@@ -672,6 +672,13 @@ replace a law of Both apps where they say so. A desktop law marked
   every card in the view it sets (#189).
 - Rows show what the user needs to act, not the stored encoding: dates
   in the device format, values translated, storage keys never.
+- **The Areas stand in the person's own order** (#280): on the phone's
+  Areas list, the desktop's sidebar and every list of Areas (File
+  into…, Area Locks, Link to…), the same on all of the person's
+  Devices, a setting of the person (ADR 0040), so the others of a
+  Shared Area keep their own. Until the first move they stand in the
+  core's order, by stored name, and a new Area sorts in among them;
+  after it a new Area goes to the end. Topics stay by name.
 
 ### Wording
 
@@ -798,6 +805,13 @@ replace a law of Both apps where they say so. A desktop law marked
   there is only one thing to do. A long-press on a Note card opens its
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A
   long-press never changes data by itself.
+- **An Area moves by its handle** (#280): each row of the phone's Areas
+  list carries a drag handle before ⋮, and a drag up or down on it,
+  taken at once, moves the Area in the list; a swipe sideways that
+  starts on it still moves between the pages, and a long press on the
+  row moves nothing. A screen reader moves it with the row's actions, Move
+  up, Move down, Move to the start and Move to the end. The search's
+  hits carry no handles.
 - **A horizontal swipe only navigates** (see Navigation); it never
   changes data or swipes a row or card away. The exceptions are the
   full-screen table, where a one-finger drag on its cells moves it

@@ -253,14 +253,8 @@ class _AreaLocksScreenState extends State<AreaLocksScreen> {
     super.didChangeDependencies();
     if (_loaded) return;
     _loaded = true;
-    final t = context.t;
-    _areas = widget.places.areas()
-      ..sort(
-        (a, b) => areaName(
-          t,
-          a,
-        ).toLowerCase().compareTo(areaName(t, b).toLowerCase()),
-      );
+    // In the person's own order, as on the Areas list (#280).
+    _areas = widget.places.store.areasInOrder();
     _read();
   }
 

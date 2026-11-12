@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -119,18 +120,11 @@ class _AreasScreenState extends State<AreasScreen>
   Widget _selectionBack(Widget child) =>
       widget.onBack == null ? selectionBack(child) : child;
 
-  /// Reads the Areas, sorted by the name the reader sees, and the hits
-  /// of the search.
+  /// Reads the Areas, in the person's own order (#280), and the hits of
+  /// the search.
   void _load() {
-    final t = context.t;
-    _areas = widget.places.areas()
-      ..sort(
-        (a, b) => areaName(
-          t,
-          a,
-        ).toLowerCase().compareTo(areaName(t, b).toLowerCase()),
-      );
     final store = widget.places.store;
+    _areas = store.areasInOrder();
     _access = {for (final a in _areas) a.id: store.accessIn(a.id)};
     _people = {
       for (final a in _areas)
@@ -343,8 +337,9 @@ class _AreasScreenState extends State<AreasScreen>
     final last = widget.trail.area(widget.places)?.id;
     final lock = LockScope.of(context);
     return [
-      for (final area in _areas)
+      for (final (index, area) in _areas.indexed)
         _PlaceRow(
+          key: ValueKey('area-row-${area.id}'),
           title: areaName(t, area),
           subtitle: _people[area.id] == null
               ? null
@@ -358,9 +353,28 @@ class _AreasScreenState extends State<AreasScreen>
           highlighted: area.id == last,
           onTap: () => _open(area),
           menu: _areaMenu(t, area),
+          // The order is the person's own, so every Area moves, a Shared
+          // one too (#280). A screen reader moves it by the row's own
+          // actions, Move up and Move down, so the handle says nothing.
+          handle: _VerticalDragStart(
+            key: ValueKey('area-move-${area.id}'),
+            index: index,
+            child: const SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(Icons.drag_handle),
+            ),
+          ),
         ),
     ];
   }
+
+  /// The Area at [from] dragged to [to], counted after it was taken
+  /// out: its new place, on all of the person's Devices (#280).
+  void _moved(int from, int to) => setState(() {
+    widget.places.store.moveArea(_areas[from].id, to);
+    _load();
+  });
 
   /// What may be done to [area] here: everything by its owner or a
   /// Manager; by anyone else exporting it as a Pack (#164) and seeing who
@@ -465,31 +479,43 @@ class _AreasScreenState extends State<AreasScreen>
                     onChanged: _filtered,
                   ),
                 Expanded(
-                  child: ListView(
-                    padding: clearOfFloatingButtons(
-                      context,
-                      const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    children: searching
-                        ? _hitCards(
+                  child: searching || _areas.isEmpty
+                      ? ListView(
+                          padding: clearOfFloatingButtons(
                             context,
-                            _hits,
-                            _file,
-                            _merge,
-                            _openNote,
-                            _schedule,
-                            widget.notes,
-                            _reload,
-                            // Hits from every Area.
-                            (_) => true,
-                            compact: compact,
-                            switched: switched,
-                            onSwitch: switchView,
-                            selected: selecting ? selected : null,
-                            onSelect: setSelected,
-                          )
-                        : _areaRows(t),
-                  ),
+                            const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          children: searching
+                              ? _hitCards(
+                                  context,
+                                  _hits,
+                                  _file,
+                                  _merge,
+                                  _openNote,
+                                  _schedule,
+                                  widget.notes,
+                                  _reload,
+                                  // Hits from every Area.
+                                  (_) => true,
+                                  compact: compact,
+                                  switched: switched,
+                                  onSwitch: switchView,
+                                  selected: selecting ? selected : null,
+                                  onSelect: setSelected,
+                                )
+                              : _areaRows(t),
+                        )
+                      // The Areas move by their handles only: a long
+                      // press never changes data (#280).
+                      : ReorderableListView(
+                          padding: clearOfFloatingButtons(
+                            context,
+                            const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          buildDefaultDragHandles: false,
+                          onReorderItem: _moved,
+                          children: _areaRows(t),
+                        ),
                 ),
               ],
             ),
@@ -1244,8 +1270,25 @@ class _AreaMark extends StatelessWidget {
 }
 
 /// One Area or Topic as an embossed row with its menu.
+/// A drag handle that takes only a drag up or down: a swipe sideways
+/// that starts on it still moves between the pages (#280).
+class _VerticalDragStart extends ReorderableDragStartListener {
+  const _VerticalDragStart({
+    super.key,
+    required super.index,
+    required super.child,
+  });
+
+  @override
+  MultiDragGestureRecognizer createRecognizer() =>
+      VerticalMultiDragGestureRecognizer(debugOwner: this);
+}
+
 class _PlaceRow extends StatelessWidget {
   final String title;
+
+  /// Where the row is dragged to another place in the list: an Area's.
+  final Widget? handle;
 
   /// Under the title: who a Shared Area is shared with.
   final String? subtitle;
@@ -1265,8 +1308,10 @@ class _PlaceRow extends StatelessWidget {
   final bool shared;
 
   const _PlaceRow({
+    super.key,
     required this.title,
     required this.menu,
+    this.handle,
     this.subtitle,
     this.leading,
     this.onTap,
@@ -1329,6 +1374,7 @@ class _PlaceRow extends StatelessWidget {
                       Icons.lock_outline,
                       semanticLabel: context.t.areaLocked,
                     ),
+                  ?handle,
                   if (menu case final menu?)
                     menu
                   else

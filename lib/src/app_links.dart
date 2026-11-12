@@ -328,7 +328,7 @@ class _LinkToScreenState extends State<LinkToScreen> {
   List<LinkTarget> _places(BuildContext context) {
     final t = context.t;
     return [
-      for (final area in widget.places.areas()) ...[
+      for (final area in widget.places.store.areasInOrder()) ...[
         (link: AppLink(AppLinkKind.place, area.id), label: areaName(t, area)),
         for (final topic in widget.places.topics(area.id))
           (
