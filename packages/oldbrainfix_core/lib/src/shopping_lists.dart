@@ -250,6 +250,13 @@ class ShoppingLine {
     required this.cameBackOn,
     required this.order,
   });
+
+  /// Whether it is checked, struck or gone, since a moment on [day] by
+  /// [wallClock].
+  bool checkedOn(Day day, WallClock wallClock) => switch (checkedAt) {
+    final at? => Day.of(wallClock(at)) == day,
+    null => false,
+  };
 }
 
 /// A Note whose Lines come back a while after they are checked
@@ -295,6 +302,20 @@ class ShoppingList {
     for (final l in lines)
       if (l.struck) l,
   ];
+
+  /// The Lines checked on [day] by [wallClock] that are still checked,
+  /// struck or gone, the one checked first first: what stays struck on
+  /// the Agenda for the day (#276).
+  List<ShoppingLine> checkedOn(Day day, WallClock wallClock) {
+    final checked = [
+      for (final l in [...lines, ..._gone])
+        if (l.checkedOn(day, wallClock)) l,
+    ];
+    return checked..sort((a, b) {
+      final byAt = a.checkedAt!.compareTo(b.checkedAt!);
+      return byAt != 0 ? byAt : a.id.compareTo(b.id);
+    });
+  }
 
   /// The Lines that came back by themselves at the start of [day].
   List<ShoppingLine> cameBack(Day day) => [
@@ -364,9 +385,14 @@ class ShoppingLists {
   /// list not in the trash nor merged that has an open Line and that
   /// this person does not keep [ShoppingOnAgenda.off], with how it shows
   /// ([onAgenda]) and its open Lines; oldest capture first. A list whose
-  /// Lines are all struck or gone shows whatever the choice. Reading
-  /// writes nothing.
-  List<ShoppingAgendaRow> agendaRows(WallClock wallClock) {
+  /// Lines are all struck or gone shows whatever the choice. With
+  /// [checkedToday] the Lines checked today and still checked follow the
+  /// open ones, struck for the day ([ShoppingList.checkedOn]), and a list
+  /// with only those shows too (#276). Reading writes nothing.
+  List<ShoppingAgendaRow> agendaRows(
+    WallClock wallClock, {
+    bool checkedToday = false,
+  }) {
     final notes = Notes(store);
     final standard = ShoppingOnAgenda.fromDevice(store.shoppingAgenda);
     final own = <String, bool>{};
@@ -385,11 +411,17 @@ class ShoppingLists {
       return byCapture != 0 ? byCapture : a.$1.id.compareTo(b.$1.id);
     });
     final lists = ofNotes([for (final (n, _) in shown) n.id], wallClock);
+    // The clock is read only when asked for.
+    final today = checkedToday ? Day.today(store.clock(), wallClock) : null;
     return [
       for (final (note, shows) in shown)
         if (lists[note.id] case final list?)
-          if (list.open case final open when open.isNotEmpty)
-            (list: list, shows: shows, lines: open),
+          if ([
+                ...list.open,
+                if (today != null) ...list.checkedOn(today, wallClock),
+              ]
+              case final lines when lines.isNotEmpty)
+            (list: list, shows: shows, lines: lines),
     ];
   }
 
@@ -809,14 +841,14 @@ class ShoppingLists {
     );
   }
 
-  /// Brings the struck Line [lineId] back now, in its place. An open one
-  /// stays as it is.
+  /// Brings the struck or gone Line [lineId] back now, in its place, as
+  /// adding its name does. An open one stays as it is.
   void uncheck(String lineId, WallClock wallClock) {
-    final (list, line) = _requireShown(lineId, wallClock);
+    final (list, line) = _requireShown(lineId, wallClock, gone: true);
     if (!mayCheck(list.noteId)) {
       throw StateError('no role in the Shared Area of ${list.noteId}');
     }
-    if (!line.struck) return;
+    if (!line.struck && !list._gone.contains(line)) return;
     store.append(lineId, ChecklistKeys.checked, null);
   }
 
@@ -902,8 +934,8 @@ class ShoppingLists {
   }
 
   /// The fields of the Line [lineId] that shows in a Shopping List whose
-  /// Note is not in the trash.
-  Map<String, String?> _requireLine(String lineId) {
+  /// Note is not in the trash, or with [gone] one gone there.
+  Map<String, String?> _requireLine(String lineId, {bool gone = false}) {
     final fields = store.currentFields(lineId);
     final note = fields[ChecklistKeys.note];
     final making = note == null ? null : this.making(note);
@@ -914,7 +946,7 @@ class ShoppingLists {
         fields[ChecklistKeys.made] != making ||
         fields[ChecklistKeys.trashed] != null ||
         trashed ||
-        isGone(fields)) {
+        (!gone && isGone(fields))) {
       throw ArgumentError.value(lineId, 'lineId', 'not a Shopping List Line');
     }
     return fields;
@@ -926,14 +958,21 @@ class ShoppingLists {
     return fields;
   }
 
-  /// The Shopping List the shown Line [lineId] lies in, and the Line.
+  /// The Shopping List the shown Line [lineId] lies in, and the Line;
+  /// with [gone] a gone one too.
   (ShoppingList, ShoppingLine) _requireShown(
     String lineId,
-    WallClock wallClock,
-  ) {
-    final note = _requireLine(lineId)[ChecklistKeys.note];
+    WallClock wallClock, {
+    bool gone = false,
+  }) {
+    final note = _requireLine(lineId, gone: gone)[ChecklistKeys.note];
     final list = note == null ? null : byNote(note, wallClock);
-    final line = list?.line(lineId);
+    final line = switch (list) {
+      final list? =>
+        list.line(lineId) ??
+            (gone ? list._gone.where((l) => l.id == lineId).firstOrNull : null),
+      null => null,
+    };
     if (list == null || line == null) {
       throw ArgumentError.value(lineId, 'lineId', 'not a Shopping List Line');
     }

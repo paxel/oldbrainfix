@@ -616,6 +616,40 @@ void main() {
       expect(entry.at, now.toUtc());
     });
 
+    testWidgets('a field without a target starts with the latest entry\'s '
+        'value, selected as it takes the cursor (#276)', (tester) async {
+      final note = notes.capture('Reading');
+      final reps = tallies.addField(note.id, name: 'Push-ups', target: 20);
+      final pages = tallies.addField(note.id, name: 'Pages');
+      tallies.add(note.id, values: {pages: 10, reps: 15});
+      now = now.add(const Duration(minutes: 1));
+      tallies.add(note.id, values: {pages: 12.5});
+      now = now.add(const Duration(minutes: 1));
+      // The latest holds no page: the one before it counts.
+      tallies.add(note.id, line: 'on the train');
+      now = now.add(const Duration(minutes: 1));
+      await startAtNotes(tester);
+      await cardMenu(tester);
+      await tap(tester, key('note-add-entry'));
+      TextEditingController field(String id) =>
+          tester.widget<TextField>(key('tally-value-$id')).controller!;
+      expect(field(pages).text, '12.5');
+      expect(field(reps).text, '20', reason: 'its target');
+      final count = store.allEntries().length;
+
+      await tester.tap(key('tally-value-$pages'));
+      await tester.pumpAndSettle();
+      expect(
+        field(pages).selection,
+        const TextSelection(baseOffset: 0, extentOffset: 4),
+        reason: 'typing replaces it',
+      );
+      // Left as it opened, it writes nothing.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(store.allEntries(), hasLength(count));
+    });
+
     testWidgets('an entry holds a value or a line; a value is a number', (
       tester,
     ) async {

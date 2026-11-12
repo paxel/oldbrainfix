@@ -66,6 +66,7 @@ extension DeviceSettings on Store {
   static const _unitSystem = 'unitSystem';
   static const _shoppingAgenda = 'shoppingAgenda';
   static const _quickNoteNudgeButtonsOff = 'quickNoteNudgeButtonsOff';
+  static const _lastShoppingList = 'lastShoppingList';
   static const _recentlyFiledInto = 'recentlyFiledInto';
 
   /// How many places filed into File into… shows at its top (#272).
@@ -291,6 +292,18 @@ extension DeviceSettings on Store {
 
   set quickNoteNudgeButtonsOn(bool on) =>
       setLocalSetting(_quickNoteNudgeButtonsOff, '${!on}');
+
+  /// The Note id of the Shopping List a capture on this Device went into
+  /// last, at the top of the lists to pick from (#276); null for none. It
+  /// may name a list gone since.
+  String? get lastShoppingList => switch (localSetting(_lastShoppingList)) {
+    final id? when id.isNotEmpty => id,
+    _ => null,
+  };
+
+  set lastShoppingList(String? noteId) => noteId == null
+      ? removeLocalSetting(_lastShoppingList)
+      : setLocalSetting(_lastShoppingList, noteId);
 
   /// The ids of the Areas and Topics this Device last filed into, the
   /// latest first, at most [recentPlacesKept] (#272). They may name a

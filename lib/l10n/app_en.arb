@@ -2176,6 +2176,8 @@
   "@captureChoiceTally": {"description": "On a capture screen: the first field of the Tally the Note becomes.", "placeholders": {"field": {"type": "String"}}},
   "addToShoppingList": "Add to a Shopping List",
   "@addToShoppingList": {"description": "In the ⋮ of a capture screen, and the title of the page it opens: makes each line of the Note being captured a Line of a Shopping List picked there, and keeps no Note (CONTEXT.md: Shopping List, Line)."},
+  "addToNamedShoppingList": "Add to {list}",
+  "@addToNamedShoppingList": {"description": "In the ⋮ of a capture screen while there is one Shopping List to add to, by its title: makes each line of the Note being captured a Line of it at once, with no page to pick from (CONTEXT.md: Shopping List, Line).", "placeholders": {"list": {"type": "String"}}},
   "captureChoiceShopping": "Shopping List: {list}",
   "@captureChoiceShopping": {"description": "On a capture screen: the Shopping List the lines being captured go into, by its title.", "placeholders": {"list": {"type": "String"}}},
   "captureShoppingUntranscribed": "Kept as a Note: its recording could not be transcribed for the Shopping List.",

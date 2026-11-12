@@ -664,8 +664,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// capture holds no photo, which no Line can hold, nothing written
   /// that hangs on the Note, and a recording only where a speech model
   /// can give its Transcript; never behind the App Lock, which keeps the
-  /// lists out of reach, nor without a list to add to.
-  VoidCallback? _shoppingOffer() {
+  /// lists out of reach, nor without a list to add to. With one list to
+  /// add to it names it, "Add to Weekly", and picks it without the page
+  /// (#276).
+  ({String label, VoidCallback run})? _shoppingOffer() {
     if ((_lock?.locked ?? false) || _photos.isNotEmpty) return null;
     if (_writtenSchedules.isNotEmpty || _frogWritten || _tallyWritten) {
       return null;
@@ -674,8 +676,23 @@ class _CaptureScreenState extends State<CaptureScreen> {
         SpeechScope.of(context)?.model.current == null) {
       return null;
     }
-    final lists = shoppingListsToAddTo(widget.notes.store, _lock);
-    return lists.isEmpty ? null : _pickShopping;
+    final t = context.t;
+    return switch (shoppingListsToAddTo(widget.notes.store, _lock)) {
+      [] => null,
+      [final only] => (
+        label: t.addToNamedShoppingList(shoppingTitle(t, only)),
+        run: () => _intoList(only),
+      ),
+      _ => (label: t.addToShoppingList, run: _pickShopping),
+    };
+  }
+
+  /// The lines go into the Shopping List [note]; it shows at the top.
+  void _intoList(Note note) {
+    if (_photos.isNotEmpty) return;
+    setState(
+      () => _shopping = (id: note.id, title: shoppingTitle(context.t, note)),
+    );
   }
 
   /// Picks the Shopping List the lines go into; it shows at the top.
@@ -687,12 +704,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
             ShoppingPickScreen(store: store, current: _shopping?.id),
       ),
     );
-    if (!mounted || picked == null || _photos.isNotEmpty) return;
-    final note = widget.notes.byId(picked);
-    if (note == null) return;
-    setState(
-      () => _shopping = (id: picked, title: shoppingTitle(context.t, note)),
-    );
+    if (!mounted || picked == null) return;
+    if (widget.notes.byId(picked) case final note?) _intoList(note);
   }
 
   /// Sets up the first field of the Tally the Note becomes.
@@ -1005,10 +1018,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
           ? 'capture into a Shopping List: a recording got no Transcript'
           : 'capture into a Shopping List: the list can no longer be added to',
     );
+    // The list used last goes to the top of the pick (#276).
+    void used() => notes.store.lastShoppingList = listId;
     if (_captured == null) {
       try {
-        ShoppingLists(notes.store)
+        final added = ShoppingLists(notes.store)
             .addLines(listId, _text.text.trim(), deviceWallClock);
+        if (added.isNotEmpty) used();
         return null;
       } on StateError {
         // The list went meanwhile: a Note with all that was set up.
@@ -1034,11 +1050,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
     ];
     if (waiting.isEmpty) {
       if (pourIntoShopping(notes, captured.noteId, listId) == true) {
+        used();
         return null;
       }
       announce(untranscribed: false);
       return captured;
     }
+    used();
     return (
       noteId: captured.noteId,
       editing: null,

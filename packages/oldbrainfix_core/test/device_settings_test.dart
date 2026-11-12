@@ -281,6 +281,15 @@ void main() {
         'quickNoteFormatBar',
       ],
     );
+    // The Shopping List a capture went into last (#276).
+    expect(store.lastShoppingList, isNull);
+    store.lastShoppingList = 'note:weekly';
+    expect(store.lastShoppingList, 'note:weekly');
+    expect(store.localSetting('lastShoppingList'), 'note:weekly');
+    store.lastShoppingList = null;
+    expect(store.lastShoppingList, isNull);
+    store.setLocalSetting('lastShoppingList', '');
+    expect(store.lastShoppingList, isNull);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 

@@ -180,6 +180,12 @@ class Line {
 
   /// Whether it shows under a parent, in its group.
   bool get inGroup => parent != null;
+
+  /// Whether it shows checked by a check made on [day] by [wallClock].
+  bool checkedOn(Day day, WallClock wallClock) => switch (checkedAt) {
+    final at? when checked => Day.of(wallClock(at)) == day,
+    _ => false,
+  };
 }
 
 /// A deleted Line of a Checklist or Shopping List (#268), for its folded
@@ -457,8 +463,10 @@ class Checklists {
   /// Lines are open of how many ([Checklist.openCount],
   /// [Checklist.count]); the apps show one of a locked Area set to
   /// Masked as a row that tells nothing of it, as a Shopping List's.
-  /// Reading writes nothing.
-  List<ChecklistAgendaRow> agendaRows() {
+  /// With [checkedToday], the wall clock today is read on, a list whose
+  /// open Lines were all checked today shows too, its Lines struck for
+  /// the day (#276). Reading writes nothing.
+  List<ChecklistAgendaRow> agendaRows({WallClock? checkedToday}) {
     final notes = Notes(store);
     final routines = Routines(store);
     final spawned = {for (final r in routines.all()) ?routines.note(r)?.id};
@@ -478,9 +486,22 @@ class Checklists {
       return byCapture != 0 ? byCapture : a.$1.id.compareTo(b.$1.id);
     });
     final lists = ofNotes([for (final (n, _) in shown) n.id]);
+    // The clock is read only when asked for.
+    final today = switch (checkedToday) {
+      final wall? => (day: Day.today(store.clock(), wall), wall: wall),
+      null => null,
+    };
+    bool listed(Checklist list) =>
+        list.openCount > 0 ||
+        switch (today) {
+          (:final day, :final wall) => list.lines.any(
+            (l) => l.checkedOn(day, wall),
+          ),
+          null => false,
+        };
     return [
       for (final (note, shows) in shown)
-        if (lists[note.id] case final list? when list.openCount > 0)
+        if (lists[note.id] case final list? when listed(list))
           (list: list, shows: shows),
     ];
   }

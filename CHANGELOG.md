@@ -22,6 +22,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a tap or click on an Occurrence on the Agenda or on its notification opens its Note in the editor or the desktop's Note dialog, with Done, Snooze and Not today at the top once it is due, instead of the Routine editor or the app as it was; Edit schedule in the row's ⋮ (on the desktop also its right-click menu) and the Routine's badge open the schedule.
 - On the phone and the desktop, File into… starts with a filter over the Areas and Topics, shows the last three Areas or Topics this Device filed into at the top, and offers New Area… at the end and New Topic… under each Area (in Advanced, for who may set up a Topic there), which make the Area or Topic and file the Note into it at once.
 - On the phone and the desktop, leaving the Routine editor, a Tally entry or the New Tally and New Session pages, by Back on the phone, by Esc, a click beside the dialog or back on the desktop, saves a change that can be saved and asks "Discard changes?" only about one that can't, instead of dropping it.
+- On the phone, a Line of a Shopping List or Checklist checked on the Agenda stays there struck through for the day, also in the Agenda widget, and its box unchecks it, while "Hide what's checked on the Agenda" still removes it at once.
+- On the phone, a tap on a Shopping List's or Checklist's heading on the Agenda opens the list with the cursor in a new empty Line after the open ones and the keyboard up; left unused, that Line is dropped.
+- On the phone, Add to a Shopping List on the capture screen names the list and picks it at once while there is only one, such as "Add to Weekly", and otherwise lists the list used last at the top.
+- On the phone, a new Tally entry starts each field without a target with its value in your latest entry, selected so that typing replaces it.
 
 ### Fixed
 

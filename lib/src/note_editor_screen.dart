@@ -49,7 +49,8 @@ import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
 /// Opens the editor of [note]; returns once the user left it. With
-/// [typeLines] the cursor starts in the Lines of a new list (#161).
+/// [typeLines] the cursor starts in a new Line of a list after its open
+/// ones (#161, #276).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
@@ -561,9 +562,10 @@ class NoteEditorScreen extends StatefulWidget {
   final Drafts drafts;
   final String noteId;
 
-  /// Whether the cursor starts in the Lines of a Checklist or Shopping
-  /// List just made from the browser's "+" (#161): a new empty Line of a
-  /// Checklist, the field at the top of a Shopping List.
+  /// Whether the cursor starts in a new empty Line of a Checklist or
+  /// Shopping List after its open Lines: one just made from the
+  /// browser's "+" (#161), or one opened from its group on the Agenda
+  /// (#276).
   final bool typeLines;
 
   const NoteEditorScreen({

@@ -81,9 +81,11 @@ class _SetDraft {
 /// One entry of a Tally on a full-screen page, Save in the top bar: a box
 /// per Check field (#264), ticked once per entry above the sets; a value
 /// per number field shown, a new entry's prefilled with the field's
-/// target, so that saving the targets is one tap. A Tally that counts in
-/// sets shows each set as a row of those values with "Add set" under
-/// them, which adds one that starts with the values of the set before;
+/// target, so that saving the targets is one tap, or for a field without
+/// one with the value of the user's latest entry that has one, selected
+/// as the field takes the cursor so typing replaces it (#276). A Tally
+/// that counts in sets shows each set as a row of those values with "Add
+/// set" under them, which adds one that starts with the values of the set before;
 /// a set after the first can be removed. Then the date it counts for,
 /// today for a new one, and one line of text. A value left empty is
 /// none. An entry that exists has Delete in the bar, which asks once; it
@@ -169,7 +171,7 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     final entry = _entry;
     final tally = _tally;
     final rows = entry == null || tally == null
-        ? [tally?.targets ?? const <String, double>{}]
+        ? [_startValues(tally)]
         : tally.setsOf(entry);
     _asOpened = [
       for (final row in rows.isEmpty ? [const <String, double>{}] : rows)
@@ -179,6 +181,51 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
         },
     ];
     _sets.addAll([for (final texts in _asOpened) _SetDraft(_fields, texts)]);
+    if (entry != null) return;
+    final first = _sets.first;
+    for (final field in _fields) {
+      if (field.target != null) continue;
+      final shown = _asOpened.first[field.id] ?? '';
+      final controller = first.values[field.id];
+      final node = first.focus[field.id];
+      if (shown.isEmpty || controller == null || node == null) continue;
+      node.addListener(() {
+        if (node.hasFocus && controller.text == shown) {
+          controller.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: shown.length,
+          );
+        }
+      });
+    }
+  }
+
+  /// What a new entry starts with (#276): each number field's target,
+  /// and for one without, the value of the user's latest entry that has
+  /// one, of its first set.
+  Map<String, double> _startValues(Tally? tally) {
+    if (tally == null) return const {};
+    final values = tally.targets;
+    final wanted = {
+      for (final field in _fields)
+        if (field.target == null) field.id,
+    };
+    if (wanted.isEmpty) return values;
+    final latest = <String, double>{};
+    for (final entry in _tallies.entries(
+      widget.noteId,
+      filter: const PersonFilter(me: true),
+    )) {
+      final sets = tally.setsOf(entry);
+      if (sets.isEmpty) continue;
+      for (final id in wanted) {
+        if (sets.first[id] case final value?) {
+          latest.putIfAbsent(id, () => value);
+        }
+      }
+      if (latest.length == wanted.length) break;
+    }
+    return {...latest, ...values};
   }
 
   @override

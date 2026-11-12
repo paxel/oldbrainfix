@@ -748,29 +748,38 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   /// Checks the Line [lineId] of a Checklist without a Routine from its
-  /// group today: it leaves the Agenda, and the list with its last.
-  void _checkListLine(String lineId) {
-    // Checked already, its box shown so until the read is in.
-    if (_tapped[_boxKey(line: lineId)] ?? false) return;
-    _checklists.check(lineId);
-    _tapped[_boxKey(line: lineId)] = true;
+  /// group today, or unchecks it: checked, it stays struck for the day
+  /// (#276), unless this Device hides what is checked.
+  void _checkListLine(String lineId, bool checked) {
+    checked ? _checklists.check(lineId) : _checklists.uncheck(lineId);
+    _tapped[_boxKey(line: lineId)] = checked;
     _reload();
   }
 
-  /// Checks the Line [lineId] of a Shopping List from its row today: it
-  /// is struck through and leaves the Agenda until it comes back.
-  void _checkShopping(String lineId) {
-    if (_tapped[_boxKey(line: lineId)] ?? false) return;
-    _shopping.check(lineId, deviceWallClock);
-    _tapped[_boxKey(line: lineId)] = true;
+  /// Checks the Line [lineId] of a Shopping List from its group today,
+  /// or brings it back: checked, it stays struck for the day (#276),
+  /// unless this Device hides what is checked, and comes back when its
+  /// reappear time says.
+  void _checkShopping(String lineId, bool checked) {
+    checked
+        ? _shopping.check(lineId, deviceWallClock)
+        : _shopping.uncheck(lineId, deviceWallClock);
+    _tapped[_boxKey(line: lineId)] = checked;
     _reload();
   }
 
   /// Opens the Shopping List or Checklist of [note] in its editor, its
-  /// locked Area first.
-  Future<void> _openList(Note note) async {
+  /// locked Area first; with [newLine] the cursor in a new Line after
+  /// the open ones (#276).
+  Future<void> _openList(Note note, {bool newLine = false}) async {
     if (!await _openAreaOfNote(note) || !mounted) return;
-    await openNote(context, widget.notes, widget.places, note);
+    await openNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      typeLines: newLine,
+    );
     if (!mounted) return;
     _closeAreas();
     _reload();
@@ -1118,11 +1127,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
       };
 
   /// A Shopping List's group today (#208): its name as the heading, with
-  /// no box, and its open Lines under it, each with its box, which checks
-  /// it and takes it off; or, as chosen for it or Masked, the heading
-  /// alone with how many are open. A tap opens the list.
+  /// no box, and its open Lines under it, then those checked today struck
+  /// for the day (#276), each with its box, which checks or unchecks it;
+  /// or, as chosen for it or Masked, the heading alone with how many are
+  /// open. A tap opens the list, on the heading in a new Line (#276).
   Widget _shoppingRow(AppLocalizations t, ShoppingRow shopping) {
-    final (:note, :area, :masked, :lines, :count, :checks) = shopping;
+    final (:note, :area, :masked, :lines, :struck, :count, :checks) = shopping;
     final title = _listTitle(t, note, t.shoppingHeading);
     return AgendaGroup(
       key: ValueKey('shopping-row-${note.id}'),
@@ -1131,25 +1141,29 @@ class _AgendaScreenState extends State<AgendaScreen> {
       title: lines.isNotEmpty
           ? title
           : t.shoppingRowOpen(masked ? t.maskedShoppingList : title, count),
-      onTap: () => _openList(note),
+      onTap: () => _openList(note, newLine: true),
       entries: [
         for (final line in lines)
-          AgendaEntry(
-            key: ValueKey('shopping-line-${line.id}'),
-            boxKey: ValueKey('shopping-check-${line.id}'),
-            text: line.text,
-            checked: _tapped[_boxKey(line: line.id)] ?? false,
-            onBox: checks ? () => _checkShopping(line.id) : null,
-            onTap: () => _openList(note),
-          ),
+          if (_tapped[_boxKey(line: line.id)] ?? struck.contains(line.id)
+              case final checked)
+            AgendaEntry(
+              key: ValueKey('shopping-line-${line.id}'),
+              boxKey: ValueKey('shopping-check-${line.id}'),
+              text: line.text,
+              checked: checked,
+              onBox: checks ? () => _checkShopping(line.id, !checked) : null,
+              onTap: () => _openList(note),
+            ),
       ],
     );
   }
 
   /// A Checklist's group today (#208), as a Shopping List's: its name as
-  /// the heading, with no box, and its open Lines under it, each with its
-  /// box; without Lines, as a Masked one, the heading alone with the count,
-  /// "Private Checklist: 3 of 7 open". A tap opens the list.
+  /// the heading, with no box, and its open Lines under it with those
+  /// checked today struck for the day (#276), each with its box; without
+  /// Lines, as a Masked one, the heading alone with the count, "Private
+  /// Checklist: 3 of 7 open". A tap opens the list, on the heading in a
+  /// new Line (#276).
   Widget _checklistRow(AppLocalizations t, ChecklistRow row) {
     final (:note, :area, :masked, :list, :lines, :checks) = row;
     final title = _listTitle(t, note, t.checklistHeading);
@@ -1164,15 +1178,17 @@ class _AgendaScreenState extends State<AgendaScreen> {
               list.openCount,
               list.count,
             ),
-      onTap: () => _openList(note),
+      onTap: () => _openList(note, newLine: true),
       entries: [
         for (final line in lines)
-          _lineEntry(
-            line,
-            checked: _tapped[_boxKey(line: line.id)] ?? line.checked,
-            onBox: checks ? () => _checkListLine(line.id) : null,
-            onTap: () => _openList(note),
-          ),
+          if (_tapped[_boxKey(line: line.id)] ?? line.checked
+              case final checked)
+            _lineEntry(
+              line,
+              checked: checked,
+              onBox: checks ? () => _checkListLine(line.id, !checked) : null,
+              onTap: () => _openList(note),
+            ),
       ],
     );
   }

@@ -124,7 +124,7 @@ replace a law of Both apps where they say so. A desktop law marked
   waits for Accept or Decline, then today's all-day Occurrences, then the
   all-day appointments of the calendars picked, then the Shopping Lists'
   groups as the user chose for each list (today only, oldest capture
-  first, none for a list without open Lines), then the
+  first, none for a list without open Lines or Lines checked today), then the
   Checklists' groups (today only, oldest capture first), then today's timed
   Occurrences and timed appointments together by time (an Occurrence
   before an appointment at the same time), then the "Eat a frog" section
@@ -146,8 +146,9 @@ replace a law of Both apps where they say so. A desktop law marked
   box and its words. A tap on a heading opens its list or Note (#270:
   an Occurrence's the editor of its Note, with its Due line once it
   is due), a tap on
-  an entry's words what its heading opens (a pick its entry form), a
-  box checks its entry. One card holds a group. Which Lines a
+  an entry's words what its heading opens (a pick its entry form; a
+  list's Line the list as it is, without the new Line its heading
+  starts, #276), a box checks its entry. One card holds a group. Which Lines a
   Checklist's group shows is decided in one place (`agendaLines`, on the
   desktop `agenda_lines`).
 - **Every Occurrence row has ⋮**, which opens the same menu as a long
@@ -161,20 +162,28 @@ replace a law of Both apps where they say so. A desktop law marked
   calendar file. Edit schedule, History and Share ask a Masked row's
   Area to open first; Snooze and Not today answer it as its box does.
 - **A Checklist without a Routine or Reminder is a group today** while
-  it has open Lines (#143, #208): its name as the heading, without a
-  box, and its open Lines under it, each with its box, which checks it;
-  or, as the user chose under **Show on the Agenda** in the ⋮ of its
-  card or in its badge in the editor (#219), the heading alone with the
-  count, "Before the trip: 3 of 7 open", or not at all: the three radio
-  choices of a Shopping List, there only for such a Checklist. A tap on
-  the heading or a Line's words opens the list. A Masked one is the
-  heading alone, "Private Checklist: 3 of 7 open".
+  it has open Lines or Lines checked today (#143, #208, #276): its name
+  as the heading, without a box, and its open Lines under it, each with
+  its box, which strikes it for the day, as an Occurrence: a Line
+  checked today stays struck in its place until the day ends, and its
+  box unchecks it; or, as the user chose under **Show on the Agenda** in
+  the ⋮ of its card or in its badge in the editor (#219), the heading
+  alone with the count, "Before the trip: 3 of 7 open", while a Line is
+  open, or not at all: the three radio choices of a Shopping List,
+  there only for such a Checklist. A tap on the heading opens the list
+  with the cursor in a new empty Line after the open ones, the keyboard
+  up (#276); a tap on a Line's words opens the list as it is. A Masked
+  one is the heading alone, "Private Checklist: 3 of 7 open".
 - **A Shopping List's group today** (#186, #208): its name as the
   heading, without a box, and its open Lines under it, each with its
-  box, which strikes it and takes it off the Agenda; chosen to show "one
-  row with the number of open Lines", or Masked, it is the heading
-  alone, "Weekly: 4 open". A tap on the heading or a Line's words opens
-  the list.
+  box, which strikes it for the day, as an Occurrence (#276): a Line
+  checked today stays struck under the open ones until the day ends,
+  also one checked Once, and its box brings it back; chosen to show
+  "one row with the number of open Lines", or Masked, it is the heading
+  alone, "Weekly: 4 open", while a Line is open. A tap on the heading
+  opens the list with the cursor in a new empty Line after the open
+  ones, the keyboard up (#276); a tap on a Line's words opens the list
+  as it is.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today
@@ -207,7 +216,7 @@ replace a law of Both apps where they say so. A desktop law marked
   in the order picked, each an entry with its box, checked and struck
   through once it has an entry, each Tally's name with its targets
   ("Push-ups 20 times"). The pick's box and words open its entry form,
-  prefilled with the targets; saving records it for this Occurrence.
+  prefilled as any new entry; saving records it for this Occurrence.
   Each pick without an entry offers "Another one" under it while the
   pool holds a Tally not picked. **The heading's box only shows Done**:
   it checks itself once every pick has an entry, removing an entry
@@ -450,6 +459,13 @@ replace a law of Both apps where they say so. A desktop law marked
   place File into… does not list (deleted, a Topic of a closed locked
   Area, a Shared Area the Device left) is not offered among the recent
   ones either.
+- **The Shopping List pick** of Add to a Shopping List lists the lists
+  this Device may add to, oldest capture first, but the one a capture on
+  this Device went into last at the top (#276, ADR 0008).
+- **A Tally's new entry** starts with each number field's target, and a
+  field without one with the value of the user's latest entry that
+  holds one (#276), selected as the field takes the cursor, so typing
+  replaces it. Left as it opened, it writes nothing.
 - **A short single choice is choice chips, a long one radio buttons**
   (#226). A choice of one value whose options are fixed words of one to
   about four, at most about seven of them, with no detail line under
@@ -602,7 +618,10 @@ replace a law of Both apps where they say so. A desktop law marked
   text row starting with its box, the rows close together, and the
   cursor moves between them. Cards only check them.
 - **A new list starts with one empty boxed Line**, the cursor in it. A
-  list this Device may add to always has a Line to type in.
+  list this Device may add to always has a Line to type in. **Opened
+  from its group's heading on the Agenda** (#276), a list starts with
+  the cursor in a new empty Line after its open Lines, the keyboard up;
+  left unused, the Line is dropped on leaving, as any empty one.
 - **Return** adds a new Line with an empty box under the cursor's Line,
   in the group of a Line with one; in the middle of a Line it moves the
   rest of the Line into the new one. **Backspace at the start** of a
@@ -861,7 +880,9 @@ replace a law of Both apps where they say so. A desktop law marked
   and Session in the alarm clock's menu, and ⋮ with the Importance, Make
   it a Tally (with the Frog, Session or Tally switch) and Add to a
   Shopping List. Each opens its usual
-  page and comes back to the capture screen with the choice shown at the
+  page (Add to a Shopping List none while there is one list to add to:
+  its entry names it, "Add to Weekly", and picks it at once, #276) and
+  comes back to the capture screen with the choice shown at the
   top ("→ Household"), not saved yet; the user can keep typing or add
   more. All of it is optional. With the format bar on, it rides on the
   keyboard; where the room is small the buttons under the text scroll
@@ -917,7 +938,8 @@ replace a law of Both apps where they say so. A desktop law marked
   holds. It is one list that scrolls when it is taller than the
   widget. **Its groups are the Agenda's** (#209): a Shopping List's and
   a Checklist's name as the heading, without a box, its words where a
-  boxed heading's begin, with their open Lines under it; a Checklist
+  boxed heading's begin, with their open Lines under it and those
+  checked today struck, box checked (#276); a Checklist
   Routine's Occurrence with its Lines; a Session's Occurrence with its
   picks; each entry with its box, indented alike in every group so its
   box stands where the heading's words begin, a Line under another

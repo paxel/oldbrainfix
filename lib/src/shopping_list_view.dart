@@ -402,7 +402,9 @@ class ShoppingSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
-  /// Whether the cursor starts in the empty Line of a new list (#161).
+  /// Whether the cursor starts in a new empty Line after the open ones:
+  /// the one of a new list (#161), or one opened from its group on the
+  /// Agenda (#276).
   final bool startLine;
 
   const ShoppingSection({
@@ -453,7 +455,8 @@ class _ShoppingSectionState extends State<ShoppingSection>
     widget.typed?.listen(keepTyped);
     if (widget.startLine) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) focusEmptyRow();
+        // Before the struck Lines.
+        if (mounted) startRowAt(rows.lastIndexWhere(placesAmong) + 1);
       });
     }
   }

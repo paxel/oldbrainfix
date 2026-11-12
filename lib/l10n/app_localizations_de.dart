@@ -4133,6 +4133,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get addToShoppingList => 'Zu einer Einkaufsliste hinzufügen';
 
   @override
+  String addToNamedShoppingList(String list) {
+    return 'Zu „$list“ hinzufügen';
+  }
+
+  @override
   String captureChoiceShopping(String list) {
     return 'Einkaufsliste: $list';
   }

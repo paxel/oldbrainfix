@@ -1084,6 +1084,7 @@
   "captureChoiceSession": "Einheit: {schedule}",
   "captureChoiceTally": "Strichliste: {field}",
   "addToShoppingList": "Zu einer Einkaufsliste hinzufügen",
+  "addToNamedShoppingList": "Zu „{list}“ hinzufügen",
   "captureChoiceShopping": "Einkaufsliste: {list}",
   "captureShoppingUntranscribed": "Als Notiz behalten: Die Aufnahme ließ sich für die Einkaufsliste nicht transkribieren.",
   "captureShoppingGone": "Als Notiz behalten: Zu dieser Einkaufsliste lässt sich nichts mehr hinzufügen.",

@@ -341,7 +341,9 @@ class ChecklistSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
-  /// Whether the cursor starts in the empty Line of a new list (#161).
+  /// Whether the cursor starts in a new empty Line after the open ones:
+  /// the one of a new list (#161), or one opened from its group on the
+  /// Agenda (#276).
   final bool startLine;
 
   const ChecklistSection({
@@ -386,9 +388,24 @@ class _ChecklistSectionState extends State<ChecklistSection>
     widget.typed?.listen(keepTyped);
     if (widget.startLine) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) focusEmptyRow();
+        if (mounted) startRowAt(_afterOpen());
       });
     }
+  }
+
+  /// The row after the last open Line and its group, at the top level;
+  /// the end of a list without an open Line.
+  int _afterOpen() {
+    bool open(TypedLine row) => switch (row.id) {
+      final id? => !(_list?.line(id)?.checked ?? true),
+      null => false,
+    };
+    var at = rows.lastIndexWhere(open);
+    if (at < 0) return rows.length;
+    while (at + 1 < rows.length && rows[at + 1].inGroup) {
+      at++;
+    }
+    return at + 1;
   }
 
   @override

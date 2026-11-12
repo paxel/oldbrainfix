@@ -6548,6 +6548,12 @@ abstract class AppLocalizations {
   /// **'Add to a Shopping List'**
   String get addToShoppingList;
 
+  /// In the ⋮ of a capture screen while there is one Shopping List to add to, by its title: makes each line of the Note being captured a Line of it at once, with no page to pick from (CONTEXT.md: Shopping List, Line).
+  ///
+  /// In en, this message translates to:
+  /// **'Add to {list}'**
+  String addToNamedShoppingList(String list);
+
   /// On a capture screen: the Shopping List the lines being captured go into, by its title.
   ///
   /// In en, this message translates to:

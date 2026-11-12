@@ -4095,6 +4095,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToShoppingList => 'Add to a Shopping List';
 
   @override
+  String addToNamedShoppingList(String list) {
+    return 'Add to $list';
+  }
+
+  @override
   String captureChoiceShopping(String list) {
     return 'Shopping List: $list';
   }

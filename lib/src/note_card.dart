@@ -160,9 +160,10 @@ class NoteActions {
   final ChecklistMenu Function()? checklist;
 
   /// Picks a Shopping List for the lines of a Note being captured
-  /// (#124), read as the menu opens; left out while it is null or gives
-  /// null.
-  final VoidCallback? Function()? addToShopping;
+  /// (#124), read as the menu opens, with its entry's words: "Add to
+  /// Weekly" where there is one list to add to (#276); left out while it
+  /// is null or gives null.
+  final ({String label, VoidCallback run})? Function()? addToShopping;
 
   /// Whether the Note shows after each box who ticked it last and when,
   /// and switching that, read as the menu opens (ADR 0035); left out
@@ -906,13 +907,8 @@ class _MoreButton extends StatelessWidget {
           if (tally == false && !(list?.isList ?? false))
             if (actions.onMakeTally case final make?)
               item('note-make-tally', Icons.bar_chart, t.makeTally, make),
-          if (addToShopping != null)
-            item(
-              'note-add-to-shopping',
-              Icons.add_shopping_cart,
-              t.addToShoppingList,
-              addToShopping,
-            ),
+          if (addToShopping case (:final label, :final run))
+            item('note-add-to-shopping', Icons.add_shopping_cart, label, run),
           if (list?.make case final make?)
             item('note-make-checklist', Icons.checklist, t.makeChecklist, make),
           if (list?.makeShopping case final make?)

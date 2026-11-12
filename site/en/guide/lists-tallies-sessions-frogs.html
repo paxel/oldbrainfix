@@ -220,15 +220,18 @@
 <ul>
   <li><strong>Off</strong>: not at all.</li>
   <li><strong>One row with the number of open Lines</strong>, such as "Weekly shopping: 4 open" or "Before the trip: 3 of 7 open". This is how every Shopping List starts.</li>
-  <li><strong>Each open Line on its own row</strong>: the list's name as a heading and its open Lines indented under it, each with its box, which checks it there. This is how every Checklist starts, but for one imported from Google Keep, which starts Off.</li>
+  <li><strong>Each open Line on its own row</strong>: the list's name as a heading and its open Lines indented under it, each with its box, which checks it there; a Line checked today stays struck through for the day, and its box unchecks it. This is how every Checklist starts, but for one imported from Google Keep, which starts Off.</li>
 </ul>
 <p>
   A list without open Lines does not show, whatever the choice, until a Line comes back, is
-  unchecked or is added. The rows come after today's all-day Occurrences, the Shopping Lists before
-  the Checklists; a tap on the heading or a Line's words opens the list. A Checklist with a Routine
-  shows as its Occurrence and has no choice. A Routine or Reminder spawned from a Shopping List is
-  Done only when checked off. A checked Line of a list leaves the Agenda, whether or not "Hide what's
-  checked on the Agenda" is on.
+  unchecked or is added; only on the day its last Lines were checked it shows them, struck through,
+  as each open Line on its own row. The rows come after today's all-day Occurrences, the Shopping
+  Lists before the Checklists. A tap on the heading opens the list with the cursor in a new empty
+  Line after the open ones, the keyboard up; left unused, that Line is dropped. A tap on a Line's
+  words opens the list as it is. A Checklist with a Routine shows as its Occurrence and has no
+  choice. A Routine or Reminder spawned from a Shopping List is Done only when checked off. A Line
+  checked there stays on the Agenda for the day, struck through, a Shopping List's under the open
+  Lines, also one checked Once; where "Hide what's checked on the Agenda" is on, it leaves at once.
 </p>
 <p>
   The choice is yours alone: it goes to your own Devices, and in a Shared Area each person decides
@@ -280,7 +283,8 @@
 <p>
   <strong>Capturing into a Shopping List</strong>: <strong>Add to a Shopping List</strong> in the ⋮
   of the capture screen makes each line of the capture a Line of the list picked, and keeps no Note.
-  A recording gives the lines of its Transcript. When it is offered is described in
+  With one list to add to, it reads <strong>Add to Weekly</strong> and picks that list at once; with
+  several, the list used last is at the top. A recording gives the lines of its Transcript. When it is offered is described in
   <a href="capture-and-sort.html">Capture and sort</a>. On the desktop it is in the
   <strong>More</strong> menu of the quick note's action row, with the lists to pick, once Settings
   under "Quick note" switch on "Add to a Shopping List" and while a Shopping List exists.
@@ -396,7 +400,7 @@
   <strong>Add entry</strong> is also in the ⋮ of the Tally's card.
 </p>
 <ul>
-  <li>An entry holds a box per Check field, ticked once per entry above the sets; a value per number field, prefilled with the targets, so saving the targets is one tap; the <strong>Date</strong> it counts for, today for a new one; and one <strong>Line of text</strong>. A value left empty is none. Numbers are typed like 12, 2.5 or 1:30. Leaving the entry, by Back on the phone, by Esc or a click beside it on the desktop, saves it as <strong>Save</strong> does once something changed; with a value that is no number, or a new entry left empty, it asks "Discard changes?" first. An entry left as it opened, targets and all, is not saved; on the desktop <strong>Cancel</strong> saves nothing either.</li>
+  <li>An entry holds a box per Check field, ticked once per entry above the sets; a value per number field, prefilled with the targets, so saving the targets is one tap, and a field without a target with its value in your latest entry that has one, selected when the field takes the cursor, so typing replaces it; the <strong>Date</strong> it counts for, today for a new one; and one <strong>Line of text</strong>. A value left empty is none. Numbers are typed like 12, 2.5 or 1:30. Leaving the entry, by Back on the phone, by Esc or a click beside it on the desktop, saves it as <strong>Save</strong> does once something changed; with a value that is no number, or a new entry left empty, it asks "Discard changes?" first. An entry left as it opened, targets and all, is not saved; on the desktop <strong>Cancel</strong> saves nothing either.</li>
   <li>In a Tally that counts in sets the values come as "Set 1", "Set 2" and so on, a row across the number fields each. <strong>Add set</strong> adds a set that starts with the values of the set before; a set after the first can be removed. The entry shows each set on a line of its own, such as "1. Weight 60 kg · Reps 10".</li>
   <li>Each chart shows slim bars of a fixed width with gaps, the newest on the right and as many as fit the width, the target as a thin line, the days the bars cover and the highest bar's value. A single bar stays slim. Older values are in the entries; the chart does not scroll sideways.</li>
   <li>The compact card shows each field's total of the current bar against its target, today's for a Tally of days.</li>
@@ -475,7 +479,7 @@
   <strong>On the Agenda</strong>: today's row of each Routine of a Session lists its picks indented
   under its title, in the order picked, each with its box and each Tally's name with its targets,
   such as "Push-ups 20 times"; the box is checked and the name struck through once it has an entry.
-  A tap on a pick or its box opens its entry form, prefilled with the targets; saving records it for
+  A tap on a pick or its box opens its entry form, prefilled as any new entry; saving records it for
   this Occurrence. A tap on a pick that has its entry opens that entry to change. Each pick without an entry offers <strong>Another one</strong> while the pool
   holds a Tally not picked. The Occurrence is Done once every pick has an entry, by anyone; removing
   an entry undoes that. The box of the Session's title only shows this: it checks itself, and a tap

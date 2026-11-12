@@ -225,6 +225,40 @@ void main() {
       expect(choices(ann), isEmpty);
     });
 
+    test('asked for, a Line checked today stays after the open ones for '
+        'the day, struck or gone, and unchecking brings it back (#276)', () {
+      final lists = ShoppingLists(ann);
+      final week = shopping(ann, 'Groceries\nMilk\nEggs\nTea');
+      lists.setOnAgenda(week, ShoppingOnAgenda.lines);
+      final eggs = idOf(ann, week, 'Eggs');
+      final milk = idOf(ann, week, 'Milk');
+      lists
+        ..setReappear(eggs, Reappear.once)
+        ..setReappear(milk, Reappear.after(1, ReappearUnit.day))
+        ..check(eggs, _wall)
+        ..check(milk, _wall);
+      List<String> today() => [
+        for (final (:list, :lines, shows: _) in lists.agendaRows(
+          _wall,
+          checkedToday: true,
+        ))
+          for (final l in lines)
+            '${l.text}${list.open.contains(l) ? '' : ' x'}',
+      ];
+      expect(rows(ann), ['Groceries: Tea'], reason: 'unasked');
+      expect(today(), ['Tea', 'Eggs x', 'Milk x']);
+      lists.check(idOf(ann, week, 'Tea'), _wall);
+      expect(today(), ['Eggs x', 'Milk x', 'Tea x'], reason: 'none open');
+      // Gone Once, Eggs comes back by its box as by its name.
+      lists.uncheck(eggs, _wall);
+      expect(today(), ['Eggs', 'Milk x', 'Tea x']);
+      lists.uncheck(eggs, _wall);
+      expect(today(), ['Eggs', 'Milk x', 'Tea x'], reason: 'open stays');
+      // Past midnight on the wall clock only Eggs is left; Milk is back.
+      clock.set(DateTime.utc(2026, 3, 5, 23, 30));
+      expect(today(), ['Milk', 'Eggs']);
+    });
+
     test('reading writes nothing', () {
       final week = shopping(ann, 'Groceries\nMilk');
       final count = ann.allEntries().length;

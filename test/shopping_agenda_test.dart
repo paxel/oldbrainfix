@@ -142,7 +142,8 @@ void main() {
   });
 
   testWidgets('each open Line indented under the list\'s name, each with '
-      'its box, checked off there (#208)', (tester) async {
+      'its box, checked off there, struck for the day after the open ones '
+      '(#208, #276)', (tester) async {
     lists.setOnAgenda(groceries, ShoppingOnAgenda.lines);
     final milk = lineId(groceries, 'Milk');
     final eggs = lineId(groceries, 'Eggs');
@@ -179,10 +180,69 @@ void main() {
       'shopping-row-$groceries',
       'shopping-line-$eggs',
       'shopping-line-$rice',
+      'shopping-line-$milk',
+      'shopping-row-$hardware',
+    ]);
+    expect(
+      tester.widget<Checkbox>(key('shopping-check-$milk')).value,
+      isTrue,
+      reason: 'struck for the day',
+    );
+    // Its box brings it back, a mis-tap undone.
+    await tap(tester, key('shopping-check-$milk'));
+    expect(
+      lists.byNote(groceries, deviceWallClock)!.line(milk)!.struck,
+      isFalse,
+    );
+    expect(shoppingRows(tester), [
+      'shopping-row-$groceries',
+      'shopping-line-$milk',
+      'shopping-line-$eggs',
+      'shopping-line-$rice',
       'shopping-row-$hardware',
     ]);
     await tap(tester, key('shopping-line-$eggs'));
     expect(find.byType(NoteEditorScreen), findsOneWidget);
+  });
+
+  /// Whether the field keyed [value] holds the cursor.
+  bool focused(WidgetTester tester, String value) =>
+      tester
+          .widget<TextField>(
+            find.descendant(of: key(value), matching: find.byType(TextField)),
+          )
+          .focusNode
+          ?.hasFocus ??
+      false;
+
+  testWidgets('opened from its heading, the list starts in a new Line after '
+      'the open ones, keyboard up; left unused, it writes nothing (#276)', (
+    tester,
+  ) async {
+    lists.setOnAgenda(groceries, ShoppingOnAgenda.lines);
+    final rice = lineId(groceries, 'Rice');
+    final tea = lineId(groceries, 'Tea');
+    await start(tester);
+    final count = store.allEntries().length;
+    await tap(
+      tester,
+      find.descendant(
+        of: key('shopping-row-$groceries'),
+        matching: find.text('Groceries'),
+      ),
+    );
+    expect(find.byType(NoteEditorScreen), findsOneWidget);
+    expect(focused(tester, 'shopping-field-new-1'), isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+    double top(String value) => tester.getTopLeft(key(value)).dy;
+    expect(top('shopping-field-$rice'), lessThan(top('shopping-field-new-1')));
+    expect(top('shopping-field-new-1'), lessThan(top('shopping-field-$tea')));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(store.allEntries(), hasLength(count));
+    // A Line's words open the list as it is.
+    await tap(tester, key('shopping-line-$rice'));
+    expect(key('shopping-field-new-2'), findsNothing);
   });
 
   testWidgets('a list chosen off stays off the Agenda', (tester) async {
@@ -196,16 +256,36 @@ void main() {
     );
   });
 
-  testWidgets('a list without open Lines never shows, whatever the choice', (
-    tester,
-  ) async {
+  testWidgets('a list without open Lines shows only with the Lines '
+      'checked today, struck, until the day is over (#276)', (tester) async {
     lists.setOnAgenda(hardware, ShoppingOnAgenda.lines);
-    lists.check(lineId(hardware, 'Nails'), deviceWallClock);
+    final nails = lineId(hardware, 'Nails');
+    lists.check(nails, deviceWallClock);
     for (final line in ['Milk', 'Eggs', 'Rice']) {
       lists.check(lineId(groceries, line), deviceWallClock);
     }
     await start(tester);
+    // The count of none open shows nothing.
+    expect(shoppingRows(tester), [
+      'shopping-row-$hardware',
+      'shopping-line-$nails',
+    ]);
+    // The next day it is gone.
+    now = DateTime(2026, 10, 25, 9);
+    await tester.pumpWidget(const SizedBox());
+    await start(tester);
     expect(shoppingRows(tester), isEmpty);
+  });
+
+  testWidgets('where this Device hides what is checked, a Line checked '
+      'leaves at once (#217, #276)', (tester) async {
+    store.agendaHidesChecked = true;
+    lists.setOnAgenda(hardware, ShoppingOnAgenda.lines);
+    final nails = lineId(hardware, 'Nails');
+    await start(tester);
+    expect(shoppingRows(tester), contains('shopping-line-$nails'));
+    await tap(tester, key('shopping-check-$nails'));
+    expect(shoppingRows(tester), isNot(contains('shopping-row-$hardware')));
   });
 
   testWidgets('a list nobody chose for shows as this Device showed '
