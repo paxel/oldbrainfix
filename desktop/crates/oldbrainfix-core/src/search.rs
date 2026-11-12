@@ -38,10 +38,18 @@ impl<'a> Search<'a> {
             Some(place) => notes.inside(place)?,
             None => notes.all()?,
         };
+        self.among(query, scope)
+    }
+
+    /// Those of `scope` that `query` finds, as [`Search::notes`] finds
+    /// them, in the order given: for a list the search does not read
+    /// itself, such as the trash (#274). A blank query keeps them all.
+    pub fn among(&self, query: &str, scope: Vec<Note>) -> Result<Vec<Note>> {
         let wanted = lower_case(query.trim());
         if wanted.is_empty() {
             return Ok(scope);
         }
+        let notes = Notes::new(self.store);
         let sections = self.section_texts(&notes)?;
         let holds = |text: &String| lower_case(text).contains(&wanted);
         Ok(scope
@@ -203,6 +211,68 @@ mod tests {
                 .set_photo_text(&voice.id, &voice.recordings[0], "x")
                 .is_err()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn among_finds_trashed_notes_as_the_search_finds_notes_in_the_order_given() -> Result<()> {
+        use crate::checklists::Checklists;
+        use crate::tallies::Tallies;
+        use std::collections::BTreeMap;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let text = notes.capture("Old sauce recipe", None, None)?;
+        let voice = notes.capture_with("", None, None, &[], &[b"voice".to_vec()])?;
+        notes.set_transcript(&voice.id, &voice.recordings[0], "Pick up the parcel")?;
+        let photo = notes.capture_with("", None, None, &[b"photo".to_vec()], &[])?;
+        notes.set_photo_text(&photo.id, &photo.photos[0], "RECEIPT 12,50")?;
+        let amended = notes.capture("Saturday", None, None)?;
+        notes.amend(&amended.id, "Bring the bags")?;
+        let host = notes.capture("Errands", None, None)?;
+        let merged = notes.capture("Opening hours", None, None)?;
+        notes.merge(&merged.id, &host.id)?;
+        let tally = notes.capture("Push-ups", None, None)?;
+        let tallies = Tallies::new(&store);
+        let reps = tallies.add_field(&tally.id, "times", "times", None, None)?;
+        tallies.add(
+            &tally.id,
+            &BTreeMap::from([(reps, 20.0)]),
+            "after work",
+            None,
+        )?;
+        let checklist = notes.capture("Trip\nTent\nSleeping bag", None, None)?;
+        Checklists::new(&store).make(&checklist.id)?;
+        let shopping = notes.capture("Shop\nOat milk", None, None)?;
+        ShoppingLists::new(&store).make(&shopping.id)?;
+        // Live, so never among the trash's.
+        let live = notes.capture("Fresh sauce", None, None)?;
+        for note in [
+            &text, &voice, &photo, &amended, &host, &tally, &checklist, &shopping,
+        ] {
+            notes.trash(&note.id)?;
+        }
+        let trashed = notes.trashed()?;
+        let search = Search::new(&store);
+        let ids = |q: &str, scope: Vec<Note>| -> Result<Vec<String>> {
+            Ok(search.among(q, scope)?.into_iter().map(|n| n.id).collect())
+        };
+        assert_eq!(ids("SAUCE", trashed.clone())?, vec![text.id.clone()]);
+        assert_eq!(ids("parcel", trashed.clone())?, vec![voice.id]);
+        assert_eq!(ids("receipt", trashed.clone())?, vec![photo.id]);
+        assert_eq!(ids("bags", trashed.clone())?, vec![amended.id]);
+        assert_eq!(ids("opening", trashed.clone())?, vec![host.id]);
+        assert_eq!(ids("after work", trashed.clone())?, vec![tally.id]);
+        assert_eq!(ids("sleeping", trashed.clone())?, vec![checklist.id]);
+        assert_eq!(ids("oat", trashed.clone())?, vec![shopping.id]);
+        assert_eq!(search.notes("sauce", None)?.len(), 1);
+        // In the order given, whatever it is; a blank query keeps all.
+        let mut given = trashed.clone();
+        given.reverse();
+        let order: Vec<String> = given.iter().map(|n| n.id.clone()).collect();
+        assert_eq!(ids("  ", given.clone())?, order);
+        let both = vec![text.clone(), live.clone()];
+        assert_eq!(ids("sauce", both)?, vec![text.id, live.id]);
+        assert!(ids("sauce", Vec::new())?.is_empty());
         Ok(())
     }
 

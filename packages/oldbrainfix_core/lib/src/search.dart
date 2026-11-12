@@ -27,9 +27,16 @@ class Search {
   List<Note> notes(String query, {String? within}) {
     final notes = Notes(store);
     final scope = within == null ? notes.all() : notes.inside(within);
+    return among(query, scope);
+  }
+
+  /// Those of [scope] that [query] finds, as [notes] finds them, in the
+  /// order given: for a list the search does not read itself, such as the
+  /// trash (#274). A blank query keeps them all.
+  List<Note> among(String query, List<Note> scope) {
     final wanted = query.trim().toLowerCase();
     if (wanted.isEmpty) return scope;
-    final sections = _sectionTexts(notes);
+    final sections = _sectionTexts(Notes(store));
     bool holds(String text) => text.toLowerCase().contains(wanted);
     return [
       for (final note in scope)

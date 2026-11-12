@@ -4947,7 +4947,8 @@ impl App {
                 };
                 self.store.notes_by(found, &self.people)?
             }
-            Selection::Trash => notes.trashed()?,
+            // Its search (#274) keeps the trash's order.
+            Selection::Trash => search.among(&self.query, notes.trashed()?)?,
         };
         let store = &self.store;
         let place = |note: Note| place_note(store, &places, note);
@@ -5268,6 +5269,23 @@ impl App {
             }
             trashed_frogs.sort_by_key(|(frog, ..)| std::cmp::Reverse(frog.trashed));
         }
+        // The trash's search (#274) finds its Routines and Frogs by their
+        // Note, as it finds the cards; one whose Note is gone it does not.
+        if self.selection == Selection::Trash && !self.query.trim().is_empty() {
+            let theirs: Vec<Note> = trashed_routines
+                .iter()
+                .filter_map(|(_, note)| note.clone())
+                .chain(trashed_frogs.iter().filter_map(|(_, note, _)| note.clone()))
+                .collect();
+            let found: HashSet<String> = search
+                .among(&self.query, theirs)?
+                .into_iter()
+                .map(|n| n.id)
+                .collect();
+            let kept = |note: &Option<Note>| note.as_ref().is_some_and(|n| found.contains(&n.id));
+            trashed_routines.retain(|(_, note)| kept(note));
+            trashed_frogs.retain(|(_, note, _)| kept(note));
+        }
         let mut all_routines = Vec::new();
         if self.selection == Selection::AllRoutines {
             let all = routines.all()?;
@@ -5509,8 +5527,8 @@ impl App {
             Action::Quit => self.quit_wanted = true,
             Action::Find => {
                 self.leave_note()?;
-                // All Notes, Unsorted, an Area and a Topic have the search
-                // (#274), the list shown searched.
+                // All Notes, Unsorted, an Area, a Topic and the trash have
+                // the search (#274), the list shown searched.
                 if !self.searches() {
                     self.go(Selection::All);
                 }
@@ -9062,11 +9080,11 @@ impl App {
     }
 
     /// Whether the list shown has a search field: All Notes, Unsorted
-    /// (#274), an Area and a Topic.
+    /// and the trash (#274), an Area and a Topic.
     fn searches(&self) -> bool {
         matches!(
             self.selection,
-            Selection::All | Selection::Unsorted | Selection::Place(_)
+            Selection::All | Selection::Unsorted | Selection::Place(_) | Selection::Trash
         )
     }
 
@@ -10577,6 +10595,7 @@ impl App {
             Selection::Unsorted => Some(self.t.search_unsorted_hint()),
             Selection::Place(id) if self.view.area(id).is_some() => Some(self.t.search_area_hint()),
             Selection::Place(_) => Some(self.t.search_topic_hint()),
+            Selection::Trash => Some(self.t.search_trash_hint()),
             _ => None,
         };
         if let Some(hint) = hint {
@@ -10618,11 +10637,11 @@ impl App {
             self.trashed_frogs(ui, tones, actions);
         }
         if self.view.notes.is_empty() {
-            let empty = if trash {
-                self.t.trash_empty()
-            } else if !self.query.trim().is_empty() {
+            let empty = if !self.query.trim().is_empty() {
                 // A search that finds nothing, not an empty list.
                 self.t.nothing_found()
+            } else if trash {
+                self.t.trash_empty()
             } else {
                 self.t.no_notes_yet()
             };

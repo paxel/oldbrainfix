@@ -4,7 +4,8 @@
 //! bring back, 1 to 3 set the Importance, Ctrl+M files and Ctrl+Shift+M
 //! merges; Down from the search goes into the cards found, and the card
 //! reached comes into view. None of them acts while a field has the
-//! keyboard. Unsorted has a search of its own, which Ctrl+F reaches.
+//! keyboard. Unsorted and the trash have a search of their own, which
+//! Ctrl+F reaches.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -14,7 +15,10 @@ use egui::accesskit::{Role, Toggled};
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use oldbrainfix_core::{Importance, Note, Notes, OwnProfile, Places, Routines, SigningKey, Store};
+use oldbrainfix_core::{
+    ClockTime, Day, Importance, Note, Notes, OwnProfile, Places, Routines, Schedule, SigningKey,
+    Store,
+};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -328,6 +332,51 @@ fn unsorted_searches_itself_and_ctrl_f_stays_there() -> TestResult {
     harness.run();
     assert!(shown(&harness)?.is_empty());
     assert!(harness.query_by_label("No Note matches.").is_some());
+    Ok(())
+}
+
+#[test]
+fn the_trash_searches_itself_and_ctrl_f_stays_there() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    let routines = Routines::new(&store);
+    let live = notes.all()?;
+    let of = |text: &str| live.iter().find(|n| n.text == text).ok_or(text.to_string());
+    notes.amend(&of(MILK)?.id, "and eggs")?;
+    routines.trash_note(&of(MILK)?.id)?;
+    routines.trash_note(&of(BANK)?.id)?;
+    // The roses' Note stays; only its Reminder is in the trash.
+    let times: Vec<ClockTime> = ClockTime::new(8, 0).into_iter().collect();
+    let once = Schedule::new(Day::new(2026, 3, 2), &times, None).ok_or("a schedule")?;
+    let reminder = routines.spawn(&of(ROSES)?.id, &once)?;
+    routines.trash(&reminder.id)?;
+    let mut harness = harness(store, Selection::Trash);
+    assert_eq!(shown(&harness)?, [BANK, MILK]);
+    assert!(harness.query_by_label(ROSES).is_some());
+    press_with(&mut harness, Modifiers::COMMAND, Key::F);
+    assert_eq!(harness.state().selection(), &Selection::Trash);
+    assert_eq!(focused(&harness).as_deref(), Some("Search the Trash"));
+    // Found by its Amend; the Reminder's Note does not hold it.
+    type_here(&mut harness, "eggs");
+    assert_eq!(shown(&harness)?, [MILK]);
+    assert!(harness.query_by_label(ROSES).is_none());
+    // The roses' Note is no card here, its Reminder is found by it.
+    harness.state_mut().set_query("the");
+    harness.run();
+    assert_eq!(shown(&harness)?, [BANK]);
+    assert!(harness.query_by_label(ROSES).is_some());
+    // Only the Reminder found: its row, and no word of nothing found.
+    harness.state_mut().set_query("roses");
+    harness.run();
+    assert!(shown(&harness)?.is_empty());
+    assert!(harness.query_by_label(ROSES).is_some());
+    assert!(harness.query_by_label("No Note matches.").is_none());
+    harness.state_mut().set_query("tent");
+    harness.run();
+    assert!(shown(&harness)?.is_empty());
+    assert!(harness.query_by_label(ROSES).is_none());
+    assert!(harness.query_by_label("No Note matches.").is_some());
+    assert!(harness.query_by_label("The trash is empty.").is_none());
     Ok(())
 }
 

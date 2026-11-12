@@ -395,11 +395,13 @@ fn the_keys_open_what_their_entries_open() -> TestResult {
     // The keys rest over the quick note's dialog.
     press(&mut harness, Key::F);
     assert_eq!(harness.state().selection(), &Selection::Trash);
+    assert_eq!(focused(&harness).as_deref(), Some("Capture"));
     harness.key_press(Key::Escape);
     harness.run();
+    // The Trash has a search of its own (#274).
     press(&mut harness, Key::F);
-    assert_eq!(harness.state().selection(), &Selection::All);
-    assert_eq!(focused(&harness).as_deref(), Some("Search all Notes"));
+    assert_eq!(harness.state().selection(), &Selection::Trash);
+    assert_eq!(focused(&harness).as_deref(), Some("Search the Trash"));
     // Ctrl+M wants a Note.
     press(&mut harness, Key::M);
     assert!(!shows(&harness, "Cancel"));

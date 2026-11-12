@@ -606,5 +606,7 @@
   "olderAppStaysFix": "Choose Quit in its tray menu, then start Old Brain Fix again.",
   "@olderAppStaysFix": {"description": "Under 'olderAppStays': what to do."},
   "searchUnsortedHint": "Search Unsorted",
-  "@searchUnsortedHint": {"description": "Hint in the search field of Unsorted on the desktop (#274); Unsorted is the list of Notes not yet filed."}
+  "@searchUnsortedHint": {"description": "Hint in the search field of Unsorted on the desktop (#274); Unsorted is the list of Notes not yet filed."},
+  "searchTrashHint": "Search the Trash",
+  "@searchTrashHint": {"description": "Hint in the search field of the Trash on the desktop (#274); it finds the Notes in the Trash, and its Routines and Frogs by their Note."}
 }

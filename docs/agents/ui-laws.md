@@ -1140,7 +1140,9 @@ replace a law of Both apps where they say so. A desktop law marked
   too, not while another dialog is open; Delete and 1 to 3 stand beside
   Delete and Importance's entries while those act on the cards selected
   (#274). Ctrl+F searches the list shown where it has a search field
-  (All Notes, Unsorted, an Area, a Topic), else All Notes'. On the desktop the menu bar leads to Settings, Backups and
+  (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
+  finds its Routines, Reminders and Frogs by their Note), else All
+  Notes'. On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
 - **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
   Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the

@@ -326,5 +326,6 @@
   "feedbackNotSavedTitle": "Feedback nicht gespeichert",
   "olderAppStays": "Ein älteres Old Brain Fix läuft noch und hat sich für dieses Update nicht beendet.",
   "olderAppStaysFix": "Wähle Beenden in seinem Menü im Infobereich und starte Old Brain Fix dann erneut.",
-  "searchUnsortedHint": "In Unsortiert suchen"
+  "searchUnsortedHint": "In Unsortiert suchen",
+  "searchTrashHint": "Im Papierkorb suchen"
 }
