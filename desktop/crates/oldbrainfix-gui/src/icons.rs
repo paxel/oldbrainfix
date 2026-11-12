@@ -86,6 +86,9 @@ pub const MORE_VERT: char = '\u{e404}';
 pub const STATUS_DONE: char = '\u{e159}';
 pub const STATUS_MISSED: char = '\u{e139}';
 pub const DAY_PARTLY: char = '\u{e660}';
+/// `remove_circle_outline`, as the phone's Routine History marks a day
+/// whose Occurrences were all skipped (#269).
+pub const DAY_SKIPPED: char = '\u{e518}';
 pub const EXPORT: char = '\u{f05d}';
 /// `shopping_cart_outlined`, as the phone marks a Shopping List's row on
 /// the Agenda (#123).

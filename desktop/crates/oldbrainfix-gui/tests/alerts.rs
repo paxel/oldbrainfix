@@ -1,8 +1,8 @@
 //! The desktop's alarm layer over the Dart core's `routines` fixture
 //! log, on a European wall clock and a clock the test moves: what shows
 //! when, the alarm sound the app rings itself (#102), Re-nag, Escalation,
-//! the Nudge in and out of Quiet Hours, Done and Snooze from a
-//! notification, alerts off, the one Catch-up Notification after the app
+//! the Nudge in and out of Quiet Hours, Done, Snooze and Not today from
+//! a notification (#269), alerts off, the one Catch-up Notification after the app
 //! was not running, and the Changes Nudge for a person synced by bundles
 //! (#109).
 
@@ -17,8 +17,8 @@ use oldbrainfix_core::{
     SigningKey, Store, WireEntry,
 };
 use oldbrainfix_gui::alerts::{
-    Alerts, CATCH_UP_KEY, CHANGES_KEY, DONE, NUDGE_KEY, Notice, OPEN, SNOOZE_10, Tap,
-    occurrence_key,
+    Alerts, CATCH_UP_KEY, CHANGES_KEY, DONE, NOT_TODAY, NUDGE_KEY, Notice, OPEN, SKIP, SNOOZE,
+    SNOOZE_10, TOMORROW, Tap, occurrence_key,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::notify::{Recorded, RecordingNotifier};
@@ -107,7 +107,7 @@ fn an_occurrence_rings_renags_escalates_and_stops_when_done() -> TestResult {
     let next = alerts.tick(&store, &berlin)?;
     assert!(shown(&record.take()).iter().all(|n| n.key != key));
     assert!(next <= oldbrainfix_core::parse_time("2026-10-26T07:00:00.000Z")?);
-    // 08:00: it rings with Done and the snoozes.
+    // 08:00: it rings with Done, Snooze and Not today (#269).
     clock.set("2026-10-26T07:00:05.000Z")?;
     alerts.tick(&store, &berlin)?;
     let record_now = record.take();
@@ -117,10 +117,7 @@ fn an_occurrence_rings_renags_escalates_and_stops_when_done() -> TestResult {
     assert_eq!(notice.body, "08:00");
     assert!(!notice.urgent);
     let actions: Vec<&str> = notice.actions.iter().map(|(id, _)| id.as_str()).collect();
-    assert_eq!(
-        actions,
-        ["done", "snooze10", "snooze30", "snooze60", "default"]
-    );
+    assert_eq!(actions, ["done", "snooze", "notToday", "default"]);
     // Its own Re-nag is 5 minutes: again at 08:05, not before.
     clock.set("2026-10-26T07:03:00.000Z")?;
     alerts.tick(&store, &berlin)?;
@@ -138,6 +135,7 @@ fn an_occurrence_rings_renags_escalates_and_stops_when_done() -> TestResult {
     let at = clock.set("2026-10-26T07:21:00.000Z")?;
     alerts.apply(
         &store,
+        &berlin,
         &Tap {
             key: key.clone(),
             action: DONE.into(),
@@ -367,6 +365,7 @@ fn a_snooze_rings_again_when_it_ends() -> TestResult {
     let at = clock.set("2026-10-26T13:01:00.000Z")?;
     alerts.apply(
         &store,
+        &berlin,
         &Tap {
             key: key.clone(),
             action: SNOOZE_10.into(),
@@ -380,6 +379,86 @@ fn a_snooze_rings_again_when_it_ends() -> TestResult {
     clock.set("2026-10-26T13:11:01.000Z")?;
     alerts.tick(&store, &berlin)?;
     assert!(shown(&record.take()).iter().any(|n| n.key == key));
+    Ok(())
+}
+
+/// A tap of `action` on the notification `key` at `at`.
+fn tap(key: &str, action: &str, at: DateTime<Utc>) -> Tap {
+    Tap {
+        key: key.to_string(),
+        action: action.to_string(),
+        at,
+    }
+}
+
+fn ids(notice: &Notice) -> Vec<&str> {
+    notice.actions.iter().map(|(id, _)| id.as_str()).collect()
+}
+
+#[test]
+fn snooze_and_not_today_show_their_choices_in_place_and_skip_stops_the_alarm() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let pills = pills(&store)?;
+    let eight = Occurrence::new(Day::new(2026, 10, 26), ClockTime::new(8, 0));
+    let key = occurrence_key(&pills, &eight);
+    clock.set("2026-10-26T07:00:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    record.take();
+    // Snooze shows its three choices in the same notification, quietly.
+    let at = clock.set("2026-10-26T07:01:00.000Z")?;
+    alerts.apply(&store, &berlin, &tap(&key, SNOOZE, at))?;
+    let snoozes = record.take();
+    let again = shown(&snoozes);
+    let notice = again.first().ok_or("shown again")?;
+    assert_eq!(notice.key, key);
+    assert_eq!(notice.title, "Take the pills");
+    assert_eq!(notice.body, "Remind me again in …");
+    assert_eq!(ids(notice), ["snooze10", "snooze30", "snooze60", "default"]);
+    assert!(notice.silent && !notice.urgent);
+    // Not today shows Skip and Tomorrow there.
+    alerts.apply(&store, &berlin, &tap(&key, NOT_TODAY, at))?;
+    let choices = record.take();
+    let notice = shown(&choices).into_iter().next().ok_or("shown again")?;
+    assert_eq!(notice.body, "Skip it, or tomorrow at the same time?");
+    assert_eq!(ids(notice), ["skip", "tomorrow", "default"]);
+    let labels: Vec<&str> = notice.actions.iter().map(|(_, l)| l.as_str()).collect();
+    assert_eq!(labels, ["Skip", "Tomorrow", "Open Old Brain Fix"]);
+    let routine = Routines::new(&store).by_id(&pills)?.ok_or("the pills")?;
+    assert_eq!(routine.skipped_at(&eight), None, "choices change nothing");
+    // Skip: skipped as of the tap, closed, and it rings no more.
+    let at = clock.set("2026-10-26T07:02:00.000Z")?;
+    alerts.apply(&store, &berlin, &tap(&key, SKIP, at))?;
+    let routine = Routines::new(&store).by_id(&pills)?.ok_or("the pills")?;
+    assert_eq!(routine.skipped_at(&eight), Some(at));
+    assert!(record.take().contains(&Recorded::Closed(key.clone())));
+    clock.set("2026-10-26T07:05:01.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    assert!(shown(&record.take()).iter().all(|n| n.key != key));
+    Ok(())
+}
+
+#[test]
+fn tomorrow_on_a_notification_rings_the_day_after_at_the_same_time() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let pills = pills(&store)?;
+    let two = Occurrence::new(Day::new(2026, 10, 26), ClockTime::new(14, 0));
+    let key = occurrence_key(&pills, &two);
+    clock.set("2026-10-26T13:00:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let at = clock.set("2026-10-26T13:01:00.000Z")?;
+    alerts.apply(&store, &berlin, &tap(&key, NOT_TODAY, at))?;
+    alerts.apply(&store, &berlin, &tap(&key, TOMORROW, at))?;
+    let routine = Routines::new(&store).by_id(&pills)?.ok_or("the pills")?;
+    assert_eq!(routine.skipped_at(&two), Some(at));
+    assert!(routine.tomorrow.contains(&two.key()));
+    // The schedule has the pills at 14:00 every day already: nothing is
+    // added, and Tuesday's rings as its own.
+    assert!(routine.moved.is_empty());
+    assert!(record.take().contains(&Recorded::Closed(key.clone())));
     Ok(())
 }
 
@@ -437,6 +516,7 @@ fn a_click_on_the_nudge_opens_unsorted_and_its_snoozes_do_not() -> TestResult {
     let at = clock.set("2026-10-27T07:01:00.000Z")?;
     alerts.apply(
         &store,
+        &berlin,
         &Tap {
             key: NUDGE_KEY.into(),
             action: SNOOZE_10.into(),
@@ -448,6 +528,7 @@ fn a_click_on_the_nudge_opens_unsorted_and_its_snoozes_do_not() -> TestResult {
     // The click opens the window on Unsorted.
     alerts.apply(
         &store,
+        &berlin,
         &Tap {
             key: NUDGE_KEY.into(),
             action: OPEN.into(),
@@ -565,6 +646,7 @@ fn the_changes_nudge_names_who_waits_and_closes_once_sent() -> TestResult {
     let at = clock.set("2026-10-26T10:31:00.000Z")?;
     alerts.apply(
         &ann,
+        &berlin,
         &Tap {
             key: CHANGES_KEY.into(),
             action: OPEN.into(),

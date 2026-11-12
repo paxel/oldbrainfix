@@ -19,8 +19,9 @@ use crate::tally_view::{self, decimal_sign, shown_value, typed_value};
 /// for a day, and its target per bar ("Pages 30 / 50 pages"), of the user's own entries in a Shared
 /// Area as its detailed view counts unless another choice is picked
 /// (#190); else of a Session Note (#191) the next run of any of its
-/// Routines not Done and how many runs of all of them were Done and
-/// Missed this week, or without a Routine how many it picks.
+/// Routines neither Done nor skipped and how many runs of all of them
+/// were Done and skipped this week (#269), or without a Routine how many
+/// it picks.
 pub fn read(
     store: &Store,
     t: &L10n,
@@ -65,17 +66,20 @@ pub fn read(
                 continue;
             }
             let mut next: Option<Occurrence> = None;
-            let (mut done, mut missed) = (0, 0);
+            let (mut done, mut skipped) = (0, 0);
             for run in &runs {
                 let routine = &run.routine;
                 let history = routines.history(routine, wall, history_view::week_start(t))?;
                 done += history.this_week.done as i64;
-                missed += history.this_week.missed as i64;
-                let first = routine
-                    .schedule
-                    .next(history.today, 64)
+                skipped += history.this_week.skipped as i64;
+                // The Routine's own Occurrences, those Tomorrow added
+                // among them (#269).
+                let mut upcoming = routine.schedule.next(history.today, 64);
+                upcoming.extend(routine.moved.iter().filter(|o| o.day >= history.today));
+                upcoming.sort();
+                let first = upcoming
                     .into_iter()
-                    .find(|o| !routine.done.contains_key(&o.key()));
+                    .find(|o| routine.done_at(o).is_none() && routine.skipped_at(o).is_none());
                 if let Some(first) = first
                     && next.is_none_or(|n| first < n)
                 {
@@ -87,7 +91,7 @@ pub fn read(
                 let when = format!("{} {}", day_text(t, next.day), occurrence_time(t, &next));
                 lines.push(t.session_card_next(&when));
             }
-            lines.push(t.session_card_week(done, missed));
+            lines.push(t.session_card_week(done, skipped));
             glances.insert(id.clone(), lines);
         }
     }

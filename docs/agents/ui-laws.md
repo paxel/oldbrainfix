@@ -1077,8 +1077,8 @@ replace a law of Both apps where they say so. A desktop law marked
   is open. On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
 - **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
-  filing or Merge** (#268), the desktop's offer to undo, with no
-  announcement: Edit ▸ Undo is first in its menu and greyed while
+  Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the
+  desktop's offer to undo, with no announcement: Edit ▸ Undo is first in its menu and greyed while
   nothing waits; Ctrl+Z works over the list and the Note dialog but not
   in a text field, where it undoes the typing. Only the last one waits.
 - **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
@@ -1261,8 +1261,12 @@ replace a law of Both apps where they say so. A desktop law marked
 
 - **The desktop's notifications are the system's** (draft, #196), for
   as long as the app runs, in the tray too: on Linux and Windows an
-  alarm offers Done, 10 min, 30 min, 1 h and "Open Old Brain Fix", on
-  macOS no buttons; there is no full-screen alarm. A click on the Nudge
+  alarm offers Done, Snooze, Not today and "Open Old Brain Fix" (#269),
+  as Windows toasts and some Linux desktops show only a few buttons;
+  Snooze shows it again in place with 10 min, 30 min and 1 h, and Not
+  today with Skip and Tomorrow, under "Skip it, or tomorrow at the same
+  time?", Tomorrow only for an Occurrence of today or later. On macOS it
+  has no buttons; there is no full-screen alarm. A click on the Nudge
   opens the window on Unsorted, in place of the phone's Nudge screen.
 
 ### What the desktop does not have

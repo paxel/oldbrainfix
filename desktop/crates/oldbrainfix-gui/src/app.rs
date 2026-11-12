@@ -145,6 +145,7 @@ use crate::media_view::{
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
 use crate::note_history_view;
+use crate::occurrence_answers::{self, Answer, Answers};
 use crate::pack_view::{self, PackAsk};
 use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
@@ -299,6 +300,8 @@ struct Row {
     /// For a Routine spawned from a Checklist its Lines as checked for
     /// this Occurrence, and whether this Device may check them (#121).
     lines: Option<(Checklist, bool)>,
+    /// What its menu offers to answer it with (#269), as read.
+    answers: Answers,
 }
 
 /// A Shopping List's group on today's Agenda (#123, #186, #208): its
@@ -345,6 +348,7 @@ fn agenda_lines(list: &Checklist, hides_checked: bool) -> Vec<ShownLine> {
 /// every pick or from every Line checked.
 fn shown_done(row: &Row) -> bool {
     row.row.done().is_some()
+        || row.row.skipped().is_some()
         || matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
         || row
             .lines
@@ -1239,6 +1243,9 @@ enum Action {
     /// checks off the Occurrence of the open Note's one Reminder, moves
     /// the Note with it to the trash and closes the dialog.
     DoneAndTrash(String, Occurrence),
+    /// Snooze or Not today on the Occurrence of the Routine (#269), from
+    /// the Agenda row's menu or the Note dialog's Due line.
+    Answer(String, Occurrence, Answer),
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
@@ -4763,6 +4770,7 @@ impl App {
             schedule: schedule_text(&self.t, &routine.schedule),
             history: routines.history(&routine, &*self.wall, week_start)?,
             streaks: DeviceSettings::new(&self.store).streaks_on()?,
+            tomorrow: routine.tomorrow.clone(),
         }))
     }
 
@@ -5903,6 +5911,15 @@ impl App {
                     occurrence,
                     trashed: Some(selected.clone()),
                 });
+            }
+            Action::Answer(routine, occurrence, answer) => {
+                let at = (routine.as_str(), &occurrence);
+                // Ctrl+Z takes a Skip or Tomorrow back (#268).
+                if let Some(undo) =
+                    occurrence_answers::answer(&self.store, &*self.wall, at, answer)?
+                {
+                    self.undo = Some(undo);
+                }
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
             Action::ExportRoutines => {
@@ -10500,6 +10517,9 @@ impl App {
                     Some(OpenAsked::DoneAndTrash(routine, occurrence)) => {
                         actions.push(Action::DoneAndTrash(routine, occurrence));
                     }
+                    Some(OpenAsked::Answer(routine, occurrence, answer)) => {
+                        actions.push(Action::Answer(routine, occurrence, answer));
+                    }
                     None => {}
                 }
                 embossed(ui, tones, false, None, |ui| {
@@ -14572,11 +14592,13 @@ fn read_agenda(
                 lines = Some((list, store.may_check_off(&row.routine.id)?));
             }
         }
+        let answers = occurrence_answers::answers(store, &row.routine, &row.occurrence, wall)?;
         Ok(Row {
             row,
             area,
             session,
             lines,
+            answers,
         })
     };
     // What shows as Done leaves where this Device hides it
@@ -14833,8 +14855,10 @@ fn agenda_entry(
 /// One Occurrence on the Agenda as a group (#208): the heading an
 /// embossed card's top, with the box to check it off, its time, its
 /// Note's text, its Area's colour and icon, and its ⋮; a click on the
-/// text opens its Routine, a right-click on it the menu of ⋮. Under it a
-/// Session's picks today, each with its box showing whether it has an
+/// text opens its Routine, a right-click on it the menu of ⋮. A skipped
+/// one stays struck for the day, as a Done one, saying so under its
+/// text, and the one Tomorrow added says where it came from (#269).
+/// Under it a Session's picks today, each with its box showing whether it has an
 /// entry, its box and words opening its entry form, and "Another one"
 /// under each without one; how many it picks on later days. A Session's
 /// own box only shows Done: once every pick has an entry it checks
@@ -14855,6 +14879,7 @@ fn agenda_row(
     let routine = &row.row.routine;
     let occurrence = row.row.occurrence;
     let done = row.row.done().is_some();
+    let skipped = row.row.skipped().is_some();
     let colour = row
         .area
         .as_ref()
@@ -14889,10 +14914,13 @@ fn agenda_row(
                 ui.spacing_mut().item_spacing.y = 2.0;
                 ui.label(RichText::new(&time).strong().color(text));
                 let mut line = RichText::new(&title).size(15.0).color(text);
-                if done {
+                if done || skipped {
                     line = line.strikethrough();
                 }
                 ui.add(egui::Label::new(line).truncate());
+                if let Some(under) = answered_under(t, &row.row) {
+                    ui.label(RichText::new(under).color(weak));
+                }
                 match &row.session {
                     Some(SessionPart::Later(count)) => {
                         ui.label(RichText::new(t.session_picks(*count)).color(text));
@@ -14913,12 +14941,13 @@ fn agenda_row(
             }
             // The same menu from a right-click and from ⋮.
             let history = !routine.is_reminder();
+            let answers = row.answers;
             let mut picked = None;
-            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, history)));
+            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let more = icon_button(ui, icons::MORE_VERT, &t.occurrence_menu(&title), weak);
                 egui::Popup::menu(&more)
-                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, history)));
+                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
                 if let Some(icon) = row
                     .area
                     .as_ref()
@@ -14936,6 +14965,9 @@ fn agenda_row(
                 }
                 Some(OccurrencePick::Share) => {
                     actions.push(Action::ShareRoutine(routine.id.clone()));
+                }
+                Some(OccurrencePick::Answer(answer)) => {
+                    actions.push(Action::Answer(routine.id.clone(), occurrence, answer));
                 }
                 None => {}
             }
@@ -15131,20 +15163,45 @@ fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Ve
     });
 }
 
+/// What shows under the text of an Agenda row Not today answered
+/// (#269): that it was skipped, or comes the day after instead, while it
+/// is not Done; on the one Tomorrow added, that it came from the day
+/// before.
+fn answered_under(t: &L10n, row: &AgendaRow) -> Option<&'static str> {
+    if row.skipped().is_some() && row.done().is_none() {
+        return Some(if row.routine.tomorrow.contains(&row.occurrence.key()) {
+            t.occurrence_tomorrow_instead()
+        } else {
+            t.occurrence_skipped()
+        });
+    }
+    row.moved().then(|| t.occurrence_from_day_before())
+}
+
 /// What was picked in an Occurrence's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OccurrencePick {
     History,
     Share,
+    Answer(Answer),
 }
 
 /// An Occurrence's menu, from a right-click on it or its ⋮, as the
-/// phone's: History for a Routine (`history`), and Share, which saves
-/// its Routine as the whole series with its end, or its Reminder, as a
-/// calendar file. What was picked.
-fn occurrence_menu(ui: &mut Ui, t: &L10n, history: bool) -> Option<OccurrencePick> {
+/// phone's: Snooze and Not today as far as `answers` allows (#269), each
+/// under its heading, then History for a Routine (`history`), and Share,
+/// which saves its Routine as the whole series with its end, or its
+/// Reminder, as a calendar file. What was picked.
+fn occurrence_menu(
+    ui: &mut Ui,
+    t: &L10n,
+    history: bool,
+    answers: Answers,
+) -> Option<OccurrencePick> {
     let text = ui.visuals().text_color();
-    let mut picked = None;
+    let mut picked = occurrence_answers::entries(ui, t, answers).map(OccurrencePick::Answer);
+    if answers.any() {
+        ui.separator();
+    }
     if history
         && ui
             .button(RichText::new(t.history_title()).color(text))

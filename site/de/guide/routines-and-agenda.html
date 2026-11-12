@@ -190,7 +190,7 @@
 <li>Tippe die Benachrichtigung.</li>
 <li>Tippe oben <strong>Erledigt</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="Der Notiz-Dialog der Notiz zum Parken mit Fällig 08:00, Erledigt und Erledigt und in den Papierkorb oben">
+<box-tab device="desktop" alt="Der Notiz-Dialog der Notiz zum Parken mit Fällig 08:00, Erledigt, Später, Nicht heute und Erledigt und in den Papierkorb oben">
 <li>Doppelklicke die Karte der Notiz.</li>
 <li>Klicke oben <strong>Erledigt</strong>.</li>
 </box-tab>
@@ -248,11 +248,17 @@
 <p>
   Auf dem Desktop kommen Alarme als Benachrichtigungen, solange die App läuft, auch aus dem
   Infobereich; nur unter Linux ohne Infobereich beendet das Schließen des Fensters die App und ihre
-  Alarme. Unter Linux und Windows bieten sie Erledigt, 10 Min., 30 Min., 1 Std. und „Old Brain Fix
-  öffnen“; unter macOS erscheinen sie ohne Knöpfe. Ein Klick auf die Benachrichtigung oder „Old Brain
-  Fix öffnen“ holt das Fenster nach vorn; eine Notiz öffnet das nicht. Ein Doppelklick auf die Karte
-  der Notiz öffnet den Notiz-Dialog, der oben dieselbe Zeile „Fällig“, Erledigt und Erledigt und in
-  den Papierkorb zeigt; ein Klick auf das Kästchen einer Karte hakt ab und öffnet nichts.
+  Alarme. Unter Linux und Windows bieten sie Erledigt, Später, Nicht heute und „Old Brain Fix
+  öffnen“, da Windows und viele Linux-Desktops nur wenige Knöpfe zeigen: Später zeigt dieselbe
+  Benachrichtigung erneut mit 10 Min., 30 Min. und 1 Std., Nicht heute mit Auslassen und Morgen,
+  Morgen nur für eine Fälligkeit von heute oder später. Unter macOS erscheinen sie ohne Knöpfe. Ein
+  Klick auf die Benachrichtigung oder „Old Brain Fix öffnen“ holt das Fenster nach vorn; eine Notiz
+  öffnet das nicht. Ein Doppelklick auf die Karte der Notiz öffnet den Notiz-Dialog, der oben
+  dieselbe Zeile „Fällig“ zeigt, mit Erledigt, Später, solange sie nicht verpasst ist, Nicht heute,
+  die ihre Wahl jeweils darunter öffnen, und Erledigt und in den Papierkorb; ein Klick auf das
+  Kästchen einer Karte hakt ab und öffnet nichts. Ein Auslassen oder Morgen in der App zeigt oben
+  keine Meldung; Strg+Z oder Bearbeiten ▸ Rückgängig nimmt es zurück, und die Fälligkeit, die Morgen
+  hinzugefügt hat, geht mit.
   „Ganztägiges erinnert ab“ ist eine Uhrzeit, die in den Einstellungen unter „Alarme“ eingetippt
   wird. Der <strong>Alarmton</strong> ist der eigene Klang von Old Brain Fix oder eine Tondatei
   („Tondatei wählen…“, „Eigenen Klang verwenden“). Die App spielt ihn selbst ab, daher bleiben die
@@ -328,7 +334,8 @@
 <p>
   Auf dem Desktop erscheint der Verlauf in der mittleren Spalte, mit demselben Inhalt wie auf dem
   Handy; er öffnet aus dem Rechtsklick-Menü oder ⋮ einer Zeile und mit dem Knopf Verlauf neben der
-  Überschrift des Editors der Routine, der sich dann schließt. Alt+Links, die Zurück-Taste der Maus
+  Überschrift des Editors der Routine, der sich dann schließt. Was ausgelassen wurde, steht neben
+  jeder Einhaltung, „· 3 ausgelassen“. Alt+Links, die Zurück-Taste der Maus
   oder der Pfeil über der Liste führen dorthin zurück, wo er geöffnet wurde. „Serien auf diesem
   Computer zeigen“ in den Einstellungen unter „Verlauf“ schaltet die Serien auf dem Desktop ab.
 </p>
@@ -458,7 +465,9 @@
   und Erinnerungen</strong>, <strong>Neue Routine oder Erinnerung</strong> und in Erweitert
   <strong>Neue Einheit</strong>. Ein Klick auf den
   Text einer Fälligkeit öffnet ihren Editor als Dialog über dem Fenster; ein Rechtsklick oder ⋮
-  öffnet ein Menü mit <strong>Verlauf</strong> bei einer Routine und <strong>Teilen</strong>.
+  öffnet ein Menü mit <strong>Später</strong> und <strong>Nicht heute</strong>, jeweils unter
+  seiner Überschrift wie auf dem Handy, dann <strong>Verlauf</strong> bei einer Routine und
+  <strong>Teilen</strong>.
   „Abgehaktes auf der Agenda ausblenden“ in den Einstellungen unter „Agenda“ blendet Abgehaktes in
   der Agenda des Desktops aus wie auf dem Handy, nur auf diesem Computer. „Notiz in den Papierkorb
   legen, wenn ihre einmalige Erinnerung erledigt ist“, ebenfalls dort, ist dieselbe Einstellung wie
@@ -525,7 +534,7 @@
 <li>Schalte <strong>Routinen und Erinnerungen in einen Kalender schreiben</strong> ein.</li>
 <li>Wähle den Kalender, in den geschrieben wird.</li>
 </box-tab>
-<box-tab device="desktop" alt="Die Agenda am Desktop mit dem offenen Menü der Snack-Zeile, mit Verlauf und Teilen">
+<box-tab device="desktop" alt="Die Agenda am Desktop mit dem offenen Menü der Snack-Zeile, mit Nicht heute, Verlauf und Teilen">
 <li>Klicke ⋮ an einer Routine auf der Agenda.</li>
 <li>Klicke <strong>Teilen</strong>.</li>
 <li>Wähle, wo die Kalenderdatei gespeichert wird.</li>

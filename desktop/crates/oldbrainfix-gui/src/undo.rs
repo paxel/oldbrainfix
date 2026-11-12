@@ -1,6 +1,6 @@
 //! What Ctrl+Z and Edit ▸ Undo take back on the desktop (#268, Q646
-//! (c)): the last delete of what can be restored, check-off, filing or
-//! Merge, in place of asking before it. Deleting what comes back asks
+//! (c)): the last delete of what can be restored, check-off, Skip or
+//! Tomorrow (#269), filing or Merge, in place of asking before it. Deleting what comes back asks
 //! nothing; deleting for good still asks once.
 //!
 //! An undo uses the restore the cores have and writes nothing more than
@@ -47,6 +47,13 @@ pub enum Undo {
         routine: String,
         occurrence: Occurrence,
         trashed: Option<String>,
+    },
+    /// The Occurrence of the Routine skipped, by Skip or by Tomorrow
+    /// (#269); its undo takes the skip back, and an Occurrence Tomorrow
+    /// added goes with it.
+    Skip {
+        routine: String,
+        occurrence: Occurrence,
     },
     /// The Frog checked off.
     FrogEaten(String),
@@ -143,6 +150,19 @@ impl Undo {
                         }
                         Ok(())
                     })?;
+                }
+            }
+            Undo::Skip {
+                routine,
+                occurrence,
+            } => {
+                // A sync or another answer may have got there first.
+                let routines = Routines::new(store);
+                let skipped = routines
+                    .by_id(&routine)?
+                    .is_some_and(|r| r.skipped_at(&occurrence).is_some());
+                if skipped && store.may_check_off(&routine)? {
+                    routines.unskip(&routine, &occurrence)?;
                 }
             }
             Undo::FrogEaten(id) => {
