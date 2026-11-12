@@ -162,6 +162,7 @@ use crate::session_view::{self, PicksShown, SessionAction, SessionCardShown, Ses
 use crate::setting_badges::{
     BadgeValue, badge, badge_dialog, badge_row, badge_switch, menu_entry, switch_icon,
 };
+use crate::settings_search;
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
@@ -1984,6 +1985,11 @@ pub struct App {
     /// scrolled to for the frames it is kept, while the dialog finds its
     /// size.
     settings_section: Option<(String, u8)>,
+    /// What is typed into the search at the top of the Settings (#282),
+    /// kept into About or Send feedback and back, gone when they close.
+    settings_query: String,
+    /// Ctrl+F over the Settings: the cursor goes into their search.
+    settings_find: bool,
     /// Syncs that need an update of the app here or on another Device,
     /// and settings a newer version saved that were kept (ADR 0034), each
     /// announced once, which Device behind the click (ADR 0019).
@@ -2401,6 +2407,8 @@ impl App {
             notice: None,
             notice_dialog: None,
             settings_section: None,
+            settings_query: String::new(),
+            settings_find: false,
             updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
             card_form: CardForm::default(),
@@ -5696,6 +5704,8 @@ impl App {
             Action::OpenPage(page) => {
                 self.save_text()?;
                 self.pages = vec![page];
+                // Opened anew, the Settings show everything (#282).
+                self.settings_query.clear();
             }
             Action::PageInto(page) => {
                 if page == Page::Feedback {
@@ -5706,7 +5716,10 @@ impl App {
             Action::PageBack => {
                 self.pages.pop();
             }
-            Action::ClosePage => self.pages.clear(),
+            Action::ClosePage => {
+                self.pages.clear();
+                self.settings_query.clear();
+            }
             Action::NewNote => {
                 // One dialog at a time: the Note open is kept and closed.
                 self.leave_note()?;
@@ -13379,7 +13392,37 @@ impl App {
             }
         };
         ui.heading(RichText::new(t.settings_title()).color(text));
-        ui.label(RichText::new(t.settings_intro()).color(weak));
+        // The search above the page it filters (#282), staying while the
+        // page scrolls; Ctrl+F puts the cursor into it, nothing on opening.
+        let finds = ui.ctx().memory(|m| m.top_modal_layer()) == Some(ui.layer_id())
+            && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::F));
+        self.settings_find |= finds;
+        let searched = self.settings_query.clone();
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::SEARCH, 20.0, weak);
+            let field = ui.add(
+                TextEdit::singleline(&mut self.settings_query)
+                    .id(Id::new("settings search"))
+                    .hint_text(t.settings_search_hint())
+                    .text_color(text)
+                    .desired_width(ui.available_width() - 32.0),
+            );
+            name_field(ui, &field, t.settings_search_hint());
+            text_menu::show(ui, &t, &field, &self.settings_query);
+            if std::mem::take(&mut self.settings_find) {
+                field.request_focus();
+            }
+            if !self.settings_query.is_empty()
+                && icon_button(ui, icons::CLOSE, t.clear_search(), text).clicked()
+            {
+                self.settings_query.clear();
+            }
+        });
+        let typed = self.settings_query.trim().to_string();
+        let query = settings_search::query_of(&typed);
+        if query.is_empty() {
+            ui.label(RichText::new(t.settings_intro()).color(weak));
+        }
         ui.add_space(8.0);
         let quiet_text = &mut self.quiet_text;
         let all_day_text = &mut self.all_day_text;
@@ -13426,36 +13469,89 @@ impl App {
                 );
             }
         };
-        egui::ScrollArea::vertical()
+        let q = query.as_str();
+        // Whether a search shows any setting, for the line that says
+        // when none does.
+        let mut found = false;
+        let mut scroll = egui::ScrollArea::vertical()
             .id_salt("settings")
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.y = 16.0;
-                ui.add_space(4.0);
+            .auto_shrink([false, false]);
+        // A new search starts at the top.
+        if self.settings_query != searched {
+            scroll = scroll.vertical_scroll_offset(0.0);
+        }
+        scroll.show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 16.0;
+            ui.add_space(4.0);
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_computer()),
+                [
+                    &[t.alerts_switch(), t.alerts_detail()],
+                    &[t.autostart_switch(), t.autostart_detail()],
+                    &[t.bigger_switch(), t.bigger_detail()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_computer(), "computer");
-                    let mut on = alerts;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.alerts_switch()).color(text))
+                    if shows[0] {
+                        let mut on = alerts;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.alerts_switch()).color(text),
+                        )
                         .changed()
-                    {
-                        actions.push(Action::Setting(Setting::Alerts(on)));
+                        {
+                            actions.push(Action::Setting(Setting::Alerts(on)));
+                        }
+                        ui.label(RichText::new(t.alerts_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.alerts_detail()).small().color(weak));
-                    let mut on = autostart;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.autostart_switch()).color(text))
+                    if shows[1] {
+                        let mut on = autostart;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.autostart_switch()).color(text),
+                        )
                         .changed()
-                    {
-                        actions.push(Action::Setting(Setting::Autostart(on)));
+                        {
+                            actions.push(Action::Setting(Setting::Autostart(on)));
+                        }
+                        ui.label(RichText::new(t.autostart_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.autostart_detail()).small().color(weak));
-                    let mut on = bigger;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.bigger_switch()).color(text))
+                    if shows[2] {
+                        let mut on = bigger;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.bigger_switch()).color(text),
+                        )
                         .changed()
-                    {
-                        actions.push(Action::Setting(Setting::Bigger(on)));
+                        {
+                            actions.push(Action::Setting(Setting::Bigger(on)));
+                        }
+                        ui.label(RichText::new(t.bigger_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.bigger_detail()).small().color(weak));
                 });
+            }
+            // The AI port's card is one setting: who may connect and
+            // opening the port.
+            let [port] = settings_search::rows(
+                q,
+                Some(t.ai_port_title()),
+                [&[
+                    t.ai_port_intro(),
+                    t.ai_reach_heading(),
+                    t.ai_reach_local(),
+                    t.ai_reach_docker(),
+                    t.ai_port_open(),
+                ]],
+            );
+            if port {
+                found = true;
                 let ai_shown = ai_view::PortShown {
                     at: section.as_deref() == Some(AI_PORT_SECTION),
                     url: ai_url.as_deref(),
@@ -13467,6 +13563,14 @@ impl App {
                 if let Some(asked) = ai_view::port_card(ui, &t, tones, ai_shown) {
                     actions.push(Action::Ai(asked));
                 }
+            }
+            let [feedback] = settings_search::rows(
+                q,
+                None,
+                [&[t.feedback_title(), t.feedback_settings_detail()]],
+            );
+            if feedback {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     if ui
                         .button(RichText::new(t.feedback_title()).color(text))
@@ -13480,6 +13584,11 @@ impl App {
                             .color(weak),
                     );
                 });
+            }
+            let [about] =
+                settings_search::rows(q, None, [&[t.about_title(), t.about_settings_detail()]]);
+            if about {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     if ui
                         .button(RichText::new(t.about_title()).color(text))
@@ -13489,132 +13598,161 @@ impl App {
                     }
                     ui.label(RichText::new(t.about_settings_detail()).small().color(weak));
                 });
+            }
+            // The hotkey is one setting, with the command beside it.
+            let [capture] = settings_search::rows(
+                q,
+                Some(t.quick_capture_heading()),
+                [&[t.hotkey_label(), t.capture_command()]],
+            );
+            if capture {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);
                 });
+            }
+            let rows = quick_note_rows(&t, &quick);
+            let shows = quick_note_shows(q, &t, &rows);
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    quick_note_card(ui, &t, &quick, actions);
+                    quick_note_card(ui, &t, (&quick, &rows, &shows), actions);
                 });
-                if let Some(speech) = speech {
+            }
+            if let Some(speech) = speech {
+                // The speech model is one setting: the model chosen.
+                let [model] = settings_search::rows(
+                    q,
+                    Some(t.speech_model_title()),
+                    [&[
+                        t.speech_model_intro(),
+                        t.speech_model_choice(),
+                        t.speech_model_pick(),
+                    ]],
+                );
+                if model {
+                    found = true;
                     embossed(ui, tones, false, None, |ui| {
                         if let Some(asked) = media_view::speech_card(ui, &t, speech) {
                             actions.push(Action::Speech(asked));
                         }
                     });
                 }
+            }
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_alarms()),
+                [
+                    &[t.renag_device(), t.settings_renag_detail()],
+                    &[t.all_day_from(), t.all_day_from_detail()],
+                    &[t.alarm_sound(), t.alarm_sound_detail()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_alarms(), "alarms");
-                    let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
-                    if !choices.contains(&renag) {
-                        choices.push(renag);
-                        choices.sort();
-                    }
-                    minutes_choice(ui, t.renag_device(), &t, renag, &choices, |m| {
-                        actions.push(Action::Setting(Setting::Renag(m)));
-                    });
-                    ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(t.all_day_from()).color(text));
-                        let field = ui.add(
-                            TextEdit::singleline(all_day_text)
-                                .id(Id::new("all day from"))
-                                .hint_text(t.time_hint())
-                                .text_color(text)
-                                .desired_width(60.0),
-                        );
-                        text_menu::show(ui, &t, &field, all_day_text);
-                        if field.changed()
-                            && let Some(time) = ClockTime::parse(all_day_text.trim())
-                            && time != all_day_from
-                        {
-                            actions.push(Action::Setting(Setting::AllDayFrom(time)));
+                    if shows[0] {
+                        let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
+                        if !choices.contains(&renag) {
+                            choices.push(renag);
+                            choices.sort();
                         }
-                    });
-                    if ClockTime::parse(all_day_text.trim()).is_none() {
-                        ui.label(
-                            RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
-                        );
+                        minutes_choice(ui, t.renag_device(), &t, renag, &choices, |m| {
+                            actions.push(Action::Setting(Setting::Renag(m)));
+                        });
+                        ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.all_day_from_detail()).small().color(weak));
-                    alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    heading(ui, t.settings_nudges(), "nudges");
-                    ui.label(
-                        RichText::new(t.nudge_settings_explain())
-                            .small()
-                            .color(weak),
-                    );
-                    let mut choices: Vec<i64> = NUDGE_REPEAT_CHOICES.to_vec();
-                    if !choices.contains(&repeat) {
-                        choices.push(repeat);
-                        choices.sort();
-                    }
-                    minutes_choice(ui, t.nudge_repeat(), &t, repeat, &choices, |m| {
-                        actions.push(Action::Setting(Setting::NudgeRepeat(m)));
-                    });
-                    let mut on = quiet_on;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.quiet_hours()).color(text))
-                        .changed()
-                    {
-                        actions.push(Action::Setting(Setting::QuietOn(on)));
-                    }
-                    if !quiet_on {
-                        return;
-                    }
-                    let mut typed = None;
-                    ui.horizontal(|ui| {
-                        for (label, value, id, start) in [
-                            (t.quiet_from(), &mut quiet_text.0, "quiet from", true),
-                            (t.quiet_until(), &mut quiet_text.1, "quiet until", false),
-                        ] {
-                            ui.label(RichText::new(label).color(text));
+                    if shows[1] {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(t.all_day_from()).color(text));
                             let field = ui.add(
-                                TextEdit::singleline(value)
-                                    .id(Id::new(id))
+                                TextEdit::singleline(all_day_text)
+                                    .id(Id::new("all day from"))
                                     .hint_text(t.time_hint())
                                     .text_color(text)
                                     .desired_width(60.0),
                             );
-                            text_menu::show(ui, &t, &field, value);
+                            text_menu::show(ui, &t, &field, all_day_text);
                             if field.changed()
-                                && let Some(time) = ClockTime::parse(value.trim())
+                                && let Some(time) = ClockTime::parse(all_day_text.trim())
+                                && time != all_day_from
                             {
-                                typed = Some((start, time));
+                                actions.push(Action::Setting(Setting::AllDayFrom(time)));
                             }
+                        });
+                        if ClockTime::parse(all_day_text.trim()).is_none() {
+                            ui.label(
+                                RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
+                            );
                         }
-                    });
-                    if let Some((start, time)) = typed {
-                        let changed = if start {
-                            QuietHours {
-                                start: time,
-                                ..quiet
-                            }
-                        } else {
-                            QuietHours { end: time, ..quiet }
-                        };
-                        if changed != quiet {
-                            actions.push(Action::Setting(Setting::Quiet(changed)));
-                        }
+                        ui.label(RichText::new(t.all_day_from_detail()).small().color(weak));
                     }
-                    let unreadable = [&quiet_text.0, &quiet_text.1]
-                        .iter()
-                        .any(|v| ClockTime::parse(v.trim()).is_none());
-                    if unreadable {
-                        ui.label(
-                            RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
-                        );
+                    if shows[2] {
+                        alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
                     }
                 });
+            }
+            // The Quiet Hours are one setting with their From and Until.
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_nudges()),
+                [
+                    &[t.nudge_settings_explain()],
+                    &[t.nudge_repeat()],
+                    &[t.quiet_hours(), t.quiet_from(), t.quiet_until()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    heading(ui, t.settings_nudges(), "nudges");
+                    if shows[0] {
+                        ui.label(
+                            RichText::new(t.nudge_settings_explain())
+                                .small()
+                                .color(weak),
+                        );
+                    }
+                    if shows[1] {
+                        let mut choices: Vec<i64> = NUDGE_REPEAT_CHOICES.to_vec();
+                        if !choices.contains(&repeat) {
+                            choices.push(repeat);
+                            choices.sort();
+                        }
+                        minutes_choice(ui, t.nudge_repeat(), &t, repeat, &choices, |m| {
+                            actions.push(Action::Setting(Setting::NudgeRepeat(m)));
+                        });
+                    }
+                    if shows[2] {
+                        quiet_hours(ui, &t, (quiet_on, quiet), quiet_text, actions);
+                    }
+                });
+            }
+            let region = match region_units {
+                UnitSystem::Metric => t.unit_system_metric_name(),
+                UnitSystem::Imperial => t.unit_system_imperial_name(),
+            };
+            let region = t.unit_system_region(region);
+            // The units have no label of their own: found by their detail
+            // line and their options.
+            let [unit] = settings_search::rows(
+                q,
+                Some(t.settings_units()),
+                [&[
+                    t.settings_units_detail(),
+                    &region,
+                    t.unit_system_metric(),
+                    t.unit_system_imperial(),
+                ]],
+            );
+            if unit {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_units(), "units");
                     ui.label(RichText::new(t.settings_units_detail()).small().color(weak));
-                    let region = match region_units {
-                        UnitSystem::Metric => t.unit_system_metric_name(),
-                        UnitSystem::Imperial => t.unit_system_imperial_name(),
-                    };
                     let options = [
-                        (None, t.unit_system_region(region)),
+                        (None, region.clone()),
                         (Some(UnitSystem::Metric), t.unit_system_metric().to_string()),
                         (
                             Some(UnitSystem::Imperial),
@@ -13626,39 +13764,65 @@ impl App {
                         actions.push(Action::Setting(Setting::Units(chosen)));
                     }
                 });
+            }
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_agenda()),
+                [
+                    &[
+                        t.hide_checked_on_agenda(),
+                        t.hide_checked_on_agenda_detail_device(),
+                    ],
+                    &[t.trash_done_reminder(), t.trash_done_reminder_detail()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_agenda(), "agenda");
-                    let mut on = hides_checked;
-                    if theme::checkbox(
-                        ui,
-                        &mut on,
-                        RichText::new(t.hide_checked_on_agenda()).color(text),
-                    )
-                    .changed()
-                    {
-                        actions.push(Action::Setting(Setting::HideChecked(on)));
+                    if shows[0] {
+                        let mut on = hides_checked;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.hide_checked_on_agenda()).color(text),
+                        )
+                        .changed()
+                        {
+                            actions.push(Action::Setting(Setting::HideChecked(on)));
+                        }
+                        ui.label(
+                            RichText::new(t.hide_checked_on_agenda_detail_device())
+                                .small()
+                                .color(weak),
+                        );
                     }
-                    ui.label(
-                        RichText::new(t.hide_checked_on_agenda_detail_device())
-                            .small()
-                            .color(weak),
-                    );
-                    let mut on = trashes_done;
-                    if theme::checkbox(
-                        ui,
-                        &mut on,
-                        RichText::new(t.trash_done_reminder()).color(text),
-                    )
-                    .changed()
-                    {
-                        actions.push(Action::Setting(Setting::TrashDoneReminder(on)));
+                    if shows[1] {
+                        let mut on = trashes_done;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.trash_done_reminder()).color(text),
+                        )
+                        .changed()
+                        {
+                            actions.push(Action::Setting(Setting::TrashDoneReminder(on)));
+                        }
+                        ui.label(
+                            RichText::new(t.trash_done_reminder_detail())
+                                .small()
+                                .color(weak),
+                        );
                     }
-                    ui.label(
-                        RichText::new(t.trash_done_reminder_detail())
-                            .small()
-                            .color(weak),
-                    );
                 });
+            }
+            let [streak] = settings_search::rows(
+                q,
+                Some(t.settings_history()),
+                [&[t.show_streaks_device(), t.show_streaks_detail()]],
+            );
+            if streak {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_history(), "history");
                     let mut on = streaks;
@@ -13673,8 +13837,22 @@ impl App {
                     }
                     ui.label(RichText::new(t.show_streaks_detail()).small().color(weak));
                 });
-                // Simple or Advanced, the person's (#197), last, so
-                // the settings of this computer come first.
+            }
+            // Simple or Advanced, the person's (#197), last, so the
+            // settings of this computer come first; found by its options.
+            let [features] = settings_search::rows(
+                q,
+                Some(t.features()),
+                [&[
+                    t.features_detail(),
+                    t.features_simple(),
+                    t.features_simple_detail(),
+                    t.features_advanced(),
+                    t.features_advanced_detail(),
+                ]],
+            );
+            if features {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.features(), "features");
                     let mut picked = advanced;
@@ -13682,7 +13860,11 @@ impl App {
                         actions.push(Action::Setting(Setting::Advanced(picked)));
                     }
                 });
-            });
+            }
+            if !found {
+                ui.label(RichText::new(t.settings_search_nothing(&typed)).color(text));
+            }
+        });
     }
 
     /// The Routines and Reminders in the trash on their own, each with
@@ -15458,19 +15640,12 @@ fn quick_capture_card(
     ui.label(RichText::new(t.capture_command()).small().color(weak));
 }
 
-/// The Settings' card on what the quick note, its dialog in the window
-/// and the popup, shows besides its text (#142): one switch for each of the Note
-/// card's buttons and the format bar, off until switched on, and the
-/// Nudge buttons, on until switched off.
-fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<Action>) {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
-    ui.label(
-        RichText::new(t.settings_quick_note_detail_device())
-            .small()
-            .color(weak),
-    );
+/// A switch of the quick note's card: what it shows and its label.
+type QuickNoteSwitch = (QuickNoteControl, bool, &'static str);
+
+/// The switches of the Settings' card on the quick note (#142) offered
+/// here, one for each of the Note card's buttons and the format bar.
+fn quick_note_rows(t: &L10n, quick: &QuickNote) -> Vec<QuickNoteSwitch> {
     let switches = [
         (QuickNoteControl::FileInto, quick.file_into, t.file_into()),
         (
@@ -15494,21 +15669,67 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
             t.quick_note_format_bar(),
         ),
     ];
-    for (control, shows, label) in switches {
-        // The format bar, Frogs, Sessions and Tallies are offered only in
-        // Advanced (#197); the alarm clock offers a Routine or Reminder
-        // without the switch (#223).
-        if matches!(
-            control,
-            QuickNoteControl::FormatBar | QuickNoteControl::Schedule
-        ) && !quick.advanced
-        {
+    // The format bar, Frogs, Sessions and Tallies are offered only in
+    // Advanced (#197); the alarm clock offers a Routine or Reminder
+    // without the switch (#223).
+    switches
+        .into_iter()
+        .filter(|(control, _, _)| {
+            quick.advanced
+                || !matches!(
+                    control,
+                    QuickNoteControl::FormatBar | QuickNoteControl::Schedule
+                )
+        })
+        .collect()
+}
+
+/// Which rows of the quick note's card the search `query` shows (#282):
+/// its detail line, each of `switches` and the Nudge buttons, in order.
+fn quick_note_shows(query: &str, t: &L10n, switches: &[QuickNoteSwitch]) -> Vec<bool> {
+    let whole = settings_search::heading_matches(query, Some(t.settings_quick_note()));
+    let shows = |words: &[&str]| whole || settings_search::matches(words, query);
+    let mut rows = vec![shows(&[t.settings_quick_note_detail_device()])];
+    rows.extend(switches.iter().map(|(_, _, label)| shows(&[label])));
+    rows.push(shows(&[
+        t.quick_note_nudge_buttons(),
+        t.quick_note_nudge_buttons_detail(),
+    ]));
+    rows
+}
+
+/// The Settings' card on what the quick note, its dialog in the window
+/// and the popup, shows besides its text (#142): one switch for each of
+/// the Note card's `switches`, off until switched on, and the Nudge
+/// buttons, on until switched off; of them the rows `shows` (#282).
+fn quick_note_card(
+    ui: &mut Ui,
+    t: &L10n,
+    (quick, switches, shows): (&QuickNote, &[QuickNoteSwitch], &[bool]),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let shown = |row: usize| shows.get(row).copied().unwrap_or(true);
+    ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
+    if shown(0) {
+        ui.label(
+            RichText::new(t.settings_quick_note_detail_device())
+                .small()
+                .color(weak),
+        );
+    }
+    for (row, &(control, on, label)) in switches.iter().enumerate() {
+        if !shown(row + 1) {
             continue;
         }
-        let mut on = shows;
+        let mut on = on;
         if theme::checkbox(ui, &mut on, RichText::new(label).color(text)).changed() {
             actions.push(Action::Setting(Setting::QuickNote(control, on)));
         }
+    }
+    if !shown(switches.len() + 1) {
+        return;
     }
     let mut on = quick.nudge_buttons;
     if theme::checkbox(
@@ -15525,6 +15746,73 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
             .small()
             .color(weak),
     );
+}
+
+/// The Settings' Quiet Hours (`on` and the hours): their switch and,
+/// while on, their From and Until as `typed`, each kept once it reads as
+/// a time.
+fn quiet_hours(
+    ui: &mut Ui,
+    t: &L10n,
+    (on, quiet): (bool, QuietHours),
+    typed: &mut (String, String),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let mut switched = on;
+    if theme::checkbox(
+        ui,
+        &mut switched,
+        RichText::new(t.quiet_hours()).color(text),
+    )
+    .changed()
+    {
+        actions.push(Action::Setting(Setting::QuietOn(switched)));
+    }
+    if !on {
+        return;
+    }
+    let mut changed_to = None;
+    ui.horizontal(|ui| {
+        for (label, value, id, start) in [
+            (t.quiet_from(), &mut typed.0, "quiet from", true),
+            (t.quiet_until(), &mut typed.1, "quiet until", false),
+        ] {
+            ui.label(RichText::new(label).color(text));
+            let field = ui.add(
+                TextEdit::singleline(value)
+                    .id(Id::new(id))
+                    .hint_text(t.time_hint())
+                    .text_color(text)
+                    .desired_width(60.0),
+            );
+            text_menu::show(ui, t, &field, value);
+            if field.changed()
+                && let Some(time) = ClockTime::parse(value.trim())
+            {
+                changed_to = Some((start, time));
+            }
+        }
+    });
+    if let Some((start, time)) = changed_to {
+        let changed = if start {
+            QuietHours {
+                start: time,
+                ..quiet
+            }
+        } else {
+            QuietHours { end: time, ..quiet }
+        };
+        if changed != quiet {
+            actions.push(Action::Setting(Setting::Quiet(changed)));
+        }
+    }
+    let unreadable = [&typed.0, &typed.1]
+        .iter()
+        .any(|v| ClockTime::parse(v.trim()).is_none());
+    if unreadable {
+        ui.label(RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color));
+    }
 }
 
 /// The Settings' alarm sound (#102): the own chime or the file chosen,

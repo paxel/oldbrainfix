@@ -1239,7 +1239,7 @@ replace a law of Both apps where they say so. A desktop law marked
   (#274). Ctrl+F searches the list shown where it has a search field
   (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
   finds its Routines, Reminders and Frogs by their Note), else All
-  Notes'. On the desktop the menu bar leads to Settings, Backups and
+  Notes'; over the Settings dialog it searches the Settings (#282). On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
 - **The Area menu acts on the Area or Topic the list shows** (#279):
   Rename (F2), Colour and icon, Share…, People, Export as Pack… and
@@ -1470,6 +1470,21 @@ replace a law of Both apps where they say so. A desktop law marked
   embossed as a Note's, its heading strong on top (This computer,
   Alarms, Nudges, Units, Agenda, History, Features, …), its settings
   under it, each with its small weak detail line.
+- **A search field sits at the top of the Settings dialog** (#282),
+  under its heading and above the intro line, staying there while the
+  cards scroll; nothing focuses it on opening, so Alt+Left and Esc keep
+  leaving, and Ctrl+F while the Settings show puts the cursor into it.
+  It filters as on the phone (Phone ▸ Settings): every word typed in a
+  setting's label, detail line or, without a label of its own, its
+  options' names, in any case, in the app's language; each under its
+  card's heading, a card left out when none of its settings match, a
+  heading that matches showing its card whole. A card drawn as one
+  piece (the AI port, Quick capture, the speech model, Units, Features)
+  is one setting. The intro line goes while a search runs, and a search
+  that finds nothing says so in the dialog ("No setting matches “…”."),
+  not at the top. ✕ in the field, or emptying it, shows everything
+  again; the search stays into About or Send feedback and back, and the
+  Settings open anew with everything.
 
 ### Buttons and look
 
