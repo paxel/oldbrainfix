@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -7,6 +9,7 @@ import 'area_look.dart';
 import 'calendar_platform.dart';
 import 'card_occurrences.dart';
 import 'checklist_view.dart';
+import 'frogs_screen.dart' show FrogIcon;
 import 'l10n.dart';
 import 'look.dart';
 import 'ocr_platform.dart';
@@ -244,8 +247,8 @@ List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
 /// Transcript, both labelled and dimmed, its Capture Context as one line
 /// under its text (#170), then each of its [sections], oldest first, the
 /// same way; and under a separator its action row, icons only: file it,
-/// spawn a Routine, Reminder, Frog or Session from it, merge it, and ⋮ for
-/// the rest with words.
+/// spawn a Routine, Reminder, Frog or Session from it, merge it, a pencil
+/// opening the editor (#281) and ⋮ for the rest with words.
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -525,6 +528,17 @@ class NoteCard extends StatelessWidget {
             semanticLabel: t.importanceImportant,
           )
         : null;
+    // Only a plain Note becomes a Session (ADR 0039), and no Code text
+    // (#213); a Routine of a Session Note runs it already.
+    final spawnsNow = switch (kind) {
+      final kind? => () => [
+        for (final spawn in Spawn.values)
+          if (spawn != Spawn.session ||
+              (kind() == NoteKind.plain && note.textFormat != TextFormats.code))
+            spawn,
+      ],
+      null => null,
+    };
     // The compact view has no buttons at the bottom; its ⋮ sits top right
     // (#189).
     final menu = !full && actions != null
@@ -533,6 +547,8 @@ class NoteCard extends StatelessWidget {
             actions: actions,
             // What the action row offers, as the compact view has none.
             onFile: onFile,
+            onSchedule: onSchedule,
+            spawnsNow: spawnsNow,
             onMerge: onMerge,
           )
         : null;
@@ -658,19 +674,7 @@ class NoteCard extends StatelessWidget {
                         onSchedule: onSchedule,
                         onMerge: onMerge,
                         actions: actions,
-                        // Only a plain Note becomes a Session (ADR 0039),
-                        // and no Code text (#213); a Routine of a Session
-                        // Note runs it already.
-                        spawnsNow: switch (kind) {
-                          final kind? => () => [
-                            for (final spawn in Spawn.values)
-                              if (spawn != Spawn.session ||
-                                  (kind() == NoteKind.plain &&
-                                      note.textFormat != TextFormats.code))
-                                spawn,
-                          ],
-                          null => null,
-                        },
+                        spawnsNow: spawnsNow,
                       ),
                     ?footer,
                   ],
@@ -690,7 +694,7 @@ class NoteCard extends StatelessWidget {
 /// A Note's action row, icons only, so it stays one line in every
 /// language; the words show on a long press: file it, spawn one of
 /// [spawns] from it (a Routine, Reminder, Frog or Session), merge it, and
-/// ⋮ for the rest with words. Each is left out when its callback is
+/// at the end a pencil opening the editor and ⋮ for the rest with words. Each is left out when its callback is
 /// null. The card draws it, and so does a capture screen (#113).
 class NoteActionRow extends StatelessWidget {
   /// The Importance ⋮ marks.
@@ -735,20 +739,19 @@ class NoteActionRow extends StatelessWidget {
             icon: const Icon(Icons.alarm_add_outlined),
             onSelected: onSchedule,
             itemBuilder: (_) => [
-              for (final spawn in spawnsNow?.call() ?? spawns)
-                // Frogs and Sessions are made only in Advanced (#197).
-                if ((actions?.advanced ?? true) ||
-                    spawn == Spawn.routine ||
-                    spawn == Spawn.reminder)
-                  PopupMenuItem(
-                    value: spawn,
-                    child: Text(switch (spawn) {
-                      Spawn.routine => t.routine,
-                      Spawn.reminder => t.reminder,
-                      Spawn.frog => t.frog,
-                      Spawn.session => t.session,
-                    }),
-                  ),
+              for (final spawn in offeredSpawns(
+                spawnsNow?.call() ?? spawns,
+                advanced: actions?.advanced ?? true,
+              ))
+                PopupMenuItem(
+                  value: spawn,
+                  child: Text(switch (spawn) {
+                    Spawn.routine => t.routine,
+                    Spawn.reminder => t.reminder,
+                    Spawn.frog => t.frog,
+                    Spawn.session => t.session,
+                  }),
+                ),
             ],
           ),
         if (onMerge != null)
@@ -758,6 +761,15 @@ class NoteActionRow extends StatelessWidget {
             icon: const Icon(Icons.call_merge),
           ),
         const Spacer(),
+        // The editor in one tap, beside the long press and ⋮ ▸ Edit
+        // (#281).
+        if (actions?.onEdit case final edit?)
+          IconButton(
+            key: const ValueKey('note-pencil'),
+            tooltip: t.edit,
+            onPressed: edit,
+            icon: const Icon(Icons.edit_outlined),
+          ),
         if (actions != null)
           _MoreButton(importance: importance, actions: actions),
       ],
@@ -765,10 +777,20 @@ class NoteActionRow extends StatelessWidget {
   }
 }
 
+/// What of [spawns] a Note's menus offer, in their order: Frogs and
+/// Sessions only in Advanced (#197).
+List<Spawn> offeredSpawns(List<Spawn> spawns, {required bool advanced}) => [
+  for (final spawn in spawns)
+    if (advanced || spawn == Spawn.routine || spawn == Spawn.reminder) spawn,
+];
+
 /// The ⋮ of a card's action row, or of a compact card's top right: a menu
 /// at the button with words. It leads with Edit, then on a compact card
-/// File into… and Merge into… (#189), then, for a Note being captured, its Importance as radio
-/// buttons, the one it has marked, then Show ticks while it has boxes, then sending, sharing, copying its text, exporting it as a Pack and removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" of
+/// File into…, Routine…, Reminder…, in Advanced Frog and Session…, and
+/// Merge into… (#189, #281), then, for a Note being captured, its Importance as radio
+/// buttons, the one it has marked, then Show ticks while it has boxes, then
+/// "Share…", which opens a small menu at the button of sending, sharing,
+/// copying its text and exporting it as a Pack (#281), then removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
 /// switch, a Shopping List's three choices as radio buttons) and "Uncheck
@@ -779,15 +801,20 @@ class _MoreButton extends StatelessWidget {
   final Importance importance;
   final NoteActions actions;
 
-  /// "File into…" and "Merge into…" after Edit, for a compact card, which
-  /// has no action row (#189); left out when null.
+  /// "File into…", the Routine, Reminder, Frog and Session of
+  /// [spawnsNow] and "Merge into…" after Edit, for a compact card, which
+  /// has no action row (#189, #281); left out when null.
   final VoidCallback? onFile;
+  final ValueChanged<Spawn>? onSchedule;
+  final List<Spawn> Function()? spawnsNow;
   final VoidCallback? onMerge;
 
   const _MoreButton({
     required this.importance,
     required this.actions,
     this.onFile,
+    this.onSchedule,
+    this.spawnsNow,
     this.onMerge,
   });
 
@@ -807,9 +834,27 @@ class _MoreButton extends StatelessWidget {
         final list = actions.checklist?.call();
         final addToShopping = actions.addToShopping?.call();
         final ticks = actions.showTicks?.call();
-        PopupMenuItem<VoidCallback> item(
+        final schedule = onSchedule;
+        final spawns = schedule == null
+            ? const <Spawn>[]
+            : offeredSpawns(
+                spawnsNow?.call() ?? Spawn.values,
+                advanced: actions.advanced,
+              );
+        // Send, Share, Copy and Export as Pack under one "Share…" (#281).
+        final shares = <_MenuEntry>[
+          if (actions.onSend case final send?)
+            ('note-send', Icons.send_outlined, t.sendToPerson, send),
+          if (actions.onShare case final share?)
+            ('note-share', Icons.share_outlined, t.shareToApp, share),
+          if (actions.onCopy case final copy?)
+            ('note-copy', Icons.copy_outlined, t.copyText, copy),
+          if (actions.onExportPack case final pack?)
+            ('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
+        ];
+        PopupMenuItem<VoidCallback> drawn(
           String key,
-          IconData icon,
+          Widget icon,
           String label,
           VoidCallback run,
         ) => PopupMenuItem(
@@ -817,12 +862,18 @@ class _MoreButton extends StatelessWidget {
           value: run,
           child: Row(
             children: [
-              Icon(icon),
+              icon,
               const SizedBox(width: 12),
               Flexible(child: Text(label)),
             ],
           ),
         );
+        PopupMenuItem<VoidCallback> item(
+          String key,
+          IconData icon,
+          String label,
+          VoidCallback run,
+        ) => drawn(key, Icon(icon), label, run);
         return [
           if (actions.onEdit case final edit?) ...[
             item('note-edit', Icons.edit_outlined, t.edit, edit),
@@ -830,9 +881,29 @@ class _MoreButton extends StatelessWidget {
           ],
           if (onFile case final file?)
             item('note-file', Icons.drive_file_move_outline, t.fileInto, file),
+          if (schedule != null)
+            for (final spawn in spawns)
+              drawn(
+                'note-spawn-${spawn.name}',
+                switch (spawn) {
+                  Spawn.routine => const Icon(Icons.repeat),
+                  Spawn.reminder => const Icon(Icons.notifications_outlined),
+                  Spawn.frog => const FrogIcon(size: 24),
+                  Spawn.session => const Icon(Icons.event_repeat),
+                },
+                switch (spawn) {
+                  Spawn.routine => t.spawnRoutine,
+                  Spawn.reminder => t.spawnReminder,
+                  // A Frog is made at once, nothing asked.
+                  Spawn.frog => t.frog,
+                  Spawn.session => t.spawnSession,
+                },
+                () => schedule(spawn),
+              ),
           if (onMerge case final merge?)
             item('note-merge', Icons.call_merge, t.mergeInto, merge),
-          if (onFile != null || onMerge != null) const PopupMenuDivider(),
+          if (onFile != null || spawns.isNotEmpty || onMerge != null)
+            const PopupMenuDivider(),
           if (actions.onImportance case final set?) ...[
             // The heading the choices continue: "Importance" "Important".
             PopupMenuItem(enabled: false, child: Text(t.importance)),
@@ -866,14 +937,15 @@ class _MoreButton extends StatelessWidget {
             const PopupMenuDivider(),
           ],
           if (ticks != null) showTicksItem(button, ticks),
-          if (actions.onSend case final send?)
-            item('note-send', Icons.send_outlined, t.sendToPerson, send),
-          if (actions.onShare case final share?)
-            item('note-share', Icons.share_outlined, t.shareToApp, share),
-          if (actions.onCopy case final copy?)
-            item('note-copy', Icons.copy_outlined, t.copyText, copy),
-          if (actions.onExportPack case final pack?)
-            item('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
+          if (shares case [(final key, final icon, final label, final run)])
+            item(key, icon, label, run)
+          else if (shares.isNotEmpty)
+            item(
+              'note-share-menu',
+              Icons.share_outlined,
+              t.shareNote,
+              () => unawaited(_shareMenu(button, shares)),
+            ),
           if ((actions.onRemovePackFrom, actions.packFrom) case (
             final remove?,
             final name?,
@@ -1000,6 +1072,41 @@ class _MoreButton extends StatelessWidget {
       },
     );
   }
+}
+
+/// An entry of a card's ⋮: its key, icon, words and what it does.
+typedef _MenuEntry = (String, IconData, String, VoidCallback);
+
+/// Opens the small menu of "Share…" where [button] is, its entries with
+/// their icons and words, and does the one picked (#281).
+Future<void> _shareMenu(BuildContext button, List<_MenuEntry> entries) async {
+  final box = button.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(button).context.findRenderObject() as RenderBox?;
+  if (box == null || overlay == null) return;
+  final at = box.localToGlobal(box.size.bottomLeft(Offset.zero));
+  final picked = await showMenu<VoidCallback>(
+    context: button,
+    position: RelativeRect.fromRect(
+      overlay.globalToLocal(at) & Size.zero,
+      Offset.zero & overlay.size,
+    ),
+    items: [
+      for (final (key, icon, label, run) in entries)
+        PopupMenuItem(
+          key: ValueKey(key),
+          value: run,
+          child: Row(
+            children: [
+              Icon(icon),
+              const SizedBox(width: 12),
+              Flexible(child: Text(label)),
+            ],
+          ),
+        ),
+    ],
+  );
+  if (picked == null || !button.mounted) return;
+  picked();
 }
 
 /// The menu entry that switches Show ticks of a Note on and off, [ticks]

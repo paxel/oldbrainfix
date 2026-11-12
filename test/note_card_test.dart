@@ -41,6 +41,7 @@ void main() {
     String locale = 'en',
     double width = 800,
     bool full = false,
+    bool schedules = true,
   }) async {
     tester.view.physicalSize = Size(width, 1200);
     tester.view.devicePixelRatio = 1;
@@ -62,8 +63,12 @@ void main() {
                 showPlace: showPlace,
                 onFile: () {},
                 onMerge: () {},
-                onSchedule: (_) {},
-                actions: NoteActions(onSend: () {}, onDelete: () {}),
+                onSchedule: schedules ? (_) {} : null,
+                actions: NoteActions(
+                  onEdit: () {},
+                  onSend: () {},
+                  onDelete: () {},
+                ),
                 full: full,
               ),
             ],
@@ -133,6 +138,23 @@ void main() {
         tester.getTopLeft(menu).dx,
         greaterThan(tester.getTopRight(find.text('Ann')).dx),
       );
+    });
+
+    testWidgets('a compact card\'s ⋮ offers no Routine or Reminder to '
+        'who may not set them up (#281)', (tester) async {
+      final note = notes.capture('Buy milk');
+      await card(tester, note, schedules: false);
+
+      await tester.tap(find.byKey(const ValueKey('note-menu')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('note-file')), findsOneWidget);
+      for (final spawn in Spawn.values) {
+        expect(
+          find.byKey(ValueKey('note-spawn-${spawn.name}')),
+          findsNothing,
+          reason: spawn.name,
+        );
+      }
     });
 
     testWidgets('one\'s own Note has no Profile line', (tester) async {
@@ -233,6 +255,8 @@ void main() {
           matching: find.byIcon(Icons.alarm_add_outlined),
         ),
         find.descendant(of: row, matching: find.byIcon(Icons.call_merge)),
+        // The pencil (#281).
+        find.descendant(of: row, matching: find.byIcon(Icons.edit_outlined)),
         find.descendant(of: row, matching: find.byIcon(Icons.more_vert)),
       ];
       final centre = tester.getCenter(buttons.first).dy;
@@ -301,7 +325,7 @@ void main() {
       await menu(tester, 'Buy milk');
 
       for (final words in [
-        'Send to a person',
+        'Share…',
         'Add to calendar',
         'Add to Note',
         'Delete',
@@ -337,6 +361,7 @@ void main() {
     testWidgets('Send to a person sends it as a Sent Item', (tester) async {
       notes.capture('Dentist on Friday');
       await menu(tester, 'Dentist on Friday');
+      await pick(tester, 'note-share-menu');
       await pick(tester, 'note-send');
 
       expect(find.byType(SendNoteDialog), findsOneWidget);

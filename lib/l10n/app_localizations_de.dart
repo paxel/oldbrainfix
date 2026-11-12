@@ -452,6 +452,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get reminder => 'Erinnerung';
 
   @override
+  String get spawnRoutine => 'Routine …';
+
+  @override
+  String get spawnReminder => 'Erinnerung …';
+
+  @override
+  String get spawnSession => 'Einheit …';
+
+  @override
   String get newRoutine => 'Neue Routine';
 
   @override
@@ -4526,6 +4535,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shareToApp => 'Mit einer App teilen';
+
+  @override
+  String get shareNote => 'Teilen …';
 
   @override
   String get noteNotShared => 'Die Notiz wurde nicht geteilt.';

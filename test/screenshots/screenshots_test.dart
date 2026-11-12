@@ -2187,6 +2187,8 @@ void main() {
                 matching: find.byKey(const ValueKey('note-menu')),
               ),
             );
+            // Send and Share to an app are under Share… (#281).
+            await _tap(tester, find.byKey(const ValueKey('note-share-menu')));
             return t;
           }
 

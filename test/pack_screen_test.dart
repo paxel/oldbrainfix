@@ -211,6 +211,7 @@ void main() {
           matching: find.byKey(const ValueKey('note-menu')),
         ),
       );
+      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
       await tap(tester, find.byKey(const ValueKey('note-pack')));
       expect(find.byType(PackExportScreen), findsOneWidget);
       expect(find.text('Training'), findsWidgets);

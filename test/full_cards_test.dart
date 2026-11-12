@@ -267,6 +267,7 @@ void main() {
       await openAllNotes(tester);
 
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
       await tap(tester, find.byKey(const ValueKey('note-copy')));
       expect(copied, ['Pack ✅ the tent\n\nMerged in\n\nAmended later']);
       expect(find.byType(NoteEditorScreen), findsNothing);

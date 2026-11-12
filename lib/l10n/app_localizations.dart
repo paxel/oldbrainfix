@@ -884,6 +884,24 @@ abstract class AppLocalizations {
   /// **'Reminder'**
   String get reminder;
 
+  /// Entry in a compact Note card's ⋮ menu that opens the editor of a new Routine for the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine…'**
+  String get spawnRoutine;
+
+  /// Entry in a compact Note card's ⋮ menu that opens the editor of a new Reminder for the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder…'**
+  String get spawnReminder;
+
+  /// Entry in a compact Note card's ⋮ menu, in Advanced, that opens the editor of a new Session run from the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Session…'**
+  String get spawnSession;
+
   /// No description provided for @newRoutine.
   ///
   /// In en, this message translates to:
@@ -7195,6 +7213,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Share to an app'**
   String get shareToApp;
+
+  /// Entry in a Note card's ⋮ menu that opens a small menu with Send to a person, Share to an app, Copy text and Export as Pack…
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get shareNote;
 
   /// Announced when a Note could not be handed to another app; the tap shows why and what to do.
   ///

@@ -269,9 +269,11 @@ replace a law of Both apps where they say so. A desktop law marked
   its name, the next run of any of its Routines and "done 4 / skipped 1
   this week" over all of them (#191); a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
-  the card** (File into, Routine, Merge); **its ⋮ sits top right** and
-  offers File into… and Merge into… after Edit, as far as the action row
-  would. In the detailed view a Shopping List shows its open Lines,
+  the card** (File into, Routine, Merge, the pencil); **its ⋮ sits top
+  right** and offers after Edit File into…, Routine…, Reminder…, in
+  Advanced Frog and Session… (#197), and Merge into…, as far as the
+  action row would (#281): the spawns only for who may set them up
+  (ADR 0013) and Session… only on a plain Note. In the detailed view a Shopping List shows its open Lines,
   tickable, the struck ones folded under them ("2 struck through") until
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
@@ -317,8 +319,16 @@ replace a law of Both apps where they say so. A desktop law marked
   off, moves the Note with the Reminder to the trash and closes the
   editor. On the desktop the same lines open the Note dialog, Done on the
   accent and "Done and move to trash" on the error colour.
-- **Copy text** in a card's ⋮ puts the text of the Note and of each
-  Section on the clipboard as they show, oldest first, a blank line
+- **A card's ⋮ on the phone stays short** (#281): Send to a person,
+  Share to an app, Copy text and Export as Pack… are one entry,
+  **Share…**, after Show ticks, which opens a small menu of the four at
+  the ⋮; the Importance is not in it (the editor's badge and the
+  selection change it, #182, #273).
+- **The detailed card's action row has a pencil** (#281), right before
+  its ⋮: one tap opens the Note editor, as the long press and ⋮ ▸ Edit
+  do.
+- **Copy text** in a card's ⋮ (under Share… on the phone) puts the text
+  of the Note and of each Section on the clipboard as they show, oldest first, a blank line
   between them, and says nothing (#183).
 - **A Section's text is edited in place in the Note editor** (#183), in
   the same field and with the same format bar as the Note's text, by the
@@ -425,7 +435,8 @@ replace a law of Both apps where they say so. A desktop law marked
   in either view, until "Remove “From Ann”" in the card's ⋮ or its badge
   in the Note editor takes it away.
 - **"Export as Pack…"** (#164) is in the menu of every Area and Topic,
-  for anyone who may read them, in a Note card's ⋮ after Copy text and
+  for anyone who may read them, in a Note card's ⋮ after Copy text
+  (under Share… on the phone, #281) and
   on the Note editor's bar after Share to an app (`inventory_2`). It
   opens the Pack's tree: Areas and Topics as headings, each Note with
   its kind's icon and its first line, under it its files with their
@@ -997,8 +1008,8 @@ replace a law of Both apps where they say so. A desktop law marked
   it, Save is announced as failed with Share as the fix), and only while
   its file is on the phone. Saved and copied say nothing, nor does
   a share sheet left without an app; a failure is announced.
-- The editor opens only through a long press on the card or Edit in its
-  ⋮.
+- The editor opens only through a long press on the card, Edit in its
+  ⋮ or the pencil of a detailed card's action row (#281).
 - In the Note editor a text that is only read, the Note's or a
   Section's, selects with a long press, with Copy in the system's menu
   (#183).

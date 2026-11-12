@@ -448,6 +448,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reminder => 'Reminder';
 
   @override
+  String get spawnRoutine => 'Routine…';
+
+  @override
+  String get spawnReminder => 'Reminder…';
+
+  @override
+  String get spawnSession => 'Session…';
+
+  @override
   String get newRoutine => 'New Routine';
 
   @override
@@ -4476,6 +4485,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareToApp => 'Share to an app';
+
+  @override
+  String get shareNote => 'Share…';
 
   @override
   String get noteNotShared => 'The Note was not shared.';
