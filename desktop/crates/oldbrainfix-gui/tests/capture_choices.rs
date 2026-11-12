@@ -137,7 +137,8 @@ fn the_popup_files_the_note_and_saves_it_without_a_nudge() -> TestResult {
     assert!(shows(&harness, "Save"));
     assert!(shows(
         &harness,
-        "Enter saves it. Esc keeps what is typed the same way; empty, it just closes."
+        "Enter saves it. Shift+Enter starts a new line. Esc keeps what is typed the same way; \
+         empty, it just closes."
     ));
     // Leaving saves all of it.
     harness.key_press(Key::Escape);
@@ -186,8 +187,11 @@ fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
     assert!(!harness.state().popup.page_open());
     assert!(!harness.state().closed);
     assert!(harness.state().popup.choices().schedules.is_empty());
-    // Alt+Left goes back from the page the same way.
+    // Alt+Left goes back from the page the same way, once the cursor
+    // left the When line it starts in (#277), where Alt+Left rests.
     spawn(&mut harness, "Reminder");
+    harness.key_press(Key::Tab);
+    harness.run();
     harness.key_press_modifiers(egui::Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert!(!harness.state().popup.page_open());

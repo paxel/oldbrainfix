@@ -40,8 +40,10 @@
 //! recording is and saved with the rest; a clipboard with neither leaves
 //! a grey line above the field (#130). No Line holds a picture: one
 //! pasted drops a Shopping List picked, and none is offered while it is
-//! held, as in the window. The field has one line: a pasted
-//! text keeps its line breaks in the Note all the same.
+//! held, as in the window. Enter saves, Shift+Enter starts a new line
+//! (#277); a pasted text keeps its line breaks in the Note all the same.
+//! Ctrl+1, Ctrl+2 and Ctrl+3 (Cmd on macOS) save with the Nudge buttons'
+//! times, Ctrl+Enter as Enter does.
 //!
 //! Closing the popup gives the keyboard back to the window that had it
 //! where the system does so for a closed window: on X11, Windows and
@@ -53,8 +55,8 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use egui::{
-    FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, TextEdit, Ui,
-    ViewportCommand,
+    Event, FontId, Frame, Id, InputState, Key, KeyboardShortcut, Margin, Modifiers, PointerButton,
+    RichText, ScrollArea, TextEdit, Ui, ViewportCommand,
 };
 use oldbrainfix_core::{
     APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic, markdown, text_format,
@@ -83,6 +85,8 @@ use crate::theme;
 
 /// The popup's size, and its size while a page shows.
 const SIZE: [f32; 2] = [480.0, 340.0];
+/// How high the field grows before its lines scroll: four of them.
+const FIELD_HEIGHT: f32 = 100.0;
 const PAGE_SIZE: [f32; 2] = [560.0, 680.0];
 
 /// What the popup is after a frame.
@@ -517,7 +521,7 @@ impl CapturePopup {
         let failure_open = self.failure_open && self.error.is_some();
         let (enter, escape, closing, back) = ui.input_mut(|i| {
             (
-                in_field && i.consume_key(Modifiers::NONE, Key::Enter),
+                in_field && take_plain_enter(i),
                 !failure_open && i.consume_key(Modifiers::NONE, Key::Escape),
                 i.viewport().close_requested(),
                 // A page goes back as a level does (UI laws, "Desktop").
@@ -558,9 +562,18 @@ impl CapturePopup {
         if enter && typed {
             return self.save(Notes::default_nudge());
         }
+        let quick = self.quick;
+        let sorted = self.choices.sorted(self.choices.place.as_deref());
+        // Ctrl+1 to 3 with the Nudge buttons' times while they show,
+        // Ctrl+Enter as Enter (#277).
+        if typed
+            && !failure_open
+            && let Some(nudge_in) = capture_choices::nudge_key(ui, !sorted && quick.nudge_buttons)
+        {
+            return self.save(nudge_in);
+        }
         let mut picked = None;
         let mut to_editor = false;
-        let quick = self.quick;
         let mut record = false;
         let mut stop = false;
         let mut asked = None;
@@ -568,7 +581,6 @@ impl CapturePopup {
         let has_recorder = self.recorder.is_some();
         let has_clipboard = self.clipboard.is_some();
         let mut pasting = false;
-        let sorted = self.choices.sorted(self.choices.place.as_deref());
         let place_chip = self.choices.place.as_ref().and_then(|place| {
             capture_choices::place_name(&t, &self.areas, place).map(|name| (name, true))
         });
@@ -599,14 +611,24 @@ impl CapturePopup {
                 if quick.format_bar {
                     format_bar::capture_bar(ui, &t, id, &mut self.text, (text, tones.accent));
                 }
-                let field = ui.add(
-                    TextEdit::singleline(&mut self.text)
-                        .id(id)
-                        .hint_text(t.capture_hint())
-                        .text_color(text)
-                        .font(FontId::proportional(18.0))
-                        .desired_width(f32::INFINITY),
-                );
+                // Enter saves, taken above; Shift+Enter starts a new
+                // line (#277), the lines past a few scrolled.
+                let field = ScrollArea::vertical()
+                    .id_salt("capture popup lines")
+                    .max_height(FIELD_HEIGHT)
+                    .show(ui, |ui| {
+                        ui.add(
+                            TextEdit::multiline(&mut self.text)
+                                .id(id)
+                                .hint_text(t.capture_hint())
+                                .text_color(text)
+                                .font(FontId::proportional(18.0))
+                                .desired_rows(1)
+                                .desired_width(f32::INFINITY)
+                                .return_key(KeyboardShortcut::new(Modifiers::SHIFT, Key::Enter)),
+                        )
+                    })
+                    .inner;
                 // Its right-click menu, with the bar's formats while the
                 // bar shows (#253); Paste as the capture's Paste (#130).
                 let formats: &[Format] = if quick.format_bar {
@@ -673,12 +695,10 @@ impl CapturePopup {
                 } else {
                     ui.label(RichText::new(t.nudge_heading()).strong().color(text));
                     ui.horizontal(|ui| {
-                        let choices = [
-                            (t.snooze10(), Duration::minutes(10)),
-                            (t.snooze30(), Duration::minutes(30)),
-                            (t.snooze60(), Notes::default_nudge()),
-                        ];
-                        for (label, nudge_in) in choices {
+                        let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
+                        for (label, nudge_in) in
+                            labels.into_iter().zip(capture_choices::nudge_times())
+                        {
                             let button = egui::Button::new(RichText::new(label).color(text));
                             if ui.add_enabled(typed, button).clicked() {
                                 picked = Some(nudge_in);
@@ -689,6 +709,8 @@ impl CapturePopup {
                 ui.add_space(4.0);
                 let hint = if sorted {
                     t.popup_keys_hint_sorted()
+                } else if quick.nudge_buttons {
+                    t.popup_nudge_keys_hint()
                 } else {
                     t.popup_keys_hint()
                 };
@@ -928,4 +950,22 @@ impl CapturePopup {
             _ => Ok(false),
         }
     }
+}
+
+/// Enter alone pressed, taken: not Shift+Enter, which starts a new line,
+/// nor Ctrl+Enter (#277).
+fn take_plain_enter(i: &mut InputState) -> bool {
+    let before = i.events.len();
+    i.events.retain(|e| {
+        !matches!(
+            e,
+            Event::Key {
+                key: Key::Enter,
+                pressed: true,
+                modifiers,
+                ..
+            } if modifiers.matches_exact(Modifiers::NONE)
+        )
+    });
+    i.events.len() != before
 }

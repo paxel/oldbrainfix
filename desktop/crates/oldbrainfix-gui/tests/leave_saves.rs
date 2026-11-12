@@ -139,6 +139,20 @@ fn click_beside<S>(harness: &mut Harness<'_, S>) {
     harness.run();
 }
 
+/// Tab out of the field holding the keyboard: the editor opens in its
+/// When line (#277), where Alt+Left rests, and a click by accessibility
+/// leaves the keyboard there.
+fn leave_field<S>(harness: &mut Harness<'_, S>) {
+    harness.key_press(Key::Tab);
+    harness.run();
+    assert!(
+        harness
+            .query_by(|n| n.is_focused()
+                && matches!(n.role(), Role::MultilineTextInput | Role::TextInput))
+            .is_none()
+    );
+}
+
 /// Types `text` over what the field labelled `label` holds.
 fn type_into<S>(harness: &mut Harness<'_, S>, label: &str, text: &str) {
     harness
@@ -207,10 +221,12 @@ fn leaving_the_routine_editor_saves_a_change_by_esc_a_click_beside_or_back() -> 
     assert!(harness.state().routine_editor().is_none());
     assert_eq!(rule_of(&device.store, &device.routine)?, "FREQ=DAILY");
 
-    // Alt+Left.
+    // Alt+Left, once the cursor left the When line it starts in (#277),
+    // where Alt+Left rests.
     harness.state_mut().open_routine(&device.routine);
     harness.run();
     pick_weekdays(&mut harness, &t);
+    leave_field(&mut harness);
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert!(harness.state().routine_editor().is_none());
@@ -371,6 +387,7 @@ fn discard_closes_the_routine_editor_without_saving() -> TestResult {
     let t = L10n::new("en");
     let mut harness = editing(&device);
     pick_no_weekday(&mut harness, &t);
+    leave_field(&mut harness);
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert!(shows(&harness, "Discard changes?"));
@@ -611,6 +628,7 @@ fn the_popups_routine_page_hands_back_a_change_on_leaving_and_asks_about_none() 
     routine_page(&mut harness, &t);
     click(&mut harness, t.repeat_weekdays());
     click(&mut harness, t.weekday_mon());
+    leave_field(&mut harness);
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert!(shows(&harness, "Discard changes?"));

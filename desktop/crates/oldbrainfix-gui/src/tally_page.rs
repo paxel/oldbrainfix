@@ -285,7 +285,7 @@ impl TallyPage {
                 ui.add_space(4.0);
                 ui.label(RichText::new(t.new_tally()).size(18.0).strong().color(text));
                 ui.horizontal_wrapped(|ui| {
-                    if theme::primary(ui, true, t.save()).clicked() {
+                    if theme::main_action(ui, true, t.save()) {
                         intent = Some(PageIntent::Save);
                     }
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {

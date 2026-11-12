@@ -198,7 +198,9 @@ impl FileIntoPicker {
         name_field(ui, &field, t.file_into_filter_hint());
         self.take_focus(ui, &field);
         let mut row = None;
-        if field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        // Ctrl+Enter as Enter, as in every dialog (#277).
+        if (field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter))) || theme::ctrl_enter(ui)
+        {
             row = Some(self.first(t));
         }
         // As tall as the whole list was, so the dialog stays put while
@@ -335,7 +337,7 @@ impl FileIntoPicker {
         let mut back = false;
         ui.horizontal(|ui| {
             back = ui.button(RichText::new(t.cancel()).color(text)).clicked();
-            made |= theme::primary(ui, ready, t.create()).clicked();
+            made |= theme::main_action(ui, ready, t.create());
         });
         let picked = made.then(|| Picked::Make {
             area: naming.area.clone(),

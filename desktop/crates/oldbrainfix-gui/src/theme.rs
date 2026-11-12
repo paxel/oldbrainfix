@@ -6,7 +6,8 @@
 
 use egui::epaint::{CornerRadius, Shadow};
 use egui::{
-    Button, Color32, Context, Rect, Response, Shape, Stroke, Theme, ThemePreference, Ui, Visuals,
+    Button, Color32, Context, Key, Modifiers, Rect, Response, Shape, Stroke, Theme,
+    ThemePreference, Ui, Visuals,
 };
 use oldbrainfix_core::ThemeChoice;
 
@@ -190,6 +191,25 @@ fn paint_buttons(visuals: &mut Visuals, b: ButtonTones) {
 /// on the accent, greyed unless `enabled`.
 pub fn primary(ui: &mut Ui, enabled: bool, label: &str) -> Response {
     emphasised(ui, ButtonKind::Primary, enabled, label)
+}
+
+/// A dialog's main action as [`primary`] draws it, which Ctrl+Enter (Cmd
+/// on macOS) also runs while its dialog is the one on top (#277);
+/// whether it was asked for.
+pub fn main_action(ui: &mut Ui, enabled: bool, label: &str) -> bool {
+    let clicked = primary(ui, enabled, label).clicked();
+    clicked || (enabled && ctrl_enter(ui))
+}
+
+/// Whether `ui` is in the dialog on top: no modal dialog lies over it.
+pub fn on_top(ui: &Ui) -> bool {
+    let layer = ui.layer_id();
+    ui.ctx().memory(|m| m.is_above_modal_layer(layer))
+}
+
+/// Ctrl+Enter (Cmd on macOS) pressed in the dialog on top, taken (#277).
+pub fn ctrl_enter(ui: &Ui) -> bool {
+    on_top(ui) && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
 }
 
 /// An action that deletes or removes: a button on the error colour,

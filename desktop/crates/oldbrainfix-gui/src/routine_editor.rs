@@ -159,6 +159,9 @@ pub struct RoutineEditor {
     /// Whether the sentence is being typed: its line has the keyboard,
     /// or had it when a click began, which may be on a suggestion.
     sentence_typing: bool,
+    /// Whether its first field still waits for the keyboard it takes as
+    /// it opens (#277): the text, else the sentence.
+    focus_first: bool,
     /// A new Reminder's chips as last shown (#271): drawn a frame on, so
     /// a click lands on the chip it was aimed at though one went since.
     quick_shown: Vec<QuickReminder>,
@@ -259,6 +262,7 @@ impl RoutineEditor {
             sentence_unknown: Vec::new(),
             sentence_shown: None,
             sentence_typing: false,
+            focus_first: true,
             quick_shown: Vec::new(),
             session: None,
             makes: false,
@@ -408,6 +412,7 @@ impl RoutineEditor {
             sentence_unknown: Vec::new(),
             sentence_shown: None,
             sentence_typing: false,
+            focus_first: true,
             quick_shown: Vec::new(),
             session: None,
             makes: false,
@@ -437,6 +442,16 @@ impl RoutineEditor {
             escalation: self.escalation,
             text: self.text.trim().to_string(),
             session: self.session.as_ref().map(SessionDraft::choice),
+        }
+    }
+
+    /// Gives `field`, the first field shown, the keyboard as the editor
+    /// opens; asked again past the dialog's first, sizing pass, which
+    /// drops it.
+    fn take_first_focus(&mut self, ui: &Ui, field: &egui::Response) {
+        if self.focus_first {
+            field.request_focus();
+            self.focus_first = ui.is_sizing_pass() || !field.has_focus();
         }
     }
 
@@ -827,6 +842,7 @@ impl RoutineEditor {
                             )
                             .labelled_by(label.id);
                         crate::text_menu::show(ui, t, &field, &self.text);
+                        self.take_first_focus(ui, &field);
                         if self.name_missing {
                             let error = ui.visuals().error_fg_color;
                             ui.label(RichText::new(t.kind_name_missing()).color(error));
@@ -847,6 +863,7 @@ impl RoutineEditor {
                                 .frame(egui::Frame::NONE),
                         );
                         crate::text_menu::show(ui, t, &field, &self.text);
+                        self.take_first_focus(ui, &field);
                         return;
                     }
                     ui.label(RichText::new(t.from_note()).strong().color(text));
@@ -905,13 +922,18 @@ impl RoutineEditor {
                     {
                         intent = Some(Intent::Delete);
                     }
-                    if theme::primary(ui, self.can_save(), t.save()).clicked() {
+                    if theme::main_action(ui, self.can_save(), t.save()) {
                         intent = Some(Intent::Save);
                     }
                 });
             });
         if changed {
             self.update();
+        }
+        // Asked as it opens only: with no field to take it, a field
+        // shown later does not pull the keyboard in.
+        if !ui.is_sizing_pass() {
+            self.focus_first = false;
         }
         intent
     }
@@ -1030,6 +1052,9 @@ impl RoutineEditor {
             )
             .labelled_by(label.id);
         crate::text_menu::show(ui, t, &field, &typed);
+        if simple {
+            self.take_first_focus(ui, &field);
+        }
         let mut changed = false;
         if simple && field.changed() {
             self.type_sentence(t, &typed, now);

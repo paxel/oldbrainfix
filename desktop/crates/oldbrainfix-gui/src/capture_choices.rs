@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::{Frame, Margin, RichText, Stroke, Ui};
+use egui::{Frame, Key, Margin, Modifiers, RichText, Stroke, Ui};
 use oldbrainfix_core::{
     Area, DeviceSettings, Error, Frogs, Importance, Note, Notes, PersonSettings, QuickNoteControl,
     Routines, Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, Topic,
@@ -705,6 +705,37 @@ impl QuickNote {
             nudge_buttons: settings.quick_note_nudge_buttons_on()?,
         })
     }
+}
+
+/// The Nudge times of the capture's buttons, 10 min, 30 min and 1 h.
+pub fn nudge_times() -> [Duration; 3] {
+    [
+        Duration::minutes(10),
+        Duration::minutes(30),
+        Notes::default_nudge(),
+    ]
+}
+
+/// The Nudge a key in the capture asks to save with, taken (#277): Ctrl+1,
+/// Ctrl+2 and Ctrl+3 (Cmd on macOS) the Nudge buttons' times while
+/// `nudges` they show, Ctrl+Enter the 1 h. Only in the dialog on top,
+/// so a dialog over the capture keeps its keys.
+pub fn nudge_key(ui: &Ui, nudges: bool) -> Option<Duration> {
+    if !crate::theme::on_top(ui) {
+        return None;
+    }
+    ui.input_mut(|i| {
+        if nudges {
+            let keys = [Key::Num1, Key::Num2, Key::Num3];
+            for (key, nudge_in) in keys.into_iter().zip(nudge_times()) {
+                if i.consume_key(Modifiers::COMMAND, key) {
+                    return Some(nudge_in);
+                }
+            }
+        }
+        i.consume_key(Modifiers::COMMAND, Key::Enter)
+            .then(Notes::default_nudge)
+    })
 }
 
 /// What was asked of the capture's action row.

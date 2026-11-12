@@ -610,7 +610,7 @@ pub fn square_page(ui: &mut Ui, t: &L10n, square: &mut Square, actions: &mut Vec
     }
     ui.add_space(8.0);
     ui.horizontal(|ui| {
-        if theme::primary(ui, true, t.profile_crop_use()).clicked() {
+        if theme::main_action(ui, true, t.profile_crop_use()) {
             actions.push(ProfileAction::UseSquare);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {

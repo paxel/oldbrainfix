@@ -180,6 +180,9 @@ pub struct FeedbackForm {
     pub worked: pack_view::Worked,
     /// Whether the Pack is being saved: "Save the Pack…" waits meanwhile.
     pub busy: bool,
+    /// Whether the text still waits for the keyboard it takes as the
+    /// page opens (#277).
+    pub focus: bool,
 }
 
 impl Default for FeedbackForm {
@@ -194,6 +197,7 @@ impl Default for FeedbackForm {
             ticks: PackTicks::new(),
             worked: pack_view::Worked::default(),
             busy: false,
+            focus: true,
         }
     }
 }
@@ -251,6 +255,11 @@ pub fn form(
             );
             crate::text_menu::show(ui, t, &field, &form.text);
             app::name_field(ui, &field, t.feedback_text_label());
+            // Asked again past a dialog's first, sizing pass, which drops it.
+            if form.focus {
+                field.request_focus();
+                form.focus = ui.is_sizing_pass() || !field.has_focus();
+            }
             ui.label(RichText::new(t.feedback_goes_along()).strong().color(text));
             for (on, label, value) in [
                 (&mut form.version, t.feedback_version(), &facts.version),
@@ -320,7 +329,7 @@ pub fn form(
             let written = !form.text.trim().is_empty();
             let fits = body.chars().count() <= MAIL_BODY_LIMIT;
             ui.horizontal(|ui| {
-                if theme::primary(ui, written && fits, t.feedback_mail()).clicked() {
+                if theme::main_action(ui, written && fits, t.feedback_mail()) {
                     asked = Some(FeedbackAsk::Mail);
                 }
                 let save = RichText::new(t.feedback_save_file()).color(text);

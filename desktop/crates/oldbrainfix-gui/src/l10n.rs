@@ -90,6 +90,8 @@ mod tests {
             (en.capture_keys_hint(), de.capture_keys_hint()),
             (en.drag_to_file(), de.drag_to_file()),
             (en.popup_keys_hint(), de.popup_keys_hint()),
+            (en.capture_nudge_keys_hint(), de.capture_nudge_keys_hint()),
+            (en.popup_nudge_keys_hint(), de.popup_nudge_keys_hint()),
             (en.hotkey_unavailable(), de.hotkey_unavailable()),
             (en.cli_usage(), de.cli_usage()),
             (en.older_app_stays(), de.older_app_stays()),

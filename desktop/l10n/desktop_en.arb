@@ -79,7 +79,7 @@
   "@timeInvalid": {"description": "Under a time field that holds no HH:MM time."},
   "dateInvalid": "Not a day",
   "@dateInvalid": {"description": "Under a date field that holds no YYYY-MM-DD day."},
-  "popupKeysHint": "Enter saves it with a Nudge in 1 h. Esc keeps what is typed the same way; empty, it just closes.",
+  "popupKeysHint": "Enter saves it with a Nudge in 1 h. Shift+Enter starts a new line. Esc keeps what is typed the same way; empty, it just closes.",
   "@popupKeysHint": {"description": "Under the text field of the desktop's capture popup."},
   "quickCaptureHeading": "Quick capture",
   "@quickCaptureHeading": {"description": "Heading of the desktop settings' card on the capture hotkey and command."},
@@ -383,7 +383,7 @@
   "@sessionMoveDown": {"description": "In the desktop's Session editor: the button that moves a Tally of the pool one place down.", "placeholders": {"name": {"type": "String"}}},
   "captureKeysHintSorted": "Ctrl+Enter saves it.",
   "@captureKeysHintSorted": {"description": "In the desktop's quick note while something is typed for a Note that is filed or has something set up, which needs no Nudge."},
-  "popupKeysHintSorted": "Enter saves it. Esc keeps what is typed the same way; empty, it just closes.",
+  "popupKeysHintSorted": "Enter saves it. Shift+Enter starts a new line. Esc keeps what is typed the same way; empty, it just closes.",
   "@popupKeysHintSorted": {"description": "Under the text field of the desktop's capture popup for a Note that is filed or has something set up, which needs no Nudge."},
   "captureChoicePlaceDesk": "Into: {place}",
   "@captureChoicePlaceDesk": {"description": "On the desktop's capture popup and capture field: the Area or Topic picked for the Note, saved with it; the desktop font has no arrow.", "placeholders": {"place": {"type": "String"}}},
@@ -608,5 +608,9 @@
   "searchUnsortedHint": "Search Unsorted",
   "@searchUnsortedHint": {"description": "Hint in the search field of Unsorted on the desktop (#274); Unsorted is the list of Notes not yet filed."},
   "searchTrashHint": "Search the Trash",
-  "@searchTrashHint": {"description": "Hint in the search field of the Trash on the desktop (#274); it finds the Notes in the Trash, and its Routines and Frogs by their Note."}
+  "@searchTrashHint": {"description": "Hint in the search field of the Trash on the desktop (#274); it finds the Notes in the Trash, and its Routines and Frogs by their Note."},
+  "captureNudgeKeysHint": "Ctrl+Enter saves it with a Nudge in 1 h. Ctrl+1, Ctrl+2 and Ctrl+3 save it with one in 10 min, 30 min or 1 h.",
+  "@captureNudgeKeysHint": {"description": "In the desktop's quick note under the Nudge buttons while something is typed (#277); Cmd on macOS is not named, as in the other key hints."},
+  "popupNudgeKeysHint": "Enter saves it with a Nudge in 1 h. Ctrl+1, Ctrl+2 and Ctrl+3 save it with one in 10 min, 30 min or 1 h. Shift+Enter starts a new line. Esc keeps what is typed the same way; empty, it just closes.",
+  "@popupNudgeKeysHint": {"description": "Under the Nudge buttons of the desktop's capture popup (#277)."}
 }

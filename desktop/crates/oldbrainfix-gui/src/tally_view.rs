@@ -830,7 +830,7 @@ fn page_bar(ui: &mut Ui, t: &L10n, heading: &str, delete: bool) -> Option<FormIn
     let mut intent = None;
     ui.label(RichText::new(heading).size(18.0).strong().color(text));
     ui.horizontal_wrapped(|ui| {
-        if theme::primary(ui, true, t.save()).clicked() {
+        if theme::main_action(ui, true, t.save()) {
             intent = Some(FormIntent::Save);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
@@ -942,7 +942,8 @@ impl FieldForm {
             name_missing: false,
             target_invalid: false,
             unit_invalid: false,
-            focus: field.is_none().then_some(NAME_FIELD),
+            // The name takes the keyboard as it opens (#277).
+            focus: Some(NAME_FIELD),
             field,
         }
     }
@@ -1098,7 +1099,13 @@ impl FieldForm {
     fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<FormIntent> {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        let focus = self.focus.take();
+        // Asked again past the dialog's first, sizing pass, which drops
+        // it (#277).
+        let focus = if ui.is_sizing_pass() {
+            self.focus
+        } else {
+            self.focus.take()
+        };
         let heading = if self.field.is_none() {
             t.tally_new_field()
         } else {
@@ -1626,7 +1633,13 @@ impl EntryForm {
 
     fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<FormIntent> {
         let text = ui.visuals().text_color();
-        let focus = self.focus.take();
+        // Asked again past the dialog's first, sizing pass, which drops
+        // it (#277).
+        let focus = if ui.is_sizing_pass() {
+            self.focus.clone()
+        } else {
+            self.focus.take()
+        };
         let heading = if self.entry.is_none() {
             t.tally_new_entry()
         } else {

@@ -121,7 +121,7 @@ pub fn export_form(
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
             *asked = Some(PackAsk::Cancel);
         }
-        if theme::primary(ui, picked && !busy, t.pack_save()).clicked() {
+        if theme::main_action(ui, picked && !busy, t.pack_save()) {
             *asked = Some(PackAsk::Save);
         }
         if busy {
@@ -172,7 +172,7 @@ pub fn import_form(
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
             *asked = Some(PackAsk::Cancel);
         }
-        if theme::primary(ui, picked, t.pack_add()).clicked() {
+        if theme::main_action(ui, picked, t.pack_add()) {
             *asked = Some(PackAsk::Add);
         }
     });

@@ -1200,11 +1200,26 @@ replace a law of Both apps where they say so. A desktop law marked
   scrolls into view; after an action, which ends the selection, Up and
   Down go on from it while it still shows, else from the top. Sorting Unsorted is Down, Ctrl+M, type, Enter for
   each Note.
-- **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
+- **Keys finish what is typed** (draft, #196, #277): Ctrl+Enter (Cmd on
   macOS) saves the quick note's Note and the text being edited in the
-  Note dialog, while Enter alone starts a new line; Enter in a one-line
-  field of a dialog takes it; Ctrl+B and Ctrl+I make bold and italic
-  while the Note's text is edited.
+  Note dialog, while Enter alone starts a new line; in the capture popup
+  Enter saves and Shift+Enter starts a new line (Q664). Ctrl+Enter runs
+  the main action of the dialog on top, the button on the accent (Save,
+  Create, Send, the Routine editor's, a Session's and a Tally's pages
+  included), and only while it may be pressed; Merge into… merges into
+  the first Note found once something is typed, File into… takes its
+  first row as Enter does; a question whose answer deletes or discards
+  keeps Ctrl+Enter from it (Q665). The first field of a dialog takes the
+  keyboard as it opens, where it has one (the Routine editor's text, else
+  its When line, a Tally's pages, Send feedback, a person's name for me);
+  the Page dialogs of sections (Settings, Profile, People, Backups, Sync,
+  Pair) open without it. Alt+Left rests in that field as in any; Esc and
+  the mouse's back button leave. In the quick note and the
+  popup Ctrl+1, Ctrl+2 and Ctrl+3 save with the Nudge buttons' 10 min,
+  30 min and 1 h while those show, named in the hint under them; the
+  list's 1 to 3 take no Ctrl and rest while a dialog is open. Enter in
+  a one-line field of a dialog takes it; Ctrl+B and Ctrl+I make bold
+  and italic while the Note's text is edited.
 - **Esc closes what lies on top** (draft, #196): a menu, a photo or
   table full screen, the top dialog, the quick note keeping what was
   typed, and over the list without a dialog the cards selected.

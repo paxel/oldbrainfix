@@ -10525,7 +10525,7 @@ impl App {
     /// it what of the Note card's buttons (#113) this Device switched on
     /// in Settings ▸ Quick note, whose choices show at the top, not saved
     /// yet, and under them the Nudge times, Ctrl+Enter taking the 1 h
-    /// one; a Note filed or with something set up, or where the Nudge
+    /// one and Ctrl+1 to 3 each of them (#277); a Note filed or with something set up, or where the Nudge
     /// buttons are switched off, gets one Save instead, nudging only an
     /// Unsorted Note. With a Shopping List picked in "More", the lines go
     /// into it instead of a Note (#124). The format bar shows over the
@@ -10551,12 +10551,13 @@ impl App {
         let has_recorder = self.recorder.is_some();
         let has_clipboard = self.clipboard.is_some();
         embossed(ui, tones, false, None, |ui| {
-            let focused = ui.memory(|m| m.has_focus(id));
-            if focused
-                && (!self.capture.trim().is_empty() || self.holds_media())
-                && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
+            // Ctrl+Enter saves, and Ctrl+1 to 3 with the Nudge buttons'
+            // times while they show (#277).
+            let nudges = !sorted && quick.nudge_buttons;
+            if (!self.capture.trim().is_empty() || self.holds_media())
+                && let Some(nudge_in) = capture_choices::nudge_key(ui, nudges)
             {
-                actions.push(Action::Capture(Notes::default_nudge()));
+                actions.push(Action::Capture(nudge_in));
             }
             // Announcements and choices go to the top (UI laws).
             let shown = (place_chip, self.view.capture_lists.as_slice());
@@ -10681,18 +10682,18 @@ impl App {
             }
             ui.label(RichText::new(t.nudge_heading()).strong().color(text));
             ui.horizontal(|ui| {
-                let choices = [
-                    (t.snooze10(), Duration::minutes(10)),
-                    (t.snooze30(), Duration::minutes(30)),
-                    (t.snooze60(), Notes::default_nudge()),
-                ];
-                for (label, nudge_in) in choices {
+                let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
+                for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times()) {
                     if ui.button(RichText::new(label).color(text)).clicked() {
                         actions.push(Action::Capture(nudge_in));
                     }
                 }
             });
-            ui.label(RichText::new(t.capture_keys_hint()).small().color(weak));
+            ui.label(
+                RichText::new(t.capture_nudge_keys_hint())
+                    .small()
+                    .color(weak),
+            );
         });
     }
 
@@ -11795,7 +11796,7 @@ impl App {
                         ui.label(RichText::new(t.file_link_question(path, shown)).color(text));
                         ui.horizontal(|ui| {
                             cancel(ui, &t, actions);
-                            if theme::primary(ui, true, t.file_link_open()).clicked() {
+                            if theme::main_action(ui, true, t.file_link_open()) {
                                 actions.push(Action::OpenLinkedFile(file.clone()));
                             }
                         });
@@ -12052,6 +12053,7 @@ impl App {
                                 pictures,
                                 person,
                                 (*comparing, name, *back),
+                                focus,
                                 &mut asked,
                             );
                             if ui
@@ -12537,6 +12539,8 @@ impl App {
             asking: None,
             back,
         });
+        // Its name field takes the keyboard (#277).
+        self.focus = true;
         Ok(())
     }
 
@@ -13866,7 +13870,7 @@ fn name_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if theme::primary(ui, ready, verb).clicked() {
+        if theme::main_action(ui, ready, verb) {
             actions.push(done);
         }
     });
@@ -13893,7 +13897,7 @@ fn link_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if theme::primary(ui, ready, t.link_set()).clicked() {
+        if theme::main_action(ui, ready, t.link_set()) {
             actions.push(Action::SetLink);
         }
     });
@@ -14222,8 +14226,7 @@ fn send_form(
     ui.label(RichText::new(t.send_what()).small().color(weak));
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        let send = egui::Button::new(RichText::new(t.send_action()).color(text));
-        if ui.add_enabled(*picked != SendTo::Nobody, send).clicked() {
+        if theme::main_action(ui, *picked != SendTo::Nobody, t.send_action()) {
             actions.push(Action::SendNote);
         }
     });
@@ -14818,6 +14821,14 @@ fn merge_form(
     );
     if field.changed() {
         actions.push(Action::MergeQuery);
+    }
+    // Ctrl+Enter merges into the first Note found, once something is
+    // typed to find it by (#277).
+    if !query.trim().is_empty()
+        && let Some((id, _)) = others.first()
+        && theme::ctrl_enter(ui)
+    {
+        actions.push(Action::Merge(id.clone()));
     }
     // The core's search, as on the phone: Transcripts, Photo Texts and
     // Sections count too.
@@ -17100,7 +17111,8 @@ fn edited_text(
     let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
     if focused || in_cell {
         *editing = true;
-        if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
+        // Not past a dialog over the Note dialog, whose key it is (#277).
+        if theme::ctrl_enter(ui) {
             actions.push(Action::SaveText);
         }
     }
@@ -17658,7 +17670,7 @@ fn name_edit(
     let accent = ui.visuals().hyperlink_color;
     let code = ui.visuals().code_bg_color;
     let mut moved = false;
-    if ui.memory(|m| m.has_focus(id)) {
+    if ui.memory(|m| m.has_focus(id)) && theme::on_top(ui) {
         ui.input_mut(|i| {
             if i.consume_key(Modifiers::COMMAND, Key::Enter) {
                 actions.push(Action::SaveText);
