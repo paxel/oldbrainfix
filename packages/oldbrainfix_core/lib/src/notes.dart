@@ -991,6 +991,55 @@ class Notes {
     store.append(noteId, NoteKeys.merged, null);
   }
 
+  /// Merges every Note of [noteIds] into the Note [intoId] in one batch
+  /// (#273), each as [merge] does: all of them or, when one is refused,
+  /// none. A Note named twice merges once. Refused for the target among
+  /// [noteIds], a Note or target not in the lists, and a Note this Device
+  /// may not change ([SharedAreas.mayChange]). Gives the Notes merged, in
+  /// the order named, for [undoMergeAll].
+  List<String> mergeAll(Iterable<String> noteIds, String intoId) {
+    final ids = noteIds.toSet().toList();
+    for (final (id, name) in [
+      for (final id in ids) (id, 'noteIds'),
+      (intoId, 'intoId'),
+    ]) {
+      final note = byId(id);
+      if (note == null || note.isTrashed || note.isMerged) {
+        throw ArgumentError.value(id, name, 'not a Note in the lists');
+      }
+    }
+    if (ids.contains(intoId)) {
+      throw ArgumentError.value(intoId, 'intoId', 'among the Notes merged');
+    }
+    for (final id in ids) {
+      if (!store.mayChange(id)) {
+        throw StateError('$id may not be merged here');
+      }
+    }
+    store.batch(() {
+      for (final id in ids) {
+        store.append(id, NoteKeys.merged, intoId);
+      }
+    });
+    return ids;
+  }
+
+  /// Undoes the Merge of each Note of [noteIds] in one batch, as
+  /// [undoMerge] does for each one that [mayUndoMerge]; the others, which
+  /// a sync or another step got to first, are left as they are. Gives the
+  /// Notes that stand alone again.
+  List<String> undoMergeAll(Iterable<String> noteIds) {
+    final undone = <String>[];
+    store.batch(() {
+      for (final id in noteIds.toSet()) {
+        if (!mayUndoMerge(id)) continue;
+        store.append(id, NoteKeys.merged, null);
+        undone.add(id);
+      }
+    });
+    return undone;
+  }
+
   /// The Sections of the Note [noteId], oldest first: its Amends, the
   /// Notes merged into it, and their Amends.
   List<Section> sections(String noteId) {

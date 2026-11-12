@@ -1187,6 +1187,77 @@ impl<'a> Notes<'a> {
             .map(drop)
     }
 
+    /// Merges every Note of `note_ids` into the Note `into_id` in one
+    /// batch (#273), each as [`Notes::merge`] does: all of them or, when
+    /// one is refused, none. A Note named twice merges once. Refused for
+    /// the target among `note_ids`, a Note or target not in the lists, and
+    /// a Note this Device may not change ([`Store::may_change`]). Gives
+    /// the Notes merged, in the order named, for
+    /// [`Notes::undo_merge_all`].
+    pub fn merge_all<I, S>(&self, note_ids: I, into_id: &str) -> Result<Vec<String>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut ids: Vec<String> = Vec::new();
+        for id in note_ids {
+            let id = id.as_ref();
+            if !ids.iter().any(|known| known == id) {
+                ids.push(id.to_string());
+            }
+        }
+        for id in ids.iter().map(String::as_str).chain([into_id]) {
+            let listed = self
+                .by_id(id)?
+                .is_some_and(|n| !n.is_trashed() && !n.is_merged());
+            if !listed {
+                return Err(Error::Invalid(format!("not a Note in the lists: {id}")));
+            }
+        }
+        if ids.iter().any(|id| id == into_id) {
+            return Err(Error::Invalid(format!(
+                "the target is among the Notes merged: {into_id}"
+            )));
+        }
+        for id in &ids {
+            if !self.store.may_change(id)? {
+                return Err(Error::Invalid(format!("{id} may not be merged here")));
+            }
+        }
+        self.store.batch(|| {
+            for id in &ids {
+                self.store.append(id, keys::MERGED, Some(into_id), None)?;
+            }
+            Ok(())
+        })?;
+        Ok(ids)
+    }
+
+    /// Undoes the Merge of each Note of `note_ids` in one batch, as
+    /// [`Notes::undo_merge`] does for each one that
+    /// [`Notes::may_undo_merge`]; the others, which a sync or another step
+    /// got to first, are left as they are. Gives the Notes that stand
+    /// alone again.
+    pub fn undo_merge_all<I, S>(&self, note_ids: I) -> Result<Vec<String>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let note_ids: Vec<S> = note_ids.into_iter().collect();
+        self.store.batch(|| {
+            let mut undone: Vec<String> = Vec::new();
+            for id in &note_ids {
+                let id = id.as_ref();
+                if undone.iter().any(|known| known == id) || !self.may_undo_merge(id)? {
+                    continue;
+                }
+                self.store.append(id, keys::MERGED, None, None)?;
+                undone.push(id.to_string());
+            }
+            Ok(undone)
+        })
+    }
+
     /// Sets the Importance of the Note `note_id`.
     pub fn set_importance(&self, note_id: &str, importance: Importance) -> Result<()> {
         self.require_note(note_id)?;
@@ -3287,6 +3358,124 @@ mod tests {
         for store in [&ann, &ben] {
             assert_eq!(merged_into(store, &merged.id)?, Some(into.id.clone()));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn several_notes_merge_into_one_in_one_batch_and_come_back_together() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let home = Places::new(&ann).add_area("Home")?.id;
+        let keys = notes.capture("Spare keys at the neighbours", Some(&home), None)?;
+        let plants = notes.capture("Water the plants", None, None)?;
+        let post = notes.capture("Empty the letter box", None, None)?;
+        let into = notes.capture("Neighbours on holiday", None, None)?;
+        let mark = ann.current_seq()?;
+        let merged = notes.merge_all([&keys.id, &plants.id, &plants.id, &post.id], &into.id)?;
+        assert_eq!(
+            merged,
+            [keys.id.clone(), plants.id.clone(), post.id.clone()]
+        );
+        let written: Vec<_> = ann
+            .entries_after(mark)?
+            .into_iter()
+            .map(|e| (e.entity, e.field, e.value))
+            .collect();
+        let pointer = |id: &str| {
+            (
+                id.to_string(),
+                keys::MERGED.to_string(),
+                Some(into.id.clone()),
+            )
+        };
+        assert_eq!(
+            written,
+            [pointer(&keys.id), pointer(&plants.id), pointer(&post.id)]
+        );
+        assert_eq!(ids(notes.all()?), std::slice::from_ref(&into.id));
+        let sections: Vec<String> = notes
+            .sections(&into.id)?
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(sections, merged);
+
+        // Another step got to one of them first.
+        notes.undo_merge(&plants.id)?;
+        let mark = ann.current_seq()?;
+        let undone = notes.undo_merge_all(merged.iter().chain([&"note:none".to_string()]))?;
+        assert_eq!(undone, [keys.id.clone(), post.id.clone()]);
+        let written: Vec<_> = ann
+            .entries_after(mark)?
+            .into_iter()
+            .map(|e| (e.entity, e.field, e.value))
+            .collect();
+        assert_eq!(
+            written,
+            [
+                (keys.id.clone(), keys::MERGED.to_string(), None),
+                (post.id.clone(), keys::MERGED.to_string(), None),
+            ]
+        );
+        assert_eq!(place_of(&ann, &keys.id)?.as_deref(), Some(home.as_str()));
+        assert!(notes.sections(&into.id)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn merging_several_writes_nothing_when_one_note_or_the_target_is_refused() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let a = notes.capture("a", None, None)?;
+        let b = notes.capture("b", None, None)?;
+        let into = notes.capture("into", None, None)?;
+        let trashed = notes.capture("trashed", None, None)?;
+        notes.trash(&trashed.id)?;
+        let merged = notes.capture("merged", None, None)?;
+        notes.merge(&merged.id, &into.id)?;
+        let mark = ann.current_seq()?;
+        let cases: [([&str; 2], &str); 6] = [
+            ([&a.id, &trashed.id], &into.id),
+            ([&a.id, &merged.id], &into.id),
+            ([&a.id, "note:none"], &into.id),
+            ([&a.id, &b.id], &trashed.id),
+            ([&a.id, &b.id], &merged.id),
+            ([&a.id, &into.id], &into.id),
+        ];
+        for (from, target) in cases {
+            assert!(
+                notes.merge_all(from, target).is_err(),
+                "{from:?} into {target}"
+            );
+        }
+        assert_eq!(ann.current_seq()?, mark);
+        assert!(notes.merge_all(Vec::<String>::new(), &into.id)?.is_empty());
+        assert_eq!(ann.current_seq()?, mark);
+        Ok(())
+    }
+
+    #[test]
+    fn a_member_merges_several_of_their_own_notes_and_none_of_anothers() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let into = Notes::new(&ann).capture("Toner", Some(&area), None)?;
+        let anns = Notes::new(&ann).capture("Order more", Some(&area), None)?;
+        let bens = Notes::new(&ben);
+        let own = bens.capture("Ben's toner", Some(&area), None)?;
+        let also = bens.capture("Ben's paper", Some(&area), None)?;
+        exchange(&ben, &ann, None)?;
+        let mark = ben.current_seq()?;
+        assert!(bens.merge_all([&own.id, &anns.id], &into.id).is_err());
+        assert_eq!(ben.current_seq()?, mark);
+        let merged = bens.merge_all([&own.id, &also.id], &into.id)?;
+        assert_eq!(merged, [own.id.clone(), also.id.clone()]);
+        exchange(&ben, &ann, None)?;
+        for id in [&own.id, &also.id] {
+            assert_eq!(merged_into(&ann, id)?, Some(into.id.clone()));
+        }
+        assert_eq!(bens.undo_merge_all(&merged)?, merged);
         Ok(())
     }
 
