@@ -461,6 +461,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scheduleSentenceAdvanced => 'Switch to Simple to type.';
 
   @override
+  String quickInAnHour(String time) {
+    return 'In 1 h, $time';
+  }
+
+  @override
+  String quickTonight(String time) {
+    return 'Tonight $time';
+  }
+
+  @override
+  String quickTomorrow(String time) {
+    return 'Tomorrow $time';
+  }
+
+  @override
+  String quickInAWeek(String time) {
+    return 'In a week, $time';
+  }
+
+  @override
   String get scheduleSimple => 'Simple';
 
   @override

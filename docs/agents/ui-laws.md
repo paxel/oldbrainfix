@@ -454,9 +454,20 @@ replace a law of Both apps where they say so. A desktop law marked
   word, the weekday names and times as suggestion chips under it; the
   words it does not understand are marked in the error colour, said
   under it, and change nothing. Left, or when a chip changes, it shows
-  the schedule again. On an Advanced schedule it is read-only, the
-  schedule's summary with "Switch to Simple to type". The sentence is
-  never stored.
+  the schedule again. It also reads a one-time Reminder in words that
+  count from now (#271): "today", "tonight", "tomorrow", "in N
+  minutes/hours/days/weeks" and their German words, "tomorrow" without a
+  time at the end of the Device's Quiet Hours (09:00 while off),
+  "tonight" at 19:00, against the store's clock. On an Advanced schedule
+  it is read-only, the schedule's summary with "Switch to Simple to
+  type". The sentence is never stored.
+- **A new Reminder offers its chips** (#271): on the phone, a new
+  Reminder, or a new Routine set to Once in Simple, shows a wrapping row
+  of chips under the When line: In 1 h, Tonight (until 19:00), Tomorrow
+  and In a week, each with its time, Tomorrow and In a week at the end of
+  the Quiet Hours. One tap sets the schedule, then Save; nothing is
+  saved by the tap. They are shortcuts that set a value, not a choice:
+  none is shown as selected. A saved Reminder and a Session show none.
 - **Send feedback shows what it sends** (#214): Settings ▸ "Send
   feedback" is a page with a field for the words, ticks for what goes
   along (version, system and device, install method ticked at first;

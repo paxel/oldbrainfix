@@ -135,7 +135,9 @@ class RoutineEditorScreen extends StatefulWidget {
   /// the text typed here.
   final String? noteId;
 
-  /// A new one starts as a Reminder: once, at the next full hour.
+  /// A new one starts as a Reminder: once, at the next full hour. A new
+  /// Reminder, this or a new Routine set to Once, offers the chips In 1 h,
+  /// Tonight, Tomorrow and In a week under its schedule's sentence (#271).
   final bool reminder;
 
   /// A new one is a Session, spawned from [noteId] or [capture], or with
@@ -229,6 +231,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   Schedule? _schedule;
   String? _ruleError;
   List<Occurrence> _next = const [];
+
+  /// The chips a new Reminder offers, at the last change (#271).
+  List<QuickReminder> _quick = const [];
 
   @override
   void initState() {
@@ -399,6 +404,47 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         ? null
         : Schedule(start: _start, times: _times, rule: rule);
     _next = _schedule?.next(_today, _preview) ?? const [];
+    _quick = _offersQuick ? quickReminders(_sentenceNow()) : const [];
+  }
+
+  /// Now by the store's clock, with this Device's day start, for the
+  /// sentence's relative words and the chips (#271).
+  SentenceNow _sentenceNow() => widget.notes.store.sentenceNow(deviceWallClock);
+
+  /// Whether the chips show: on a new Reminder in the simple editor, not
+  /// on a Session or its schedule.
+  bool get _offersQuick =>
+      widget.routineId == null &&
+      _draft == null &&
+      widget.initial == null &&
+      !_advanced &&
+      _kind == RepeatKind.once;
+
+  /// Sets the Reminder [chip] stands for, read again at the tap; a chip
+  /// whose time has passed since, as Tonight at 19:00, only goes.
+  void _pickQuick(QuickChip chip) {
+    final fresh = quickReminders(_sentenceNow());
+    final quick = fresh.where((q) => q.chip == chip).firstOrNull;
+    if (quick == null) {
+      _change(() {});
+    } else {
+      _takeSentence(quick.schedule);
+    }
+  }
+
+  /// [quick]'s label with its time.
+  static String _quickLabel(
+    AppLocalizations t,
+    String locale,
+    QuickReminder quick,
+  ) {
+    final time = clockText(locale, quick.time);
+    return switch (quick.chip) {
+      QuickChip.inAnHour => t.quickInAnHour(time),
+      QuickChip.tonight => t.quickTonight(time),
+      QuickChip.tomorrow => t.quickTomorrow(time),
+      QuickChip.inAWeek => t.quickInAWeek(time),
+    };
   }
 
   void _change(VoidCallback change) => setState(() {
@@ -711,8 +757,25 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   null => '',
                 },
                 today: _today,
+                now: _sentenceNow,
                 onRead: _takeSentence,
               ),
+              if (_quick.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  key: const ValueKey('quickReminders'),
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final quick in _quick)
+                      ActionChip(
+                        key: ValueKey('quick-${quick.chip.name}'),
+                        label: Text(_quickLabel(t, locale, quick)),
+                        onPressed: () => _pickQuick(quick.chip),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
               ChoiceChips<bool>(
                 value: _advanced,

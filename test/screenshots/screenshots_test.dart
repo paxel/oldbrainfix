@@ -1562,11 +1562,12 @@ void main() {
             expect(find.byType(NoteHistoryScreen), findsOneWidget);
           });
 
-          // Routines and the Agenda (#173): a new Routine typed from the
-          // Agenda's bar, the snack's schedule on weekdays, its Re-nag
-          // and Escalation, a Reminder due now in its Note's editor, the
-          // Missed Summary, the snack's History, the Agenda with its
-          // groups, All Routines and Reminders and the Calendar page.
+          // Routines and the Agenda (#173): a new Reminder typed from the
+          // Agenda's bar with its chips, the snack's schedule on weekdays,
+          // its Re-nag and Escalation, a Reminder due now in its Note's
+          // editor, the Missed Summary, the snack's History, the Agenda
+          // with its groups, All Routines and Reminders and the Calendar
+          // page.
           boxFrame('routines-and-agenda', 'set-up', (tester) async {
             final t = await start(tester, seed());
             await _tap(tester, find.byTooltip(t.newRoutineTooltip));
@@ -1575,7 +1576,9 @@ void main() {
               texts.captureText,
             );
             await tester.pumpAndSettle();
-            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+            // Once, with the new Reminder's chips (#271).
+            await _tap(tester, find.text(t.repeatOnce));
+            expect(find.byKey(const ValueKey('quickReminders')), findsOne);
           });
 
           /// The snack's Routine in its editor, through its row's Edit

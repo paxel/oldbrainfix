@@ -908,6 +908,30 @@ abstract class AppLocalizations {
   /// **'Switch to Simple to type.'**
   String get scheduleSentenceAdvanced;
 
+  /// The chip that sets a new Reminder to an hour from now, with its time (#271).
+  ///
+  /// In en, this message translates to:
+  /// **'In 1 h, {time}'**
+  String quickInAnHour(String time);
+
+  /// The chip that sets a new Reminder to 19:00 today, with its time.
+  ///
+  /// In en, this message translates to:
+  /// **'Tonight {time}'**
+  String quickTonight(String time);
+
+  /// The chip that sets a new Reminder to tomorrow when this Device's Quiet Hours end, with its time.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow {time}'**
+  String quickTomorrow(String time);
+
+  /// The chip that sets a new Reminder to a week from today when the Quiet Hours end, with its time.
+  ///
+  /// In en, this message translates to:
+  /// **'In a week, {time}'**
+  String quickInAWeek(String time);
+
   /// No description provided for @scheduleSimple.
   ///
   /// In en, this message translates to:

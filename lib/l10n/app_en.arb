@@ -205,6 +205,42 @@
   "scheduleSentenceHint": "Every day at 08:00",
   "scheduleSentenceUnknown": "Marked words are not understood and change nothing.",
   "scheduleSentenceAdvanced": "Switch to Simple to type.",
+  "quickInAnHour": "In 1 h, {time}",
+  "@quickInAnHour": {
+    "description": "The chip that sets a new Reminder to an hour from now, with its time (#271).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "quickTonight": "Tonight {time}",
+  "@quickTonight": {
+    "description": "The chip that sets a new Reminder to 19:00 today, with its time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "quickTomorrow": "Tomorrow {time}",
+  "@quickTomorrow": {
+    "description": "The chip that sets a new Reminder to tomorrow when this Device's Quiet Hours end, with its time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "quickInAWeek": "In a week, {time}",
+  "@quickInAWeek": {
+    "description": "The chip that sets a new Reminder to a week from today when the Quiet Hours end, with its time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "scheduleSimple": "Simple",
   "scheduleAdvanced": "Advanced",
   "repeatOnce": "Once",

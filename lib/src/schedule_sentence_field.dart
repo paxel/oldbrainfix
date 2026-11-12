@@ -7,8 +7,9 @@ import 'l10n.dart';
 /// 0044): the schedule as a sentence in the app's language. Typing in it
 /// hands each schedule it reads to [onRead] as it is typed, with the
 /// next words as suggestions under it; the words it does not understand
-/// are marked and change nothing. Left, or when a chip changes the
-/// schedule, it shows the schedule again. On
+/// are marked and change nothing. It also reads a one-time Reminder in
+/// words relative to [now], such as "tomorrow 7 pm" (#271). Left, or
+/// when a chip changes the schedule, it shows the schedule again. On
 /// an Advanced schedule ([schedule] null) it shows [summary], read-only,
 /// and says to switch to Simple to type.
 class ScheduleSentenceField extends StatefulWidget {
@@ -18,8 +19,11 @@ class ScheduleSentenceField extends StatefulWidget {
   /// What it shows on an Advanced schedule.
   final String summary;
 
-  /// The day the sentence is written and read on.
+  /// The day the sentence is written on.
   final Day today;
+
+  /// Now, for the relative words; asked anew at each read.
+  final SentenceNow Function() now;
 
   final ValueChanged<SimpleSchedule> onRead;
 
@@ -28,6 +32,7 @@ class ScheduleSentenceField extends StatefulWidget {
     required this.schedule,
     required this.summary,
     required this.today,
+    required this.now,
     required this.onRead,
   });
 
@@ -96,7 +101,7 @@ class _ScheduleSentenceFieldState extends State<ScheduleSentenceField> {
   void _moved() => setState(() {});
 
   void _typed(String text) {
-    final read = readSchedule(text, _language, widget.today);
+    final read = readScheduleAt(text, _language, widget.now());
     _controller.unknown = read.unknown;
     final schedule = read.schedule;
     if (schedule != null) _shown = schedule;
