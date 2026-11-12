@@ -22,8 +22,12 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
+use oldbrainfix_core::schedule::WallClock;
 use oldbrainfix_core::schedule::WeekdayRule;
-use oldbrainfix_core::schedule_sentence::{self, SimpleSchedule};
+use oldbrainfix_core::schedule_sentence::{
+    self, QuickChip, QuickReminder, SentenceNow, SimpleSchedule,
+};
+use oldbrainfix_core::settings::{DEFAULT_DAY_START, DeviceSettings};
 use oldbrainfix_core::{
     ClockTime, Day, Note, Notes, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit,
     Routine, Routines, Schedule, SimpleRepeat, Store,
@@ -50,6 +54,27 @@ const PREVIEW: usize = 3;
 
 /// The most times a repeat can end after, as on the phone.
 const MAX_COUNT: i64 = 99_999;
+
+/// Now by the store's clock on `wall`, with this Device's day start: what
+/// the sentence's relative words and a new Reminder's chips are read at
+/// (#271). Asked anew each frame; while the day start cannot be read, at
+/// 09:00.
+pub fn sentence_now(store: &Store, wall: &WallClock) -> SentenceNow {
+    DeviceSettings::new(store)
+        .sentence_now(wall)
+        .unwrap_or_else(|_| SentenceNow::at(wall(store.now()), DEFAULT_DAY_START))
+}
+
+/// The label of a new Reminder's chip, with its time (#271).
+pub fn quick_label(t: &L10n, quick: &QuickReminder) -> String {
+    let time = clock_text(quick.time);
+    match quick.chip {
+        QuickChip::InAnHour => t.quick_in_an_hour(&time),
+        QuickChip::Tonight => t.quick_tonight(&time),
+        QuickChip::Tomorrow => t.quick_tomorrow(&time),
+        QuickChip::InAWeek => t.quick_in_a_week(&time),
+    }
+}
 
 /// What the user asked of the editor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,6 +156,9 @@ pub struct RoutineEditor {
     /// Whether the sentence is being typed: its line has the keyboard,
     /// or had it when a click began, which may be on a suggestion.
     sentence_typing: bool,
+    /// A new Reminder's chips as last shown (#271): drawn a frame on, so
+    /// a click lands on the chip it was aimed at though one went since.
+    quick_shown: Vec<QuickReminder>,
     /// A new Session's part.
     session: Option<SessionDraft>,
     /// Whether it makes its plain Note a Session, its setup alone,
@@ -211,6 +239,7 @@ impl RoutineEditor {
             sentence_unknown: Vec::new(),
             sentence_shown: None,
             sentence_typing: false,
+            quick_shown: Vec::new(),
             session: None,
             makes: false,
             history: false,
@@ -358,6 +387,7 @@ impl RoutineEditor {
             sentence_unknown: Vec::new(),
             sentence_shown: None,
             sentence_typing: false,
+            quick_shown: Vec::new(),
             session: None,
             makes: false,
             history: !routine.is_reminder(),
@@ -457,19 +487,47 @@ impl RoutineEditor {
     }
 
     /// Reads `text` typed into the schedule's sentence in the language
-    /// of `t`: a schedule it reads fills the chips and times, the parts
-    /// not understood are marked and change nothing (#227).
-    pub fn type_sentence(&mut self, t: &L10n, text: &str) {
+    /// of `t`, its relative words at `now` (#271): a schedule it reads
+    /// fills the chips and times, the parts not understood are marked and
+    /// change nothing (#227).
+    pub fn type_sentence(&mut self, t: &L10n, text: &str, now: &SentenceNow) {
         self.sentence = text.to_string();
-        let read = schedule_sentence::read(text, t.locale(), self.today);
+        let read = schedule_sentence::read_at(text, t.locale(), now);
         self.sentence_unknown = read.unknown;
         if let Some(schedule) = read.schedule {
-            self.start = schedule.start;
-            self.start_text = schedule.start.to_string();
-            self.times.clone_from(&schedule.times);
-            self.take_simple(&schedule.repeat);
+            self.take_schedule(&schedule);
             self.sentence_shown = Some(schedule);
-            self.update();
+        }
+    }
+
+    /// Fills the chips and times with `schedule`.
+    fn take_schedule(&mut self, schedule: &SimpleSchedule) {
+        self.start = schedule.start;
+        self.start_text = schedule.start.to_string();
+        self.times.clone_from(&schedule.times);
+        self.take_simple(&schedule.repeat);
+        self.update();
+    }
+
+    /// Whether it offers the chips In 1 h, Tonight, Tomorrow and In a
+    /// week (#271): a new Reminder, or a new Routine set to Once, in the
+    /// simple mode; not a Session or its setup.
+    pub fn offers_quick(&self) -> bool {
+        self.routine.is_none()
+            && self.session.is_none()
+            && !self.makes
+            && !self.advanced
+            && self.kind == RepeatKind::Once
+    }
+
+    /// Sets the Reminder of `chip`, read again at `now`; a chip gone
+    /// since, as Tonight from 19:00 on, sets nothing.
+    pub fn take_quick(&mut self, chip: QuickChip, now: &SentenceNow) {
+        if let Some(quick) = schedule_sentence::quick_reminders(now)
+            .into_iter()
+            .find(|q| q.chip == chip)
+        {
+            self.take_schedule(&quick.schedule());
         }
     }
 
@@ -647,14 +705,16 @@ impl RoutineEditor {
         Ok(Some(id))
     }
 
-    /// Draws the editor, `shown_now` being the time on the wall clock;
-    /// what was asked of it.
+    /// Draws the editor, `shown_now` being the time on the wall clock and
+    /// `now` what the sentence and the chips are read at
+    /// ([`sentence_now`]); what was asked of it.
     pub fn show(
         &mut self,
         ui: &mut Ui,
         t: &L10n,
         tones: Tones,
         shown_now: NaiveDateTime,
+        now: &SentenceNow,
     ) -> Option<Intent> {
         let mut intent = None;
         let mut changed = false;
@@ -765,7 +825,7 @@ impl RoutineEditor {
                 }
                 // Making a Note a Session sets it up alone (#191).
                 if !self.makes {
-                    changed |= self.schedule_panels(ui, t, tones, (once, shown_now));
+                    changed |= self.schedule_panels(ui, t, tones, (once, shown_now, now));
                 }
                 ui.horizontal(|ui| {
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
@@ -794,12 +854,13 @@ impl RoutineEditor {
         ui: &mut Ui,
         t: &L10n,
         tones: Tones,
-        (once, shown_now): (bool, NaiveDateTime),
+        (once, shown_now, now): (bool, NaiveDateTime, &SentenceNow),
     ) -> bool {
         let text = ui.visuals().text_color();
         let mut changed = false;
         embossed(ui, tones, false, None, |ui| {
-            changed |= self.sentence_line(ui, t);
+            changed |= self.sentence_line(ui, t, now);
+            changed |= self.quick_line(ui, t, now);
             let mut advanced = self.advanced;
             let modes = [
                 (false, t.schedule_simple().to_string()),
@@ -842,7 +903,7 @@ impl RoutineEditor {
     /// as suggestions under it and the words not understood marked; on
     /// an Advanced schedule a summary, read-only. Whether it changed the
     /// schedule.
-    fn sentence_line(&mut self, ui: &mut Ui, t: &L10n) -> bool {
+    fn sentence_line(&mut self, ui: &mut Ui, t: &L10n, now: &SentenceNow) -> bool {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let error = ui.visuals().error_fg_color;
@@ -901,7 +962,7 @@ impl RoutineEditor {
         crate::text_menu::show(ui, t, &field, &typed);
         let mut changed = false;
         if simple && field.changed() {
-            self.type_sentence(t, &typed);
+            self.type_sentence(t, &typed, now);
             changed = true;
         }
         if !simple {
@@ -954,12 +1015,48 @@ impl RoutineEditor {
                     &format!("{}{space}", suggestion.text),
                 );
                 let at = suggestion.range.start + suggestion.text.len() + 1;
-                self.type_sentence(t, &typed);
+                self.type_sentence(t, &typed, now);
                 crate::format_bar::select(ui, id, &self.sentence, (at, at));
                 changed = true;
             }
         }
         changed
+    }
+
+    /// A new Reminder's chips under the When line (#271), each with its
+    /// time: shortcuts that set the schedule, then Save, not a choice, so
+    /// none shows as picked. Whether one changed the schedule.
+    fn quick_line(&mut self, ui: &mut Ui, t: &L10n, now: &SentenceNow) -> bool {
+        if !self.offers_quick() {
+            return false;
+        }
+        let text = ui.visuals().text_color();
+        let fresh = schedule_sentence::quick_reminders(now);
+        if self.quick_shown.is_empty() {
+            self.quick_shown.clone_from(&fresh);
+        }
+        let mut picked = None;
+        ui.horizontal_wrapped(|ui| {
+            for quick in &self.quick_shown {
+                // Its own id, so a key meant for Tonight never lands on
+                // Tomorrow once Tonight is gone.
+                let button = ui.push_id(quick.chip, |ui| {
+                    ui.button(RichText::new(quick_label(t, quick)).color(text))
+                });
+                if button.inner.clicked() {
+                    picked = Some(quick.chip);
+                }
+            }
+        });
+        if self.quick_shown != fresh {
+            self.quick_shown = fresh;
+            ui.ctx().request_repaint();
+        }
+        let Some(chip) = picked else {
+            return false;
+        };
+        self.take_quick(chip, now);
+        true
     }
 
     fn switch_mode(&mut self, advanced: bool) {

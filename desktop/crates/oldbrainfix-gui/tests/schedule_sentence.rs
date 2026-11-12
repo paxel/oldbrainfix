@@ -1,7 +1,8 @@
 //! The schedule as a sentence at the top of the Routine editor (#227),
 //! driven headless by egui_kittest: written as the schedule changes,
 //! typed to fill the chips and times, with suggestions and the words not
-//! understood marked, read-only on an Advanced schedule.
+//! understood marked, read-only on an Advanced schedule; a one-time
+//! Reminder in words relative to the store's clock (#271).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -18,7 +19,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    ClockTime, Day, Recurrence, Routines, Schedule, SigningKey, Store, parse_time,
+    ClockTime, Day, DeviceSettings, QuietHours, Recurrence, Routines, Schedule, SigningKey, Store,
+    parse_time,
 };
 use oldbrainfix_gui::App;
 use oldbrainfix_gui::l10n::L10n;
@@ -57,10 +59,19 @@ fn editor(store: Store, locale: &str) -> Harness<'static, App> {
             app,
         );
     harness.run();
+    // A row's click opens its Note; "Edit schedule" in its ⋮ opens the
+    // Routine editor (#270).
+    let t = L10n::new(locale);
     harness
-        .query_all_by_label("pills")
+        .query_all_by_label(&t.occurrence_menu("pills"))
         .next()
         .unwrap_or_else(|| panic!("no pills on the Agenda"))
+        .click();
+    harness.run();
+    harness
+        .query_all_by_role_and_label(Role::Button, t.edit_schedule())
+        .last()
+        .unwrap_or_else(|| panic!("no Edit schedule in the menu"))
         .click();
     harness.run();
     harness
@@ -218,4 +229,58 @@ fn in_german_with_the_apps_weekday_names() -> TestResult {
     assert!(picked(&harness, "Monatlich an einem Wochentag"));
     assert!(picked(&harness, weekday_long(&de, 5)));
     Ok(())
+}
+
+/// The editor's schedule, once read.
+fn edited(harness: &Harness<'_, App>) -> Option<Schedule> {
+    harness.state().routine_editor()?.schedule().cloned()
+}
+
+#[test]
+fn relative_words_count_from_the_stores_clock_and_the_day_start() -> TestResult {
+    let today = Day::new(2026, 10, 25);
+    let tomorrow = Day::new(2026, 10, 26);
+    let mut harness = editor(store("FREQ=DAILY", today, &[])?, "en");
+    // Noon in Berlin on Sunday, 25 October 2026 (#271).
+    type_sentence(&mut harness, "When", "tomorrow 7 pm");
+    assert!(sentence_unknown_none(&harness));
+    assert_eq!(edited(&harness), Schedule::new(tomorrow, &[at(19)], None));
+    type_sentence(&mut harness, "When", "in 2 hours");
+    assert_eq!(edited(&harness), Schedule::new(today, &[at(14)], None));
+    type_sentence(&mut harness, "When", "tonight");
+    assert_eq!(edited(&harness), Schedule::new(today, &[at(19)], None));
+    harness.get_by_label("Save").click();
+    harness.run();
+    let routine = Routines::new(harness.state().store())
+        .all()?
+        .into_iter()
+        .next()
+        .ok_or("routine")?;
+    assert_eq!(
+        Some(routine.schedule),
+        Schedule::new(today, &[at(19)], None)
+    );
+
+    // "Tomorrow" without a time is when this Device's Quiet Hours end.
+    let store = store("FREQ=DAILY", today, &[])?;
+    let quiet = QuietHours {
+        start: at(22),
+        end: ClockTime::new(6, 45).ok_or("a time")?,
+    };
+    DeviceSettings::new(&store).set_quiet_hours(quiet)?;
+    let mut harness = editor(store, "de");
+    type_sentence(&mut harness, "Wann", "morgen");
+    assert_eq!(
+        edited(&harness),
+        Schedule::new(tomorrow, &[quiet.end], None)
+    );
+    Ok(())
+}
+
+/// Whether the line says no word is not understood.
+fn sentence_unknown_none(harness: &Harness<'_, App>) -> bool {
+    !shows(
+        harness,
+        "Marked words are not understood and change nothing.",
+    )
 }

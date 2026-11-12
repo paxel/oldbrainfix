@@ -461,13 +461,15 @@ replace a law of Both apps where they say so. A desktop law marked
   "tonight" at 19:00, against the store's clock. On an Advanced schedule
   it is read-only, the schedule's summary with "Switch to Simple to
   type". The sentence is never stored.
-- **A new Reminder offers its chips** (#271): on the phone, a new
-  Reminder, or a new Routine set to Once in Simple, shows a wrapping row
-  of chips under the When line: In 1 h, Tonight (until 19:00), Tomorrow
-  and In a week, each with its time, Tomorrow and In a week at the end of
-  the Quiet Hours. One tap sets the schedule, then Save; nothing is
-  saved by the tap. They are shortcuts that set a value, not a choice:
-  none is shown as selected. A saved Reminder and a Session show none.
+- **A new Reminder offers its chips** (#271): on the phone and the
+  desktop, a new Reminder, or a new Routine set to Once in Simple, shows
+  a wrapping row of chips under the When line: In 1 h, Tonight (until
+  19:00), Tomorrow and In a week, each with its time, Tomorrow and In a
+  week at the end of the Quiet Hours. One tap or click sets the
+  schedule, read again at that moment, then Save; nothing is saved by
+  it. They are shortcuts that set a value, not a choice: none is shown
+  as selected, and on the desktop they are plain buttons. A saved
+  Reminder and a Session show none.
 - **Send feedback shows what it sends** (#214): Settings ▸ "Send
   feedback" is a page with a field for the words, ticks for what goes
   along (version, system and device, install method ticked at first;

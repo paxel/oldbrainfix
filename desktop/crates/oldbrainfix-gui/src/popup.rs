@@ -780,6 +780,7 @@ impl CapturePopup {
         let t = self.t;
         let tones = theme::tones(ui.visuals());
         let shown_now = (self.wall)(self.store.now());
+        let now = crate::routine_editor::sentence_now(&self.store, &*self.wall);
         let mut asked = None;
         Frame::NONE
             .fill(tones.background)
@@ -788,9 +789,9 @@ impl CapturePopup {
                 ui.set_min_size(ui.available_size());
                 self.failure_line(ui);
                 asked = match &mut self.page {
-                    Some(Page::Schedule(editor)) => {
-                        editor.show(ui, &t, tones, shown_now).map(PageAsk::Schedule)
-                    }
+                    Some(Page::Schedule(editor)) => editor
+                        .show(ui, &t, tones, shown_now, &now)
+                        .map(PageAsk::Schedule),
                     Some(Page::Tally(form)) => form.show(ui, &t, tones).map(PageAsk::Tally),
                     None => None,
                 };

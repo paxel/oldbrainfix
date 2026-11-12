@@ -107,6 +107,8 @@ struct Texts {
     new_routine: &'static str,
     what_hint: &'static str,
     weekdays: &'static str,
+    /// The repeat chip of a Reminder.
+    once: &'static str,
     escalate: &'static str,
     /// The start of an Agenda row's ⋮, "More for {title}".
     more_for: &'static str,
@@ -180,6 +182,7 @@ const EN: Texts = Texts {
     new_routine: "New Routine or Reminder",
     what_hint: "What is to be done?",
     weekdays: "Weekdays",
+    once: "Once",
     escalate: "Escalate to an urgent alarm with sound",
     more_for: "More for",
     packing: "Packing for the weekend at the lake\n✓ Toothbrush\nPhone charger\nHiking gear\n  ✓ Boots\n  Rain jacket",
@@ -243,6 +246,7 @@ const DE: Texts = Texts {
     new_routine: "Neue Routine oder Erinnerung",
     what_hint: "Was ist zu tun?",
     weekdays: "Wochentage",
+    once: "Einmal",
     escalate: "Zum dringenden Alarm mit Ton eskalieren",
     more_for: "Mehr zu",
     packing: "Packen fürs Wochenende am See\n✓ Zahnbürste\nLadekabel fürs Handy\nWandersachen\n  ✓ Wanderschuhe\n  Regenjacke",
@@ -1040,7 +1044,7 @@ fn all_guide_frames() -> TestResult {
                 &box_frame("capture-and-sort", "history"),
             )?);
             // Routines and the Agenda (#173): a new Routine typed from the
-            // Agenda's bar, the snack's schedule on weekdays, its Re-nag
+            // Agenda's bar and set to Once with its chips (#271), the snack's schedule on weekdays, its Re-nag
             // and Escalation, a Reminder due now in its Note's dialog, the
             // Missed Summary, the snack's History, the Agenda, All Routines
             // and Reminders, and an Occurrence's menu with Share.
@@ -1052,6 +1056,10 @@ fn all_guide_frames() -> TestResult {
                 .click();
             harness.run();
             harness.get_by(|n| n.is_focused()).type_text(texts.capture);
+            harness.run();
+            harness
+                .get_by_role_and_label(Role::RadioButton, texts.once)
+                .click_accesskit();
             harness.run();
             problems.extend(match_frame(
                 &mut harness,
