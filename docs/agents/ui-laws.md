@@ -46,9 +46,10 @@ replace a law of Both apps where they say so. A desktop law marked
   person, asked on the first start's Starter Set page above the Areas,
   two radio buttons with Simple picked, and changed in Settings after
   the settings of the Device. **Simple hides only making**:
-  Tally, Session, Frog and Topic in "+", Frog and Session in every
-  spawn menu, New Session, Tally and Session in the kind badge, "Make
-  it a Tally", the format bar, and roles when sharing and in People.
+  Tally, Session, Frog and Topic in "+", New Topic… in File into…
+  (#272), Frog and Session in every spawn menu, New Session, Tally and
+  Session in the kind badge, "Make it a Tally", the format bar, and
+  roles when sharing and in People.
   What exists shows and works as in Advanced. Never chosen is Advanced.
 
 ### Clicks and taps
@@ -426,6 +427,21 @@ replace a law of Both apps where they say so. A desktop law marked
 - A dialog has one question and at most two actions plus Cancel. More
   than that is a page. A list to choose from (Areas, Topics, People) is
   a menu at the finger or a page, never a sheet.
+- **File into…** (#272), from a card, the browser or capture alike, is
+  a filter field over the Areas and Topics (focused on the desktop, not
+  on the phone), then "Filed into recently" with the last three places
+  this Device filed into (ADR 0008), the latest first, while nothing is
+  typed, then the Areas alphabetically, each with its Topics. An Area
+  whose name matches shows with all its Topics, else with those that
+  match. **"New Topic…" ends each Area** for who may set up a Topic
+  there, only in Advanced, never in a closed locked Area; **"New Area…"
+  ends the list**, also when it is empty or nothing matches. Each asks
+  the name (New Area… with the filter's text filled in), makes the
+  place and files into it at once, from capture too, where the place
+  stays when the Note is not saved; Cancel makes nothing and stays. A
+  place File into… does not list (deleted, a Topic of a closed locked
+  Area, a Shared Area the Device left) is not offered among the recent
+  ones either.
 - **A short single choice is choice chips, a long one radio buttons**
   (#226). A choice of one value whose options are fixed words of one to
   about four, at most about seven of them, with no detail line under

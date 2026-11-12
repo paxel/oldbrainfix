@@ -320,7 +320,8 @@ void main() {
       expect(find.byType(NudgeScreen), findsOneWidget);
       for (final text in ['note 1', 'note 2']) {
         await tap(tester, find.byTooltip('File into…').first);
-        await tap(tester, find.text('Bills'));
+        // From the second time on, Bills is also filed into recently.
+        await tap(tester, find.text('Bills').first);
         expect(cards(tester), isNot(contains(text)));
       }
       await tester.pageBack();

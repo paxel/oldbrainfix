@@ -344,6 +344,36 @@ abstract class AppLocalizations {
   /// **'File into…'**
   String get fileInto;
 
+  /// The filter field at the top of File into…
+  ///
+  /// In en, this message translates to:
+  /// **'Filter Areas and Topics'**
+  String get fileIntoFilterHint;
+
+  /// Heading over the last three places this Device filed into, at the top of File into…
+  ///
+  /// In en, this message translates to:
+  /// **'Filed into recently'**
+  String get fileIntoRecent;
+
+  /// The row at the end of File into… that makes an Area and files into it
+  ///
+  /// In en, this message translates to:
+  /// **'New Area…'**
+  String get fileIntoNewArea;
+
+  /// The row under an Area in File into… that makes a Topic there and files into it
+  ///
+  /// In en, this message translates to:
+  /// **'New Topic…'**
+  String get fileIntoNewTopic;
+
+  /// File into… when nothing matches the filter
+  ///
+  /// In en, this message translates to:
+  /// **'No Area or Topic matches.'**
+  String get fileIntoNoMatch;
+
   /// No description provided for @firstStartTitle.
   ///
   /// In en, this message translates to:

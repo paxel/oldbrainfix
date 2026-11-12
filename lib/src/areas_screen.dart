@@ -1243,15 +1243,21 @@ class _PlaceRow extends StatelessWidget {
   );
 }
 
-/// Asks for a name; null when cancelled or left empty.
+/// Asks for a name; null when cancelled or left empty. Its button says
+/// Rename when there is an [initial] name, unless [creates].
 Future<String?> askName(
   BuildContext context, {
   required String title,
   String initial = '',
+  bool creates = false,
 }) async {
   final name = await showDialog<String>(
     context: context,
-    builder: (_) => _NameDialog(title: title, initial: initial),
+    builder: (_) => _NameDialog(
+      title: title,
+      initial: initial,
+      creates: creates || initial.isEmpty,
+    ),
   );
   final trimmed = name?.trim();
   return trimmed == null || trimmed.isEmpty ? null : trimmed;
@@ -1261,7 +1267,14 @@ class _NameDialog extends StatefulWidget {
   final String title;
   final String initial;
 
-  const _NameDialog({required this.title, required this.initial});
+  /// Whether its button says Create rather than Rename.
+  final bool creates;
+
+  const _NameDialog({
+    required this.title,
+    required this.initial,
+    required this.creates,
+  });
 
   @override
   State<_NameDialog> createState() => _NameDialogState();
@@ -1297,7 +1310,7 @@ class _NameDialogState extends State<_NameDialog> {
         ),
         TextButton(
           onPressed: _done,
-          child: Text(widget.initial.isEmpty ? t.create : t.rename),
+          child: Text(widget.creates ? t.create : t.rename),
         ),
       ],
     );

@@ -78,6 +78,26 @@
   },
   "unsorted": "Unsorted",
   "fileInto": "File into…",
+  "fileIntoFilterHint": "Filter Areas and Topics",
+  "@fileIntoFilterHint": {
+    "description": "The filter field at the top of File into…"
+  },
+  "fileIntoRecent": "Filed into recently",
+  "@fileIntoRecent": {
+    "description": "Heading over the last three places this Device filed into, at the top of File into…"
+  },
+  "fileIntoNewArea": "New Area…",
+  "@fileIntoNewArea": {
+    "description": "The row at the end of File into… that makes an Area and files into it"
+  },
+  "fileIntoNewTopic": "New Topic…",
+  "@fileIntoNewTopic": {
+    "description": "The row under an Area in File into… that makes a Topic there and files into it"
+  },
+  "fileIntoNoMatch": "No Area or Topic matches.",
+  "@fileIntoNoMatch": {
+    "description": "File into… when nothing matches the filter"
+  },
   "firstStartTitle": "Welcome to Old Brain Fix",
   "firstStartIntro": "How does Old Brain Fix start on this Device?",
   "firstStartNew": "New to Old Brain Fix",

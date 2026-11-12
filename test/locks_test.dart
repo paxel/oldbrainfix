@@ -730,14 +730,26 @@ void main() {
       tester,
     ) async {
       final (:doctor, note: _, routine: _) = lockedDoctor();
-      places.addTopic(doctor.id, 'Dentist');
+      final dentist = places.addTopic(doctor.id, 'Dentist');
       final home = places.addArea('Home');
       places.addTopic(home.id, 'Garden');
+      // Filed into last before the lock closed (#272): the Topic stays
+      // hidden on top too, and no new Topic is made there.
+      store.filedInto(dentist.id);
       await show(tester, FileIntoScreen(places: places));
 
       expect(find.text('Doctor'), findsOneWidget);
       expect(find.text('Dentist'), findsNothing);
       expect(find.text('Garden'), findsOneWidget);
+      expect(find.text(en.fileIntoRecent), findsNothing);
+      expect(
+        find.byKey(ValueKey('file-into-new-topic-${doctor.id}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(ValueKey('file-into-new-topic-${home.id}')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('all Routines and Reminders, and so the exported file', (

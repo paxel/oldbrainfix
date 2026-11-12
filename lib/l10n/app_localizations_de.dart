@@ -152,6 +152,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileInto => 'Ablegen in …';
 
   @override
+  String get fileIntoFilterHint => 'Bereiche und Themen filtern';
+
+  @override
+  String get fileIntoRecent => 'Zuletzt abgelegt in';
+
+  @override
+  String get fileIntoNewArea => 'Neuer Bereich …';
+
+  @override
+  String get fileIntoNewTopic => 'Neues Thema …';
+
+  @override
+  String get fileIntoNoMatch => 'Kein Bereich und kein Thema passt.';
+
+  @override
   String get firstStartTitle => 'Willkommen bei Old Brain Fix';
 
   @override

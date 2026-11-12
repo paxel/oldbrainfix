@@ -151,6 +151,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileInto => 'File into…';
 
   @override
+  String get fileIntoFilterHint => 'Filter Areas and Topics';
+
+  @override
+  String get fileIntoRecent => 'Filed into recently';
+
+  @override
+  String get fileIntoNewArea => 'New Area…';
+
+  @override
+  String get fileIntoNewTopic => 'New Topic…';
+
+  @override
+  String get fileIntoNoMatch => 'No Area or Topic matches.';
+
+  @override
   String get firstStartTitle => 'Welcome to Old Brain Fix';
 
   @override

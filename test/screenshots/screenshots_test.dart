@@ -1519,6 +1519,21 @@ void main() {
             ]) {
               seeded.store.setQuickNoteShows(control, true);
             }
+            // Filed into the Kitchen, then Work, before: on top (#272).
+            final places = Places(seeded.store);
+            final household = places.areas().firstWhere(
+              (a) => a.starter == 'household',
+            );
+            seeded.store
+              ..filedInto(
+                places
+                    .topics(household.id)
+                    .firstWhere((t) => t.starter == 'kitchen')
+                    .id,
+              )
+              ..filedInto(
+                places.areas().firstWhere((a) => a.starter == 'work').id,
+              );
             final t = await start(tester, seeded);
             await openTextCapture(tester);
             await tester.enterText(find.byType(TextField), texts.captureText);
