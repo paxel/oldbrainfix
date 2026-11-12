@@ -3,6 +3,8 @@
 //! trash act on the selection together, or on the card alone outside
 //! it, and Restore in the trash; one Ctrl+Z takes back the trash or the
 //! Merge of all of them, and a Note this Device may not change stays.
+//! The same menu offers Routine…, Reminder…, in Advanced Frog and
+//! Session… for the card alone, to who may set them up (#281).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,8 +17,8 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
-    AreaRole, ClockTime, Day, Importance, Invite, Notes, OwnProfile, PairedDevice, Places,
-    Routines, Schedule, SigningKey, Store,
+    AreaRole, Checklists, ClockTime, Day, Frogs, Importance, Invite, Notes, OwnProfile,
+    PairedDevice, PersonSettings, Places, Routines, Schedule, SigningKey, Store,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -248,6 +250,7 @@ fn the_cards_selected_in_the_trash_are_restored_together() -> TestResult {
     harness.run();
     assert!(harness.query_by_label("Move to trash").is_none());
     assert!(harness.query_by_label("Merge into…").is_none());
+    assert!(harness.query_by_label("Reminder…").is_none());
     harness.key_press(egui::Key::Escape);
     harness.run();
     right_pick(&mut harness, PLUMBER, "Restore")?;
@@ -536,5 +539,150 @@ fn the_note_menu_weighs_and_restores_the_note_open() -> TestResult {
         .click();
     harness.run();
     assert!(!trashed(&harness, &ids, MILK)?);
+    Ok(())
+}
+
+/// The entries of the card menu of `text`, by their labels, that show
+/// after a right-click, the menu left open.
+fn menu_of(harness: &mut Harness<'_, App>, text: &str, labels: &[&str]) -> Vec<String> {
+    pause(harness);
+    card(harness, text).click_secondary();
+    harness.run();
+    labels
+        .iter()
+        .filter(|label| harness.query_all_by_label(label).next().is_some())
+        .map(|label| label.to_string())
+        .collect()
+}
+
+const SPAWNS: [&str; 4] = ["Routine…", "Reminder…", "Frog", "Session…"];
+
+#[test]
+fn a_cards_menu_offers_its_routines_after_file_into_and_before_merge_into() -> TestResult {
+    let mut harness = harness(store()?, Selection::All);
+    let order = [
+        "File into…",
+        "Routine…",
+        "Reminder…",
+        "Frog",
+        "Session…",
+        "Merge into…",
+        "Importance ⏵",
+    ];
+    assert_eq!(menu_of(&mut harness, MILK, &order), order);
+    let tops: Vec<f32> = order
+        .iter()
+        .map(|label| {
+            harness
+                .query_all_by_label(label)
+                .next_back()
+                .map_or(f32::NAN, |n| n.rect().top())
+        })
+        .collect();
+    assert!(
+        tops.windows(2).all(|w| w[0] < w[1]),
+        "out of order: {tops:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn frog_and_session_are_offered_only_in_advanced() -> TestResult {
+    let store = store()?;
+    PersonSettings::new(&store).set_advanced(false)?;
+    let mut harness = harness(store, Selection::All);
+    assert_eq!(
+        menu_of(&mut harness, MILK, &SPAWNS),
+        ["Routine…", "Reminder…"]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_checklist_has_no_session_and_a_frog_open_no_second() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store).all()?;
+    let id = |text: &str| {
+        notes
+            .iter()
+            .find(|n| n.text == text)
+            .map(|n| n.id.clone())
+            .ok_or(format!("no {text:?}"))
+    };
+    Checklists::new(&store).make(&id(ROSES)?)?;
+    let mut harness = harness(store, Selection::All);
+    assert_eq!(
+        menu_of(&mut harness, ROSES, &SPAWNS),
+        ["Routine…", "Reminder…", "Frog"]
+    );
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+
+    // Frog spawns one at once, nothing asked; then it is not offered
+    // again while that one is open.
+    right_pick(&mut harness, MILK, "Frog")?;
+    let milk = id(MILK)?;
+    let frogs = Frogs::new(harness.state().store()).of_note(&milk)?;
+    assert_eq!(frogs.len(), 1);
+    assert_eq!(
+        menu_of(&mut harness, MILK, &SPAWNS),
+        ["Routine…", "Reminder…", "Session…"]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_member_sets_up_nothing_for_another_persons_note() -> TestResult {
+    let mut harness = harness(shared()?, Selection::All);
+    assert!(menu_of(&mut harness, MILK, &SPAWNS).is_empty());
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert_eq!(menu_of(&mut harness, ROSES, &SPAWNS), SPAWNS);
+    Ok(())
+}
+
+#[test]
+fn reminder_sets_one_up_for_the_card_alone() -> TestResult {
+    let mut harness = harness(store()?, Selection::All);
+    let ids = known(&harness)?;
+    select(&mut harness, &[MILK, ROSES]);
+    right_pick(&mut harness, ROSES, "Reminder…")?;
+    harness.run();
+    let roses = note(&harness, &ids, ROSES)?.id;
+    let editor = harness.state().routine_editor().ok_or("the editor")?;
+    assert_eq!(
+        editor.note.as_ref().map(|n| n.id.as_str()),
+        Some(roses.as_str())
+    );
+    assert!(harness.query_by_label("New Reminder").is_some());
+    harness
+        .query_all_by_role_and_label(Role::Button, "Save")
+        .next_back()
+        .ok_or("Save")?
+        .click_accesskit();
+    harness.run();
+    assert!(harness.state().routine_editor().is_none());
+    let store = harness.state().store();
+    let made = Routines::new(store).of_note(&roses)?;
+    assert_eq!(made.len(), 1);
+    assert!(made.iter().all(|r| r.is_reminder()));
+    let milk = note(&harness, &ids, MILK)?.id;
+    assert!(Routines::new(store).of_note(&milk)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn session_opens_the_editor_of_a_session_of_the_note() -> TestResult {
+    let mut harness = harness(store()?, Selection::All);
+    let ids = known(&harness)?;
+    right_pick(&mut harness, MILK, "Session…")?;
+    harness.run();
+    let milk = note(&harness, &ids, MILK)?.id;
+    let editor = harness.state().routine_editor().ok_or("the editor")?;
+    assert_eq!(
+        editor.note.as_ref().map(|n| n.id.as_str()),
+        Some(milk.as_str())
+    );
+    assert!(editor.session().is_some());
     Ok(())
 }

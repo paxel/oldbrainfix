@@ -1846,6 +1846,9 @@ pub struct App {
     /// last opened offers (#120).
     lines: TypedLines,
     card_menu: Option<CardMenu>,
+    /// What the same menu offers of Routines, Reminders, Frogs and
+    /// Sessions (#281).
+    card_spawns: Option<CardSpawns>,
     /// The region the system reports, an ISO country code, which picks
     /// the units Tallies show unless this Device chose them.
     region: Option<String>,
@@ -2315,6 +2318,7 @@ impl App {
             tally_whose: HashMap::new(),
             lines: TypedLines::default(),
             card_menu: None,
+            card_spawns: None,
             region: region_of(sys_locale::get_locale().as_deref()),
             changes: None,
             seen_changes: 0,
@@ -7222,14 +7226,45 @@ impl App {
                 }
             }
             ChecklistAction::Menu(note) => {
-                self.card_menu = match Notes::new(&self.store).by_id(&note)? {
-                    Some(note) => Some(checklist_view::card_menu(&self.store, &note, &*self.wall)?),
+                let note = Notes::new(&self.store).by_id(&note)?;
+                self.card_menu = match &note {
+                    Some(note) => Some(checklist_view::card_menu(&self.store, note, &*self.wall)?),
+                    None => None,
+                };
+                self.card_spawns = match &note {
+                    Some(note) => Some(self.card_spawns(note)?),
                     None => None,
                 };
             }
             ChecklistAction::Removed(asked) => self.removed_lines(asked, false)?,
         }
         Ok(())
+    }
+
+    /// What a card's menu offers of the Note `note`'s Routines (#281), as
+    /// the Note menu and the "+" badge do: Routine… and Reminder… for who
+    /// may set them up (ADR 0013), in Advanced also Frog while it has none
+    /// open and Session… on a plain Note without Code text (#197, #213).
+    fn card_spawns(&self, note: &Note) -> oldbrainfix_core::Result<CardSpawns> {
+        let schedules = !note.is_trashed()
+            && self
+                .store
+                .may_manage(self.store.area_of(&note.id)?.as_deref())?;
+        let advanced = schedules && self.view.advanced;
+        let frog_open = advanced
+            && Frogs::new(&self.store)
+                .of_note(&note.id)?
+                .iter()
+                .any(|f| !f.is_done());
+        let plain = advanced
+            && NoteKind::of(&self.store, &note.id)? == NoteKind::Plain
+            && note.text_format != text_format::CODE;
+        Ok(CardSpawns {
+            note: note.id.clone(),
+            schedules,
+            frog: advanced && !frog_open,
+            session: plain,
+        })
     }
 
     /// Does what was asked of a Shopping List, on a card or in the
@@ -11217,6 +11252,7 @@ impl App {
                     session: self.view.sessions.contains(id),
                     session_shown: self.view.card_sessions.get(id),
                     menu: self.card_menu.as_ref(),
+                    spawns: self.card_spawns.as_ref(),
                     changes: self.view.card_changes.contains(id),
                     may: self.view.card_may.contains(id),
                     boxes: CardBoxes {
@@ -17383,6 +17419,8 @@ struct CardLook<'a> {
     session: bool,
     session_shown: Option<&'a SessionCardShown>,
     menu: Option<&'a CardMenu>,
+    /// What that menu offers of Routines, read as it opens (#281).
+    spawns: Option<&'a CardSpawns>,
     /// Whether this Device may change its text, its tables full screen
     /// (#128).
     changes: bool,
@@ -17396,6 +17434,17 @@ struct CardLook<'a> {
     /// Today's Occurrences of its Routines and Reminders, a box for each
     /// that ticks it as on the Agenda (#215).
     today: &'a [CardOccurrence],
+}
+
+/// What a card's menu offers of the Note's Routines (#281): Routine…
+/// and Reminder… with `schedules`, Frog with `frog` and Session… with
+/// `session`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CardSpawns {
+    note: String,
+    schedules: bool,
+    frog: bool,
+    session: bool,
 }
 
 /// The folds of a card this Device keeps open (UI laws, "Lists"; #189):
@@ -18950,6 +18999,7 @@ fn note_card(
     let mut menu_opened = resp.secondary_clicked();
     let mut picked = None;
     let menu = look.menu.filter(|m| m.note == note.id);
+    let spawns = look.spawns.filter(|s| s.note == note.id);
     let has_boxes = !note.boxes.is_empty() || look.sections.iter().any(|s| !s.boxes.is_empty());
     let mut entries = |ui: &mut Ui| {
         let text = ui.visuals().text_color();
@@ -18963,6 +19013,39 @@ fn note_card(
                 .clicked()
         {
             picked = Some(Action::AskFileInto(vec![note.id.clone()]));
+        }
+        // Its Routines after File into…, as the phone's compact ⋮ has
+        // them (#281); for this card alone.
+        if let Some(spawns) = spawns {
+            let id = || Some(note.id.clone());
+            let mut entries = Vec::new();
+            if spawns.schedules {
+                entries.push((
+                    t.spawn_routine(),
+                    Action::NewRoutine {
+                        note: id(),
+                        reminder: false,
+                    },
+                ));
+                entries.push((
+                    t.spawn_reminder(),
+                    Action::NewRoutine {
+                        note: id(),
+                        reminder: true,
+                    },
+                ));
+            }
+            if spawns.frog {
+                entries.push((t.frog(), Action::SpawnFrog(note.id.clone())));
+            }
+            if spawns.session {
+                entries.push((t.spawn_session(), Action::NewSession(id())));
+            }
+            for (label, action) in entries {
+                if ui.button(RichText::new(label).color(text)).clicked() {
+                    picked = Some(action);
+                }
+            }
         }
         // These too with the cards selected along (#273).
         let one = || vec![note.id.clone()];

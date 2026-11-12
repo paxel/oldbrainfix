@@ -30,7 +30,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a tap or click on a Shopping List's or Checklist's heading on the Agenda opens the list with the cursor in a new empty Line after the open ones, on the phone with the keyboard up; left unused, that Line is dropped.
 - On the phone and the desktop, Add to a Shopping List on the capture screen or in the quick note's More menu names the list and picks it at once while there is only one, such as "Add to Weekly", and otherwise lists the list used last at the top.
 - On the phone and the desktop, a new Tally entry starts each field without a target with its value in your latest entry, selected so that typing replaces it.
-- On the phone, a compact card's ⋮ offers Routine… and Reminder…, in Advanced also Frog and Session…, beside File into… and Merge into…; a card's ⋮ puts Send to a person, Share to an app, Copy text and Export as Pack… under one Share…, and a detailed card's pencil opens the Note editor in one tap.
+- On the phone and the desktop, a compact card's ⋮ on the phone and a card's ⋮ and right-click on the desktop offer Routine… and Reminder…, in Advanced also Frog and Session…, beside File into… and Merge into…; on the phone a card's ⋮ puts Send to a person, Share to an app, Copy text and Export as Pack… under one Share…, and a detailed card's pencil opens the Note editor in one tap.
 - On the desktop, back and forward show each place with the search, person filter and scroll position it was left with, instead of clearing them; a place shown anew starts with none and at the top.
 
 ### Fixed

@@ -1355,7 +1355,12 @@ replace a law of Both apps where they say so. A desktop law marked
   its menu offers, after File into…, Merge into… and Importance ▸
   Important, Normal or Unimportant, and Move to trash last, each only on
   a card this Device may change; a card in the Trash has no ⋮, and its
-  right-click offers Restore alone. On a selected card each acts on all
+  right-click offers Restore alone. Between File into… and Merge into…
+  stand Routine… and Reminder…, in Advanced Frog while the Note has no
+  open Frog and Session… on a plain Note, as in the phone's compact ⋮
+  (#281), only for who may set them up (ADR 0013) and for that card
+  alone, selected or not; the ⋮ and the right-click are one menu in
+  both views. On a selected card each acts on all
   the cards selected, on another on that card alone, as File into…
   does, and the Note menu offers the same while no Note is open (see
   Menu bar and keys). Merge into… opens the Note picker with every Note,
