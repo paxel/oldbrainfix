@@ -1274,7 +1274,9 @@ impl FieldForm {
 /// One entry of a Tally: a box per Check field (#264), ticked once per
 /// entry above the sets; a value per number field shown, a new entry's
 /// prefilled with the field's target, so that saving the targets is one
-/// click. A Tally that counts in sets shows each set as a row of those
+/// click, or for a field without one with the value of the user's latest
+/// entry that has one, selected as the field takes the keyboard so typing
+/// replaces it (#276). A Tally that counts in sets shows each set as a row of those
 /// values with "Add set" under them, which adds one that starts with the
 /// values of the set before; a set after the first can be removed. Then
 /// the day it counts for, today for a new one, at the same time of day;
@@ -1316,8 +1318,48 @@ pub struct EntryForm {
     invalid: HashSet<String>,
     empty: bool,
     focus: Option<String>,
+    /// The fields of a new entry that start with the value of the user's
+    /// latest entry (#276), by id.
+    from_latest: HashSet<String>,
+    /// The value of one of them that took the keyboard holding that
+    /// value, by its key: selected while the pointer that gave the
+    /// keyboard is down, which would place the cursor.
+    selecting: Option<String>,
     /// The Session and its Occurrence a new entry is recorded for.
     pick: Option<(String, Occurrence)>,
+}
+
+/// What a new entry of `tally` starts with (#276): each number field's
+/// target, and for one of `fields` without, the value of the first set
+/// of the latest of `mine`, the user's entries newest first, that holds
+/// one; with the fields that start so.
+fn start_values(
+    tally: &Tally,
+    fields: &[TallyField],
+    mine: &[TallyEntry],
+) -> (BTreeMap<String, f64>, HashSet<String>) {
+    let mut values = tally.targets();
+    let mut wanted: HashSet<String> = fields
+        .iter()
+        .filter(|f| f.target.is_none())
+        .map(|f| f.id.clone())
+        .collect();
+    let mut latest = HashSet::new();
+    for entry in mine {
+        if wanted.is_empty() {
+            break;
+        }
+        let Some(first) = tally.sets_of(entry).into_iter().next() else {
+            continue;
+        };
+        for (id, value) in first {
+            if wanted.remove(&id) {
+                values.entry(id.clone()).or_insert(value);
+                latest.insert(id);
+            }
+        }
+    }
+    (values, latest)
 }
 
 /// The key of the value of `field` in the set `set` of the entry page.
@@ -1326,18 +1368,24 @@ fn value_key(set: usize, field: &str) -> String {
 }
 
 impl EntryForm {
-    /// The page of `entry` of `tally`, or of a new one, on `today`.
+    /// The page of `entry` of `tally`, or of a new one, on `today`,
+    /// starting from `mine`, the user's entries newest first.
     pub fn new(
         tally: &Tally,
-        entry: Option<(TallyEntry, bool)>,
+        (entry, mine): (Option<(TallyEntry, bool)>, &[TallyEntry]),
         (system, today): (UnitSystem, Day),
         wall: &WallClock,
         t: &L10n,
     ) -> EntryForm {
         let decimal = decimal_sign(t);
         let fields: Vec<TallyField> = tally.numbers().into_iter().cloned().collect();
+        let mut from_latest = HashSet::new();
         let rows = match &entry {
-            None => vec![tally.targets()],
+            None => {
+                let (values, latest) = start_values(tally, &fields, mine);
+                from_latest = latest;
+                vec![values]
+            }
             Some((entry, _)) => tally.sets_of(entry),
         };
         let rows = if rows.is_empty() {
@@ -1388,6 +1436,8 @@ impl EntryForm {
             system,
             invalid: HashSet::new(),
             empty: false,
+            from_latest,
+            selecting: None,
             pick: None,
         }
     }
@@ -1634,6 +1684,28 @@ impl EntryForm {
                                 crate::text_menu::show(ui, t, &edit, typed);
                                 if focus.as_deref() == Some(key.as_str()) {
                                     edit.request_focus();
+                                }
+                                // The latest value, as it opened, is
+                                // selected as it takes the keyboard
+                                // (#276), also against a click's cursor.
+                                let as_opened = self.opened.first().and_then(|s| {
+                                    let at = self.fields.iter().position(|f| f.id == field.id)?;
+                                    s.get(at)
+                                });
+                                if i == 0
+                                    && edit.gained_focus()
+                                    && self.from_latest.contains(&field.id)
+                                    && as_opened == Some(&*typed)
+                                {
+                                    self.selecting = Some(key.clone());
+                                }
+                                if self.selecting.as_deref() == Some(key.as_str()) {
+                                    if edit.has_focus() {
+                                        crate::format_bar::select(ui, id, typed, (0, typed.len()));
+                                    }
+                                    if !edit.has_focus() || !ui.input(|i| i.pointer.any_down()) {
+                                        self.selecting = None;
+                                    }
                                 }
                                 let unit = tally_units::shown_unit(&field.unit, system);
                                 ui.label(RichText::new(unit).color(text));

@@ -361,9 +361,16 @@ pub fn capture(
     let Some(list) = choices.shopping.as_deref().filter(|_| photos.is_empty()) else {
         return note(choices).map(Captured::Note);
     };
+    // The list used last goes to the top of the pick (#276).
+    let used = || DeviceSettings::new(store).set_last_shopping_list(Some(list));
     if recordings.is_empty() {
         return match ShoppingLists::new(store).add_lines(list, text, wall) {
-            Ok(_) => Ok(Captured::Poured),
+            Ok(added) => {
+                if !added.is_empty() {
+                    used()?;
+                }
+                Ok(Captured::Poured)
+            }
             // The list went meanwhile: a Note with all that was set up.
             Err(Error::Invalid(_)) => note(choices).map(Captured::Kept),
             Err(e) => Err(e),
@@ -372,6 +379,7 @@ pub fn capture(
     // Until the Transcripts are there, the Note holds all of it.
     let note = Notes::new(store).capture_with(text, None, None, &[], recordings)?;
     formatted(store, &note)?;
+    used()?;
     Ok(Captured::Waiting(note))
 }
 
@@ -565,13 +573,21 @@ pub fn shopping_title(t: &L10n, note: &Note) -> String {
 
 /// The Shopping Lists a capture can go into, by their Note's id with
 /// their title: each one this Device may add Lines to, oldest capture
-/// first.
+/// first, but the one a capture on this Device went into last at the top
+/// (#276).
 pub fn shopping_lists(store: &Store, t: &L10n) -> oldbrainfix_core::Result<Vec<ListTitle>> {
-    Ok(ShoppingLists::new(store)
+    let mut lists: Vec<ListTitle> = ShoppingLists::new(store)
         .addable()?
         .iter()
         .map(|note| (note.id.clone(), shopping_title(t, note)))
-        .collect())
+        .collect();
+    if let Some(last) = DeviceSettings::new(store).last_shopping_list()?
+        && let Some(at) = lists.iter().position(|(id, _)| *id == last)
+    {
+        let used = lists.remove(at);
+        lists.insert(0, used);
+    }
+    Ok(lists)
 }
 
 /// The title of the Shopping List `id` among `lists`; "Shopping List"
@@ -599,7 +615,8 @@ pub fn place_name(t: &L10n, areas: &[(Area, Vec<Topic>)], id: &str) -> Option<St
 
 /// "Add to a Shopping List" in a menu: its heading over `lists`, by
 /// their Note's id with their title, as radio buttons, the one picked
-/// before on; the one picked.
+/// before on; with one list a single entry naming it, "Add to Weekly"
+/// (#276). The one picked.
 fn shopping_picker(
     ui: &mut Ui,
     t: &L10n,
@@ -607,6 +624,20 @@ fn shopping_picker(
     lists: &[ListTitle],
 ) -> Option<String> {
     let text = ui.visuals().text_color();
+    if let [(id, title)] = lists {
+        let on = current == Some(id.as_str());
+        let words = t.add_to_named_shopping_list(title);
+        let entry = if on {
+            ui.radio(true, RichText::new(words).color(text))
+        } else {
+            ui.button(RichText::new(words).color(text))
+        };
+        if entry.clicked() {
+            ui.close();
+            return (!on).then(|| id.clone());
+        }
+        return None;
+    }
     ui.label(RichText::new(t.add_to_shopping_list()).strong().color(text));
     let mut picked = None;
     for (id, title) in lists {

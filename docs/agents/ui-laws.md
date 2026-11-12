@@ -620,8 +620,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A new list starts with one empty boxed Line**, the cursor in it. A
   list this Device may add to always has a Line to type in. **Opened
   from its group's heading on the Agenda** (#276), a list starts with
-  the cursor in a new empty Line after its open Lines, the keyboard up;
-  left unused, the Line is dropped on leaving, as any empty one.
+  the cursor in a new empty Line after its open Lines, the keyboard up
+  (on the desktop the keyboard's focus there); left unused, the Line is
+  dropped on leaving, as any empty one.
 - **Return** adds a new Line with an empty box under the cursor's Line,
   in the group of a Line with one; in the middle of a Line it moves the
   rest of the Line into the new one. **Backspace at the start** of a
@@ -1323,7 +1324,9 @@ replace a law of Both apps where they say so. A desktop law marked
   the alarm clock, whose menu offers Routine and Reminder (#223), its
   editor a dialog over the quick note dialog or a page of the popup;
   switched on, File into…, Frog and Session in the clock's menu, and
-  More with the Importance, Make it a Tally and Add to a Shopping List,
+  More with the Importance, Make it a Tally and Add to a Shopping List
+  (its lists as radio buttons, the one used last at the top; with one
+  list a single entry naming it, "Add to Weekly", #276),
   and the format bar over the field, without ☐, link and table. Files
   dropped onto the window open the dialog and wait in it. Leaving the
   dialog by its cross, Esc, Alt+Left, the mouse's back button or a click

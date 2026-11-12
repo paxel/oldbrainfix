@@ -307,10 +307,12 @@ struct Row {
 }
 
 /// A Shopping List's group on today's Agenda (#123, #186, #208): its
-/// heading, the list's title, and its open `lines` under it; or, as
-/// chosen for it, the heading alone saying how many are open,
-/// "Groceries: 3 open". With the Area its Note is filed in and whether
-/// this Device may check its Lines.
+/// heading, the list's title, and its open `lines` under it, then those
+/// checked today, by id in `struck`, which stay struck for the day
+/// unless this Device hides what is checked (#276); or, as chosen for
+/// it, the heading alone saying how many are open, "Groceries: 3 open".
+/// With the Area its Note is filed in and whether this Device may check
+/// its Lines.
 #[derive(Debug, Clone)]
 struct ShoppingRow {
     note_id: String,
@@ -318,12 +320,14 @@ struct ShoppingRow {
     /// What the heading says.
     text: String,
     lines: Vec<ShoppingLine>,
+    struck: HashSet<String>,
     checks: bool,
 }
 
 /// A Checklist's group on today's Agenda (#143, #208), shaped as a
 /// Shopping List's: its Note, Area, what its heading says and its open
-/// Lines under it; with no Lines the heading says how many are open,
+/// Lines under it, with those checked today unless this Device hides
+/// what is checked (#276); with no Lines the heading says how many are open,
 /// "Packing: 3 of 7 open". With whether this Device may check them.
 #[derive(Debug, Clone)]
 struct ChecklistRow {
@@ -337,12 +341,37 @@ struct ChecklistRow {
 /// The Lines a Checklist shows under its heading on the Agenda (#208): a
 /// Checklist Routine's Occurrence every Line, checked ones struck
 /// through, or only its open ones where this Device `hides_checked`
-/// (#217); a Checklist without a Routine its open ones. The one place
-/// that decides it.
-fn agenda_lines(list: &Checklist, hides_checked: bool) -> Vec<ShownLine> {
+/// (#217); a Checklist without a Routine its open ones, and those checked
+/// `today` struck for the day (#276), a Line with a group while a Line of
+/// it shows. The one place that decides it.
+fn agenda_lines(
+    list: &Checklist,
+    hides_checked: bool,
+    today: Option<(Day, &oldbrainfix_core::WallClock)>,
+) -> Vec<ShownLine> {
+    if list.on.is_some() && !hides_checked {
+        return checklist_view::shown_lines(list);
+    }
+    let mut shown: HashSet<&str> = list
+        .lines
+        .iter()
+        .filter(|line| {
+            !line.checked
+                || (!hides_checked && today.is_some_and(|(day, wall)| line.checked_on(day, wall)))
+        })
+        .map(|line| line.id.as_str())
+        .collect();
+    // A group's Line shows over the Lines of its group that show.
+    let parents: Vec<&str> = list
+        .lines
+        .iter()
+        .filter(|line| shown.contains(line.id.as_str()))
+        .filter_map(|line| line.parent.as_deref())
+        .collect();
+    shown.extend(parents);
     checklist_view::shown_lines(list)
         .into_iter()
-        .filter(|line| (list.on.is_some() && !hides_checked) || !line.checked)
+        .filter(|line| shown.contains(line.id.as_str()))
         .collect()
 }
 
@@ -366,7 +395,8 @@ struct AgendaView {
     /// choose (#123).
     shopping: Vec<ShoppingRow>,
     /// Today's rows of the Checklists without a Routine that show on this
-    /// person's Agenda and have open Lines, oldest capture first (#143).
+    /// person's Agenda and have open Lines or Lines checked today, oldest
+    /// capture first (#143, #276).
     checklists: Vec<ChecklistRow>,
     tomorrow: Vec<Row>,
     /// The days after tomorrow, each with its rows.
@@ -1188,6 +1218,10 @@ enum Action {
     /// Opens the Note in the Note dialog (#146): a double-click on its
     /// card or Edit (#114).
     SelectNote(String),
+    /// Opens the Checklist or Shopping List of this Note in the Note
+    /// dialog with the keyboard in a new empty Line after its open ones,
+    /// as a click on its group's heading on the Agenda does (#276).
+    StartLine(String),
     /// Switches the card of this Note to its other view, in place, and
     /// keeps that on this Device until the list's switch changes (#189).
     SwitchView(String),
@@ -1729,7 +1763,8 @@ pub struct App {
     /// "Keep as code" waits under it (#213).
     code_offer: Option<String>,
     /// Whether the Lines of the Note opened next are to be typed in at
-    /// once: a Checklist or Shopping List just made (#161).
+    /// once: a Checklist or Shopping List just made (#161), or opened from
+    /// its group's heading on the Agenda (#276).
     start_lines: bool,
     /// Whose entries each Tally shows, by its Note, once picked (#190);
     /// the default until then.
@@ -4752,10 +4787,14 @@ impl App {
             (None, None) => (None, (false, &none)),
         };
         self.lines.arrange(detail, listed, rights);
-        // A list just made: its first Line takes the keyboard (#161).
+        // A list just made, or opened from its group's heading on the
+        // Agenda: a new Line after its open ones takes the keyboard
+        // (#161, #276).
         if self.start_lines && self.lines.note.is_some() && self.lines.note == self.selected_note {
             self.start_lines = false;
-            self.lines.focus_empty_row();
+            if let Some(listed) = listed {
+                self.lines.start_row(listed);
+            }
         }
         if self.view.detail.is_none() {
             self.badge = None;
@@ -5668,6 +5707,10 @@ impl App {
                 self.selected_note = Some(id);
                 self.editor = None;
                 self.tally_form = None;
+            }
+            Action::StartLine(id) => {
+                self.act(Action::SelectNote(id))?;
+                self.start_lines = true;
             }
             Action::Capture(nudge_in) => {
                 // A running recording is ended and kept first; held
@@ -6944,10 +6987,17 @@ impl App {
                 };
                 let today = Day::today(self.store.now(), &*self.wall);
                 let system = self.unit_system()?;
+                let mine = self.own_entries(&tally, entry.is_none())?;
                 self.save_text()?;
                 self.editor = None;
                 self.selected_note = Some(note_id);
-                let form = EntryForm::new(&tally, entry, (system, today), &*self.wall, &self.t);
+                let form = EntryForm::new(
+                    &tally,
+                    (entry, &mine),
+                    (system, today),
+                    &*self.wall,
+                    &self.t,
+                );
                 self.tally_form = Some(TallyForm::Entry(form.for_pick(&session, occurrence)));
             }
             SessionAction::Another {
@@ -7056,8 +7106,9 @@ impl App {
                 let Some(line) = self.lines.stored_id(&self.store, &*self.wall, &line)? else {
                     return Ok(());
                 };
-                // A sync meanwhile may have taken it.
-                if let Some(shown) = self.shopping_line_of(&line)?
+                // A sync meanwhile may have taken it; one checked Once
+                // is brought back from gone, as from the Agenda (#276).
+                if let Some(shown) = self.shopping_line_of(&line, !checked)?
                     && lists.may_check(&shown.note_id)?
                 {
                     if checked {
@@ -7074,7 +7125,7 @@ impl App {
                     return Ok(());
                 };
                 self.lines.keep(&self.store, &*self.wall)?;
-                let Some(shown) = self.shopping_line_of(&id)? else {
+                let Some(shown) = self.shopping_line_of(&id, false)? else {
                     return Ok(());
                 };
                 if !lists.may_edit(&id)? {
@@ -7369,13 +7420,42 @@ impl App {
         Ok(())
     }
 
-    /// The Line `id` of a Shopping List, while it shows there (#122).
-    fn shopping_line_of(&self, id: &str) -> oldbrainfix_core::Result<Option<ShoppingLine>> {
+    /// The Line `id` of a Shopping List, while it shows there (#122), or
+    /// with `gone` while it is gone, checked Once (#276).
+    fn shopping_line_of(
+        &self,
+        id: &str,
+        gone: bool,
+    ) -> oldbrainfix_core::Result<Option<ShoppingLine>> {
         let Some(note) = self.store.current(id, checklist_keys::NOTE)? else {
             return Ok(None);
         };
         let list = ShoppingLists::new(&self.store).by_note(&note, &*self.wall)?;
-        Ok(list.and_then(|list| list.line(id).cloned()))
+        Ok(list.and_then(|list| {
+            list.line(id)
+                .or_else(|| {
+                    gone.then(|| list.gone().iter().find(|l| l.id == id))
+                        .flatten()
+                })
+                .cloned()
+        }))
+    }
+
+    /// The user's own entries of `tally`, newest first, which a new entry
+    /// starts from (#276); none unless `new`.
+    fn own_entries(
+        &self,
+        tally: &oldbrainfix_core::Tally,
+        new: bool,
+    ) -> oldbrainfix_core::Result<Vec<oldbrainfix_core::TallyEntry>> {
+        if !new {
+            return Ok(Vec::new());
+        }
+        let mine = PersonFilter {
+            me: true,
+            ..PersonFilter::default()
+        };
+        Tallies::new(&self.store).entries(&tally.note_id, &mine)
     }
 
     /// The Line `id` with its Checklist, while it shows in one.
@@ -7435,11 +7515,12 @@ impl App {
                     _ => None,
                 };
                 let today = Day::today(self.store.now(), &*self.wall);
+                let mine = self.own_entries(&tally, entry.is_none())?;
                 self.save_text()?;
                 self.editor = None;
                 self.tally_form = Some(TallyForm::Entry(EntryForm::new(
                     &tally,
-                    entry,
+                    (entry, &mine),
                     (system, today),
                     &*self.wall,
                     &self.t,
@@ -15203,7 +15284,9 @@ fn read_agenda(
     }
     let frog_rows = shown_frogs(today.shown.clone())?;
     let mut shopping_rows = Vec::new();
-    for shown in shopping.agenda_rows(wall)? {
+    // The Lines checked today stay, struck for the day, unless this
+    // Device hides what is checked (#276).
+    for shown in shopping.agenda_rows_with(wall, !hides_checked)? {
         let Some(note) = notes.by_id(&shown.list.note_id)? else {
             continue;
         };
@@ -15212,23 +15295,33 @@ fn read_agenda(
             _ => t.shopping_heading().to_string(),
         };
         // As this person chose for the list (#186); one kept
-        // off is not among them.
-        let count = shown.lines.len() as i64;
+        // off is not among them, nor a count of none open.
+        let count = shown.list.open_count() as i64;
         let (lines, text) = match shown.shows {
             ShoppingOnAgenda::Lines => (shown.lines, title),
-            ShoppingOnAgenda::Count => (Vec::new(), t.shopping_row_open(&title, count)),
-            ShoppingOnAgenda::Off => continue,
+            ShoppingOnAgenda::Count if count > 0 => {
+                (Vec::new(), t.shopping_row_open(&title, count))
+            }
+            ShoppingOnAgenda::Count | ShoppingOnAgenda::Off => continue,
         };
+        let open: HashSet<&str> = shown.list.open().iter().map(|l| l.id.as_str()).collect();
+        let struck = lines
+            .iter()
+            .filter(|l| !open.contains(l.id.as_str()))
+            .map(|l| l.id.clone())
+            .collect();
         shopping_rows.push(ShoppingRow {
             area: place(note.clone())?.area,
             checks: shopping.may_check(&note.id)?,
             note_id: note.id,
             text,
             lines,
+            struck,
         });
     }
     let mut checklist_rows = Vec::new();
-    for row in lists.agenda_rows()? {
+    let day = Day::today(store.now(), wall);
+    for row in lists.agenda_rows_with((!hides_checked).then_some(wall))? {
         let Some(note) = notes.by_id(&row.list.note_id)? else {
             continue;
         };
@@ -15241,9 +15334,14 @@ fn read_agenda(
         let ChecklistAgendaRow { list, shows } = row;
         let lines = match shows {
             ListOnAgenda::Count => Vec::new(),
-            // Its checked Lines never show (#143).
-            _ => agenda_lines(&list, true),
+            // Its checked Lines show only on the day they were checked
+            // (#143, #276).
+            _ => agenda_lines(&list, hides_checked, Some((day, wall))),
         };
+        // Never a count of none open.
+        if lines.is_empty() && list.open_count() == 0 {
+            continue;
+        }
         let text = if lines.is_empty() {
             let (open, count) = (list.open_count() as i64, list.count() as i64);
             t.checklist_row_open(&title, open, count)
@@ -15576,7 +15674,7 @@ fn agenda_row(
             session_picks(ui, t, tones, (shown, hides_checked), actions);
         } else if let Some((list, checks)) = &row.lines {
             // The Lines go there too, checked for this Occurrence.
-            for line in agenda_lines(list, hides_checked) {
+            for line in agenda_lines(list, hides_checked, None) {
                 let id = Id::new(("row line", &routine.id, occurrence.key(), &line.id));
                 let shown = (id, line.text.as_str(), usize::from(line.in_group));
                 let clicks = agenda_entry(
@@ -15659,7 +15757,8 @@ fn session_picks(
 
 /// The heading of a Shopping List's or Checklist's group: its kind's
 /// icon where a box would be, its `words`, a click on which opens the
-/// Note `note_id`, and its Area's icon.
+/// Note `note_id` with the keyboard in a new Line after its open ones
+/// (#276), and its Area's icon.
 fn list_heading(
     ui: &mut Ui,
     (icon, area, colour): (char, Option<&Area>, Option<Color32>),
@@ -15681,7 +15780,7 @@ fn list_heading(
             .on_hover_cursor(egui::CursorIcon::PointingHand);
         open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, words));
         if open.clicked() {
-            actions.push(Action::SelectNote(note_id.to_string()));
+            actions.push(Action::StartLine(note_id.to_string()));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(icon) = area.and_then(|a| icons::area_icon(a.icon.as_deref())) {
@@ -15692,10 +15791,11 @@ fn list_heading(
 }
 
 /// A Shopping List's group today (#123, #208): its title as the heading,
-/// with the cart and no box, and the Lines that came back today under it,
-/// each with its box, which strikes it and takes it off the Agenda; or,
-/// as chosen for it, the heading alone with how many are open. A click
-/// on a heading's or Line's words opens the Note.
+/// with the cart and no box, and its open Lines under it, then those
+/// checked today struck for the day (#276), each with its box, which
+/// checks or brings it back; or, as chosen for it, the heading alone with
+/// how many are open. A click on a Line's words opens the Note, on the
+/// heading's in a new Line (#276).
 fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<Action>) {
     let colour = row
         .area
@@ -15706,15 +15806,16 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
         list_heading(ui, icon, (&row.note_id, &row.text, "shopping row"), actions);
         for line in &row.lines {
             let id = Id::new(("shopping line", line.id.as_str()));
+            let struck = row.struck.contains(&line.id);
             let clicks = agenda_entry(
                 ui,
                 tones,
                 (id, &line.text, 0),
-                (false, false),
+                (struck, struck),
                 (row.checks, true),
             );
             if clicks.boxed {
-                let check = ShoppingAction::Check(line.id.clone(), true);
+                let check = ShoppingAction::Check(line.id.clone(), !struck);
                 actions.push(Action::Shopping(check));
             }
             if clicks.words {
@@ -15725,9 +15826,10 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
 }
 
 /// A Checklist's group today (#143, #208): its title as the heading,
-/// with the list's icon and no box, and its open Lines under it, each
-/// with its box, which checks it. A click on a heading's or Line's words
-/// opens the Note.
+/// with the list's icon and no box, and its open Lines under it with
+/// those checked today struck for the day (#276), each with its box,
+/// which checks or unchecks it. A click on a Line's words opens the
+/// Note, on the heading's in a new Line (#276).
 fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Vec<Action>) {
     let colour = row
         .area

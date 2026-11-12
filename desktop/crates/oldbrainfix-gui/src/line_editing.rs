@@ -245,15 +245,52 @@ impl TypedLines {
         }
     }
 
-    /// The cursor into the empty Line of a list without Lines, as a new
-    /// list starts (#161).
-    pub fn focus_empty_row(&mut self) {
-        if let [row] = self.rows.as_slice()
-            && row.id.is_none()
-            && row.typed().is_empty()
+    /// The cursor into a new empty row after the open Lines of `listed`,
+    /// as a list opened from its group on the Agenda starts (#276), or
+    /// into the empty new row there is already, as a new list starts with
+    /// one (#161). Nothing where this Device may not add Lines. Left
+    /// unused, the row goes as the Note is left.
+    pub fn start_row(&mut self, listed: Listed) {
+        if !self.adds {
+            return;
+        }
+        if let Some(row) = self
+            .rows
+            .iter()
+            .find(|r| r.id.is_none() && r.typed().is_empty())
         {
             self.focus = Some((row.key, 0));
+            return;
         }
+        let at = match listed {
+            // Before the struck Lines.
+            Listed::Shopping(_) => (0..self.rows.len())
+                .rev()
+                .find(|at| self.places_among(*at))
+                .map_or(0, |at| at + 1),
+            // After the last open Line and its group, at the top level;
+            // the end of a list without an open Line.
+            Listed::Checklist(list) => {
+                let open = |row: &TypedLine| {
+                    row.id
+                        .as_deref()
+                        .and_then(|id| list.line(id))
+                        .is_some_and(|line| !line.checked)
+                };
+                match self.rows.iter().rposition(open) {
+                    None => self.rows.len(),
+                    Some(mut at) => {
+                        while self.rows.get(at + 1).is_some_and(|r| r.in_group) {
+                            at += 1;
+                        }
+                        at + 1
+                    }
+                }
+            }
+        };
+        let row = self.row(None, "", false);
+        self.focus = Some((row.key, 0));
+        self.rows.insert(at.min(self.rows.len()), row);
     }
 
     /// The rows for the Lines of `list`: those there already kept with

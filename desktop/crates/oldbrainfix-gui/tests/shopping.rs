@@ -14,9 +14,12 @@
 //! Agenda shows each Shopping List with open Lines as chosen for it
 //! (#186), in the card's ⋮ and with the Note dialog's badge: one row with
 //! the number of open Lines, the default, each open Line with its box, or
-//! none; a list nobody chose for shows as this Device showed Shopping
-//! Lists before, the Settings no longer choose it, and a click on a row
-//! opens the Note.
+//! none; a Line checked there stays struck under the open ones for the
+//! day, also one checked Once, and its box brings it back, unless this
+//! Device hides what is checked (#276); a list nobody chose for shows as
+//! this Device showed Shopping Lists before, the Settings no longer
+//! choose it, and a click on a Line's row opens the Note, on the heading
+//! with the keyboard in a new Line after the open ones (#276).
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -1004,7 +1007,7 @@ fn by_default_the_agenda_has_one_row_with_the_open_lines_of_the_list() -> TestRe
 }
 
 #[test]
-fn the_lines_choice_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
+fn the_lines_choice_checks_a_line_on_the_agenda_and_it_stays_struck_for_the_day() -> TestResult {
     let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
     // The list's name as the heading, its open Lines under it (#208).
     let heading = harness.get_by_role_and_label(Role::Button, "Weekly").rect();
@@ -1018,8 +1021,103 @@ fn the_lines_choice_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
+    // Struck under the open ones (#276); its box brings it back.
+    assert!(checked(&harness, "Bread")?);
+    assert!(!checked(&harness, "Milk")?);
+    let bread = harness.get_by_role_and_label(Role::Button, "Bread").rect();
+    let apples = harness.get_by_role_and_label(Role::Button, "Apples").rect();
+    assert!(apples.top() < bread.top());
+    tick(&mut harness, "Bread")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
+    assert!(!checked(&harness, "Bread")?);
+    Ok(())
+}
+
+#[test]
+fn a_line_checked_once_on_the_agenda_stays_struck_and_its_box_brings_it_back() -> TestResult {
+    let (mut harness, note) = agenda_with(|store, note| {
+        let lists = ShoppingLists::new(store);
+        lists.set_on_agenda(note, ShoppingOnAgenda::Lines)?;
+        lists.set_reappear(&line_id(store, note, "Milk")?, Reappear::Once)?;
+        Ok(())
+    })?;
+    tick(&mut harness, "Milk")?;
+    // Gone from the list, still struck on the Agenda for the day.
+    assert_eq!(texts(&harness, &note)?, ["Bread", "Apples"]);
+    assert!(checked(&harness, "Milk")?);
+    tick(&mut harness, "Milk")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
+    assert!(!checked(&harness, "Milk")?);
+    Ok(())
+}
+
+#[test]
+fn every_line_checked_today_stays_struck_but_its_count_does_not_show() -> TestResult {
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    for line in ["Milk", "Bread", "Apples"] {
+        tick(&mut harness, line)?;
+    }
+    assert!(shows_weekly(&harness));
+    for line in ["Milk", "Bread", "Apples"] {
+        assert!(checked(&harness, line)?, "{line}");
+    }
+    assert!(!shows(&harness, NOTHING_TODAY));
+    // As its count, with none open, the list does not show.
+    ShoppingLists::new(harness.state().store()).set_on_agenda(&note, ShoppingOnAgenda::Count)?;
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert!(!shows_weekly(&harness));
+    assert!(shows(&harness, NOTHING_TODAY));
+    Ok(())
+}
+
+#[test]
+fn hiding_whats_checked_takes_a_checked_line_off_the_agenda_at_once() -> TestResult {
+    let (mut harness, note) = agenda_with(|store, note| {
+        ShoppingLists::new(store).set_on_agenda(note, ShoppingOnAgenda::Lines)?;
+        oldbrainfix_core::DeviceSettings::new(store).set_agenda_hides_checked(true)?;
+        Ok(())
+    })?;
+    tick(&mut harness, "Bread")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
     assert!(boxes(&harness, "Bread").is_empty());
     assert!(!boxes(&harness, "Milk").is_empty());
+    Ok(())
+}
+
+#[test]
+fn the_heading_opens_the_list_in_a_new_line_before_the_struck_ones() -> TestResult {
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    tick(&mut harness, "Bread")?;
+    harness
+        .get_by_role_and_label(Role::Button, "Weekly")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert_eq!(rows(&harness), ["Milk", "Apples", "", "Bread"]);
+    harness.get_by(|n| n.is_focused()).type_text("Tea");
+    harness.run();
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    // Left unused, the new Line is dropped.
+    harness
+        .get_by_role_and_label(Role::Button, "Weekly")
+        .click();
+    harness.run();
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
     Ok(())
 }
 
@@ -1053,20 +1151,33 @@ fn the_off_choice_shows_no_shopping_list() -> TestResult {
 }
 
 #[test]
-fn a_list_without_open_lines_never_shows() -> TestResult {
-    for shows_as in [None, Some(ShoppingOnAgenda::Lines)] {
+fn a_list_without_open_lines_shows_only_its_lines_checked_today_one_by_one() -> TestResult {
+    let ways = [
+        (None, false),
+        (Some(ShoppingOnAgenda::Lines), false),
+        (Some(ShoppingOnAgenda::Lines), true),
+    ];
+    for (shows_as, hides) in ways {
         let (harness, _) = agenda_with(|store, note| {
             let lists = ShoppingLists::new(store);
             if let Some(shows) = shows_as {
                 lists.set_on_agenda(note, shows)?;
             }
+            oldbrainfix_core::DeviceSettings::new(store).set_agenda_hides_checked(hides)?;
             for line in ["Milk", "Bread", "Apples"] {
                 lists.check(&line_id(store, note, line)?, &utc)?;
             }
             Ok(())
         })?;
-        assert!(!shows_weekly(&harness), "{shows_as:?}");
-        assert!(shows(&harness, NOTHING_TODAY), "{shows_as:?}");
+        // Struck for the day where each Line shows and nothing checked
+        // is hidden (#276); never as a count of none open.
+        let shown = shows_as.is_some() && !hides;
+        let way = format!("{shows_as:?}, hiding {hides}");
+        assert_eq!(shows_weekly(&harness), shown, "{way}");
+        assert_eq!(shows(&harness, NOTHING_TODAY), !shown, "{way}");
+        if shown {
+            assert!(checked(&harness, "Milk")?, "{way}");
+        }
     }
     Ok(())
 }

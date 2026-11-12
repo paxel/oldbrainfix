@@ -366,7 +366,8 @@ fn each_switch_brings_its_control_back_and_takes_it_away_again() -> TestResult {
     settings.set_quick_note_shows(QuickNoteControl::Shopping, true)?;
     let mut harness = popup(&store);
     click(&mut harness, "More");
-    assert!(shows(&harness, "Add to a Shopping List"));
+    // One list to add to: its entry names it (#276).
+    assert!(shows(&harness, "Add to Groceries"));
     assert!(!shows(&harness, "Important"));
     Ok(())
 }
@@ -546,7 +547,7 @@ fn to_full_editor_is_not_offered_while_a_shopping_list_is_picked() -> TestResult
     let mut harness = popup(&store);
     type_in_popup(&mut harness, "Eggs");
     click(&mut harness, "More");
-    harness.get_by_label("Groceries").click_accesskit();
+    harness.get_by_label("Add to Groceries").click_accesskit();
     harness.run();
     assert!(!shows(&harness, "To full editor"));
     Ok(())
