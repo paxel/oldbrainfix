@@ -46,6 +46,7 @@ use oldbrainfix_core::{
     Routines, Schedule, ShoppingLists, SigningKey, Store, Tallies, parse_time, text_format,
 };
 use oldbrainfix_gui::feedback_view::FeedbackFacts;
+use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
 use oldbrainfix_gui::{App, Page, Selection};
@@ -938,9 +939,9 @@ fn all_guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame("capture-and-sort", "capture"),
             )?);
-            // Capture and sort: the quick note with what Settings ▸ Quick
-            // note switched on, the capture popup of the hotkey, the
-            // Unsorted Notes, the Note dialog and its History.
+            // Capture and sort: File into… over the quick note with what
+            // Settings ▸ Quick note switched on, the capture popup of the
+            // hotkey, the Unsorted Notes, the Note dialog and its History.
             let mut harness = window_with(texts, language, theme, |store, _| {
                 let device = DeviceSettings::new(store);
                 for control in [
@@ -949,6 +950,20 @@ fn all_guide_frames() -> TestResult {
                     QuickNoteControl::Importance,
                 ] {
                     device.set_quick_note_shows(control, true)?;
+                }
+                // Filed into Repairs, then Work, before: on top (#272).
+                let places = Places::new(store);
+                for area in places.areas()? {
+                    if area.name == texts.household {
+                        for topic in places.topics(&area.id)? {
+                            device.filed_into(&topic.id)?;
+                        }
+                    }
+                }
+                for area in places.areas()? {
+                    if area.name == texts.work {
+                        device.filed_into(&area.id)?;
+                    }
                 }
                 Ok(())
             })?;
@@ -959,6 +974,10 @@ fn all_guide_frames() -> TestResult {
                 .click();
             harness.run();
             harness.get_by(|n| n.is_focused()).type_text(texts.capture);
+            harness.run();
+            harness
+                .get_by_role_and_label(Role::Button, L10n::new(language).file_into())
+                .click();
             harness.run();
             problems.extend(match_frame(
                 &mut harness,

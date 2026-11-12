@@ -123,6 +123,7 @@ use crate::checklist_view::{
 };
 use crate::enrich::Enricher;
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
+use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
@@ -681,6 +682,14 @@ struct UpdateNotice {
     details: String,
 }
 
+/// What File into… files (#272): these Notes, or the Note being
+/// captured.
+#[derive(Debug, Clone, PartialEq)]
+enum Filing {
+    Notes(Vec<String>),
+    Capture,
+}
+
 /// A dialog over the window.
 #[derive(Debug, Clone, PartialEq)]
 enum Dialog {
@@ -870,9 +879,11 @@ enum Dialog {
     /// while it runs.
     Import,
     /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Notes
-    /// `notes` go into, the selected ones together (#148).
+    /// go into, the selected ones together (#148), or the Note being
+    /// captured, picked with a filter (#272).
     FileInto {
-        notes: Vec<String>,
+        into: Filing,
+        picker: Box<FileIntoPicker>,
     },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
@@ -1106,6 +1117,11 @@ enum Action {
     /// Asks where the Notes with these ids are filed (Note ▸ File into…,
     /// Ctrl+M, a card's right-click), together (#148).
     AskFileInto(Vec<String>),
+    /// File into…'s answer (#272): the place picked, or the new one to
+    /// make and file into.
+    FileIntoPicked(Picked),
+    /// From naming a new place in File into… back to its list.
+    FileIntoBack,
     /// A click on a card (#148): as its [`Pick`] says, it selects this
     /// card alone, adds or takes it away, or selects the run up to it.
     PickCard(String, Pick),
@@ -5468,7 +5484,13 @@ impl App {
                     self.folder_now()?;
                 }
             }
-            Action::AskFileInto(notes) => self.dialog = Some(Dialog::FileInto { notes }),
+            Action::AskFileInto(notes) => self.ask_file_into(Filing::Notes(notes))?,
+            Action::FileIntoPicked(picked) => self.file_into_picked(picked)?,
+            Action::FileIntoBack => {
+                if let Some(Dialog::FileInto { picker, .. }) = &mut self.dialog {
+                    picker.back();
+                }
+            }
             Action::PickCard(id, pick) => {
                 let order = self.shown_cards();
                 match pick {
@@ -7428,7 +7450,8 @@ impl App {
 
     /// Does what was asked of the capture's buttons or its choices: a
     /// Routine, Reminder, Session or Tally opens its page in a dialog over
-    /// the quick note, which hands its choice back to the capture (#113).
+    /// the quick note, which hands its choice back to the capture (#113),
+    /// and File into… its dialog (#272).
     fn capture_choice(&mut self, asked: Ask) -> oldbrainfix_core::Result<()> {
         let place = self.capture_place();
         match self.capture_choices.take(asked, &self.store)? {
@@ -7448,6 +7471,7 @@ impl App {
                 self.tally_form = None;
                 self.editor = Some(editor);
             }
+            Some(Opens::FileInto) => self.ask_file_into(Filing::Capture)?,
             Some(Opens::Tally) => {
                 self.save_text()?;
                 self.editor = None;
@@ -8936,6 +8960,44 @@ impl App {
     /// person's in a Shared Area where it is a Member, one in the trash,
     /// and every one where this Device may not write in `place`, such as
     /// an Area it was taken out of (ADR 0013); how many stayed is told.
+    /// File into… (#272) for `into`, over the Areas shown.
+    fn ask_file_into(&mut self, into: Filing) -> oldbrainfix_core::Result<()> {
+        let picker = FileIntoPicker::read(&self.store, &self.t, &self.view.areas)?;
+        self.dialog = Some(Dialog::FileInto {
+            into,
+            picker: Box::new(picker),
+        });
+        Ok(())
+    }
+
+    /// Files what File into… was for into the place picked, a new one
+    /// made first, which stays even when a Note captured is not saved.
+    fn file_into_picked(&mut self, picked: Picked) -> oldbrainfix_core::Result<()> {
+        let place = match picked {
+            Picked::Place(place) => place,
+            Picked::Make { area, name } => file_into::make(&self.store, area.as_deref(), &name)?,
+            Picked::Close => {
+                self.dialog = None;
+                return Ok(());
+            }
+        };
+        match self.dialog.take() {
+            Some(Dialog::FileInto {
+                into: Filing::Notes(notes),
+                ..
+            }) => self.file_notes(&notes, &place)?,
+            Some(Dialog::FileInto {
+                into: Filing::Capture,
+                ..
+            }) => {
+                self.capture_choice(Ask::FileInto(place))?;
+                self.capture_focus = true;
+            }
+            other => self.dialog = other,
+        }
+        Ok(())
+    }
+
     fn file_notes(&mut self, ids: &[String], place: &str) -> oldbrainfix_core::Result<()> {
         let notes = Notes::new(&self.store);
         let into = self.store.may_write_in(place)?;
@@ -8957,6 +9019,9 @@ impl App {
             .batch(|| moving.iter().try_for_each(|id| notes.file(id, place)))?;
         if !moving.is_empty() {
             self.undo = Some(Undo::Filed(before));
+            // Filed by File into… or a drag alike, it is filed into last
+            // (#272).
+            DeviceSettings::new(&self.store).filed_into(place)?;
         }
         self.cards.clear();
         let stayed = ids.len() - moving.len();
@@ -10057,7 +10122,7 @@ impl App {
                 return;
             }
             ui.add_space(4.0);
-            let offer = (self.view.areas.as_slice(), spawns, self.capture_lists());
+            let offer = (spawns, self.capture_lists());
             let row = (&quick, true);
             match capture_choices::action_row(ui, &t, &self.capture_choices, offer, row) {
                 Some(RowAsk::Choice(asked)) => actions.push(Action::CaptureChoice(asked)),
@@ -11529,48 +11594,17 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
-                    Dialog::FileInto { notes } => {
+                    Dialog::FileInto { into, picker } => {
                         // Several selected: how many go (#148).
-                        match notes.len() {
-                            1 => title(ui, t.file_into()),
-                            n => title(ui, &t.file_notes_into(n as i64)),
+                        match into {
+                            Filing::Notes(notes) if notes.len() != 1 => {
+                                title(ui, &t.file_notes_into(notes.len() as i64));
+                            }
+                            _ => title(ui, t.file_into()),
                         }
-                        let text = ui.visuals().text_color();
-                        let weak = ui.visuals().weak_text_color();
-                        egui::ScrollArea::vertical()
-                            .max_height(420.0)
-                            .show(ui, |ui| {
-                                for (area, topics) in &view.areas {
-                                    let places = std::iter::once((
-                                        area.id.clone(),
-                                        area_name(&t, area),
-                                        0.0,
-                                    ))
-                                    .chain(
-                                        topics
-                                            .iter()
-                                            .map(|p| (p.id.clone(), topic_name(&t, p), 24.0)),
-                                    );
-                                    for (place, name, indent) in places {
-                                        ui.horizontal(|ui| {
-                                            ui.add_space(indent);
-                                            let button =
-                                                egui::Button::new(RichText::new(name).color(text));
-                                            if ui.add(button).clicked() {
-                                                actions.push(Action::CloseDialog);
-                                                actions.push(Action::File {
-                                                    notes: notes.clone(),
-                                                    place,
-                                                });
-                                            }
-                                        });
-                                    }
-                                }
-                                if view.areas.is_empty() {
-                                    ui.label(RichText::new(t.no_areas_yet()).color(weak));
-                                }
-                            });
-                        cancel(ui, &t, actions);
+                        if let Some(picked) = picker.show(ui, &t) {
+                            actions.push(Action::FileIntoPicked(picked));
+                        }
                     }
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);
@@ -11629,6 +11663,8 @@ impl App {
                 | Dialog::Person {
                     asking: Some(_), ..
                 } => Action::CancelBlock,
+                // Naming a new place goes back to the list (#272).
+                Dialog::FileInto { picker, .. } if picker.naming() => Action::FileIntoBack,
                 _ => Action::CloseDialog,
             });
         }

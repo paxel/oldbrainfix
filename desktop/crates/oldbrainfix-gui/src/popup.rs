@@ -15,7 +15,7 @@
 //! then go into the list picked instead of a Note, the rest waiting
 //! unshown (#124), and no "To full editor" meanwhile; the format bar too.
 //! With the Nudge buttons switched off, one Save takes their place and
-//! nudges in 1 h. Routine,
+//! nudges in 1 h. File into… (#272), Routine,
 //! Reminder, Session and the Tally open their page in the popup, grown
 //! for it, which hands its choice back; every choice shows at the top,
 //! not saved yet, with a button that drops it. All of it is saved with
@@ -23,7 +23,8 @@
 //! an empty Note. A Note filed or with something set up gets one Save
 //! instead of the Nudge buttons and no Nudge. Esc on a page goes back to
 //! the capture without its choice, as do Alt+Left and the mouse's back
-//! button.
+//! button; naming a new place in File into…, they go back to its list.
+//! A place made there stays, the Note saved or not.
 //!
 //! Its microphone button records voice into the same Note: recording
 //! starts at once, and one big stop button ends it and leaves it on the
@@ -62,6 +63,7 @@ use crate::capture_choices::{
 };
 use crate::cli::note_text;
 use crate::enrich::Enricher;
+use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::format_bar::{self, Format};
 use crate::icons;
 use crate::l10n::L10n;
@@ -115,12 +117,14 @@ pub fn capture(
 enum Page {
     Schedule(Box<RoutineEditor>),
     Tally(Box<TallyForm>),
+    FileInto(Box<FileIntoPicker>),
 }
 
 /// What was asked of the page shown.
 enum PageAsk {
     Schedule(Intent),
     Tally(FormIntent),
+    FileInto(Picked),
 }
 
 /// What is announced at the top of the popup: what it says, why for a
@@ -524,7 +528,14 @@ impl CapturePopup {
         }
         self.failure_dialog(ui.ctx());
         if paged {
-            if escape || back {
+            // Naming a new place goes back to File into…'s list (#272).
+            if let Some(Page::FileInto(picker)) = &mut self.page
+                && picker.naming()
+                && (escape || back)
+            {
+                picker.back();
+                self.show_page(ui);
+            } else if escape || back {
                 self.close_page(ui.ctx());
             } else {
                 self.show_page(ui);
@@ -636,7 +647,7 @@ impl CapturePopup {
                     }
                 });
                 ui.add_space(4.0);
-                let offer = (self.areas.as_slice(), self.spawns, lists.as_slice());
+                let offer = (self.spawns, lists.as_slice());
                 match capture_choices::action_row(ui, &t, &self.choices, offer, (&quick, typed)) {
                     Some(RowAsk::Choice(button)) => asked = Some(button),
                     Some(RowAsk::ToEditor) => to_editor = true,
@@ -765,6 +776,10 @@ impl CapturePopup {
                 let form = FieldForm::choose(system, &self.t);
                 Ok(Page::Tally(Box::new(TallyForm::Field(form))))
             }
+            Opens::FileInto => {
+                let picker = FileIntoPicker::read(&self.store, &self.t, &self.areas)?;
+                Ok(Page::FileInto(Box::new(picker)))
+            }
         }
     }
 
@@ -793,6 +808,11 @@ impl CapturePopup {
                         .show(ui, &t, tones, shown_now, &now)
                         .map(PageAsk::Schedule),
                     Some(Page::Tally(form)) => form.show(ui, &t, tones).map(PageAsk::Tally),
+                    Some(Page::FileInto(picker)) => {
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.file_into()).size(18.0).strong().color(text));
+                        picker.show(ui, &t).map(PageAsk::FileInto)
+                    }
                     None => None,
                 };
             });
@@ -829,6 +849,21 @@ impl CapturePopup {
                     return Ok(false);
                 };
                 self.choices.tally = Some(field);
+                Ok(true)
+            }
+            (PageAsk::FileInto(picked), _) => {
+                let place = match picked {
+                    Picked::Place(place) => place,
+                    // Made at once: it stays when the Note is not saved.
+                    Picked::Make { area, name } => {
+                        let place = file_into::make(&self.store, area.as_deref(), &name)?;
+                        self.read_places();
+                        place
+                    }
+                    Picked::Close => return Ok(true),
+                };
+                self.choices.take(Ask::FileInto(place), &self.store)?;
+                self.read_spawns();
                 Ok(true)
             }
             (PageAsk::Schedule(Intent::Close) | PageAsk::Tally(FormIntent::Close), _) => Ok(true),

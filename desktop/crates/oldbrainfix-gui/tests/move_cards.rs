@@ -15,7 +15,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
-    AreaRole, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey, Store,
+    AreaRole, DeviceSettings, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey, Store,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -243,7 +243,12 @@ fn a_click_selects_ctrl_and_shift_select_more_and_esc_clears() -> TestResult {
 fn an_unsorted_card_dragged_onto_a_topic_is_filed_there() -> TestResult {
     let mut harness = harness(store()?, Selection::Unsorted);
     drag_onto(&mut harness, MILK, "Kitchen");
-    assert_eq!(place_of(&harness, MILK)?, Some(place(&harness, "Kitchen")?));
+    let kitchen = place(&harness, "Kitchen")?;
+    assert_eq!(place_of(&harness, MILK)?, Some(kitchen.clone()));
+    // A drag files into a place as File into… does: it is filed into
+    // last (#272).
+    let recent = DeviceSettings::new(harness.state().store()).recently_filed_into()?;
+    assert_eq!(recent, [kitchen]);
     // It left Unsorted; the others did not move.
     assert!(!has_card(&harness, MILK));
     assert_eq!(place_of(&harness, PLUMBER)?, None);
@@ -415,5 +420,34 @@ fn a_card_this_device_may_not_move_stays_and_the_details_say_how_many() -> TestR
             .query_by_label_contains("Filed: 1. Stayed where they were: 1.")
             .is_some()
     );
+    Ok(())
+}
+
+#[test]
+fn file_into_offers_new_topic_only_where_this_device_may_set_one_up() -> TestResult {
+    let mut harness = harness(shared()?, Selection::All);
+    click(&mut harness, ROSES, Modifiers::NONE);
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
+    harness.run_steps(8);
+    // Under Ben's Garden, not under Ann's Household, where he is a
+    // Member (#272).
+    let new_topics: Vec<_> = harness
+        .query_all_by_role_and_label(Role::Button, "New Topic…")
+        .map(|n| n.rect().top())
+        .collect();
+    assert_eq!(new_topics.len(), 1);
+    let garden = harness
+        .query_all_by_role_and_label(Role::Button, "Garden")
+        .last()
+        .ok_or("the dialog's Garden")?
+        .rect()
+        .top();
+    let household = harness
+        .query_all_by_role_and_label(Role::Button, "Household")
+        .last()
+        .ok_or("the dialog's Household")?
+        .rect()
+        .top();
+    assert!(garden < new_topics[0] && new_topics[0] < household);
     Ok(())
 }

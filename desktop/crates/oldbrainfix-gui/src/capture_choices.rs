@@ -166,6 +166,9 @@ pub enum Chip {
 /// What was asked of the capture's buttons or its choices.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ask {
+    /// "File into…": opens its picker (#272).
+    PickPlace,
+    /// The Area or Topic picked there.
     FileInto(String),
     Spawn(Spawn),
     Importance(Importance),
@@ -179,8 +182,13 @@ pub enum Ask {
 /// The page a button opens, which hands back its choice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Opens {
-    Schedule { reminder: bool, session: bool },
+    Schedule {
+        reminder: bool,
+        session: bool,
+    },
     Tally,
+    /// File into… (#272).
+    FileInto,
 }
 
 impl CaptureChoices {
@@ -251,7 +259,10 @@ impl CaptureChoices {
     /// Takes what was asked; the page to open for it, if any.
     pub fn take(&mut self, asked: Ask, store: &Store) -> oldbrainfix_core::Result<Option<Opens>> {
         match asked {
+            Ask::PickPlace => return Ok(Some(Opens::FileInto)),
             Ask::FileInto(picked) => {
+                // Picked, it is filed into last, saved or not (#272).
+                DeviceSettings::new(store).filed_into(&picked)?;
                 self.keep_what_fits(store, Some(&picked))?;
                 self.place = Some(picked);
             }
@@ -292,10 +303,9 @@ pub fn may_spawn(store: &Store, place: Option<&str>) -> oldbrainfix_core::Result
 /// A Shopping List a capture can go into: its Note's id and its title.
 pub type ListTitle = (String, String);
 
-/// What the capture's buttons offer: the Areas with their Topics to
-/// file into, whether the Note may spawn where it goes, and the Shopping
-/// Lists it can go into.
-pub type Offer<'a> = (&'a [(Area, Vec<Topic>)], bool, &'a [ListTitle]);
+/// What the capture's buttons offer: whether the Note may spawn where it
+/// goes, and the Shopping Lists it can go into.
+pub type Offer<'a> = (bool, &'a [ListTitle]);
 
 /// What a capture came to.
 #[derive(Debug, Clone, PartialEq)]
@@ -587,37 +597,6 @@ pub fn place_name(t: &L10n, areas: &[(Area, Vec<Topic>)], id: &str) -> Option<St
     None
 }
 
-/// "File into…" as a menu of the Areas with their Topics indented; the
-/// one picked.
-pub fn file_into_menu(ui: &mut Ui, t: &L10n, areas: &[(Area, Vec<Topic>)]) -> Option<String> {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    let mut picked = None;
-    ui.menu_button(RichText::new(t.file_into()).color(text), |ui| {
-        for (area, topics) in areas {
-            let mut file = |ui: &mut Ui, id: &str, label: String, indent| {
-                ui.horizontal(|ui| {
-                    ui.add_space(indent);
-                    if ui.button(RichText::new(label).color(text)).clicked() {
-                        picked = Some(id.to_string());
-                        // A pick closes the menu, also one by keyboard or
-                        // screen reader, which no pointer click closes.
-                        ui.close();
-                    }
-                });
-            };
-            file(ui, &area.id, area_name(t, area), 0.0);
-            for topic in topics {
-                file(ui, &topic.id, topic_name(t, topic), 16.0);
-            }
-        }
-        if areas.is_empty() {
-            ui.label(RichText::new(t.no_areas_yet()).color(weak));
-        }
-    });
-    picked
-}
-
 /// "Add to a Shopping List" in a menu: its heading over `lists`, by
 /// their Note's id with their title, as radio buttons, the one picked
 /// before on; the one picked.
@@ -707,7 +686,7 @@ pub enum RowAsk {
 }
 
 /// The capture's action row: "To full editor", waiting until `ready`,
-/// "File into…" over `areas` once `quick` switched it on, the alarm
+/// "File into…", opening its picker, once `quick` switched it on, the alarm
 /// clock while `spawns`, else why not, its menu a Routine or Reminder
 /// (#223) and, switched on, a Frog and Session, and "More" with what
 /// `quick` switched on: the Importance, "Make it a Tally", which goes
@@ -719,7 +698,7 @@ pub fn action_row(
     ui: &mut Ui,
     t: &L10n,
     choices: &CaptureChoices,
-    (areas, spawns, lists): Offer<'_>,
+    (spawns, lists): Offer<'_>,
     (quick, ready): (&QuickNote, bool),
 ) -> Option<RowAsk> {
     let text = ui.visuals().text_color();
@@ -743,10 +722,13 @@ pub fn action_row(
         if ui.add_enabled(ready, editor).clicked() {
             asked = Some(RowAsk::ToEditor);
         }
+        // Its picker opens over the capture, with a filter (#272).
         if quick.file_into
-            && let Some(place) = file_into_menu(ui, t, areas)
+            && ui
+                .button(RichText::new(t.file_into()).color(text))
+                .clicked()
         {
-            asked = Some(RowAsk::Choice(Ask::FileInto(place)));
+            asked = Some(RowAsk::Choice(Ask::PickPlace));
         }
         // The alarm clock is always there for a Routine or Reminder
         // (#223), its menu as the Note's "+"; the switch adds Frog and
