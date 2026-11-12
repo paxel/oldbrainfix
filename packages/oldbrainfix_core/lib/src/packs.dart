@@ -488,6 +488,13 @@ extension PackTree on Pack {
     ],
   };
 
+  /// What is ticked when a Backup is opened to take Notes back from it
+  /// (#285): no Note, and everything under each, so a Note ticked comes
+  /// back whole, its photos and recordings with it.
+  Set<String> backupTicks() => allKeys().difference({
+    for (final (i, _) in notes.indexed) PackItemKeys.note(i),
+  });
+
   /// [ticks] with the item [key] ticked [on], as the Session rule says
   /// (Q458): ticking a Session ticks the Tallies of its pool; unticking a
   /// Tally takes it out of the pool of each Session, and a Session left
@@ -1139,10 +1146,68 @@ extension PackExport on Store {
     ], closed);
   }
 
+  /// The Pack of a Backup opened to take Notes back from it (#285): every
+  /// Note this Store holds but those merged into another, those in the
+  /// trash among them, each Area in the person's own order by [shown]
+  /// with its own Notes and then its Topics' Notes, then the Notes filed
+  /// into no Area, newest capture first, as [packOfAll] lists them; the
+  /// Tallies a Session picks from that are not among them after them.
+  /// The files' sizes come from [sizeOf], `photo` or `audio` and a hash
+  /// to the size of the bytes held, null for none; without it, from the
+  /// blobs here. [trashed] are the indices of the Notes that lay in the
+  /// trash.
+  ({Pack pack, Set<int> trashed}) packOfEverything({
+    String Function(Area area)? shown,
+    int? Function(String kind, String hash)? sizeOf,
+  }) {
+    final places = Places(this);
+    final notes = Notes(this);
+    final kept = [
+      for (final id in entitiesOfType(NoteKeys.typeNote))
+        if (notes.byId(id) case final note? when !note.isMerged) note,
+    ];
+    kept.sort((a, b) {
+      final byCapture = b.captured.compareTo(a.captured);
+      return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
+    });
+    final ids = [
+      for (final area in areasInOrder(shown: shown)) ...[
+        area.id,
+        for (final t in places.topics(area.id)) t.id,
+      ],
+    ];
+    final order = <Note>[];
+    final pack = _packOfNotes(
+      [
+        for (final id in ids)
+          for (final n in kept)
+            if (n.place == id) n,
+        for (final n in kept)
+          if (n.place == null) n,
+      ],
+      const {},
+      sizeOf: sizeOf,
+      seen: order,
+    );
+    return (
+      pack: pack,
+      trashed: {
+        for (final (i, n) in order.indexed)
+          if (n.isTrashed) i,
+      },
+    );
+  }
+
   /// The Pack of [picked], in their order, and the Tallies their Sessions
   /// pick from that are not among them after them, but for those filed
-  /// into an Area of [closed].
-  Pack _packOfNotes(List<Note> picked, Set<String> closed) {
+  /// into an Area of [closed]; the files' sizes from [sizeOf] when given.
+  /// [seen] gets the Notes in the order the Pack holds them.
+  Pack _packOfNotes(
+    List<Note> picked,
+    Set<String> closed, {
+    int? Function(String kind, String hash)? sizeOf,
+    List<Note>? seen,
+  }) {
     final notes = Notes(this);
     final places = Places(this);
     final order = [...picked];
@@ -1189,8 +1254,9 @@ extension PackExport on Store {
     final out = <PackNote>[];
     for (final (i, note) in order.indexed) {
       final (area, topic) = placeOf(note);
-      out.add(_packNote(note, area, topic, i >= picked.length, index));
+      out.add(_packNote(note, area, topic, i >= picked.length, index, sizeOf));
     }
+    seen?.addAll(order);
     return Pack(
       areas: [for (final a in areaNames) PackArea(a.name, a.topics)],
       notes: out,
@@ -1198,13 +1264,15 @@ extension PackExport on Store {
   }
 
   /// The Note [note] as a Pack carries it, filed into the Pack's Area
-  /// [area] and Topic [topic], its Session's pool by [index].
+  /// [area] and Topic [topic], its Session's pool by [index], the sizes
+  /// of its files from [sizeOf] when given.
   PackNote _packNote(
     Note note,
     int? area,
     int? topic,
     bool outside,
     Map<String, int> index,
+    int? Function(String kind, String hash)? sizeOf,
   ) {
     final id = note.id;
     final kind = NoteKinds(this).of(id);
@@ -1213,13 +1281,10 @@ extension PackExport on Store {
     final fields = tally?.fields ?? const <TallyField>[];
     final fieldIndex = {for (final (i, f) in fields.indexed) f.id: i};
     PackFile file(String kind, String hash, String? text) {
-      final bytes = blob(kind, hash);
-      return PackFile(
-        hash,
-        hasFile: bytes != null,
-        size: bytes?.length ?? 0,
-        text: text,
-      );
+      final size = sizeOf == null
+          ? blob(kind, hash)?.length
+          : sizeOf(kind, hash);
+      return PackFile(hash, hasFile: size != null, size: size ?? 0, text: text);
     }
 
     final routines = Routines(this).ofNote(id)

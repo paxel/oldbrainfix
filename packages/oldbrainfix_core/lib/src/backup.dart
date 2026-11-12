@@ -11,8 +11,11 @@ import 'package:cryptography/dart.dart' show DartArgon2id;
 import 'area_keys.dart';
 import 'device_settings.dart';
 import 'entry.dart';
+import 'packs.dart';
+import 'places.dart';
 import 'profiles.dart';
 import 'recovery_sheet.dart';
+import 'schedule.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
@@ -839,24 +842,38 @@ class _ChunkReader {
       _at == _plain.length && !await _next() && _ended;
 }
 
-/// Restores the Backup at [path], opened with [backupKey], into the
-/// empty log of [store]. This Device keeps its own identity: it takes in
-/// the entries, Moments, blobs, Area keys and pinned keys, pins the old
-/// Device's key as verified, takes the own Profile back with its own key
-/// bound to it by the old Device's ([OwnProfile.restoreOwnProfile]),
-/// and keeps the backup key, so the Recovery Sheet stays good. In every
-/// Shared Area where the old Device held a role, it signs the same role
-/// for itself as the old Device. Of the old Device's settings only the
-/// playback speed comes along, if it is one offered. The log is written in one
-/// transaction, once the whole file proved sound.
-Future<RestoreResult> restoreBackup(
-  Store store,
-  String path,
-  Uint8List backupKey,
-) async {
-  if (store.currentSeq() != 0) {
-    throw const BackupException(BackupProblem.notEmpty);
-  }
+/// What the payload of a Backup holds but its blobs, read whole and
+/// checked.
+class _Payload {
+  /// The signing key of the Device the Backup was made on.
+  final SigningKey old;
+  final List<Entry> entries;
+  final List<({int seq, String cause, String? label, DateTime at})> moments;
+  final List<AreaKey> keys;
+  final List<PinnedKey> pinned;
+  final Object? profile;
+  final int? version;
+  final double? speed;
+  final int blobs;
+
+  const _Payload({
+    required this.old,
+    required this.entries,
+    required this.moments,
+    required this.keys,
+    required this.pinned,
+    required this.profile,
+    required this.version,
+    required this.speed,
+    required this.blobs,
+  });
+}
+
+/// The header of the Backup at [path] and its content key, opened with
+/// [backupKey]: [BackupProblem.notABackup] for a file that is none,
+/// [BackupProblem.needsUpdate] for one of a later format, and
+/// [BackupProblem.wrongSecret] when [backupKey] does not open it.
+(BackupHeader, Uint8List) _opened(String path, Uint8List backupKey) {
   final header = readBackupHeader(path);
   if (header == null) throw const BackupException(BackupProblem.notABackup);
   final contentKey = unseal(
@@ -867,6 +884,25 @@ Future<RestoreResult> restoreBackup(
   if (contentKey == null) {
     throw const BackupException(BackupProblem.wrongSecret);
   }
+  return (header, contentKey);
+}
+
+/// Whether [bytes] are the [kind] blob [hash]: a photo or a recording
+/// whose SHA-256 is [hash].
+bool _isBlob(String kind, String hash, Uint8List bytes) =>
+    (kind == 'photo' || kind == 'audio') &&
+    sha256.convert(bytes).toString() == hash;
+
+/// Reads the payload of the Backup at [path], its [header] opened with
+/// [contentKey], every record checked to its last chunk, and hands each
+/// blob to [blob] as it comes: never more than that one is whole in
+/// memory. [blob] throws to refuse it.
+Future<_Payload> _readPayload(
+  String path,
+  BackupHeader header,
+  Uint8List contentKey,
+  void Function(String kind, String hash, Uint8List bytes) blob,
+) async {
   const damaged = BackupException(BackupProblem.damaged);
   final raf = File(path).openSync();
   SigningKey? old;
@@ -933,7 +969,7 @@ Future<RestoreResult> restoreBackup(
           if (size < 0 || size > _maxBlobBytes) throw damaged;
           final bytes = await payload.bytes(size);
           final (kind, hash) = splitBlobRef(ref);
-          if (!store.putBlob(kind, hash, bytes)) throw damaged;
+          blob(kind, hash, bytes);
           blobs++;
         case {'size': final int size}:
           // A record of a later kind: its bytes are passed over.
@@ -948,7 +984,50 @@ Future<RestoreResult> restoreBackup(
   } finally {
     raf.closeSync();
   }
-  final from = old;
+  return _Payload(
+    old: old,
+    entries: entries,
+    moments: moments,
+    keys: keys,
+    pinned: pinned,
+    profile: profile,
+    version: version,
+    speed: speed,
+    blobs: blobs,
+  );
+}
+
+/// Restores the Backup at [path], opened with [backupKey], into the
+/// empty log of [store]. This Device keeps its own identity: it takes in
+/// the entries, Moments, blobs, Area keys and pinned keys, pins the old
+/// Device's key as verified, takes the own Profile back with its own key
+/// bound to it by the old Device's ([OwnProfile.restoreOwnProfile]),
+/// and keeps the backup key, so the Recovery Sheet stays good. In every
+/// Shared Area where the old Device held a role, it signs the same role
+/// for itself as the old Device. Of the old Device's settings only the
+/// playback speed comes along, if it is one offered. The log is written in one
+/// transaction, once the whole file proved sound.
+Future<RestoreResult> restoreBackup(
+  Store store,
+  String path,
+  Uint8List backupKey,
+) async {
+  if (store.currentSeq() != 0) {
+    throw const BackupException(BackupProblem.notEmpty);
+  }
+  final (header, contentKey) = _opened(path, backupKey);
+  final payload = await _readPayload(path, header, contentKey, (
+    kind,
+    hash,
+    bytes,
+  ) {
+    if (!store.putBlob(kind, hash, bytes)) {
+      throw const BackupException(BackupProblem.damaged);
+    }
+  });
+  final from = payload.old;
+  final entries = payload.entries;
+  final moments = payload.moments;
   final roles = store.batch(() {
     if (store.currentSeq() != 0) {
       throw const BackupException(BackupProblem.notEmpty);
@@ -967,18 +1046,18 @@ Future<RestoreResult> restoreBackup(
         at: m.at,
       );
     }
-    store.learnAreaKeys(keys);
+    store.learnAreaKeys(payload.keys);
     final oldRecord = KeyRecord.make(from);
     store.learnKeys([oldRecord], verifiedDevice: oldRecord.device);
-    for (final p in pinned) {
+    for (final p in payload.pinned) {
       store.learnKeys([
         p.record,
       ], verifiedDevice: p.trust == KeyTrust.verified ? p.record.device : null);
     }
     store
-      ..restoreOwnProfile(profile, old: from)
-      ..keepBackupKeys(backupKey, header.pass, version: version ?? 1);
-    if (speed case final speed?) store.playbackSpeed = speed;
+      ..restoreOwnProfile(payload.profile, old: from)
+      ..keepBackupKeys(backupKey, header.pass, version: payload.version ?? 1);
+    if (payload.speed case final speed?) store.playbackSpeed = speed;
     return _handRoles(store, from);
   });
   store.profileChanged();
@@ -986,9 +1065,9 @@ Future<RestoreResult> restoreBackup(
     from: deviceIdFromKey(from.publicKey),
     entries: entries.length,
     moments: moments.length,
-    keys: keys.length,
-    pinned: pinned.length,
-    blobs: blobs,
+    keys: payload.keys.length,
+    pinned: payload.pinned.length,
+    blobs: payload.blobs,
     roles: roles,
   );
 }
@@ -1071,6 +1150,175 @@ int _handRoles(Store store, SigningKey old) {
     handed++;
   }
   return handed;
+}
+
+// ------------------------------------------------------ taking Notes back
+
+/// A Backup opened to take Notes back from it (#285), without restoring
+/// it: its Notes as a Pack's tree shows them (ADR 0043), read from a
+/// store of its own that holds the Backup's log as the Device that made
+/// it held it, gone once the Pack is made. Its files stay in the Backup
+/// until they are added ([addBackupNotes]), so the file must stay where
+/// it is until then.
+class OpenedBackup {
+  /// Every Note of the Backup but those merged into another, those in its
+  /// trash among them, as [PackExport.packOfEverything] lists them; its
+  /// files without their bytes.
+  final Pack pack;
+
+  /// The indices in [pack] of the Notes that lay in the Backup's trash.
+  final Set<int> trashed;
+
+  /// When the Backup was made.
+  final DateTime created;
+
+  final String _path;
+  final Uint8List _line;
+  final Uint8List _contentKey;
+
+  const OpenedBackup._(
+    this.pack,
+    this.trashed,
+    this.created,
+    this._path,
+    this._line,
+    this._contentKey,
+  );
+}
+
+/// Opens the Backup at [path] with [backupKey] (through [unlockBackup])
+/// to take Notes back from it, and leaves [store] as it is: nothing of
+/// the Backup is restored, kept or taken in. Its entries go into a store
+/// in memory of their own, read as the Device that made the Backup read
+/// them, its signing key and Profile and the keys it pinned, so the
+/// person's own Devices and the roles of the Shared Areas count as they
+/// did there; its blobs are checked against their hashes and only their
+/// sizes kept. [shown] names the Areas as the app shows them, for their
+/// order. The same refusals as [restoreBackup]: a [BackupException] of
+/// [BackupProblem.notABackup], [BackupProblem.needsUpdate],
+/// [BackupProblem.wrongSecret] or [BackupProblem.damaged].
+Future<OpenedBackup> openBackupNotes(
+  Store store,
+  String path,
+  Uint8List backupKey, {
+  String Function(Area area)? shown,
+}) async {
+  final (header, contentKey) = _opened(path, backupKey);
+  final sizes = <String, int>{};
+  final payload = await _readPayload(path, header, contentKey, (
+    kind,
+    hash,
+    bytes,
+  ) {
+    if (!_isBlob(kind, hash, bytes)) {
+      throw const BackupException(BackupProblem.damaged);
+    }
+    sizes['$kind/$hash'] = bytes.length;
+  });
+  final now = store.clock();
+  // The Device that made it, so what it read as its own reads so here.
+  final view = Store.inMemory(clock: () => now, newKey: () => payload.old);
+  try {
+    view.batch(() {
+      for (final e in payload.entries) {
+        view.insert(e);
+      }
+      for (final p in payload.pinned) {
+        view.learnKeys(
+          [p.record],
+          verifiedDevice: p.trust == KeyTrust.verified ? p.record.device : null,
+        );
+      }
+      view.restoreOwnProfile(payload.profile, old: payload.old);
+    });
+    final (:pack, :trashed) = view.packOfEverything(
+      shown: shown,
+      sizeOf: (kind, hash) => sizes['$kind/$hash'],
+    );
+    return OpenedBackup._(
+      pack,
+      trashed,
+      header.created,
+      path,
+      header.line,
+      contentKey,
+    );
+  } finally {
+    view.close();
+  }
+}
+
+/// "Add" on the Backup [opened] with [ticks] (#285): the ticked Notes as
+/// copies, as a Pack's are added ([PackImport.addPack]), claimed, into
+/// new Areas named after the Backup's, never into one there already. The
+/// files ticked are read from the Backup one after the other and kept,
+/// each checked against its hash, before the log names them; nothing of
+/// the Backup's identity, keys or roles is taken, and the log is not
+/// touched otherwise. [BackupProblem.damaged] when the file changed since
+/// it was opened, before anything is written to the log; a file found
+/// damaged half-way leaves blobs nobody refers to, never a half log.
+Future<PackAdded> addBackupNotes(
+  Store store,
+  OpenedBackup opened,
+  Set<String> ticks, {
+  required WallClock wallClock,
+  required String suffix,
+  required String noArea,
+}) async {
+  const damaged = BackupException(BackupProblem.damaged);
+  final picked = opened.pack.picked(ticks);
+  final needed = {
+    for (final n in picked.notes) ...[
+      for (final p in n.photos)
+        if (p.hasFile) 'photo/${p.hash}',
+      for (final a in n.recordings)
+        if (a.hasFile) 'audio/${a.hash}',
+    ],
+  };
+  if (needed.isNotEmpty) {
+    final BackupHeader? header;
+    try {
+      header = readBackupHeader(opened._path);
+    } on Object {
+      throw damaged;
+    }
+    if (header == null || !_sameBytes(header.line, opened._line)) {
+      throw damaged;
+    }
+    final kept = <String>{};
+    try {
+      await _readPayload(opened._path, header, opened._contentKey, (
+        kind,
+        hash,
+        bytes,
+      ) {
+        final ref = '$kind/$hash';
+        if (!needed.contains(ref)) return;
+        if (!store.putBlob(kind, hash, bytes)) throw damaged;
+        kept.add(ref);
+      });
+    } on FileSystemException {
+      throw damaged;
+    }
+    if (kept.length != needed.length) throw damaged;
+  }
+  // The bytes are here under the hashes the Pack names.
+  return store.addPack(
+    OpenedPack(pack: opened.pack),
+    ticks,
+    claim: true,
+    wallClock: wallClock,
+    suffix: suffix,
+    noArea: noArea,
+  );
+}
+
+bool _sameBytes(List<int> a, List<int> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------- folder

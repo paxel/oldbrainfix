@@ -12,10 +12,10 @@
 //! sealed in chunks with a content key of its own, sealed with the
 //! backup key. The bytes are the Dart core's, byte for byte.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -25,8 +25,11 @@ use sha2::{Digest, Sha256};
 
 use crate::entry::{WireEntry, dart_iso, parse_time};
 use crate::keys::{AREA_KEY_BYTES, AreaKey, SEAL_NONCE_BYTES, SEAL_TAG_BYTES, seal, unseal};
+use crate::packs::{OpenedPack, Pack, PackAdded, PackTicks};
+use crate::places::Area;
 use crate::profile::OwnProfile;
 use crate::recovery;
+use crate::schedule::WallClock;
 use crate::settings::{DeviceSettings, offered_speed, speed_text};
 use crate::shared::{ROLE_PREFIX, role_field};
 use crate::signing::{
@@ -833,30 +836,58 @@ struct MomentIn {
     at: String,
 }
 
-/// Restores the Backup at `path`, opened with `backup_key`, into the
-/// empty log of `store`, as the Dart core's `restoreBackup`: this Device
-/// keeps its identity, takes in the entries, Moments, blobs, Area keys
-/// and pinned keys, pins the old Device's key as verified, takes the own
-/// Profile back with its own key bound to it by the old Device's, keeps
-/// the backup key, and signs as the old Device its roles in the Shared
-/// Areas for itself. Of the old Device's settings only the playback
-/// speed comes along, if it is one offered. The log is written in one
-/// transaction, once the whole file proved sound.
-pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Result<Restored> {
-    if store.current_seq()? != 0 {
-        return Err(problem(Problem::NotEmpty));
-    }
+/// What the payload of a Backup holds but its blobs, read whole and
+/// checked.
+struct Payload {
+    /// The signing key of the Device the Backup was made on.
+    old: SigningKey,
+    entries: Vec<WireEntry>,
+    moments: Vec<MomentIn>,
+    keys: Vec<AreaKey>,
+    pinned: Vec<PinnedKey>,
+    profile: Option<(Value, i64)>,
+    speed: Option<f64>,
+    blobs: usize,
+}
+
+/// The header of the Backup at `path` and its content key, opened with
+/// `backup_key`: [`Problem::NotABackup`] for a file that is none,
+/// [`Problem::NeedsUpdate`] for one of a later format, and
+/// [`Problem::WrongSecret`] when `backup_key` does not open it.
+fn opened(path: &Path, backup_key: &[u8; KEY_BYTES]) -> Result<(Header, [u8; KEY_BYTES])> {
     let header = read_header(path)?.ok_or(problem(Problem::NotABackup))?;
     let content_key = unseal(backup_key, &header.sealed_key, sealed_as::KEY)
         .and_then(|k| k.try_into().ok())
         .ok_or(problem(Problem::WrongSecret))?;
+    Ok((header, content_key))
+}
+
+/// Whether `bytes` are the `kind` blob `hash`: a photo or a recording
+/// whose SHA-256 is `hash`.
+fn is_blob(kind: &str, hash: &str, bytes: &[u8]) -> bool {
+    matches!(kind, "photo" | "audio") && hex::encode(Sha256::digest(bytes)) == hash
+}
+
+/// What a blob read from a Backup is handed to: its kind, its hash and
+/// its bytes, the only blob whole in memory then. An error refuses it.
+type OnBlob<'a> = dyn FnMut(&str, &str, Vec<u8>) -> Result<()> + 'a;
+
+/// Reads the payload of the Backup at `path`, its `header` opened with
+/// `content_key`, every record checked to its last chunk, as the Dart
+/// core's `_readPayload`, and hands each blob to `blob` as it comes.
+fn read_payload(
+    path: &Path,
+    header: &Header,
+    content_key: &[u8; KEY_BYTES],
+    blob: &mut OnBlob,
+) -> Result<Payload> {
     let damaged = || problem(Problem::Damaged);
     let mut file = BufReader::new(File::open(path)?);
     let mut skipped = Vec::new();
     file.read_until(b'\n', &mut skipped)?;
     let mut payload = ChunkReader {
         input: file,
-        key: content_key,
+        key: *content_key,
         header: header.hash(),
         chunk: header.chunk,
         index: 0,
@@ -931,9 +962,7 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
         } else if let Some(reference) = json.get("blob").and_then(Value::as_str) {
             let bytes = payload.bytes(size_of(&json)?)?;
             let (kind, hash) = split_blob_ref(reference);
-            if !store.put_blob(kind, hash, &bytes)? {
-                return Err(damaged());
-            }
+            blob(kind, hash, bytes)?;
             blobs += 1;
         } else if json.get("size").is_some() {
             // A record of a later kind: its bytes are passed over.
@@ -944,6 +973,49 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
     if !payload.at_end()? {
         return Err(damaged());
     }
+    Ok(Payload {
+        old,
+        entries,
+        moments,
+        keys,
+        pinned,
+        profile,
+        speed,
+        blobs,
+    })
+}
+
+/// Restores the Backup at `path`, opened with `backup_key`, into the
+/// empty log of `store`, as the Dart core's `restoreBackup`: this Device
+/// keeps its identity, takes in the entries, Moments, blobs, Area keys
+/// and pinned keys, pins the old Device's key as verified, takes the own
+/// Profile back with its own key bound to it by the old Device's, keeps
+/// the backup key, and signs as the old Device its roles in the Shared
+/// Areas for itself. Of the old Device's settings only the playback
+/// speed comes along, if it is one offered. The log is written in one
+/// transaction, once the whole file proved sound.
+pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Result<Restored> {
+    if store.current_seq()? != 0 {
+        return Err(problem(Problem::NotEmpty));
+    }
+    let (header, content_key) = opened(path, backup_key)?;
+    let payload = read_payload(path, &header, &content_key, &mut |kind, hash, bytes| {
+        if store.put_blob(kind, hash, &bytes)? {
+            Ok(())
+        } else {
+            Err(problem(Problem::Damaged))
+        }
+    })?;
+    let Payload {
+        old,
+        entries,
+        moments,
+        keys,
+        pinned,
+        profile,
+        speed,
+        blobs,
+    } = payload;
     let roles = store.batch(|| {
         if store.current_seq()? != 0 {
             return Err(problem(Problem::NotEmpty));
@@ -1057,6 +1129,165 @@ fn hand_roles(store: &Store, old: &SigningKey) -> Result<usize> {
         handed += 1;
     }
     Ok(handed)
+}
+
+// -------------------------------------------------------- taking Notes back
+
+/// A Backup opened to take Notes back from it (#285), as the Dart core's
+/// `OpenedBackup`, without restoring it: its Notes as a Pack's tree
+/// shows them (ADR 0043), read from a store of its own that held the
+/// Backup's log as the Device that made it held it, gone once the Pack
+/// was made. Its files stay in the Backup until they are added
+/// ([`add_notes`]), so the file must stay where it is until then.
+#[derive(Clone)]
+pub struct OpenedBackup {
+    /// Every Note of the Backup but those merged into another, those in
+    /// its trash among them, as [`Store::pack_of_everything`] lists them;
+    /// its files without their bytes.
+    pub pack: Pack,
+    /// The indices in `pack` of the Notes that lay in the Backup's trash.
+    pub trashed: BTreeSet<usize>,
+    /// When the Backup was made.
+    pub created: DateTime<Utc>,
+    path: PathBuf,
+    line: Vec<u8>,
+    content_key: [u8; KEY_BYTES],
+}
+
+impl std::fmt::Debug for OpenedBackup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Never its content key.
+        f.debug_struct("OpenedBackup")
+            .field("pack", &self.pack)
+            .field("trashed", &self.trashed)
+            .field("created", &self.created)
+            .field("path", &self.path)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Opens the Backup at `path` with `backup_key` (through [`unlock`]) to
+/// take Notes back from it, as the Dart core's `openBackupNotes`, and
+/// leaves `store` as it is: nothing of the Backup is restored, kept or
+/// taken in. Its entries go into a store in memory of their own, read as
+/// the Device that made the Backup read them, its signing key and
+/// Profile and the keys it pinned, so the person's own Devices and the
+/// roles of the Shared Areas count as they did there; its blobs are
+/// checked against their hashes and only their sizes kept. `shown` names
+/// the Areas as the app shows them, for their order. The same refusals
+/// as [`restore`]: [`Problem::NotABackup`], [`Problem::NeedsUpdate`],
+/// [`Problem::WrongSecret`] or [`Problem::Damaged`].
+pub fn open_notes(
+    store: &Store,
+    path: &Path,
+    backup_key: &[u8; KEY_BYTES],
+    shown: impl Fn(&Area) -> String,
+) -> Result<OpenedBackup> {
+    let (header, content_key) = opened(path, backup_key)?;
+    let mut sizes: HashMap<String, usize> = HashMap::new();
+    let payload = read_payload(path, &header, &content_key, &mut |kind, hash, bytes| {
+        if !is_blob(kind, hash, &bytes) {
+            return Err(problem(Problem::Damaged));
+        }
+        sizes.insert(format!("{kind}/{hash}"), bytes.len());
+        Ok(())
+    })?;
+    let now = store.now();
+    // The Device that made it, so what it read as its own reads so here.
+    let seed = *payload.old.seed();
+    let view = Store::in_memory(Box::new(move || now), move || {
+        Ok(SigningKey::from_seed(seed))
+    })?;
+    view.batch(|| {
+        for e in &payload.entries {
+            view.insert(e)?;
+        }
+        let mut report = ImportReport::default();
+        for p in &payload.pinned {
+            let verified = (p.trust == KeyTrust::Verified).then_some(p.record.device.as_str());
+            view.learn_keys(std::slice::from_ref(&p.record), verified, &mut report)?;
+        }
+        OwnProfile::new(&view).restore(payload.profile.as_ref().map(|(p, _)| p), &payload.old)?;
+        Ok(())
+    })?;
+    let size_of = |kind: &str, hash: &str| sizes.get(&format!("{kind}/{hash}")).copied();
+    let (pack, trashed) = view.pack_of_everything(shown, &size_of)?;
+    Ok(OpenedBackup {
+        pack,
+        trashed,
+        created: header.created,
+        path: path.to_path_buf(),
+        line: header.line,
+        content_key,
+    })
+}
+
+/// "Add" on the Backup `opened` with `ticks` (#285), as the Dart core's
+/// `addBackupNotes`: the ticked Notes as copies, as a Pack's are added
+/// ([`Store::add_pack`]), claimed, into new Areas named after the
+/// Backup's, never into one there already. The files ticked are read
+/// from the Backup one after the other and kept, each checked against
+/// its hash, before the log names them; nothing of the Backup's
+/// identity, keys or roles is taken, and the log is not touched
+/// otherwise. [`Problem::Damaged`] when the file changed since it was
+/// opened, before anything is written to the log; a file found damaged
+/// half-way leaves blobs nobody refers to, never a half log.
+pub fn add_notes(
+    store: &Store,
+    opened: &OpenedBackup,
+    ticks: &PackTicks,
+    wall_clock: &WallClock,
+    suffix: &str,
+    no_area: &str,
+) -> Result<PackAdded> {
+    let damaged = || problem(Problem::Damaged);
+    let picked = opened.pack.picked(ticks);
+    let mut needed: HashSet<String> = HashSet::new();
+    for n in &picked.notes {
+        for (kind, files) in [("photo", &n.photos), ("audio", &n.recordings)] {
+            for f in files.iter().filter(|f| f.has_file) {
+                needed.insert(format!("{kind}/{}", f.hash));
+            }
+        }
+    }
+    if !needed.is_empty() {
+        let header = match read_header(&opened.path) {
+            Ok(Some(header)) if header.line == opened.line => header,
+            _ => return Err(damaged()),
+        };
+        let mut kept: HashSet<String> = HashSet::new();
+        let read = read_payload(
+            &opened.path,
+            &header,
+            &opened.content_key,
+            &mut |kind, hash, bytes| {
+                let reference = format!("{kind}/{hash}");
+                if !needed.contains(&reference) {
+                    return Ok(());
+                }
+                if !store.put_blob(kind, hash, &bytes)? {
+                    return Err(damaged());
+                }
+                kept.insert(reference);
+                Ok(())
+            },
+        );
+        match read {
+            Ok(_) => {}
+            Err(Error::Io(_)) => return Err(damaged()),
+            Err(e) => return Err(e),
+        }
+        if kept.len() != needed.len() {
+            return Err(damaged());
+        }
+    }
+    // The bytes are here under the hashes the Pack names.
+    let pack = OpenedPack {
+        pack: opened.pack.clone(),
+        from: None,
+        from_kept: false,
+    };
+    store.add_pack(&pack, ticks, true, wall_clock, suffix, no_area)
 }
 
 // ------------------------------------------------------------------ folder
@@ -1774,6 +2005,276 @@ mod tests {
         assert!(store.take_backup_key(Some(&with(json!({"key": low, "version": 3}))))?);
         assert_eq!(store.backup_key()?, Some([1u8; 32]));
         assert_eq!(store.backup_key_version()?, 3);
+        Ok(())
+    }
+
+    // ------------------------------------------------ taking Notes back
+
+    /// A Backup of [`full`] with a Transcript on its recording, a Note in
+    /// its trash, one filed nowhere and a Shared Area, and its key.
+    fn with_notes(dir: &Path) -> Result<(Store, std::path::PathBuf, [u8; KEY_BYTES])> {
+        let store = full(dir)?;
+        let notes = Notes::new(&store);
+        let pills = notes.all()?.into_iter().next().ok_or(damaged_err())?;
+        let recording = pills.recordings.first().ok_or(damaged_err())?;
+        notes.set_transcript(&pills.id, recording, "Eight sharp")?;
+        let area = Places::new(&store).add_area("Old")?;
+        let doctor = pills.place.clone().ok_or(damaged_err())?;
+        let old = notes.capture("Old list", Some(&doctor), None)?;
+        notes.trash(&old.id)?;
+        notes.capture("Call the vet", None, None)?;
+        store.share(&area.id)?;
+        let code = set_up(&store, PASSPHRASE, CHEAP, &mut system_random)?;
+        let path = dir.join(format!("n.{EXTENSION}"));
+        write_backup(&store, &path, &mut system_random)?;
+        let key = recovery::decode_code(&code).ok_or(damaged_err())?;
+        Ok((store, path, key))
+    }
+
+    fn settings(store: &Store) -> Result<Vec<(String, String)>> {
+        store.local_settings_with_prefix("")
+    }
+
+    fn by_name(area: &Area) -> String {
+        area.name.clone()
+    }
+
+    fn utc_wall(at: DateTime<Utc>) -> chrono::NaiveDateTime {
+        at.naive_utc()
+    }
+
+    fn refused<T>(result: Result<T>, want: Problem) -> bool {
+        matches!(result, Err(Error::Backup(p)) if p == want)
+    }
+
+    #[test]
+    fn a_backup_opens_as_a_packs_tree_and_leaves_the_log_as_it_is() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let (old, path, key) = with_notes(dir.path())?;
+        let store = device(dir.path(), "o", &held(20), 2)?;
+        Notes::new(&store).capture("Already here", None, None)?;
+        let seq = store.current_seq()?;
+        let before = settings(&store)?;
+        let opened = open_notes(&store, &path, &key, by_name)?;
+        assert_eq!(store.current_seq()?, seq);
+        assert_eq!(settings(&store)?, before);
+        assert!(held_blobs(&store)?.is_empty());
+        let header = read_header(&path)?.ok_or(damaged_err())?;
+        assert_eq!(opened.created, header.created);
+        let names: Vec<&str> = opened.pack.areas.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["Doctor"]);
+        let texts: Vec<&str> = opened.pack.notes.iter().map(|n| n.text.as_str()).collect();
+        assert_eq!(texts, ["Old list", "Pills at eight", "Call the vet"]);
+        assert_eq!(opened.trashed, BTreeSet::from([0]));
+        // As the Device that made it reads it, files and sizes alike.
+        let held = |kind: &str, hash: &str| old.blob(kind, hash).map(|b| b.len());
+        let (there, trashed) = old.pack_of_everything(by_name, &held)?;
+        assert_eq!(opened.pack.tree(), there.tree());
+        assert_eq!(opened.trashed, trashed);
+        let pills = opened.pack.notes.get(1).ok_or(damaged_err())?;
+        assert_eq!(pills.photos.first().map(|p| p.size), Some(150_000));
+        assert_eq!(pills.recordings.first().map(|a| a.size), Some(900));
+        assert_eq!(
+            pills.recordings.first().and_then(|a| a.text.as_deref()),
+            Some("Eight sharp")
+        );
+        // Nothing of a Note is ticked, everything under each is.
+        let ticks = opened.pack.backup_ticks();
+        let mut under = opened.pack.all_keys();
+        for i in 0..3 {
+            under.remove(&crate::packs::item_keys::note(i));
+        }
+        assert_eq!(ticks, under);
+        assert_eq!(opened.pack.size(&ticks), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn add_takes_the_ticked_notes_in_as_copies_and_nothing_of_the_backups_identity() -> Result<()> {
+        use crate::packs::item_keys;
+        let dir = tempfile::tempdir()?;
+        let (old, path, key) = with_notes(dir.path())?;
+        let store = device(dir.path(), "p", &held(20), 2)?;
+        Places::new(&store).add_area("Doctor")?;
+        let before = settings(&store)?;
+        let opened = open_notes(&store, &path, &key, by_name)?;
+        let mut ticks = opened.pack.backup_ticks();
+        for i in [0, 1] {
+            ticks = opened.pack.tick(&ticks, &item_keys::note(i), true);
+        }
+        // The recording stays behind, its Transcript comes.
+        ticks.remove(&item_keys::recording(1, 0));
+        let mark = store.current_seq()?;
+        let added = add_notes(
+            &store,
+            &opened,
+            &ticks,
+            &utc_wall,
+            "Backup",
+            "From a Backup",
+        )?;
+        assert_eq!(added.notes, 2);
+        let area = added.areas.first().ok_or(damaged_err())?;
+        assert_eq!(
+            Places::new(&store).area_by_id(area)?.map(|a| a.name),
+            Some("Doctor (Backup)".to_string())
+        );
+        let copies = Notes::new(&store).inside(area)?;
+        let pills = copies
+            .iter()
+            .find(|n| n.text == "Pills at eight")
+            .ok_or(damaged_err())?;
+        assert!(
+            copies
+                .iter()
+                .any(|n| n.text == "Old list" && !n.is_trashed())
+        );
+        let photo = pills.photos.first().ok_or(damaged_err())?;
+        assert_eq!(store.photo(photo), old.photo(photo));
+        assert!(pills.recordings.is_empty());
+        let recording = pills.removed_recordings.first().ok_or(damaged_err())?;
+        assert_eq!(
+            pills.transcripts.get(recording).map(String::as_str),
+            Some("Eight sharp")
+        );
+        assert_eq!(store.audio(recording), None);
+        // Nothing of the Backup's identity, keys, Profile or roles.
+        assert_eq!(settings(&store)?, before);
+        let own = store.device_id()?;
+        let old_ids: HashSet<String> = old.all_entries()?.into_iter().map(|e| e.entity).collect();
+        for e in store.entries_after(mark)? {
+            assert_eq!(e.device, own);
+            assert!(!old_ids.contains(&e.entity), "{}", e.entity);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn opening_refuses_as_restoring_does() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let (_old, path, key) = with_notes(dir.path())?;
+        let store = device(dir.path(), "r", &held(20), 2)?;
+        assert!(refused(
+            open_notes(&store, &path, &[0; 32], by_name),
+            Problem::WrongSecret
+        ));
+        let bytes = std::fs::read(&path)?;
+        let header = read_header(&path)?.ok_or(damaged_err())?;
+        let line = String::from_utf8_lossy(&header.line).into_owned();
+        let mut later = format!("{{\"format\":2,{}", &line[1..]).into_bytes();
+        later.extend_from_slice(&bytes[header.line.len()..]);
+        let mut flipped = bytes.clone();
+        let at = bytes.len() - 5;
+        flipped[at] ^= 1;
+        let variants = [
+            (later, Problem::NeedsUpdate),
+            (b"no Backup\n".to_vec(), Problem::NotABackup),
+            (flipped, Problem::Damaged),
+            (bytes[..bytes.len() - 3].to_vec(), Problem::Damaged),
+        ];
+        for (n, (changed, want)) in variants.into_iter().enumerate() {
+            let file = dir.path().join(format!("r{n}.{EXTENSION}"));
+            std::fs::write(&file, changed)?;
+            assert!(
+                refused(open_notes(&store, &file, &key, by_name), want),
+                "variant {n}"
+            );
+        }
+        assert_eq!(store.current_seq()?, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_changed_after_it_was_opened_adds_nothing() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let (old, path, key) = with_notes(dir.path())?;
+        let store = device(dir.path(), "c", &held(20), 2)?;
+        let opened = open_notes(&store, &path, &key, by_name)?;
+        // Another Backup of the same Device in its place.
+        Notes::new(&old).capture("Written since", None, None)?;
+        write_backup(&old, &path, &mut system_random)?;
+        let ticks = opened.pack.tick(&opened.pack.backup_ticks(), "n1", true);
+        assert!(refused(
+            add_notes(
+                &store,
+                &opened,
+                &ticks,
+                &utc_wall,
+                "Backup",
+                "From a Backup"
+            ),
+            Problem::Damaged
+        ));
+        assert_eq!(store.current_seq()?, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_blob_whose_bytes_are_not_its_hash_is_a_damaged_backup() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let store = device(dir.path(), "b", &held(1), 1)?;
+        set_up(&store, PASSPHRASE, CHEAP, &mut system_random)?;
+        let backup_key = store.backup_key()?.ok_or(damaged_err())?;
+        let pass = store.backup_pass()?.ok_or(damaged_err())?;
+        let content_key = [9; KEY_BYTES];
+        let sealed_key = seal(&backup_key, &content_key, sealed_as::KEY, &[1; 24])?;
+        let line = Header::encode(*held(2).lock(), &pass, &sealed_key, CHUNK_BYTES);
+        let hash = hex::encode(Sha256::digest(b"the photo"));
+        let about = json!({"about": {
+            "device": store.device_id()?,
+            "seed": store.signing_key()?.seed_hex(),
+        }});
+        let payload = format!("{about}\n{{\"blob\":\"photo/{hash}\",\"size\":9}}\nnot it!!!");
+        let aad = sealed_as::chunk(&hex::encode(Sha256::digest(&line)), 0, true);
+        let mut file = line.clone();
+        file.push(b'\n');
+        file.extend(seal(&content_key, payload.as_bytes(), &aad, &[2; 24])?);
+        let path = dir.path().join(format!("crafted.{EXTENSION}"));
+        std::fs::write(&path, file)?;
+        assert!(refused(
+            open_notes(&store, &path, &backup_key, by_name),
+            Problem::Damaged
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn a_backup_reads_as_the_device_that_made_it_not_as_another_persons() -> Result<()> {
+        use crate::person_settings::{PersonSettings, keys as person_keys};
+        let dir = tempfile::tempdir()?;
+        let ada = device(dir.path(), "ada", &held(1), 1)?;
+        let places = Places::new(&ada);
+        let health = places.add_area("Health")?;
+        let work = places.add_area("Work")?;
+        Notes::new(&ada).capture("Stretch", Some(&health.id), None)?;
+        Notes::new(&ada).capture("Report", Some(&work.id), None)?;
+        PersonSettings::new(&ada).set_area_order(&[&work.id, &health.id])?;
+        let cy = device(dir.path(), "cy", &held(25), 7)?;
+        let mark = cy.current_seq()?;
+        let order = json!([health.id, work.id]).to_string();
+        cy.append(
+            person_keys::ENTITY,
+            person_keys::AREA_ORDER,
+            Some(&order),
+            None,
+        )?;
+        for e in cy.entries_after(mark)? {
+            ada.insert(&e.wire())?;
+        }
+        let shown: Vec<String> = PersonSettings::new(&ada)
+            .areas_in_order_by(by_name)?
+            .into_iter()
+            .map(|a| a.name)
+            .collect();
+        assert_eq!(shown, ["Work", "Health"]);
+        let code = set_up(&ada, PASSPHRASE, CHEAP, &mut system_random)?;
+        let path = dir.path().join(format!("order.{EXTENSION}"));
+        write_backup(&ada, &path, &mut system_random)?;
+        let store = device(dir.path(), "w", &held(26), 2)?;
+        let key = recovery::decode_code(&code).ok_or(damaged_err())?;
+        let opened = open_notes(&store, &path, &key, by_name)?;
+        let names: Vec<&str> = opened.pack.areas.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["Work", "Health"]);
         Ok(())
     }
 }

@@ -78,3 +78,18 @@ The desktop core reads and writes the same bytes (`packs.rs`), and the desktop s
 ## Sets and Check fields (#264)
 
 Amended by #264 (ADR 0028): a Tally's field carries `"check":true` when it is a Check field, and the Note its Tally's `"bar"` when it is not a day and `"sets":true` when it counts in sets; an unknown bar is no Pack. What a field multiplied still travels as before, so a former multiplier Tally arrives counting in sets.
+
+## A Backup's Notes (#285)
+
+Amended by #285 (Q682 (a), ADR 0016): a Backup opened to take Notes back from it shows the same tree, made by the same core from the Pack of what the Backup's Device held (`packOfEverything`, `pack_of_everything`): every Note but those merged into another, each where it was filed, the Areas in the person's own order as `packOfAll` lists them, then the Notes filed into no Area, newest capture first; the Notes that lay in its trash among them, filed where they were, the core saying which (`trashed`). Their kinds, photos with Photo Texts, recordings with Transcripts, Routines, Reminders and Frogs are a Pack's; a file's size is the Pack's, in base64, while the file itself keeps its size beside it.
+
+Nothing of a Note starts ticked, but everything under each does (`backupTicks`, `backup_ticks`), so a Note ticked comes back whole, files included; the Session rule holds as everywhere. "Add" is a Pack's "Add", claimed and without a Profile, so no "From …" badge: new private Areas named after the Backup's, with the suffix the app hands in where the name is taken ("Health (Backup)"), the Notes of no Area in a new Area of the app's name, Routines starting on the day of "Add", a Reminder already past left out, every entity under a new id. A Note that lay in the trash arrives out of it. A Backup's Notes have no AI port tool either: opening one is a person's own act with their own file and their own key, as a Pack's.
+
+### Considered (#285)
+
+- Only the Notes outside the trash, as Feedback's Pack of everything (rejected: the trash keeps a Note 30 days and the folder the last four weekly Backups, so a Note purged from the trash mostly lies in the trash of every Backup still kept).
+- Everything ticked at the start, as when a Pack is opened (rejected: a Backup holds the whole log; "Add" would copy all of it beside itself).
+
+### Consequences (#285)
+
+- The `backup-notes` fixture holds a Backup with every kind of Note, a photo and a recording longer than a chunk, a Note in the trash and one of no Area; its tree, the ticks at the start, the Notes added back into the log of the Device that made it, their files read from the Backup, and its refusals. Both cores read the same tree and write the same entries, byte for byte.

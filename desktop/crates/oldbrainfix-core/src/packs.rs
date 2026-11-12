@@ -558,6 +558,18 @@ impl Pack {
         out
     }
 
+    /// What is ticked when a Backup is opened to take Notes back from it
+    /// (#285), as the Dart core's `backupTicks`: no Note, and everything
+    /// under each, so a Note ticked comes back whole, its photos and
+    /// recordings with it.
+    pub fn backup_ticks(&self) -> PackTicks {
+        let mut out = self.all_keys();
+        for i in 0..self.notes.len() {
+            out.remove(&item_keys::note(i));
+        }
+        out
+    }
+
     /// `ticks` with the item `key` ticked `on`, as the Session rule says
     /// (Q458): ticking a Session ticks the Tallies of its pool; unticking
     /// a Tally takes it out of the pool of each Session, and a Session
@@ -788,6 +800,10 @@ const FROG_JSON: &str = "true";
 
 /// Reads the bytes of a `kind` (`photo` or `audio`) file by its hash.
 pub type BytesOf<'a> = dyn Fn(&str, &str) -> Option<Vec<u8>> + 'a;
+
+/// The size of the bytes of the `kind` (`photo` or `audio`) file `hash`
+/// held, none for none.
+pub type SizeOf<'a> = dyn Fn(&str, &str) -> Option<usize> + 'a;
 
 fn routine_json(s: &Schedule) -> Value {
     let mut pairs = Vec::new();
@@ -1461,10 +1477,73 @@ impl Store {
         self.pack_of_notes(&picked, closed)
     }
 
+    /// The Pack of a Backup opened to take Notes back from it (#285), as
+    /// the Dart core's `packOfEverything`: every Note this Store holds but
+    /// those merged into another, those in the trash among them, each
+    /// Area in the person's own order by `shown` with its own Notes and
+    /// then its Topics' Notes, then the Notes filed into no Area, newest
+    /// capture first, as [`Store::pack_of_all_by`] lists them; the Tallies
+    /// a Session picks from that are not among them after them. The
+    /// files' sizes come from `size_of`, `photo` or `audio` and a hash to
+    /// the size of the bytes held, none for none. Beside the Pack, the
+    /// indices of the Notes that lay in the trash.
+    pub fn pack_of_everything(
+        &self,
+        shown: impl Fn(&Area) -> String,
+        size_of: &SizeOf,
+    ) -> Result<(Pack, BTreeSet<usize>)> {
+        let places = Places::new(self);
+        let notes = Notes::new(self);
+        let mut kept = Vec::new();
+        for id in self.entities_of_type(note_keys::TYPE_NOTE)? {
+            if let Some(note) = notes.by_id(&id)?
+                && !note.is_merged()
+            {
+                kept.push(note);
+            }
+        }
+        kept.sort_by(|a, b| b.captured.cmp(&a.captured).then_with(|| a.id.cmp(&b.id)));
+        let mut ids = Vec::new();
+        for area in PersonSettings::new(self).areas_in_order_by(shown)? {
+            let topics = places.topics(&area.id)?;
+            ids.push(area.id);
+            ids.extend(topics.into_iter().map(|t| t.id));
+        }
+        let mut picked: Vec<Note> = ids
+            .iter()
+            .flat_map(|id| {
+                kept.iter()
+                    .filter(move |n| n.place.as_deref() == Some(id.as_str()))
+            })
+            .cloned()
+            .collect();
+        picked.extend(kept.iter().filter(|n| n.place.is_none()).cloned());
+        let (pack, order) = self.pack_of_notes_by(&picked, &HashSet::new(), size_of)?;
+        let mut trashed = BTreeSet::new();
+        for (i, id) in order.iter().enumerate() {
+            if notes.by_id(id)?.is_some_and(|n| n.is_trashed()) {
+                trashed.insert(i);
+            }
+        }
+        Ok((pack, trashed))
+    }
+
     /// The Pack of `picked`, in their order, and the Tallies their
     /// Sessions pick from that are not among them after them, but for
     /// those filed into an Area of `closed`.
     fn pack_of_notes(&self, picked: &[Note], closed: &HashSet<String>) -> Result<Pack> {
+        let held = |kind: &str, hash: &str| self.blob(kind, hash).map(|b| b.len());
+        Ok(self.pack_of_notes_by(picked, closed, &held)?.0)
+    }
+
+    /// [`Store::pack_of_notes`] with the files' sizes from `size_of`, and
+    /// the ids of the Notes in the order the Pack holds them.
+    fn pack_of_notes_by(
+        &self,
+        picked: &[Note],
+        closed: &HashSet<String>,
+        size_of: &SizeOf,
+    ) -> Result<(Pack, Vec<String>)> {
         let notes = Notes::new(self);
         let places = Places::new(self);
         let mut order: Vec<String> = picked.iter().map(|n| n.id.clone()).collect();
@@ -1531,17 +1610,19 @@ impl Store {
                     }
                 }
             }
-            out.push(self.pack_note(&note, area, topic, i >= picked.len(), &index)?);
+            out.push(self.pack_note(&note, area, topic, i >= picked.len(), &index, size_of)?);
         }
-        Ok(Pack {
+        let pack = Pack {
             areas: area_names,
             notes: out,
             card: None,
-        })
+        };
+        Ok((pack, order))
     }
 
     /// The Note `note` as a Pack carries it, filed into the Pack's Area
-    /// `area` and Topic `topic`, its Session's pool by `index`.
+    /// `area` and Topic `topic`, its Session's pool by `index`, the sizes
+    /// of its files from `size_of`.
     fn pack_note(
         &self,
         note: &Note,
@@ -1549,6 +1630,7 @@ impl Store {
         topic: Option<usize>,
         outside: bool,
         index: &HashMap<String, usize>,
+        size_of: &SizeOf,
     ) -> Result<PackNote> {
         let id = &note.id;
         let kind = NoteKind::of(self, id)?;
@@ -1573,7 +1655,7 @@ impl Store {
             .map(|(i, f)| (f.id.as_str(), i))
             .collect();
         let file = |kind: &str, hash: &str, text: Option<&String>| {
-            let size = self.blob(kind, hash).map(|b| b.len());
+            let size = size_of(kind, hash);
             PackFile {
                 hash: hash.to_string(),
                 bytes: None,

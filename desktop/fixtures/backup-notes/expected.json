@@ -1,0 +1,243 @@
+{
+  "passphrase": "Notizen zurück, bitte",
+  "recoveryCode": "A595-6N2N-ASBN-GPAT-BDE5-TQJZ-C1GP-4RV4-CNK6-ET39-D9NP-RVBE-DXRC",
+  "backupKey": "5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f70",
+  "created": "2026-01-10T12:00:00.000Z",
+  "opened": "2026-01-11T18:00:00.000Z",
+  "tree": [
+    {
+      "key": "a0",
+      "kind": "area",
+      "note": null,
+      "index": null,
+      "size": 0,
+      "children": [
+        {
+          "key": "n0",
+          "kind": "note",
+          "note": 0,
+          "index": null,
+          "size": 45,
+          "children": []
+        }
+      ]
+    },
+    {
+      "key": "a1",
+      "kind": "area",
+      "note": null,
+      "index": null,
+      "size": 0,
+      "children": [
+        {
+          "key": "n1",
+          "kind": "note",
+          "note": 1,
+          "index": null,
+          "size": 49,
+          "children": [
+            {
+              "key": "n1.f",
+              "kind": "frog",
+              "note": 1,
+              "index": null,
+              "size": 4,
+              "children": []
+            }
+          ]
+        },
+        {
+          "key": "n2",
+          "kind": "note",
+          "note": 2,
+          "index": null,
+          "size": 42,
+          "children": [
+            {
+              "key": "n2.r0",
+              "kind": "routine",
+              "note": 2,
+              "index": 0,
+              "size": 58,
+              "children": []
+            },
+            {
+              "key": "n2.r1",
+              "kind": "reminder",
+              "note": 2,
+              "index": 1,
+              "size": 38,
+              "children": []
+            }
+          ]
+        },
+        {
+          "key": "a1.t0",
+          "kind": "topic",
+          "note": null,
+          "index": null,
+          "size": 0,
+          "children": [
+            {
+              "key": "n3",
+              "kind": "note",
+              "note": 3,
+              "index": null,
+              "size": 52,
+              "children": [
+                {
+                  "key": "n3.p0",
+                  "kind": "photo",
+                  "note": 3,
+                  "index": 0,
+                  "size": 40,
+                  "children": []
+                },
+                {
+                  "key": "n3.pt0",
+                  "kind": "photoText",
+                  "note": 3,
+                  "index": 0,
+                  "size": 8,
+                  "children": []
+                },
+                {
+                  "key": "n3.a0",
+                  "kind": "recording",
+                  "note": 3,
+                  "index": 0,
+                  "size": 133336,
+                  "children": []
+                },
+                {
+                  "key": "n3.at0",
+                  "kind": "transcript",
+                  "note": 3,
+                  "index": 0,
+                  "size": 9,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "key": "n4",
+              "kind": "note",
+              "note": 4,
+              "index": null,
+              "size": 103,
+              "children": [
+                {
+                  "key": "n4.r0",
+                  "kind": "routine",
+                  "note": 4,
+                  "index": 0,
+                  "size": 68,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "key": "n5",
+              "kind": "note",
+              "note": 5,
+              "index": null,
+              "size": 115,
+              "children": []
+            },
+            {
+              "key": "n6",
+              "kind": "note",
+              "note": 6,
+              "index": null,
+              "size": 114,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "n7",
+      "kind": "note",
+      "note": 7,
+      "index": null,
+      "size": 40,
+      "children": []
+    }
+  ],
+  "trashed": [
+    0
+  ],
+  "areas": [
+    "Work",
+    "Health"
+  ],
+  "texts": [
+    "Old list",
+    "Fix the bike",
+    "Water",
+    "Route",
+    "Training",
+    "Laps",
+    "Bag",
+    "Call the vet"
+  ],
+  "start": [
+    "n1.f",
+    "n2.r0",
+    "n2.r1",
+    "n3.a0",
+    "n3.at0",
+    "n3.p0",
+    "n3.pt0",
+    "n4.r0"
+  ],
+  "picked": [
+    4,
+    3,
+    0,
+    7
+  ],
+  "ticks": [
+    "n0",
+    "n1.f",
+    "n2.r0",
+    "n2.r1",
+    "n3",
+    "n3.a0",
+    "n3.at0",
+    "n3.p0",
+    "n3.pt0",
+    "n4",
+    "n4.r0",
+    "n5",
+    "n7"
+  ],
+  "size": 133816,
+  "added": {
+    "areas": [
+      "area:00000000000000000000000000001301",
+      "area:00000000000000000000000000001302",
+      "area:00000000000000000000000000001304"
+    ],
+    "notes": 5
+  },
+  "areaNames": {
+    "area:00000000000000000000000000001304": "From a Backup",
+    "area:00000000000000000000000000000001": "Health",
+    "area:00000000000000000000000000001302": "Health (Backup)",
+    "area:00000000000000000000000000000003": "Work",
+    "area:00000000000000000000000000001301": "Work (Backup)"
+  },
+  "blobs": [
+    "audio/7c42097b6e665c191aef8cd0fa872b75cbb083314d20e32a1aaa20fec44c7837",
+    "photo/f2ac3e54ed5dfa8bb916b78586ff51b818bb0da14c0e04ae1efccf12b8d5fc3e"
+  ],
+  "refused": {
+    "wrongKey": "wrongSecret",
+    "later": "needsUpdate",
+    "flipped": "damaged",
+    "cut": "damaged",
+    "none": "notABackup"
+  }
+}

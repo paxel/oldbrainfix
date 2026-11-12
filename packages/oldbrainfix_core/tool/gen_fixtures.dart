@@ -7383,6 +7383,208 @@ void _packFixture(Directory root) {
   }
 }
 
+/// Taking Notes back from a Backup (#285): Ada's Device with her Work
+/// before her Health, a Routine and a Reminder, a Checklist, a Tally a
+/// Session picks, a photo and a recording longer than a chunk with their
+/// texts, an open Frog, a Note in the trash and one filed nowhere, backed
+/// up with counted random bytes; a day later she has removed the photo
+/// and the recording, opens the Backup and adds some of its Notes back.
+/// Nothing of the Backup's identity is drawn: the fixtures after this one
+/// keep their ids.
+Future<void> _backupNotesFixture(Directory root) async {
+  final out = Directory('${root.path}/backup-notes')
+    ..createSync(recursive: true);
+  final keep = secretBytes;
+  secretBytes = _counted(700);
+  final ada = _store();
+  final work = Directory.systemTemp.createTempSync('oldbrainfix_notes_');
+  DateTime wall(DateTime utc) => utc;
+  try {
+    final places = Places(ada);
+    final notes = Notes(ada);
+    final health = places.addArea('Health');
+    final running = places.addTopic(health.id, 'Running');
+    final office = places.addArea('Work');
+    final water = notes.capture('Water', place: health.id);
+    Routines(ada).spawn(
+      water.id,
+      Schedule(
+        start: Day(2025, 12, 1),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    Routines(ada).spawn(
+      water.id,
+      Schedule(start: Day(2026, 2, 1), times: [ClockTime(9, 30)]),
+    );
+    final bag = notes.capture('Bag\nShoes\nBottle', place: running.id);
+    Checklists(ada).make(bag.id);
+    final laps = notes.capture('Laps', place: running.id);
+    Tallies(ada).addField(laps.id, name: 'Laps', target: 10);
+    final training = notes.capture('Training', place: running.id);
+    Sessions(ada).spawn(
+      training.id,
+      Schedule(
+        start: Day(2025, 12, 1),
+        times: [ClockTime(7, 0)],
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO'),
+      ),
+      pool: [laps.id],
+      count: 1,
+      rule: SessionRule.least,
+    );
+    final route = notes.capture(
+      'Route',
+      place: running.id,
+      photos: [_photo(51)],
+      recordings: [
+        Uint8List.fromList(List.generate(100000, (i) => (i * 11 + 5) & 0xff)),
+      ],
+    );
+    final media = notes.byId(route.id)!;
+    final photo = media.photos.single;
+    final recording = media.recordings.single;
+    notes.setPhotoText(route.id, photo, 'Park map');
+    notes.setTranscript(route.id, recording, 'Turn left');
+    final bike = notes.capture('Fix the bike', place: health.id);
+    Frogs(ada).spawn(bike.id);
+    final old = notes.capture('Old list', place: office.id);
+    notes.trash(old.id);
+    notes.capture('Call the vet');
+    ada
+      ..setAreaOrder([office.id, health.id])
+      ..applyProfileDefaults(name: 'Ada');
+    const passphrase = 'Notizen zurück, bitte';
+    final code = await setUpBackups(
+      ada,
+      passphrase,
+      kdf: const BackupKdf(memory: 64, iterations: 1),
+    );
+    final made = DateTime.utc(2026, 1, 10, 12);
+    _held = made;
+    secretBytes = _counted(7000);
+    final file = '${out.path}/backup.$backupExtension';
+    await writeBackup(ada, file);
+    final there = ada.packOfEverything();
+
+    // A day later the photo and the recording are gone here.
+    final opened = DateTime.utc(2026, 1, 11, 18);
+    _held = opened;
+    notes
+      ..removePhoto(route.id, photo)
+      ..removeRecording(route.id, recording);
+    _writeDevice(ada, out, 'device');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'device': _keySettings(ada)})}\n',
+    );
+
+    final header = readBackupHeader(file);
+    if (header == null) throw StateError('the notes fixture has no header');
+    final key = await unlockBackup(header, passphrase: passphrase);
+    final byCode = await unlockBackup(header, recoveryCode: code);
+    if (key == null || byCode == null || hex(key) != hex(byCode)) {
+      throw StateError('the notes fixture does not open');
+    }
+    final backup = await openBackupNotes(ada, file, key);
+    Object? item(PackItem i) => {
+      'key': i.key,
+      'kind': i.kind.name,
+      'note': i.note,
+      'index': i.index,
+      'size': i.size,
+      'children': [for (final c in i.children) item(c)],
+    };
+    final tree = [for (final i in backup.pack.tree()) item(i)];
+    if (jsonEncode(tree) !=
+            jsonEncode([for (final i in there.pack.tree()) item(i)]) ||
+        jsonEncode(backup.trashed.toList()) !=
+            jsonEncode(there.trashed.toList())) {
+      throw StateError('the notes fixture reads otherwise than its Device');
+    }
+    List<String> sorted(Iterable<String> keys) => keys.toList()..sort();
+    final texts = [for (final n in backup.pack.notes) n.text];
+    final picked = [
+      for (final text in ['Training', 'Route', 'Old list', 'Call the vet'])
+        texts.indexOf(text),
+    ];
+    var ticks = backup.pack.backupTicks();
+    for (final i in picked) {
+      ticks = backup.pack.tick(ticks, PackItemKeys.note(i), true);
+    }
+    var ids = 0x1300;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    final mark = ada.currentSeq();
+    final added = await addBackupNotes(
+      ada,
+      backup,
+      ticks,
+      wallClock: wall,
+      suffix: 'Backup',
+      noArea: 'From a Backup',
+    );
+    _writeAfter(ada, mark, File('${out.path}/added.jsonl'));
+
+    // Refused as restoring refuses, each file made from the Backup.
+    final bytes = File(file).readAsBytesSync();
+    final line = utf8.decode(header.line);
+    final variants = {
+      'later': [
+        ...utf8.encode('{"format":2,${line.substring(1)}'),
+        ...bytes.sublist(header.line.length),
+      ],
+      'flipped': Uint8List.fromList(bytes)..[bytes.length - 1] ^= 1,
+      'cut': bytes.sublist(0, bytes.length - 3),
+      'none': utf8.encode('no Backup\n'),
+    };
+    Future<String> refusal(String path, Uint8List key) async {
+      try {
+        await openBackupNotes(ada, path, key);
+        return 'opened';
+      } on BackupException catch (e) {
+        return e.problem.name;
+      }
+    }
+
+    final refused = <String, String>{
+      'wrongKey': await refusal(file, Uint8List(32)),
+    };
+    for (final MapEntry(key: what, value: changed) in variants.entries) {
+      final path = '${work.path}/$what.$backupExtension';
+      File(path).writeAsBytesSync(changed);
+      refused[what] = await refusal(path, key);
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'passphrase': passphrase,
+        'recoveryCode': code,
+        'backupKey': hex(key),
+        'created': backup.created.toIso8601String(),
+        'opened': opened.toIso8601String(),
+        'tree': tree,
+        'trashed': backup.trashed.toList()..sort(),
+        'areas': [for (final a in backup.pack.areas) a.name],
+        'texts': texts,
+        'start': sorted(backup.pack.backupTicks()),
+        'picked': picked,
+        'ticks': sorted(ticks),
+        'size': backup.pack.size(ticks),
+        'added': {'areas': added.areas, 'notes': added.notes},
+        'areaNames': {for (final a in Places(ada).areas()) a.id: a.name},
+        'blobs': heldBlobs(ada),
+        'refused': refused,
+      })}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    _held = null;
+    work.deleteSync(recursive: true);
+    ada.close();
+  }
+}
+
 /// Profile card files (#144): Ada (the writer's key) with a picture
 /// makes her card file and the one answering another, Ben (the joiner's
 /// key) his answering hers; the file names of a few names; then Ben opens
@@ -9960,6 +10162,21 @@ Future<void> main(List<String> args) async {
     'Profile with the new Device\'s key bound to it by the old one\'s '
     'and her playback speed among them, and what it reads '
     '(`expected.json`).\n'
+    '- `backup-notes/`: taking Notes back from a Backup (#285): Ada\'s '
+    'Device with her Work before her Health, a Routine and a Reminder, a '
+    'Checklist, a Tally a Session picks, a photo and a recording longer '
+    'than a chunk with their texts, an open Frog, a Note in the trash and '
+    'one filed nowhere; her Backup (`backup.$backupExtension`, a low '
+    'Argon2id cost, random bytes counted from 7001 on, at a held clock); '
+    'a day later, the photo and the recording removed, her log '
+    '(`device.jsonl`) and keys (`settings.json`); the Backup opened with '
+    'the passphrase and the recovery key, its tree with keys, kinds and '
+    'sizes, the Notes that lay in the trash, the keys ticked at the start, '
+    'then Training, Route, the Note in the trash and the one filed nowhere '
+    'ticked and added back (`added.jsonl`, ids counted from 0x1301), with '
+    'the Areas made, the blobs she holds then, and the refusals of a wrong '
+    'key, a later header, a flipped byte, a cut-off file and a file that '
+    'is no Backup (`expected.json`).\n'
     '- `profiles/`: Profile names as typed and as kept, initials, '
     'placeholder colours, short codes from an id and a first key, records '
     'as they are written and records refused, the own Profile\'s local '
@@ -10123,6 +10340,7 @@ Future<void> main(List<String> args) async {
   _pendingFixture(root);
   await _offerFixture(root);
   _packFixture(root);
+  await _backupNotesFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

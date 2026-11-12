@@ -7033,6 +7033,114 @@ fn packs_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
 }
 
 #[test]
+fn notes_are_taken_back_from_a_backup_as_the_dart_core_takes_them() -> TestResult {
+    use oldbrainfix_core::backup::{Problem, add_notes, open_notes, read_header, unlock};
+    use oldbrainfix_core::packs::item_keys;
+    let dir = fixtures().join("backup-notes");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let at = expected["opened"].as_str().ok_or("opened")?;
+    let mut ada = fixture_device("backup-notes", "device", writer_key, at)?;
+    let file = dir.join("backup.obfbackup");
+    let header = read_header(&file)?.ok_or("a header")?;
+    assert_eq!(
+        Some(dart_iso(header.created).as_str()),
+        expected["created"].as_str()
+    );
+    let passphrase = expected["passphrase"].as_str().ok_or("passphrase")?;
+    let code = expected["recoveryCode"].as_str().ok_or("code")?;
+    let key = unlock(&header, Some(passphrase), None)?.ok_or("the passphrase opens it")?;
+    assert_eq!(unlock(&header, None, Some(code))?, Some(key));
+    assert_eq!(
+        Some(hex::encode(key).as_str()),
+        expected["backupKey"].as_str()
+    );
+
+    // Her Notes as the Device that made it read them, nothing kept here.
+    let mark = ada.current_seq()?;
+    let opened = open_notes(&ada, &file, &key, |a| a.name.clone())?;
+    assert_eq!(ada.current_seq()?, mark);
+    let tree: Vec<Value> = opened.pack.tree().iter().map(pack_item_json).collect();
+    assert_eq!(Value::Array(tree), expected["tree"]);
+    assert_eq!(json!(opened.trashed), expected["trashed"]);
+    let names: Vec<_> = opened.pack.areas.iter().map(|a| a.name.clone()).collect();
+    assert_eq!(json!(names), expected["areas"]);
+    let texts: Vec<_> = opened.pack.notes.iter().map(|n| n.text.clone()).collect();
+    assert_eq!(json!(texts), expected["texts"]);
+    assert_eq!(json!(dart_iso(opened.created)), expected["created"]);
+    assert_eq!(json!(opened.pack.backup_ticks()), expected["start"]);
+
+    // Some of them added back, their photo and recording from the Backup.
+    let mut ticks = opened.pack.backup_ticks();
+    for i in expected["picked"].as_array().ok_or("picked")? {
+        let i = usize::try_from(i.as_u64().ok_or("an index")?)?;
+        ticks = opened.pack.tick(&ticks, &item_keys::note(i), true);
+    }
+    assert_eq!(json!(ticks), expected["ticks"]);
+    assert_eq!(json!(opened.pack.size(&ticks)), expected["size"]);
+    counted_ids(&mut ada, 0x1300);
+    let wall = |at: DateTime<Utc>| at.naive_utc();
+    let added = add_notes(&ada, &opened, &ticks, &wall, "Backup", "From a Backup")?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("added.jsonl"))?
+    );
+    assert_eq!(
+        json!({"areas": added.areas, "notes": added.notes}),
+        expected["added"]
+    );
+    let names: serde_json::Map<String, Value> = Places::new(&ada)
+        .areas()?
+        .into_iter()
+        .map(|a| (a.id, json!(a.name)))
+        .collect();
+    assert_eq!(Value::Object(names), expected["areaNames"]);
+    assert_eq!(
+        json!(oldbrainfix_core::backup::held_blobs(&ada)?),
+        expected["blobs"]
+    );
+
+    // Refused as restoring refuses, each file made from the Backup.
+    let name = |p: Problem| match p {
+        Problem::NotABackup => "notABackup",
+        Problem::NeedsUpdate => "needsUpdate",
+        Problem::WrongSecret => "wrongSecret",
+        Problem::Damaged => "damaged",
+        Problem::NotEmpty => "notEmpty",
+    };
+    let refusal =
+        |path: &std::path::Path, key: &[u8; 32]| -> Result<String, Box<dyn std::error::Error>> {
+            Ok(match open_notes(&ada, path, key, |a| a.name.clone()) {
+                Ok(_) => "opened".to_string(),
+                Err(oldbrainfix_core::Error::Backup(p)) => name(p).to_string(),
+                Err(e) => return Err(e.into()),
+            })
+        };
+    let bytes = std::fs::read(&file)?;
+    let line = String::from_utf8(header.line.clone())?;
+    let mut later = format!("{{\"format\":2,{}", &line[1..]).into_bytes();
+    later.extend_from_slice(&bytes[header.line.len()..]);
+    let mut flipped = bytes.clone();
+    if let Some(last) = flipped.last_mut() {
+        *last ^= 1;
+    }
+    let work = tempfile::tempdir()?;
+    let mut refused = serde_json::Map::new();
+    refused.insert("wrongKey".into(), json!(refusal(&file, &[0; 32])?));
+    for (what, changed) in [
+        ("later", later),
+        ("flipped", flipped),
+        ("cut", bytes[..bytes.len() - 3].to_vec()),
+        ("none", b"no Backup\n".to_vec()),
+    ] {
+        let path = work.path().join(format!("{what}.obfbackup"));
+        std::fs::write(&path, changed)?;
+        refused.insert(what.into(), json!(refusal(&path, &key)?));
+    }
+    assert_eq!(Value::Object(refused), expected["refused"]);
+    Ok(())
+}
+
+#[test]
 fn entries_of_a_later_version_are_kept_and_passed_on_byte_for_byte() -> TestResult {
     use oldbrainfix_core::signing::{ImportReport, KeyRecord};
     let dir = fixtures().join("versions");
