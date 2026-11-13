@@ -73,10 +73,13 @@ class ShareInboxTests: XCTestCase {
     XCTAssertEqual(ShareTypes.kind(of: ["public.plain-text", "public.jpeg"])?.1, "public.jpeg")
   }
 
-  func testAnyOtherFileIsNotTaken() {
-    XCTAssertNil(ShareTypes.kind(of: ["com.adobe.pdf"], name: "Bill.pdf"))
+  func testAnyOtherFileIsAnAttachment() {
+    XCTAssertEqual(ShareTypes.kind(of: ["com.adobe.pdf"], name: "Bill.pdf")?.0, .attachment)
+    XCTAssertEqual(ShareTypes.kind(of: ["public.zip-archive"])?.0, .attachment)
+    XCTAssertEqual(ShareTypes.kind(of: ["public.data"])?.0, .attachment)
+    // A picture is still a photo, and a file URL alone is nothing to load.
+    XCTAssertEqual(ShareTypes.kind(of: ["com.adobe.pdf", "public.jpeg"])?.0, .photo)
     XCTAssertNil(ShareTypes.kind(of: ["public.file-url"], name: "notes.zip"))
-    XCTAssertNil(ShareTypes.kind(of: ["public.data"]))
   }
 
   func testTheExportedTypesAreTheOnesTheAppDeclares() throws {

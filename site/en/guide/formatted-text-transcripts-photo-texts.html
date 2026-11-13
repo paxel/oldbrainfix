@@ -305,17 +305,53 @@
 <p>
   A word with "#" in front, such as "#garden", is a tag and is drawn in the accent colour, on cards,
   in Sections and in the editor. A tap on it on a card, in a Section or in a table opens the search
-  of all Notes with the tag as written. Nothing is stored for a tag, and there is no list of tags;
-  it is a word of the text. Typing the tag into the search finds the same.
+  of all Notes with the tag as written. Nothing is stored for a tag; it is a word of the text, and
+  the tag tree lists every tag (see "Browse your #tags"). Typing the tag into the search finds the
+  same.
 </p>
 <ul>
   <li>A tag is made of letters, digits, "_" and "-", and holds at least one letter: "#to-do" and "#v2" are tags, "#126" is a number.</li>
+  <li>A "/" nests a tag: "#life/health/back" is one tag, below "#life/health" and "#life". The search for "#life" finds it too.</li>
   <li>"# Title" with a space, "C#" and the "#" in a web address are no tags. In a formatted text, a "#word" inside code, a code block or a link's address is none either; nor is any in a Code text.</li>
   <li>The search for "#garden" finds every Note holding it in any case, also "#gardening", which begins with it, but not the word "garden" without "#".</li>
 </ul>
 <p>
   On the desktop a tag's click closes the Note dialog and searches all Notes, as on the phone; in
   the field being edited it places the cursor.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="tag-tree">
+<h2>Browse your #tags</h2>
+<p>See every #tag of your Notes by its levels, such as #life/health below #life.</p>
+<box-tab device="phone" alt="The tag tree: #garden and #life, with health and back unfolded below #life, each with its count of Notes">
+<li>Tap <strong>Search and browse</strong>.</li>
+<li>Tap <strong>Tags</strong> below the Areas.</li>
+<li>Tap the arrow beside a tag for the tags below it.</li>
+<li>Tap a tag to search for it.</li>
+</box-tab>
+<box-tab device="desktop" alt="All Notes searched for #boiler, the boiler's service found">
+<li>Press Ctrl+F.</li>
+<li>Type # and the start of a tag, such as #life.</li>
+</box-tab>
+<box-more>
+<p>
+  The tag tree lists the #tags of every Note and its Sections, the top level as written
+  ("#life"), each level below by its own word ("health"), indented, with how many Notes carry the
+  tag or a tag below it. At first only the top level shows; the arrow beside a tag unfolds the
+  levels below. A tap on a tag goes back to the Areas list and searches for it there. A tag written
+  in several ways ("#Life", "#life") shows as most of its Notes write it.
+</p>
+<p>
+  Typing "#" into the search of the Areas list shows the tags that start with what is typed as
+  buttons under the field, at most twelve; a tap fills one in, so a tag is found without knowing
+  its exact spelling. While a locked Area is closed, neither <strong>Tags</strong> nor these
+  buttons show, as the tree is read from every Note.
+</p>
+<p>
+  The desktop app has no tag tree yet. Its search for "#life" finds every Note with a tag below it,
+  as on the phone.
 </p>
 </box-more>
 </guide-box>
@@ -418,6 +454,56 @@
 </box-more>
 </guide-box>
 
+<guide-box name="attachment">
+<h2>Attach a file to a Note</h2>
+<p>Keep a letter, a contract or any other file with the Note it belongs to.</p>
+<box-tab device="phone" alt="The card of the lease, its file Lease 2026.pdf with its size and pages, and its Attachment Text under it">
+<li>Tap <strong>+</strong> on the Agenda.</li>
+<li>Tap <strong>File</strong>.</li>
+<li>Pick one or more files.</li>
+<li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
+<li>Tap the file on its card to open it.</li>
+</box-tab>
+<box-tab device="desktop" alt="All Notes searched for a word, the Notes holding it found">
+<li>Attach the file on the phone.</li>
+<li>Sync the computer with the phone.</li>
+<li>Press Ctrl+F.</li>
+<li>Type a word of the file's text.</li>
+</box-tab>
+<box-more>
+<p>
+  Any file can be attached: a PDF, a Word document, a spreadsheet, a <code>.zip</code>. It is kept
+  as it is, with its name, type and size, on all your Devices and with everyone you share the Note's
+  Area with. Besides <strong>File</strong> in Capture and in the fan of <strong>+</strong>, a file
+  comes in by sharing it from another app to Old Brain Fix, and by <strong>Attach a file</strong>
+  in the Note editor's bar. A file larger than 256 MB is not attached, and the app says so at the
+  top. A Note made from one file alone shows the file as its card and goes by its name, also in
+  alarms. A tap on a file opens it with the app of the phone that opens that kind; one that has not
+  synced to the phone yet, or that no app opens, is said at the top.
+</p>
+<p>
+  The text of a file is read out where its format allows: a PDF's own text and, through the same
+  text recognition as for photos, its scanned pages; <code>.docx</code>, <code>.odt</code>,
+  <code>.xlsx</code> and <code>.ods</code> files; plain text and Markdown. This Attachment Text shows
+  dimmed under the file, under the words "Attachment Text", and the search finds it and the file's
+  name. The phone reads a PDF of up to ten pages and other files up to 10 MB itself, in the
+  background. A longer PDF, or a larger file, is left to your computer: until it has read the file
+  and the text has synced back, the phone shows "The text follows from the computer." Other files,
+  such as a <code>.zip</code>, have no text.
+</p>
+<p>
+  In the Note editor, under each file: <strong>Replace Note text</strong> and <strong>Append to Note
+  text</strong> take its text in, <strong>Remove generated text</strong> removes the text (the
+  announcement at the top brings it back), <strong>Read the text again</strong> reads it anew, and
+  <strong>Remove Attachment, keep text</strong> asks once and removes the file from all your Devices
+  while its text stays. The card's ⋮ offers the last too.
+</p>
+<p>
+  The desktop app does not show Attachments yet; its search already finds their names and texts.
+</p>
+</box-more>
+</guide-box>
+
 <guide-box name="generated">
 <h2>Use or remove a Transcript or Photo Text</h2>
 <p>Take a Transcript or Photo Text into the Note's text, or remove it.</p>
@@ -471,7 +557,8 @@
 <p>
   The notes browser has a search field on every level: "Search all Notes" on the Areas list,
   "Search this Area" and "Search this Topic" below it. The search finds what is typed in any case,
-  in a Note's text and its Sections, its Transcripts and Photo Texts, the text lines of its Tally's
+  in a Note's text and its Sections, its Transcripts and Photo Texts, the names and Attachment Texts
+  of its files, the text lines of its Tally's
   entries and the Lines of its Checklist or Shopping List. A formatted text is searched as it reads:
   "bold" finds "**bold**", and the Markdown marks are found nowhere. A removed Transcript or Photo
   Text is no longer found.

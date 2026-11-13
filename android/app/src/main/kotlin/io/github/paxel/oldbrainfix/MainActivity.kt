@@ -38,6 +38,9 @@ class MainActivity : FlutterActivity() {
     /** The answer to Capture's "pick", until the gallery comes back. */
     private var galleryAnswer: MethodChannel.Result? = null
 
+    /** The answer to the file picker's "pick" (#267), until it comes back. */
+    private var filesAnswer: MethodChannel.Result? = null
+
     /** The answer to the Profile's "pick", until the picture picker comes back. */
     private var pictureAnswer: MethodChannel.Result? = null
 
@@ -404,6 +407,21 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILES_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                when (call.method) {
+                    "pick" -> pickFiles(result)
+                    "open" -> result.success(
+                        Files.open(this, args["path"] as? String ?: "", args["type"] as? String ?: ""),
+                    )
+                    "pdfPages" -> inBackground(result) { Files.pdfPages(call.arguments as? String ?: "") }
+                    "pdfPage" -> inBackground(result) {
+                        Files.pdfPage(args["path"] as? String ?: "", (args["index"] as? Number)?.toInt() ?: -1)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OCR_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -693,6 +711,26 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
+     * Opens the system's file picker for Attachments (#267), several files
+     * of any kind at once, which needs no storage permission; they come
+     * back copied with their names and types in [onActivityResult].
+     */
+    private fun pickFiles(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_FILES)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(emptyList<Map<String, String?>>())
+        }
+        filesAnswer?.success(emptyList<Map<String, String?>>())
+        filesAnswer = result
+    }
+
+    /**
      * Lets the user pick a speech model file of their own with the
      * system's file picker, which needs no storage permission, and copies
      * it to the side; answers its SHA-256, or null when none was picked.
@@ -894,6 +932,29 @@ class MainActivity : FlutterActivity() {
             return inBackground(answer) {
                 uris.mapNotNull { uri -> Photos.normalize { contentResolver.openInputStream(uri) } }
             }
+        }
+        if (requestCode == REQUEST_FILES) {
+            val answer = filesAnswer
+            filesAnswer = null
+            val clips = data?.clipData
+            val uris = Photos.picked(
+                resultCode == Activity.RESULT_OK,
+                clips?.let { (0 until it.itemCount).mapNotNull { i -> it.getItemAt(i).uri } },
+                data?.data,
+            )
+            if (answer == null) {
+                // The app was gone while the picker was open: the files
+                // still reach a Note, through Capture like a share.
+                if (uris.isNotEmpty()) {
+                    Thread {
+                        Shares.keepPickedFiles(this, uris)
+                        runOnUiThread { photoChannel?.invokeMethod("shared", null) }
+                    }.start()
+                }
+                return
+            }
+            if (uris.isEmpty()) return answer.success(emptyList<Map<String, String?>>())
+            return inBackground(answer) { Files.handed(Files.copy(this, uris)) }
         }
         if (requestCode == REQUEST_MODEL) {
             val answer = modelAnswer ?: return
@@ -1098,6 +1159,7 @@ class MainActivity : FlutterActivity() {
         private const val SHORTCUTS_CHANNEL = "io.github.paxel.oldbrainfix/shortcuts"
         private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
+        private const val FILES_CHANNEL = "io.github.paxel.oldbrainfix/files"
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val EXIT_CHANNEL = "io.github.paxel.oldbrainfix/exit"
@@ -1114,6 +1176,7 @@ class MainActivity : FlutterActivity() {
         private const val REQUEST_BUNDLE = 6
         private const val REQUEST_PICTURE = 7
         private const val REQUEST_GALLERY = 8
+        private const val REQUEST_FILES = 16
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12

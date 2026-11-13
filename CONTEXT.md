@@ -39,7 +39,7 @@ The act of creating a Note through one of the quick entry points (the "+" button
 _Avoid_: quick add, record
 
 **Quick note**:
-The text capture screen, and on the desktop the quick note dialog of the window (File ▸ New Note, Ctrl+N, "+") and the capture popup: the text, Photo, Voice, Gallery and Paste (on the desktop Record voice, Paste and From file…), the Nudge buttons, "To full editor", which saves the Note Unsorted and opens it in the Note editor, on the desktop the Note dialog, and the alarm clock, whose menu sets up a Routine or Reminder saved with the Note (#223). What else sorts the Note (File into…, Frog, Session or Tally, Add to a Shopping List, the Importance) and the format bar show only where the Device's settings switch them on; the Nudge buttons can be switched off for a single Save. German: Schnellnotiz.
+The text capture screen, and on the desktop the quick note dialog of the window (File ▸ New Note, Ctrl+N, "+") and the capture popup: the text, Photo, Voice, Gallery, Paste and File (on the desktop Record voice, Paste and From file…), the Nudge buttons, "To full editor", which saves the Note Unsorted and opens it in the Note editor, on the desktop the Note dialog, and the alarm clock, whose menu sets up a Routine or Reminder saved with the Note (#223). What else sorts the Note (File into…, Frog, Session or Tally, Add to a Shopping List, the Importance) and the format bar show only where the Device's settings switch them on; the Nudge buttons can be switched off for a single Save. German: Schnellnotiz.
 _Avoid_: quick add
 
 **Capture Context**:

@@ -12,6 +12,7 @@ import 'browser.dart';
 import 'browser_add.dart';
 import 'file_into_screen.dart';
 import 'frogs_screen.dart';
+import 'hidden_from_ai_view.dart';
 import 'home_pages.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -27,6 +28,7 @@ import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'share_area_screen.dart';
 import 'system_bars.dart';
+import 'tag_tree_screen.dart';
 import 'text_marks_view.dart';
 import 'trash_screen.dart';
 
@@ -72,6 +74,9 @@ class _AreasScreenState extends State<AreasScreen>
   /// ones (ADR 0013).
   Map<String, AreaAccess> _access = const {};
   Map<String, List<Person>> _people = const {};
+
+  /// The marks Hidden from AI, of Areas and Notes alike (#267).
+  Set<String> _hidden = const {};
 
   /// The name each person's Profile shows, by Profile id.
   Map<String, String> _names = const {};
@@ -130,6 +135,7 @@ class _AreasScreenState extends State<AreasScreen>
     final store = widget.places.store;
     _areas = store.areasInOrder(shown: _shown);
     _access = {for (final a in _areas) a.id: store.accessIn(a.id)};
+    _hidden = store.hiddenFromAiMarks();
     _people = {
       for (final a in _areas)
         if (store.isShared(a.id)) a.id: store.people(a.id),
@@ -250,6 +256,27 @@ class _AreasScreenState extends State<AreasScreen>
     _reload();
   }
 
+  /// Opens the tag tree; a tag tapped there is searched for here.
+  Future<void> _openTags() async {
+    final tag = await Navigator.of(context).push(
+      MaterialPageRoute<String>(
+        builder: (_) => TagTreeScreen(store: widget.places.store),
+      ),
+    );
+    if (!mounted) return;
+    if (tag == null) return _reload();
+    _searchTag(context, tag);
+  }
+
+  /// The row below the Areas that opens the tag tree (#267, Q623).
+  Widget _tagsRow(AppLocalizations t) => _PlaceRow(
+    key: const ValueKey('tags-row'),
+    title: t.tagsTitle,
+    leading: const Icon(Icons.tag),
+    onTap: _openTags,
+    menu: null,
+  );
+
   Future<void> _openTrash() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -314,6 +341,18 @@ class _AreasScreenState extends State<AreasScreen>
         if (!mounted || go == null) return;
         widget.places.deleteArea(area.id, go);
       case _AreaAction.share:
+        // Nothing Hidden from AI goes to anyone (#267): asked before how.
+        final store = widget.places.store;
+        if (!_people.containsKey(area.id) &&
+            !await showToAiFirst(
+              context,
+              store,
+              store.hiddenFromAiIn(area.id),
+              area: area.id,
+            )) {
+          return;
+        }
+        if (!mounted) return;
         await Navigator.of(context).push(
           MaterialPageRoute<bool>(
             builder: (_) =>
@@ -332,6 +371,8 @@ class _AreasScreenState extends State<AreasScreen>
           ),
         );
         if (!mounted) return;
+      case _AreaAction.hideFromAi:
+        hiddenFromAiEntry(widget.places.store, area.id, () {})?.toggle();
     }
     _reload();
   }
@@ -354,6 +395,7 @@ class _AreasScreenState extends State<AreasScreen>
           leading: _AreaMark(area: area),
           locked: lock?.isAreaClosed(area.id) ?? false,
           shared: _people.containsKey(area.id),
+          hiddenFromAi: _hidden.contains(area.id),
           highlighted: area.id == last,
           onTap: () => _open(area),
           menu: _areaMenu(t, area),
@@ -404,6 +446,17 @@ class _AreasScreenState extends State<AreasScreen>
         ),
         if (shared)
           PopupMenuItem(value: _AreaAction.people, child: Text(t.peopleTitle)),
+        // Read as the menu opens: a sync may have shared it meanwhile.
+        if (hiddenFromAiEntry(widget.places.store, area.id, () {}) case (
+          :final on,
+          toggle: _,
+        ))
+          hiddenFromAiMenuItem(
+            context,
+            key: ValueKey('area-hidden-from-ai-${area.id}'),
+            value: _AreaAction.hideFromAi,
+            on: on,
+          ),
         if (manages)
           PopupMenuItem(value: _AreaAction.delete, child: Text(t.delete)),
       ],
@@ -414,6 +467,10 @@ class _AreasScreenState extends State<AreasScreen>
   Widget build(BuildContext context) {
     final t = context.t;
     final searching = _query.text.trim().isNotEmpty;
+    // The tag tree reads every Note, a closed locked Area's too: it waits
+    // while one is closed, as its Notes do (#267).
+    final lock = LockScope.of(context);
+    final tagsShown = !_areas.any((a) => lock?.isAreaClosed(a.id) ?? false);
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       onForward: _forward,
@@ -475,6 +532,7 @@ class _AreasScreenState extends State<AreasScreen>
                   controller: _query,
                   hint: t.searchAllHint,
                   onChanged: _searched,
+                  tags: tagsShown ? widget.places.store : null,
                 ),
                 if (searching)
                   PersonFilterChips(
@@ -507,7 +565,7 @@ class _AreasScreenState extends State<AreasScreen>
                                   selected: selecting ? selected : null,
                                   onSelect: setSelected,
                                 )
-                              : _areaRows(t),
+                              : [..._areaRows(t), if (tagsShown) _tagsRow(t)],
                         )
                       // The Areas move by their handles only: a long
                       // press never changes data (#280).
@@ -518,6 +576,7 @@ class _AreasScreenState extends State<AreasScreen>
                           ),
                           buildDefaultDragHandles: false,
                           onReorderItem: _moved,
+                          footer: tagsShown ? _tagsRow(t) : null,
                           children: _areaRows(t),
                         ),
                 ),
@@ -535,7 +594,7 @@ class _AreasScreenState extends State<AreasScreen>
   }
 }
 
-enum _AreaAction { rename, look, share, pack, people, delete }
+enum _AreaAction { rename, look, share, pack, people, hideFromAi, delete }
 
 enum _TopicAction { rename, pack, delete }
 
@@ -1253,9 +1312,13 @@ Future<bool> fileNote(
       builder: (_) => FileIntoScreen(places: places, current: note.place),
     ),
   );
-  if (placeId == null) return false;
-  notes.file(note.id, placeId);
-  return true;
+  if (placeId == null || !context.mounted) return false;
+  // Nothing Hidden from AI goes into a Shared Area (#267).
+  final filed = await unlessHiddenFromAi(context, notes.store, () {
+    notes.file(note.id, placeId);
+    return true;
+  });
+  return filed ?? false;
 }
 
 /// An Area's icon in its colour, or a plain dot of its colour, or a
@@ -1311,6 +1374,9 @@ class _PlaceRow extends StatelessWidget {
   /// A Shared Area: two people say so.
   final bool shared;
 
+  /// An Area Hidden from AI (#267): a shield says so.
+  final bool hiddenFromAi;
+
   const _PlaceRow({
     super.key,
     required this.title,
@@ -1322,6 +1388,7 @@ class _PlaceRow extends StatelessWidget {
     this.highlighted = false,
     this.locked = false,
     this.shared = false,
+    this.hiddenFromAi = false,
   });
 
   @override
@@ -1373,6 +1440,7 @@ class _PlaceRow extends StatelessWidget {
                       Icons.people_outline,
                       semanticLabel: context.t.areaShared,
                     ),
+                  if (hiddenFromAi) const HiddenFromAiMark(),
                   if (locked)
                     Icon(
                       Icons.lock_outline,

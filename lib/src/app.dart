@@ -12,6 +12,8 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_links.dart';
+import 'attachment_reader.dart';
+import 'attachment_views.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
 import 'areas_screen.dart';
@@ -26,6 +28,7 @@ import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'file_platform.dart';
 import 'failure_dialog.dart';
 import 'first_start_screen.dart';
 import 'folder_platform.dart';
@@ -90,6 +93,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// The Device's camera and what other apps share in; none when not
   /// given.
   final PhotoPlatform photos;
+
+  /// The Device's file picker, the system's apps that open a file, and
+  /// the PDF reader of the native library (#267); none when not given.
+  final FilePlatform files;
 
   /// The Device's microphone and playback of voice recordings; none when
   /// not given.
@@ -187,6 +194,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.location = const NoLocation(),
     this.alarms = const NoAlarms(),
     this.photos = const NoPhotos(),
+    this.files = const NoFiles(),
     this.voice = const NoVoice(),
     this.context = const NoContext(),
     this.requests = const NoCaptureRequests(),
@@ -256,6 +264,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
+  late final AttachmentReader _attachmentReader;
   late final _profile = OwnProfileModel(
     store: widget.store,
     platform: widget.profile,
@@ -282,6 +291,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     unawaited(_speechModel.check());
     // Photo Texts come in the background too, never holding Capture up.
     _photoReader = PhotoReader(notes: _notes, platform: widget.ocr);
+    // And Attachment Texts, the PDFs' scans through the same OCR (#267).
+    _attachmentReader = AttachmentReader(
+      notes: _notes,
+      files: widget.files,
+      ocr: widget.ocr,
+    );
     // The own Profile from the phone's name, asking nothing; on the first
     // start only once it is past its first screen (ADR 0017), so a Device
     // being added takes the Profile of the user's other Devices.
@@ -297,6 +312,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _transcriber.dispose();
     _speechModel.dispose();
     _photoReader.dispose();
+    _attachmentReader.dispose();
     _lock.dispose();
     _profile.dispose();
     _pager.dispose();
@@ -381,41 +397,51 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                           transcriber: _transcriber,
                           child: PhotoReaderScope(
                             reader: _photoReader,
-                            child: CalendarScope(
-                              calendar: widget.calendar,
-                              child: CalendarMirrorScope(
-                                mirror: _mirror,
-                                child: AppointmentScope(
-                                  source: widget.appointments,
-                                  child: DraftsScope(
-                                    drafts: _drafts,
-                                    child: LockScope(
-                                      lock: _lock,
-                                      child: PairingScope(
-                                        pairing: widget.pairing,
-                                        child: AutoSyncScope(
-                                          sync: _autoSync,
-                                          child: FolderScope(
-                                            folders: widget.folders,
-                                            child: BundleScope(
-                                              bundles: widget.bundles,
-                                              child: PersonScope(
-                                                store: widget.store,
-                                                platform: widget.profile,
-                                                onChangesSent: _alarms.replan,
-                                                child: TagSearchScope(
-                                                  onSearch: _searchTag,
-                                                  child: AppLinkScope(
-                                                    onOpen: _links.open,
-                                                    onPick: _pickLink,
-                                                    child: AlarmSyncScope(
-                                                      alarms: _alarms,
-                                                      child: HomeShortcutsScope(
-                                                        shortcuts:
-                                                            widget.shortcuts,
-                                                        child:
-                                                            child ??
-                                                            const SizedBox.shrink(),
+                            child: FileScope(
+                              files: widget.files,
+                              child: AttachmentReaderScope(
+                                reader: _attachmentReader,
+                                child: AttachmentScope(
+                                  notes: _notes,
+                                  child: CalendarScope(
+                                    calendar: widget.calendar,
+                                    child: CalendarMirrorScope(
+                                      mirror: _mirror,
+                                      child: AppointmentScope(
+                                        source: widget.appointments,
+                                        child: DraftsScope(
+                                          drafts: _drafts,
+                                          child: LockScope(
+                                            lock: _lock,
+                                            child: PairingScope(
+                                              pairing: widget.pairing,
+                                              child: AutoSyncScope(
+                                                sync: _autoSync,
+                                                child: FolderScope(
+                                                  folders: widget.folders,
+                                                  child: BundleScope(
+                                                    bundles: widget.bundles,
+                                                    child: PersonScope(
+                                                      store: widget.store,
+                                                      platform: widget.profile,
+                                                      onChangesSent:
+                                                          _alarms.replan,
+                                                      child: TagSearchScope(
+                                                        onSearch: _searchTag,
+                                                        child: AppLinkScope(
+                                                          onOpen: _links.open,
+                                                          onPick: _pickLink,
+                                                          child: AlarmSyncScope(
+                                                            alarms: _alarms,
+                                                            child: HomeShortcutsScope(
+                                                              shortcuts: widget
+                                                                  .shortcuts,
+                                                              child:
+                                                                  child ??
+                                                                  const SizedBox.shrink(),
+                                                            ),
+                                                          ),
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
@@ -936,6 +962,7 @@ class _HomeState extends State<_Home> {
       photo: way == CaptureWay.photo,
       gallery: way == CaptureWay.gallery,
       paste: way == CaptureWay.paste,
+      file: way == CaptureWay.file,
       onChanged: () {},
     ),
   );

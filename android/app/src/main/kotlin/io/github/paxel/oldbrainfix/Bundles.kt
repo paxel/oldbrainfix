@@ -55,8 +55,14 @@ object Bundles {
     /** Keeps the bundle [intent] opens or sends, to be taken by the app. */
     fun receive(context: Context, intent: Intent) {
         val uri = uriOf(intent) ?: return
-        val path = copy(context, uri) ?: return
+        keep(context, uri)
+    }
+
+    /** Keeps the bundle at [uri], to be taken by the app; whether it could be read. */
+    fun keep(context: Context, uri: Uri): Boolean {
+        val path = copy(context, uri) ?: return false
         synchronized(waiting) { waiting.addLast(path) }
+        return true
     }
 
     /** The bundle an "open with" ([Intent.ACTION_VIEW]) or a share names. */

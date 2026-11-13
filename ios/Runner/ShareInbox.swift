@@ -103,17 +103,30 @@ enum ShareInbox {
   }
 
   /// One share taken out of the inbox: its subject, its text, links
-  /// included, and the bytes of its pictures as they were shared.
+  /// included, the bytes of its pictures as they were shared, and its
+  /// other files as Attachments (#267), moved to where Dart attaches them.
   struct Taken: Equatable {
     var subject: String?
     var text: String
     var photos: [Data]
+    var files: [TakenFile] = []
   }
 
-  /// Takes the oldest share with text or pictures out of [inbox]; its
-  /// files of the app's own types stay for [takeFiles]. Nil when none
-  /// waits.
-  static func takeShare(from inbox: URL, _ files: FileManager = .default) -> Taken? {
+  /// A file of a share for an Attachment: where it lies now, the name it
+  /// was shared under and its MIME type, empty when not known.
+  struct TakenFile: Equatable {
+    var path: String
+    var name: String
+    var type: String
+  }
+
+  /// Takes the oldest share with text, pictures or other files out of
+  /// [inbox], those files moved into [attachments] when it is given and
+  /// let go of otherwise; its files of the app's own types stay for
+  /// [takeFiles]. Nil when none waits.
+  static func takeShare(
+    from inbox: URL, attachments destination: URL? = nil, _ files: FileManager = .default
+  ) -> Taken? {
     for folder in folders(in: inbox, files) {
       guard var manifest = readManifest(in: folder) else {
         try? files.removeItem(at: folder)
@@ -124,13 +137,30 @@ enum ShareInbox {
         guard let file = inside(folder, name) else { return nil }
         return try? Data(contentsOf: file)
       }
-      let taken = Taken(subject: manifest.subject, text: manifest.text, photos: photos)
+      var moved: [TakenFile] = []
+      if let destination {
+        try? files.createDirectory(at: destination, withIntermediateDirectories: true)
+      }
+      for shared in manifest.attachments ?? [] {
+        guard let file = inside(folder, shared.file) else { continue }
+        guard let destination else {
+          try? files.removeItem(at: file)
+          continue
+        }
+        let target = destination.appendingPathComponent(UUID().uuidString)
+        if (try? files.moveItem(at: file, to: target)) != nil {
+          moved.append(TakenFile(path: target.path, name: shared.name, type: shared.type))
+        }
+      }
+      let taken = Taken(
+        subject: manifest.subject, text: manifest.text, photos: photos, files: moved)
       for name in manifest.photos {
         if let file = inside(folder, name) { try? files.removeItem(at: file) }
       }
       manifest.subject = nil
       manifest.texts = []
       manifest.photos = []
+      manifest.attachments = nil
       keep(manifest, in: folder, files)
       return taken
     }
@@ -200,19 +230,21 @@ enum ShareInbox {
 
 /// One share as the extension wrote it: its subject (the sharing app's
 /// title), its texts and links in the order shared, and the names of
-/// its files in the share's folder, pictures and the app's own files
-/// apart.
+/// its files in the share's folder, pictures, the app's own files and
+/// any other files (#267) apart. An older app reading it ignores the
+/// other files; one written by an older extension has none.
 struct ShareManifest: Codable, Equatable {
   var version = 1
   var subject: String?
   var texts: [String] = []
   var photos: [String] = []
   var files: [String] = []
+  var attachments: [SharedAttachment]?
 
-  /// Whether there is text or a picture for Capture.
+  /// Whether there is text, a picture or another file for Capture.
   var hasShare: Bool {
     !(subject ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !text.isEmpty
-      || !photos.isEmpty
+      || !photos.isEmpty || !(attachments ?? []).isEmpty
   }
 
   var isEmpty: Bool { !hasShare && files.isEmpty }
@@ -248,6 +280,15 @@ struct ShareManifest: Codable, Equatable {
   }
 }
 
+/// A file shared for an Attachment (#267): its [file] in the share's
+/// folder, the [name] it was shared under and its MIME [type], empty
+/// when not known.
+struct SharedAttachment: Codable, Equatable {
+  var file: String
+  var name: String
+  var type: String
+}
+
 /// What one shared attachment is to the app.
 enum ShareKind: Equatable {
   /// A file of one of the app's own types: a bundle, Sent Item, Profile
@@ -259,6 +300,8 @@ enum ShareKind: Equatable {
   case link
   /// Plain text.
   case text
+  /// Any other file, kept as an Attachment of the Note (#267).
+  case attachment
 }
 
 /// The app's own document types: the UTIs the Runner's Info.plist
@@ -283,7 +326,8 @@ enum ShareTypes {
   /// What an attachment registered as [identifiers], suggesting the
   /// name [name], is to the app; the type to load it as; nil for what
   /// the app does not take. The app's own files go first, then
-  /// pictures, links and text; a file of any other type is not taken.
+  /// pictures, links and text; a file of any other type is an
+  /// Attachment (#267).
   static func kind(of identifiers: [String], name: String? = nil) -> (ShareKind, String)? {
     for id in identifiers {
       if let ext = documentExtension(uti: id, name: nil) { return (.file(ext: ext), id) }
@@ -302,6 +346,9 @@ enum ShareTypes {
     }
     if let match = types.first(where: { $0.type.conforms(to: .plainText) }) {
       return (.text, match.id)
+    }
+    if let match = types.first(where: { $0.type.conforms(to: .data) }) {
+      return (.attachment, match.id)
     }
     return nil
   }

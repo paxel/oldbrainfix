@@ -112,13 +112,16 @@ class SessionDraft {
   ];
 
   /// The Tallies of [order] the picker shows: with a [filter] those
-  /// carrying any of its tags, else all.
+  /// carrying any of its tags or a tag nested under one (#267: `#sport`
+  /// shows `#sport/run`), else all.
   List<String> get shown {
     final filter = this.filter;
     if (filter.isEmpty) return order;
+    bool under(String tag) =>
+        filter.any((f) => tag == f || tag.startsWith('$f/'));
     return [
       for (final id in order)
-        if (tagsOf(id).any(filter.contains)) id,
+        if (tagsOf(id).any(under)) id,
     ];
   }
 

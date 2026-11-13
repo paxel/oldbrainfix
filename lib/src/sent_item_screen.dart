@@ -9,6 +9,7 @@ import 'announcements.dart';
 import 'bundle_platform.dart';
 import 'checklist_view.dart';
 import 'failure_dialog.dart';
+import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
 import 'pack_screen.dart';
@@ -45,6 +46,11 @@ Future<void> sendNoteFile(
     fix: fix,
     details: details,
   );
+  // A Note Hidden from AI goes to nobody (#267): asked before whom.
+  if (!await showToAiFirst(context, store, store.hiddenFromAiBy(noteId)) ||
+      !context.mounted) {
+    return;
+  }
   final picked = await showDialog<_Pick>(
     context: context,
     builder: (_) => SendNoteDialog(
@@ -63,9 +69,15 @@ Future<void> sendNoteFile(
     );
     return;
   }
-  File(path).writeAsBytesSync(
-    sendNote(store, noteId, to: picked.to, cancel: picked.cancel),
+  if (!context.mounted) return;
+  // Marked meanwhile, as by a sync: asked again.
+  final bytes = await unlessHiddenFromAi(
+    context,
+    store,
+    () => sendNote(store, noteId, to: picked.to, cancel: picked.cancel),
   );
+  if (bytes == null) return;
+  File(path).writeAsBytesSync(bytes);
   if (await files.share(path, type: sentItemMimeType) == ShareOutcome.noApp) {
     notSent(t.sendNoApp, t.sendNoAppFix, 'sent item: no app took the file');
   }

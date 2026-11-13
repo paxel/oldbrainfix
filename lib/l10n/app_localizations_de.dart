@@ -5036,7 +5036,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, „Zum vollen Editor“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, Datei, „Zum vollen Editor“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';
@@ -6037,4 +6037,155 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get backupAddDamagedFix =>
       'Nichts wurde hinzugefügt; öffne die Sicherung noch einmal.';
+
+  @override
+  String get tagsTitle => '#Wörter';
+
+  @override
+  String get tagsNone =>
+      'Noch keine #Wörter. Ein Wort mit # davor in einer Notiz, etwa #garten oder #leben/gesundheit, erscheint hier.';
+
+  @override
+  String tagNotes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen',
+      one: '1 Notiz',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get tagUnfold => '#Wörter darunter zeigen';
+
+  @override
+  String get tagFold => '#Wörter darunter ausblenden';
+
+  @override
+  String get hiddenFromAi => 'Vor KI verborgen';
+
+  @override
+  String get hiddenFromAiByArea => 'Aus, über ihren Bereich verborgen';
+
+  @override
+  String get hiddenFromAiRefusedTitle => 'Vor KI verborgen';
+
+  @override
+  String hiddenFromAiRefusedBody(String names) {
+    return '$names: vor KI verborgen. Was vor KI verborgen ist, geht an niemanden sonst. Zeige es zuerst der KI.';
+  }
+
+  @override
+  String get hiddenFromAiShow => 'Der KI zeigen';
+
+  @override
+  String get file => 'Datei';
+
+  @override
+  String get attachFile => 'Datei anhängen';
+
+  @override
+  String get attachmentTextLabel => 'Anhangtext';
+
+  @override
+  String get attachmentTextFromComputer => 'Der Text folgt vom Computer.';
+
+  @override
+  String attachmentPages(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Seiten',
+      one: '1 Seite',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String openFile(String name) {
+    return '$name öffnen';
+  }
+
+  @override
+  String get fileNotOpened => 'Ein Anhang wurde nicht geöffnet.';
+
+  @override
+  String get fileNotOpenedTitle => 'Anhang nicht geöffnet';
+
+  @override
+  String get fileNotHereCause => 'Der Anhang ist noch nicht auf diesem Gerät.';
+
+  @override
+  String get fileNotHereFix =>
+      'Er kommt mit dem nächsten Synchronisieren; nichts geht verloren.';
+
+  @override
+  String get fileNoAppCause =>
+      'Keine App auf diesem Gerät öffnet Dateien dieser Art.';
+
+  @override
+  String get fileNoAppFix =>
+      'Installiere eine App dafür, oder öffne den Anhang am Computer.';
+
+  @override
+  String get fileNotAttached => 'Eine Datei wurde nicht angehängt.';
+
+  @override
+  String get fileNotAttachedTitle => 'Datei nicht angehängt';
+
+  @override
+  String get fileTooLargeCause =>
+      'Sie ist größer als 256 MB, das Höchste für eine Datei.';
+
+  @override
+  String get fileUnreadableCause =>
+      'Sie ließ sich auf diesem Gerät nicht lesen.';
+
+  @override
+  String get fileNotAttachedFix =>
+      'Nichts wurde geschrieben; die Datei liegt noch, wo sie war.';
+
+  @override
+  String get removeFileKeepText => 'Anhang entfernen, Text behalten';
+
+  @override
+  String get removeFileQuestion =>
+      'Diesen Anhang entfernen und seinen Anhangtext behalten?';
+
+  @override
+  String get undoAttachmentTextRemoved => 'Anhangtext entfernt';
+
+  @override
+  String get fileReadAgainFailed =>
+      'Der Text eines Anhangs konnte nicht gelesen werden.';
+
+  @override
+  String get fileReadAgainFailedTitle => 'Anhang nicht gelesen';
+
+  @override
+  String get fileReadAgainCause =>
+      'Dieser Anhang ließ sich auf diesem Gerät nicht lesen.';
+
+  @override
+  String get attachment => 'Anhang';
+
+  @override
+  String hiddenFromAiAreaFirst(String names) {
+    return '$names: vor KI verborgen. Eine Notiz in einem Bereich, der vor KI verborgen ist, geht an niemanden sonst. Nimm die Markierung zuerst im Menü des Bereichs in der Bereichsliste ab.';
+  }
+
+  @override
+  String get captureNotFiledHidden => 'Eine Notiz wurde nicht abgelegt.';
+
+  @override
+  String get captureNotFiledHiddenTitle => 'Notiz nicht abgelegt';
+
+  @override
+  String get captureNotFiledHiddenCause =>
+      'Sie ist vor KI verborgen, und was vor KI verborgen ist, kommt in keinen geteilten Bereich.';
+
+  @override
+  String get captureNotFiledHiddenFix =>
+      'Sie bleibt, wo sie war; nimm die Markierung ab und lege sie dann ab.';
 }

@@ -6,10 +6,12 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'area_look.dart';
+import 'attachment_views.dart';
 import 'calendar_platform.dart';
 import 'card_occurrences.dart';
 import 'checklist_view.dart';
 import 'frogs_screen.dart' show FrogIcon;
+import 'hidden_from_ai_view.dart';
 import 'iphone_words.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -98,11 +100,14 @@ String? whereCaptured(CaptureContext capture) =>
 /// events as one calendar file when there are any.
 typedef NoteCalendar = ({List<CalendarChoice> add, CalendarChoice? file});
 
-/// A photo ([photo]) or voice recording [hash] a card's ⋮ menu offers
-/// to remove while its [text] stays, shown to tell several apart; [run]
-/// asks once and removes it (ADR 0020).
+/// What a card's ⋮ menu offers to remove while its text stays.
+enum RemovedMedia { photo, recording, file }
+
+/// A photo, voice recording or Attachment (#267) [hash] of [kind] a
+/// card's ⋮ menu offers to remove while its [text] stays, shown to tell
+/// several apart; [run] asks once and removes it (ADR 0020).
 typedef MediaRemoval = ({
-  bool photo,
+  RemovedMedia kind,
   String hash,
   String text,
   VoidCallback run,
@@ -179,6 +184,11 @@ class NoteActions {
   /// while it is null or gives null, as for a Note without boxes.
   final ({bool on, VoidCallback toggle})? Function()? showTicks;
 
+  /// Whether the Note is marked Hidden from AI and switching the mark,
+  /// read as the menu opens (#267, [hiddenFromAiEntry]); left out while
+  /// it is null or gives null, as in a Shared Area.
+  final ({bool on, VoidCallback toggle})? Function()? hideFromAi;
+
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
 
@@ -205,6 +215,7 @@ class NoteActions {
     this.checklist,
     this.addToShopping,
     this.showTicks,
+    this.hideFromAi,
     this.onDelete,
     this.advanced = true,
   });
@@ -356,6 +367,11 @@ class NoteCard extends StatelessWidget {
   final ValueChanged<bool>? onSelect;
   final bool selected;
 
+  /// Whether the Note is Hidden from AI, by its own mark or another's,
+  /// such as its Area's (#267): a shield beside the Important marker
+  /// says so.
+  final bool hiddenFromAi;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -394,6 +410,7 @@ class NoteCard extends StatelessWidget {
     this.occurrences,
     this.onSelect,
     this.selected = false,
+    this.hiddenFromAi = false,
   });
 
   /// Where the first line with words of [text] starts and ends, without
@@ -528,13 +545,22 @@ class NoteCard extends StatelessWidget {
     // Its time and place show under the text of the detailed view (#170):
     // with no Profile or place over the text it has no header.
     final headed = author != null || place != null || actions?.packFrom != null;
-    final marker = important
+    final importantMark = important
         ? Icon(
             Icons.label_important,
             color: scheme.primary,
             semanticLabel: t.importanceImportant,
           )
         : null;
+    final hiddenMark = hiddenFromAi
+        ? const HiddenFromAiMark(key: ValueKey('note-hidden-from-ai-mark'))
+        : null;
+    final marker = hiddenMark == null
+        ? importantMark
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [?importantMark, hiddenMark],
+          );
     // Only a plain Note becomes a Session (ADR 0039), and no Code text
     // (#213); a Routine of a Session Note runs it already.
     final spawnsNow = switch (kind) {
@@ -855,6 +881,7 @@ class _MoreButton extends StatelessWidget {
         final list = actions.checklist?.call();
         final addToShopping = actions.addToShopping?.call();
         final ticks = actions.showTicks?.call();
+        final hidden = actions.hideFromAi?.call();
         final schedule = onSchedule;
         final spawns = schedule == null
             ? const <Spawn>[]
@@ -958,6 +985,13 @@ class _MoreButton extends StatelessWidget {
             const PopupMenuDivider(),
           ],
           if (ticks != null) showTicksItem(button, ticks),
+          if (hidden != null)
+            hiddenFromAiMenuItem(
+              button,
+              key: const ValueKey('note-hidden-from-ai'),
+              value: hidden.toggle,
+              on: hidden.on,
+            ),
           if (shares case [(final key, final icon, final label, final run)])
             item(key, icon, label, run)
           else if (shares.isNotEmpty)
@@ -1062,22 +1096,22 @@ class _MoreButton extends StatelessWidget {
               value: removal.run,
               child: Row(
                 children: [
-                  Icon(
-                    removal.photo
-                        ? Icons.hide_image_outlined
-                        : Icons.mic_off_outlined,
-                  ),
+                  Icon(switch (removal.kind) {
+                    RemovedMedia.photo => Icons.hide_image_outlined,
+                    RemovedMedia.recording => Icons.mic_off_outlined,
+                    RemovedMedia.file => Icons.link_off,
+                  }),
                   const SizedBox(width: 12),
                   Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          removal.photo
-                              ? t.removePhotoKeepText
-                              : t.removeRecordingKeepText,
-                        ),
+                        Text(switch (removal.kind) {
+                          RemovedMedia.photo => t.removePhotoKeepText,
+                          RemovedMedia.recording => t.removeRecordingKeepText,
+                          RemovedMedia.file => t.removeFileKeepText,
+                        }),
                         // Which one, when there are several.
                         Text(
                           removal.text.trim().split('\n').first,
@@ -1657,6 +1691,26 @@ class _CompactNoteState extends State<_CompactNote> {
               photoText: note.photoTexts[hash],
               compact: true,
             ),
+          // Its files (#267): one alone is the card, titled by its name.
+          for (final file in note.attachments) ...[
+            AttachmentRow(
+              key: ValueKey('file:${file.hash}'),
+              file: file,
+              large: note.aloneFile != null,
+            ),
+            AttachmentText(
+              file: file,
+              text: note.attachmentTexts[file.hash],
+              compact: true,
+            ),
+          ],
+          for (final file in note.removedAttachments)
+            AttachmentText(
+              key: ValueKey('fileText:${file.hash}'),
+              file: file,
+              text: note.attachmentTexts[file.hash],
+              compact: true,
+            ),
         ],
       ],
     );
@@ -1751,6 +1805,10 @@ class _FullNoteState extends State<_FullNote> {
           recordings: note.recordings,
           transcripts: note.transcripts,
           removedRecordings: note.removedRecordings,
+          files: note.attachments,
+          fileTexts: note.attachmentTexts,
+          removedFiles: note.removedAttachments,
+          aloneFile: note.aloneFile != null,
           list: widget.list,
           onTable: widget.onTable,
           named: _kind != NoteKind.plain,
@@ -1780,6 +1838,9 @@ class _FullNoteState extends State<_FullNote> {
                 recordings: section.recordings,
                 transcripts: section.transcripts,
                 removedRecordings: section.removedRecordings,
+                files: section.attachments,
+                fileTexts: section.attachmentTexts,
+                removedFiles: section.removedAttachments,
               ),
               const SizedBox(height: 8),
               CaptureLine.ofSection(
@@ -1819,6 +1880,13 @@ class _Whole extends StatelessWidget {
   final Map<String, String> transcripts;
   final List<String> removedRecordings;
 
+  /// Its files with their Attachment Texts, and those removed while their
+  /// texts stay (#267); [aloneFile] when its one file is the card.
+  final List<Attachment> files;
+  final Map<String, String> fileTexts;
+  final List<Attachment> removedFiles;
+  final bool aloneFile;
+
   /// A Checklist's Lines, right under the text.
   final Widget? list;
 
@@ -1844,6 +1912,10 @@ class _Whole extends StatelessWidget {
     required this.recordings,
     required this.transcripts,
     required this.removedRecordings,
+    this.files = const [],
+    this.fileTexts = const {},
+    this.removedFiles = const [],
+    this.aloneFile = false,
     this.list,
     this.ticking,
     this.onTable,
@@ -1932,6 +2004,26 @@ class _Whole extends StatelessWidget {
           noteId: id,
           hash: hash,
           transcript: transcripts[hash],
+          labelled: true,
+        ),
+      for (final file in files)
+        Column(
+          key: ValueKey('file:${file.hash}'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AttachmentRow(file: file, large: aloneFile),
+            AttachmentText(
+              file: file,
+              text: fileTexts[file.hash],
+              labelled: true,
+            ),
+          ],
+        ),
+      for (final file in removedFiles)
+        AttachmentText(
+          key: ValueKey('fileText:${file.hash}'),
+          file: file,
+          text: fileTexts[file.hash],
           labelled: true,
         ),
     ];

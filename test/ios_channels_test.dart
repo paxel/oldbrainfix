@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/calendar_platform.dart';
 import 'package:oldbrainfix/src/capture_requests.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/context_platform.dart';
+import 'package:oldbrainfix/src/file_platform.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/home_shortcuts.dart';
@@ -47,6 +48,7 @@ const channels = [
   'context',
   'device',
   'exit',
+  'files',
   'folder',
   'location',
   'lock',
@@ -101,6 +103,7 @@ void main() {
         location: const AndroidLocation(),
         alarms: alarms,
         photos: AndroidPhotos(),
+        files: const AndroidFiles(),
         voice: AndroidVoice(),
         context: const AndroidContext(),
         requests: AndroidCaptureRequests(),

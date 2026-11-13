@@ -41,6 +41,7 @@ import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/feedback_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
+import 'package:oldbrainfix/src/file_platform.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/frogs_screen.dart';
@@ -66,6 +67,7 @@ import 'package:oldbrainfix/src/speech_model_screen.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
+import 'package:oldbrainfix/src/tag_tree_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -335,6 +337,27 @@ const _de = (
 
 /// A store seeded with a believable household, work and car life in
 /// [texts], as of [_now].
+/// The file picker of a phone, as every frame shows its File button and
+/// entry (#267); nothing is ever picked in a frame.
+class _GuideFiles implements FilePlatform {
+  const _GuideFiles();
+
+  @override
+  bool get pickable => true;
+
+  @override
+  Future<List<DeviceFile>> pickFiles() async => const [];
+
+  @override
+  Future<bool> open(String path, String type) async => false;
+
+  @override
+  Future<int?> pdfPages(String path) async => null;
+
+  @override
+  Future<PdfPage?> pdfPage(String path, int index) async => null;
+}
+
 class _Seeded {
   final Store store;
   final Routine snack;
@@ -1004,6 +1027,7 @@ Future<AppLocalizations> _start(
         alarms: alarms ?? FakeAlarms(),
         voice: FakeVoice(),
         photos: FakePhotos(),
+        files: const _GuideFiles(),
         bundles: bundles,
         folders: folders,
         appointments: appointments,
@@ -2018,6 +2042,35 @@ void main() {
             await search(tester, texts.search);
           });
 
+          // The tag tree (#267): the seeded tags and a nested one,
+          // unfolded to its last level.
+          boxFrame(texts175, 'tag-tree', (tester) async {
+            final seeded = seed();
+            final notes = Notes(seeded.store);
+            final (life, health, back) = language == 'de'
+                ? ('leben', 'gesundheit', 'rücken')
+                : ('life', 'health', 'back');
+            notes
+              ..capture('#$life/$health/$back')
+              ..capture('#$life/$health')
+              ..capture(language == 'de' ? '#garten' : '#garden');
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(const ValueKey('tags-row')));
+            expect(find.byType(TagTreeScreen), findsOneWidget);
+            await _tap(tester, find.byKey(ValueKey('tree-open-#$life')));
+            await _tap(
+              tester,
+              find.byKey(ValueKey('tree-open-#$life/$health')),
+            );
+          });
+
           /// The Speech model page, opened from Settings.
           Future<void> speechModel(WidgetTester tester) async {
             final t = await _start(
@@ -2062,6 +2115,49 @@ void main() {
             await tester.pumpAndSettle();
             await tester.ensureVisible(receipt.first);
             await tester.pumpAndSettle();
+          });
+
+          // A Note of one PDF alone, as its card (#267): its name and
+          // size, and its Attachment Text under it.
+          boxFrame(texts175, 'attachment', (tester) async {
+            final seeded = seed();
+            final notes = Notes(seeded.store);
+            final household = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'household')
+                .id;
+            final lease = notes.capture(
+              '',
+              place: household,
+              files: [
+                NewFile(
+                  name: language == 'de'
+                      ? 'Mietvertrag 2026.pdf'
+                      : 'Lease 2026.pdf',
+                  bytes: Uint8List(184320),
+                  mediaType: 'application/pdf',
+                  pages: 3,
+                ),
+              ],
+            );
+            notes.setAttachmentText(
+              lease.id,
+              notes.byId(lease.id)!.attachments.single.hash,
+              language == 'de'
+                  ? 'Mietvertrag\nDie Wohnung im 2. Stock wird ab dem '
+                        '1. Januar 2026 vermietet.\nMiete: 820 € im Monat'
+                  : 'Lease\nThe flat on the second floor is let from '
+                        '1 January 2026.\nRent: £820 a month',
+            );
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
           });
 
           boxFrame(texts175, 'generated', (tester) async {
@@ -2455,6 +2551,23 @@ void main() {
             await toPrivacy(tester, t);
             await _tap(tester, find.byKey(const ValueKey('areaLocks')));
             expect(find.byType(AreaLocksScreen), findsOneWidget);
+          });
+
+          // The Household's menu in the Areas list, its switch Hidden
+          // from AI (#267).
+          boxFrame(privacy177, 'hidden-from-ai', (tester) async {
+            final seeded = seed();
+            final household = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'household')
+                .id;
+            final t = await start(tester, seeded);
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(ValueKey('area-menu-$household')));
+            expect(
+              find.byKey(ValueKey('area-hidden-from-ai-$household')),
+              findsOneWidget,
+            );
           });
 
           boxFrame(privacy177, 'block', (tester) async {

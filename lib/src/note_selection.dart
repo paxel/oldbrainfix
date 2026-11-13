@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
 import 'file_into_screen.dart';
+import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
@@ -179,11 +180,31 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
       ),
     );
     if (!mounted || placeId == null) return false;
-    notes.store.batch(() {
-      for (final note in chosen) {
-        if (notes.store.mayChange(note.id)) notes.file(note.id, placeId);
+    final store = notes.store;
+    final moved = [
+      for (final note in chosen)
+        if (store.mayChange(note.id)) note.id,
+    ];
+    // Nothing Hidden from AI goes into a Shared Area (#267): one question
+    // for all of them, before any moves.
+    final area = store.areaOf(placeId);
+    if (area != null && store.isShared(area)) {
+      final marks = {
+        for (final id in moved) ...store.hiddenFromAiBy(id),
+      }.toList()..sort();
+      if (!await showToAiFirst(context, store, marks) || !mounted) {
+        return false;
       }
+    }
+    final filed = await unlessHiddenFromAi(context, store, () {
+      store.batch(() {
+        for (final id in moved) {
+          notes.file(id, placeId);
+        }
+      });
+      return true;
     });
+    if (!mounted || filed == null) return false;
     stopSelecting();
     return true;
   }

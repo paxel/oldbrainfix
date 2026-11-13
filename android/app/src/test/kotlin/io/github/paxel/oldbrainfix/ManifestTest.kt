@@ -45,6 +45,18 @@ class ManifestTest {
     }
 
     @Test
+    fun anyFileCanBeSharedToTheAppForAnAttachment() {
+        val share = activity(".ShareActivity")
+        val filters = elements(share, "intent-filter")
+        for (action in listOf("android.intent.action.SEND", "android.intent.action.SEND_MULTIPLE")) {
+            val filter = filters.single { f ->
+                elements(f, "action").any { it.getAttributeNS(android, "name") == action }
+            }
+            assertEquals(listOf("*/*"), dataOf(filter, "mimeType"))
+        }
+    }
+
+    @Test
     fun aPackOpensWithTheAppAsACardFileDoes() {
         val types = dataOf(activity(".BundleActivity"), "mimeType")
         assertTrue(types.contains("application/vnd.oldbrainfix.pack"))

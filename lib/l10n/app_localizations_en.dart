@@ -4973,7 +4973,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, Photo, Voice, Gallery, Paste, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
+      'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -5965,4 +5965,154 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupAddDamagedFix => 'Nothing was added; open the Backup again.';
+
+  @override
+  String get tagsTitle => 'Tags';
+
+  @override
+  String get tagsNone =>
+      'No tags yet. A word with # in front in a Note, such as #garden or #life/health, shows here.';
+
+  @override
+  String tagNotes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes',
+      one: '1 Note',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get tagUnfold => 'Show the tags below';
+
+  @override
+  String get tagFold => 'Hide the tags below';
+
+  @override
+  String get hiddenFromAi => 'Hidden from AI';
+
+  @override
+  String get hiddenFromAiByArea => 'Off, hidden by its Area';
+
+  @override
+  String get hiddenFromAiRefusedTitle => 'Hidden from AI';
+
+  @override
+  String hiddenFromAiRefusedBody(String names) {
+    return '$names: hidden from AI. What is hidden from AI is not given to other people. Show it to the AI first.';
+  }
+
+  @override
+  String get hiddenFromAiShow => 'Show to the AI';
+
+  @override
+  String get file => 'File';
+
+  @override
+  String get attachFile => 'Attach a file';
+
+  @override
+  String get attachmentTextLabel => 'Attachment Text';
+
+  @override
+  String get attachmentTextFromComputer =>
+      'The text follows from the computer.';
+
+  @override
+  String attachmentPages(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pages',
+      one: '1 page',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String openFile(String name) {
+    return 'Open $name';
+  }
+
+  @override
+  String get fileNotOpened => 'An Attachment was not opened.';
+
+  @override
+  String get fileNotOpenedTitle => 'Attachment not opened';
+
+  @override
+  String get fileNotHereCause => 'The Attachment is not on this Device yet.';
+
+  @override
+  String get fileNotHereFix => 'It comes with the next sync; nothing is lost.';
+
+  @override
+  String get fileNoAppCause =>
+      'No app on this Device opens files of this kind.';
+
+  @override
+  String get fileNoAppFix =>
+      'Install an app for it, or open the Attachment on the computer.';
+
+  @override
+  String get fileNotAttached => 'A file was not attached.';
+
+  @override
+  String get fileNotAttachedTitle => 'File not attached';
+
+  @override
+  String get fileTooLargeCause =>
+      'It is larger than 256 MB, the most a file can be.';
+
+  @override
+  String get fileUnreadableCause => 'It could not be read on this Device.';
+
+  @override
+  String get fileNotAttachedFix =>
+      'Nothing was written; the file is still where it was.';
+
+  @override
+  String get removeFileKeepText => 'Remove Attachment, keep text';
+
+  @override
+  String get removeFileQuestion =>
+      'Remove this Attachment and keep its Attachment Text?';
+
+  @override
+  String get undoAttachmentTextRemoved => 'Attachment Text removed';
+
+  @override
+  String get fileReadAgainFailed =>
+      'The text of an Attachment could not be read.';
+
+  @override
+  String get fileReadAgainFailedTitle => 'Attachment not read';
+
+  @override
+  String get fileReadAgainCause =>
+      'This Attachment could not be read on this Device.';
+
+  @override
+  String get attachment => 'Attachment';
+
+  @override
+  String hiddenFromAiAreaFirst(String names) {
+    return '$names: hidden from AI. A Note in an Area hidden from AI is not given to other people. Take the mark off in the Area\'s menu in the Areas list first.';
+  }
+
+  @override
+  String get captureNotFiledHidden => 'A Note was not filed.';
+
+  @override
+  String get captureNotFiledHiddenTitle => 'Note not filed';
+
+  @override
+  String get captureNotFiledHiddenCause =>
+      'It is hidden from AI, and what is hidden from AI does not go into a Shared Area.';
+
+  @override
+  String get captureNotFiledHiddenFix =>
+      'It stays where it was; take the mark off, then file it.';
 }

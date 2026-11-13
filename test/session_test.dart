@@ -598,6 +598,29 @@ void main() {
       expect(sessions.setupOf(made.noteId)?.pool, [pushUps, mop]);
     });
 
+    testWidgets('a tag picked filters for the Tallies tagged below it too, '
+        'and no more (#267)', (tester) async {
+      final run = tally('Run #sport/run');
+      final swim = tally('Swim #Sport/Swim');
+      final chess = tally('Chess #sportive');
+      final plain = tally('Plank #sport');
+      final made = session([plain], count: 1);
+      await start(tester);
+      await edit(tester, made.noteId);
+
+      await tap(tester, key('session-tag-#sport'));
+      expect(key('session-pool-$plain'), findsOneWidget);
+      expect(key('session-pool-$run'), findsOneWidget);
+      expect(key('session-pool-$swim'), findsOneWidget);
+      expect(key('session-pool-$chess'), findsNothing);
+
+      await tap(tester, key('session-tag-#sport'));
+      await tap(tester, key('session-tag-#sport/run'));
+      expect(key('session-pool-$run'), findsOneWidget);
+      expect(key('session-pool-$swim'), findsNothing);
+      expect(key('session-pool-$plain'), findsNothing);
+    });
+
     testWidgets('the New Session page filters its pool by tag, and New Tally '
         'there carries the tags (#220)', (tester) async {
       final pushUps = tally('Push-ups #sport');

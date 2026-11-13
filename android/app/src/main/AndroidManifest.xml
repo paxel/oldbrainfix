@@ -96,8 +96,11 @@
             android:excludeFromRecents="true"
             android:theme="@style/CrashTheme"/>
         <!-- The share target: images, sound files such as voice messages,
-             text and links from other apps. It only hands the share over
-             to MainActivity. -->
+             text and links from other apps, and any other file, which
+             becomes an Attachment (#267). It only hands the share over
+             to MainActivity. A file of one of the app's own types, or
+             one a messenger names only "some file" or a zip, is offered
+             to BundleActivity too: the user picks which. -->
         <activity
             android:name=".ShareActivity"
             android:exported="true"
@@ -107,29 +110,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="application/ogg" />
+                <data android:mimeType="*/*" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="application/ogg" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
         <!-- Sync bundles (ADR 0003), Sent Items (ADR 0009), Profile card

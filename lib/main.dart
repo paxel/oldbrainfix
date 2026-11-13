@@ -23,6 +23,7 @@ import 'src/capture_requests.dart';
 import 'src/context_platform.dart';
 import 'src/crash_guard.dart';
 import 'src/drafts.dart';
+import 'src/file_platform.dart';
 import 'src/folder_platform.dart';
 import 'src/help_notes.dart';
 import 'src/home_shortcuts.dart';
@@ -118,6 +119,7 @@ Future<void> _openAndRun(Directory dir) async {
       // such as the setup's steps, do the rest (#238).
       alarms: Platform.isIOS ? IosAlarms() : AndroidAlarms(),
       photos: AndroidPhotos(),
+      files: const AndroidFiles(),
       voice: AndroidVoice(),
       context: const AndroidContext(),
       requests: AndroidCaptureRequests(),

@@ -1419,7 +1419,7 @@ fn texts_frames(
     theme: egui::Theme,
     box_frame: impl Fn(&str) -> String,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let scenes: [(&str, TextsScene); 8] = [
+    let scenes: [(&str, TextsScene); 10] = [
         ("format", |harness, notes, _| {
             harness.state_mut().edit_note(&notes.formatted);
             harness.run();
@@ -1487,6 +1487,28 @@ fn texts_frames(
                 .next()
                 .ok_or("the boiler's #tag")?
                 .click_accesskit();
+            harness.run();
+            Ok(())
+        }),
+        // The desktop has no tag tree yet (#267): its search for a tag,
+        // which finds the tags below it too.
+        ("tag-tree", |harness, _, texts| {
+            show_household(harness, texts)?;
+            let tag = harness.state().t().search_for_tag(texts.tag);
+            harness
+                .query_all_by_label(&tag)
+                .next()
+                .ok_or("the boiler's #tag")?
+                .click_accesskit();
+            harness.run();
+            Ok(())
+        }),
+        // Nor Attachments yet (#267): its search, which finds their
+        // names and texts.
+        ("attachment", |harness, _, texts| {
+            harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::F);
+            harness.run();
+            harness.get_by(|n| n.is_focused()).type_text(texts.search);
             harness.run();
             Ok(())
         }),
@@ -2033,7 +2055,7 @@ fn privacy_frames(
     theme: egui::Theme,
     box_frame: impl Fn(&str) -> String,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let scenes: [(&str, PrivacyScene); 5] = [
+    let scenes: [(&str, PrivacyScene); 6] = [
         ("set-up", |harness, _| {
             harness.state_mut().open(Page::Backups);
             harness.run();
@@ -2051,6 +2073,11 @@ fn privacy_frames(
             Ok(())
         }),
         ("area-locks", |harness, texts| {
+            show_household(harness, texts)
+        }),
+        // The desktop sets no mark Hidden from AI yet (#267): the
+        // Household's Notes, as for the Area Locks.
+        ("hidden-from-ai", |harness, texts| {
             show_household(harness, texts)
         }),
         ("block", |harness, _| {

@@ -246,6 +246,7 @@ AlarmPlanRead planAlarms(
   final locks = AreaLocks(store);
   final masked = <String, bool>{};
   final alarms = Alarms(store);
+  final notes = Notes(store);
   String title(PlannedAlarm alarm) {
     final routine = byId[alarm.routineId];
     // From a locked Area set to Masked, on the lock screen too.
@@ -253,9 +254,15 @@ AlarmPlanRead planAlarms(
         masked.putIfAbsent(routine.id, () => locks.masks(routine))) {
       return maskedText(t, locale, routine, alarm.occurrence);
     }
-    // A photo or voice Note without words is still there.
+    // A photo, voice or file Note without words is still there.
     return _title(alarm.text) ??
-        (alarm.text == null ? t.noteGone : wordlessTitle(t, alarm.wordless));
+        (alarm.text == null
+            ? t.noteGone
+            : switch (routine == null ? null : notes.byId(routine.noteId)) {
+                    final note? => fileTitle(t, note),
+                    null => null,
+                  } ??
+                  wordlessTitle(t, alarm.wordless));
   }
 
   final planned = alarms.nudge(wallClock);

@@ -37,7 +37,7 @@ Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widge
 _Avoid_: Schnell hinzufügen, Aufnehmen
 
 **Schnellnotiz** [Quick note]:
-Der Bildschirm zum Erfassen von Text, auf dem Desktop der Schnellnotiz-Dialog des Fensters (Datei ▸ Neue Notiz, Strg+N, „+“) und das Fenster „Notiz erfassen“: der Text, Foto, Sprache, Galerie und Einfügen (auf dem Desktop Sprache aufnehmen, Einfügen und Aus Datei…), die Stupser-Knöpfe, „Zum vollen Editor“, das die Notiz unsortiert speichert und im Notiz-Editor öffnet, auf dem Desktop im Notiz-Dialog, und der Wecker, dessen Menü eine Routine oder Erinnerung anlegt, die mit der Notiz gespeichert wird (#223). Was die Notiz sonst einsortiert (Ablegen in …, Frosch, Einheit oder Strichliste, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit), und die Formatleiste erscheinen nur, wo die Einstellungen des Geräts sie einschalten; die Stupser-Knöpfe lassen sich für ein einziges Speichern ausschalten.
+Der Bildschirm zum Erfassen von Text, auf dem Desktop der Schnellnotiz-Dialog des Fensters (Datei ▸ Neue Notiz, Strg+N, „+“) und das Fenster „Notiz erfassen“: der Text, Foto, Sprache, Galerie, Einfügen und Datei (auf dem Desktop Sprache aufnehmen, Einfügen und Aus Datei…), die Stupser-Knöpfe, „Zum vollen Editor“, das die Notiz unsortiert speichert und im Notiz-Editor öffnet, auf dem Desktop im Notiz-Dialog, und der Wecker, dessen Menü eine Routine oder Erinnerung anlegt, die mit der Notiz gespeichert wird (#223). Was die Notiz sonst einsortiert (Ablegen in …, Frosch, Einheit oder Strichliste, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit), und die Formatleiste erscheinen nur, wo die Einstellungen des Geräts sie einschalten; die Stupser-Knöpfe lassen sich für ein einziges Speichern ausschalten.
 _Avoid_: Schnell hinzufügen
 
 **Erfassungskontext** [Capture Context]:
@@ -325,6 +325,10 @@ Eine optionale Sperre auf einem einzelnen Bereich, die zu bleibt, auch während 
 
 **Maskiert** [Masked]:
 Wie eine Fälligkeit aus einem gesperrten Bereich in Alarmen und in der Agenda erscheint, wenn ihr Bereich das so will: "Private Routine, 08:00", trotzdem abhakbar.
+
+**Vor KI verborgen** [Hidden from AI]:
+Eine Markierung, die du auf einen Bereich oder eine einzelne Notiz setzt, auf dem Handy oder am Computer, nur für deine eigenen Geräte: Für die KI (eine KI-Aufgabe, das Fragen am Computer) gibt es die Notiz, jede Notiz des Bereichs und ihre Ergänzungen, Routinen, Erinnerungen, Frösche, Zeilen und #Wörter nicht, nicht einmal als Anzahl. Verborgen und geteilt schließen sich aus: In einem geteilten Bereich wird die Markierung nicht angeboten, und was verborgen ist, wird weder in einen geteilten Bereich abgelegt noch geteilt, gesendet oder in ein Paket gelegt, bis du die Markierung abnimmst. Du selbst siehst und exportierst es wie immer.
+_Avoid_: privat, geheim, ausgeschlossen, gesperrt (eine Bereichssperre ist etwas anderes)
 
 **Sicherung** [Backup]:
 Eine verschlüsselte Datei mit allem, was auf einem Gerät ist, geöffnet mit einer Passphrase.

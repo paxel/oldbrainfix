@@ -33,8 +33,9 @@ replace a law of Both apps where they say so. A desktop law marked
   with its first Routine (#191). **Every Session pool list filters by
   tag** (#220), on this page, the Session Note's page and the Routine
   editor: the #tags of its Tallies' texts as filter chips above it,
-  those most Tallies carry first; the Tallies carrying any chip picked
-  show, ticks the filter hides stay and a line counts them, "New Tally"
+  those most Tallies carry first; the Tallies carrying any chip picked,
+  or a tag nested under it (`#sport/run` under `#sport`, #267), show,
+  ticks the filter hides stay and a line counts them, "New Tally"
   starts its name with the tags picked, and Rolling's order moves only
   unfiltered. The filter is a view, kept while the page is open, never
   stored. Leaving a name dialog without Create makes nothing. **Leaving
@@ -793,6 +794,17 @@ replace a law of Both apps where they say so. A desktop law marked
   Capture). **The folder**, first in the Agenda's top bar, opens the
   Areas list (#221); search by text and by #tag stays inside the
   browser.
+- **The tag tree** (#267, Q623, Q639): a row "Tags" below the Areas in
+  the Areas list opens every tag of the Notes by its levels, the top
+  level as written (`#life`), a level below by its own part (`health`),
+  indented, each with how many Notes carry it or a tag below it; the
+  levels below a tag unfold by its arrow, the top level alone at first.
+  A tap on a tag goes back to the Areas list searching for it, as a tap
+  on a tag in a text does. Typing `#` in the Areas list's search shows
+  the tags starting with what is typed as chips under the field, at most
+  twelve, the one typed exactly left out; a tap fills it in. While a
+  locked Area is closed, neither the row nor the chips show, as the tree
+  is read from every Note.
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and
@@ -881,8 +893,8 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Capture
 
-- **The Agenda's "+" fans out Text, Voice, Photo, Gallery and Paste**,
-  and so does the lock screen's, each an icon with
+- **The Agenda's "+" fans out Text, Voice, Photo, Gallery, Paste and
+  File** (File: #267), and so does the lock screen's, each an icon with
   its words, upward from the button; it is not a bottom sheet. While
   the fan is open, "+" reads as close; a second tap on it, a tap
   outside or Back closes the fan. Text opens text capture, Voice starts
@@ -890,14 +902,18 @@ replace a law of Both apps where they say so. A desktop law marked
   picture picker and continues as a photo Note, Paste opens text capture
   filled from the clipboard: its text in the field, its picture as the
   Note's photo, both when it holds both, and a line on the screen, no
-  announcement, when it holds neither. The clipboard is read only on
+  announcement, when it holds neither. File opens the system's file
+  picker, several files of any kind at once, and continues as text
+  capture with them attached as the Note's Attachments; a file larger
+  than 256 MB, or one that cannot be read, is not attached and is
+  announced, the others are. The clipboard is read only on
   that tap, never on opening or in the background. **A long press on
   "+" opens text capture at once** (#282), the Agenda's and the lock
   screen's alike, as Text in the fan does, with no fan; a tap still fans
   out. A screen reader announces the long press with the button ("write
   a Note at once"), and on the iPhone, whose VoiceOver has no long press,
   it is among the button's actions. The text capture
-  screen keeps its Photo, Voice, Gallery and Paste buttons. Every other
+  screen keeps its Photo, Voice, Gallery, Paste and File buttons. Every other
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
@@ -921,8 +937,8 @@ replace a law of Both apps where they say so. A desktop law marked
   there." at the top.
 - **On the iPhone a share waits for the app** (#241): iOS lets no Share
   extension open its app, so "Old Brain Fix" in the share sheet keeps
-  the text, links, pictures or the app's own files and says so on a small
-  card with OK. The next time the app opens or comes back, each share
+  the text, links, pictures, the app's own files or any other file and
+  says so on a small card with OK. The next time the app opens or comes back, each share
   opens Capture as on Android, and a Pack, Profile card, Sent Item or
   bundle opens as "Open with" opens it. A share carries no source app on
   the iPhone.
@@ -931,8 +947,13 @@ replace a law of Both apps where they say so. A desktop law marked
   show iOS's own "Allow Paste" prompt each time it reads the clipboard.
   Both are iOS's, not the app's, and are allowed beside "Capture never
   asks anything"; the app itself still asks nothing there.
+- **A file shared in becomes an Attachment** (#267): any file another
+  app shares, other than a picture or a sound file, opens Capture with it
+  attached, one Note with the text and pictures shared with it, written
+  at once; a file of the app's own types (a bundle, Sent Item, Profile
+  card or Pack) shared to the app opens as "Open with" opens it.
 - **The quick note is uncluttered** (#142): by default it shows the
-  text field, Photo, Voice, Gallery and Paste, the Nudge buttons,
+  text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
   **To full editor** and the alarm clock beside it (#223), whose menu
   offers Routine and Reminder as the Note editor's "+" does, in Simple
   too; nothing else that sorts and no chips. The Routine or Reminder
@@ -1053,6 +1074,32 @@ replace a law of Both apps where they say so. A desktop law marked
   it, Save is announced as failed with Share as the fix), and only while
   its file is on the phone. Saved and copied say nothing, nor does
   a share sheet left without an app; a failure is announced.
+- **An Attachment shows on its card** (#267, ADR 0047): each file a row
+  with the icon of its kind (a PDF, a text document, a table, plain text
+  or Markdown, any other file), its name, its size and its pages when
+  they were counted. A tap opens it with the system's app for its type,
+  asking nothing, as the file is the Note's own (unlike a file link,
+  #261); a file whose bytes have not synced yet, or one no app opens, is
+  announced. Its Attachment Text shows under it as a Photo Text does:
+  dimmed, labelled "Attachment Text" in the detailed view and whole
+  there, its first three lines in the compact view. While a computer is
+  to read it (a PDF of more than ten pages or not counted, a larger
+  file), "The text follows from the computer." stands there instead. A
+  Note of one file alone is that file as its card, its name as the
+  title, and goes by the file's name wherever only its words fit, rows
+  and alarms included. In the Note editor each file has Replace and
+  Append for its text, Remove for the text (with the undo at the top,
+  #268), Read the text again (not for a file left to a computer), and
+  "Remove Attachment, keep text", asked once, where this Device may;
+  the card's ⋮ offers the last too. "Attach a file" on the editor's bar
+  picks more files.
+- **Hidden from AI** (#267, ADR 0049): a card's ⋮ and an Area's menu in
+  the Areas list have the switch "Hidden from AI", the Note editor its
+  badge, offered on a Note or Area in no Shared Area and, once marked,
+  always to take the mark off; it is read as the menu opens. A shield
+  beside the Important marker on a card and on an Area's row shows what
+  is hidden, a Note by its own mark or its Area's; the editor's badge
+  says "Off, hidden by its Area" when only the Area hides it.
 - The editor opens only through a long press on the card, Edit in its
   ⋮ or the pencil of a detailed card's action row (#281).
 - In the Note editor a text that is only read, the Note's or a
@@ -1093,6 +1140,16 @@ replace a law of Both apps where they say so. A desktop law marked
 - An editor with several fields is a full-screen page with Save in the
   top bar; secondary state changes are rows at the bottom of the page.
   The Note editor's settings are its badges (see Cards).
+- **Something Hidden from AI is not given away** (#267, ADR 0049):
+  filing it into a Shared Area (a card, the selection, File into…),
+  sharing an Area that is hidden or holds a hidden Note, Send to a
+  person and Export as Pack ask once, naming what is hidden: "… hidden
+  from AI. What is hidden from AI is not given to other people. Show it
+  to the AI first." with Cancel and "Show to the AI", which takes the
+  marks of what is given off and goes on. A Note hidden by its Area's
+  mark is only named with the Area, and the question says the mark
+  comes off in the Area's menu; one tap never shows the other Notes of
+  that Area to the AI. Send and sharing an Area ask before whom.
 
 ### Text editor
 

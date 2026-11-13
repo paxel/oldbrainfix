@@ -324,17 +324,54 @@
   Ein Wort mit „#“ davor, etwa „#Garten“, ist ein #Wort und erscheint in der Akzentfarbe, auf
   Karten, in Abschnitten und im Editor. Ein Tippen darauf auf einer Karte, in einem Abschnitt oder in
   einer Tabelle öffnet die Suche in allen Notizen nach dem Wort, so wie es geschrieben ist. Für ein
-  #Wort wird nichts gespeichert, und es gibt keine Liste davon; es ist ein Wort des Texts. Das #Wort
-  in die Suche zu tippen, findet dasselbe.
+  #Wort wird nichts gespeichert; es ist ein Wort des Texts, und die Liste der #Wörter zeigt sie alle
+  (siehe „Deine #Wörter durchstöbern“). Das #Wort in die Suche zu tippen, findet dasselbe.
 </p>
 <ul>
   <li>Ein #Wort besteht aus Buchstaben, Ziffern, „_“ und „-“ und enthält mindestens einen Buchstaben: „#to-do“ und „#v2“ zählen, „#126“ ist eine Zahl.</li>
+  <li>Ein „/“ verschachtelt ein #Wort: „#leben/gesundheit/rücken“ ist ein #Wort, unter „#leben/gesundheit“ und „#leben“. Die Suche nach „#leben“ findet es auch.</li>
   <li>„# Titel“ mit Leerzeichen, „C#“ und das „#“ in einer Webadresse zählen nicht. In einem formatierten Text zählt auch ein „#Wort“ in Code, in einem Codeblock oder in der Adresse eines Links nicht, ebenso wenig eines in einem Code-Text.</li>
   <li>Die Suche nach „#Garten“ findet jede Notiz, die es in beliebiger Groß- und Kleinschreibung enthält, auch „#Gartenarbeit“, das damit beginnt, aber nicht das Wort „Garten“ ohne „#“.</li>
 </ul>
 <p>
   Auf dem Desktop schließt ein Klick auf ein #Wort den Notiz-Dialog und durchsucht alle Notizen,
   wie auf dem Handy; im Feld, das gerade bearbeitet wird, setzt er den Cursor.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="tag-tree">
+<h2>Deine #Wörter durchstöbern</h2>
+<p>Sieh alle #Wörter deiner Notizen nach ihren Ebenen, etwa #leben/gesundheit unter #leben.</p>
+<box-tab device="phone" alt="Die Liste der #Wörter: #garten und #leben, unter #leben gesundheit und rücken aufgeklappt, jedes mit der Anzahl seiner Notizen">
+<li>Tippe <strong>Suchen und stöbern</strong>.</li>
+<li>Tippe <strong>#Wörter</strong> unter den Bereichen.</li>
+<li>Tippe den Pfeil neben einem #Wort für die #Wörter darunter.</li>
+<li>Tippe ein #Wort, um danach zu suchen.</li>
+</box-tab>
+<box-tab device="desktop" alt="Alle Notizen nach #Therme durchsucht, die Wartung der Therme gefunden">
+<li>Drücke Strg+F.</li>
+<li>Tippe # und den Anfang eines #Worts, etwa #leben.</li>
+</box-tab>
+<box-more>
+<p>
+  Die Liste der #Wörter zeigt die #Wörter aller Notizen und ihrer Abschnitte, die oberste Ebene so
+  wie geschrieben („#leben“), jede Ebene darunter mit ihrem eigenen Wort („gesundheit“), eingerückt,
+  mit der Anzahl der Notizen, die das #Wort oder eines darunter tragen. Zuerst zeigt nur die oberste
+  Ebene; der Pfeil neben einem #Wort klappt die Ebenen darunter auf. Ein Tippen auf ein #Wort führt
+  zurück in die Liste der Bereiche und sucht dort danach. Ein #Wort, das verschieden geschrieben ist
+  („#Leben“, „#leben“), zeigt sich so, wie die meisten seiner Notizen es schreiben.
+</p>
+<p>
+  Wenn du „#“ in die Suche der Liste der Bereiche tippst, zeigen sich die #Wörter, die mit dem
+  Getippten beginnen, als Knöpfe unter dem Feld, höchstens zwölf; ein Tippen setzt eines ein, sodass
+  du ein #Wort findest, ohne seine genaue Schreibweise zu kennen. Solange ein gesperrter Bereich zu
+  ist, zeigen sich weder <strong>#Wörter</strong> noch diese Knöpfe, denn die Liste wird aus allen
+  Notizen gelesen.
+</p>
+<p>
+  Die Desktop-App hat noch keine Liste der #Wörter. Ihre Suche nach „#leben“ findet jede Notiz mit
+  einem #Wort darunter, wie auf dem Handy.
 </p>
 </box-more>
 </guide-box>
@@ -440,6 +477,57 @@
 </box-more>
 </guide-box>
 
+<guide-box name="attachment">
+<h2>Eine Datei an eine Notiz hängen</h2>
+<p>Bewahre einen Brief, einen Vertrag oder jede andere Datei bei der Notiz auf, zu der sie gehört.</p>
+<box-tab device="phone" alt="Die Karte des Mietvertrags, sein Anhang Mietvertrag 2026.pdf mit Größe und Seiten und sein Anhangtext darunter">
+<li>Tippe <strong>+</strong> auf der Agenda.</li>
+<li>Tippe <strong>Datei</strong>.</li>
+<li>Wähle eine oder mehrere Dateien.</li>
+<li>Tippe <strong>10 Min.</strong>, <strong>30 Min.</strong> oder <strong>1 Std.</strong></li>
+<li>Tippe den Anhang auf seiner Karte, um ihn zu öffnen.</li>
+</box-tab>
+<box-tab device="desktop" alt="Alle Notizen nach einem Wort durchsucht, die Notizen damit gefunden">
+<li>Hänge die Datei auf dem Handy an.</li>
+<li>Synchronisiere den Computer mit dem Handy.</li>
+<li>Drücke Strg+F.</li>
+<li>Tippe ein Wort aus dem Text der Datei.</li>
+</box-tab>
+<box-more>
+<p>
+  Jede Datei lässt sich anhängen: ein PDF, ein Word-Dokument, eine Tabelle, ein <code>.zip</code>. Sie
+  bleibt, wie sie ist, mit Name, Art und Größe, auf all deinen Geräten und bei allen, mit denen du den
+  Bereich der Notiz teilst. Außer über <strong>Datei</strong> beim Erfassen und im Fächer von
+  <strong>+</strong> kommt ein Anhang herein, wenn du eine Datei aus einer anderen App mit Old Brain
+  Fix teilst, und über <strong>Datei anhängen</strong> in der Leiste des Notiz-Editors. Eine Datei,
+  die größer als 256 MB ist, wird nicht angehängt, und die App sagt es oben. Eine Notiz, die nur aus
+  einer Datei gemacht wurde, zeigt die Datei als ihre Karte und heißt nach ihr, auch in Alarmen. Ein
+  Tippen auf einen Anhang öffnet ihn mit der App des Handys, die diese Art öffnet; einer, der noch
+  nicht auf das Handy synchronisiert ist oder den keine App öffnet, wird oben gemeldet.
+</p>
+<p>
+  Der Text einer Datei wird gelesen, wo ihr Format es erlaubt: der eigene Text eines PDFs und, mit
+  derselben Texterkennung wie bei Fotos, seine gescannten Seiten; <code>.docx</code>-,
+  <code>.odt</code>-, <code>.xlsx</code>- und <code>.ods</code>-Dateien; reiner Text und Markdown. Dieser
+  Anhangtext steht abgeblendet unter dem Anhang, unter dem Wort „Anhangtext“, und die Suche findet ihn
+  und den Namen der Datei. Das Handy liest ein PDF bis zehn Seiten und andere Dateien bis 10 MB selbst,
+  im Hintergrund. Ein längeres PDF oder eine größere Datei bleibt deinem Computer überlassen: Bis er
+  sie gelesen hat und der Text zurück synchronisiert ist, zeigt das Handy „Der Text folgt vom
+  Computer.“ Andere Dateien, etwa ein <code>.zip</code>, haben keinen Text.
+</p>
+<p>
+  Im Notiz-Editor unter jedem Anhang: <strong>Notiztext ersetzen</strong> und <strong>An Notiztext
+  anhängen</strong> übernehmen seinen Text, <strong>Erkannten Text entfernen</strong> entfernt den
+  Text (die Meldung oben holt ihn zurück), <strong>Text erneut lesen</strong> liest ihn neu, und
+  <strong>Anhang entfernen, Text behalten</strong> fragt einmal und entfernt die Datei von all deinen
+  Geräten, während ihr Text bleibt. Das ⋮ der Karte bietet das Letzte auch an.
+</p>
+<p>
+  Die Desktop-App zeigt Anhänge noch nicht; ihre Suche findet ihre Namen und Texte schon.
+</p>
+</box-more>
+</guide-box>
+
 <guide-box name="generated">
 <h2>Ein Transkript oder einen Fototext übernehmen oder entfernen</h2>
 <p>Nimm ein Transkript oder einen Fototext in den Text der Notiz, oder entferne ihn.</p>
@@ -497,7 +585,8 @@
   Der Notizbrowser hat auf jeder Ebene ein Suchfeld: „Alle Notizen durchsuchen“ in der Liste der
   Bereiche, „Diesen Bereich durchsuchen“ und „Dieses Thema durchsuchen“ darunter. Die Suche findet,
   was getippt wird, in beliebiger Groß- und Kleinschreibung, im Text einer Notiz und ihrer
-  Abschnitte, in ihren Transkripten und Fototexten, in den Textzeilen der Einträge ihrer Strichliste
+  Abschnitte, in ihren Transkripten und Fototexten, in den Namen und Anhangtexten ihrer Anhänge, in
+  den Textzeilen der Einträge ihrer Strichliste
   und in den Zeilen ihrer Checkliste oder Einkaufsliste. Ein formatierter Text wird so durchsucht,
   wie er sich liest: „fett“ findet „**fett**“, und die Markdown-Zeichen werden nirgends gefunden. Ein
   entferntes Transkript oder ein entfernter Fototext wird nicht mehr gefunden.

@@ -57,7 +57,7 @@ enum _RowChoice { schedule, history, share }
 /// the five days after the same way, each under its weekday and date.
 /// Each is checked off as Done on its own, the coming days' already
 /// today. "+"
-/// fans out Text, Voice, Photo, Gallery and Paste to capture a Note, whose card
+/// fans out Text, Voice, Photo, Gallery, Paste and File to capture a Note, whose card
 /// then shows on top with its enrich options
 /// until the browser opens or the app comes back. The app bar's folder,
 /// its first action, opens the notes browser; the bar also opens the list
@@ -570,6 +570,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       photo: way == CaptureWay.photo,
       gallery: way == CaptureWay.gallery,
       paste: way == CaptureWay.paste,
+      file: way == CaptureWay.file,
       onCaptured: (id) => _capturedId = id,
       onChanged: _reloadIfMounted,
     );

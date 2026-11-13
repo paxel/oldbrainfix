@@ -644,17 +644,21 @@ class _SwipeDrag extends HorizontalDragGestureRecognizer {
       );
 }
 
-/// The search field on top of a browser level, with ✕ to clear it.
+/// The search field on top of a browser level, with ✕ to clear it. With
+/// [tags], typing `#` shows the tags of the tag tree that start with what
+/// is typed as chips under it (#267, Q639), whose tap fills one in.
 class BrowserSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final ValueChanged<String> onChanged;
+  final Store? tags;
 
   const BrowserSearchField({
     super.key,
     required this.controller,
     required this.hint,
     required this.onChanged,
+    this.tags,
   });
 
   void _clear() {
@@ -662,27 +666,137 @@ class BrowserSearchField extends StatelessWidget {
     onChanged('');
   }
 
+  void _pick(String tag) {
+    controller.value = TextEditingValue(
+      text: tag,
+      selection: TextSelection.collapsed(offset: tag.length),
+    );
+    onChanged(tag);
+  }
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-    child: TextField(
-      controller: controller,
-      onChanged: onChanged,
-      textInputAction: TextInputAction.search,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: controller.text.isEmpty
-            ? null
-            : IconButton(
-                tooltip: context.t.clearSearch,
-                onPressed: _clear,
-                icon: const Icon(Icons.close),
-              ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+  Widget build(BuildContext context) {
+    final field = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: context.t.clearSearch,
+                  onPressed: _clear,
+                  icon: const Icon(Icons.close),
+                ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        ),
       ),
-    ),
-  );
+    );
+    final tags = this.tags;
+    if (tags == null) return field;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field,
+        TagSuggestions(store: tags, controller: controller, onPick: _pick),
+      ],
+    );
+  }
+}
+
+/// The tags of the tag tree that start with the `#…` typed into
+/// [controller], as chips that fill one in (#267, Q639), the one typed
+/// exactly left out; nothing while what is typed starts otherwise. They
+/// are read as the text changes, never while building, and at most
+/// [shown] of them show, the tree's order kept.
+class TagSuggestions extends StatefulWidget {
+  final Store store;
+  final TextEditingController controller;
+  final ValueChanged<String> onPick;
+
+  static const shown = 12;
+
+  const TagSuggestions({
+    super.key,
+    required this.store,
+    required this.controller,
+    required this.onPick,
+  });
+
+  @override
+  State<TagSuggestions> createState() => _TagSuggestionsState();
+}
+
+class _TagSuggestionsState extends State<TagSuggestions> {
+  List<TagNode> _found = const [];
+  String _read = '';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_changed);
+    _find();
+  }
+
+  @override
+  void didUpdateWidget(TagSuggestions old) {
+    super.didUpdateWidget(old);
+    if (old.controller != widget.controller) {
+      old.controller.removeListener(_changed);
+      widget.controller.addListener(_changed);
+      _find();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (widget.controller.text == _read) return;
+    setState(_find);
+  }
+
+  void _find() {
+    final typed = widget.controller.text;
+    _read = typed;
+    final wanted = typed.trim().toLowerCase();
+    _found = !wanted.startsWith('#')
+        ? const []
+        : [
+            for (final node in TagTree(widget.store).suggestions(typed))
+              if (node.tag.toLowerCase() != wanted) node,
+          ].take(TagSuggestions.shown).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_found.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      key: const ValueKey('search-tag-suggestions'),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      // Not a sideways list: swipes belong to the browser.
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final node in _found)
+            ActionChip(
+              key: ValueKey('search-tag-${node.tag}'),
+              label: Text(node.tag),
+              onPressed: () => widget.onPick(node.tag),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Notes as a diary of cards, each with "file into…", "merge into…",
@@ -744,6 +858,9 @@ List<Widget> diaryCards(
   Map<String, List<AgendaRow>>? today;
   List<AgendaRow> todayOf(Note note) =>
       (today ??= routines.todayByNote(deviceWallClock))[note.id] ?? const [];
+  // The marks Hidden from AI, read once for the list (#267); without one
+  // no card walks up from its Note.
+  final hidden = notes.store.hiddenFromAiMarks();
   return [
     for (final placed in shown)
       if (placed case (
@@ -788,6 +905,9 @@ List<Widget> diaryCards(
           occurrences: (read: () => todayOf(note), routines: routines),
           onTap: onSwitch == null ? null : () => onSwitch(note),
           onEdit: () => onOpen(note),
+          hiddenFromAi:
+              hidden.isNotEmpty &&
+              notes.store.hiddenFromAiBy(note.id, hidden).isNotEmpty,
           onSelect: selected == null || onSelect == null || !changes
               ? null
               : (on) => onSelect(note, on),

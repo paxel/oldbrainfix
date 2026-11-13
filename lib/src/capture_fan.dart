@@ -4,12 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import 'file_platform.dart';
 import 'l10n.dart';
 import 'photo_platform.dart';
 import 'voice_platform.dart';
 
 /// A way the Agenda's "+" fans out to capture a Note.
-enum CaptureWay { text, voice, photo, gallery, paste }
+enum CaptureWay { text, voice, photo, gallery, paste, file }
 
 /// One entry of a fan: its key, its icon and its words.
 typedef FanEntry = ({Key key, Widget icon, String label});
@@ -202,6 +203,7 @@ class CaptureFanRoute extends FanRoute<CaptureWay> {
       CaptureWay.photo => (Icons.photo_camera_outlined, t.photo),
       CaptureWay.gallery => (Icons.photo_library_outlined, t.gallery),
       CaptureWay.paste => (Icons.content_paste, t.paste),
+      CaptureWay.file => (Icons.attach_file, t.file),
     };
     return (
       key: ValueKey('captureFan-${way.name}'),
@@ -225,6 +227,7 @@ CaptureFanRoute? captureFanFor(BuildContext context, GlobalKey plus) {
       if (photos.available) CaptureWay.photo,
       if (photos.pickable) CaptureWay.gallery,
       if (photos.pasteable) CaptureWay.paste,
+      if (FileScope.of(context).pickable) CaptureWay.file,
     ],
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
   );
