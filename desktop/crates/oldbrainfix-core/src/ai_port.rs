@@ -48,8 +48,10 @@ pub const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-0
 /// The name the port gives itself, and the client config uses.
 pub const SERVER_NAME: &str = "oldbrainfix";
 
-/// What the port tells the client about itself at `initialize`.
-const INSTRUCTIONS: &str = "Old Brain Fix is a memory aid. Through this port you work on the user's Notes, Areas, Topics, Routines and Reminders for one task, and set up Tallies, Sessions, Checklists, Shopping Lists and Frogs. Every change you make waits as a Pending Change: the user reviews all of them together when the task is done and accepts or rejects them. What the user recorded, a Tally's entries, the ticks of Lines and Boxes, the check-offs, a Session's picks and the eaten Frogs, you only read. Nothing reaches other people.";
+/// What the port tells the client about itself at `initialize`, with the
+/// rule the Ask panel's model answers by (#294, Q692): the port sees no
+/// answer, so none is checked.
+const INSTRUCTIONS: &str = "Old Brain Fix is a memory aid. Through this port you work on the user's Notes, Areas, Topics, Routines and Reminders for one task, and set up Tallies, Sessions, Checklists, Shopping Lists and Frogs. Every change you make waits as a Pending Change: the user reviews all of them together when the task is done and accepts or rejects them. What the user recorded, a Tally's entries, the ticks of Lines and Boxes, the check-offs, a Session's picks and the eaten Frogs, you only read. Nothing reaches other people. When the user asks about their Notes, answer only from the Notes you read through this port with read_note, never from general knowledge or a guess; link the Note of every statement as a Markdown link with its title as the label and oldbrainfix://note/ followed by its id as the address, such as [Dentist](oldbrainfix://note/note:3f2a); and when the Notes you read hold nothing about it, say that it is not in their Notes.";
 
 /// A tool call waiting for its answer.
 #[derive(Debug)]
@@ -1012,6 +1014,20 @@ Main:
             Some(&json!("2025-03-26"))
         );
         assert_eq!(seen[1], json!(202));
+        // An outside client answers by the Ask panel's rule (#294).
+        let told = seen[0]
+            .pointer("/result/instructions")
+            .and_then(Value::as_str)
+            .ok_or("instructions")?;
+        for rule in [
+            "answer only from the Notes you read through this port",
+            "never from general knowledge",
+            "link the Note of every statement",
+            "oldbrainfix://note/",
+            "say that it is not in their Notes",
+        ] {
+            assert!(told.contains(rule), "{rule}");
+        }
         let listed = seen[2]
             .pointer("/result/tools")
             .and_then(Value::as_array)

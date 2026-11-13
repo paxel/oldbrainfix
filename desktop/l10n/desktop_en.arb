@@ -745,6 +745,8 @@
   "@askKept": {"description": "Link under an answer once it was kept; opens that Note."},
   "askCut": "The answer was cut off at its length limit.",
   "@askCut": {"description": "Under an answer that reached the provider's length limit."},
+  "askUnchecked": "A source could not be checked.",
+  "@askUnchecked": {"description": "Under an answer that linked a Note its model did not read in this question: the link was removed and its words kept (#294)."},
   "askRefused": "The model declined to answer this question.",
   "@askRefused": {"description": "In place of an answer the model refused."},
   "askKeyRefused": "{provider} refused the API key.",

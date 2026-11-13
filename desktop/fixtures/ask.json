@@ -52,27 +52,41 @@
   ],
   "replies": [
     {
-      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\"},\"review\":false}",
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\",\"unchecked\":false},\"review\":false}",
       "answer": {
         "text": "In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).",
         "notes": [
           "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
         ],
-        "cut": false
+        "cut": false,
+        "unchecked": false
       },
       "review": false
     },
     {
-      "body": "{\"answer\":{\"cut\":true,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\",\"note:ffff\"],\"text\":\"Filed into Health; it waits for your review. Ärzte: …\"},\"review\":true}",
+      "body": "{\"answer\":{\"cut\":true,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\",\"note:ffff\"],\"text\":\"Filed into Health; it waits for your review. Ärzte: …\",\"unchecked\":false},\"review\":true}",
       "answer": {
         "text": "Filed into Health; it waits for your review. Ärzte: …",
         "notes": [
           "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9",
           "note:ffff"
         ],
-        "cut": true
+        "cut": true,
+        "unchecked": false
       },
       "review": true
+    },
+    {
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9), a scan.\",\"unchecked\":true},\"review\":false}",
+      "answer": {
+        "text": "In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9), a scan.",
+        "notes": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "cut": false,
+        "unchecked": true
+      },
+      "review": false
     },
     {
       "body": "{\"failure\":\"unready\",\"review\":false,\"unready\":\"noKey\"}",
@@ -203,7 +217,18 @@
         "notes": [
           "note:1"
         ],
-        "cut": false
+        "cut": false,
+        "unchecked": false
+      },
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"notes\":[],\"text\":\"T\",\"unchecked\":\"yes\"},\"review\":false}",
+      "answer": {
+        "text": "T",
+        "notes": [],
+        "cut": false,
+        "unchecked": false
       },
       "review": false
     }

@@ -6200,6 +6200,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneAskCut => 'The answer was cut off at its length limit.';
 
   @override
+  String get phoneAskUnchecked => 'A source could not be checked.';
+
+  @override
   String phoneAskUnreadyCause(String provider) {
     return '$provider is not set up on the computer yet.';
   }

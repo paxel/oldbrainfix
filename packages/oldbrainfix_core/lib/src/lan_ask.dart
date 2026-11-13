@@ -126,16 +126,20 @@ Map<String, Object?> askBody(String question, List<AskExchange> earlier) => {
 
 /// The answer as the phone gets it: its Markdown text, the ids of the
 /// Notes it links as app links in the order first linked (ADR 0046),
-/// which open on the phone, and whether it was cut off at its length.
+/// which open on the phone, whether it was cut off at its length, and
+/// whether the desktop removed a link to a Note its model did not read in
+/// this question ([unchecked], #294); a reply without it removed none.
 class DesktopAnswer {
   final String text;
   final List<String> notes;
   final bool cut;
+  final bool unchecked;
 
   const DesktopAnswer({
     required this.text,
     required this.notes,
     this.cut = false,
+    this.unchecked = false,
   });
 }
 
@@ -216,6 +220,7 @@ class AskReply {
           'cut': answer.cut,
           'notes': answer.notes,
           'text': answer.text,
+          'unchecked': answer.unchecked,
         },
         'review': review,
       };
@@ -259,6 +264,7 @@ class AskReply {
                 if (id is String) id,
           ],
           cut: answered['cut'] == true,
+          unchecked: answered['unchecked'] == true,
         ),
         review: review,
       );

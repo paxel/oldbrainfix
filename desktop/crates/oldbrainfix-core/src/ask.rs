@@ -59,7 +59,7 @@ pub const MAX_ROUNDS: usize = 24;
 /// What the model is told, the same for every question so that a
 /// provider can keep it cached; the time and the question come in the
 /// user's turn.
-pub const SYSTEM: &str = "You answer questions about the user's own Notes in Old Brain Fix, a memory aid. Find what you need with the tools: search with find_notes several times, with different words, synonyms and spellings in the user's language, use list_new for what came in since a time, and read the Notes you use with read_note. Answer briefly and only from what the Notes say; when they hold nothing about it, say so. Link every Note you use as a Markdown link with its title as the label and oldbrainfix://note/ followed by its id as the address, such as [Dentist](oldbrainfix://note/note:3f2a). Answer in the language of the question. Change something only when the user asks for it, such as filing what is new into Areas and Topics or adding tags to a text: every change waits for the user's review in the app, so say what you changed and that it waits for review. Notes the user hid from the AI do not exist for you.";
+pub const SYSTEM: &str = "You answer questions about the user's own Notes in Old Brain Fix, a memory aid. Find what you need with the tools: search with find_notes several times, with different words, synonyms and spellings in the user's language, use list_new for what came in since a time, and read the Notes you use with read_note. Answer briefly and only from the Notes you read with read_note during this question, never from general knowledge or a guess: an excerpt find_notes or list_new gives, or a Note an earlier answer named, counts only once you read that Note with read_note in this question; the Areas, Topics, tags, Routines and check-offs the other tools list count too. Link the Note of every statement you take from a Note as a Markdown link with its title as the label and oldbrainfix://note/ followed by its id as the address, such as [Dentist](oldbrainfix://note/note:3f2a); a link to a Note you did not read in this question is removed. When the Notes you read hold nothing about it, answer only \"That's not in your Notes\", translated into the language of the question. Answer in the language of the question. Change something only when the user asks for it, such as filing what is new into Areas and Topics or adding tags to a text: every change waits for the user's review in the app, so say what you changed and that it waits for review, linking only the Notes you read. Notes the user hid from the AI do not exist for you.";
 
 /// The line before the question in the user's turn, the time after it.
 const NOW: &str = "Now on this computer: ";
@@ -350,15 +350,17 @@ pub struct Exchange {
 }
 
 /// The model's answer: its text, Markdown with the Notes it came from as
-/// app links, those Notes' ids in the order first linked (explicit, so
-/// that what they link can be checked, #294), the Notes the tools handed
-/// out in full, and whether the answer was cut off at its length.
+/// app links, those Notes' ids in the order first linked, the Notes the
+/// tools handed out in full, whether the answer was cut off at its
+/// length, and whether a link was removed from it: every Note it links
+/// was read in this question ([`checked`], #294).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Answer {
     pub text: String,
     pub notes: Vec<String>,
     pub read: Vec<String>,
     pub cut: bool,
+    pub unchecked: bool,
 }
 
 /// What the model did after a request.
@@ -643,28 +645,34 @@ impl Conversation {
     }
 
     fn answered(&self, text: String, cut: bool) -> Step {
+        let (text, unchecked) = checked(&text, &self.read);
         Step::Answered(Answer {
             notes: linked_notes(&text),
             text,
             read: self.read.clone(),
             cut,
+            unchecked,
         })
     }
 
     /// Gives the model what the tools it called answered, each output
-    /// beside its call.
+    /// beside its call. A Note counts as read when `read_note` or
+    /// `read_attachment_text` handed it out: a tool that only names a
+    /// Note, such as `read_check_offs`, answers for one hidden from the AI
+    /// or none at all without an error.
     pub fn answer(&mut self, done: &[(ToolCall, ToolOutput)]) {
         for (call, output) in done {
-            if !output.is_error {
-                for key in ["id", "note"] {
-                    if call.name.starts_with("read_")
-                        && let Some(id) = call.args.get(key).and_then(Value::as_str)
-                        && id.starts_with("note:")
-                        && !self.read.iter().any(|r| r == id)
-                    {
-                        self.read.push(id.to_string());
-                    }
-                }
+            let key = match call.name.as_str() {
+                "read_note" => "id",
+                "read_attachment_text" => "note",
+                _ => continue,
+            };
+            if !output.is_error
+                && let Some(id) = call.args.get(key).and_then(Value::as_str)
+                && id.starts_with("note:")
+                && !self.read.iter().any(|r| r == id)
+            {
+                self.read.push(id.to_string());
             }
         }
         let unreadable = std::mem::take(&mut self.unreadable);
@@ -750,6 +758,52 @@ pub fn linked_notes(text: &str) -> Vec<String> {
         walk(&block.spans, &mut out);
     }
     out
+}
+
+/// `text` with every app link to a Note not in `read` made plain text,
+/// its label's words kept (#294, Q691), and whether one was: the answer
+/// may name only the Notes the model read in this question, which also
+/// leaves out any Hidden from AI or none that exists. A link's label is
+/// read without links, so one that shows once its link is gone is
+/// checked too. An answer without such a link stays as it is.
+pub fn checked(text: &str, read: &[String]) -> (String, bool) {
+    fn walk(spans: &[Span], read: &[String], out: &mut Vec<(usize, usize, usize, usize)>) {
+        for span in spans {
+            if span.kind == SpanKind::Link
+                && let Some(AppLink::Note(id)) = app_link::parse(&span.url)
+            {
+                if !read.contains(&id) {
+                    out.push((span.start, span.end, span.content_start, span.content_end));
+                }
+                continue;
+            }
+            walk(&span.children, read, out);
+        }
+    }
+    let mut text = text.to_string();
+    let mut unchecked = false;
+    loop {
+        let mut cut = Vec::new();
+        for block in markdown::parse(&text) {
+            walk(&block.spans, read, &mut cut);
+        }
+        cut.sort_unstable();
+        let mut changed = false;
+        for (start, end, label_start, label_end) in cut.into_iter().rev() {
+            if let (Some(before), Some(label), Some(after)) = (
+                text.get(..start),
+                text.get(label_start..label_end),
+                text.get(end..),
+            ) {
+                text = format!("{before}{label}{after}");
+                changed = true;
+            }
+        }
+        if !changed {
+            return (text, unchecked);
+        }
+        unchecked = true;
+    }
 }
 
 /// Asks `conversation` through `transport` until the model answers, the
@@ -1017,6 +1071,12 @@ mod tests {
         assert_eq!(asked.answer.notes, std::slice::from_ref(&note.id));
         assert_eq!(asked.answer.read, std::slice::from_ref(&note.id));
         assert!(!asked.answer.cut);
+        // Its one link names the Note read: the answer stays as it came.
+        assert!(!asked.answer.unchecked);
+        assert_eq!(
+            asked.answer.text,
+            format!("In the [blue folder](oldbrainfix://note/{}).", note.id)
+        );
         assert_eq!(asked.task, None);
         let bodies = fake.bodies();
         assert_eq!(bodies.len(), 3);
@@ -1179,16 +1239,17 @@ mod tests {
     fn an_openai_compatible_model_calls_tools_and_hears_of_arguments_it_got_wrong() -> TestResult {
         let store = store();
         let note = Notes::new(&store).capture("Wifi password on the router", None, None)?;
-        let calls = |id: &str, args: &str| {
+        let calls = |id: &str, name: &str, args: &str| {
             json!({"choices": [{"finish_reason": "tool_calls", "message": {
                 "content": null,
                 "role": "assistant",
-                "tool_calls": [{"function": {"arguments": args, "name": "find_notes"}, "id": id, "type": "function"}],
+                "tool_calls": [{"function": {"arguments": args, "name": name}, "id": id, "type": "function"}],
             }}]})
         };
         let fake = Fake::new(vec![
-            calls("c1", "{words: wifi"),
-            calls("c2", r#"{"words": ["wifi"]}"#),
+            calls("c1", "find_notes", "{words: wifi"),
+            calls("c2", "find_notes", r#"{"words": ["wifi"]}"#),
+            calls("c3", "read_note", &json!({"id": note.id}).to_string()),
             json!({"choices": [{"finish_reason": "stop", "message": {
                 "content": format!("[On the router](oldbrainfix://note/{})", note.id),
                 "role": "assistant",
@@ -1329,6 +1390,180 @@ mod tests {
         assert!(seen.to_ascii_lowercase().contains("x-api-key: sk-test"));
         assert!(seen.ends_with(r#"{"model":"m"}"#));
         Ok(())
+    }
+
+    #[test]
+    fn the_system_prompt_answers_only_from_the_notes_read_with_a_link_for_each() {
+        for rule in [
+            "only from the Notes you read with read_note during this question",
+            "never from general knowledge",
+            "Link the Note of every statement",
+            "the Areas, Topics, tags, Routines and check-offs the other tools list count too",
+            "oldbrainfix://note/",
+            "a link to a Note you did not read in this question is removed",
+            "\"That's not in your Notes\"",
+            "translated into the language of the question",
+        ] {
+            assert!(SYSTEM.contains(rule), "{rule}");
+        }
+    }
+
+    #[test]
+    fn a_link_to_a_note_not_read_in_this_question_is_removed_and_the_answer_marked() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let passport = notes.capture("Passport in the blue folder", None, None)?;
+        let old = notes.capture("Passport photo booth at the station", None, None)?;
+        let fake = Fake::new(vec![
+            tool_use("find_notes", json!({"words": ["passport"]})),
+            tool_use("read_note", json!({"id": passport.id})),
+            end_turn(&format!(
+                "In the [blue folder](oldbrainfix://note/{}), photos from the [station](oldbrainfix://note/{}).",
+                passport.id, old.id
+            )),
+        ]);
+        let asked = ask(&store, &fake, anthropic(), "Where is my passport?")?;
+        // The Note only found keeps its words, without its link; the one
+        // read keeps its link.
+        assert_eq!(
+            asked.answer.text,
+            format!(
+                "In the [blue folder](oldbrainfix://note/{}), photos from the station.",
+                passport.id
+            )
+        );
+        assert_eq!(asked.answer.notes, std::slice::from_ref(&passport.id));
+        assert!(asked.answer.unchecked);
+        Ok(())
+    }
+
+    #[test]
+    fn a_note_read_in_an_earlier_question_is_not_read_in_this_one() -> TestResult {
+        let store = store();
+        let passport = Notes::new(&store).capture("Passport in the blue folder", None, None)?;
+        let link = format!("[blue folder](oldbrainfix://note/{})", passport.id);
+        let earlier = [Exchange {
+            question: "Where is my passport?".into(),
+            answer: format!("In the {link}."),
+        }];
+        let fake = Fake::new(vec![end_turn(&format!("Still in the {link}."))]);
+        let mut conversation =
+            Conversation::new(anthropic(), &earlier, "Still there?", "2026-01-01 10:00");
+        let answer = store
+            .ask(&mut conversation, &fake, &utc)
+            .map_err(|e| e.to_string())?
+            .answer;
+        assert_eq!(answer.text, "Still in the blue folder.");
+        assert!(answer.notes.is_empty() && answer.unchecked);
+        Ok(())
+    }
+
+    #[test]
+    fn a_link_to_a_note_that_does_not_exist_is_removed_and_the_answer_marked() -> TestResult {
+        let store = store();
+        let fake = Fake::new(vec![
+            tool_use("read_note", json!({"id": "note:0a1b2c3d"})),
+            end_turn("On [Friday](oldbrainfix://note/note:0a1b2c3d) at 9."),
+        ]);
+        let asked = ask(&store, &fake, anthropic(), "When is the dentist?")?;
+        assert!(
+            asked.answer.read.is_empty(),
+            "a read that failed reads none"
+        );
+        assert_eq!(asked.answer.text, "On Friday at 9.");
+        assert!(asked.answer.notes.is_empty());
+        assert!(asked.answer.unchecked);
+        Ok(())
+    }
+
+    #[test]
+    fn an_answer_without_links_stays_as_it_came_and_unmarked() -> TestResult {
+        let store = store();
+        Notes::new(&store).capture("Bike lock code 4711", None, None)?;
+        let text = "That's not in your Notes. See [the guide](oldbrainfix://guide/ask) or [the web](https://example.com).";
+        let fake = Fake::new(vec![
+            tool_use("find_notes", json!({"words": ["tax"]})),
+            end_turn(text),
+        ]);
+        let asked = ask(&store, &fake, anthropic(), "When is my tax return due?")?;
+        assert_eq!(asked.answer.text, text);
+        assert!(asked.answer.notes.is_empty());
+        assert!(!asked.answer.unchecked);
+        Ok(())
+    }
+
+    #[test]
+    fn a_link_to_a_note_hidden_from_ai_is_removed_even_when_the_model_names_it() -> TestResult {
+        let store = store();
+        let hidden = Notes::new(&store).capture("Diary: the kidney results", None, None)?;
+        store.set_hidden_from_ai(&hidden.id, true)?;
+        // The model knows the id from elsewhere and asks every tool that
+        // takes a Note for it: none hands it out.
+        let fake = Fake::new(vec![
+            tool_use("read_note", json!({"id": hidden.id})),
+            tool_use("read_check_offs", json!({"note": hidden.id})),
+            tool_use(
+                "read_attachment_text",
+                json!({"note": hidden.id, "file": "abc"}),
+            ),
+            end_turn(&format!(
+                "See your [diary](oldbrainfix://note/{}).",
+                hidden.id
+            )),
+        ]);
+        let asked = ask(&store, &fake, anthropic(), "What about my kidney?")?;
+        assert!(asked.answer.read.is_empty(), "{:?}", asked.answer.read);
+        assert_eq!(asked.answer.text, "See your diary.");
+        assert!(asked.answer.notes.is_empty());
+        assert!(asked.answer.unchecked);
+        Ok(())
+    }
+
+    #[test]
+    fn every_note_link_is_checked_wherever_it_stands() {
+        let read = vec!["note:a".to_string()];
+        let (text, unchecked) = checked(
+            "**[A](OLDBRAINFIX://note/note:b)**, [a](oldbrainfix://note/note:a)",
+            &read,
+        );
+        assert_eq!(text, "**A**, [a](oldbrainfix://note/note:a)");
+        assert!(unchecked);
+        // A link that shows once the one around it is gone goes too.
+        let (text, unchecked) = checked(
+            "[[x](oldbrainfix://note/note:c)](oldbrainfix://note/note:d)",
+            &read,
+        );
+        assert_eq!(text, "x");
+        assert!(unchecked);
+        // The id as the link says it once its escapes are read.
+        let (text, unchecked) = checked(
+            "[a](oldbrainfix://note/note%3Aa) [c](oldbrainfix://note/note%3Ac)",
+            &read,
+        );
+        assert_eq!(text, "[a](oldbrainfix://note/note%3Aa) c");
+        assert!(unchecked);
+        // In a table's cell, and beside an Area's link, which stays.
+        let table = "| What | Where |\n| --- | --- |\n| Key | [hook](oldbrainfix://note/note:e) |\n\n[Home](oldbrainfix://area/area:h)";
+        let (text, unchecked) = checked(table, &read);
+        assert_eq!(
+            text,
+            "| What | Where |\n| --- | --- |\n| Key | hook |\n\n[Home](oldbrainfix://area/area:h)"
+        );
+        assert!(unchecked);
+        for text in [
+            "Plain, `[a](oldbrainfix://note/note:b)` in code, and oldbrainfix://note/note:b bare.",
+            "[a](oldbrainfix://note/note:a)",
+            "",
+        ] {
+            assert_eq!(checked(text, &read), (text.to_string(), false), "{text}");
+        }
+        // What is left links only Notes read.
+        let (text, _) = checked(
+            "[a](oldbrainfix://note/note:a) [b](oldbrainfix://note/note:b) [[c](oldbrainfix://note/note:a)](oldbrainfix://note/note:z)",
+            &read,
+        );
+        assert!(linked_notes(&text).iter().all(|id| read.contains(id)));
+        assert_eq!(linked_notes(&text), ["note:a"]);
     }
 
     #[test]

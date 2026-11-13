@@ -10106,6 +10106,12 @@ abstract class AppLocalizations {
   /// **'The answer was cut off at its length limit.'**
   String get phoneAskCut;
 
+  /// Line under an answer that linked a Note the computer's model did not read in this question: the computer removed the link and kept its words (#294).
+  ///
+  /// In en, this message translates to:
+  /// **'A source could not be checked.'**
+  String get phoneAskUnchecked;
+
   /// Why the computer cannot ask its provider yet.
   ///
   /// In en, this message translates to:

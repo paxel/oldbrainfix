@@ -169,12 +169,15 @@ impl Question {
 }
 
 /// The answer as the phone gets it: its Markdown text, the Notes it
-/// links in the order first linked, and whether it was cut off.
+/// links in the order first linked, whether it was cut off, and whether
+/// a link to a Note not read was removed from it ([`crate::ask::checked`]);
+/// a reply without the last is one with none removed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Answered {
     pub text: String,
     pub notes: Vec<String>,
     pub cut: bool,
+    pub unchecked: bool,
 }
 
 /// Why the phone's question got no answer.
@@ -274,7 +277,12 @@ impl AskReply {
             Ok(answer) => {
                 map.insert(
                     "answer".into(),
-                    json!({"cut": answer.cut, "notes": answer.notes, "text": answer.text}),
+                    json!({
+                        "cut": answer.cut,
+                        "notes": answer.notes,
+                        "text": answer.text,
+                        "unchecked": answer.unchecked,
+                    }),
                 );
                 map.insert("review".into(), json!(self.review));
             }
@@ -321,6 +329,7 @@ impl AskReply {
                     text: answer.get("text")?.as_str()?.to_string(),
                     notes,
                     cut: answer.get("cut").and_then(Value::as_bool) == Some(true),
+                    unchecked: answer.get("unchecked").and_then(Value::as_bool) == Some(true),
                 }),
                 review,
             });
@@ -438,6 +447,7 @@ impl Store {
                         text: asked.answer.text,
                         notes: asked.answer.notes,
                         cut: asked.answer.cut,
+                        unchecked: asked.answer.unchecked,
                     })
                     .map_err(|e| AskFailure::of(e, &provider))
             }
@@ -844,9 +854,10 @@ mod tests {
         let fake = Fake::new(vec![
             tool_use("find_notes", json!({"words": ["passport"]})),
             tool_use("read_note", json!({"id": hidden.id})),
+            tool_use("read_note", json!({"id": passport.id})),
             end_turn(&format!(
-                "In the [blue folder](oldbrainfix://note/{}).",
-                passport.id
+                "In the [blue folder](oldbrainfix://note/{}), a [scan](oldbrainfix://note/{}).",
+                passport.id, hidden.id
             )),
         ]);
         let body = Question {
@@ -862,10 +873,16 @@ mod tests {
         assert_eq!(
             reply,
             AskReply {
+                // The hidden Note was never read, so its link is gone, and
+                // the phone hears that a source could not be checked.
                 outcome: Ok(Answered {
-                    text: format!("In the [blue folder](oldbrainfix://note/{}).", passport.id),
+                    text: format!(
+                        "In the [blue folder](oldbrainfix://note/{}), a scan.",
+                        passport.id
+                    ),
                     notes: vec![passport.id.clone()],
                     cut: false,
+                    unchecked: true,
                 }),
                 review: false,
             }

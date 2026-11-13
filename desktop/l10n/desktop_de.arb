@@ -396,6 +396,7 @@
   "askKeep": "Als Notiz behalten",
   "askKept": "Als Notiz behalten",
   "askCut": "Die Antwort wurde an ihrer Längengrenze abgeschnitten.",
+  "askUnchecked": "Eine Quelle konnte nicht geprüft werden.",
   "askRefused": "Das Modell hat diese Frage nicht beantwortet.",
   "askKeyRefused": "{provider} hat den API-Schlüssel abgelehnt.",
   "askProviderFailed": "{provider} hat mit einem Fehler geantwortet.",

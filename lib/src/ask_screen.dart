@@ -661,6 +661,14 @@ class _AskScreenState extends State<AskScreen> {
         const SizedBox(height: 4),
         Text(t.phoneAskCut, style: weak),
       ],
+      if (asked.answer.unchecked) ...[
+        const SizedBox(height: 4),
+        Text(
+          t.phoneAskUnchecked,
+          key: ValueKey('ask-unchecked-$i'),
+          style: weak,
+        ),
+      ],
       if (asked.sources.isNotEmpty) ...[
         const SizedBox(height: 8),
         Text(t.phoneAskFromNotes, style: weak),

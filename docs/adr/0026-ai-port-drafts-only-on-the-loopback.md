@@ -111,3 +111,7 @@ Amended by #267 (ADR 0049): every tool runs as the AI sees the store (`Store::fo
 ## Asking (#267)
 
 Amended by ADR 0051: the desktop's Ask panel calls the port's tools in-process, as the AI sees the store, through `Store::ask_tool`, which reads in no AI Task, so asking does not pause sync, and opens the AI Task only at the model's first change, drafted as the port drafts it; one the question left without a change is declined. Two tools that only read join the port, for the user's own MCP client too: `find_notes` (several words at once, the Notes holding most of them first, each with its title, capture time, place, the words it holds and an excerpt) and `list_new` (the Notes captured or amended since a day or a time). The port itself still opens its AI Task when it opens. No trust rule changed.
+
+## Answers only from the Notes read (#294)
+
+Amended by #294 (Q692): the `instructions` the port sends on `initialize` carry the Ask panel's rule (ADR 0051) for the user's own MCP client: answer questions about the Notes only from the Notes read through the port with `read_note`, never from general knowledge or a guess, link the Note of every statement as `[title](oldbrainfix://note/<id>)` (ADR 0046), and say when the Notes read hold nothing about it. The port sees no answer of an outside client, so none is checked. No trust rule changed.

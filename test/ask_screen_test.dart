@@ -255,6 +255,31 @@ void main() {
       expect(desk.asked.last.$2, isEmpty, reason: 'started over');
     });
 
+    testWidgets('say when a source could not be checked, and only '
+        'then', (tester) async {
+      store.allowAsking(fakeClaude);
+      var unchecked = true;
+      final desk = FakeAsking(
+        answer: (_) => AskReply.answered(
+          DesktopAnswer(
+            text: 'In the blue folder.',
+            notes: const [],
+            unchecked: unchecked,
+          ),
+        ),
+      );
+      await pumpAsk(tester, desk);
+      await ask(tester, 'Where is my passport?');
+      expect(key('ask-unchecked-0'), findsOneWidget);
+      expect(find.text('A source could not be checked.'), findsOneWidget);
+      unchecked = false;
+      await ask(tester, 'And the ID card?');
+      // Newest first: the new answer is marked nothing, the first still.
+      expect(key('ask-unchecked-0'), findsNothing);
+      expect(key('ask-unchecked-1'), findsOneWidget);
+      expect(find.text('A source could not be checked.'), findsOneWidget);
+    });
+
     testWidgets('Keep as Note saves the question and the answer as a '
         'Markdown Note in Unsorted with no Nudge', (tester) async {
       store.allowAsking(fakeClaude);

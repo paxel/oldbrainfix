@@ -7450,7 +7450,12 @@ Map<String, Object?> _ask() {
   Map<String, Object?> reply(AskReply reply) => {
     'body': jsonEncode(reply.toJson()),
     if (reply.answer case final answer?)
-      'answer': {'text': answer.text, 'notes': answer.notes, 'cut': answer.cut}
+      'answer': {
+        'text': answer.text,
+        'notes': answer.notes,
+        'cut': answer.cut,
+        'unchecked': answer.unchecked,
+      }
     else ...{
       'failure': reply.failure?.name,
       'message': reply.message,
@@ -7533,6 +7538,13 @@ Map<String, Object?> _ask() {
           ),
           review: true,
         ),
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'In the [blue folder](oldbrainfix://note/$passport), a scan.',
+            notes: [passport],
+            unchecked: true,
+          ),
+        ),
         AskReply.failed(AskFailure.unready, unready: AskUnready.noKey),
         AskReply.failed(AskFailure.unready, unready: AskUnready.badUrl),
         AskReply.failed(AskFailure.unready),
@@ -7567,6 +7579,10 @@ Map<String, Object?> _ask() {
           },
           'review': 1,
           'later': true,
+        },
+        {
+          'answer': {'notes': <String>[], 'text': 'T', 'unchecked': 'yes'},
+          'review': false,
         },
       ])
         {...reply(AskReply.fromJson(body)!), 'body': jsonEncode(body)},
@@ -10910,8 +10926,9 @@ Future<void> main(List<String> args) async {
     'typed, what is no code and codes of a later version (ADR 0034).\n'
     '- `ask.json`: the phone\'s question through the desktop (#267, ADR '
     '0051): question bodies with their earlier exchanges, the provider as '
-    'the phone learns it, answers and every kind of failure as bodies with '
-    'what they hold, replies of a later desktop, and addresses typed by '
+    'the phone learns it, answers (one whose unread Note links were '
+    'removed, #294) and every kind of failure as bodies with what they '
+    'hold, replies of a later desktop, and addresses typed by '
     'hand for a paired Device as read or refused.\n'
     '- `later_formats.json`: what files and values of a later version '
     '(ADR 0034) come to: Sent Items, Backup header lines, the opened keys '

@@ -194,6 +194,8 @@ fn an_answer_shows_with_links_that_open_the_notes_it_came_from() -> TestResult {
     ask(&mut harness, "Where is my passport?");
     assert!(shows(&harness, "Where is my passport?"));
     assert!(shows(&harness, t.ask_from_notes()));
+    // Its link names the Note read: nothing is marked.
+    assert!(!shows(&harness, t.ask_unchecked()));
     // The tools read the Note itself.
     assert!(fake.sent().contains(PASSPORT));
     harness.get_by_role_and_label(Role::Link, PASSPORT).click();
@@ -216,7 +218,11 @@ fn an_answer_shows_with_links_that_open_the_notes_it_came_from() -> TestResult {
 fn keep_as_note_saves_the_question_and_its_answer_and_leaving_drops_the_rest() -> TestResult {
     let (store, passport) = store()?;
     let answer = format!("In the [blue folder](oldbrainfix://note/{passport}).");
-    let fake = Fake::new(vec![end_turn(&answer), end_turn("Also in the drawer.")]);
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"id": passport})),
+        end_turn(&answer),
+        end_turn("Also in the drawer."),
+    ]);
     let t = L10n::new("en");
     let mut harness = harness(store, &fake);
     ask(&mut harness, "Where is my passport?");
@@ -418,6 +424,33 @@ fn off_the_windows_thread_the_tools_are_answered_on_it() -> TestResult {
     assert!(harness.state().ask_panel().asking.is_none());
     assert!(fake.sent().contains(PASSPORT));
     assert!(shows(&harness, PASSPORT));
+    Ok(())
+}
+
+#[test]
+fn a_link_to_a_note_not_read_goes_and_the_answer_says_a_source_could_not_be_checked() -> TestResult
+{
+    let (store, passport) = store()?;
+    // The model only found the Note, and links it.
+    let fake = Fake::new(vec![
+        tool_use("find_notes", json!({"words": ["passport"]})),
+        end_turn(&format!(
+            "It is in the [blue folder](oldbrainfix://note/{passport})."
+        )),
+    ]);
+    let t = L10n::new("en");
+    let mut harness = harness(store, &fake);
+    harness.state_mut().set_redraw(Arc::new(|| {}));
+    ask_off_thread(&mut harness, "Where is my passport?");
+    until(&mut harness, |app| !app.ask_panel().exchanges.is_empty());
+    assert!(shows(&harness, t.ask_unchecked()));
+    assert!(shows(&harness, "It is in the blue folder."));
+    assert!(
+        harness
+            .query_by_role_and_label(Role::Link, "blue folder")
+            .is_none()
+    );
+    assert!(!shows(&harness, t.ask_from_notes()));
     Ok(())
 }
 

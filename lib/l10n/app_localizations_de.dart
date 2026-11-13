@@ -6274,6 +6274,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Antwort wurde an ihrer Längengrenze abgeschnitten.';
 
   @override
+  String get phoneAskUnchecked => 'Eine Quelle konnte nicht geprüft werden.';
+
+  @override
   String phoneAskUnreadyCause(String provider) {
     return '$provider ist auf dem Computer noch nicht eingerichtet.';
   }

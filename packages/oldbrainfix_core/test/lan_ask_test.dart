@@ -67,13 +67,15 @@ void main() {
 
     tearDown(() => host.stop());
 
-    test('names the provider and answers the question with its Notes and '
-        'the review that waits', () async {
+    test('names the provider and answers the question with its Notes, '
+        'whether a source could not be checked, and the review that '
+        'waits', () async {
       final device = await pair();
       host.answering = (body) => const AskReply.answered(
         DesktopAnswer(
-          text: 'In the [blue folder](oldbrainfix://note/note:1).',
+          text: 'In the [blue folder](oldbrainfix://note/note:1), a scan.',
           notes: ['note:1'],
+          unchecked: true,
         ),
         review: true,
       );
@@ -87,6 +89,7 @@ void main() {
       );
       expect(reply.answer?.notes, ['note:1']);
       expect(reply.answer?.text, contains('blue folder'));
+      expect(reply.answer?.unchecked, isTrue);
       expect(reply.review, isTrue);
       expect(host.asked.single, {
         'earlier': [
@@ -253,6 +256,26 @@ void main() {
         0,
         reason: 'a status is a whole number',
       );
+    });
+
+    test('the mark that a source could not be checked goes both ways, and '
+        'an answer without it has none', () {
+      for (final unchecked in [true, false]) {
+        final reply = AskReply.answered(
+          DesktopAnswer(text: 'T', notes: const [], unchecked: unchecked),
+        );
+        final json = reply.toJson();
+        expect((json['answer'] as Map?)?['unchecked'], unchecked);
+        expect(AskReply.fromJson(json)?.answer?.unchecked, unchecked);
+      }
+      for (final later in [
+        {'text': 'T'},
+        {'text': 'T', 'unchecked': 'yes'},
+        {'text': 'T', 'unchecked': 1},
+      ]) {
+        final reply = AskReply.fromJson({'answer': later, 'review': false});
+        expect(reply?.answer?.unchecked, isFalse, reason: '$later');
+      }
     });
 
     test('a provider of a later protocol is none, a reason not known is '

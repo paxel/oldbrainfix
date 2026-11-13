@@ -668,7 +668,10 @@
 <p>
   The line under the heading names the provider and the model. The model searches your Notes several
   times with its own words, reads the Notes it uses and links them in its answer; a click on a link, or
-  on a title under <strong>From these Notes</strong>, opens the Note over the panel. Only what the model
+  on a title under <strong>From these Notes</strong>, opens the Note over the panel. The model answers only
+  from the Notes it read for this question, never from general knowledge, and says "That's not in your
+  Notes" when they hold nothing about it. A link to a Note it did not read is removed, its words stay,
+  and the answer then says <strong>A source could not be checked</strong>. Only what the model
   finds and reads is sent to the provider: the names of your Areas, Topics and tags, your Routines and Reminders with their check-offs when it lists them, the titles and short excerpts of the Notes its searches find, and the Notes it reads in full, with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context (when and where a Note was captured, the calendar event and the Bluetooth device). Notes and Areas Hidden from AI are never
   sent, not even as a count. Asking does not pause sync.
 </p>

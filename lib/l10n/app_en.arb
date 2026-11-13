@@ -3313,6 +3313,8 @@
   "@phoneAskKept": {"description": "Shown once the answer was kept; a tap opens the Note."},
   "phoneAskCut": "The answer was cut off at its length limit.",
   "@phoneAskCut": {"description": "Line under an answer the provider cut off."},
+  "phoneAskUnchecked": "A source could not be checked.",
+  "@phoneAskUnchecked": {"description": "Line under an answer that linked a Note the computer's model did not read in this question: the computer removed the link and kept its words (#294)."},
   "phoneAskUnreadyCause": "{provider} is not set up on the computer yet.",
   "@phoneAskUnreadyCause": {"description": "Why the computer cannot ask its provider yet.", "placeholders": {"provider": {"type": "String", "example": "Anthropic"}}},
   "phoneAskUnreadyFix": "Set up the provider under Ask panel in the computer's Settings.",

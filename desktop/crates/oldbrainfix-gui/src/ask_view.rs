@@ -251,8 +251,9 @@ pub fn page(
 }
 
 /// An answer as Markdown, its links opening the Notes they name, whether
-/// it was cut off, the Notes it came from, and "Keep as Note", or that it
-/// was kept.
+/// it was cut off, whether a link to a Note not read was removed from it
+/// (#294), the Notes it came from, and "Keep as Note", or that it was
+/// kept.
 fn answer_rows(
     ui: &mut Ui,
     t: &L10n,
@@ -272,6 +273,9 @@ fn answer_rows(
     text_marks_view::link_clicks(ui, Id::new(("ask answer", at)), &spots.links);
     if answer.cut {
         ui.label(RichText::new(t.ask_cut()).small().color(weak));
+    }
+    if answer.unchecked {
+        ui.label(RichText::new(t.ask_unchecked()).small().color(weak));
     }
     if !exchange.sources.is_empty() {
         ui.label(RichText::new(t.ask_from_notes()).small().color(weak));

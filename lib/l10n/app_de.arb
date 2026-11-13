@@ -1676,6 +1676,7 @@
   "phoneAskKeep": "Als Notiz behalten",
   "phoneAskKept": "Als Notiz gespeichert",
   "phoneAskCut": "Die Antwort wurde an ihrer Längengrenze abgeschnitten.",
+  "phoneAskUnchecked": "Eine Quelle konnte nicht geprüft werden.",
   "phoneAskUnreadyCause": "{provider} ist auf dem Computer noch nicht eingerichtet.",
   "phoneAskUnreadyFix": "Richte den Anbieter unter Fragen-Ansicht in den Einstellungen des Computers ein.",
   "phoneAskUnreadyModel": "Gib unter Fragen-Ansicht in den Einstellungen des Computers ein Modell an.",

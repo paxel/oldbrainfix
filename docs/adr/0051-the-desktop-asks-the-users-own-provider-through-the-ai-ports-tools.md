@@ -21,7 +21,7 @@ A `Conversation` is the protocol alone: it gives the next request, takes the rep
 
 ## The answer
 
-The model is told to link every Note it uses as an app link (ADR 0046), `[title](oldbrainfix://note/<id>)`. The answer is its Markdown text, the ids of the Notes it links in the order first linked, the ids of the Notes the tools handed out in full, and whether it was cut off: the links are explicit, so that #294 can check each against what the model read. The panel draws the text as a formatted text, each link opening its Note, and lists the Notes it came from by their titles. A question not answered goes back into the field, and why is announced at the top with the provider's own message. An answer is gone once the list shows another place, unless "Keep as Note" saved the question and the answer, with its links, as a new Unsorted Note in Markdown. A follow-up is asked after the earlier questions and answers of the panel, as text.
+The model is told to link every Note it uses as an app link (ADR 0046), `[title](oldbrainfix://note/<id>)`. The answer is its Markdown text, the ids of the Notes it links in the order first linked, the ids of the Notes the tools handed out in full, whether it was cut off, and whether a source could not be checked (see "Answers only from the Notes read" below). The panel draws the text as a formatted text, each link opening its Note, and lists the Notes it came from by their titles. A question not answered goes back into the field, and why is announced at the top with the provider's own message. An answer is gone once the list shows another place, unless "Keep as Note" saved the question and the answer, with its links, as a new Unsorted Note in Markdown. A follow-up is asked after the earlier questions and answers of the panel, as text.
 
 ## The provider is a local setting
 
@@ -47,7 +47,7 @@ The model is told to link every Note it uses as an app link (ADR 0046), `[title]
 Amended by #267 (Q640, Q641): the phone holds no provider and no key; it asks the user's own desktop over the paired connection (ADR 0003), and the desktop runs the question as the panel does. The wire and who may ask are in ADR 0003.
 
 - The desktop asks with its own provider and key, on its clock, through `Store::ask` (`Store::answer_question` in `lan_ask.rs`): the same tools, the same system prompt, Hidden from AI out of every request, the earlier exchanges the phone sends asked before the question, as the panel's follow-ups. A change the model makes is a draft of the AI Task, reviewed on the desktop only; the answer says whether a review now waits, read after the question, so that one that failed after a draft says so too.
-- The phone gets the answer's text and the ids of the Notes it links, which open on the phone, and whether it was cut off; not the ids of the Notes the tools read. A question not answered comes back with its kind and, for a refused key, another error of the provider, no reply from it or one that could not be read, the provider's message.
+- The phone gets the answer's text and the ids of the Notes it links, which open on the phone, whether it was cut off, and whether a source could not be checked (`unchecked`, #294; a reply without it is one with none removed); not the ids of the Notes the tools read. A question not answered comes back with its kind and, for a refused key, another error of the provider, no reply from it or one that could not be read, the provider's message.
 - The key never leaves the desktop: the provider is named to the phone by its protocol, model and host alone, and every message of a failure has the key and the user and query of the address replaced before it goes out, since a provider may repeat the key it refused and an error the address.
 - Before the first question the phone names the provider and what is sent and asks the user's permission (guideline 5.1.2(i)); "Keep as Note" saves the question and the answer on the phone as on the desktop. That screen is the phone's.
 
@@ -56,3 +56,18 @@ Amended by #267 (Q640, Q641): the phone holds no provider and no key; it asks th
 - A phone's question reads the desktop's Notes, those Hidden from AI aside, and reaches the desktop's provider; the desktop must be running, at home or through the user's VPN.
 - One question at a time on the desktop: a second phone asking meanwhile hears that the desktop is busy.
 - A phone's question that opened an AI Task and left it without a change declines it at its end, as the panel does; unlike the panel, it does not see whether the AI port's client works in that task meanwhile without having changed anything yet.
+
+## Answers only from the Notes read (#294)
+
+Amended by #294 (Q690, Q691): a plausible answer from general knowledge, such as a date the model guessed, is the worst one for a forgetful user, and the panel answers "what did I write, when, where"; a general question belongs in the provider's own chat.
+
+- The system prompt tells the model to answer only from the Notes it read with `read_note` in this question, never from general knowledge or a guess: an excerpt `find_notes` or `list_new` gives, or a Note an earlier answer named, counts only once the model read that Note in this question; the Areas, Topics, tags, Routines and check-offs the other tools list count too. It links the Note of every statement taken from a Note, and a report of its changes links only Notes it read, and answers "That's not in your Notes", in the language of the question, when the Notes it read hold nothing about it. The prompt stays the same for every question, so that it stays cached.
+- A Note counts as read in this question when `read_note` or `read_attachment_text` handed it out without an error. A tool that only names a Note, such as `read_check_offs`, answers for one Hidden from AI or one that does not exist without an error, so it reads none.
+- When the model has answered, the core checks every app link to a Note in the text (`ask::checked`, in `Conversation`, so the panel's thread, `Store::ask` and the phone's question all pass through it): a link to a Note not read in this question, which includes every Note Hidden from AI and any id that names none, is removed and its label's words stay as plain text, and the answer is marked `unchecked`. A link's label is read without links, so the check runs again on the text until it removes nothing. Links to other places of the app, to the web, and text in code stay. The Notes the answer links are then read from the checked text, so they are all Notes read. An answer without such a link is not changed and not marked.
+- The panel shows "A source could not be checked" under a marked answer, and the phone the same under one marked in the reply. "Keep as Note" keeps the checked text.
+
+### Considered Options
+
+- Dropping a removed link with its words (rejected: the sentence around it would no longer read, and the mark already says that a source is missing).
+- Replacing a marked answer with "That's not in your Notes" (rejected, Q691: an answer may hold sources read beside one that is not, and nothing the user could use is thrown away).
+- Counting the Notes `find_notes` and `list_new` show as read (rejected: an excerpt is not the Note, and the model is told to read what it uses).

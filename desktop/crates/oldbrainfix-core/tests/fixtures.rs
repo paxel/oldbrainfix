@@ -5518,6 +5518,7 @@ fn ask_reply_of(
                 text: answer["text"].as_str().ok_or("text")?.to_string(),
                 notes,
                 cut: answer["cut"].as_bool().ok_or("cut")?,
+                unchecked: answer["unchecked"].as_bool().ok_or("unchecked")?,
             }),
             review,
         });
