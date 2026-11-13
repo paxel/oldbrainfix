@@ -43,7 +43,7 @@ use oldbrainfix_core::{
     Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search,
     Section, SessionRule, Sessions, ShoppingAgendaRow, ShoppingList, ShoppingLists,
     ShoppingOnAgenda, SigningKey, SimpleRepeat, Store, Tallies, Tally, TallyEntry, TallyPeriod,
-    TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
+    TallyRule, UnitSystem, WireEntry, Wordless, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -233,6 +233,9 @@ fn note_json(note: &Note) -> Value {
                 "aloneFile".into(),
                 json!(note.alone_file().map(|a| a.hash.clone())),
             );
+        }
+        if note.wordless() == Wordless::File {
+            all.insert("wordlessName".into(), json!(note.wordless_name()));
         }
     }
     out
@@ -7801,12 +7804,21 @@ fn the_tag_tree_is_read_as_the_dart_core_reads_it() -> TestResult {
         }
     };
     let notes = Notes::new(&store);
+    let places = Places::new(&store);
+    let mut area_ids = Vec::new();
+    for name in fixture["areas"].as_array().ok_or("areas")? {
+        area_ids.push(places.add_area(name.as_str().ok_or("area")?)?.id);
+    }
     let mut ids = Vec::new();
     for note in captured {
         tick();
         let text = note["text"].as_str().ok_or("text")?;
         let format = note["format"].as_str().unwrap_or("plain");
-        let id = notes.capture_as(text, format, None, None)?.id;
+        let place = match note["area"].as_u64() {
+            Some(i) => Some(area_ids.get(usize::try_from(i)?).ok_or("area")?.as_str()),
+            None => None,
+        };
+        let id = notes.capture_as(text, format, place, None)?.id;
         for amend in note["amends"].as_array().into_iter().flatten() {
             tick();
             notes.amend(&id, amend.as_str().ok_or("amend")?)?;
@@ -7831,23 +7843,36 @@ fn the_tag_tree_is_read_as_the_dart_core_reads_it() -> TestResult {
         })
     }
     let tree = TagTree::new(&store);
-    let mut suggestions = serde_json::Map::new();
-    for typed in fixture["suggestions"]
-        .as_object()
-        .ok_or("suggestions")?
-        .keys()
-    {
-        let tags: Vec<String> = tree
-            .suggestions(typed)?
-            .into_iter()
-            .map(|n| n.tag)
-            .collect();
-        suggestions.insert(typed.clone(), json!(tags));
+    let mut closed = std::collections::HashSet::new();
+    let areas = fixture["areas"].as_array().ok_or("areas")?;
+    for shut in fixture["closed"]["areas"].as_array().ok_or("closed")? {
+        let i = areas.iter().position(|a| a == shut).ok_or("closed area")?;
+        closed.insert(area_ids.get(i).ok_or("area")?.clone());
     }
-    assert_eq!(json!(suggestions), fixture["suggestions"]);
-    let ours: Vec<Value> = tree.tree()?.iter().map(node).collect();
-    assert_eq!(json!(ours), fixture["tree"]);
-    assert!(ours.len() >= 4);
+    assert!(!closed.is_empty());
+    for (shut, wanted) in [
+        (std::collections::HashSet::new(), &fixture),
+        (closed, &fixture["closed"]),
+    ] {
+        let mut suggestions = serde_json::Map::new();
+        for typed in wanted["suggestions"]
+            .as_object()
+            .ok_or("suggestions")?
+            .keys()
+        {
+            let tags: Vec<String> = tree
+                .suggestions(typed, &shut)?
+                .into_iter()
+                .map(|n| n.tag)
+                .collect();
+            suggestions.insert(typed.clone(), json!(tags));
+        }
+        assert_eq!(json!(suggestions), wanted["suggestions"]);
+        let ours: Vec<Value> = tree.tree(&shut)?.iter().map(node).collect();
+        assert_eq!(json!(ours), wanted["tree"]);
+        assert!(ours.len() >= 4);
+    }
+    assert_ne!(fixture["tree"], fixture["closed"]["tree"]);
     Ok(())
 }
 

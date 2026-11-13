@@ -40,7 +40,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
+      "wordless": "file",
       "attachments": [
         {
           "hash": "eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e",
@@ -104,7 +104,8 @@
       },
       "removedAttachments": [],
       "removedAttachmentTexts": [],
-      "aloneFile": null
+      "aloneFile": null,
+      "wordlessName": "Lease.pdf"
     },
     {
       "id": "note:00000000000000000000000000000003",
@@ -134,7 +135,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
+      "wordless": "file",
       "attachments": [
         {
           "hash": "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
@@ -151,7 +152,8 @@
       },
       "removedAttachments": [],
       "removedAttachmentTexts": [],
-      "aloneFile": "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95"
+      "aloneFile": "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
+      "wordlessName": "Brief.odt"
     },
     {
       "id": "note:00000000000000000000000000000004",
@@ -181,7 +183,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
+      "wordless": "file",
       "attachments": [
         {
           "hash": "53e24f787827167c43df3b374f94c2e089a78e3d271450a23a12ed5fa44a9b7a",
@@ -210,7 +212,8 @@
       "removedAttachmentTexts": [
         "53e24f787827167c43df3b374f94c2e089a78e3d271450a23a12ed5fa44a9b7a"
       ],
-      "aloneFile": null
+      "aloneFile": null,
+      "wordlessName": "Costs.xlsx"
     },
     {
       "id": "note:00000000000000000000000000000005",
@@ -240,7 +243,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
+      "wordless": "file",
       "attachments": [
         {
           "hash": "f5bf2db642f8f7bb0c39837e6fa8f70f7fb55f034e4e9c825847007d13fb35a4",
@@ -255,7 +258,8 @@
       "attachmentTexts": {},
       "removedAttachments": [],
       "removedAttachmentTexts": [],
-      "aloneFile": null
+      "aloneFile": null,
+      "wordlessName": "boxes.csv"
     },
     {
       "id": "note:00000000000000000000000000000006",
@@ -285,7 +289,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
+      "wordless": "file",
       "attachments": [
         {
           "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
@@ -300,7 +304,8 @@
       "attachmentTexts": {},
       "removedAttachments": [],
       "removedAttachmentTexts": [],
-      "aloneFile": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986"
+      "aloneFile": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
+      "wordlessName": "Plan.ods"
     },
     {
       "id": "note:00000000000000000000000000000007",
@@ -330,7 +335,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
+      "wordless": "file",
       "attachments": [
         {
           "hash": "cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4",
@@ -345,7 +350,8 @@
       "attachmentTexts": {},
       "removedAttachments": [],
       "removedAttachmentTexts": [],
-      "aloneFile": null
+      "aloneFile": null,
+      "wordlessName": "old.txt"
     }
   ],
   "all": [

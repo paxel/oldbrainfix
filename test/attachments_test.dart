@@ -30,6 +30,8 @@ import 'open_capture.dart';
 /// app, its text is read here or left to the computer, and the file and
 /// its text are removed as a photo's are.
 void main() {
+  // The app's own way of keeping a picked file, off the UI isolate.
+  final keepAside = keepDeviceFile;
   late Store store;
   late Notes notes;
   late Directory dir;
@@ -41,7 +43,7 @@ void main() {
   setUp(() {
     // The reading runs in place, where the test's clock reaches it.
     fileTextWork = <R>(work) async => work();
-    readDeviceFile = (path) async => File(path).readAsBytesSync();
+    keepDeviceFile = (files, path) async => files.putFrom(path);
     writeOpenedFile = (path, bytes) async => File(path).writeAsBytesSync(bytes);
     store = Store.inMemory(clock: () => DateTime.utc(2026, 11, 12, 9))
       ..starterSetOffered = true
@@ -55,6 +57,7 @@ void main() {
   });
   tearDown(() {
     fileTextWork = Isolate.run;
+    keepDeviceFile = keepAside;
     store.close();
     announcements.dispose();
     dir.deleteSync(recursive: true);
@@ -217,6 +220,44 @@ void main() {
     );
   });
 
+  test('a picked file is copied and hashed off the UI isolate into the '
+      'store\'s files, in chunks, and attached by its hash', () async {
+    keepDeviceFile = keepAside;
+    final disk = Store.open('${dir.path}/db.sqlite');
+    addTearDown(disk.close);
+    // Larger than one chunk, so the hash runs over several.
+    final bytes = Uint8List.fromList([
+      for (var i = 0; i < (1 << 20) + 300; i++) i % 251,
+    ]);
+    final copy = File('${dir.path}/picked')..writeAsBytesSync(bytes);
+    // As the bytes hash whole.
+    final whole = MemoryBlobs().putFrom(copy.path);
+    final read = await readPickedFiles(files, [
+      DeviceFile(path: copy.path, name: 'Big.bin'),
+    ], disk);
+    final file = read.files.single;
+    expect(file.hash, whole);
+    expect(file.size, bytes.length);
+    expect(copy.existsSync(), isFalse);
+    expect(disk.hasFile(file.hash!), isTrue);
+    expect(Directory('${dir.path}/files').listSync().map((f) => f.path), [
+      '${dir.path}/files/${file.hash}',
+    ]);
+    final note = Notes(disk).capture('', files: read.files);
+    expect(note.attachments.single.hash, file.hash);
+    expect(note.attachments.single.size, bytes.length);
+    expect(Notes(disk).fileBytes(file.hash!), bytes);
+  });
+
+  test('a file said to be kept whose bytes are not here is refused', () {
+    final missing = NewFile.kept(name: 'Gone.pdf', hash: 'a' * 64, size: 3);
+    final note = notes.capture('Papers').id;
+    expect(() => notes.attachFile(note, missing), throwsArgumentError);
+    expect(() => notes.capture('', files: [missing]), throwsArgumentError);
+    expect(notes.byId(note)?.attachments, isEmpty);
+    expect(notes.all().length, 1);
+  });
+
   testWidgets('a file larger than 256 MB is not attached and said at the '
       'top; the others are', (tester) async {
     final large = File('${dir.path}/large');
@@ -230,8 +271,11 @@ void main() {
       DeviceFile(path: large.path, name: 'Film.mkv'),
       DeviceFile(path: small.path, name: 'ok.txt'),
     ];
-    final read = await readPickedFiles(files, picked);
+    final read = await readPickedFiles(files, picked, store);
     expect(read.files.map((f) => f.name), ['ok.txt']);
+    // Kept before it is named, and nothing kept of the one left out.
+    expect(read.files.single.bytes, isEmpty);
+    expect(store.file(read.files.single.hash!), bytesOf('ok'));
     expect(read.tooLarge, isTrue);
     expect(read.refused.single, startsWith('Film.mkv'));
     expect(large.existsSync(), isFalse);
@@ -262,7 +306,7 @@ void main() {
           type: 'application/pdf',
         ),
     ];
-    final read = await readPickedFiles(files, picked);
+    final read = await readPickedFiles(files, picked, store);
     expect(read.files.map((f) => f.pages), [2, 12]);
     final id = notes.capture('Bills', files: read.files).id;
     final attached = notes.byId(id)!.attachments;

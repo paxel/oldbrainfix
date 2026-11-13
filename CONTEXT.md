@@ -329,7 +329,7 @@ An optional lock on a single Area that stays closed even while the app is open.
 How an Occurrence from a locked Area appears in alarms and on the Agenda when its Area chooses so: "Private Routine, 08:00", still checkable.
 
 **Hidden from AI**:
-A mark the user sets on an Area or a single Note, on the phone or the desktop, for their own Devices only: for the AI (an AI Task, the Ask panel) the Note, every Note in the Area, and their Amends, Routines, Reminders, Frogs, Lines and tags do not exist, not even as a count. Hidden and shared exclude each other: the mark is not offered in a Shared Area, and a hidden Note or Area is not filed into a Shared Area, shared, sent or put into a Pack until the user takes the mark off. The user sees and exports it as ever (ADR 0049). German: Vor KI verborgen.
+A mark the user sets on an Area or a single Note, on the phone or the desktop, for their own Devices only: for the AI (an AI Task, the Ask panel) the Note, every Note in the Area, and their Amends, Routines, Reminders, Frogs, Lines and tags do not exist, not even as a count. Hidden and shared exclude each other: the mark is not offered in a Shared Area, and a hidden Note or Area is not filed into a Shared Area, merged with a Note of one either way, shared, sent or put into a Pack until the user takes the mark off. The user sees and exports it as ever (ADR 0049). German: Vor KI verborgen.
 _Avoid_: private, secret, excluded, locked (an Area Lock is another thing)
 
 **Backup**:

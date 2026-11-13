@@ -1,4 +1,176 @@
 {
+  "areas": [
+    "Locked",
+    "Open"
+  ],
+  "closed": {
+    "areas": [
+      "Locked"
+    ],
+    "suggestions": {
+      "#": [
+        "#a",
+        "#b",
+        "#garten",
+        "#garten/beet",
+        "#İzmir",
+        "#İzmir/ΟΔΟΣ",
+        "#label",
+        "#Life",
+        "#Life/health",
+        "#Life/health/back",
+        "#Life/health/knee",
+        "#Life/home",
+        "#Life/work",
+        "#merged",
+        "#merged/in",
+        "#𝔸x",
+        "#𝔸x/y"
+      ],
+      "#l": [
+        "#label",
+        "#Life",
+        "#Life/health",
+        "#Life/health/back",
+        "#Life/health/knee",
+        "#Life/home",
+        "#Life/work"
+      ],
+      "#LIFE/": [
+        "#Life/health",
+        "#Life/health/back",
+        "#Life/health/knee",
+        "#Life/home",
+        "#Life/work"
+      ],
+      "#life/health/b": [
+        "#Life/health/back"
+      ],
+      "#g": [
+        "#garten",
+        "#garten/beet"
+      ],
+      "garten": [],
+      "#i": [
+        "#İzmir",
+        "#İzmir/ΟΔΟΣ"
+      ],
+      "#izmir/οδοσ": [
+        "#İzmir/ΟΔΟΣ"
+      ],
+      "#x": []
+    },
+    "tree": [
+      {
+        "children": [],
+        "name": "a",
+        "notes": 1,
+        "tag": "#a"
+      },
+      {
+        "children": [],
+        "name": "b",
+        "notes": 1,
+        "tag": "#b"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "name": "beet",
+            "notes": 2,
+            "tag": "#garten/beet"
+          }
+        ],
+        "name": "garten",
+        "notes": 3,
+        "tag": "#garten"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "name": "ΟΔΟΣ",
+            "notes": 1,
+            "tag": "#İzmir/ΟΔΟΣ"
+          }
+        ],
+        "name": "İzmir",
+        "notes": 1,
+        "tag": "#İzmir"
+      },
+      {
+        "children": [],
+        "name": "label",
+        "notes": 1,
+        "tag": "#label"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "name": "back",
+                "notes": 3,
+                "tag": "#Life/health/back"
+              },
+              {
+                "children": [],
+                "name": "knee",
+                "notes": 1,
+                "tag": "#Life/health/knee"
+              }
+            ],
+            "name": "health",
+            "notes": 4,
+            "tag": "#Life/health"
+          },
+          {
+            "children": [],
+            "name": "home",
+            "notes": 1,
+            "tag": "#Life/home"
+          },
+          {
+            "children": [],
+            "name": "work",
+            "notes": 1,
+            "tag": "#Life/work"
+          }
+        ],
+        "name": "Life",
+        "notes": 4,
+        "tag": "#Life"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "name": "in",
+            "notes": 1,
+            "tag": "#merged/in"
+          }
+        ],
+        "name": "merged",
+        "notes": 1,
+        "tag": "#merged"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "name": "y",
+            "notes": 1,
+            "tag": "#𝔸x/y"
+          }
+        ],
+        "name": "𝔸x",
+        "notes": 1,
+        "tag": "#𝔸x"
+      }
+    ]
+  },
   "notes": [
     {
       "text": "#Life/Health/back pain\n#life/work and #life/work"
@@ -31,6 +203,24 @@
     },
     {
       "text": "https://example.org/#top #a//b #a/-c C# #b/"
+    },
+    {
+      "text": "#GARTEN/geheim #secret #LIFE",
+      "area": 0
+    },
+    {
+      "text": "Physio #LIFE/health",
+      "area": 1,
+      "into": 8
+    },
+    {
+      "text": "#LIFE/home #garten/beet",
+      "area": 1
+    },
+    {
+      "text": "open #Life/health/back",
+      "area": 0,
+      "into": 10
     }
   ],
   "suggestions": {
@@ -39,39 +229,45 @@
       "#b",
       "#garten",
       "#garten/beet",
+      "#garten/geheim",
       "#İzmir",
       "#İzmir/ΟΔΟΣ",
       "#label",
-      "#life",
-      "#life/health",
-      "#life/health/Back",
-      "#life/health/knee",
-      "#life/work",
+      "#Life",
+      "#Life/health",
+      "#Life/health/back",
+      "#Life/health/knee",
+      "#Life/home",
+      "#Life/work",
       "#merged",
       "#merged/in",
+      "#secret",
       "#𝔸x",
       "#𝔸x/y"
     ],
     "#l": [
       "#label",
-      "#life",
-      "#life/health",
-      "#life/health/Back",
-      "#life/health/knee",
-      "#life/work"
+      "#Life",
+      "#Life/health",
+      "#Life/health/back",
+      "#Life/health/knee",
+      "#Life/home",
+      "#Life/work"
     ],
     "#LIFE/": [
-      "#life/health",
-      "#life/health/Back",
-      "#life/health/knee",
-      "#life/work"
+      "#Life/health",
+      "#Life/health/back",
+      "#Life/health/knee",
+      "#Life/home",
+      "#Life/work"
     ],
     "#life/health/b": [
-      "#life/health/Back"
+      "#Life/health/back"
     ],
     "#g": [
       "#garten",
-      "#garten/beet"
+      "#garten/beet",
+      "#garten/geheim"
     ],
     "garten": [],
     "#i": [
@@ -101,12 +297,18 @@
         {
           "children": [],
           "name": "beet",
-          "notes": 1,
+          "notes": 2,
           "tag": "#garten/beet"
+        },
+        {
+          "children": [],
+          "name": "geheim",
+          "notes": 1,
+          "tag": "#garten/geheim"
         }
       ],
       "name": "garten",
-      "notes": 2,
+      "notes": 4,
       "tag": "#garten"
     },
     {
@@ -134,31 +336,37 @@
           "children": [
             {
               "children": [],
-              "name": "Back",
-              "notes": 2,
-              "tag": "#life/health/Back"
+              "name": "back",
+              "notes": 3,
+              "tag": "#Life/health/back"
             },
             {
               "children": [],
               "name": "knee",
               "notes": 1,
-              "tag": "#life/health/knee"
+              "tag": "#Life/health/knee"
             }
           ],
           "name": "health",
-          "notes": 3,
-          "tag": "#life/health"
+          "notes": 5,
+          "tag": "#Life/health"
+        },
+        {
+          "children": [],
+          "name": "home",
+          "notes": 1,
+          "tag": "#Life/home"
         },
         {
           "children": [],
           "name": "work",
           "notes": 1,
-          "tag": "#life/work"
+          "tag": "#Life/work"
         }
       ],
-      "name": "life",
-      "notes": 3,
-      "tag": "#life"
+      "name": "Life",
+      "notes": 5,
+      "tag": "#Life"
     },
     {
       "children": [
@@ -172,6 +380,12 @@
       "name": "merged",
       "notes": 1,
       "tag": "#merged"
+    },
+    {
+      "children": [],
+      "name": "secret",
+      "notes": 1,
+      "tag": "#secret"
     },
     {
       "children": [

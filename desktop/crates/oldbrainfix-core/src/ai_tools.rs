@@ -17,7 +17,7 @@ use std::io::Cursor;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
 use serde_json::{Value, json};
@@ -1483,7 +1483,8 @@ impl Store {
                         "tag": n.tag,
                     })
                 }
-                let tree = TagTree::new(self).tree()?;
+                // Area Locks are the phone's: nothing is closed here.
+                let tree = TagTree::new(self).tree(&HashSet::new())?;
                 ToolOutput::json(&Value::Array(tree.iter().map(node).collect()))
             }
             "list_routines" => {

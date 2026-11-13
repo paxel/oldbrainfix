@@ -194,6 +194,10 @@ class PlannedAlarm {
   /// What that Note is titled as while [text] is blank ([Note.wordless]).
   final Wordless wordless;
 
+  /// The name of the file it goes by as [Wordless.file]
+  /// ([Note.wordlessName]); empty otherwise.
+  final String wordlessName;
+
   const PlannedAlarm({
     required this.kind,
     required this.routineId,
@@ -206,6 +210,7 @@ class PlannedAlarm {
     required this.endsAt,
     required this.text,
     this.wordless = Wordless.photo,
+    this.wordlessName = '',
   });
 
   /// Names the alarm for good: one per kind and Occurrence.
@@ -309,6 +314,7 @@ List<PlannedAlarm> alarmPlan({
           endsAt: t.endsAt,
           text: note?.visibleText,
           wordless: note?.wordless ?? Wordless.photo,
+          wordlessName: note?.wordlessName ?? '',
         ),
       );
       planned++;

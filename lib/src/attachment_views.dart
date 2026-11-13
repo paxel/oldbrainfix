@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,11 +16,15 @@ import 'l10n.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart' show packSizeText;
 
-/// Reads the bytes of a file on this Device; tests read in place, where
-/// the file system's own futures do not run.
+/// Keeps the bytes of the file at [path] on this Device among the attached
+/// [files] of the store ([Blobs.putFrom]), copied and hashed off the UI
+/// isolate, as a file may be 256 MiB; gives the hash. Tests keep them in
+/// place, where the file system's own futures do not run.
 @visibleForTesting
-Future<Uint8List> Function(String path) readDeviceFile = (path) =>
-    File(path).readAsBytes();
+Future<String> Function(Blobs files, String path) keepDeviceFile = (
+  files,
+  path,
+) => Isolate.run(() => files.putFrom(path));
 
 /// Writes [bytes] to [path] for another app to open; tests write in place.
 @visibleForTesting
@@ -257,8 +262,8 @@ Future<void> openAttachment(
   }
 }
 
-/// The files picked or shared on this Device, read in as the core
-/// attaches them, and those left out: each with its reason in [refused],
+/// The files picked or shared on this Device, kept as the core attaches
+/// them, and those left out: each with its reason in [refused],
 /// [tooLarge] when one was larger than a file may be.
 typedef ReadFiles = ({
   List<NewFile> files,
@@ -267,14 +272,16 @@ typedef ReadFiles = ({
 });
 
 /// The files [picked] on this Device as the core attaches them (#267):
-/// each read in, a PDF's pages counted where this Device has a reader for
-/// them, so the core knows who reads its text (Q645). A file larger than
-/// the most a file can be ([maxFileBytes]) or one that cannot be read is
-/// left out ([announceNotAttached]); nothing of it is written. The copies
-/// on this Device go either way.
+/// each kept among the attached files of [store] off the UI isolate
+/// ([keepDeviceFile]), a PDF's pages counted where this Device has a
+/// reader for them, so the core knows who reads its text (Q645). A file
+/// larger than the most a file can be ([maxFileBytes]) or one that cannot
+/// be read is left out ([announceNotAttached]); nothing of it is named in
+/// the log. The copies on this Device go either way.
 Future<ReadFiles> readPickedFiles(
   FilePlatform files,
   List<DeviceFile> picked,
+  Store store,
 ) async {
   final kept = <NewFile>[];
   final refused = <String>[];
@@ -289,13 +296,19 @@ Future<ReadFiles> readPickedFiles(
           refused.add('$name: $size bytes');
           continue;
         }
-        final bytes = await readDeviceFile(file.path);
         final kind = FileTexts.kindOf(name, file.type);
         final pages = kind == FileKind.pdf
             ? await files.pdfPages(file.path)
             : null;
+        final hash = await keepDeviceFile(store.blobs.files, file.path);
         kept.add(
-          NewFile(name: name, mediaType: file.type, bytes: bytes, pages: pages),
+          NewFile.kept(
+            name: name,
+            mediaType: file.type,
+            hash: hash,
+            size: size,
+            pages: pages,
+          ),
         );
       } on FileSystemException catch (e) {
         refused.add('$name: $e');
@@ -336,7 +349,8 @@ int attachFiles(Notes notes, String noteId, List<NewFile> files) {
       notes.attachFile(noteId, file);
       attached++;
     } on ArgumentError {
-      // Larger than a file may be: checked before already.
+      // Larger than a file may be, or its kept bytes gone: both checked
+      // as it was read in ([readPickedFiles]).
     }
   }
   return attached;

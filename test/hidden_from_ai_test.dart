@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/merge_into_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
@@ -197,6 +198,94 @@ void main() {
     await tap(tester, find.text('Close'));
     expect(store.isMarkedHiddenFromAi(health.id), isTrue);
     expect(notes.byId(back)?.place, health.id);
+  });
+
+  testWidgets('merging a hidden Note into a Note of a Shared Area asks '
+      'first, as does merging one of a Shared Area into a hidden Note', (
+    tester,
+  ) async {
+    final diary = notes.capture('Diary of today').id;
+    store.setHiddenFromAi(diary, true);
+    final shared = store.share(places.addArea('Family').id);
+    final milk = notes.capture('Milk for the family', place: shared).id;
+    await allNotes(tester);
+
+    Future<void> mergeFromCard(String text, String into) async {
+      await tap(
+        tester,
+        find.descendant(
+          of: card(text),
+          matching: find.byTooltip('Merge into…'),
+        ),
+      );
+      await tap(
+        tester,
+        find
+            .descendant(
+              of: find.byType(MergeIntoScreen),
+              matching: find.textContaining(into, findRichText: true),
+            )
+            .first,
+      );
+    }
+
+    await mergeFromCard('Diary', 'Milk');
+    expect(key('hidden-from-ai-refused'), findsOneWidget);
+    expect(find.textContaining('Diary of today: hidden from AI'), findsOne);
+    await tap(tester, find.text('Cancel'));
+    expect(notes.byId(diary)?.isMerged, isFalse);
+    expect(store.isMarkedHiddenFromAi(diary), isTrue);
+
+    await mergeFromCard('Milk', 'Diary');
+    expect(key('hidden-from-ai-refused'), findsOneWidget);
+    expect(find.textContaining('Diary of today: hidden from AI'), findsOne);
+    await tap(tester, key('hidden-from-ai-show'));
+    expect(store.isMarkedHiddenFromAi(diary), isFalse);
+    expect(notes.byId(milk)?.mergedInto, diary);
+  });
+
+  testWidgets('merging the ticked Notes asks once for all of them; Cancel '
+      'keeps them ticked and apart, Show to the AI merges them', (
+    tester,
+  ) async {
+    final diary = notes.capture('Diary of today').id;
+    final dream = notes.capture('Dream of a boat').id;
+    store
+      ..setHiddenFromAi(diary, true)
+      ..setHiddenFromAi(dream, true);
+    final shared = store.share(places.addArea('Family').id);
+    final milk = notes.capture('Milk for the family', place: shared).id;
+    await allNotes(tester);
+
+    Future<void> mergeTicked() async {
+      await tap(tester, key('selection-merge'));
+      await tap(
+        tester,
+        find
+            .descendant(
+              of: find.byType(MergeIntoScreen),
+              matching: find.textContaining('Milk', findRichText: true),
+            )
+            .first,
+      );
+    }
+
+    await tap(tester, key('selectNotes'));
+    await tap(tester, key('select-$diary'));
+    await tap(tester, key('select-$dream'));
+    await mergeTicked();
+    expect(key('hidden-from-ai-refused'), findsOneWidget);
+    expect(find.textContaining('Diary of today'), findsWidgets);
+    await tap(tester, find.text('Cancel'));
+    expect(notes.byId(diary)?.isMerged, isFalse);
+    expect(notes.byId(dream)?.isMerged, isFalse);
+    expect(tester.widget<Checkbox>(key('select-$diary')).value, isTrue);
+
+    await mergeTicked();
+    await tap(tester, key('hidden-from-ai-show'));
+    expect(store.hiddenFromAiMarks(), isEmpty);
+    expect(notes.byId(diary)?.mergedInto, milk);
+    expect(notes.byId(dream)?.mergedInto, milk);
   });
 
   testWidgets('filing into an Area of the user\'s own asks nothing', (

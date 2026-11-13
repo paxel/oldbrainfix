@@ -2281,7 +2281,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final files = FileScope.of(context);
     final picked = await files.pickFiles();
     if (picked.isEmpty) return;
-    final read = await readPickedFiles(files, picked);
+    final read = await readPickedFiles(files, picked, widget.notes.store);
     announceNotAttached(t, announcements, navigator, read);
     // Written also when the editor was left meanwhile: nothing is lost.
     attachFiles(widget.notes, widget.noteId, read.files);

@@ -40,6 +40,13 @@ class AppLock extends ChangeNotifier {
   bool isAreaClosed(String areaId) =>
       store.isAreaLocked(areaId) && !_open.contains(areaId);
 
+  /// The locked Areas that are closed now, whose Notes stay out of every
+  /// list, the tag tree's included.
+  Set<String> get closedAreas => {
+    for (final area in Places(store).areas())
+      if (isAreaClosed(area.id)) area.id,
+  };
+
   /// Whether [note] stays out of every list now.
   bool hides(Note note) => AreaLocks(store).hides(note, _open);
 

@@ -3850,6 +3850,7 @@ Map<String, Object?> _note(Note note) => {
     note.removedAttachmentTexts,
   ),
   if (note.attachments.isNotEmpty) 'aloneFile': note.aloneFile?.hash,
+  if (note.wordless == Wordless.file) 'wordlessName': note.wordlessName,
 };
 
 /// The attached files of a Note or Section, only when it has any, so a
@@ -9046,10 +9047,14 @@ Map<String, Object?> _textTags() {
   };
 }
 
-/// The tag tree (#267): the Notes captured, each with its format, its
-/// Amends, the one it is merged into and whether it is trashed, then the
-/// tree read from them and the suggestions for what is typed.
+/// The tag tree (#267): the Areas made, the Notes captured, each with its
+/// format, the Area it is filed into by its index, its Amends, the one it
+/// is merged into and whether it is trashed, then the tree read from them
+/// and the suggestions for what is typed, with nothing closed and with
+/// the Areas of `closed` closed.
 Map<String, Object?> _tagTree() {
+  const areas = ['Locked', 'Open'];
+  const shut = ['Locked'];
   const captured = [
     {'text': '#Life/Health/back pain\n#life/work and #life/work'},
     {
@@ -9065,6 +9070,12 @@ Map<String, Object?> _tagTree() {
     {'text': 'merged #merged/in #garten', 'into': 1},
     {'text': '#Garten #GARTEN/beet #İzmir/ΟΔΟΣ #𝔸x/y'},
     {'text': 'https://example.org/#top #a//b #a/-c C# #b/'},
+    {'text': '#GARTEN/geheim #secret #LIFE', 'area': 0},
+    // Merged into a Note of a closed Area, closed with it, and the other
+    // way round, open with its Note.
+    {'text': 'Physio #LIFE/health', 'area': 1, 'into': 8},
+    {'text': '#LIFE/home #garten/beet', 'area': 1},
+    {'text': 'open #Life/health/back', 'area': 0, 'into': 10},
   ];
   const typed = [
     '#',
@@ -9084,11 +9095,19 @@ Map<String, Object?> _tagTree() {
   );
   try {
     final notes = Notes(store);
+    final places = Places(store);
+    final areaIds = [for (final name in areas) places.addArea(name).id];
     final ids = <String>[];
     for (final note in captured) {
       at = at.add(const Duration(minutes: 1));
       final format = note['format'] as String? ?? TextFormats.plain;
-      final id = notes.capture(note['text'] as String, format: format).id;
+      final place = switch (note['area']) {
+        final int i => areaIds[i],
+        _ => null,
+      };
+      final id = notes
+          .capture(note['text'] as String, format: format, place: place)
+          .id;
       ids.add(id);
       for (final amend in note['amends'] as List<String>? ?? const <String>[]) {
         at = at.add(const Duration(minutes: 1));
@@ -9106,7 +9125,20 @@ Map<String, Object?> _tagTree() {
       'tag': n.tag,
     };
     final tree = TagTree(store);
+    final closed = {
+      for (final (i, name) in areas.indexed)
+        if (shut.contains(name)) areaIds[i],
+    };
     return {
+      'areas': areas,
+      'closed': {
+        'areas': shut,
+        'suggestions': {
+          for (final t in typed)
+            t: [for (final n in tree.suggestions(t, closed: closed)) n.tag],
+        },
+        'tree': [for (final n in tree.tree(closed: closed)) node(n)],
+      },
       'notes': captured,
       'suggestions': {
         for (final t in typed) t: [for (final n in tree.suggestions(t)) n.tag],
@@ -10762,10 +10794,11 @@ Future<void> main(List<String> args) async {
     '`\\` or `&`, as in "C#" and web addresses; nested tags with a `/` '
     'inside, at the end, doubled and before a `-` (#267).\n'
     '- `tag_tree.json`: the tag tree (#267): Notes captured in a fresh '
-    'store, plain, formatted and as code, with Amends, a Merge and one '
-    'trashed, and the tree read from them by its levels, each tag as '
-    'written most often with its count of Notes, and the suggestions for '
-    'what is typed.\n'
+    'store, plain, formatted and as code, some filed into two Areas, with '
+    'Amends, Merges and one trashed, and the tree read from them by its '
+    'levels, each tag as written most often with its count of Notes, and '
+    'the suggestions for what is typed; both again with one Area closed '
+    '(`closed`), its Notes and those merged into them left out.\n'
     '- `file_texts.json`: the texts of attached files (ADR 0047): for each '
     'file its name, media type and bytes, the kind it is and what reading '
     'it gives: Word documents, workbooks, OpenDocument texts and '

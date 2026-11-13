@@ -95,6 +95,43 @@ void main() {
     expect(_lines(TagTree(store).tree()), ['#two 1', '  #two/three 1']);
   });
 
+  test('the Notes of a closed Area are left out, as if they were not '
+      'there; the tree of every Note stays as it was', () {
+    final places = Places(store);
+    final locked = places.addArea('Health').id;
+    final topic = places.addTopic(locked, 'Back').id;
+    final open = places.addArea('Home').id;
+    final filed = capture('#LIFE/Health #secret');
+    notes.file(filed.id, locked);
+    final inTopic = capture('#LIFE/back');
+    notes.file(inTopic.id, topic);
+    notes.file(capture('#life/home').id, open);
+    capture('#Life');
+    final every = _lines(TagTree(store).tree());
+    expect(every, [
+      '#LIFE 4',
+      '  #LIFE/back 1',
+      '  #LIFE/Health 1',
+      '  #LIFE/home 1',
+      '#secret 1',
+    ]);
+    final closed = _lines(TagTree(store).tree(closed: {locked}));
+    // As the tree reads with those Notes gone.
+    expect(closed, ['#Life 2', '  #Life/home 1']);
+    List<String> tags(String typed, Set<String> closed) => [
+      for (final n in TagTree(store).suggestions(typed, closed: closed)) n.tag,
+    ];
+    expect(tags('#', {locked}), ['#Life', '#Life/home']);
+    expect(tags('#s', {locked}), isEmpty);
+    expect(tags('#s', {open}), ['#secret']);
+    // Asked again with nothing closed, nothing stays left out.
+    expect(_lines(TagTree(store).tree()), every);
+    for (final n in [filed, inTopic]) {
+      notes.trash(n.id);
+    }
+    expect(_lines(TagTree(store).tree()), closed);
+  });
+
   test('suggestions are the tags beginning with what is typed, ignoring '
       'case, each before those under it', () {
     capture('#Garten #Garten/Beet #Gartenarbeit #life/health #gas');

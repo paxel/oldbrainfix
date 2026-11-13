@@ -6,7 +6,7 @@
 //! and the Capture Context of Notes and Sections. Every write appends the same entries, in the same order and read from the
 //! clock as often, as the Dart core's, so both logs come out alike.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -149,12 +149,14 @@ impl Importance {
 }
 
 /// What a Note without words is titled as where only its words fit, as
-/// in a row or an alarm.
+/// in a row or an alarm: a photo, a voice recording, or a file, which
+/// goes by its name ([`Note::wordless_name`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Wordless {
     #[default]
     Photo,
     VoiceRecording,
+    File,
 }
 
 impl Wordless {
@@ -163,6 +165,7 @@ impl Wordless {
         match self {
             Wordless::Photo => "photo",
             Wordless::VoiceRecording => "voiceRecording",
+            Wordless::File => "file",
         }
     }
 }
@@ -403,18 +406,35 @@ impl Note {
         alone.then_some(file)
     }
 
-    /// What the Note is titled as while its text is blank: a voice
-    /// recording when it has one and no photo, removed ones whose texts
-    /// stay included; a photo otherwise.
+    /// What the Note is titled as while its text is blank, removed
+    /// photos, recordings and files whose texts stay included: a photo
+    /// when it has one; else a voice recording when it has one; else a
+    /// file when it has one, by [`Note::wordless_name`]; a photo
+    /// otherwise.
     pub fn wordless(&self) -> Wordless {
-        if self.photos.is_empty()
-            && self.removed_photos.is_empty()
-            && !(self.recordings.is_empty() && self.removed_recordings.is_empty())
-        {
+        if !(self.photos.is_empty() && self.removed_photos.is_empty()) {
+            Wordless::Photo
+        } else if !(self.recordings.is_empty() && self.removed_recordings.is_empty()) {
             Wordless::VoiceRecording
+        } else if !(self.attachments.is_empty() && self.removed_attachments.is_empty()) {
+            Wordless::File
         } else {
             Wordless::Photo
         }
+    }
+
+    /// The name a Note titled [`Wordless::File`] goes by (#267): its
+    /// first attached file's, else its first removed one's; empty when
+    /// that file has no name, or for any other Note.
+    pub fn wordless_name(&self) -> String {
+        if self.wordless() != Wordless::File {
+            return String::new();
+        }
+        self.attachments
+            .first()
+            .or_else(|| self.removed_attachments.first())
+            .map(|a| a.name.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -1564,7 +1584,10 @@ impl<'a> Notes<'a> {
 
     /// Merges the Note `note_id` into the Note `into_id`: it becomes a
     /// dated Section of it and leaves every list and Unsorted. Nothing is
-    /// copied; the merged Note only points at its target.
+    /// copied; the merged Note only points at its target. Hidden and
+    /// shared do not meet (#267): a Note Hidden from AI does not merge
+    /// into a Note of a Shared Area, nor a Note of a Shared Area into a
+    /// hidden one ([`Error::HiddenFromAi`]).
     pub fn merge(&self, note_id: &str, into_id: &str) -> Result<()> {
         for id in [note_id, into_id] {
             let listed = self
@@ -1577,9 +1600,42 @@ impl<'a> Notes<'a> {
         if note_id == into_id {
             return Err(Error::Invalid("a Note cannot merge into itself".into()));
         }
+        self.refuse_hidden_merge(&[note_id.to_string()], into_id)?;
         self.store
             .append(note_id, keys::MERGED, Some(into_id), None)
             .map(drop)
+    }
+
+    /// [`Error::HiddenFromAi`] when merging `note_ids` into `into_id`
+    /// would put something Hidden from AI together with a Shared Area: a
+    /// hidden Note into a Note of one, by the marks that hide it, or a
+    /// Note of one into a hidden Note, by the marks that hide the target.
+    /// The marks of all of them, sorted, each once.
+    fn refuse_hidden_merge(&self, note_ids: &[String], into_id: &str) -> Result<()> {
+        let marks = self.store.hidden_from_ai_marks()?;
+        if marks.is_empty() {
+            return Ok(());
+        }
+        let shared = |id: &str| -> Result<bool> {
+            match self.store.area_of(id)? {
+                Some(area) => self.store.is_shared(&area),
+                None => Ok(false),
+            }
+        };
+        let mut found: BTreeSet<String> = BTreeSet::new();
+        let into_shared = shared(into_id)?;
+        let into_hidden = self.store.hidden_by(into_id, &marks)?;
+        for id in note_ids {
+            if into_shared {
+                found.extend(self.store.hidden_by(id, &marks)?);
+            }
+            if !into_hidden.is_empty() && shared(id)? {
+                found.extend(into_hidden.iter().cloned());
+            }
+        }
+        let mut found: Vec<String> = found.into_iter().collect();
+        found.sort_by(|a, b| crate::store::utf16_cmp(a, b));
+        Store::refuse_hidden_from_ai(found)
     }
 
     /// Whether this Device may undo the Merge of the Note `note_id`
@@ -1615,9 +1671,10 @@ impl<'a> Notes<'a> {
     /// Merges every Note of `note_ids` into the Note `into_id` in one
     /// batch (#273), each as [`Notes::merge`] does: all of them or, when
     /// one is refused, none. A Note named twice merges once. Refused for
-    /// the target among `note_ids`, a Note or target not in the lists, and
-    /// a Note this Device may not change ([`Store::may_change`]). Gives
-    /// the Notes merged, in the order named, for
+    /// the target among `note_ids`, a Note or target not in the lists, a
+    /// Note this Device may not change ([`Store::may_change`]), and what
+    /// is Hidden from AI meeting a Shared Area as for [`Notes::merge`].
+    /// Gives the Notes merged, in the order named, for
     /// [`Notes::undo_merge_all`].
     pub fn merge_all<I, S>(&self, note_ids: I, into_id: &str) -> Result<Vec<String>>
     where
@@ -1649,6 +1706,7 @@ impl<'a> Notes<'a> {
                 return Err(Error::Invalid(format!("{id} may not be merged here")));
             }
         }
+        self.refuse_hidden_merge(&ids, into_id)?;
         self.store.batch(|| {
             for id in &ids {
                 self.store.append(id, keys::MERGED, Some(into_id), None)?;
@@ -2286,6 +2344,55 @@ mod tests {
         assert_eq!(wordless(&memo.id)?, Some(Wordless::VoiceRecording));
         assert_eq!(notes.by_id(&both.id)?.map(|n| n.photos.len()), Some(0));
         assert_eq!(wordless(&both.id)?, Some(Wordless::Photo));
+        Ok(())
+    }
+
+    #[test]
+    fn a_note_of_files_without_words_is_titled_by_its_first_files_name() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let titled = |id: &str| -> Result<Option<(Wordless, String)>> {
+            Ok(notes.by_id(id)?.map(|n| (n.wordless(), n.wordless_name())))
+        };
+        let file = |name: &'static str, byte: &'static [u8]| NewFile {
+            name,
+            media_type: "",
+            bytes: byte,
+            pages: None,
+        };
+        let lease = notes.capture_with_files(
+            "",
+            None,
+            None,
+            &[],
+            &[],
+            &[file("Lease 2026.pdf", &[1]), file("Plan.zip", &[2])],
+        )?;
+        let nameless = notes.capture_with_files("", None, None, &[], &[], &[file("", &[3])])?;
+        let with_photo =
+            notes.capture_with_files("", None, None, &[photo(1)], &[], &[file("a.pdf", &[4])])?;
+        let with_voice =
+            notes.capture_with_files("", None, None, &[], &[voice(1)], &[file("b.pdf", &[5])])?;
+        let file_of = |name: &str| Some((Wordless::File, name.to_string()));
+        assert_eq!(titled(&lease.id)?, file_of("Lease 2026.pdf"));
+        assert_eq!(titled(&nameless.id)?, file_of(""));
+        assert_eq!(
+            titled(&with_photo.id)?,
+            Some((Wordless::Photo, String::new()))
+        );
+        assert_eq!(
+            titled(&with_voice.id)?,
+            Some((Wordless::VoiceRecording, String::new()))
+        );
+        // The file went, its text stayed: still titled by it.
+        let rent = notes.capture_with_files("", None, None, &[], &[], &[file("Rent.txt", &[6])])?;
+        let hash = rent.attachments[0].hash.clone();
+        notes.set_attachment_text(&rent.id, &hash, "500 EUR")?;
+        notes.remove_attachment(&rent.id, &hash)?;
+        assert_eq!(notes.by_id(&rent.id)?.map(|n| n.attachments.len()), Some(0));
+        assert_eq!(titled(&rent.id)?, file_of("Rent.txt"));
+        let words = notes.capture("Words", None, None)?;
+        assert_eq!(titled(&words.id)?, Some((Wordless::Photo, String::new())));
         Ok(())
     }
 

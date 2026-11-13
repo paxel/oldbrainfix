@@ -7,11 +7,15 @@ include!(concat!(env!("OUT_DIR"), "/l10n.rs"));
 use oldbrainfix_core::Wordless;
 
 /// What a Note without words is titled as where only its words fit, as
-/// in a row or an alarm ([`oldbrainfix_core::Note::wordless`]).
-pub fn wordless(t: &L10n, wordless: Wordless) -> &'static str {
+/// in a row or an alarm ([`oldbrainfix_core::Note::wordless`]): a file by
+/// its `name` ([`oldbrainfix_core::Note::wordless_name`]), the word for
+/// an Attachment when it has none.
+pub fn wordless(t: &L10n, wordless: Wordless, name: &str) -> String {
     match wordless {
-        Wordless::Photo => t.photo(),
-        Wordless::VoiceRecording => t.voice_recording(),
+        Wordless::Photo => t.photo().to_string(),
+        Wordless::VoiceRecording => t.voice_recording().to_string(),
+        Wordless::File if name.is_empty() => t.attachment().to_string(),
+        Wordless::File => name.to_string(),
     }
 }
 
@@ -75,10 +79,18 @@ mod tests {
     fn a_note_without_words_is_titled_by_what_it_holds() {
         let en = L10n::new("en");
         let de = L10n::new("de");
-        assert_eq!(wordless(&en, Wordless::Photo), "Photo");
-        assert_eq!(wordless(&en, Wordless::VoiceRecording), "Voice recording");
-        assert_eq!(wordless(&de, Wordless::Photo), "Foto");
-        assert_eq!(wordless(&de, Wordless::VoiceRecording), "Sprachaufnahme");
+        assert_eq!(wordless(&en, Wordless::Photo, ""), "Photo");
+        assert_eq!(
+            wordless(&en, Wordless::VoiceRecording, ""),
+            "Voice recording"
+        );
+        assert_eq!(wordless(&de, Wordless::Photo, ""), "Foto");
+        assert_eq!(
+            wordless(&de, Wordless::VoiceRecording, ""),
+            "Sprachaufnahme"
+        );
+        assert_eq!(wordless(&de, Wordless::File, "Lease.pdf"), "Lease.pdf");
+        assert_eq!(wordless(&en, Wordless::File, ""), "Attachment");
     }
 
     #[test]

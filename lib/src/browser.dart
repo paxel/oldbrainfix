@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -646,12 +647,15 @@ class _SwipeDrag extends HorizontalDragGestureRecognizer {
 
 /// The search field on top of a browser level, with ✕ to clear it. With
 /// [tags], typing `#` shows the tags of the tag tree that start with what
-/// is typed as chips under it (#267, Q639), whose tap fills one in.
+/// is typed as chips under it (#267, Q639), whose tap fills one in; the
+/// Notes of the Areas of [closedTags], the locked Areas closed now, are
+/// left out of them.
 class BrowserSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final ValueChanged<String> onChanged;
   final Store? tags;
+  final Set<String> closedTags;
 
   const BrowserSearchField({
     super.key,
@@ -659,6 +663,7 @@ class BrowserSearchField extends StatelessWidget {
     required this.hint,
     required this.onChanged,
     this.tags,
+    this.closedTags = const {},
   });
 
   void _clear() {
@@ -703,7 +708,12 @@ class BrowserSearchField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         field,
-        TagSuggestions(store: tags, controller: controller, onPick: _pick),
+        TagSuggestions(
+          store: tags,
+          controller: controller,
+          onPick: _pick,
+          closed: closedTags,
+        ),
       ],
     );
   }
@@ -712,12 +722,14 @@ class BrowserSearchField extends StatelessWidget {
 /// The tags of the tag tree that start with the `#…` typed into
 /// [controller], as chips that fill one in (#267, Q639), the one typed
 /// exactly left out; nothing while what is typed starts otherwise. They
-/// are read as the text changes, never while building, and at most
-/// [shown] of them show, the tree's order kept.
+/// are read as the text or [closed] changes, never while building, and at
+/// most [shown] of them show, the tree's order kept. The Notes of the
+/// Areas of [closed], the locked Areas closed now, are left out.
 class TagSuggestions extends StatefulWidget {
   final Store store;
   final TextEditingController controller;
   final ValueChanged<String> onPick;
+  final Set<String> closed;
 
   static const shown = 12;
 
@@ -726,6 +738,7 @@ class TagSuggestions extends StatefulWidget {
     required this.store,
     required this.controller,
     required this.onPick,
+    this.closed = const {},
   });
 
   @override
@@ -750,6 +763,8 @@ class _TagSuggestionsState extends State<TagSuggestions> {
       old.controller.removeListener(_changed);
       widget.controller.addListener(_changed);
       _find();
+    } else if (!setEquals(old.closed, widget.closed)) {
+      _find();
     }
   }
 
@@ -771,7 +786,9 @@ class _TagSuggestionsState extends State<TagSuggestions> {
     _found = !wanted.startsWith('#')
         ? const []
         : [
-            for (final node in TagTree(widget.store).suggestions(typed))
+            for (final node in TagTree(
+              widget.store,
+            ).suggestions(typed, closed: widget.closed))
               if (node.tag.toLowerCase() != wanted) node,
           ].take(TagSuggestions.shown).toList();
   }
@@ -858,9 +875,12 @@ List<Widget> diaryCards(
   Map<String, List<AgendaRow>>? today;
   List<AgendaRow> todayOf(Note note) =>
       (today ??= routines.todayByNote(deviceWallClock))[note.id] ?? const [];
-  // The marks Hidden from AI, read once for the list (#267); without one
-  // no card walks up from its Note.
-  final hidden = notes.store.hiddenFromAiMarks();
+  // The Notes Hidden from AI (#267), read once for the list and kept by
+  // the core until the log changes; without a mark no card walks up from
+  // its Note.
+  final hidden = notes.store.hiddenFromAiAmong([
+    for (final placed in shown) placed.note.id,
+  ]);
   return [
     for (final placed in shown)
       if (placed case (
@@ -905,9 +925,7 @@ List<Widget> diaryCards(
           occurrences: (read: () => todayOf(note), routines: routines),
           onTap: onSwitch == null ? null : () => onSwitch(note),
           onEdit: () => onOpen(note),
-          hiddenFromAi:
-              hidden.isNotEmpty &&
-              notes.store.hiddenFromAiBy(note.id, hidden).isNotEmpty,
+          hiddenFromAi: hidden.contains(note.id),
           onSelect: selected == null || onSelect == null || !changes
               ? null
               : (on) => onSelect(note, on),

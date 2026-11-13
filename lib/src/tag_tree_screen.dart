@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'page_bar.dart';
@@ -11,7 +12,8 @@ import 'system_bars.dart';
 /// the page with it, for the Areas list to search for it, as a tap on a
 /// tag in a text does (ADR 0032). The levels below a tag unfold by its
 /// arrow; at first only the top level shows. The tree is read when the
-/// page opens.
+/// page opens and again as an Area opens or closes, without the Notes of
+/// the locked Areas closed then (Area Locks), as every list.
 class TagTreeScreen extends StatefulWidget {
   final Store store;
 
@@ -27,10 +29,34 @@ class _TagTreeScreenState extends State<TagTreeScreen> {
   /// The tags whose levels below show.
   final _open = <String>{};
 
+  /// The app's lock, followed while the page shows.
+  AppLock? _lock;
+  var _started = false;
+
   @override
-  void initState() {
-    super.initState();
-    _tree = TagTree(widget.store).tree();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lock = LockScope.of(context);
+    if (_started && lock == _lock) return;
+    _started = true;
+    _lock?.removeListener(_locksChanged);
+    _lock = lock?..addListener(_locksChanged);
+    _tree = _read();
+  }
+
+  @override
+  void dispose() {
+    _lock?.removeListener(_locksChanged);
+    super.dispose();
+  }
+
+  List<TagNode> _read() =>
+      TagTree(widget.store)
+          .tree(closed: _lock?.closedAreas ?? const <String>{});
+
+  /// An Area opened or closed, or the app locked: read again.
+  void _locksChanged() {
+    if (mounted) setState(() => _tree = _read());
   }
 
   void _toggle(String tag) => setState(() {

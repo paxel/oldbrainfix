@@ -211,7 +211,9 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
 
   /// Merges the ticked Notes of [shown] into the Note picked in Merge
   /// into…, in one batch (#273), and ends the selection; whether they
-  /// were merged. A ticked Note picked takes the others in.
+  /// were merged. A ticked Note picked takes the others in. Hidden from
+  /// AI and a Shared Area do not meet in a Merge (#267): asked as when
+  /// filing, and the selection stays when nothing merged.
   Future<bool> mergeSelected(
     Notes notes,
     Places places,
@@ -246,9 +248,18 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
         target != null &&
         !target.isTrashed &&
         !target.isMerged;
-    if (merges) notes.mergeAll(going, intoId);
+    if (!merges) {
+      stopSelecting();
+      return false;
+    }
+    final merged = await unlessHiddenFromAi(
+      context,
+      notes.store,
+      () => notes.mergeAll(going, intoId),
+    );
+    if (!mounted || merged == null) return false;
     stopSelecting();
-    return merges;
+    return true;
   }
 
   /// Sets the Importance of the ticked Notes of [shown] in one batch and

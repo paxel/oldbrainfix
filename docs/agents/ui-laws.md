@@ -802,9 +802,9 @@ replace a law of Both apps where they say so. A desktop law marked
   A tap on a tag goes back to the Areas list searching for it, as a tap
   on a tag in a text does. Typing `#` in the Areas list's search shows
   the tags starting with what is typed as chips under the field, at most
-  twelve, the one typed exactly left out; a tap fills it in. While a
-  locked Area is closed, neither the row nor the chips show, as the tree
-  is read from every Note.
+  twelve, the one typed exactly left out; a tap fills it in. The tree
+  and the chips leave out the Notes of a locked Area while it is closed,
+  as every list does.
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and
@@ -1142,6 +1142,8 @@ replace a law of Both apps where they say so. A desktop law marked
   The Note editor's settings are its badges (see Cards).
 - **Something Hidden from AI is not given away** (#267, ADR 0049):
   filing it into a Shared Area (a card, the selection, File into…),
+  merging it with a Note of a Shared Area either way (a card, the
+  selection, Merge into…; the selection stays when nothing merged),
   sharing an Area that is hidden or holds a hidden Note, Send to a
   person and Export as Pack ask once, naming what is hidden: "… hidden
   from AI. What is hidden from AI is not given to other people. Show it

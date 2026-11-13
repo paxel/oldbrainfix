@@ -493,7 +493,7 @@ impl Alerts {
             if alarm.text.is_none() {
                 t.note_gone().to_string()
             } else {
-                wordless(&t, alarm.wordless).to_string()
+                wordless(&t, alarm.wordless, &alarm.wordless_name)
             }
         });
         let key = occurrence_key(&alarm.routine_id, &alarm.occurrence);
@@ -651,6 +651,7 @@ mod tests {
             ends_at: parse_time(ends)?,
             text: Some("Pills".into()),
             wordless: Wordless::Photo,
+            wordless_name: String::new(),
         })
     }
 
@@ -732,8 +733,14 @@ mod tests {
             wordless: Wordless::Photo,
             ..voice.clone()
         };
+        let file = PlannedAlarm {
+            wordless: Wordless::File,
+            wordless_name: "Mietvertrag.pdf".into(),
+            ..voice.clone()
+        };
         assert!(alerts.show_alarm(&voice, now));
         assert!(alerts.show_alarm(&photo, now));
+        assert!(alerts.show_alarm(&file, now));
         let titles: Vec<String> = notifier
             .take()
             .into_iter()
@@ -742,7 +749,7 @@ mod tests {
                 crate::notify::Recorded::Closed(_) => None,
             })
             .collect();
-        assert_eq!(titles, ["Sprachaufnahme", "Foto"]);
+        assert_eq!(titles, ["Sprachaufnahme", "Foto", "Mietvertrag.pdf"]);
         Ok(())
     }
 

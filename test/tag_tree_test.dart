@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/tag_tree_screen.dart';
@@ -157,17 +158,52 @@ void main() {
     expect(find.byType(NoteCard), findsOneWidget);
   });
 
-  testWidgets('while a locked Area is closed the row and the chips wait, as '
-      'its Notes do', (tester) async {
+  testWidgets('while a locked Area is closed the row and the chips leave '
+      'its Notes out, as every list does', (tester) async {
     final diary = Places(store).addArea('Diary');
-    notes.capture('Secret #affair', place: diary.id);
+    notes.capture('Secret #affair #life/love', place: diary.id);
+    notes.capture('Physio #life/health');
     store
       ..setPin('1234', iterations: 10)
       ..setAreaLocked(diary.id, true);
     await startAtAreas(tester);
-    expect(key('tags-row'), findsNothing);
-    await tester.enterText(find.byType(TextField).last, '#');
+    final field = find.byType(TextField).last;
+
+    await tester.enterText(field, '#');
     await tester.pumpAndSettle();
-    expect(key('search-tag-suggestions'), findsNothing);
+    expect(key('search-tag-#life'), findsOneWidget);
+    expect(key('search-tag-#life/health'), findsOneWidget);
+    expect(key('search-tag-#affair'), findsNothing);
+    expect(key('search-tag-#life/love'), findsNothing);
+    await tester.enterText(field, '');
+    await tester.pumpAndSettle();
+
+    await tap(tester, key('tags-row'));
+    expect(key('tree-row-#affair'), findsNothing);
+    expect(
+      find.descendant(of: key('tree-row-#life'), matching: find.text('1 Note')),
+      findsOneWidget,
+    );
+    // Opened while the tree shows, its tags come; closed again, they go.
+    final lock = LockScope.of(tester.element(find.byType(TagTreeScreen)))!;
+    lock.openArea(diary.id);
+    await tester.pumpAndSettle();
+    expect(key('tree-row-#affair'), findsOneWidget);
+    lock.closeAreas();
+    await tester.pumpAndSettle();
+    expect(key('tree-row-#affair'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Without the lock its tags are there again.
+    store.setAreaLocked(diary.id, false);
+    await tester.enterText(field, '#');
+    await tester.pumpAndSettle();
+    expect(key('search-tag-#affair'), findsOneWidget);
+    expect(key('search-tag-#life/love'), findsOneWidget);
+    await tester.enterText(field, '');
+    await tester.pumpAndSettle();
+    await tap(tester, key('tags-row'));
+    expect(key('tree-row-#affair'), findsOneWidget);
   });
 }

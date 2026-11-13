@@ -351,6 +351,10 @@ class Store {
   /// here.
   Uint8List? file(String hash) => _files.get(hash);
 
+  /// Whether the bytes of the attached file [hash] are here, without
+  /// reading them.
+  bool hasFile(String hash) => _files.has(hash);
+
   /// The photos, the voice recordings and the attached files kept here,
   /// to read them off this isolate, as a Pack is written ([PackWrite]).
   ({Blobs photos, Blobs audio, Blobs files}) get blobs =>

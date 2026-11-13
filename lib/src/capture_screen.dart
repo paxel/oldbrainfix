@@ -888,7 +888,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
           if (before != null) await before;
           final picked = await coming;
           if (picked.isEmpty) return;
-          final read = await readPickedFiles(widget.files, picked);
+          final read = await readPickedFiles(
+            widget.files,
+            picked,
+            widget.notes.store,
+          );
           announceNotAttached(t, announcements, navigator, read);
           if (mounted && !_leaving) {
             setState(() => _addFiles(read.files));

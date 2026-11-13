@@ -1,13 +1,16 @@
 //! The tag tree (#267, ADR 0032), as the Dart core's `TagTree` reads it:
 //! every tag in the texts of the Notes neither in the trash nor merged
 //! and of their Sections, as the texts draw them, by its levels. Nothing
-//! is stored for it; it is read from the texts.
+//! is stored for it; it is read from the texts. The Notes filed into an
+//! Area of `closed`, the locked Areas not open now, are left out, as from
+//! every list (Area Locks).
 
 use std::collections::{HashMap, HashSet};
 
 use crate::Result;
 use crate::markdown;
 use crate::notes::Notes;
+use crate::places::Places;
 use crate::search::lower_case;
 use crate::store::{Store, utf16_cmp};
 use crate::text_format;
@@ -38,16 +41,33 @@ impl<'a> TagTree<'a> {
     }
 
     /// The tags of the first level, each with those under it, by name: in
-    /// lower case, by UTF-16 code units.
-    pub fn tree(&self) -> Result<Vec<TagNode>> {
-        let tree = self.store.worked_out("tag_tree", || self.build())?;
-        Ok(tree.as_ref().clone())
+    /// lower case, by UTF-16 code units. Those only the Notes filed into
+    /// an Area of `closed` hold do not show, nor do those Notes count.
+    pub fn tree(&self, closed: &HashSet<String>) -> Result<Vec<TagNode>> {
+        let read = self.store.worked_out("tag_tree", || self.read())?;
+        let mut root = Level::default();
+        for note in read.iter() {
+            if note.area.as_ref().is_some_and(|a| closed.contains(a)) {
+                continue;
+            }
+            for (parts, written) in &note.tags {
+                let mut level = &mut root;
+                for (part, spelling) in parts.iter().zip(written) {
+                    let held = level.parts.entry(part.clone()).or_default();
+                    *held.spellings.entry(spelling.clone()).or_default() += 1;
+                    held.notes.insert(note.id.clone());
+                    level = &mut held.under;
+                }
+            }
+        }
+        Ok(root.nodes("#"))
     }
 
     /// Every tag of the tree whose tag begins with `typed`, ignoring
     /// case, each before those under it: what is offered when a `#` is
     /// typed in the search. None when `typed` does not begin with a `#`.
-    pub fn suggestions(&self, typed: &str) -> Result<Vec<TagNode>> {
+    /// `closed` as for [`TagTree::tree`].
+    pub fn suggestions(&self, typed: &str, closed: &HashSet<String>) -> Result<Vec<TagNode>> {
         let wanted = lower_case(typed.trim());
         if !wanted.starts_with('#') {
             return Ok(Vec::new());
@@ -61,37 +81,58 @@ impl<'a> TagTree<'a> {
             }
         }
         let mut out = Vec::new();
-        walk(&self.tree()?, &wanted, &mut out);
+        walk(&self.tree(closed)?, &wanted, &mut out);
         Ok(out)
     }
 
-    fn build(&self) -> Result<Vec<TagNode>> {
+    /// The tags of each Note in the lists, with the Area it is filed into,
+    /// whatever is closed: kept until the log changes.
+    fn read(&self) -> Result<Vec<NoteTags>> {
         let notes = Notes::new(self.store);
+        let places = Places::new(self.store);
         let all = notes.all()?;
         let ids: Vec<String> = all.iter().map(|n| n.id.clone()).collect();
         let sections = notes.sections_of(&ids)?;
-        let mut root = Level::default();
+        let mut out = Vec::new();
         for note in &all {
             let mut texts = vec![(note.text_format.clone(), note.shown_text())];
             for s in sections.get(&note.id).into_iter().flatten() {
                 texts.push((s.text_format.clone(), s.shown_text()));
             }
+            let mut tags = Vec::new();
             for (format, text) in &texts {
                 for found in tags_in(format, text) {
                     let written = text.get(found.start + 1..found.end).unwrap_or_default();
                     let parts = found.tag.get(1..).unwrap_or_default();
-                    let mut level = &mut root;
-                    for (part, spelling) in parts.split('/').zip(written.split('/')) {
-                        let held = level.parts.entry(part.to_string()).or_default();
-                        *held.spellings.entry(spelling.to_string()).or_default() += 1;
-                        held.notes.insert(note.id.clone());
-                        level = &mut held.under;
-                    }
+                    tags.push((
+                        parts.split('/').map(str::to_string).collect(),
+                        written.split('/').map(str::to_string).collect(),
+                    ));
                 }
             }
+            let area = match &note.place {
+                Some(place) => Some(match places.topic_by_id(place)? {
+                    Some(topic) => topic.area_id,
+                    None => place.clone(),
+                }),
+                None => None,
+            };
+            out.push(NoteTags {
+                id: note.id.clone(),
+                area,
+                tags,
+            });
         }
-        Ok(root.nodes("#"))
+        Ok(out)
     }
+}
+
+/// The tags of one Note: each as its parts in lower case and as written,
+/// and the Area the Note is filed into, directly or through a Topic.
+struct NoteTags {
+    id: String,
+    area: Option<String>,
+    tags: Vec<(Vec<String>, Vec<String>)>,
 }
 
 /// The tags of `text` in `format` as it is drawn: none in a Code text,
@@ -177,7 +218,7 @@ mod tests {
     }
 
     fn tree(store: &Store) -> Result<Vec<String>> {
-        Ok(lines(&TagTree::new(store).tree()?, ""))
+        Ok(lines(&TagTree::new(store).tree(&HashSet::new())?, ""))
     }
 
     #[test]
@@ -201,7 +242,7 @@ mod tests {
                 "  #life/work 1",
             ]
         );
-        let found = TagTree::new(&store).tree()?;
+        let found = TagTree::new(&store).tree(&HashSet::new())?;
         let names: Vec<&str> = found.iter().map(|n| n.name.as_str()).collect();
         assert_eq!(names, ["garten", "life"]);
         Ok(())
@@ -276,6 +317,51 @@ mod tests {
     }
 
     #[test]
+    fn the_notes_of_a_closed_area_are_left_out_as_if_they_were_not_there() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let places = Places::new(&store);
+        let locked = places.add_area("Health")?.id;
+        let topic = places.add_topic(&locked, "Back")?.id;
+        let open = places.add_area("Home")?.id;
+        let filed = notes.capture("#LIFE/Health #secret", Some(&locked), None)?;
+        let in_topic = notes.capture("#LIFE/back", Some(&topic), None)?;
+        notes.capture("#life/home", Some(&open), None)?;
+        notes.capture("#Life", None, None)?;
+        let every = tree(&store)?;
+        assert_eq!(
+            every,
+            [
+                "#LIFE 4",
+                "  #LIFE/back 1",
+                "  #LIFE/Health 1",
+                "  #LIFE/home 1",
+                "#secret 1",
+            ]
+        );
+        let shut = HashSet::from([locked.clone()]);
+        let closed = lines(&TagTree::new(&store).tree(&shut)?, "");
+        // As the tree reads with those Notes gone.
+        assert_eq!(closed, ["#Life 2", "  #Life/home 1"]);
+        let tags = |typed: &str, closed: &HashSet<String>| -> Result<Vec<String>> {
+            Ok(TagTree::new(&store)
+                .suggestions(typed, closed)?
+                .into_iter()
+                .map(|n| n.tag)
+                .collect())
+        };
+        assert_eq!(tags("#", &shut)?, ["#Life", "#Life/home"]);
+        assert!(tags("#s", &shut)?.is_empty());
+        assert_eq!(tags("#s", &HashSet::from([open]))?, ["#secret"]);
+        // Asked again with nothing closed, nothing stays left out.
+        assert_eq!(tree(&store)?, every);
+        notes.trash(&filed.id)?;
+        notes.trash(&in_topic.id)?;
+        assert_eq!(tree(&store)?, closed);
+        Ok(())
+    }
+
+    #[test]
     fn suggestions_are_the_tags_beginning_with_what_is_typed() -> Result<()> {
         let store = crate::store::tests::store();
         Notes::new(&store).capture(
@@ -285,7 +371,7 @@ mod tests {
         )?;
         let tags = |typed: &str| -> Result<Vec<String>> {
             Ok(TagTree::new(&store)
-                .suggestions(typed)?
+                .suggestions(typed, &HashSet::new())?
                 .into_iter()
                 .map(|n| n.tag)
                 .collect())

@@ -97,6 +97,47 @@ void main() {
       expect(ann.isHiddenFromAi(inTopic), isFalse);
     });
 
+    test('those of a list that are hidden are the ones each walk finds, '
+        'read anew as the log changes', () {
+      final area = places.addArea('Health').id;
+      final topic = places.addTopic(area, 'Back').id;
+      final inTopic = notes.capture('Physio', place: topic).id;
+      final inArea = notes.capture('Doctor', place: area).id;
+      final alone = notes.capture('Diary').id;
+      final open = notes.capture('Shopping').id;
+      final merged = notes.capture('Notes on the diary').id;
+      notes.merge(merged, alone);
+      final all = [inTopic, inArea, alone, open, merged, topic, area];
+      expect(ann.hiddenFromAiAmong(all), isEmpty);
+      ann.setHiddenFromAi(area, true);
+      ann.setHiddenFromAi(alone, true);
+      Set<String> each() => {
+        for (final id in all)
+          if (ann.isHiddenFromAi(id)) id,
+      };
+      expect(each(), {inTopic, inArea, alone, merged, topic, area});
+      final walked = each();
+      hiddenFromAiLinksRead = 0;
+      expect(ann.hiddenFromAiAmong(all), walked);
+      // Each link once for all of them: fewer than a walk of each.
+      final once = hiddenFromAiLinksRead;
+      hiddenFromAiLinksRead = 0;
+      each();
+      expect(once, lessThan(hiddenFromAiLinksRead));
+      // Asked again, as a list built again does, it walks nothing again.
+      hiddenFromAiLinksRead = 0;
+      expect(ann.hiddenFromAiAmong(all), walked);
+      expect(ann.hiddenFromAiAmong([open, inArea]), {inArea});
+      expect(hiddenFromAiLinksRead, 0);
+      notes.file(inArea, places.addArea('Work').id);
+      ann.setHiddenFromAi(alone, false);
+      hiddenFromAiLinksRead = 0;
+      expect(ann.hiddenFromAiAmong(all), {inTopic, topic, area});
+      // The log changed: read anew.
+      expect(hiddenFromAiLinksRead, greaterThan(0));
+      expect(ann.hiddenFromAiAmong(all), each());
+    });
+
     test("it travels between one's own Devices", () {
       final desk = device(clock, 'Ann at the desk');
       exchange(desk, ann);
@@ -180,6 +221,41 @@ void main() {
       notes.file(doctor, area);
       expect(notes.byId(doctor)?.place, area);
       expect(ann.isHiddenFromAi(doctor), isFalse);
+    });
+
+    test('a hidden Note and one of the Shared Area merge neither way', () {
+      final diary = notes.capture('Diary').id;
+      ann.setHiddenFromAi(diary, true);
+      final health = places.addArea('Health').id;
+      ann.setHiddenFromAi(health, true);
+      final doctor = notes.capture('Doctor', place: health).id;
+      final topic = places.addTopic(area, 'Kitchen').id;
+      final milk = notes.capture('Milk', place: area).id;
+      final eggs = notes.capture('Eggs', place: topic).id;
+      final plain = notes.capture('Plain').id;
+      final written = ann.allEntries().length;
+      // Hidden into shared, by the marks hiding what merges.
+      expect(() => notes.merge(diary, milk), throwsA(refusedFor([diary])));
+      expect(() => notes.merge(doctor, eggs), throwsA(refusedFor([health])));
+      // Shared into hidden, by the marks hiding the target.
+      expect(() => notes.merge(milk, diary), throwsA(refusedFor([diary])));
+      expect(() => notes.merge(eggs, doctor), throwsA(refusedFor([health])));
+      expect(
+        () => notes.mergeAll([doctor, plain, diary], milk),
+        throwsA(refusedFor([health, diary]..sort())),
+      );
+      expect(
+        () => notes.mergeAll([plain, milk], diary),
+        throwsA(refusedFor([diary])),
+      );
+      expect(ann.allEntries().length, written);
+      // Hidden with hidden, shared with shared, and anything with a Note
+      // of neither merge as before.
+      notes.merge(doctor, diary);
+      notes.merge(eggs, milk);
+      notes.mergeAll([plain], diary);
+      expect(notes.byId(doctor)?.isMerged, isTrue);
+      expect(notes.byId(eggs)?.isMerged, isTrue);
     });
 
     test("a link another person's Device wrote shows nothing hidden", () {

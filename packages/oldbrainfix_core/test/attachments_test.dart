@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -85,6 +86,48 @@ void main() {
     expect(read.aloneFile, isNull, reason: 'it has words and five files');
     notes.trash(note.id);
     expect(notes.unreadAttachments(computer: true), isEmpty);
+  });
+
+  test('a file kept from its path, in chunks, is attached by its hash as '
+      'one attached from its bytes; kept twice, it is there once', () {
+    final dir = Directory.systemTemp.createTempSync('kept_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final files = FileBlobs('${dir.path}/files');
+    final bytes = Uint8List.fromList([
+      for (var i = 0; i < (3 << 20) + 17; i++) i % 253,
+    ]);
+    final path = (File('${dir.path}/picked')..writeAsBytesSync(bytes)).path;
+    final hash = files.putFrom(path);
+    expect(hash, ann.putFile(bytes));
+    expect(files.putFrom(path), hash);
+    expect(files.has(hash), isTrue);
+    expect(files.get(hash), bytes);
+    // Nothing left beside it.
+    expect(files.dir.listSync().map((f) => f.uri.pathSegments.last), [hash]);
+    expect(files.has('a' * 64), isFalse);
+    expect(files.has('../picked'), isFalse);
+    // A file that cannot be read leaves nothing beside.
+    expect(
+      () => files.putFrom('${dir.path}/missing'),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(files.dir.listSync().length, 1);
+
+    final memory = MemoryBlobs();
+    expect(memory.putFrom(path), hash);
+    expect(memory.has(hash), isTrue);
+    expect(ann.hasFile(hash), isTrue);
+    final note = notes.capture(
+      'Big',
+      files: [NewFile.kept(name: 'Big.bin', hash: hash, size: bytes.length)],
+    );
+    expect(note.attachments.single.hash, hash);
+    expect(note.attachments.single.size, bytes.length);
+    final missing = NewFile.kept(name: 'Gone.pdf', hash: 'b' * 64, size: 1);
+    expect(() => notes.attachFile(note.id, missing), throwsArgumentError);
+    final huge = NewFile.kept(name: 'Film', hash: hash, size: maxFileBytes + 1);
+    expect(() => notes.attachFile(note.id, huge), throwsArgumentError);
+    expect(notes.byId(note.id)?.attachments.length, 1);
   });
 
   test('a Note made from a file alone shows the file', () {

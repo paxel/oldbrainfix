@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
 import 'browser.dart';
+import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
 import 'note_card.dart';
 import 'page_bar.dart';
@@ -11,7 +12,8 @@ import 'system_bars.dart';
 import 'text_marks_view.dart';
 
 /// Opens "merge into…" for [note] and merges it into the Note picked
-/// there; true when it was merged.
+/// there; true when it was merged. Hidden from AI and a Shared Area do
+/// not meet in a Merge (#267): asked as when filing.
 Future<bool> mergeNote(
   BuildContext context,
   Notes notes,
@@ -24,9 +26,12 @@ Future<bool> mergeNote(
           MergeIntoScreen(notes: notes, places: places, noteId: note.id),
     ),
   );
-  if (intoId == null) return false;
-  notes.merge(note.id, intoId);
-  return true;
+  if (intoId == null || !context.mounted) return false;
+  final merged = await unlessHiddenFromAi(context, notes.store, () {
+    notes.merge(note.id, intoId);
+    return true;
+  });
+  return merged ?? false;
 }
 
 /// Picks the Note to merge the Note [noteId] into: every other Note as a

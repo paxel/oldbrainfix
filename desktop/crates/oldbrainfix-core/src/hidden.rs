@@ -191,14 +191,57 @@ impl Store {
         Err(Error::HiddenFromAi(marks))
     }
 
+    /// Those of `entities` that are Hidden from AI
+    /// ([`Store::hidden_from_ai_by`]), as a list of cards shows the mark:
+    /// the marks read once, and each link followed once for all of them.
+    /// Empty while nothing is marked. As the Dart core's
+    /// `hiddenFromAiAmong`.
+    pub fn hidden_from_ai_among<I, S>(&self, entities: I) -> Result<BTreeSet<String>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let marks = self.hidden_from_ai_marks()?;
+        let mut out = BTreeSet::new();
+        if marks.is_empty() {
+            return Ok(out);
+        }
+        let mut own = HashMap::new();
+        let mut above = HashMap::new();
+        for id in entities {
+            let id = id.as_ref();
+            if !self
+                .walk_hidden(id, &marks, &mut own, &mut above)?
+                .is_empty()
+            {
+                out.insert(id.to_string());
+            }
+        }
+        Ok(out)
+    }
+
     /// [`Store::hidden_from_ai_by`] with the marks read already.
     pub(crate) fn hidden_by(&self, entity: &str, marks: &BTreeSet<String>) -> Result<Vec<String>> {
         if marks.is_empty() {
             return Ok(Vec::new());
         }
+        let found = self.walk_hidden(entity, marks, &mut HashMap::new(), &mut HashMap::new())?;
+        Ok(sorted(found.into_iter().collect()))
+    }
+
+    /// The marks of `marks` reached walking up from `entity`; `own` and
+    /// `above` remember, for this walk or several, which Devices are the
+    /// user's own and what each id lies in or under
+    /// ([`Store::above_for_ai`]).
+    fn walk_hidden(
+        &self,
+        entity: &str,
+        marks: &BTreeSet<String>,
+        own: &mut HashMap<String, bool>,
+        above: &mut HashMap<String, Vec<String>>,
+    ) -> Result<BTreeSet<String>> {
         let mut found: BTreeSet<String> = BTreeSet::new();
         let mut seen: HashSet<String> = HashSet::new();
-        let mut own: HashMap<String, bool> = HashMap::new();
         let mut todo = vec![entity.to_string()];
         while let Some(id) = todo.pop() {
             if !seen.insert(id.clone()) {
@@ -207,9 +250,15 @@ impl Store {
             if marks.contains(&id) && (id.starts_with("note:") || id.starts_with("area:")) {
                 found.insert(id.clone());
             }
-            todo.extend(self.above_for_ai(&id, &mut own)?);
+            if let Some(held) = above.get(&id) {
+                todo.extend(held.iter().cloned());
+                continue;
+            }
+            let held = self.above_for_ai(&id, own)?;
+            todo.extend(held.iter().cloned());
+            above.insert(id, held);
         }
-        Ok(sorted(found.into_iter().collect()))
+        Ok(found)
     }
 
     /// What `id` lies in or under, as the log alone has it and as the
@@ -679,6 +728,50 @@ mod tests {
     }
 
     #[test]
+    fn those_of_a_list_that_are_hidden_are_the_ones_each_walk_finds() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let places = Places::new(&ann);
+        let notes = Notes::new(&ann);
+        let area = places.add_area("Health")?.id;
+        let topic = places.add_topic(&area, "Back")?.id;
+        let in_topic = notes.capture("Physio", Some(&topic), None)?.id;
+        let in_area = notes.capture("Doctor", Some(&area), None)?.id;
+        let alone = notes.capture("Diary", None, None)?.id;
+        let open = notes.capture("Shopping", None, None)?.id;
+        let merged = notes.capture("Notes on the diary", None, None)?.id;
+        notes.merge(&merged, &alone)?;
+        let all = [&in_topic, &in_area, &alone, &open, &merged, &topic, &area];
+        assert!(ann.hidden_from_ai_among(all)?.is_empty());
+        ann.set_hidden_from_ai(&area, true)?;
+        ann.set_hidden_from_ai(&alone, true)?;
+        let each = || -> Made<BTreeSet<String>> {
+            let mut out = BTreeSet::new();
+            for id in all {
+                if ann.is_hidden_from_ai(id)? {
+                    out.insert(id.clone());
+                }
+            }
+            Ok(out)
+        };
+        let want: BTreeSet<String> = [&in_topic, &in_area, &alone, &merged, &topic, &area]
+            .into_iter()
+            .cloned()
+            .collect();
+        assert_eq!(each()?, want);
+        assert_eq!(ann.hidden_from_ai_among(all)?, each()?);
+        assert_eq!(
+            ann.hidden_from_ai_among([&open, &in_area])?,
+            BTreeSet::from([in_area.clone()])
+        );
+        notes.file(&in_area, &places.add_area("Work")?.id)?;
+        ann.set_hidden_from_ai(&alone, false)?;
+        let want: BTreeSet<String> = [&in_topic, &topic, &area].into_iter().cloned().collect();
+        assert_eq!(ann.hidden_from_ai_among(all)?, want);
+        assert_eq!(ann.hidden_from_ai_among(all)?, each()?);
+        Ok(())
+    }
+
+    #[test]
     fn it_travels_between_own_devices() -> TestResult {
         let ann = device(1, "Ann")?;
         let desk = device(3, "Ann at the desk")?;
@@ -764,6 +857,60 @@ mod tests {
         notes.file(&doctor, &places.add_area("Work")?.id)?;
         notes.file(&doctor, &area)?;
         assert!(!ann.is_hidden_from_ai(&doctor)?);
+        Ok(())
+    }
+
+    #[test]
+    fn hidden_and_shared_notes_do_not_merge_either_way() -> TestResult {
+        let (ann, _, area) = household()?;
+        let places = Places::new(&ann);
+        let notes = Notes::new(&ann);
+        let diary = notes.capture("Diary", None, None)?.id;
+        ann.set_hidden_from_ai(&diary, true)?;
+        let health = places.add_area("Health")?.id;
+        ann.set_hidden_from_ai(&health, true)?;
+        let doctor = notes.capture("Doctor", Some(&health), None)?.id;
+        let topic = places.add_topic(&area, "Kitchen")?.id;
+        let milk = notes.capture("Milk", Some(&area), None)?.id;
+        let eggs = notes.capture("Eggs", Some(&topic), None)?.id;
+        let plain = notes.capture("Plain", None, None)?.id;
+        let written = ann.all_entries()?.len();
+        // Hidden into shared, by the marks hiding what merges.
+        assert_eq!(
+            refused(notes.merge(&diary, &milk))?,
+            std::slice::from_ref(&diary)
+        );
+        assert_eq!(
+            refused(notes.merge(&doctor, &eggs))?,
+            std::slice::from_ref(&health)
+        );
+        // Shared into hidden, by the marks hiding the target.
+        assert_eq!(
+            refused(notes.merge(&milk, &diary))?,
+            std::slice::from_ref(&diary)
+        );
+        assert_eq!(
+            refused(notes.merge(&eggs, &doctor))?,
+            std::slice::from_ref(&health)
+        );
+        let mut both = vec![diary.clone(), health.clone()];
+        both.sort();
+        assert_eq!(
+            refused(notes.merge_all([&doctor, &plain, &diary], &milk))?,
+            both
+        );
+        assert_eq!(
+            refused(notes.merge_all([&plain, &milk], &diary))?,
+            std::slice::from_ref(&diary)
+        );
+        assert_eq!(ann.all_entries()?.len(), written);
+        // Hidden with hidden, shared with shared, and anything with a
+        // Note of neither merge as before.
+        notes.merge(&doctor, &diary)?;
+        notes.merge(&eggs, &milk)?;
+        notes.merge_all([&plain], &diary)?;
+        assert!(notes.by_id(&doctor)?.is_some_and(|n| n.is_merged()));
+        assert!(notes.by_id(&eggs)?.is_some_and(|n| n.is_merged()));
         Ok(())
     }
 
@@ -1037,7 +1184,7 @@ mod tests {
         ann.set_hidden_from_ai(&health, true)?;
         ann.set_hidden_from_ai(&diary, true)?;
         // Worked out for the user first, so nothing kept leaks.
-        assert!(!TagTree::new(&ann).tree()?.is_empty());
+        assert!(!TagTree::new(&ann).tree(&HashSet::new())?.is_empty());
         assert_eq!(Search::new(&ann).notes("secret", None)?.len(), 4);
 
         assert_eq!(read_all(&ann, &task, &visible)?, before);

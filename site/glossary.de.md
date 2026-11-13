@@ -327,7 +327,7 @@ Eine optionale Sperre auf einem einzelnen Bereich, die zu bleibt, auch während 
 Wie eine Fälligkeit aus einem gesperrten Bereich in Alarmen und in der Agenda erscheint, wenn ihr Bereich das so will: "Private Routine, 08:00", trotzdem abhakbar.
 
 **Vor KI verborgen** [Hidden from AI]:
-Eine Markierung, die du auf einen Bereich oder eine einzelne Notiz setzt, auf dem Handy oder am Computer, nur für deine eigenen Geräte: Für die KI (eine KI-Aufgabe, das Fragen am Computer) gibt es die Notiz, jede Notiz des Bereichs und ihre Ergänzungen, Routinen, Erinnerungen, Frösche, Zeilen und #Wörter nicht, nicht einmal als Anzahl. Verborgen und geteilt schließen sich aus: In einem geteilten Bereich wird die Markierung nicht angeboten, und was verborgen ist, wird weder in einen geteilten Bereich abgelegt noch geteilt, gesendet oder in ein Paket gelegt, bis du die Markierung abnimmst. Du selbst siehst und exportierst es wie immer.
+Eine Markierung, die du auf einen Bereich oder eine einzelne Notiz setzt, auf dem Handy oder am Computer, nur für deine eigenen Geräte: Für die KI (eine KI-Aufgabe, das Fragen am Computer) gibt es die Notiz, jede Notiz des Bereichs und ihre Ergänzungen, Routinen, Erinnerungen, Frösche, Zeilen und #Wörter nicht, nicht einmal als Anzahl. Verborgen und geteilt schließen sich aus: In einem geteilten Bereich wird die Markierung nicht angeboten, und was verborgen ist, wird weder in einen geteilten Bereich abgelegt noch mit einer Notiz eines geteilten Bereichs zusammengeführt, geteilt, gesendet oder in ein Paket gelegt, bis du die Markierung abnimmst. Du selbst siehst und exportierst es wie immer.
 _Avoid_: privat, geheim, ausgeschlossen, gesperrt (eine Bereichssperre ist etwas anderes)
 
 **Sicherung** [Backup]:

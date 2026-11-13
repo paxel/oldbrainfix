@@ -256,7 +256,8 @@ class _AreasScreenState extends State<AreasScreen>
     _reload();
   }
 
-  /// Opens the tag tree; a tag tapped there is searched for here.
+  /// Opens the tag tree, without the Notes of the locked Areas closed;
+  /// a tag tapped there is searched for here.
   Future<void> _openTags() async {
     final tag = await Navigator.of(context).push(
       MaterialPageRoute<String>(
@@ -467,10 +468,13 @@ class _AreasScreenState extends State<AreasScreen>
   Widget build(BuildContext context) {
     final t = context.t;
     final searching = _query.text.trim().isNotEmpty;
-    // The tag tree reads every Note, a closed locked Area's too: it waits
-    // while one is closed, as its Notes do (#267).
+    // The tags offered leave out the Notes of a closed locked Area, as
+    // every list does (#267).
     final lock = LockScope.of(context);
-    final tagsShown = !_areas.any((a) => lock?.isAreaClosed(a.id) ?? false);
+    final closed = {
+      for (final area in _areas)
+        if (lock?.isAreaClosed(area.id) ?? false) area.id,
+    };
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       onForward: _forward,
@@ -532,7 +536,8 @@ class _AreasScreenState extends State<AreasScreen>
                   controller: _query,
                   hint: t.searchAllHint,
                   onChanged: _searched,
-                  tags: tagsShown ? widget.places.store : null,
+                  tags: widget.places.store,
+                  closedTags: closed,
                 ),
                 if (searching)
                   PersonFilterChips(
@@ -565,7 +570,7 @@ class _AreasScreenState extends State<AreasScreen>
                                   selected: selecting ? selected : null,
                                   onSelect: setSelected,
                                 )
-                              : [..._areaRows(t), if (tagsShown) _tagsRow(t)],
+                              : [..._areaRows(t), _tagsRow(t)],
                         )
                       // The Areas move by their handles only: a long
                       // press never changes data (#280).
@@ -576,7 +581,7 @@ class _AreasScreenState extends State<AreasScreen>
                           ),
                           buildDefaultDragHandles: false,
                           onReorderItem: _moved,
-                          footer: tagsShown ? _tagsRow(t) : null,
+                          footer: _tagsRow(t),
                           children: _areaRows(t),
                         ),
                 ),

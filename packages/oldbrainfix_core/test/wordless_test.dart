@@ -60,11 +60,55 @@ void main() {
       expect(wordless(both.id), Wordless.photo);
     });
 
+    test('as a file by its name when it holds files and no photo or '
+        'recording, removed ones included', () {
+      NewFile file(String name, int n) =>
+          NewFile(name: name, bytes: Uint8List.fromList([n]));
+      final lease = notes.capture(
+        '',
+        files: [file('Lease 2026.pdf', 1), file('Plan.zip', 2)],
+      );
+      final nameless = notes.capture('', files: [file('', 3)]);
+      final withPhoto = notes.capture(
+        '',
+        photos: [photo(1)],
+        files: [file('a.pdf', 4)],
+      );
+      final withVoice = notes.capture(
+        '',
+        recordings: [voice(1)],
+        files: [file('b.pdf', 5)],
+      );
+      expect(wordless(lease.id), Wordless.file);
+      expect(notes.byId(lease.id)?.wordlessName, 'Lease 2026.pdf');
+      expect(wordless(nameless.id), Wordless.file);
+      expect(notes.byId(nameless.id)?.wordlessName, '');
+      expect(wordless(withPhoto.id), Wordless.photo);
+      expect(notes.byId(withPhoto.id)?.wordlessName, '');
+      expect(wordless(withVoice.id), Wordless.voiceRecording);
+      expect(notes.byId(withVoice.id)?.wordlessName, '');
+      // The file went, its text stayed: still titled by it.
+      final rent = notes.capture('', files: [file('Rent.txt', 6)]);
+      final hash = notes.byId(rent.id)!.attachments.single.hash;
+      notes.setAttachmentText(rent.id, hash, '500 EUR');
+      notes.removeAttachment(rent.id, hash);
+      expect(notes.byId(rent.id)?.attachments, isEmpty);
+      expect(wordless(rent.id), Wordless.file);
+      expect(notes.byId(rent.id)?.wordlessName, 'Rent.txt');
+      expect(wordless(notes.capture('Words').id), Wordless.photo);
+    });
+
     test('in its alarms as in its rows', () {
       final routines = Routines(store);
       final memo = notes.capture('', recordings: [voice(1)]);
       final receipt = notes.capture('', photos: [photo(1)]);
-      for (final note in [memo, receipt]) {
+      final lease = notes.capture(
+        '',
+        files: [
+          NewFile(name: 'Lease.pdf', bytes: Uint8List.fromList([1])),
+        ],
+      );
+      for (final note in [memo, receipt, lease]) {
         routines.spawn(
           note.id,
           Schedule(start: Day(2026, 10, 25), times: [ClockTime(10, 0)]),
@@ -72,11 +116,15 @@ void main() {
       }
       final titled = {
         for (final alarm in Alarms(store).plan(europe))
-          routines.byId(alarm.routineId)?.noteId: alarm.wordless,
+          routines.byId(alarm.routineId)?.noteId: (
+            alarm.wordless,
+            alarm.wordlessName,
+          ),
       };
       expect(titled, {
-        memo.id: Wordless.voiceRecording,
-        receipt.id: Wordless.photo,
+        memo.id: (Wordless.voiceRecording, ''),
+        receipt.id: (Wordless.photo, ''),
+        lease.id: (Wordless.file, 'Lease.pdf'),
       });
     });
   });

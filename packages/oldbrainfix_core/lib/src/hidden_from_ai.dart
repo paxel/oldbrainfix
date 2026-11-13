@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 import 'area_keys.dart';
 import 'checklists.dart';
 import 'entry.dart';
@@ -41,6 +43,11 @@ class HiddenFromAiRefused implements Exception {
   @override
   String toString() => 'HiddenFromAiRefused(${marks.join(', ')})';
 }
+
+/// How many times a walk Hidden from AI read what an id lies in or under
+/// from the log, for tests: a list built again reads nothing again.
+@visibleForTesting
+int hiddenFromAiLinksRead = 0;
 
 /// The mark "Hidden from AI" on a Note or an Area (#267, ADR 0049): for
 /// the AI such a Note, a Note in such an Area, and everything on them do
@@ -104,9 +111,41 @@ extension HiddenFromAi on Store {
   List<String> hiddenFromAiBy(String entity, [Set<String>? marks]) {
     marks ??= hiddenFromAiMarks();
     if (marks.isEmpty) return const [];
+    return _hiddenBy(entity, marks, {}, {}).toList()..sort();
+  }
+
+  /// Whether [entity] does not exist for the AI ([hiddenFromAiBy]).
+  bool isHiddenFromAi(String entity) => hiddenFromAiBy(entity).isNotEmpty;
+
+  /// Those of [entities] that are Hidden from AI ([hiddenFromAiBy]), as a
+  /// list of cards shows the mark: the marks read once, and each link
+  /// followed once for all of them and kept until the log changes, so a
+  /// list built again walks nothing again. Empty while nothing is marked.
+  Set<String> hiddenFromAiAmong(Iterable<String> entities) {
+    final walks = workedOut(_HiddenWalks, _HiddenWalks.new);
+    final marks = walks.marks ??= hiddenFromAiMarks();
+    if (marks.isEmpty) return const {};
+    return {
+      for (final id in entities)
+        if (walks.hidden.putIfAbsent(
+          id,
+          () => _hiddenBy(id, marks, walks.own, walks.above).isNotEmpty,
+        ))
+          id,
+    };
+  }
+
+  /// The marks of [marks] reached walking up from [entity]; [own] and
+  /// [above] remember, for this walk or several, which Devices are the
+  /// user's own and what each id lies in or under ([_aboveForAi]).
+  Set<String> _hiddenBy(
+    String entity,
+    Set<String> marks,
+    Map<String, bool> own,
+    Map<String, List<String>> above,
+  ) {
     final found = <String>{};
     final seen = <String>{};
-    final own = <String, bool>{};
     final todo = [entity];
     while (todo.isNotEmpty) {
       final id = todo.removeLast();
@@ -115,13 +154,10 @@ extension HiddenFromAi on Store {
           (id.startsWith('note:') || id.startsWith('area:'))) {
         found.add(id);
       }
-      todo.addAll(_aboveForAi(id, own));
+      todo.addAll(above.putIfAbsent(id, () => _aboveForAi(id, own)));
     }
-    return found.toList()..sort();
+    return found;
   }
-
-  /// Whether [entity] does not exist for the AI ([hiddenFromAiBy]).
-  bool isHiddenFromAi(String entity) => hiddenFromAiBy(entity).isNotEmpty;
 
   /// The marks that keep the Area [areaId] from being shared, sorted: its
   /// own, and those hiding a Note filed in it or one of its Topics,
@@ -148,6 +184,7 @@ extension HiddenFromAi on Store {
   /// Area a mark or an own choice is about. Only ids of the kind expected
   /// count.
   List<String> _aboveForAi(String id, Map<String, bool> own) {
+    hiddenFromAiLinksRead++;
     List<String> held(String field, List<String> kinds) {
       Entry? latest;
       Entry? mine;
@@ -195,4 +232,14 @@ extension HiddenFromAi on Store {
     }
     return [?one];
   }
+}
+
+/// What [HiddenFromAi.hiddenFromAiAmong] read, kept while the log stays as
+/// it is: the marks, whether each entity asked for is hidden, and the
+/// walk's links and own Devices.
+class _HiddenWalks {
+  Set<String>? marks;
+  final hidden = <String, bool>{};
+  final own = <String, bool>{};
+  final above = <String, List<String>>{};
 }

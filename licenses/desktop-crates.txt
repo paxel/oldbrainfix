@@ -7903,6 +7903,7 @@ rustc-hash 1.1.0
 rustix 0.38.44
 rustix 1.1.5
 rustversion 1.0.23
+semver 1.0.28
 serde 1.0.229
 serde_core 1.0.229
 serde_derive 1.0.229

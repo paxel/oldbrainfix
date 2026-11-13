@@ -211,6 +211,9 @@ pub struct PlannedAlarm {
     /// What that Note is titled as while `text` is blank
     /// ([`Note::wordless`]).
     pub wordless: Wordless,
+    /// The name of the file it goes by as [`Wordless::File`]
+    /// ([`Note::wordless_name`]); empty otherwise.
+    pub wordless_name: String,
 }
 
 impl PlannedAlarm {
@@ -326,6 +329,7 @@ pub fn alarm_plan(
                 ends_at: t.ends_at,
                 text: note.as_ref().map(Note::visible_text),
                 wordless: note.as_ref().map(Note::wordless).unwrap_or_default(),
+                wordless_name: note.as_ref().map(Note::wordless_name).unwrap_or_default(),
             });
             planned += 1;
         }
@@ -788,6 +792,7 @@ mod tests {
             ends_at: parse_time(ends)?,
             text: None,
             wordless: Wordless::Photo,
+            wordless_name: String::new(),
         })
     }
 
@@ -815,16 +820,34 @@ mod tests {
         let ten = ClockTime::new(10, 0).into_iter().collect::<Vec<_>>();
         let schedule = crate::schedule::Schedule::new(Day::new(2026, 1, 2), &ten, None)
             .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+        let lease = notes.capture_with_files(
+            "",
+            None,
+            None,
+            &[],
+            &[],
+            &[crate::notes::NewFile {
+                name: "Lease.pdf",
+                media_type: "",
+                bytes: &[1],
+                pages: None,
+            }],
+        )?;
         let voice = routines.spawn(&memo.id, &schedule)?.id;
         let photo = routines.spawn(&receipt.id, &schedule)?.id;
-        let titled: BTreeMap<String, Wordless> = Alarms::new(&store)
+        let file = routines.spawn(&lease.id, &schedule)?.id;
+        let titled: BTreeMap<String, (Wordless, String)> = Alarms::new(&store)
             .plan(&utc_wall)?
             .into_iter()
-            .map(|a| (a.routine_id, a.wordless))
+            .map(|a| (a.routine_id, (a.wordless, a.wordless_name)))
             .collect();
         assert_eq!(
             titled,
-            BTreeMap::from([(voice, Wordless::VoiceRecording), (photo, Wordless::Photo)])
+            BTreeMap::from([
+                (voice, (Wordless::VoiceRecording, String::new())),
+                (photo, (Wordless::Photo, String::new())),
+                (file, (Wordless::File, "Lease.pdf".to_string())),
+            ])
         );
         Ok(())
     }

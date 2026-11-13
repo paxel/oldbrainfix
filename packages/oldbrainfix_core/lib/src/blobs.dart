@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
 
 /// Photo and voice recording bytes live outside the log in
 /// content-addressed storage, keyed by their SHA-256 (Catlog's blob
@@ -16,6 +19,43 @@ abstract interface class Blobs {
 
   /// Lets go of the bytes under [hash]; returns whether they were here.
   bool remove(String hash);
+
+  /// Whether the bytes under [hash] are here, without reading them.
+  bool has(String hash);
+
+  /// Keeps the bytes of the file at [path] as they are, under their
+  /// SHA-256, and returns that hash; a hash already held stays as it is.
+  /// Read in chunks, so a large file is never held whole: for an attached
+  /// file of up to 256 MiB, run off the UI isolate, which a [FileBlobs]
+  /// can be sent to.
+  String putFrom(String path);
+}
+
+/// The SHA-256 of the bytes read from [input] in chunks of a MiB, each
+/// handed to [also] as it is read.
+String _hashOf(RandomAccessFile input, [void Function(Uint8List)? also]) {
+  final out = _DigestSink();
+  final hashing = sha256.startChunkedConversion(out);
+  while (true) {
+    final chunk = input.readSync(1 << 20);
+    if (chunk.isEmpty) break;
+    hashing.add(chunk);
+    also?.call(chunk);
+  }
+  hashing.close();
+  out.close();
+  return out.value.toString();
+}
+
+/// Where a chunked SHA-256 lands.
+class _DigestSink implements Sink<Digest> {
+  late Digest value;
+
+  @override
+  void add(Digest data) => value = data;
+
+  @override
+  void close() {}
 }
 
 /// [Blobs] as one file per blob in [dir].
@@ -58,6 +98,44 @@ class FileBlobs implements Blobs {
     file.deleteSync();
     return true;
   }
+
+  @override
+  bool has(String hash) => _file(hash)?.existsSync() ?? false;
+
+  @override
+  String putFrom(String path) {
+    // Copied beside under a name of its own while it is hashed, then
+    // renamed to its hash: a kill midway leaves a stray .tmp, and two
+    // files kept at once never write into one another.
+    final tmp = File(
+      '${dir.path}/in-${Random.secure().nextInt(1 << 32).toRadixString(16)}'
+      '-${Random.secure().nextInt(1 << 32).toRadixString(16)}.tmp',
+    );
+    final input = File(path).openSync();
+    final String hash;
+    try {
+      final output = tmp.openSync(mode: FileMode.writeOnly);
+      try {
+        hash = _hashOf(input, output.writeFromSync);
+        output.flushSync();
+      } finally {
+        output.closeSync();
+      }
+    } catch (_) {
+      // A full disk midway leaves nothing beside.
+      if (tmp.existsSync()) tmp.deleteSync();
+      rethrow;
+    } finally {
+      input.closeSync();
+    }
+    final file = _file(hash);
+    if (file == null || file.existsSync()) {
+      tmp.deleteSync();
+    } else {
+      tmp.renameSync(file.path);
+    }
+    return hash;
+  }
 }
 
 /// [Blobs] in memory: gone with the store. For tests.
@@ -73,4 +151,15 @@ class MemoryBlobs implements Blobs {
 
   @override
   bool remove(String hash) => _held.remove(hash) != null;
+
+  @override
+  bool has(String hash) => _held.containsKey(hash);
+
+  @override
+  String putFrom(String path) {
+    final bytes = File(path).readAsBytesSync();
+    final hash = sha256.convert(bytes).toString();
+    put(hash, bytes);
+    return hash;
+  }
 }

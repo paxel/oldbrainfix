@@ -143,8 +143,9 @@ abstract final class SectionKeys {
 enum Importance { unimportant, normal, important }
 
 /// What a Note without words is titled as where only its words fit, as
-/// in a row or an alarm.
-enum Wordless { photo, voiceRecording }
+/// in a row or an alarm: a photo, a voice recording, or a file, which
+/// goes by its name ([Note.wordlessName]).
+enum Wordless { photo, voiceRecording, file }
 
 /// The largest file that can be attached: the most a bundle, a Backup and
 /// the local network carry of one (ADR 0003, 0047).
@@ -260,19 +261,38 @@ class Attachment {
 /// A file to attach: its [name], the media type the app was told (empty,
 /// or `application/octet-stream`, for the one its name's ending says,
 /// [FileTexts.mediaTypeOf]), its [bytes] and, for a PDF, how many [pages]
-/// it has when the app counted them.
+/// it has when the app counted them. A file kept already ([NewFile.kept])
+/// comes by its [hash] and [size] instead of its bytes.
 class NewFile {
   final String name;
   final String mediaType;
   final Uint8List bytes;
   final int? pages;
 
-  const NewFile({
+  /// The SHA-256 its bytes are kept under already, by [Blobs.putFrom] into
+  /// the store's files; null while they are in [bytes].
+  final String? hash;
+
+  /// Its size in bytes.
+  final int size;
+
+  NewFile({
     required this.name,
     required this.bytes,
     this.mediaType = '',
     this.pages,
-  });
+  }) : hash = null,
+       size = bytes.length;
+
+  /// A file whose bytes were kept already under [hash], [size] bytes
+  /// long, off the UI isolate: attaching it only names it in the log.
+  NewFile.kept({
+    required this.name,
+    required String this.hash,
+    required this.size,
+    this.mediaType = '',
+    this.pages,
+  }) : bytes = Uint8List(0);
 }
 
 /// [name] as a file's name is kept: the part after its last `/` or `\`,
@@ -579,15 +599,27 @@ class Note {
       ? attachments.first
       : null;
 
-  /// What the Note is titled as while its text is blank: a voice
-  /// recording when it has one and no photo, removed ones whose texts
-  /// stay included; a photo otherwise.
-  Wordless get wordless =>
-      photos.isEmpty &&
-          removedPhotos.isEmpty &&
-          (recordings.isNotEmpty || removedRecordings.isNotEmpty)
-      ? Wordless.voiceRecording
-      : Wordless.photo;
+  /// What the Note is titled as while its text is blank, removed photos,
+  /// recordings and files whose texts stay included: a photo when it has
+  /// one; else a voice recording when it has one; else a file when it has
+  /// one, by [wordlessName]; a photo otherwise.
+  Wordless get wordless {
+    if (photos.isNotEmpty || removedPhotos.isNotEmpty) return Wordless.photo;
+    if (recordings.isNotEmpty || removedRecordings.isNotEmpty) {
+      return Wordless.voiceRecording;
+    }
+    if (attachments.isNotEmpty || removedAttachments.isNotEmpty) {
+      return Wordless.file;
+    }
+    return Wordless.photo;
+  }
+
+  /// The name a Note titled [Wordless.file] goes by (#267): its first
+  /// attached file's, else its first removed one's; empty when that file
+  /// has no name, or for any other Note.
+  String get wordlessName => wordless == Wordless.file
+      ? (attachments.firstOrNull ?? removedAttachments.first).name
+      : '';
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).
@@ -850,7 +882,7 @@ class Notes {
   }
 
   static void _requireSize(NewFile file) {
-    if (file.bytes.length > maxFileBytes) {
+    if (file.size > maxFileBytes) {
       throw ArgumentError.value(
         file.name,
         'file',
@@ -859,16 +891,22 @@ class Notes {
     }
   }
 
-  /// Keeps the bytes of [file] and gives what its field holds.
+  /// Keeps the bytes of [file], unless they are kept already, and gives
+  /// what its field holds. A file said to be kept whose bytes are not
+  /// here is refused: the log never names a file that is not there.
   Attachment _keepFile(NewFile file) {
-    final hash = store.putFile(file.bytes);
+    final kept = file.hash;
+    if (kept != null && !store.hasFile(kept)) {
+      throw ArgumentError.value(file.name, 'file', 'its bytes are not kept');
+    }
+    final hash = kept ?? store.putFile(file.bytes);
     final name = cleanName(file.name);
     // A type not named is the one its name's ending says.
     final named = cleanType(file.mediaType);
     final mediaType = named == unknownType
         ? FileTexts.mediaTypeOf(name)
         : named;
-    final size = file.bytes.length;
+    final size = file.size;
     final pages = switch (file.pages) {
       final int p when p >= 0 && p <= _maxCount => p,
       _ => null,
@@ -1351,7 +1389,9 @@ class Notes {
 
   /// Merges the Note [noteId] into the Note [intoId]: it becomes a dated
   /// Section of it, with its own Capture Context, and leaves every list
-  /// and Unsorted.
+  /// and Unsorted. Hidden and shared do not meet (#267): a Note Hidden
+  /// from AI does not merge into a Note of a Shared Area, nor a Note of a
+  /// Shared Area into a hidden one ([HiddenFromAiRefused]).
   ///
   /// Nothing is copied: the merged Note keeps its entity and only points
   /// at its target, which shows it as a Section. Whatever belongs to it,
@@ -1367,7 +1407,31 @@ class Notes {
     if (noteId == intoId) {
       throw ArgumentError.value(intoId, 'intoId', 'the Note itself');
     }
+    _refuseHiddenMerge([noteId], intoId);
     store.append(noteId, NoteKeys.merged, intoId);
+  }
+
+  /// Throws [HiddenFromAiRefused] when merging [noteIds] into [intoId]
+  /// would put something Hidden from AI together with a Shared Area: a
+  /// hidden Note into a Note of one, by the marks that hide it, or a Note
+  /// of one into a hidden Note, by the marks that hide the target. The
+  /// marks of all of them, sorted, each once.
+  void _refuseHiddenMerge(List<String> noteIds, String intoId) {
+    final marks = store.hiddenFromAiMarks();
+    if (marks.isEmpty) return;
+    bool shared(String id) {
+      final area = store.areaOf(id);
+      return area != null && store.isShared(area);
+    }
+
+    final found = <String>{};
+    final intoShared = shared(intoId);
+    final intoHidden = store.hiddenFromAiBy(intoId, marks);
+    for (final id in noteIds) {
+      if (intoShared) found.addAll(store.hiddenFromAiBy(id, marks));
+      if (intoHidden.isNotEmpty && shared(id)) found.addAll(intoHidden);
+    }
+    store.refuseHiddenFromAi(found.toList()..sort());
   }
 
   /// Whether this Device may undo the Merge of the Note [noteId] (#268):
@@ -1395,9 +1459,10 @@ class Notes {
   /// Merges every Note of [noteIds] into the Note [intoId] in one batch
   /// (#273), each as [merge] does: all of them or, when one is refused,
   /// none. A Note named twice merges once. Refused for the target among
-  /// [noteIds], a Note or target not in the lists, and a Note this Device
-  /// may not change ([SharedAreas.mayChange]). Gives the Notes merged, in
-  /// the order named, for [undoMergeAll].
+  /// [noteIds], a Note or target not in the lists, a Note this Device may
+  /// not change ([SharedAreas.mayChange]), and what is Hidden from AI
+  /// meeting a Shared Area as for [merge]. Gives the Notes merged, in the
+  /// order named, for [undoMergeAll].
   List<String> mergeAll(Iterable<String> noteIds, String intoId) {
     final ids = noteIds.toSet().toList();
     for (final (id, name) in [
@@ -1417,6 +1482,7 @@ class Notes {
         throw StateError('$id may not be merged here');
       }
     }
+    _refuseHiddenMerge(ids, intoId);
     store.batch(() {
       for (final id in ids) {
         store.append(id, NoteKeys.merged, intoId);

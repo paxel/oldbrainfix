@@ -17322,7 +17322,7 @@ fn frogs_shown(
 pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
     match note {
         Some(note) if !note.text.trim().is_empty() => note.visible_text().trim().to_string(),
-        Some(note) => l10n::wordless(t, note.wordless()).to_string(),
+        Some(note) => l10n::wordless(t, note.wordless(), &note.wordless_name()),
         None => t.note_gone().to_string(),
     }
 }
