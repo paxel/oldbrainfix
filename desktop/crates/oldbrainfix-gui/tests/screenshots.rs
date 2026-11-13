@@ -1377,6 +1377,9 @@ fn all_guide_frames() -> TestResult {
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().open(Page::Settings);
             problems.extend(match_frame(&mut harness, &box_frame(DESKTOP, "tray"))?);
+            // Asking from away (#267): the computer keeps running from
+            // login, the home server the phone asks.
+            problems.extend(match_frame(&mut harness, &box_frame(DESKTOP, "ask-away"))?);
             problems.extend(match_frame(&mut harness, &box_frame(PRIVACY, "privacy"))?);
             problems.extend(match_frame(
                 &mut harness,

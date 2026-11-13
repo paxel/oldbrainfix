@@ -263,6 +263,10 @@ One installation of the app, on a phone or a desktop. Most settings belong to a 
 **Pairing**:
 Introducing two Devices, or a person, to each other in person or by code, which hands over the keys they need.
 
+**Address by hand**:
+An address the user types for a paired Device of their own, such as its Tailscale name, where sync and the phone's questions reach it through a VPN when the local network does not find it. A local setting of the Device that keeps it, never synced; the pinned certificate still decides whether the Device answering there is the one paired (ADR 0003). German: Adresse von Hand.
+_Avoid_: remote access, relay, server address
+
 **Shared Area**:
 An Area that other people sync with. Everything outside it stays private. It is shared in person by Pairing, or from afar with a person in People through an offer file the person accepts or declines; changes then travel by a shared folder or by bundles.
 
@@ -322,7 +326,7 @@ One job the user hands to an AI model of their choice through the desktop's AI p
 _Avoid_: agent, assistant, chat, AI mode
 
 **Ask panel**:
-Where the user asks the desktop about their Notes (AI ▸ Ask…): the question goes to a provider the user entered with their own API key, Anthropic or an OpenAI-compatible one such as a local Ollama, whose model searches and reads the Notes through the AI port's tools and answers with links to the Notes it came from. Only what the model finds and reads is sent, never what is Hidden from AI. Asking pauses no sync; a change the model makes, such as filing what is new, waits as an AI Task for review. An answer is gone once the panel is left, unless kept as a Note (ADR 0051). German: Fragen-Ansicht.
+Where the user asks the desktop about their Notes (AI ▸ Ask…): the question goes to a provider the user entered with their own API key, Anthropic or an OpenAI-compatible one such as a local Ollama, whose model searches and reads the Notes through the AI port's tools and answers with links to the Notes it came from. Only what the model finds and reads is sent, never what is Hidden from AI. Asking pauses no sync; a change the model makes, such as filing what is new, waits as an AI Task for review. An answer is gone once the panel is left, unless kept as a Note (ADR 0051). The phone's Ask page asks through it: the question goes over the paired connection to the user's own desktop, which answers as the panel does; the phone holds no provider and no key, and names the provider and what is sent and asks the user's permission before the first question to it. German: Fragen-Ansicht.
 _Avoid_: chat, assistant, copilot, AI search
 
 ### Privacy

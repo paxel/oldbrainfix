@@ -678,10 +678,12 @@
 <guide-box name="ask">
 <h2>Zu deinen Notizen fragen</h2>
 <p>Frag ein KI-Modell deiner Wahl zu deinen Notizen und bekomm Antworten mit Links zu ihnen.</p>
-<box-tab device="phone" alt="Synchronisieren auf dem Handy: Code scannen, das Feld Kopplungscode mit Jetzt synchronisieren und Code dieses Geräts zeigen">
+<box-tab device="phone" alt="Fragen auf dem Handy: die Zeile mit Computer, Anbieter und Modell, die Frage Wo ist der Ersatzschlüssel?, die Antwort mit einem Link zur Notiz, Aus diesen Notizen mit dem Titel der Notiz, und Als Notiz behalten">
 <li>Markiere private Notizen und Bereiche als <strong>Vor KI verborgen</strong>.</li>
-<li>Gleiche das Handy mit dem Computer ab.</li>
-<li>Frag in der Desktop-App.</li>
+<li>Tippe in der Leiste der Agenda auf <strong>Fragen</strong>.</li>
+<li>Lies, was gesendet wird, und tippe auf <strong>Erlauben</strong>.</li>
+<li>Tipp deine Frage ein und tippe auf <strong>Fragen</strong>.</li>
+<li>Tippe eine Notiz unter <strong>Aus diesen Notizen</strong>, um sie zu öffnen.</li>
 </box-tab>
 <box-tab device="desktop" alt="Die Fragen-Ansicht: die Frage Wo sind die Winterreifen?, die Antwort mit einem Link zur Notiz, Aus diesen Notizen mit dem Titel der Notiz, und Als Notiz behalten">
 <li>Trag unter <strong>Fragen-Ansicht</strong> in den Einstellungen Anbieter, Modell und API-Schlüssel ein.</li>
@@ -692,7 +694,7 @@
 </box-tab>
 <box-more>
 <p>
-  Nur der Desktop fragt. Old Brain Fix stellt kein Modell und kein Konto: Unter
+  Nur der Desktop spricht mit dem Anbieter. Old Brain Fix stellt kein Modell und kein Konto: Unter
   <strong>Fragen-Ansicht</strong> in den Einstellungen wählst du <strong>Anthropic (Claude)</strong>
   oder einen OpenAI-kompatiblen Anbieter wie DeepSeek, OpenRouter, Ollama oder LM Studio, mit seiner
   Basis-URL (leer fragt Ollama auf diesem Computer), das Modell und deinen eigenen API-Schlüssel, den
@@ -716,6 +718,59 @@
   Themen, warten seine Änderungen als KI-Aufgabe: Die Ansicht sagt es, und <strong>Prüfen</strong>
   zeigt sie, um sie als Ganzes anzunehmen oder abzulehnen (siehe
   <a href="#den-ki-port-oeffnen">Den KI-Port öffnen</a>). Der Abgleich wartet, bis du entscheidest.
+</p>
+<p>
+  Auf dem Handy steht <strong>Fragen</strong> in der Leiste der Agenda, sobald ein Computer von dir
+  gekoppelt ist. Das Handy führt kein Modell aus und spricht mit keinem Anbieter: Es schickt die Frage
+  über die gekoppelte Verbindung an deinen Computer, der seinen Anbieter mit seinem eigenen Schlüssel
+  fragt, wie die Ansicht es tut, und die Antwort mit ihren Links zurückschickt, die die Notizen auf dem
+  Handy öffnen. Der Computer muss laufen, zu Hause oder über dein VPN (siehe
+  <a href="#von-unterwegs-fragen">Von unterwegs fragen</a>). Vor der ersten Frage, und wieder, sobald
+  der Computer einen anderen Anbieter oder ein anderes Modell fragt, nennt das Handy den Computer, den
+  Anbieter, das Modell und seine Adresse und was gesendet wird, dasselbe wie oben, und fragt nach deiner
+  Erlaubnis; nichts wird gesendet, bevor du auf <strong>Erlauben</strong> tippst, und
+  <strong>Jetzt nicht</strong> sendet nichts. Eine Folgefrage wird nach den früheren Antworten gestellt,
+  <strong>Neu beginnen</strong> verwirft sie, ebenso das Verlassen der Seite, und
+  <strong>Als Notiz behalten</strong> speichert die Frage und ihre Antwort als neue Notiz in Unsortiert.
+  Ändert das Modell etwas, sagt das Handy, dass die Änderungen auf dem Computer auf deine Prüfung warten.
+  Antwortet kein Computer von dir, oder ist sein Anbieter nicht eingerichtet, sagt die Seite warum und
+  was zu tun ist; eine Frage ohne Antwort kommt zurück ins Feld, und oben steht, warum.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="ask-away">
+<h2>Von unterwegs fragen</h2>
+<p>Erreich deinen Computer vom Handy über ein VPN, um zu fragen und abzugleichen.</p>
+<box-tab device="phone" alt="Synchronisieren auf dem Handy: der gekoppelte Computer Desk mit Automatisch synchronisieren und Adresse von Hand desk.tail1234.ts.net">
+<li>Installiere Tailscale auf dem Handy und melde dich an.</li>
+<li>Tippe auf das Profilbild, dann <strong>Mit einem anderen Gerät synchronisieren</strong>.</li>
+<li>Tipp den Tailscale-Namen des Computers unter <strong>Adresse von Hand</strong> ein.</li>
+<li>Tippe in der Leiste der Agenda auf <strong>Fragen</strong>.</li>
+</box-tab>
+<box-tab device="desktop" alt="Die Einstellungen am Desktop als Dialog über der Agenda: unter Dieser Computer Benachrichtigungen auf diesem Computer, Beim Anmelden starten und Größere Schrift und Symbole, dann der KI-Port mit Wer sich verbinden darf und die Fragen-Ansicht mit Anthropic (Claude) und OpenAI-kompatibel">
+<li>Installiere Tailscale auf dem Computer und melde dich an.</li>
+<li>Lass <strong>Beim Anmelden starten</strong> in den Einstellungen angehakt.</li>
+<li>Lass den Computer an.</li>
+</box-tab>
+<box-more>
+<p>
+  Old Brain Fix baut keinen eigenen Fernzugang; ein VPN, das du außerhalb der App betreibst, trägt die
+  gekoppelte Verbindung. Ein VPN, das dein Heimnetz zum Handy leitet, etwa WireGuard am Router, braucht
+  nichts weiter: Das Handy erreicht den Computer an der Adresse, an der es ihn zu Hause gefunden hat.
+  Tailscale gibt dem Computer eine andere Adresse und trägt die Suche im Netz nicht, also gib dem Handy
+  den Tailscale-Namen des Computers, etwa <code>desk.tail1234.ts.net</code>, oder seine
+  Tailscale-Adresse unter <strong>Adresse von Hand</strong> unter dem Computer bei
+  <strong>Gekoppelte Geräte</strong>. Ein Port nach einem Doppelpunkt ist nur nötig, wenn der Computer
+  an einem anderen Port anbietet als dem, an dem er zuletzt gefunden wurde.
+</p>
+<p>
+  Das Handy sucht den Computer zuerst dort, wo dieses Netz ihn findet, dann an seiner Adresse von Hand,
+  dann dort, wo er zuletzt war. Es vertraut an jeder Adresse nur dem Zertifikat, mit dem es gekoppelt
+  hat, sodass ein Gerät, das dort an seiner Stelle antwortet, nichts bekommt. Der automatische Abgleich
+  nimmt denselben Weg, also gleicht das Handy auch von unterwegs ab. Die Adresse bleibt auf diesem
+  Handy: Sie wird nicht synchronisiert und mit dem Computer vergessen. Eine Adresse, die
+  keine ist, oder ein Port außerhalb von 1 bis 65535 steht unter dem Feld und wird nicht behalten.
 </p>
 </box-more>
 </guide-box>

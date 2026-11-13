@@ -6209,4 +6209,262 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get captureNotFiledHiddenFix =>
       'Sie bleibt, wo sie war; nimm die Markierung ab und lege sie dann ab.';
+
+  @override
+  String get phoneAskTitle => 'Fragen';
+
+  @override
+  String get phoneAskLooking => 'Suche deinen Computer …';
+
+  @override
+  String get phoneAskTryAgain => 'Noch einmal versuchen';
+
+  @override
+  String get phoneAskHint => 'Frag etwas zu deinen Notizen';
+
+  @override
+  String get phoneAskButton => 'Fragen';
+
+  @override
+  String get phoneAskStartOver => 'Neu beginnen';
+
+  @override
+  String phoneAskAsking(String provider) {
+    return 'Warte auf die Antwort von $provider …';
+  }
+
+  @override
+  String phoneAskSends(String computer, String provider, String model) {
+    return 'Fragen gehen über $computer an $provider, Modell $model. Nur was das Modell in deinen Notizen findet und liest, wird dorthin gesendet, nie was vor KI verborgen ist.';
+  }
+
+  @override
+  String get phoneAskTaskWaits =>
+      'Änderungen der KI warten auf dem Computer auf deine Prüfung. Die Synchronisierung mit ihm wartet, bis du dort entscheidest.';
+
+  @override
+  String get phoneAskFromNotes => 'Aus diesen Notizen';
+
+  @override
+  String get phoneAskKeep => 'Als Notiz behalten';
+
+  @override
+  String get phoneAskKept => 'Als Notiz gespeichert';
+
+  @override
+  String get phoneAskCut =>
+      'Die Antwort wurde an ihrer Längengrenze abgeschnitten.';
+
+  @override
+  String phoneAskUnreadyCause(String provider) {
+    return '$provider ist auf dem Computer noch nicht eingerichtet.';
+  }
+
+  @override
+  String get phoneAskUnreadyFix =>
+      'Richte den Anbieter unter Fragen-Ansicht in den Einstellungen des Computers ein.';
+
+  @override
+  String get phoneAskUnreadyModel =>
+      'Gib unter Fragen-Ansicht in den Einstellungen des Computers ein Modell an.';
+
+  @override
+  String get phoneAskUnreadyKey =>
+      'Gib unter Fragen-Ansicht in den Einstellungen des Computers den API-Schlüssel ein.';
+
+  @override
+  String get phoneAskUnreadyUrl =>
+      'Gib dem Anbieter unter Fragen-Ansicht in den Einstellungen des Computers eine https://-Adresse; http:// nur auf dem Computer oder im Heimnetz.';
+
+  @override
+  String get phoneAskConsentTitle => 'Vor deiner ersten Frage';
+
+  @override
+  String phoneAskConsentIntro(
+    String computer,
+    String provider,
+    String model,
+    String host,
+  ) {
+    return 'Deine Fragen gehen von diesem Telefon an deinen Computer $computer, der sie an $provider sendet, Modell $model, unter $host.';
+  }
+
+  @override
+  String phoneAskConsentWhat(String provider) {
+    return 'Was $provider erhält:';
+  }
+
+  @override
+  String get phoneAskConsentQuestion =>
+      'Deine Frage und, wenn du weiterfragst, die Fragen und Antworten davor.';
+
+  @override
+  String get phoneAskConsentNames =>
+      'Die Namen deiner Bereiche, Themen und #Wörter.';
+
+  @override
+  String get phoneAskConsentRoutines =>
+      'Deine Routinen und Erinnerungen mit ihren Erledigt-Haken, wenn das Modell sie auflistet.';
+
+  @override
+  String get phoneAskConsentFound =>
+      'Die Titel und kurze Auszüge der Notizen, die seine Suchen finden.';
+
+  @override
+  String get phoneAskConsentRead =>
+      'Die Notizen, die es ganz liest, mit ihren Abschnitten, Transkripten, Fototexten, Anhangtexten und ihrem Erfassungskontext (wann und wo eine Notiz erfasst wurde, der Kalendertermin und das Bluetooth-Gerät).';
+
+  @override
+  String phoneAskConsentNever(String provider) {
+    return 'Nichts, was vor KI verborgen ist, wird gesendet, nicht einmal als Anzahl. $provider behandelt, was es erhält, nach seinen eigenen Bedingungen; Old Brain Fix und sein Entwickler erhalten nichts.';
+  }
+
+  @override
+  String get phoneAskConsentAgain =>
+      'Nichts wird gesendet, bevor du es erlaubst. Fragt der Computer einen anderen Anbieter oder ein anderes Modell, fragt dieses Telefon dich noch einmal.';
+
+  @override
+  String get phoneAskAllow => 'Erlauben';
+
+  @override
+  String get phoneAskFailed => 'Die Frage wurde nicht beantwortet.';
+
+  @override
+  String get phoneAskFailedTitle => 'Nicht beantwortet';
+
+  @override
+  String phoneAskKeyRefused(String provider) {
+    return '$provider hat den API-Schlüssel des Computers abgelehnt.';
+  }
+
+  @override
+  String get phoneAskKeyFix =>
+      'Prüfe den API-Schlüssel unter Fragen-Ansicht in den Einstellungen des Computers.';
+
+  @override
+  String phoneAskProviderFailed(String provider) {
+    return '$provider hat dem Computer mit einem Fehler geantwortet.';
+  }
+
+  @override
+  String get phoneAskProviderFix =>
+      'Prüfe den Namen des Modells in den Einstellungen des Computers, oder frag später noch einmal.';
+
+  @override
+  String phoneAskNoReply(String provider) {
+    return 'Von $provider kam keine Antwort an den Computer.';
+  }
+
+  @override
+  String get phoneAskNoReplyFix =>
+      'Prüfe das Netz des Computers und die Adresse des Anbieters in seinen Einstellungen, dann frag noch einmal.';
+
+  @override
+  String phoneAskUnreadable(String provider) {
+    return 'Die Antwort von $provider war auf dem Computer nicht lesbar.';
+  }
+
+  @override
+  String get phoneAskUnreadableFix =>
+      'Prüfe, ob die Basis-URL in den Einstellungen des Computers zu einer OpenAI-kompatiblen API führt.';
+
+  @override
+  String get phoneAskTooManyRounds =>
+      'Das Modell hat zu lange gesucht, ohne zu antworten.';
+
+  @override
+  String get phoneAskNarrowerFix => 'Stell eine engere Frage.';
+
+  @override
+  String get phoneAskRefused => 'Das Modell hat diese Frage nicht beantwortet.';
+
+  @override
+  String get phoneAskOtherWordsFix => 'Stell sie mit anderen Worten.';
+
+  @override
+  String get phoneAskStopped =>
+      'Der Computer hat aufgehört, auf die Antwort zu warten.';
+
+  @override
+  String get phoneAskAgainFix => 'Frag noch einmal.';
+
+  @override
+  String get phoneAskBusy =>
+      'Der Computer beantwortet gerade eine andere Frage.';
+
+  @override
+  String get phoneAskBusyFix => 'Frag gleich noch einmal.';
+
+  @override
+  String get phoneAskUnknown =>
+      'Der Computer hat so geantwortet, dass diese Version es nicht lesen kann.';
+
+  @override
+  String get phoneAskUpdatePhoneFix =>
+      'Installiere auf diesem Telefon das neueste Old Brain Fix.';
+
+  @override
+  String get phoneAskNoComputer =>
+      'Mit diesem Telefon ist kein Computer von dir gekoppelt.';
+
+  @override
+  String get phoneAskNoComputerFix =>
+      'Kopple deinen Computer unter Profil ▸ Mit einem anderen Gerät synchronisieren, dann frag.';
+
+  @override
+  String get phoneAskUnreachable => 'Kein Computer von dir hat geantwortet.';
+
+  @override
+  String get phoneAskUnreachableFix =>
+      'Starte Old Brain Fix auf dem Computer und verbinde dich mit seinem Netz oder deinem VPN; über Tailscale gib ihm unter Profil ▸ Mit einem anderen Gerät synchronisieren eine Adresse von Hand.';
+
+  @override
+  String get phoneAskWrongHost =>
+      'An der Adresse deines Computers hat ein anderes Gerät geantwortet.';
+
+  @override
+  String get phoneAskWrongHostFix =>
+      'Prüfe die Adresse von Hand unter Profil ▸ Mit einem anderen Gerät synchronisieren, oder kopple den Computer noch einmal.';
+
+  @override
+  String get phoneAskDeclined =>
+      'Dein Computer lässt dieses Telefon nicht fragen.';
+
+  @override
+  String get phoneAskDeclinedFix =>
+      'Schalte auf dem Computer unter Synchronisieren „Automatisch synchronisieren“ für dieses Telefon ein.';
+
+  @override
+  String get phoneAskNotOffered =>
+      'Keines deiner gekoppelten Geräte beantwortet Fragen.';
+
+  @override
+  String get phoneAskNotOfferedFix =>
+      'Installiere auf deinem Computer das neueste Old Brain Fix; ein Telefon beantwortet keine Fragen.';
+
+  @override
+  String get phoneAskTimedOut =>
+      'Dein Computer hat nicht rechtzeitig geantwortet.';
+
+  @override
+  String get phoneAskTimedOutFix =>
+      'Prüfe, ob der Computer an und wach ist, dann frag noch einmal.';
+
+  @override
+  String get phoneAskBrokeOff => 'Die Verbindung zu deinem Computer brach ab.';
+
+  @override
+  String get handAddressLabel => 'Adresse von Hand';
+
+  @override
+  String get handAddressHelp =>
+      'Für ein VPN wie Tailscale: sein Name oder seine Adresse dort, etwa desk.tail1234.ts.net, bei Bedarf mit :Port. Versucht, wenn dieses Netz es nicht findet.';
+
+  @override
+  String get handAddressInvalid =>
+      'Keine Adresse. Gib einen Namen oder eine IP-Adresse ein, bei Bedarf mit :Port.';
+
+  @override
+  String get handAddressBadPort =>
+      'Der Port muss eine Zahl von 1 bis 65535 sein.';
 }

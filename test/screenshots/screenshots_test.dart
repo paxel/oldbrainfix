@@ -30,6 +30,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/ask_screen.dart';
 import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/appointments.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
@@ -75,6 +76,7 @@ import '../backup_test.dart' show DirFolders, quickKey;
 import '../bundle_test.dart' show FakeBundles;
 import '../fake_alarms.dart';
 import '../fake_appointments.dart';
+import '../fake_ask.dart';
 import '../fake_photos.dart';
 import '../fake_speech.dart';
 import '../fake_voice.dart';
@@ -155,6 +157,8 @@ typedef _Texts = ({
   String packTally,
   String packList,
   String packStretch,
+  String askQuestion,
+  String askAnswer,
 });
 
 const _en = (
@@ -244,6 +248,8 @@ const _en = (
   packTally: 'Laps',
   packList: 'Race day\nShoes\nStart number\nWater',
   packStretch: 'Stretch after running',
+  askQuestion: 'Where is the spare key?',
+  askAnswer: 'The spare key is with the [Müllers on the 2nd floor](%s).',
 );
 
 const _de = (
@@ -333,6 +339,8 @@ const _de = (
   packTally: 'Runden',
   packList: 'Lauftag\nSchuhe\nStartnummer\nWasser',
   packStretch: 'Nach dem Laufen dehnen',
+  askQuestion: 'Wo ist der Ersatzschlüssel?',
+  askAnswer: 'Der Ersatzschlüssel liegt bei [Müllers im 2. Stock](%s).',
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -2741,10 +2749,70 @@ void main() {
 
           // Asking (#267) is the desktop's: the phone marks what is hidden
           // and syncs with the computer first.
+          // Asking the computer from the phone (#267): a question answered
+          // from the spare key's Note, the provider allowed before.
           boxFrame(desktop178, 'ask', (tester) async {
-            final t = await sharingApp(tester, _Seeded(texts));
-            await openSync(tester, t);
-            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+            final seeded = seed();
+            final store = seeded.store..allowAsking(fakeClaude);
+            final key = Notes(store)
+                .all()
+                .firstWhere((n) => n.text == texts.spareKey);
+            final link = AppLink(AppLinkKind.note, key.id).url;
+            await start(tester, seeded);
+            unawaited(
+              Navigator.of(tester.element(find.byType(AgendaScreen))).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AskScreen(
+                    store: store,
+                    asking: FakeAsking(
+                      answer: (_) => AskReply.answered(
+                        DesktopAnswer(
+                          text: texts.askAnswer.replaceFirst('%s', link),
+                          notes: [key.id],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('ask-question')),
+              texts.askQuestion,
+            );
+            await _tap(tester, find.byKey(const ValueKey('ask-button')));
+            FocusManager.instance.primaryFocus?.unfocus();
+            await tester.pumpAndSettle();
+            expect(find.byKey(ValueKey('ask-source-0-${key.id}')), findsOne);
+          });
+
+          // Asking from away (#267): the computer's Tailscale name as its
+          // address by hand on the Sync page.
+          boxFrame(desktop178, 'ask-away', (tester) async {
+            final seeded = _Seeded(texts);
+            seeded.store
+              ..rememberDevice(
+                PairedDevice(
+                  id: 'device:guide-desk',
+                  name: 'Desk',
+                  fingerprint: 'ab' * 32,
+                  host: '192.168.1.5',
+                  port: 4000,
+                  lastSync: _now,
+                ),
+              )
+              ..setHandAddress('device:guide-desk', 'desk.tail1234.ts.net');
+            final t = await sharingApp(tester, seeded);
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('address-device:guide-desk')),
+            );
+            // The computer's name and its switch above the field.
+            await tester.drag(notesList.last, const Offset(0, 260));
+            await tester.pumpAndSettle();
+            expect(find.byKey(const ValueKey('hand-address')), findsOne);
           });
 
           boxFrame(desktop178, 'look', (tester) async {

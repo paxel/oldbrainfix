@@ -805,6 +805,23 @@ replace a law of Both apps where they say so. A desktop law marked
   twelve, the one typed exactly left out; a tap fills it in. The tree
   and the chips leave out the Notes of a locked Area while it is closed,
   as every list does.
+- **Ask** (#267, ADR 0051) is a `BarAction` in the Agenda's bar after
+  the folder, shown once a Device of the user's own that hosts is
+  paired, and opens the Ask page, which asks the user's computer as the
+  desktop's Ask panel does (see Desktop, "Menu bar and keys"). Before
+  the first question to a provider, protocol, host and model alike, the
+  page shows in place of the question field the computer, the provider,
+  its model and host and what is sent, with Allow and Not now; nothing
+  is sent before Allow, and a provider not allowed is asked about again
+  before the next question, which stays in the field. While no computer
+  of the user's answers, or its provider is not set up, the page says
+  why and what to do in the error colour, with Try again; a question not
+  answered goes back into the field and is announced at the top. The
+  answers stand under the field, the newest first, each with "From
+  these Notes" and Keep as Note; Start over in the bar drops them, and
+  so does leaving the page. **An address by hand** sits under each such
+  paired Device on the Sync page, a field with its line of what it is
+  for and its error under it once it is left or submitted.
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and

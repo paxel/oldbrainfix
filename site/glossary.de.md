@@ -261,6 +261,10 @@ Eine Installation der App, auf einem Handy oder einem Computer. Die meisten Eins
 **Koppeln** [Pairing]:
 Zwei Geräte oder eine Person miteinander bekannt machen, persönlich oder per Code, wobei sie die Schlüssel bekommen, die sie brauchen.
 
+**Adresse von Hand** [Address by hand]:
+Eine Adresse, die du für ein gekoppeltes eigenes Gerät eintippst, etwa seinen Tailscale-Namen, an der der Abgleich und die Fragen des Handys es über ein VPN erreichen, wenn das lokale Netz es nicht findet. Eine Einstellung des Geräts, das sie hat, nie abgeglichen; das gemerkte Zertifikat entscheidet weiter, ob das Gerät, das dort antwortet, das gekoppelte ist.
+_Avoid_: Fernzugriff, Relay, Serveradresse
+
 **Geteilter Bereich** [Shared Area]:
 Ein Bereich, den andere Menschen mit abgleichen. Alles außerhalb bleibt privat.
 
@@ -320,7 +324,7 @@ Eine Arbeit, die du über den KI-Port des Computers einem KI-Modell deiner Wahl 
 _Avoid_: Agent, Assistent, Chat, KI-Modus
 
 **Fragen-Ansicht** [Ask panel]:
-Wo du den Computer zu deinen Notizen fragst (KI ▸ Fragen …): Die Frage geht an einen Anbieter, den du mit deinem eigenen API-Schlüssel eingetragen hast, Anthropic oder einen OpenAI-kompatiblen wie ein lokales Ollama, dessen Modell die Notizen über die Werkzeuge des KI-Ports sucht und liest und mit Links zu den Notizen antwortet, aus denen es die Antwort hat. Gesendet wird nur, was das Modell findet und liest, nie was vor KI verborgen ist. Das Fragen hält keinen Abgleich an; eine Änderung des Modells, etwa das Ablegen des Neuen, wartet als KI-Aufgabe auf deine Prüfung. Eine Antwort ist weg, sobald du die Ansicht verlässt, außer du behältst sie als Notiz.
+Wo du den Computer zu deinen Notizen fragst (KI ▸ Fragen …): Die Frage geht an einen Anbieter, den du mit deinem eigenen API-Schlüssel eingetragen hast, Anthropic oder einen OpenAI-kompatiblen wie ein lokales Ollama, dessen Modell die Notizen über die Werkzeuge des KI-Ports sucht und liest und mit Links zu den Notizen antwortet, aus denen es die Antwort hat. Gesendet wird nur, was das Modell findet und liest, nie was vor KI verborgen ist. Das Fragen hält keinen Abgleich an; eine Änderung des Modells, etwa das Ablegen des Neuen, wartet als KI-Aufgabe auf deine Prüfung. Eine Antwort ist weg, sobald du die Ansicht verlässt, außer du behältst sie als Notiz. Die Seite Fragen auf dem Handy fragt über sie: Die Frage geht über die gekoppelte Verbindung an deinen eigenen Computer, der wie die Ansicht antwortet; das Handy hat keinen Anbieter und keinen Schlüssel und nennt vor der ersten Frage an einen Anbieter diesen und was gesendet wird und fragt nach deiner Erlaubnis.
 _Avoid_: Chat, Assistent, Copilot, KI-Suche
 
 ## Privatsphäre

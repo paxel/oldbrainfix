@@ -188,6 +188,13 @@ class AutoSync extends ChangeNotifier {
 
   int _ownSeq() => store.versionVector()[store.deviceId] ?? 0;
 
+  /// Where discovery last heard the paired Device [id], if it did: the
+  /// first address a question to the desktop tries (#267).
+  PairedAddress? foundAt(String id) => switch (_found[id]) {
+    final found? => (host: found.host, port: found.port),
+    null => null,
+  };
+
   List<String> get _devices => [
     for (final device in store.autoSyncDevices()) device.id,
     if (store.syncFolder != null) folderId,

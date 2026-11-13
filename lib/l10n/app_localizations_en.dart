@@ -6136,4 +6136,256 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get captureNotFiledHiddenFix =>
       'It stays where it was; take the mark off, then file it.';
+
+  @override
+  String get phoneAskTitle => 'Ask';
+
+  @override
+  String get phoneAskLooking => 'Looking for your computer…';
+
+  @override
+  String get phoneAskTryAgain => 'Try again';
+
+  @override
+  String get phoneAskHint => 'Ask about your Notes';
+
+  @override
+  String get phoneAskButton => 'Ask';
+
+  @override
+  String get phoneAskStartOver => 'Start over';
+
+  @override
+  String phoneAskAsking(String provider) {
+    return 'Waiting for the answer from $provider…';
+  }
+
+  @override
+  String phoneAskSends(String computer, String provider, String model) {
+    return 'Questions go through $computer to $provider, model $model. Only what the model finds and reads in your Notes is sent there, never what is Hidden from AI.';
+  }
+
+  @override
+  String get phoneAskTaskWaits =>
+      'Changes the AI made wait for your review on the computer. Sync with it waits until you decide there.';
+
+  @override
+  String get phoneAskFromNotes => 'From these Notes';
+
+  @override
+  String get phoneAskKeep => 'Keep as Note';
+
+  @override
+  String get phoneAskKept => 'Kept as a Note';
+
+  @override
+  String get phoneAskCut => 'The answer was cut off at its length limit.';
+
+  @override
+  String phoneAskUnreadyCause(String provider) {
+    return '$provider is not set up on the computer yet.';
+  }
+
+  @override
+  String get phoneAskUnreadyFix =>
+      'Set up the provider under Ask panel in the computer\'s Settings.';
+
+  @override
+  String get phoneAskUnreadyModel =>
+      'Name a model under Ask panel in the computer\'s Settings.';
+
+  @override
+  String get phoneAskUnreadyKey =>
+      'Enter the API key under Ask panel in the computer\'s Settings.';
+
+  @override
+  String get phoneAskUnreadyUrl =>
+      'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.';
+
+  @override
+  String get phoneAskConsentTitle => 'Before your first question';
+
+  @override
+  String phoneAskConsentIntro(
+    String computer,
+    String provider,
+    String model,
+    String host,
+  ) {
+    return 'Your questions go from this phone to your computer $computer, which sends them to $provider, model $model, at $host.';
+  }
+
+  @override
+  String phoneAskConsentWhat(String provider) {
+    return 'What $provider receives:';
+  }
+
+  @override
+  String get phoneAskConsentQuestion =>
+      'Your question, and the questions and answers before it when you ask on.';
+
+  @override
+  String get phoneAskConsentNames =>
+      'The names of your Areas, Topics and tags.';
+
+  @override
+  String get phoneAskConsentRoutines =>
+      'Your Routines and Reminders with their check-offs, when the model lists them.';
+
+  @override
+  String get phoneAskConsentFound =>
+      'The titles and short excerpts of the Notes its searches find.';
+
+  @override
+  String get phoneAskConsentRead =>
+      'The Notes it reads in full, with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context (when and where a Note was captured, the calendar event and the Bluetooth device).';
+
+  @override
+  String phoneAskConsentNever(String provider) {
+    return 'Nothing Hidden from AI is sent, not even as a count. $provider handles what it receives under its own terms; Old Brain Fix and its developer receive nothing.';
+  }
+
+  @override
+  String get phoneAskConsentAgain =>
+      'Nothing is sent until you allow it. When the computer asks another provider or model, this phone asks you again.';
+
+  @override
+  String get phoneAskAllow => 'Allow';
+
+  @override
+  String get phoneAskFailed => 'The question was not answered.';
+
+  @override
+  String get phoneAskFailedTitle => 'Not answered';
+
+  @override
+  String phoneAskKeyRefused(String provider) {
+    return '$provider refused the computer\'s API key.';
+  }
+
+  @override
+  String get phoneAskKeyFix =>
+      'Check the API key under Ask panel in the computer\'s Settings.';
+
+  @override
+  String phoneAskProviderFailed(String provider) {
+    return '$provider answered the computer with an error.';
+  }
+
+  @override
+  String get phoneAskProviderFix =>
+      'Check the model\'s name in the computer\'s Settings, or ask again later.';
+
+  @override
+  String phoneAskNoReply(String provider) {
+    return 'No answer came from $provider to the computer.';
+  }
+
+  @override
+  String get phoneAskNoReplyFix =>
+      'Check the computer\'s network and the provider\'s address in its Settings, then ask again.';
+
+  @override
+  String phoneAskUnreadable(String provider) {
+    return 'The answer from $provider could not be read on the computer.';
+  }
+
+  @override
+  String get phoneAskUnreadableFix =>
+      'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.';
+
+  @override
+  String get phoneAskTooManyRounds =>
+      'The model searched too long without answering.';
+
+  @override
+  String get phoneAskNarrowerFix => 'Ask a narrower question.';
+
+  @override
+  String get phoneAskRefused => 'The model declined to answer this question.';
+
+  @override
+  String get phoneAskOtherWordsFix => 'Ask it in other words.';
+
+  @override
+  String get phoneAskStopped => 'The computer stopped waiting for the answer.';
+
+  @override
+  String get phoneAskAgainFix => 'Ask again.';
+
+  @override
+  String get phoneAskBusy => 'The computer is answering another question.';
+
+  @override
+  String get phoneAskBusyFix => 'Ask again in a moment.';
+
+  @override
+  String get phoneAskUnknown =>
+      'The computer answered in a way this version cannot read.';
+
+  @override
+  String get phoneAskUpdatePhoneFix =>
+      'Install the latest Old Brain Fix on this phone.';
+
+  @override
+  String get phoneAskNoComputer =>
+      'No computer of yours is paired with this phone.';
+
+  @override
+  String get phoneAskNoComputerFix =>
+      'Pair your computer under Profile ▸ Sync with another Device, then ask.';
+
+  @override
+  String get phoneAskUnreachable => 'No computer of yours answered.';
+
+  @override
+  String get phoneAskUnreachableFix =>
+      'Start Old Brain Fix on the computer and join its network or your VPN; through Tailscale, give it an address by hand under Profile ▸ Sync with another Device.';
+
+  @override
+  String get phoneAskWrongHost =>
+      'Another device answered at your computer\'s address.';
+
+  @override
+  String get phoneAskWrongHostFix =>
+      'Check the address by hand under Profile ▸ Sync with another Device, or pair the computer again.';
+
+  @override
+  String get phoneAskDeclined => 'Your computer does not let this phone ask.';
+
+  @override
+  String get phoneAskDeclinedFix =>
+      'On the computer, switch on Sync automatically for this phone under Sync.';
+
+  @override
+  String get phoneAskNotOffered =>
+      'None of your paired Devices answers questions.';
+
+  @override
+  String get phoneAskNotOfferedFix =>
+      'Install the latest Old Brain Fix on your computer; a phone answers no questions.';
+
+  @override
+  String get phoneAskTimedOut => 'Your computer did not answer in time.';
+
+  @override
+  String get phoneAskTimedOutFix =>
+      'Check that the computer is on and awake, then ask again.';
+
+  @override
+  String get phoneAskBrokeOff => 'The connection to your computer broke off.';
+
+  @override
+  String get handAddressLabel => 'Address by hand';
+
+  @override
+  String get handAddressHelp =>
+      'For a VPN such as Tailscale: its name or address there, such as desk.tail1234.ts.net, with :port if needed. Tried when this network does not find it.';
+
+  @override
+  String get handAddressInvalid =>
+      'Not an address. Type a name or an IP address, with :port if needed.';
+
+  @override
+  String get handAddressBadPort => 'The port must be a number from 1 to 65535.';
 }

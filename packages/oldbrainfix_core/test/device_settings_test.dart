@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -320,5 +322,47 @@ void main() {
       expect(store.playbackSpeed, 1, reason: kept);
       expect(store.chosenPlaybackSpeed, isNull, reason: kept);
     }
+  });
+
+  test('asking through the desktop is allowed per provider, host and '
+      'model (#267)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    const claude = DesktopProvider(
+      protocol: AskProtocol.anthropic,
+      model: 'claude-opus-5-5',
+      host: 'api.anthropic.com',
+    );
+    const other = DesktopProvider(
+      protocol: AskProtocol.openai,
+      model: 'deepseek-chat',
+      host: 'api.deepseek.com',
+    );
+    const otherModel = DesktopProvider(
+      protocol: AskProtocol.anthropic,
+      model: 'claude-haiku',
+      host: 'api.anthropic.com',
+    );
+    expect(store.askAllowed(claude), isFalse);
+    store.allowAsking(claude);
+    expect(store.askAllowed(claude), isTrue);
+    expect(store.askAllowed(other), isFalse, reason: 'another provider');
+    expect(store.askAllowed(otherModel), isFalse, reason: 'another model');
+    store
+      ..allowAsking(other)
+      ..allowAsking(claude);
+    expect(store.askAllowed(claude), isTrue, reason: 'both kept');
+    expect(store.askAllowed(other), isTrue);
+    expect(
+      store.localSetting('askAllowed'),
+      jsonEncode([
+        jsonEncode(['anthropic', 'api.anthropic.com', 'claude-opus-5-5']),
+        jsonEncode(['openai', 'api.deepseek.com', 'deepseek-chat']),
+      ]),
+      reason: 'once each',
+    );
+    store.setLocalSetting('askAllowed', 'not json');
+    expect(store.askAllowed(claude), isFalse);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 }

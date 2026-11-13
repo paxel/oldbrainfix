@@ -642,10 +642,12 @@
 <guide-box name="ask">
 <h2>Ask about your Notes</h2>
 <p>Ask an AI model of your choice about your Notes, answered with links to them.</p>
-<box-tab device="phone" alt="Sync on the phone: Scan the code, the Pair code field with Sync now, and Show this Device's code">
+<box-tab device="phone" alt="Ask on the phone: the line naming the computer, the provider and the model, the question Where is the spare key?, the answer with a link to the Note, From these Notes with the Note's title, and Keep as Note">
 <li>Mark private Notes and Areas <strong>Hidden from AI</strong>.</li>
-<li>Sync the phone with the computer.</li>
-<li>Ask in the desktop app.</li>
+<li>Tap <strong>Ask</strong> in the Agenda's bar.</li>
+<li>Read what is sent, then tap <strong>Allow</strong>.</li>
+<li>Type your question and tap <strong>Ask</strong>.</li>
+<li>Tap a Note under <strong>From these Notes</strong> to open it.</li>
 </box-tab>
 <box-tab device="desktop" alt="The Ask panel: the question Where are the winter tyres?, the answer with a link to the Note, From these Notes with the Note's title, and Keep as Note">
 <li>Enter provider, model and API key under <strong>Ask panel</strong> in the Settings.</li>
@@ -656,7 +658,7 @@
 </box-tab>
 <box-more>
 <p>
-  Only the desktop asks. Old Brain Fix provides no model and no account: under <strong>Ask panel</strong>
+  Only the desktop talks to the provider. Old Brain Fix provides no model and no account: under <strong>Ask panel</strong>
   in the Settings you choose <strong>Anthropic (Claude)</strong> or an OpenAI-compatible provider such
   as DeepSeek, OpenRouter, Ollama or LM Studio, with its base URL (empty asks Ollama on this computer),
   the model and your own API key, which a model on this computer does not need. The key stays on this
@@ -679,6 +681,55 @@
   as "sort what's new" into Areas and Topics, its changes wait as an AI Task: the panel says so, and
   <strong>Review</strong> shows them to accept or reject as a whole (see
   <a href="#open-the-ai-port">Open the AI port</a>). Sync waits until you decide.
+</p>
+<p>
+  On the phone, <strong>Ask</strong> shows in the Agenda's bar once a computer of yours is paired. The
+  phone runs no model and talks to no provider: it sends the question over the paired connection to your
+  computer, which asks its provider with its own key, as the panel does, and sends back the answer with
+  its links, which open the Notes on the phone. The computer must be running, at home or through your VPN
+  (see <a href="#ask-from-away-from-home">Ask from away from home</a>). Before the first question, and
+  again whenever the computer asks another provider or model, the phone names the computer, the provider,
+  the model and its address and what is sent, the same as above, and asks your permission; nothing is
+  sent before you tap <strong>Allow</strong>, and <strong>Not now</strong> sends nothing. A follow-up is
+  asked after the earlier answers, <strong>Start over</strong> drops them, as leaving the page does, and
+  <strong>Keep as Note</strong> saves the question and its answer as a new Note in Unsorted. When the
+  model changes something, the phone says that the changes wait for your review on the computer. When no
+  computer of yours answers, or its provider is not set up, the page says why and what to do; a question
+  that gets no answer goes back into the field, and the top says why.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="ask-away">
+<h2>Ask from away from home</h2>
+<p>Reach your computer from the phone through a VPN, to ask and to sync.</p>
+<box-tab device="phone" alt="Sync on the phone: the paired computer Desk with Sync automatically and Address by hand desk.tail1234.ts.net">
+<li>Install Tailscale on the phone and sign in.</li>
+<li>Tap the Profile picture, then <strong>Sync with another Device</strong>.</li>
+<li>Type the computer's Tailscale name under <strong>Address by hand</strong>.</li>
+<li>Tap <strong>Ask</strong> in the Agenda's bar.</li>
+</box-tab>
+<box-tab device="desktop" alt="The desktop Settings as a dialog over the Agenda: under This computer Notifications on this computer, Start at login and Bigger text and icons, then the AI port with Who may connect and the Ask panel with Anthropic (Claude) and OpenAI-compatible">
+<li>Install Tailscale on the computer and sign in.</li>
+<li>Leave <strong>Start at login</strong> ticked in Settings.</li>
+<li>Leave the computer on.</li>
+</box-tab>
+<box-more>
+<p>
+  Old Brain Fix builds no remote access of its own; a VPN you run outside the app carries the paired
+  connection. A VPN that routes your home network to the phone, such as WireGuard on the router, needs
+  nothing more: the phone reaches the computer at the address it found it at home. Tailscale gives the
+  computer another address and does not carry the network's discovery, so give the phone the computer's
+  Tailscale name, such as <code>desk.tail1234.ts.net</code>, or its Tailscale address, under
+  <strong>Address by hand</strong> below the computer in <strong>Paired Devices</strong>. A port after a
+  colon is needed only when the computer hosts on another port than the one it was last found at.
+</p>
+<p>
+  The phone tries the computer where this network finds it first, then at its address by hand, then
+  where it was last. It trusts only the certificate it paired with, at every address, so a device that
+  answers there in its place gets nothing. Automatic sync takes the same way, so the phone syncs from
+  away too. The address stays on this phone: it is not synced and goes when the computer is forgotten.
+  An address that is none, or a port outside 1 to 65535, is said under the field and not kept.
 </p>
 </box-more>
 </guide-box>

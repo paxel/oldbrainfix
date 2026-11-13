@@ -9997,6 +9997,407 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'It stays where it was; take the mark off, then file it.'**
   String get captureNotFiledHiddenFix;
+
+  /// Title of the phone's Ask page and its button in the Agenda's bar (#267): asks the user's own computer about the Notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get phoneAskTitle;
+
+  /// Shown on the Ask page while the phone looks for the user's own computer and the provider it asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for your computer…'**
+  String get phoneAskLooking;
+
+  /// Button on the Ask page that looks for the computer again.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get phoneAskTryAgain;
+
+  /// Hint in the Ask page's question field.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about your Notes'**
+  String get phoneAskHint;
+
+  /// Button that sends the question to the computer.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get phoneAskButton;
+
+  /// Bar action of the Ask page that drops the questions asked, for a new one.
+  ///
+  /// In en, this message translates to:
+  /// **'Start over'**
+  String get phoneAskStartOver;
+
+  /// Shown under the question while the computer asks its provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the answer from {provider}…'**
+  String phoneAskAsking(String provider);
+
+  /// Line at the top of the Ask page naming the computer, its provider and model.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions go through {computer} to {provider}, model {model}. Only what the model finds and reads in your Notes is sent there, never what is Hidden from AI.'**
+  String phoneAskSends(String computer, String provider, String model);
+
+  /// Line on the Ask page when the answer says an AI Task waits for review on the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes the AI made wait for your review on the computer. Sync with it waits until you decide there.'**
+  String get phoneAskTaskWaits;
+
+  /// Heading over the Notes an answer links, each opening its Note.
+  ///
+  /// In en, this message translates to:
+  /// **'From these Notes'**
+  String get phoneAskFromNotes;
+
+  /// Button that saves the question and its answer as a Note in Unsorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as Note'**
+  String get phoneAskKeep;
+
+  /// Shown once the answer was kept; a tap opens the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept as a Note'**
+  String get phoneAskKept;
+
+  /// Line under an answer the provider cut off.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer was cut off at its length limit.'**
+  String get phoneAskCut;
+
+  /// Why the computer cannot ask its provider yet.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} is not set up on the computer yet.'**
+  String phoneAskUnreadyCause(String provider);
+
+  /// Fix when the computer's provider is not set up, for a reason this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up the provider under Ask panel in the computer\'s Settings.'**
+  String get phoneAskUnreadyFix;
+
+  /// Fix: the computer's provider has no model.
+  ///
+  /// In en, this message translates to:
+  /// **'Name a model under Ask panel in the computer\'s Settings.'**
+  String get phoneAskUnreadyModel;
+
+  /// Fix: the computer's Anthropic provider has no key.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the API key under Ask panel in the computer\'s Settings.'**
+  String get phoneAskUnreadyKey;
+
+  /// Fix: the computer's provider address may not be asked.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.'**
+  String get phoneAskUnreadyUrl;
+
+  /// Heading of the permission asked on the Ask page before the first question to a provider (App Store guideline 5.1.2(i)).
+  ///
+  /// In en, this message translates to:
+  /// **'Before your first question'**
+  String get phoneAskConsentTitle;
+
+  /// Names the computer and the third-party AI provider it sends the questions to.
+  ///
+  /// In en, this message translates to:
+  /// **'Your questions go from this phone to your computer {computer}, which sends them to {provider}, model {model}, at {host}.'**
+  String phoneAskConsentIntro(
+    String computer,
+    String provider,
+    String model,
+    String host,
+  );
+
+  /// Heading over the list of what is sent to the provider.
+  ///
+  /// In en, this message translates to:
+  /// **'What {provider} receives:'**
+  String phoneAskConsentWhat(String provider);
+
+  /// What is sent: the question.
+  ///
+  /// In en, this message translates to:
+  /// **'Your question, and the questions and answers before it when you ask on.'**
+  String get phoneAskConsentQuestion;
+
+  /// What is sent: names.
+  ///
+  /// In en, this message translates to:
+  /// **'The names of your Areas, Topics and tags.'**
+  String get phoneAskConsentNames;
+
+  /// What is sent: Routines and Reminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Routines and Reminders with their check-offs, when the model lists them.'**
+  String get phoneAskConsentRoutines;
+
+  /// What is sent: search hits.
+  ///
+  /// In en, this message translates to:
+  /// **'The titles and short excerpts of the Notes its searches find.'**
+  String get phoneAskConsentFound;
+
+  /// What is sent: Notes read in full.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes it reads in full, with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context (when and where a Note was captured, the calendar event and the Bluetooth device).'**
+  String get phoneAskConsentRead;
+
+  /// What is never sent, and who receives nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing Hidden from AI is sent, not even as a count. {provider} handles what it receives under its own terms; Old Brain Fix and its developer receive nothing.'**
+  String phoneAskConsentNever(String provider);
+
+  /// Says that nothing goes without the permission, and when it is asked again.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is sent until you allow it. When the computer asks another provider or model, this phone asks you again.'**
+  String get phoneAskConsentAgain;
+
+  /// Button that allows questions to the provider named.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get phoneAskAllow;
+
+  /// Announcement at the top when a question got no answer; its tap gives cause and fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The question was not answered.'**
+  String get phoneAskFailed;
+
+  /// Title of its details.
+  ///
+  /// In en, this message translates to:
+  /// **'Not answered'**
+  String get phoneAskFailedTitle;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} refused the computer\'s API key.'**
+  String phoneAskKeyRefused(String provider);
+
+  /// Fix for a refused key.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the API key under Ask panel in the computer\'s Settings.'**
+  String get phoneAskKeyFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} answered the computer with an error.'**
+  String phoneAskProviderFailed(String provider);
+
+  /// Fix for an error of the provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the model\'s name in the computer\'s Settings, or ask again later.'**
+  String get phoneAskProviderFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer came from {provider} to the computer.'**
+  String phoneAskNoReply(String provider);
+
+  /// Fix for no reply from the provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the computer\'s network and the provider\'s address in its Settings, then ask again.'**
+  String get phoneAskNoReplyFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer from {provider} could not be read on the computer.'**
+  String phoneAskUnreadable(String provider);
+
+  /// Fix for an unreadable reply.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.'**
+  String get phoneAskUnreadableFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The model searched too long without answering.'**
+  String get phoneAskTooManyRounds;
+
+  /// Fix for a search too long.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a narrower question.'**
+  String get phoneAskNarrowerFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The model declined to answer this question.'**
+  String get phoneAskRefused;
+
+  /// Fix for a declined question.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask it in other words.'**
+  String get phoneAskOtherWordsFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer stopped waiting for the answer.'**
+  String get phoneAskStopped;
+
+  /// Fix: ask again.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask again.'**
+  String get phoneAskAgainFix;
+
+  /// Why a question was not answered: one at a time on the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer is answering another question.'**
+  String get phoneAskBusy;
+
+  /// Fix for a busy computer.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask again in a moment.'**
+  String get phoneAskBusyFix;
+
+  /// Why a question was not answered: a failure of a later desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer answered in a way this version cannot read.'**
+  String get phoneAskUnknown;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the latest Old Brain Fix on this phone.'**
+  String get phoneAskUpdatePhoneFix;
+
+  /// Why the phone cannot ask: no own paired Device that hosts.
+  ///
+  /// In en, this message translates to:
+  /// **'No computer of yours is paired with this phone.'**
+  String get phoneAskNoComputer;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair your computer under Profile ▸ Sync with another Device, then ask.'**
+  String get phoneAskNoComputerFix;
+
+  /// Why the phone cannot ask: no address of the computer answered.
+  ///
+  /// In en, this message translates to:
+  /// **'No computer of yours answered.'**
+  String get phoneAskUnreachable;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Old Brain Fix on the computer and join its network or your VPN; through Tailscale, give it an address by hand under Profile ▸ Sync with another Device.'**
+  String get phoneAskUnreachableFix;
+
+  /// Why the phone cannot ask: the pinned certificate did not match.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device answered at your computer\'s address.'**
+  String get phoneAskWrongHost;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the address by hand under Profile ▸ Sync with another Device, or pair the computer again.'**
+  String get phoneAskWrongHostFix;
+
+  /// Why the phone cannot ask: the computer declined it.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer does not let this phone ask.'**
+  String get phoneAskDeclined;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'On the computer, switch on Sync automatically for this phone under Sync.'**
+  String get phoneAskDeclinedFix;
+
+  /// Why the phone cannot ask: only phones or older desktops answered.
+  ///
+  /// In en, this message translates to:
+  /// **'None of your paired Devices answers questions.'**
+  String get phoneAskNotOffered;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the latest Old Brain Fix on your computer; a phone answers no questions.'**
+  String get phoneAskNotOfferedFix;
+
+  /// Why the phone cannot ask: a timeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer did not answer in time.'**
+  String get phoneAskTimedOut;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the computer is on and awake, then ask again.'**
+  String get phoneAskTimedOutFix;
+
+  /// Why the phone cannot ask: anything else on the way.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection to your computer broke off.'**
+  String get phoneAskBrokeOff;
+
+  /// Field under an own paired Device on the Sync page (#267): an address such as a Tailscale name, tried when the local network does not find it.
+  ///
+  /// In en, this message translates to:
+  /// **'Address by hand'**
+  String get handAddressLabel;
+
+  /// Helper line under that field.
+  ///
+  /// In en, this message translates to:
+  /// **'For a VPN such as Tailscale: its name or address there, such as desk.tail1234.ts.net, with :port if needed. Tried when this network does not find it.'**
+  String get handAddressHelp;
+
+  /// Error under the field for text that is no address.
+  ///
+  /// In en, this message translates to:
+  /// **'Not an address. Type a name or an IP address, with :port if needed.'**
+  String get handAddressInvalid;
+
+  /// Error under the field for a port that is none.
+  ///
+  /// In en, this message translates to:
+  /// **'The port must be a number from 1 to 65535.'**
+  String get handAddressBadPort;
 }
 
 class _AppLocalizationsDelegate

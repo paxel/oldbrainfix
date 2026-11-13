@@ -15,6 +15,7 @@ import 'app_lock.dart';
 import 'appointments.dart';
 import 'area_offer_screen.dart';
 import 'areas_screen.dart';
+import 'ask_screen.dart';
 import 'browser.dart';
 import 'all_routines_screen.dart';
 import 'calendar_platform.dart';
@@ -168,6 +169,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final _locks = AreaLocks(widget.notes.store);
   late final _frogs = Frogs(widget.notes.store);
   late final _sessions = Sessions(widget.notes.store);
+
+  /// Whether a computer of the user's own is paired to ask (#267).
+  late var _mayAsk = askableDevices(widget.notes.store).isNotEmpty;
   late final _checklists = Checklists(widget.notes.store);
   late final _shopping = ShoppingLists(widget.notes.store);
 
@@ -706,10 +710,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
       trail: widget.trail,
     );
     if (!mounted) return;
+    // Sync, behind the Profile, pairs and forgets computers.
+    _mayAsk = askableDevices(widget.notes.store).isNotEmpty;
     _reload();
     // Settings lead to the Calendar page too.
     unawaited(_readCalendar());
   }
+
+  Future<void> _openAsk() => openAsk(context, widget.notes.store);
 
   Future<void> _openAllRoutines() async {
     await openAllRoutines(context, widget.notes, widget.places);
@@ -1376,6 +1384,15 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ),
             // What does not fit goes into ⋮ from the end, the folder
             // and the Profile picture never (UI laws, "The bar").
+            // Asking the computer, once one of the user's is paired
+            // (#267).
+            if (_mayAsk)
+              BarAction(
+                key: const ValueKey('ask'),
+                label: t.phoneAskTitle,
+                onPressed: _openAsk,
+                icon: Icons.question_answer_outlined,
+              ),
             BarAction(
               key: const ValueKey('allRoutines'),
               label: t.allRoutinesTitle,

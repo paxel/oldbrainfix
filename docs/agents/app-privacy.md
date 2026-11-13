@@ -96,12 +96,45 @@ Each line names what the app does with the data and why that is not
 - **The desktop's Ask panel** (#267, ADR 0051) is not the iPhone app's:
   the desktop sends a question, and what its model finds and reads in
   the Notes, to the AI provider the user entered with their own key,
-  never to the developer, and nothing Hidden from AI. The iPhone app
-  talks to no AI provider, so guideline 5.1.2(i) and the label stay as
-  they are. The phone's question through the user's desktop (#267,
-  next step) reaches a provider and brings in 5.1.2(i): before the
-  first question the phone must name the provider and what is sent and
-  ask permission; answer these questions again then.
+  never to the developer, and nothing Hidden from AI.
+- **The phone's Ask through the user's desktop** (#267, ADR 0003, ADR
+  0051): the iPhone sends the question, and the earlier questions and
+  answers of the same conversation, over the paired connection to the
+  user's own desktop, as a sync does (TLS, pinned certificate, the
+  phone's proof), on the local network or through a VPN the user runs;
+  the desktop asks its provider and sends back the answer's text and the
+  ids of the Notes it links. The iPhone itself talks to no AI provider
+  and holds no key; it learns the provider's protocol, model and host
+  from the desktop and keeps, as a local setting, which ones the user
+  allowed. Neither the developer nor a party the developer works with
+  receives anything: the user's desktop is the user's own Device, and
+  the provider is the user's choice with the user's own account, so
+  this is not "collect", and the label stays **Data Not Collected**.
+- **Guideline 5.1.2(i)** applies all the same, as the question reaches
+  a third-party AI through the desktop: before the first question to a
+  provider, the Ask page names the user's computer, the provider, its
+  model and host, and what is sent (the question and earlier exchanges;
+  the names of Areas, Topics and tags; Routines and Reminders with their
+  check-offs when listed; titles and excerpts of the Notes found; the
+  Notes read in full with their Sections, Transcripts, Photo Texts,
+  Attachment Texts and Capture Context; nothing Hidden from AI), and
+  asks with **Allow** and **Not now**. Nothing is sent before Allow; a
+  provider, host or model the user did not allow is asked about again
+  before the next question goes out (`askAllowed`, `allowAsking` in
+  `device_settings.dart`). The privacy policy says the same under
+  "Asking from the phone".
+
+## Google Play: Data safety
+
+Re-checked for #267 against the same facts, not against Play's
+definitions read anew: Play's answers stay **No data collected** and
+**No data shared**. The Android app sends a question only to the user's
+own paired desktop, end to end over TLS with the pinned certificate,
+never to the developer or a party the developer works with; the desktop,
+not the Android app, sends it on to the provider the user set up with
+their own key. Nothing new is stored off the device by the app. Read
+Play's definitions of "collection" and "sharing" in the Play Console
+before the next submission and note them here as above for Apple.
 
 ## Privacy Policy URL
 

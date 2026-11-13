@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'lan_ask.dart';
 import 'nudges.dart';
 import 'schedule.dart';
 import 'schedule_sentence.dart';
@@ -68,6 +69,7 @@ extension DeviceSettings on Store {
   static const _quickNoteNudgeButtonsOff = 'quickNoteNudgeButtonsOff';
   static const _lastShoppingList = 'lastShoppingList';
   static const _recentlyFiledInto = 'recentlyFiledInto';
+  static const _askAllowed = 'askAllowed';
 
   /// How many places filed into File into… shows at its top (#272).
   static const recentPlacesKept = 3;
@@ -333,6 +335,37 @@ extension DeviceSettings on Store {
       ].take(recentPlacesKept).toList(),
     ),
   );
+
+  /// Whether the user allowed this Device to send questions through the
+  /// desktop to [provider] (#267, App Store guideline 5.1.2(i)): once for
+  /// each protocol, host and model, as an OpenAI-compatible host such as
+  /// OpenRouter hands a question on to the model's maker. Another
+  /// provider asks again.
+  bool askAllowed(DesktopProvider provider) =>
+      _askAllowedList.contains(_askKey(provider));
+
+  /// Keeps that the user allowed questions to [provider].
+  void allowAsking(DesktopProvider provider) {
+    final key = _askKey(provider);
+    final kept = _askAllowedList;
+    if (kept.contains(key)) return;
+    setLocalSetting(_askAllowed, jsonEncode([...kept, key]));
+  }
+
+  List<String> get _askAllowedList {
+    try {
+      if (jsonDecode(localSetting(_askAllowed) ?? '[]')
+          case final List<Object?> keys) {
+        return keys.whereType<String>().toList();
+      }
+    } on FormatException {
+      // A broken setting allows none.
+    }
+    return [];
+  }
+
+  static String _askKey(DesktopProvider provider) =>
+      jsonEncode([provider.protocol.name, provider.host, provider.model]);
 
   /// The system this Device shows the known units of Tallies in, when
   /// one was chosen; null follows the region.
