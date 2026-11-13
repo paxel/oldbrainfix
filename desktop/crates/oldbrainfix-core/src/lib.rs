@@ -6,7 +6,7 @@
 //! the background; and of the photos, voice recordings and attached
 //! files kept beside the log, with their Photo Texts, Transcripts and
 //! Attachment Texts and the search over them; and the LAN sync between Devices with its pair codes, keys and
-//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the Packs of copied Notes one hands another, the encrypted Backups with their Recovery Sheet, the user's own Profile, and the Imports of a folder of files and of a Google Keep export. The Dart core
+//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the Packs of copied Notes one hands another, the encrypted Backups with their Recovery Sheet, the user's own Profile, the Imports of a folder of files and of a Google Keep export, and the vault of Markdown files written for another tool and rebuilt from it. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
@@ -78,6 +78,7 @@ pub mod text_boxes;
 pub mod text_format;
 pub mod text_tags;
 pub mod transcript_prompts;
+pub mod vault;
 
 /// The symbol of `alphabet` for the low five bits of `value`, as the
 /// pair codes, the Recovery Sheet and the Profile codes write base32.

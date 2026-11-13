@@ -53,6 +53,10 @@ pub enum Error {
     /// changed.
     #[error("hidden from AI: {}", .0.join(", "))]
     HiddenFromAi(Vec<String>),
+    /// A vault that was not rebuilt (#267, ADR 0050), and why: nothing
+    /// was written.
+    #[error("vault: {0:?}")]
+    Vault(crate::vault::VaultProblem),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

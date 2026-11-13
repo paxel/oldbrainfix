@@ -93,6 +93,7 @@ pub mod text_menu;
 pub mod theme;
 pub mod tray;
 pub mod undo;
+pub mod vault_view;
 pub mod window_sizes;
 
 pub use app::{App, Page, Selection, Wall, local_wall};

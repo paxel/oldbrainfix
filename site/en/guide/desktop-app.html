@@ -20,10 +20,10 @@
 <li>Open it.</li>
 <li>Pick one of the three choices on the first start.</li>
 </box-tab>
-<box-tab device="desktop" alt="The first start in the desktop app: New to Old Brain Fix, Add a Device of mine and Restore from a Backup">
+<box-tab device="desktop" alt="The first start in the desktop app: New to Old Brain Fix, Add a Device of mine, Restore from a Backup and Rebuild from a vault">
 <li>Install the app as the <a href="../reference/install.html">Install</a> page says.</li>
 <li>Start Old Brain Fix.</li>
-<li>Pick one of the three choices on the first start.</li>
+<li>Pick one of the choices on the first start.</li>
 </box-tab>
 <box-more>
 <p>
@@ -41,7 +41,9 @@
   The first start offers the same three choices as the phone: <strong>New to Old Brain
   Fix</strong> with the Starter Set, where Simple or Advanced is picked, <strong>Add a Device of
   mine</strong> and <strong>Restore from a Backup</strong> (see
-  <a href="getting-started.html#on-the-desktop">Getting started</a>). The Profile takes the name and
+  <a href="getting-started.html#on-the-desktop">Getting started</a>), and a fourth,
+  <strong>Rebuild from a vault</strong> (see <a href="#take-your-notes-to-another-app">Take your Notes
+  to another app</a>). The Profile takes the name and
   picture of your login on the computer, or else the computer's name. The desktop asks neither for
   the speech model nor for alarm access.
 </p>
@@ -292,7 +294,7 @@
 </box-tab>
 <box-more>
 <ul>
-  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Attach a file…</strong> picks files of any kind: with the Note dialog open they go onto its Note, else they wait in the quick note for a new Note, as files dropped onto the window do. <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown or text files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Open Pack…</strong> opens a Pack someone sent you (see <a href="sharing-and-sync.html">Sharing and sync</a>). <strong>Open a Backup…</strong> opens a Backup to take Notes back from it, as on the Backups dialog (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
+  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Attach a file…</strong> picks files of any kind: with the Note dialog open they go onto its Note, else they wait in the quick note for a new Note, as files dropped onto the window do. <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown or text files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Open Pack…</strong> opens a Pack someone sent you (see <a href="sharing-and-sync.html">Sharing and sync</a>). <strong>Open a Backup…</strong> opens a Backup to take Notes back from it, as on the Backups dialog (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Export as vault…</strong> writes every Note as Markdown files for another app (see <a href="#take-your-notes-to-another-app">Take your Notes to another app</a>). <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
   <li><strong>Edit</strong>: <strong>Undo</strong> (Ctrl+Z) takes back the last delete, check-off, filing or Merge, of all the cards selected at once where they went together; it is greyed while there is nothing to undo. <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Find</strong> (Ctrl+F) puts the cursor into the search field of the list shown, All Notes' where the list has none, such as the Agenda, and over the Settings into theirs. <strong>Settings…</strong> (Ctrl+,) opens the Settings, whose search field at the top shows only the settings that hold the words typed.</li>
   <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Theme</strong> (see <a href="#change-the-theme-and-the-size">Change the theme and the size</a>).</li>
   <li><strong>Area</strong>, for the Area or Topic the list shows: <strong>Rename</strong> (F2), <strong>Colour and icon</strong>, <strong>Share…</strong>, <strong>People</strong>, <strong>Export as Pack…</strong>, <strong>Hidden from AI</strong>, <strong>Move up</strong> (Alt+Up), <strong>Move down</strong> (Alt+Down) and <strong>Delete</strong>, as its right-click in the sidebar offers them. Each is greyed where that menu leaves it out, such as Colour and icon, Share…, People, Hidden from AI, Move up and Move down for a Topic, Hidden from AI for a Shared Area, Move up for the first Area and Move down for the last, and all of them while no Area or Topic shows or a dialog, the Note dialog too, lies over the list.</li>
@@ -633,6 +635,51 @@
   the Trash setting among them. It sets a Note's text format, sets up Tallies, Sessions, Checklists,
   Shopping Lists and Frogs, and turns a Checklist into a Shopping List and back, each as a change that
   waits for the review. What you recorded it only reads.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="vault">
+<h2>Take your Notes to another app</h2>
+<p>Write every Note as Markdown files for another app, and bring them back later.</p>
+<box-tab device="phone" alt="Sync on the phone: Scan the code, the Pair code field with Sync now, and Show this Device's code">
+<li>Sync the phone with the computer.</li>
+<li>Export the vault in the desktop app.</li>
+</box-tab>
+<box-tab device="desktop" alt="The File menu open, with Export as vault… below Save as Markdown…">
+<li>Click <strong>File ▸ Export as vault…</strong>.</li>
+<li>Choose the folder the vault goes into.</li>
+<li>Wait until the top says <strong>Vault written</strong>.</li>
+</box-tab>
+<box-more>
+<p>
+  Only the desktop writes a vault. It goes into a new folder inside the one you choose, named
+  <code>oldbrainfix-vault-</code> and the date, so nothing in that folder is changed. Each Area is a
+  folder, each Topic a folder inside it, and each Note a Markdown file named by its first line and the
+  day it was captured, with its Sections as dated parts, its Lines as a task list, a Tally's entries as
+  a table, a Session's Tallies as links, and its photos, recordings and files in an
+  <code>attachments</code> folder beside it. Its text is written as it is, and a link to another Note
+  becomes a link to that Note's file, which Obsidian and git hosts follow. What the Markdown does not
+  show, such as the capture time, the Area, the Importance and the Routines and Reminders with their
+  check-offs, is kept as properties at the top of the file.
+</p>
+<p>
+  Everything this computer holds goes in, Notes of other people in Shared Areas with their author and
+  Notes hidden from AI too, but not where and with what a Note was captured. The folder is not
+  encrypted: keep it where only you can read it. Writing it can take a while; the dialog can be closed,
+  and the top says when it is written, its tap the folder. Nothing you change in the vault comes back
+  by itself, and the vault is not kept current: export again for a new one. A Backup remains the way to
+  keep everything (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>).
+</p>
+<p>
+  To come back, click <strong>Rebuild from a vault</strong> on the first start of an empty Old Brain
+  Fix, beside <strong>Restore from a Backup</strong>, and choose the vault's folder. Each Note comes
+  back with its properties, every Note, Area and Topic new and yours, Shared Areas as your own private
+  ones. A Markdown or text file you made in the other app becomes a new Note with its text, its tags
+  and its file's date, in the Area of its first folder and the Topic of its second. Your other Devices
+  do not sync with the rebuilt Notes: empty them and pair them again. A folder without a Markdown or
+  text file, an Old Brain Fix that holds Notes already, or a vault of a newer version rebuilds nothing,
+  and the top says why.
 </p>
 </box-more>
 </guide-box>

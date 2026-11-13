@@ -585,7 +585,7 @@ fn base(name: &str) -> &str {
 /// The name without its extension of the file `base`, and the format it
 /// becomes a Note in, by its extension in any case of ASCII letters;
 /// `None` for a hidden file and any other kind.
-fn format_of(base: &str) -> Option<(&str, &'static str)> {
+pub(crate) fn format_of(base: &str) -> Option<(&str, &'static str)> {
     if base.starts_with('.') {
         return None;
     }
@@ -637,7 +637,7 @@ const CP1252: [char; 32] = [
 /// under the file's name `stem` as its first line, a heading in
 /// Markdown, unless its first line with words already says it (the
 /// Note's title, in any case).
-fn titled(stem: &str, text: &str, format: &str) -> String {
+pub(crate) fn titled(stem: &str, text: &str, format: &str) -> String {
     let trimmed = text.trim_end_matches(is_space);
     let lead = trimmed.len() - trimmed.trim_start_matches(is_space).len();
     let body = &trimmed[trimmed[..lead].rfind('\n').map_or(0, |i| i + 1)..];

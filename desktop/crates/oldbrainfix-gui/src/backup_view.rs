@@ -5,8 +5,9 @@
 //! weekly Backup and writes one now; and the first start's view that
 //! asks whether the user is new, then offers the Starter Set, adds a
 //! Device of their own or restores a Backup into the empty log with the
-//! passphrase or the recovery key; and a Backup opened to take Notes
-//! back from it (#285), on a page of its own.
+//! passphrase or the recovery key, or rebuilds a vault into it (#267);
+//! and a Backup opened to take Notes back from it (#285), on a page of
+//! its own.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -260,6 +261,9 @@ pub enum WelcomeAction {
     Pick,
     /// Restore the file chosen with what was typed.
     Restore,
+    /// Choose a vault's folder and rebuild it into the empty log (#267,
+    /// ADR 0050).
+    Rebuild,
     /// A sync with the other Device went through; go on.
     Synced,
     /// Back to the three choices, nothing kept.
@@ -284,12 +288,15 @@ pub struct Welcome {
     /// Whether the key typed is no recovery key; said red under the
     /// field until it changes.
     pub code_invalid: bool,
+    /// While a vault is rebuilt: how many of its files were read, of how
+    /// many.
+    pub rebuilding: Option<(usize, usize)>,
 }
 
 impl Welcome {
-    /// Whether the view shows the three choices.
+    /// Whether the view shows the choices.
     pub fn choosing(&self) -> bool {
-        self.starter.is_none() && !self.adding && self.file.is_none()
+        self.starter.is_none() && !self.adding && self.file.is_none() && self.rebuilding.is_none()
     }
 }
 
@@ -322,6 +329,15 @@ pub fn welcome(
     }
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
+    if let Some((done, total)) = state.rebuilding {
+        ui.heading(RichText::new(t.vault_rebuild()).color(text));
+        ui.horizontal(|ui| {
+            ui.add(egui::Spinner::new());
+            let said = t.vault_rebuilding(done as i64, total as i64);
+            ui.label(RichText::new(said).color(weak));
+        });
+        return;
+    }
     let Some((_, header)) = &state.file else {
         ui.heading(RichText::new(t.first_start_title()).color(text));
         ui.label(RichText::new(t.first_start_intro()).color(text));
@@ -334,6 +350,9 @@ pub fn welcome(
         }
         if choice(ui, t.restore_offer_detail(), t.restore_offer()) {
             actions.push(WelcomeAction::Pick);
+        }
+        if choice(ui, t.vault_rebuild_detail(), t.vault_rebuild()) {
+            actions.push(WelcomeAction::Rebuild);
         }
         return;
     };

@@ -2731,6 +2731,14 @@ void main() {
             await openSync(tester, t, find.text('Laptop'));
           });
 
+          // The vault (#267) is the desktop's alone: the phone syncs with
+          // the computer first.
+          boxFrame(desktop178, 'vault', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(tester, t);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
           boxFrame(desktop178, 'look', (tester) async {
             final t = await start(tester, seed());
             await openSettings(tester, t);

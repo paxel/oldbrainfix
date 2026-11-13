@@ -2183,7 +2183,7 @@ type AppWindow = Box<Harness<'static, App>>;
 /// Repairs shown below its path, the capture popup, a text kept from the
 /// command line in Unsorted, a dropped photo waiting in the quick note,
 /// the Agenda, the speech model, the Sync menu, an AI Task's review, the
-/// View menu and the quick note's ways to a photo.
+/// View menu, the File menu and the quick note's ways to a photo.
 fn desktop_frames(
     texts: &Texts,
     language: &str,
@@ -2194,7 +2194,7 @@ fn desktop_frames(
     let mut harness = Box::new(first_start(language, theme)?);
     problems.extend(match_frame(&mut harness, &box_frame("install"))?);
     drop(harness);
-    let scenes: [(&str, DesktopScene); 7] = [
+    let scenes: [(&str, DesktopScene); 8] = [
         ("cards", |harness, texts| {
             show_household(harness, texts)?;
             // Ctrl-clicked, each after a pause, so no click counts double.
@@ -2259,6 +2259,11 @@ fn desktop_frames(
         ("look", |harness, _| {
             let view = harness.state().t().menu_view().to_string();
             click_last(harness, &view)
+        }),
+        // File ▸ Export as vault… (#267).
+        ("vault", |harness, _| {
+            let file = harness.state().t().menu_file().to_string();
+            click_first(harness, &file)
         }),
     ];
     for (name, scene) in scenes {

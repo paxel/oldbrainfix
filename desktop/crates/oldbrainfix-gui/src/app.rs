@@ -187,6 +187,7 @@ use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::text_menu::{self, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::undo::Undo;
+use crate::vault_view::{self, VaultDone, VaultJob};
 use crate::window_sizes;
 use oldbrainfix_core::tag_tree::TagTree;
 
@@ -1027,6 +1028,9 @@ enum Dialog {
     /// Google Keep export, each with what it does, or that it reads
     /// while it runs.
     Import,
+    /// File ▸ Export as vault… (#267): what it writes and how far it is;
+    /// closing it leaves the vault being written, announced when done.
+    Vault,
     /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Notes
     /// go into, the selected ones together (#148), or the Note being
     /// captured, picked with a filter (#272).
@@ -1339,6 +1343,9 @@ enum Action {
     SelectAllCards,
     /// File ▸ Import…: asks which Import.
     AskImport,
+    /// File ▸ Export as vault… (#267): asks for the folder, then writes
+    /// the vault off the window's thread.
+    ExportVault,
     /// Opens the Note in the Note dialog (#146): a double-click on its
     /// card or Edit (#114).
     SelectNote(String),
@@ -2055,6 +2062,11 @@ pub struct App {
     /// Asks the system's dialog for the zip of a Google Takeout export.
     import_zip_picker: FolderPicker,
     import: FolderImport,
+    /// Asks the system's dialog for the folder a vault goes into, or is
+    /// rebuilt from (#267).
+    vault_picker: FolderPicker,
+    /// The vault being written or rebuilt off the window's thread.
+    vault: VaultJob,
     /// Asks where to save a Sent Item.
     item_saver: FileSaver,
     /// Asks where to save the own Profile card file (#144).
@@ -2531,6 +2543,8 @@ impl App {
             import_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             import_zip_picker: Box::new(|title| zip_dialog(title).pick_file()),
             import: FolderImport::default(),
+            vault_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
+            vault: VaultJob::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
             pack_saver: Box::new(|title, name| pack_dialog(title).set_file_name(name).save_file()),
@@ -2794,6 +2808,24 @@ impl App {
         self.import.running()
     }
 
+    /// Asks `picker` for the folder a vault goes into, or is rebuilt
+    /// from, instead of the system's dialog; tests hand in a path.
+    pub fn set_vault_picker(&mut self, picker: FolderPicker) {
+        self.vault_picker = picker;
+    }
+
+    /// Whether a vault is being written or rebuilt.
+    pub fn vault_running(&self) -> bool {
+        self.vault.running()
+    }
+
+    /// Whether File ▸ Export as vault… may start: none is written, and
+    /// neither is the AI port open nor an AI Task waiting for its review,
+    /// so no draft goes into the vault as a Note.
+    fn may_export_vault(&self) -> bool {
+        !self.vault.running() && self.ai_port.is_none() && self.view.ai_task.is_none()
+    }
+
     /// Hands in the dialogs asking where to save the Recovery Sheet and
     /// which Backup to restore.
     pub fn set_backup_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
@@ -2922,8 +2954,9 @@ impl App {
             }
             WelcomeAction::Synced => self.welcomed()?,
             WelcomeAction::Back => {
-                // A join under way finishes first: what it brings is kept.
-                if self.sync.joining() {
+                // A join or a rebuild under way finishes first: what it
+                // brings is kept.
+                if self.sync.joining() || self.vault.running() {
                     return Ok(());
                 }
                 // Left after a sync went through: on, as with Continue.
@@ -2957,6 +2990,19 @@ impl App {
                             "backup: no Backup header in the file picked".into(),
                         ),
                     }
+                }
+            }
+            WelcomeAction::Rebuild => {
+                if self.vault.running() {
+                    return Ok(());
+                }
+                if let Some(folder) = (self.vault_picker)(t.vault_rebuild_pick_title()) {
+                    let root = t.import_area_name(&folder_name(&folder));
+                    self.vault.rebuild(self.store.clone(), folder, root);
+                    if let Some(welcome) = &mut self.welcome {
+                        welcome.rebuilding = Some((0, 0));
+                    }
+                    self.notice = None;
                 }
             }
             WelcomeAction::Restore => {
@@ -3014,6 +3060,49 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// Announces how a vault job ended: an export written or not; a
+    /// rebuild answers the first start, or goes back to its choices
+    /// saying why.
+    fn vault_done(&mut self, done: VaultDone) {
+        let t = self.t;
+        match done {
+            VaultDone::Exported(Ok(exported)) => {
+                self.announce_done(
+                    t.vault_written(),
+                    vault_view::exported_details(&t, &exported),
+                );
+            }
+            VaultDone::Exported(Err(e)) => self.announce_failure(
+                t.vault_not_written(),
+                t.vault_not_written_title(),
+                (t.vault_not_written_cause(), t.nothing_lost_fix()),
+                format!("vault: {e}"),
+            ),
+            VaultDone::Rebuilt(Ok(rebuilt)) => {
+                if let Err(e) = self.welcomed() {
+                    eprintln!("first start: {e}");
+                }
+                self.announce_done(t.vault_rebuilt(), vault_view::rebuilt_details(&t, &rebuilt));
+                self.refresh();
+                if let Some(wake) = &self.wake {
+                    drop(wake.send(Event::Wake));
+                }
+            }
+            VaultDone::Rebuilt(Err(e)) => {
+                if let Some(welcome) = &mut self.welcome {
+                    welcome.rebuilding = None;
+                }
+                let (cause, fix) = vault_view::rebuild_failure(&t, &e);
+                self.announce_failure(
+                    t.vault_not_rebuilt(),
+                    t.vault_not_rebuilt_title(),
+                    (cause, fix),
+                    format!("vault: {e}"),
+                );
+            }
+        }
     }
 
     /// The first start's view is answered: new with the Starter Set
@@ -7266,6 +7355,16 @@ impl App {
                     self.import.start(self.store.clone(), folder, name, area);
                 }
             }
+            Action::ExportVault => {
+                if self.may_export_vault()
+                    && let Some(parent) = (self.vault_picker)(self.t.vault_export_pick_title())
+                {
+                    self.vault
+                        .export(self.store.clone(), parent, self.t, self.wall.clone());
+                    // Its dialog says how far it is meanwhile.
+                    self.dialog = Some(Dialog::Vault);
+                }
+            }
             Action::Sync(SyncAction::ImportKeep) => {
                 if !self.import.running() {
                     self.dialog = Some(Dialog::ImportKeep);
@@ -9892,6 +9991,26 @@ impl App {
                     .request_repaint_after(std::time::Duration::from_millis(100)),
             }
         }
+        // A vault being written or rebuilt, also after its dialog closed:
+        // its answer is announced when it comes, how far it is meanwhile.
+        if self.vault.running() {
+            match self.vault.finished() {
+                Some(done) => {
+                    if self.dialog == Some(Dialog::Vault) {
+                        self.dialog = None;
+                    }
+                    self.vault_done(done);
+                    ui.ctx().request_repaint();
+                }
+                None => {
+                    if let Some(welcome) = &mut self.welcome {
+                        welcome.rebuilding = Some(self.vault.progress());
+                    }
+                    ui.ctx()
+                        .request_repaint_after(std::time::Duration::from_millis(100));
+                }
+            }
+        }
         // Hosting that could not start, or a session that choked, is
         // announced once, its full text behind the click.
         if let Some((started, details)) = self.sync.take_error() {
@@ -11376,6 +11495,15 @@ impl App {
                         None,
                         may(|n| n.amends),
                         Action::SaveAsMarkdown(id.clone()),
+                    ),
+                    // Greyed while one is written, and while the AI port is
+                    // open or its Task waits, whose drafts are no Notes yet
+                    // (#267).
+                    (
+                        t.menu_export_vault(),
+                        None,
+                        self.may_export_vault(),
+                        Action::ExportVault,
                     ),
                 ];
                 menu_entries(ui, items, actions);
@@ -13728,6 +13856,7 @@ impl App {
         let pictures = &mut self.pictures;
         let person_square = &mut self.person_square;
         let importing = self.import.kind();
+        let vault = self.vault.running().then(|| self.vault.progress());
         let frame = Frame::NONE
             .fill(tones.card)
             .corner_radius(theme::CARD_RADIUS)
@@ -14211,6 +14340,22 @@ impl App {
                             }
                             let said = if running { reading } else { detail };
                             ui.label(RichText::new(said).small().color(weak));
+                        }
+                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
+                    Dialog::Vault => {
+                        title(ui, t.vault_export_title());
+                        let text = ui.visuals().text_color();
+                        let weak = ui.visuals().weak_text_color();
+                        ui.label(RichText::new(t.vault_export_detail()).color(text));
+                        if let Some((done, total)) = vault {
+                            ui.horizontal(|ui| {
+                                ui.add(egui::Spinner::new());
+                                let said = t.vault_writing(done as i64, total as i64);
+                                ui.label(RichText::new(said).small().color(weak));
+                            });
                         }
                         if ui.button(RichText::new(t.close()).color(text)).clicked() {
                             actions.push(Action::CloseDialog);

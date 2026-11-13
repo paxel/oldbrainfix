@@ -1,5 +1,6 @@
 //! The first start driven headless (#106): its view asks whether the user
-//! is new, adds a Device of their own or restores a Backup, and makes no
+//! is new, adds a Device of their own, restores a Backup or rebuilds a
+//! vault (#267, driven in `vault.rs`), and makes no
 //! Profile before the answer. "New to Old Brain Fix" offers the Starter
 //! Set and plants what is left ticked. "Add a Device of mine" pairs either way
 //! round over the loopback and syncs, taking the other Device's Profile
@@ -139,6 +140,7 @@ fn untouched(harness: &Harness<'_, App>) -> TestResult {
     assert!(shows(harness, "New to Old Brain Fix"));
     assert!(shows(harness, "Add a Device of mine"));
     assert!(shows(harness, "Restore from a Backup"));
+    assert!(shows(harness, "Rebuild from a vault"));
     assert!(restore_due(app.store())?);
     assert!(own_name(app.store())?.is_none());
     Ok(())
