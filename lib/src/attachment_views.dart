@@ -15,6 +15,7 @@ import 'file_platform.dart';
 import 'l10n.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart' show packSizeText;
+import 'pdf_viewer.dart';
 
 /// Keeps the bytes of the file at [path] on this Device among the attached
 /// [files] of the store ([Blobs.putFrom]), copied and hashed off the UI
@@ -60,7 +61,8 @@ String aloneFileTitle(BuildContext context, Attachment file) =>
     file.name.isEmpty ? context.t.attachment : file.name;
 
 /// An Attachment of a Note (#267, ADR 0047): the icon of its kind, its
-/// name and size; a tap opens it with the system's app ([openAttachment]).
+/// name and size; a tap opens it ([openAttachment]), a PDF full screen
+/// with its Attachment Text [text] one tap away (#286).
 /// [large] draws the name as a card's title, for a Note made from the
 /// file alone. [noteId] names the Note that holds it, so the question
 /// before an app opens says who added it; null for a file held for a
@@ -69,12 +71,14 @@ class AttachmentRow extends StatelessWidget {
   final Attachment file;
   final bool large;
   final String? noteId;
+  final String? text;
 
   const AttachmentRow({
     super.key,
     required this.file,
     this.large = false,
     this.noteId,
+    this.text,
   });
 
   @override
@@ -92,7 +96,13 @@ class AttachmentRow extends StatelessWidget {
         onTap: notes == null
             ? null
             : () => unawaited(
-                openAttachment(context, notes, file, noteId: noteId),
+                openAttachment(
+                  context,
+                  notes,
+                  file,
+                  noteId: noteId,
+                  text: text,
+                ),
               ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -233,17 +243,19 @@ bool mayInstall(Attachment file) {
       file.mediaType.trim().toLowerCase() == apkMediaType;
 }
 
-/// Opens [file] of [notes] with the system's app for its type: written
-/// where the app hands files to other apps first. On Android an app
-/// ([mayInstall]) asks first, once, naming the file and, for the Note
-/// [noteId] another person's Device added it to, that person. A file
-/// whose bytes are not on this Device yet, or one no app opens, is
-/// announced at the top.
+/// Opens [file] of [notes]: written where the app hands files to other
+/// apps first, a PDF the system's renderer can draw full screen in the
+/// app with its Attachment Text [text] (#286), any other file with the
+/// system's app for its type. On Android an app ([mayInstall]) asks
+/// first, once, naming the file and, for the Note [noteId] another
+/// person's Device added it to, that person. A file whose bytes are not
+/// on this Device yet, or one no app opens, is announced at the top.
 Future<void> openAttachment(
   BuildContext context,
   Notes notes,
   Attachment file, {
   String? noteId,
+  String? text,
 }) async {
   final t = context.t;
   if (defaultTargetPlatform == TargetPlatform.android && mayInstall(file)) {
@@ -277,6 +289,7 @@ Future<void> openAttachment(
   }
   final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
+  final pages = Navigator.of(context);
   final bundles = BundleScope.of(context);
   final files = FileScope.of(context);
   void failed(String cause, String fix, String details) => announceFailureWith(
@@ -308,6 +321,20 @@ Future<void> openAttachment(
     await writeOpenedFile(path, bytes);
   } on FileSystemException catch (e) {
     return failed(t.fileNoAppCause, t.fileNoAppFix, 'file ${file.hash}: $e');
+  }
+  // A PDF the system cannot draw, as one locked with a password, opens
+  // with its app as any other file.
+  if (file.kind == FileKind.pdf) {
+    final sizes = await files.pdfLayout(path);
+    if (sizes != null && sizes.isNotEmpty) {
+      await pages.push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              PdfViewerScreen(file: file, path: path, pages: sizes, text: text),
+        ),
+      );
+      return;
+    }
   }
   if (!await files.open(path, file.mediaType)) {
     failed(

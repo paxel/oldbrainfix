@@ -6388,4 +6388,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get handAddressBadPort => 'The port must be a number from 1 to 65535.';
+
+  @override
+  String pdfPageOf(int page, int pages) {
+    return 'Page $page of $pages';
+  }
+
+  @override
+  String get openInOtherApp => 'Open in another app';
 }

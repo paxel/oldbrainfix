@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
 import 'package:oldbrainfix/src/file_platform.dart';
+
+import 'fake_photos.dart' show onePixelPng;
 
 /// A [FilePlatform] the test drives: what the file picker hands back, as
 /// copies in [dir], what opens with another app, and the PDFs the
-/// native reader reads, by their bytes' length.
+/// native reader reads and the system's renderer draws (#286), by their
+/// bytes' length.
 class FakeFiles implements FilePlatform {
   /// Where the picked files are put, as Android copies them aside.
   final Directory dir;
@@ -28,6 +33,22 @@ class FakeFiles implements FilePlatform {
 
   /// What the reader was asked for, in order.
   final read = <String>[];
+
+  /// Each PDF the renderer draws, by its bytes' length: its pages' sizes
+  /// in points. Any other it cannot draw.
+  final layouts = <int, List<Size>>{};
+
+  /// The pages the renderer drew, with the widths asked for, in order.
+  final drawn = <({int index, int width})>[];
+
+  /// The pages the renderer fails to draw.
+  final undrawable = <int>{};
+
+  /// The widest the renderer draws a page; wider fails, as out of memory.
+  int? widest;
+
+  /// The pages whose drawings wait until the test completes them.
+  final held = <int, Completer<Uint8List?>>{};
 
   FakeFiles(this.dir);
 
@@ -67,5 +88,20 @@ class FakeFiles implements FilePlatform {
     read.add('page $index');
     final pages = pdfs[File(path).lengthSync()];
     return pages == null || index >= pages.length ? null : pages[index];
+  }
+
+  @override
+  Future<List<Size>?> pdfLayout(String path) async =>
+      layouts[File(path).lengthSync()];
+
+  @override
+  Future<Uint8List?> pdfRender(String path, int index, int width) async {
+    drawn.add((index: index, width: width));
+    if (held[index] case final waiting?) return waiting.future;
+    final tooWide = switch (widest) {
+      final widest? => width > widest,
+      null => false,
+    };
+    return undrawable.contains(index) || tooWide ? null : onePixelPng;
   }
 }

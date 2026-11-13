@@ -2206,6 +2206,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           key: ValueKey('file:${file.hash}'),
           file: file,
           noteId: id,
+          text: texts[file.hash],
         ),
         AttachmentText(file: file, text: texts[file.hash]),
         ...takeOver(file.hash, texts[file.hash]),

@@ -1094,9 +1094,19 @@ replace a law of Both apps where they say so. A desktop law marked
 - **An Attachment shows on its card** (#267, ADR 0047): each file a row
   with the icon of its kind (a PDF, a text document, a table, plain text
   or Markdown, any other file), its name, its size and its pages when
-  they were counted. A tap opens it with the system's app for its type,
-  asking nothing, as the file is the Note's own (unlike a file link,
-  #261), except an Android app (`.apk`, `.apks`, `.apkm`, `.xapk` or
+  they were counted. A tap opens it, on the card and in the Note
+  editor, asking nothing, as the file is the Note's own (unlike a file
+  link, #261): **a PDF full screen like a photo** (#286), drawn by the
+  system's own renderer (Android's `PdfRenderer`, the iPhone's PDFKit),
+  its pages swiped sideways and zoomed with two fingers, a zoomed page
+  panning instead of turning, "Page 2 of 12" at the top when it has
+  more than one, its Attachment Text one tap away on the bar's
+  Attachment Text button and back, and its ⋮ opening it in another app;
+  back closes it. Only the page shown and the one on either side are
+  drawn, as large as they show, the page shown anew when zoomed. A PDF
+  the system cannot draw (one locked with a password), an Office file
+  and any other file open with the system's app for its type, except
+  an Android app (`.apk`, `.apks`, `.apkm`, `.xapk` or
   the media type of one), which asks once first: "… could install an
   app. Open it anyway?", with the person who added it when another
   person did; a file whose bytes have not synced yet, or one no app

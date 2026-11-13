@@ -27,8 +27,9 @@ class PdfPage {
 }
 
 /// The platform seam for Attachments: the system's file picker, opening
-/// a file with the system's app, and the PDF reader of the app's native
-/// library (android/…/Files.kt, android/ocr; the iPhone's FilesChannel).
+/// a file with the system's app, the PDF reader of the app's native
+/// library (android/…/Files.kt, android/ocr; the iPhone's FilesChannel),
+/// and the system's own PDF renderer for the viewer (#286).
 /// Widget tests hand in a fake.
 abstract interface class FilePlatform {
   /// Whether this Device has a file picker; the File button only shows
@@ -51,6 +52,38 @@ abstract interface class FilePlatform {
   /// The page [index] of the PDF at [path], counted from 0; null where it
   /// cannot be read.
   Future<PdfPage?> pdfPage(String path, int index);
+
+  /// The size of each page of the PDF at [path] in points, as this
+  /// Device's own renderer reads it (#286): Android's `PdfRenderer`, the
+  /// iPhone's PDFKit; null where it cannot show the PDF, as one locked
+  /// with a password.
+  Future<List<Size>?> pdfLayout(String path);
+
+  /// The page [index] of the PDF at [path] drawn on white [width] pixels
+  /// wide, at most [maxRenderSide] pixels a side and [maxRenderPixels] in
+  /// all, as a PNG; null where it cannot be drawn.
+  Future<Uint8List?> pdfRender(String path, int index, int width);
+}
+
+/// The longest side a PDF page is drawn at, in pixels (#286).
+const maxRenderSide = 4096;
+
+/// The most pixels a PDF page is drawn with (#286): 32 MB as a bitmap.
+const maxRenderPixels = 8 * 1024 * 1024;
+
+/// The sizes of a channel's answer to `pdfLayout`: each page's width and
+/// height in points, one after the other; null for anything else.
+List<Size>? pdfSizes(List<Object?>? raw) {
+  if (raw == null || raw.length.isOdd) return null;
+  final sizes = <Size>[];
+  for (var i = 0; i < raw.length; i += 2) {
+    final (width, height) = (raw[i], raw[i + 1]);
+    if (width is! num || height is! num || width <= 0 || height <= 0) {
+      return null;
+    }
+    sizes.add(Size(width.toDouble(), height.toDouble()));
+  }
+  return sizes;
 }
 
 /// No picker and no reader: the default where none is handed in.
@@ -71,6 +104,12 @@ class NoFiles implements FilePlatform {
 
   @override
   Future<PdfPage?> pdfPage(String path, int index) async => null;
+
+  @override
+  Future<List<Size>?> pdfLayout(String path) async => null;
+
+  @override
+  Future<Uint8List?> pdfRender(String path, int index, int width) async => null;
 }
 
 /// The app's own channel to Android's file picker and views and to the
@@ -110,6 +149,18 @@ class AndroidFiles implements FilePlatform {
       scan: page['scan'] as Uint8List?,
     );
   }
+
+  @override
+  Future<List<Size>?> pdfLayout(String path) async =>
+      pdfSizes(await _ask<List<Object?>>('pdfLayout', path));
+
+  @override
+  Future<Uint8List?> pdfRender(String path, int index, int width) =>
+      _ask<Uint8List>('pdfRender', {
+        'path': path,
+        'index': index,
+        'width': width,
+      });
 
   static Future<T?> _ask<T>(String method, [Object? arguments]) async {
     try {

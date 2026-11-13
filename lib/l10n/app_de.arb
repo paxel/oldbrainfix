@@ -1723,5 +1723,7 @@
   "handAddressLabel": "Adresse von Hand",
   "handAddressHelp": "Für ein VPN wie Tailscale: sein Name oder seine Adresse dort, etwa desk.tail1234.ts.net, bei Bedarf mit :Port. Versucht, wenn dieses Netz es nicht findet.",
   "handAddressInvalid": "Keine Adresse. Gib einen Namen oder eine IP-Adresse ein, bei Bedarf mit :Port.",
-  "handAddressBadPort": "Der Port muss eine Zahl von 1 bis 65535 sein."
+  "handAddressBadPort": "Der Port muss eine Zahl von 1 bis 65535 sein.",
+  "pdfPageOf": "Seite {page} von {pages}",
+  "openInOtherApp": "In anderer App öffnen"
 }

@@ -1,5 +1,6 @@
 import Flutter
 import Foundation
+import PDFKit
 import UIKit
 import UniformTypeIdentifiers
 
@@ -8,7 +9,8 @@ import UniformTypeIdentifiers
 /// kind (`pick`), a Note's file opened with another app (`open`), and the
 /// PDF reader of the app's native library, the desktop's
 /// `oldbrainfix-pdf` in android/ocr's `pdf` module (`pdfPages`,
-/// `pdfPage`), one page at a time.
+/// `pdfPage`), one page at a time; and PDFKit drawing a PDF's pages for
+/// the app's viewer (`pdfLayout`, `pdfRender`, #286).
 enum FilesChannel {
   static let name = "io.github.paxel.oldbrainfix/files"
 
@@ -45,6 +47,20 @@ enum FilesChannel {
           let page = readPage(path: path, index: index)
           DispatchQueue.main.async { result(page) }
         }
+      case "pdfLayout":
+        let path = call.arguments as? String ?? ""
+        work.async {
+          let sizes = layout(path: path)
+          DispatchQueue.main.async { result(sizes) }
+        }
+      case "pdfRender":
+        let path = args["path"] as? String ?? ""
+        let index = (args["index"] as? NSNumber)?.intValue ?? -1
+        let width = (args["width"] as? NSNumber)?.intValue ?? 0
+        work.async {
+          let png = render(path: path, index: index, width: width)
+          DispatchQueue.main.async { result(png) }
+        }
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -66,6 +82,61 @@ enum FilesChannel {
       answer["scan"] = FlutterStandardTypedData(bytes: PhotoShape.normalize(scan) ?? scan)
     }
     return answer
+  }
+
+  /// The longest side and the most pixels a page is drawn with, as
+  /// Files.kt draws them.
+  private static let maxRenderSide = 4096.0
+  private static let maxRenderPixels = 8.0 * 1024 * 1024
+
+  /// The size of [page] in points as it shows, turned as it is turned.
+  private static func shownSize(_ page: PDFPage) -> CGSize {
+    let box = page.bounds(for: .mediaBox).size
+    return page.rotation % 180 == 0 ? box : CGSize(width: box.height, height: box.width)
+  }
+
+  /// The size of each page of the PDF at [path] in points, width then
+  /// height, as PDFKit reads it; nil where it cannot open it, as one
+  /// locked with a password.
+  private static func layout(path: String) -> [Double]? {
+    guard let pdf = PDFDocument(url: URL(fileURLWithPath: path)), !pdf.isLocked else { return nil }
+    var sizes: [Double] = []
+    for index in 0..<pdf.pageCount {
+      guard let page = pdf.page(at: index) else { return nil }
+      let size = shownSize(page)
+      sizes.append(Double(size.width))
+      sizes.append(Double(size.height))
+    }
+    return sizes
+  }
+
+  /// The page [index] of the PDF at [path] drawn on white [width] pixels
+  /// wide, in its proportions, at most [maxRenderSide] a side and
+  /// [maxRenderPixels] in all, as a PNG; nil where it cannot be drawn.
+  private static func render(path: String, index: Int, width: Int) -> FlutterStandardTypedData? {
+    guard let pdf = PDFDocument(url: URL(fileURLWithPath: path)), !pdf.isLocked,
+      index >= 0, index < pdf.pageCount, let page = pdf.page(at: index)
+    else { return nil }
+    let size = shownSize(page)
+    guard size.width > 0, size.height > 0 else { return nil }
+    let wide = min(max(Double(width), 1), maxRenderSide)
+    let high = wide * Double(size.height) / Double(size.width)
+    let shrink = min(1, maxRenderSide / max(wide, high), (maxRenderPixels / (wide * high)).squareRoot())
+    let pixels = CGSize(width: max(1, floor(wide * shrink)), height: max(1, (high * shrink).rounded()))
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    let image = UIGraphicsImageRenderer(size: pixels, format: format).image { context in
+      UIColor.white.setFill()
+      context.fill(CGRect(origin: .zero, size: pixels))
+      let cg = context.cgContext
+      // PDF space runs upwards.
+      cg.translateBy(x: 0, y: pixels.height)
+      cg.scaleBy(x: pixels.width / size.width, y: -pixels.height / size.height)
+      page.draw(with: .mediaBox, to: cg)
+    }
+    guard let png = image.pngData() else { return nil }
+    return FlutterStandardTypedData(bytes: png)
   }
 
   /// A page as the native reader encodes it: the length of its text in

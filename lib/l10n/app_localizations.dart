@@ -10398,6 +10398,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The port must be a number from 1 to 65535.'**
   String get handAddressBadPort;
+
+  /// At the top of an attached PDF shown full screen (#286): the page shown and how many there are.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pages}'**
+  String pdfPageOf(int page, int pages);
+
+  /// The entry in the ⋮ of an attached PDF shown full screen (#286) that opens it with the system's app for PDFs.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in another app'**
+  String get openInOtherApp;
 }
 
 class _AppLocalizationsDelegate

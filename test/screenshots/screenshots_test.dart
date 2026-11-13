@@ -364,6 +364,12 @@ class _GuideFiles implements FilePlatform {
 
   @override
   Future<PdfPage?> pdfPage(String path, int index) async => null;
+
+  @override
+  Future<List<Size>?> pdfLayout(String path) async => null;
+
+  @override
+  Future<Uint8List?> pdfRender(String path, int index, int width) async => null;
 }
 
 class _Seeded {

@@ -1698,6 +1698,7 @@ class _CompactNoteState extends State<_CompactNote> {
               file: file,
               large: note.aloneFile != null,
               noteId: note.id,
+              text: note.attachmentTexts[file.hash],
             ),
             AttachmentText(
               file: file,
@@ -2012,7 +2013,12 @@ class _Whole extends StatelessWidget {
           key: ValueKey('file:${file.hash}'),
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AttachmentRow(file: file, large: aloneFile, noteId: id),
+            AttachmentRow(
+              file: file,
+              large: aloneFile,
+              noteId: id,
+              text: fileTexts[file.hash],
+            ),
             AttachmentText(
               file: file,
               text: fileTexts[file.hash],

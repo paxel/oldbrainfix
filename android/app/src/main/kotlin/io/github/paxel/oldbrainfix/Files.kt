@@ -4,11 +4,19 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
+import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * The PDF reader of Attachment Texts (#267, ADR 0047): the desktop's
@@ -128,4 +136,72 @@ object Files {
         val scan = page["scan"] as? ByteArray ?: return page
         return page + ("scan" to (Photos.normalize { scan.inputStream() } ?: scan))
     }
+
+    /** The longest side a page is drawn at, as the app's viewer asks (#286). */
+    const val MAX_RENDER_SIDE = 4096
+
+    /** The most pixels a page is drawn with: 32 MB as a bitmap. */
+    const val MAX_RENDER_PIXELS = 8 * 1024 * 1024
+
+    /** One page drawn at a time: each bitmap is large. */
+    private val rendering = Any()
+
+    /**
+     * The size in pixels a page of [pageWidth] by [pageHeight] points is
+     * drawn at when [width] pixels are asked for: that wide, at most
+     * [MAX_RENDER_SIDE] a side and [MAX_RENDER_PIXELS] in all, in the
+     * page's proportions; null for a page without a size.
+     */
+    fun renderSize(pageWidth: Int, pageHeight: Int, width: Int): Pair<Int, Int>? {
+        if (pageWidth <= 0 || pageHeight <= 0) return null
+        val wide = width.coerceIn(1, MAX_RENDER_SIDE).toDouble()
+        val high = wide * pageHeight / pageWidth
+        val shrink = minOf(1.0, MAX_RENDER_SIDE / max(wide, high), sqrt(MAX_RENDER_PIXELS / (wide * high)))
+        return max(1, (wide * shrink).toInt()) to max(1, (high * shrink).roundToInt())
+    }
+
+    /**
+     * The size of each page of the PDF at [path] in points, width then
+     * height, as Android's own PdfRenderer reads it for the app's viewer
+     * (#286); null where it cannot open it, as one with a password.
+     */
+    fun pdfLayout(path: String): List<Int>? = runCatching {
+        synchronized(rendering) {
+            ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                PdfRenderer(fd).use { pdf ->
+                    (0 until pdf.pageCount).flatMap { index ->
+                        pdf.openPage(index).use { listOf(it.width, it.height) }
+                    }
+                }
+            }
+        }
+    }.getOrNull()
+
+    /**
+     * The page [index] of the PDF at [path] drawn on white [width] pixels
+     * wide ([renderSize]) as a PNG, or null.
+     */
+    fun pdfRender(path: String, index: Int, width: Int): ByteArray? = runCatching {
+        synchronized(rendering) {
+            ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                PdfRenderer(fd).use { pdf ->
+                    if (index !in 0 until pdf.pageCount) return@runCatching null
+                    pdf.openPage(index).use { page ->
+                        val (wide, high) = renderSize(page.width, page.height, width)
+                            ?: return@runCatching null
+                        val bitmap = Bitmap.createBitmap(wide, high, Bitmap.Config.ARGB_8888)
+                        try {
+                            bitmap.eraseColor(Color.WHITE)
+                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            ByteArrayOutputStream().also {
+                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                            }.toByteArray()
+                        } finally {
+                            bitmap.recycle()
+                        }
+                    }
+                }
+            }
+        }
+    }.getOrNull()
 }

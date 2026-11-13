@@ -419,6 +419,14 @@ class MainActivity : FlutterActivity() {
                     "pdfPage" -> inBackground(result) {
                         Files.pdfPage(args["path"] as? String ?: "", (args["index"] as? Number)?.toInt() ?: -1)
                     }
+                    "pdfLayout" -> inBackground(result) { Files.pdfLayout(call.arguments as? String ?: "") }
+                    "pdfRender" -> inBackground(result) {
+                        Files.pdfRender(
+                            args["path"] as? String ?: "",
+                            (args["index"] as? Number)?.toInt() ?: -1,
+                            (args["width"] as? Number)?.toInt() ?: 0,
+                        )
+                    }
                     else -> result.notImplemented()
                 }
             }

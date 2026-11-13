@@ -3408,5 +3408,9 @@
   "handAddressInvalid": "Not an address. Type a name or an IP address, with :port if needed.",
   "@handAddressInvalid": {"description": "Error under the field for text that is no address."},
   "handAddressBadPort": "The port must be a number from 1 to 65535.",
-  "@handAddressBadPort": {"description": "Error under the field for a port that is none."}
+  "@handAddressBadPort": {"description": "Error under the field for a port that is none."},
+  "pdfPageOf": "Page {page} of {pages}",
+  "@pdfPageOf": {"description": "At the top of an attached PDF shown full screen (#286): the page shown and how many there are.", "placeholders": {"page": {"type": "int"}, "pages": {"type": "int"}}},
+  "openInOtherApp": "Open in another app",
+  "@openInOtherApp": {"description": "The entry in the ⋮ of an attached PDF shown full screen (#286) that opens it with the system's app for PDFs."}
 }
