@@ -451,6 +451,7 @@ impl CapturePopup {
         let held = Held {
             photos: &self.photos,
             recordings: &self.recorded,
+            files: &[],
             transcribes: self.transcribes(),
         };
         let transcriber = self.transcriber.as_ref().map(|(enricher, _)| enricher);

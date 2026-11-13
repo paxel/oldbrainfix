@@ -171,13 +171,18 @@ impl SessionDraft {
     }
 
     /// Whether the Tally `id` shows under `filter`: with no tag in it
-    /// always, else when it carries any of them.
+    /// always, else when it carries any of them or a tag nested under one
+    /// (#267: `#sport` shows `#sport/run`, not `#sportive`).
     fn shows(&self, id: &str, filter: &[String]) -> bool {
-        filter.is_empty()
-            || self
-                .tags
-                .get(id)
-                .is_some_and(|tags| filter.iter().any(|tag| tags.contains(tag)))
+        let under = |tag: &String| {
+            filter.iter().any(|f| {
+                tag == f
+                    || tag
+                        .strip_prefix(f.as_str())
+                        .is_some_and(|rest| rest.starts_with('/'))
+            })
+        };
+        filter.is_empty() || self.tags.get(id).is_some_and(|tags| tags.iter().any(under))
     }
 
     /// How many Tallies ticked the filter hides.
@@ -554,6 +559,29 @@ mod tests {
         draft.set_own(0, true);
         draft.set_own(7, true);
         assert_eq!(draft.counts, [Some(1), None, None, None, None, None, None]);
+        Ok(())
+    }
+
+    /// #267: a tag nested under one picked shows with it, a longer word
+    /// beginning with it does not.
+    #[test]
+    fn a_picked_tag_shows_the_tags_nested_under_it() -> TestResult {
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || {
+            Ok(SigningKey::from_seed([3; 32]))
+        })?;
+        let mut draft = SessionDraft::of(&store, &L10n::new("en"), "note:a", None)?;
+        for (id, text) in [
+            ("run", "Run #sport/run"),
+            ("swim", "Swim #sport"),
+            ("chess", "Chess #sportive"),
+        ] {
+            draft.tags.insert(id.into(), tags_of(Some(text)));
+        }
+        let filter = ["#sport".to_string()];
+        assert!(draft.shows("run", &filter));
+        assert!(draft.shows("swim", &filter));
+        assert!(!draft.shows("chess", &filter));
+        assert!(!draft.shows("swim", &["#sport/run".to_string()]));
         Ok(())
     }
 }

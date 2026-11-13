@@ -115,7 +115,7 @@
   "@photosHint": {"description": "Under the desktop's Paste button in the capture."},
   "fromFile": "From file…",
   "@fromFile": {"description": "In the desktop's quick note: opens the system's dialog to choose pictures or sound files, made into a Note."},
-  "fromFileTitle": "Choose pictures or sound files",
+  "fromFileTitle": "Choose files",
   "@fromFileTitle": {"description": "Title of the system's dialog that From file… opens."},
   "fromFileHint": "Pictures and sound files chosen here or dropped onto the window wait under the field and are saved with what is typed as one Note.",
   "@fromFileHint": {"description": "Under the desktop's From file… button."},
@@ -642,5 +642,17 @@
   "noteWindowKeepOnTop": "Keep on top",
   "@noteWindowKeepOnTop": {"description": "Checkbox at the top of a Note's own window on the desktop (#287): the window stays above all other windows while it is open; off as it opens."},
   "noteWindowKeepOnTopWayland": "Wayland lets no app keep its window on top. Your desktop's own window menu may offer it, as KDE's \"Keep above others\" does.",
-  "@noteWindowKeepOnTopWayland": {"description": "Under the greyed Keep on top of a Note's own window on Wayland (#287): why it cannot be ticked, and where the desktop may offer the same."}
+  "@noteWindowKeepOnTopWayland": {"description": "Under the greyed Keep on top of a Note's own window on Wayland (#287): why it cannot be ticked, and where the desktop may offer the same."},
+  "attachFileMenu": "Attach a file…",
+  "@attachFileMenu": {"description": "In the desktop's File menu and the Note dialog (#267): picks files of any kind; with the Note dialog open they go onto its Note (a picture as its photo, a sound file as its voice recording, any other file as an Attachment), else they wait in the quick note for a new Note, as a drop does."},
+  "attachFileTitle": "Choose files to attach",
+  "@attachFileTitle": {"description": "Title of the system's dialog that Attach a file… opens (#267)."},
+  "fileNoProgramCause": "No program for files of this kind could be started on this computer.",
+  "@fileNoProgramCause": {"description": "Why an Attachment clicked in the desktop app was not opened (#267): the system's opener found no program for it."},
+  "fileNoProgramFix": "Install a program for files of this kind; the Attachment stays on the Note.",
+  "@fileNoProgramFix": {"description": "What to do when no program opened an Attachment on the desktop (#267)."},
+  "hiddenFromAiAreaFirstDesktop": "{names}: hidden from AI. A Note in an Area hidden from AI is not given to other people. Take the mark off in the Area's menu first.",
+  "@hiddenFromAiAreaFirstDesktop": {"description": "The desktop's question when a Note to be given to other people is hidden from AI by its Area's mark (#267): only Close; the mark comes off in the Area menu or the Area's right-click in the sidebar, so one click never shows the Area's other Notes to the AI.", "placeholders": {"names": {"type": "String"}}},
+  "tagSuggestionsLabel": "Tags starting with what is typed",
+  "@tagSuggestionsLabel": {"description": "What a screen reader hears for the row of tag buttons under a desktop search field while a # is typed into it (#267)."}
 }

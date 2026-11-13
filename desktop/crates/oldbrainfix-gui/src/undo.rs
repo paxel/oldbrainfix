@@ -12,6 +12,8 @@ use oldbrainfix_core::{
     Checklists, Frogs, Notes, Occurrence, Places, Routines, ShoppingLists, Store, Tallies,
 };
 
+use crate::media_view::Made;
+
 /// The one thing the next undo takes back.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Undo {
@@ -35,12 +37,12 @@ pub enum Undo {
     },
     /// The "From …" badge of the Note removed.
     PackFrom(String),
-    /// The Photo Text (`photo`) or Transcript of `hash` of the Note
-    /// `note` removed, with the text it had.
+    /// The Photo Text, Transcript or Attachment Text (#267) of `hash` of
+    /// the Note `note` removed, with the text it had.
     Text {
         note: String,
         hash: String,
-        photo: bool,
+        made: Made,
         text: String,
     },
     /// The Note with this id merged into another.
@@ -109,25 +111,28 @@ impl Undo {
             Undo::Text {
                 note,
                 hash,
-                photo,
+                made,
                 text,
             } => {
                 let notes = Notes::new(store);
                 // Made again meanwhile, or the file gone: nothing to
                 // bring back.
                 let removed = notes.by_id(&note)?.is_some_and(|n| {
-                    let (files, removed) = if photo {
-                        (&n.photos, &n.removed_photo_texts)
-                    } else {
-                        (&n.recordings, &n.removed_transcripts)
+                    let (held, removed) = match made {
+                        Made::Photo => (n.photos.contains(&hash), &n.removed_photo_texts),
+                        Made::Recording => (n.recordings.contains(&hash), &n.removed_transcripts),
+                        Made::File => (
+                            n.attachments.iter().any(|a| a.hash == hash),
+                            &n.removed_attachment_texts,
+                        ),
                     };
-                    files.contains(&hash) && removed.contains(&hash)
+                    held && removed.contains(&hash)
                 });
                 if removed && store.may_change(&note)? {
-                    if photo {
-                        notes.set_photo_text(&note, &hash, &text)?;
-                    } else {
-                        notes.set_transcript(&note, &hash, &text)?;
+                    match made {
+                        Made::Photo => notes.set_photo_text(&note, &hash, &text)?,
+                        Made::Recording => notes.set_transcript(&note, &hash, &text)?,
+                        Made::File => notes.set_attachment_text(&note, &hash, &text)?,
                     }
                 }
             }

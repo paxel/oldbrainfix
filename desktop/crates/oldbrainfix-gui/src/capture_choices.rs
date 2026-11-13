@@ -32,12 +32,13 @@ use std::sync::Arc;
 use chrono::Duration;
 use egui::{Frame, Key, Margin, Modifiers, RichText, Stroke, Ui};
 use oldbrainfix_core::{
-    Area, DeviceSettings, Error, Frogs, Importance, Note, Notes, PersonSettings, QuickNoteControl,
-    Routines, Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, Topic,
-    WallClock, markdown, text_format,
+    Area, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes, PersonSettings,
+    QuickNoteControl, Routines, Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies,
+    TallyRule, Topic, WallClock, markdown, text_format,
 };
 
 use crate::app::{Wall, icon_button};
+use crate::attachment_view::HeldFile;
 use crate::enrich::{Enricher, Said};
 use crate::icons;
 use crate::l10n::L10n;
@@ -338,27 +339,34 @@ pub fn capture(
     text: &str,
     place: Option<&str>,
     nudge_in: Duration,
-    (photos, recordings): (&[Vec<u8>], &[Vec<u8>]),
+    (photos, recordings, files): (&[Vec<u8>], &[Vec<u8>], &[HeldFile]),
     (choices, wall): (&CaptureChoices, &WallClock),
 ) -> oldbrainfix_core::Result<Captured> {
     let text = text.trim();
-    if text.is_empty() && photos.is_empty() && recordings.is_empty() {
+    if text.is_empty() && photos.is_empty() && recordings.is_empty() && files.is_empty() {
         return Ok(Captured::Nothing);
     }
+    let attached: Vec<NewFile> = files.iter().map(HeldFile::new_file).collect();
     let note = |choices: &CaptureChoices| {
         let mut choices = choices.clone();
         choices.shopping = None;
         // A sorted Note needs no Nudge (#113).
         let nudge = (!choices.sorted(place)).then_some(nudge_in);
         store.batch(|| {
-            let note = Notes::new(store).capture_with(text, place, nudge, photos, recordings)?;
+            let note = Notes::new(store)
+                .capture_with_files(text, place, nudge, photos, recordings, &attached)?;
             formatted(store, &note)?;
             choices.write(store, &note.id)?;
             Ok(note)
         })
     };
-    // No Line holds a photo: the capture stays a Note, to keep it.
-    let Some(list) = choices.shopping.as_deref().filter(|_| photos.is_empty()) else {
+    // No Line holds a photo or a file: the capture stays a Note, to keep
+    // it.
+    let Some(list) = choices
+        .shopping
+        .as_deref()
+        .filter(|_| photos.is_empty() && files.is_empty())
+    else {
         return note(choices).map(Captured::Note);
     };
     // The list used last goes to the top of the pick (#276).
@@ -395,12 +403,14 @@ fn untranscribed_details(list: &str) -> String {
     format!("shopping list {list}: no speech model to transcribe with")
 }
 
-/// What is held with the text being captured: the photos and the
-/// recordings, and whether a recording gets its Transcript here.
+/// What is held with the text being captured: the photos, the
+/// recordings and the files, and whether a recording gets its Transcript here.
 #[derive(Debug, Clone, Copy)]
 pub struct Held<'a> {
     pub photos: &'a [Vec<u8>],
     pub recordings: &'a [Vec<u8>],
+    /// The files to attach (#267).
+    pub files: &'a [HeldFile],
     pub transcribes: bool,
 }
 
@@ -424,6 +434,7 @@ pub fn save(
     // once it is saved; a photo keeps it a Note anyway.
     let untranscribed = picked.is_some()
         && held.photos.is_empty()
+        && held.files.is_empty()
         && !held.recordings.is_empty()
         && !held.transcribes;
     let mut writing = choices.clone();
@@ -435,7 +446,7 @@ pub fn save(
         text,
         place,
         nudge_in,
-        (held.photos, held.recordings),
+        (held.photos, held.recordings, held.files),
         (&writing, &**wall),
     )?;
     let list = picked.unwrap_or("");

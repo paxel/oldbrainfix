@@ -42,7 +42,7 @@ use oldbrainfix_core::backup;
 use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{
     AreaRole, BoxState, Boxes, Checklists, ClockTime, Day, DeviceSettings, Frogs, ImportReport,
-    Importance, Notes, OwnProfile, PairedDevice, PersonSettings, Places, QuickNoteControl,
+    Importance, NewFile, Notes, OwnProfile, PairedDevice, PersonSettings, Places, QuickNoteControl,
     Routines, Schedule, ShoppingLists, SigningKey, Store, Tallies, parse_time, text_format,
 };
 use oldbrainfix_gui::feedback_view::FeedbackFacts;
@@ -1490,27 +1490,61 @@ fn texts_frames(
             harness.run();
             Ok(())
         }),
-        // The desktop has no tag tree yet (#267): its search for a tag,
-        // which finds the tags below it too.
-        ("tag-tree", |harness, _, texts| {
-            show_household(harness, texts)?;
-            let tag = harness.state().t().search_for_tag(texts.tag);
-            harness
-                .query_all_by_label(&tag)
-                .next()
-                .ok_or("the boiler's #tag")?
-                .click_accesskit();
+        // The tag tree (#267): the seeded tags and a nested one, unfolded
+        // to its last level.
+        ("tag-tree", |harness, _, _| {
+            let de = harness.state().t().locale() == "de";
+            let (life, health, back, garden) = if de {
+                ("leben", "gesundheit", "rücken", "garten")
+            } else {
+                ("life", "health", "back", "garden")
+            };
+            let notes = Notes::new(harness.state().store());
+            notes.capture(&format!("#{life}/{health}/{back}"), None, None)?;
+            notes.capture(&format!("#{life}/{health}"), None, None)?;
+            notes.capture(&format!("#{garden}"), None, None)?;
+            harness.state_mut().select(Selection::Tags);
             harness.run();
+            // #life's arrow, then health's: each the one still folded.
+            for _ in 0..2 {
+                let unfold = harness.state().t().tag_unfold().to_string();
+                harness.get_by_label(&unfold).click_accesskit();
+                harness.run();
+            }
             Ok(())
         }),
-        // Nor Attachments yet (#267): its search, which finds their
-        // names and texts.
+        // A Note of one PDF alone in the Household, as its card (#267): its
+        // name, size and pages, and its Attachment Text under it.
         ("attachment", |harness, _, texts| {
-            harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::F);
-            harness.run();
-            harness.get_by(|n| n.is_focused()).type_text(texts.search);
-            harness.run();
-            Ok(())
+            let de = harness.state().t().locale() == "de";
+            let store = harness.state().store();
+            let household = Places::new(store)
+                .areas()?
+                .into_iter()
+                .find(|a| a.name == texts.household)
+                .ok_or("the Household Area")?;
+            let notes = Notes::new(store);
+            let bytes = vec![0; 184_320];
+            let file = NewFile {
+                name: if de {
+                    "Mietvertrag 2026.pdf"
+                } else {
+                    "Lease 2026.pdf"
+                },
+                media_type: "application/pdf",
+                bytes: &bytes,
+                pages: Some(3),
+            };
+            let lease =
+                notes.capture_with_files("", Some(&household.id), None, &[], &[], &[file])?;
+            let hash = lease.attachments.first().ok_or("the lease")?.hash.clone();
+            let text = if de {
+                "Mietvertrag\nDie Wohnung im 2. Stock wird ab dem 1. Januar 2026 vermietet.\nMiete: 820 € im Monat"
+            } else {
+                "Lease\nThe flat on the second floor is let from 1 January 2026.\nRent: £820 a month"
+            };
+            notes.set_attachment_text(&lease.id, &hash, text)?;
+            show_household(harness, texts)
         }),
         ("search", |harness, _, texts| {
             // Ctrl+F on the Agenda: All Notes, the cursor in its search.
@@ -2075,10 +2109,26 @@ fn privacy_frames(
         ("area-locks", |harness, texts| {
             show_household(harness, texts)
         }),
-        // The desktop sets no mark Hidden from AI yet (#267): the
-        // Household's Notes, as for the Area Locks.
+        // The Household marked Hidden from AI (#267): the shields on its
+        // row and its cards, and its right-click with the switch ticked.
         ("hidden-from-ai", |harness, texts| {
-            show_household(harness, texts)
+            let household = Places::new(harness.state().store())
+                .areas()?
+                .into_iter()
+                .find(|a| a.name == texts.household)
+                .ok_or("the Household Area")?;
+            harness
+                .state()
+                .store()
+                .set_hidden_from_ai(&household.id, true)?;
+            show_household(harness, texts)?;
+            harness
+                .get_all_by_label(texts.household)
+                .next()
+                .ok_or("the Household's row")?
+                .click_secondary();
+            harness.run();
+            Ok(())
         }),
         ("block", |harness, _| {
             lena_profile(harness)?;

@@ -188,6 +188,19 @@ pub const SESSION_LEAST: char = '\u{f04c6}';
 /// A folded description of a Note of a kind (#188), `expand_more`, and
 /// one unfolded, `expand_less`.
 pub const EXPAND_MORE: char = '\u{e246}';
+/// The kinds of an Attachment (#267), as on the phone: a PDF, a text
+/// document, a table, plain text or Markdown, any other file.
+pub const FILE_PDF: char = '\u{f2a4}';
+pub const FILE_DOCUMENT: char = '\u{efae}';
+pub const FILE_TABLE: char = '\u{f0d6}';
+pub const FILE_TEXT: char = '\u{ee93}';
+pub const FILE_OTHER: char = '\u{f12d}';
+/// `attach_file`: "Attach a file…".
+pub const ATTACH_FILE: char = '\u{e0b1}';
+/// `shield_outlined`: Hidden from AI (#267).
+pub const HIDDEN_FROM_AI: char = '\u{f379}';
+/// `tag`: the sidebar's Tags (#267).
+pub const TAG: char = '\u{e640}';
 pub const EXPAND_LESS: char = '\u{e245}';
 
 /// How the phone draws each of the core's Area icons.

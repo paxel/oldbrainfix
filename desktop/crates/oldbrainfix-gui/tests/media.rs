@@ -380,7 +380,7 @@ fn pictures_dropped_onto_the_window_become_one_photo_note() -> TestResult {
             bytes: Some(Arc::from(png(10, 10))),
             ..Default::default()
         },
-        // Not a picture: left alone.
+        // Not a picture: an Attachment of the same Note (#267).
         egui::DroppedFile {
             bytes: Some(Arc::from(&b"plain text"[..])),
             ..Default::default()
@@ -397,6 +397,7 @@ fn pictures_dropped_onto_the_window_become_one_photo_note() -> TestResult {
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].photos.len(), 2);
+    assert_eq!(notes[0].attachments.len(), 1);
     let kept = store.photo(&notes[0].photos[0]).ok_or("the photo")?;
     let size = image::load_from_memory(&kept).map(|i| (i.width(), i.height()))?;
     assert_eq!(size, (2048, 683));

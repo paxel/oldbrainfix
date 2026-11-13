@@ -1272,7 +1272,7 @@ replace a law of Both apps where they say so. A desktop law marked
 - The desktop window is a classic desktop window (#145): **the menu
   bar** on top (File, Edit, View, Area, Note, AI, Sync, Help); **the
   sidebar** on the left with the Agenda, Unsorted, All Notes, Frogs, the
-  Areas with their Topics and the Trash, marking the place shown; **the list** in
+  Areas with their Topics, Tags (#267) and the Trash, marking the place shown; **the list** in
   the middle. **A Note opens as a dialog over the window** (#146), one at
   a time, over the list and the sidebar but not the menu bar, which
   stays at hand for it; closing it keeps what was typed: its cross, Esc,
@@ -1306,6 +1306,17 @@ replace a law of Both apps where they say so. A desktop law marked
   (#279), a click on it selecting nothing; this Device keeps each fold
   (ADR 0008), as lists keep theirs, Areas starting unfolded. A folded
   Area still shows the Topic shown under it, marked.
+- **Tags below the Areas opens the tag tree in the list** (#267): every
+  tag by its levels as on the phone (see Phone ▸ Navigation, "The tag
+  tree"), each level's arrow unfolding the levels below, kept while the
+  app runs; a click on a tag shows All Notes searching for it. Typing
+  `#` into a list's search (not the Trash's) shows the tags starting
+  with what is typed as buttons under the field, at most twelve, the one
+  typed exactly left out; a click fills it in. The desktop has no Area
+  Locks, so nothing is left out. **An Area Hidden from AI has a shield
+  at the end of its row**, before the chevron, and so has each card
+  hidden in its top row, beside the view button; both name it to a screen reader
+  and in a tooltip.
 - **The window keeps its geometry on each computer** (#278): its size
   and position, whether it is maximized, the sidebar's width and the
   Note dialog's size are settings of the Device (ADR 0008) and come
@@ -1354,11 +1365,16 @@ replace a law of Both apps where they say so. A desktop law marked
   finds its Routines, Reminders and Frogs by their Note), else All
   Notes'; over the Settings dialog it searches the Settings (#282). On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
+- **File ▸ Attach a file…** (#267) picks files of any kind and does
+  with them what a drop does (see Capture): onto the Note in the Note
+  dialog, else into the quick note for a new Note.
 - **The Area menu acts on the Area or Topic the list shows** (#279):
-  Rename (F2), Colour and icon, Share…, People, Export as Pack… and
+  Rename (F2), Colour and icon, Share…, People, Export as Pack…, the
+  switch Hidden from AI (#267) and
   Delete, the sidebar right-click's entries, each greyed where that
-  menu would leave it out (a Topic has no Colour and icon, Share… or
-  People), and all of them while no Area or Topic shows or a dialog
+  menu would leave it out (a Topic has no Colour and icon, Share…,
+  People or Hidden from AI, nor has an Area in a Shared Area that is not
+  marked), and all of them while no Area or Topic shows or a dialog
   lies over the list, the Note dialog included, so that none acts on a
   place behind it. F2 rests in a text field and while a menu is open.
   The sidebar's right-click stays, and keeps New Topic. Move up
@@ -1464,6 +1480,15 @@ replace a law of Both apps where they say so. A desktop law marked
   Both apps (#226); the Sync dialog's "Bundle for",
   a dropdown beside its words (`sync_view.rs`), does not follow that
   yet.
+- **The question Hidden from AI is a dialog** (#267), asked as on the
+  phone (Phone ▸ Dialogs and pages, "Something Hidden from AI is not
+  given away"): before the Send dialog
+  and the Share dialog open, and when File into…, a drag onto an Area,
+  Merge into… or Export as Pack… is refused, with Cancel and "Show to
+  the AI" on the accent, which takes the marks off and does again what
+  was asked; a Note hidden by another Area's mark only names that Area,
+  with Close, and its mark comes off in the Area's menu. A Merge refused
+  keeps the cards selected, and nothing waits for Ctrl+Z.
 - **A Pack's tree is a dialog on the desktop** (#165): "Tick all" and
   "Untick all" stand over the tree under its size, in place of the
   phone's bar; every box, "Add my Profile" and "Claim as mine" too,
@@ -1521,6 +1546,29 @@ replace a law of Both apps where they say so. A desktop law marked
   along; one outside it goes alone. A card this Device may not move
   stays where it is; the announcement says so without numbers, its
   details how many moved and how many stayed.
+- **An Attachment shows on its card and in the Note dialog** (#267,
+  ADR 0047), as on the phone (Phone ▸ Cards): a row with the icon of its
+  kind, its name, its size and its pages; a click on it opens a copy
+  with the system's program for its type, asking nothing, and selects no
+  card; one whose bytes are not here yet, or that no program opens, is
+  announced. Its Attachment Text shows dimmed under it, "Attachment
+  Text" over it on a full card and in the Note dialog, where it selects
+  to be copied, its first three lines on a compact card. The computer
+  reads the text of every file waiting, those left to it by a phone
+  too, on a thread of its own, a PDF page by page with its scanned pages
+  read as photos are; a file that does not read as its kind gets an
+  empty text, so it is not read again, and one whose bytes are not here
+  waits for them. In the Note dialog each file has Replace Note text,
+  Append to Note text, Remove generated text (Ctrl+Z brings it back),
+  Read the text again for a file of a kind with text, and "Remove
+  Attachment, keep text", asked once; "Attach a file…" under the files
+  picks more. The card's menu has none of these, as it has none for a
+  photo.
+- **Hidden from AI on the desktop** (#267, ADR 0049): a card's ⋮ and
+  right-click, an Area's right-click in the sidebar and the Area menu
+  have the checkbox "Hidden from AI", the Note dialog its badge, offered
+  as on the phone (Phone ▸ Cards) and read as the menu opens; the badge
+  says "Off, hidden by its Area" while only another mark hides it.
 - **A photo gets out of the Note** (#149): on the desktop a right-click
   on a photo in the Note editor or full screen offers "Save image as…",
   "Copy image" and "Open in another program". Saved and copied say
@@ -1544,7 +1592,15 @@ replace a law of Both apps where they say so. A desktop law marked
   (its lists as radio buttons, the one used last at the top; with one
   list a single entry naming it, "Add to Weekly", #276),
   and the format bar over the field, without ☐, link and table. Files
-  dropped onto the window open the dialog and wait in it. Leaving the
+  dropped onto the window open the dialog and wait in it (#267): a
+  picture as a photo, a sound file as a voice recording, any other file
+  as an Attachment, each named on its own line; From file… picks files
+  of any kind the same way. **A file dropped onto the Note dialog goes
+  onto its Note** while nothing lies over the dialog, a picture as its
+  photo, a sound file as its recording, any other as its Attachment;
+  onto a Note's own window the same. A file larger than 256 MB, or one
+  that cannot be read, is told by its size before it is read, not
+  attached and announced; the others are. Leaving the
   dialog by its cross, Esc, Alt+Left, the mouse's back button or a click
   beside it keeps what is typed, nudged in 1 h. To full editor in the
   window opens the Note in the Note dialog in its place; in the popup it

@@ -310,6 +310,8 @@ struct Shell {
     new_popup: NewPopup,
     transcriber: Enricher,
     reader: Enricher,
+    /// The Attachment Texts' (#267).
+    files_reader: Enricher,
     speech: SpeechModel,
     folder_wanted: Arc<AtomicBool>,
     /// Whether a sync of this Device runs, for the line under the menu
@@ -446,6 +448,7 @@ impl Shell {
             Some(self.reader.clone()),
             Some(self.speech.clone()),
         );
+        app.set_attachment_reader(Some(self.files_reader.clone()));
         let quit = Arc::new(AtomicBool::new(false));
         // Where and as large as it was left on this computer (#278),
         // read again at every opening.
@@ -900,15 +903,24 @@ fn run() -> Result<i32, String> {
         Box::new(OcrEngine::default()),
         enriched(),
     );
+    // Its own RustO for the scanned pages of PDFs (#267).
+    let files_reader = Enricher::spawn(
+        store.clone(),
+        Kind::AttachmentTexts,
+        Box::new(OcrEngine::default()),
+        enriched(),
+    );
     let saved: Saved = {
         let (changes, events, window) = (changes.clone(), events_tx.clone(), window.clone());
         let (transcriber, reader, speech) = (transcriber.clone(), reader.clone(), speech.clone());
+        let files_reader = files_reader.clone();
         Arc::new(move || {
             changes.fetch_add(1, Ordering::SeqCst);
             let _ = events.send(Event::Wake);
             wake(&window);
             // A voice Note from the popup is transcribed without the window.
             reader.kick();
+            files_reader.kick();
             if speech.current().is_some() {
                 transcriber.kick();
             }
@@ -1011,6 +1023,7 @@ fn run() -> Result<i32, String> {
         new_popup,
         transcriber,
         reader,
+        files_reader,
         speech,
         folder_wanted,
         syncing,

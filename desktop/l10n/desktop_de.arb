@@ -71,7 +71,7 @@
   "speechModelReady": "Das Sprachmodell ist bereit. Sprachnotizen werden auf diesem Computer transkribiert.",
   "photosHint": "Eingefügter Text kommt ins Feld; ein eingefügtes Bild wartet darunter und wird mit dem Getippten als Foto der Notiz gespeichert.",
   "fromFile": "Aus Datei…",
-  "fromFileTitle": "Bilder oder Tondateien wählen",
+  "fromFileTitle": "Dateien wählen",
   "fromFileHint": "Hier gewählte oder auf das Fenster gezogene Bilder und Tondateien warten unter dem Feld und werden mit dem Getippten als eine Notiz gespeichert.",
   "fileRecordingFailed": "{count, plural, =1{Eine Aufnahme aus einer Datei kann nicht transkribiert werden.} other{Aufnahmen aus Dateien können nicht transkribiert werden.}}",
   "fileRecordingUnreadable": "In der Datei ist kein Ton zu finden: Sie ist keine Tondatei oder beschädigt.",
@@ -344,5 +344,11 @@
   "hotkeyRecordingHint": "Halte Strg, Alt oder beide und drücke einen Buchstaben, eine Ziffer, F1 bis F12 oder die Leertaste. Esc bricht ab.",
   "noteWindowOpen": "In eigenem Fenster öffnen",
   "noteWindowKeepOnTop": "Im Vordergrund halten",
-  "noteWindowKeepOnTopWayland": "Unter Wayland kann keine App ihr Fenster im Vordergrund halten. Das Fenstermenü deiner Arbeitsumgebung kann es anbieten, wie KDEs „Im Vordergrund halten“."
+  "noteWindowKeepOnTopWayland": "Unter Wayland kann keine App ihr Fenster im Vordergrund halten. Das Fenstermenü deiner Arbeitsumgebung kann es anbieten, wie KDEs „Im Vordergrund halten“.",
+  "attachFileMenu": "Datei anhängen …",
+  "attachFileTitle": "Dateien zum Anhängen wählen",
+  "fileNoProgramCause": "Auf diesem Computer ließ sich kein Programm für Dateien dieser Art starten.",
+  "fileNoProgramFix": "Installiere ein Programm für Dateien dieser Art; der Anhang bleibt an der Notiz.",
+  "hiddenFromAiAreaFirstDesktop": "{names}: vor KI verborgen. Eine Notiz in einem Bereich, der vor KI verborgen ist, geht an niemanden sonst. Nimm die Markierung zuerst im Menü des Bereichs ab.",
+  "tagSuggestionsLabel": "#Wörter, die mit dem Getippten beginnen"
 }
