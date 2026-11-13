@@ -3627,8 +3627,8 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ================================================================================
-libsqlite3-sys 0.36.0
-rusqlite 0.38.0
+libsqlite3-sys 0.40.0
+rusqlite 0.42.0
 
 Copyright (c) 2014 The rusqlite developers
 
@@ -7901,7 +7901,7 @@ quote 1.0.47
 rtrb 0.3.5
 rustc-hash 1.1.0
 rustix 0.38.44
-rustix 1.1.5
+rustix 1.1.6
 rustversion 1.0.23
 semver 1.0.28
 serde 1.0.229
@@ -8595,7 +8595,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ================================================================================
-hashlink 0.11.1
+hashlink 0.12.2
 
 This work is derived in part from the `linked-hash-map` crate, Copyright (c)
 2015 The Rust Project Developers
