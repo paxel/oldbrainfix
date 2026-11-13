@@ -25,6 +25,7 @@ import 'look.dart';
 import 'named_places_screen.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
+import 'print_platform.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'settings_search.dart';
@@ -46,7 +47,7 @@ enum _Importing { folder, keep }
 /// page: the theme and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
-/// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
+/// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
 /// Google Keep export; Send feedback (#214); and About. Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
@@ -880,6 +881,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                 ),
                               ),
+                            if (PrintScope.of(context) case final printing
+                                when printing.available)
+                              SettingsRow(
+                                words: [
+                                  t.printService,
+                                  t.printServiceOn,
+                                  t.printServiceOff,
+                                  t.printServiceUnknown,
+                                  t.printServiceOpen,
+                                ],
+                                child: _PrintServiceRow(printing: printing),
+                              ),
                           ],
                         ),
                       ],
@@ -1060,6 +1073,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Print to Old Brain Fix (#293): whether Android has the app's print
+/// service on, read again each time the app comes back, as from Android's
+/// print settings, and the button that opens them. Android lets no app
+/// turn it on itself.
+class _PrintServiceRow extends StatefulWidget {
+  final PrintPlatform printing;
+
+  const _PrintServiceRow({required this.printing});
+
+  @override
+  State<_PrintServiceRow> createState() => _PrintServiceRowState();
+}
+
+class _PrintServiceRowState extends State<_PrintServiceRow> {
+  /// What Android said last; null until it answered.
+  PrintServiceState? _state;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: () => unawaited(_read()));
+    unawaited(_read());
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<void> _read() async {
+    final state = await widget.printing.serviceState();
+    if (!mounted || state == _state) return;
+    setState(() => _state = state);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return ControlBelow(
+      key: const ValueKey('printService'),
+      leading: const Icon(Icons.print_outlined),
+      title: Text(t.printService),
+      subtitle: Text(switch (_state) {
+        PrintServiceState.on => t.printServiceOn,
+        PrintServiceState.off => t.printServiceOff,
+        PrintServiceState.unknown || null => t.printServiceUnknown,
+      }, key: const ValueKey('printService-state')),
+      control: TextButton(
+        key: const ValueKey('printService-open'),
+        onPressed: () => unawaited(widget.printing.openSettings()),
+        child: Text(t.printServiceOpen),
       ),
     );
   }

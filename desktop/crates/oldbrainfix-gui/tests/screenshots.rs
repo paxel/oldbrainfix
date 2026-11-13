@@ -1418,6 +1418,39 @@ fn texts_scene(
     match_frame(&mut harness, path)
 }
 
+/// The Note of the lease's PDF alone in the Household, as its card (#267):
+/// its name, size and pages, and its Attachment Text under it.
+fn lease_card(harness: &mut TextsWindow, _: &TextNotes, texts: &Texts) -> TestResult {
+    let de = harness.state().t().locale() == "de";
+    let store = harness.state().store();
+    let household = Places::new(store)
+        .areas()?
+        .into_iter()
+        .find(|a| a.name == texts.household)
+        .ok_or("the Household Area")?;
+    let notes = Notes::new(store);
+    let bytes = vec![0; 184_320];
+    let file = NewFile {
+        name: if de {
+            "Mietvertrag 2026.pdf"
+        } else {
+            "Lease 2026.pdf"
+        },
+        media_type: "application/pdf",
+        bytes: &bytes,
+        pages: Some(3),
+    };
+    let lease = notes.capture_with_files("", Some(&household.id), None, &[], &[], &[file])?;
+    let hash = lease.attachments.first().ok_or("the lease")?.hash.clone();
+    let text = if de {
+        "Mietvertrag\nDie Wohnung im 2. Stock wird ab dem 1. Januar 2026 vermietet.\nMiete: 820 € im Monat"
+    } else {
+        "Lease\nThe flat on the second floor is let from 1 January 2026.\nRent: £820 a month"
+    };
+    notes.set_attachment_text(&lease.id, &hash, text)?;
+    show_household(harness, texts)
+}
+
 /// The frames of the page "Formatted text, Transcripts and Photo Texts"
 /// (#175), in `texts`' words, `language` and `theme`: the boiler's service
 /// being edited under the format bar, the script's Text format, the meter
@@ -1430,7 +1463,7 @@ fn texts_frames(
     theme: egui::Theme,
     box_frame: impl Fn(&str) -> String,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let scenes: [(&str, TextsScene); 10] = [
+    let scenes: [(&str, TextsScene); 11] = [
         ("format", |harness, notes, _| {
             harness.state_mut().edit_note(&notes.formatted);
             harness.run();
@@ -1526,37 +1559,10 @@ fn texts_frames(
         }),
         // A Note of one PDF alone in the Household, as its card (#267): its
         // name, size and pages, and its Attachment Text under it.
-        ("attachment", |harness, _, texts| {
-            let de = harness.state().t().locale() == "de";
-            let store = harness.state().store();
-            let household = Places::new(store)
-                .areas()?
-                .into_iter()
-                .find(|a| a.name == texts.household)
-                .ok_or("the Household Area")?;
-            let notes = Notes::new(store);
-            let bytes = vec![0; 184_320];
-            let file = NewFile {
-                name: if de {
-                    "Mietvertrag 2026.pdf"
-                } else {
-                    "Lease 2026.pdf"
-                },
-                media_type: "application/pdf",
-                bytes: &bytes,
-                pages: Some(3),
-            };
-            let lease =
-                notes.capture_with_files("", Some(&household.id), None, &[], &[], &[file])?;
-            let hash = lease.attachments.first().ok_or("the lease")?.hash.clone();
-            let text = if de {
-                "Mietvertrag\nDie Wohnung im 2. Stock wird ab dem 1. Januar 2026 vermietet.\nMiete: 820 € im Monat"
-            } else {
-                "Lease\nThe flat on the second floor is let from 1 January 2026.\nRent: £820 a month"
-            };
-            notes.set_attachment_text(&lease.id, &hash, text)?;
-            show_household(harness, texts)
-        }),
+        ("attachment", lease_card),
+        // The same card for a page printed to a PDF and dropped onto the
+        // window (#293): the desktop has no print service of its own.
+        ("print-in", lease_card),
         ("search", |harness, _, texts| {
             // Ctrl+F on the Agenda: All Notes, the cursor in its search.
             harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::F);

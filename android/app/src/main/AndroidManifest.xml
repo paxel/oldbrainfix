@@ -216,6 +216,25 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+        <!-- Print to Old Brain Fix (#293): Android's print service with one
+             printer, "Old Brain Fix". Only the system binds it, and only
+             once the user turned it on in Android's print settings. A
+             print job's PDF is kept in the app's files and opens Capture
+             as a PDF shared in does. In the app's own process, where the
+             shares wait. -->
+        <service
+            android:name=".PrintInService"
+            android:label="@string/print_printer"
+            android:icon="@mipmap/ic_launcher"
+            android:exported="true"
+            android:permission="android.permission.BIND_PRINT_SERVICE">
+            <intent-filter>
+                <action android:name="android.printservice.PrintService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.printservice"
+                android:resource="@xml/print_service" />
+        </service>
         <!-- Home-screen widgets: one capture button each, and all three
              side by side. -->
         <receiver

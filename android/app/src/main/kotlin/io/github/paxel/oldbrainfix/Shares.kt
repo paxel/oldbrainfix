@@ -132,6 +132,20 @@ object Shares {
         synchronized(waiting) { waiting.addLast(Share(null, null, emptyList(), attachments = attachments)) }
     }
 
+    /**
+     * Takes the pages printed to the app (#293) that wait in its files
+     * ([PrintIn.take]): each comes as a share of its own, its PDF an
+     * Attachment named after the print job, from no source app, as
+     * Android does not tell a print service which app printed.
+     */
+    fun keepPrinted(context: Context) {
+        val printed = PrintIn.take(PrintIn.dir(context), Files.dir(context))
+        if (printed.isEmpty()) return
+        synchronized(waiting) {
+            for (print in printed) waiting.addLast(Share(null, null, emptyList(), attachments = listOf(print)))
+        }
+    }
+
     /** Copies the files behind [uris] to the side, while the permission to read them lasts. */
     private fun copy(context: Context, uris: List<Uri>): List<File> {
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }

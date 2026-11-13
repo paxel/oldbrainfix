@@ -13,7 +13,8 @@ import org.w3c.dom.Element
  * Pack (#164) come in as a bundle or a Sent Item does, and no card link
  * opens the app. Clear-text traffic is off, the one exported receiver
  * hears only the system's broadcasts (#235), and a Tally's shortcut lands
- * where no other app reaches (#284).
+ * where no other app reaches (#284). The print service only the system
+ * binds, in the app's own process (#293).
  */
 class ManifestTest {
     private val android = "http://schemas.android.com/apk/res/android"
@@ -109,5 +110,20 @@ class ManifestTest {
         assertEquals(listOf(".RearmReceiver"), exported.map { it.getAttributeNS(android, "name") })
         val actions = elements(exported.single(), "action").map { it.getAttributeNS(android, "name") }.toSet()
         assertEquals(RearmActions.all, actions)
+    }
+
+    @Test
+    fun thePrintServiceIsBoundOnlyByTheSystemInTheAppsOwnProcess() {
+        val service = elements(manifest.documentElement, "service")
+            .single { it.getAttributeNS(android, "name") == ".PrintInService" }
+        assertEquals("android.permission.BIND_PRINT_SERVICE", service.getAttributeNS(android, "permission"))
+        // The shares wait in MainActivity's process.
+        assertEquals("", service.getAttributeNS(android, "process"))
+        val actions = elements(service, "action").map { it.getAttributeNS(android, "name") }
+        assertEquals(listOf("android.printservice.PrintService"), actions)
+        val meta = elements(service, "meta-data").single()
+        assertEquals("android.printservice", meta.getAttributeNS(android, "name"))
+        assertEquals("@xml/print_service", meta.getAttributeNS(android, "resource"))
+        assertTrue(File("src/main/res/xml/print_service.xml").isFile)
     }
 }

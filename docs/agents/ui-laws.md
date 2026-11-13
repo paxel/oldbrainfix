@@ -969,6 +969,15 @@ replace a law of Both apps where they say so. A desktop law marked
   attached, one Note with the text and pictures shared with it, written
   at once; a file of the app's own types (a bundle, Sent Item, Profile
   card or Pack) shared to the app opens as "Open with" opens it.
+- **A page printed to the app comes in as a shared PDF does** (#293):
+  on Android, Old Brain Fix is a print service with one printer, "Old
+  Brain Fix"; a print job opens Capture with its PDF attached, named
+  after the job's document, without a source app, as Android names
+  none. Where Android keeps the app from coming up by itself, the print
+  waits and opens Capture the next time the app opens or comes back.
+  Settings ▸ Capture ▸ "Print to Old Brain Fix", in Simple and Advanced,
+  says whether Android has the service on and opens Android's print
+  settings, where only the user turns it on; the iPhone has no row.
 - **The quick note is uncluttered** (#142): by default it shows the
   text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
   **To full editor** and the alarm clock beside it (#223), whose menu

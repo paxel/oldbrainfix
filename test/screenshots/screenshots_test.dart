@@ -56,6 +56,7 @@ import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/pack_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
+import 'package:oldbrainfix/src/print_platform.dart';
 import 'package:oldbrainfix/src/profile_card.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -370,6 +371,21 @@ class _GuideFiles implements FilePlatform {
 
   @override
   Future<Uint8List?> pdfRender(String path, int index, int width) async => null;
+}
+
+/// The print service of an Android phone, turned on (#293), as Settings
+/// shows its row in every frame.
+class _GuidePrinting implements PrintPlatform {
+  const _GuidePrinting();
+
+  @override
+  bool get available => true;
+
+  @override
+  Future<PrintServiceState> serviceState() async => PrintServiceState.on;
+
+  @override
+  Future<bool> openSettings() async => false;
 }
 
 class _Seeded {
@@ -1021,6 +1037,7 @@ Future<AppLocalizations> _start(
   FolderPlatform folders = const NoFolders(),
   AppointmentSource appointments = const NoAppointments(),
   SpeechPlatform speech = const NoSpeech(),
+  PrintPlatform printing = const _GuidePrinting(),
   Size screen = _screen,
   FakeViewPadding padding = FakeViewPadding.zero,
 }) async {
@@ -1042,6 +1059,7 @@ Future<AppLocalizations> _start(
         voice: FakeVoice(),
         photos: FakePhotos(),
         files: const _GuideFiles(),
+        printing: printing,
         bundles: bundles,
         folders: folders,
         appointments: appointments,
@@ -1243,6 +1261,8 @@ void _storeScreenshots({required bool iphone}) {
           appointments: appointments,
           screen: screen,
           padding: iphone ? _iphoneSafeArea : FakeViewPadding.zero,
+          // Only Android lets an app be a printer (#293).
+          printing: iphone ? const NoPrinting() : const _GuidePrinting(),
         );
 
         Future<void> tap(WidgetTester tester, Finder finder) =>
@@ -2172,6 +2192,33 @@ void main() {
             );
             await _tap(tester, find.byTooltip(t.browseTooltip));
             await _tap(tester, find.text(t.starterHousehold));
+          });
+
+          // Print to Old Brain Fix (#293): the phone's Settings searched
+          // for its row, the print service on.
+          boxFrame(texts175, 'print-in', (tester) async {
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            await tester.enterText(
+              find.descendant(
+                of: find.byKey(const ValueKey('settingsSearch')),
+                matching: find.byType(TextField),
+              ),
+              t.printService,
+            );
+            // The row found, without the cursor blinking in the field.
+            FocusManager.instance.primaryFocus?.unfocus();
+            await tester.pumpAndSettle();
+            expect(find.text(t.printServiceOn), findsOneWidget);
           });
 
           boxFrame(texts175, 'generated', (tester) async {

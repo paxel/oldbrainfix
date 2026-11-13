@@ -32,6 +32,7 @@ import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
 import 'src/pairing_platform.dart';
 import 'src/photo_platform.dart';
+import 'src/print_platform.dart';
 import 'src/profile_platform.dart';
 import 'src/routine_editor_screen.dart';
 import 'src/speech_platform.dart';
@@ -120,6 +121,8 @@ Future<void> _openAndRun(Directory dir) async {
       alarms: Platform.isIOS ? IosAlarms() : AndroidAlarms(),
       photos: AndroidPhotos(),
       files: const AndroidFiles(),
+      // Only Android lets an app be a printer (#293).
+      printing: Platform.isIOS ? const NoPrinting() : const AndroidPrinting(),
       voice: AndroidVoice(),
       context: const AndroidContext(),
       requests: AndroidCaptureRequests(),

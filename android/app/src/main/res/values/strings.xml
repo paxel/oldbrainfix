@@ -24,4 +24,9 @@
     <string name="crash_body">Old Brain Fix ran into an unexpected error and had to stop. Your saved Notes are safe. Open the app again, and if this happens again, send the report so it can be fixed.</string>
     <string name="crash_send_report">Send report to the developer</string>
     <string name="crash_close">Close</string>
+    <!-- Print to Old Brain Fix (#293): the print service's one printer,
+         and what Android's print notification says when a page could not
+         be kept. -->
+    <string name="print_printer" translatable="false">Old Brain Fix</string>
+    <string name="print_failed">Old Brain Fix could not keep the printed pages.</string>
 </resources>

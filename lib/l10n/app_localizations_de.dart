@@ -1655,6 +1655,24 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpeechModelDetail => 'Für Transkripte von Sprachnotizen.';
 
   @override
+  String get printService => 'An Old Brain Fix drucken';
+
+  @override
+  String get printServiceOn =>
+      'Ein. Drucke in einer beliebigen App und wähle Old Brain Fix als Drucker, um die Seiten als PDF zu erfassen.';
+
+  @override
+  String get printServiceOff =>
+      'Aus. Schalte Old Brain Fix in den Druckeinstellungen von Android ein, um Seiten in eine Notiz zu drucken.';
+
+  @override
+  String get printServiceUnknown =>
+      'Schalte Old Brain Fix in den Druckeinstellungen von Android ein. Dann drucke in einer beliebigen App und wähle Old Brain Fix als Drucker, um die Seiten als PDF zu erfassen.';
+
+  @override
+  String get printServiceOpen => 'Druckeinstellungen öffnen';
+
+  @override
   String get settingsCalendar => 'Kalender';
 
   @override

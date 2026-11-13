@@ -197,7 +197,12 @@ class MainActivity : FlutterActivity() {
                     "take" -> takePhoto(result)
                     "pick" -> pickPhotos(result)
                     "paste" -> paste(result)
-                    "shared" -> inBackground(result) { Shares.take() }
+                    "shared" -> inBackground(result) {
+                        // Pages printed to the app wait in its files,
+                        // also through a restart (#293).
+                        Shares.keepPrinted(this@MainActivity)
+                        Shares.take()
+                    }
                     "save" -> {
                         val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
                         inBackground(result) {
@@ -427,6 +432,17 @@ class MainActivity : FlutterActivity() {
                             (args["width"] as? Number)?.toInt() ?: 0,
                         )
                     }
+                    else -> result.notImplemented()
+                }
+            }
+        // Print to Old Brain Fix (#293): whether the print service is on,
+        // asked again each time Settings shows, and Android's print
+        // settings, where the user turns it on.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PRINT_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "state" -> result.success(PrintIn.state(this).name.lowercase())
+                    "openSettings" -> result.success(PrintIn.openSettings(this))
                     else -> result.notImplemented()
                 }
             }
@@ -1168,6 +1184,7 @@ class MainActivity : FlutterActivity() {
         private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
         private const val FILES_CHANNEL = "io.github.paxel.oldbrainfix/files"
+        private const val PRINT_CHANNEL = "io.github.paxel.oldbrainfix/print"
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val EXIT_CHANNEL = "io.github.paxel.oldbrainfix/exit"

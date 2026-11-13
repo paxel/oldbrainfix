@@ -2672,6 +2672,36 @@ abstract class AppLocalizations {
   /// **'For Transcripts of voice Notes.'**
   String get settingsSpeechModelDetail;
 
+  /// Settings ▸ Capture, Android only (#293): the row of the app's print service, with which printing in any app to the printer Old Brain Fix opens Capture with the printed pages as a PDF.
+  ///
+  /// In en, this message translates to:
+  /// **'Print to Old Brain Fix'**
+  String get printService;
+
+  /// The print service row's line while Android lists the service as on (#293).
+  ///
+  /// In en, this message translates to:
+  /// **'On. Print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.'**
+  String get printServiceOn;
+
+  /// The print service row's line while Android lists the service as turned off (#293).
+  ///
+  /// In en, this message translates to:
+  /// **'Off. Turn on Old Brain Fix in Android\'s print settings to print pages into a Note.'**
+  String get printServiceOff;
+
+  /// The print service row's line where Android does not tell whether the service is on (#293).
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on Old Brain Fix in Android\'s print settings. Then print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.'**
+  String get printServiceUnknown;
+
+  /// The print service row's button (#293): opens Android's print settings, where the service is turned on or off.
+  ///
+  /// In en, this message translates to:
+  /// **'Open print settings'**
+  String get printServiceOpen;
+
   /// No description provided for @settingsCalendar.
   ///
   /// In en, this message translates to:

@@ -1645,6 +1645,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSpeechModelDetail => 'For Transcripts of voice Notes.';
 
   @override
+  String get printService => 'Print to Old Brain Fix';
+
+  @override
+  String get printServiceOn =>
+      'On. Print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.';
+
+  @override
+  String get printServiceOff =>
+      'Off. Turn on Old Brain Fix in Android\'s print settings to print pages into a Note.';
+
+  @override
+  String get printServiceUnknown =>
+      'Turn on Old Brain Fix in Android\'s print settings. Then print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.';
+
+  @override
+  String get printServiceOpen => 'Open print settings';
+
+  @override
   String get settingsCalendar => 'Calendar';
 
   @override

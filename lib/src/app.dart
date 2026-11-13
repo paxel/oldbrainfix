@@ -51,6 +51,7 @@ import 'person_screen.dart';
 import 'place_names.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
+import 'print_platform.dart';
 import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
@@ -97,6 +98,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// The Device's file picker, the system's apps that open a file, and
   /// the PDF reader of the native library (#267); none when not given.
   final FilePlatform files;
+
+  /// Android's print service for Print to Old Brain Fix (#293); none when
+  /// not given, as on the iPhone.
+  final PrintPlatform printing;
 
   /// The Device's microphone and playback of voice recordings; none when
   /// not given.
@@ -195,6 +200,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.alarms = const NoAlarms(),
     this.photos = const NoPhotos(),
     this.files = const NoFiles(),
+    this.printing = const NoPrinting(),
     this.voice = const NoVoice(),
     this.context = const NoContext(),
     this.requests = const NoCaptureRequests(),
@@ -399,46 +405,50 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                             reader: _photoReader,
                             child: FileScope(
                               files: widget.files,
-                              child: AttachmentReaderScope(
-                                reader: _attachmentReader,
-                                child: AttachmentScope(
-                                  notes: _notes,
-                                  child: CalendarScope(
-                                    calendar: widget.calendar,
-                                    child: CalendarMirrorScope(
-                                      mirror: _mirror,
-                                      child: AppointmentScope(
-                                        source: widget.appointments,
-                                        child: DraftsScope(
-                                          drafts: _drafts,
-                                          child: LockScope(
-                                            lock: _lock,
-                                            child: PairingScope(
-                                              pairing: widget.pairing,
-                                              child: AutoSyncScope(
-                                                sync: _autoSync,
-                                                child: FolderScope(
-                                                  folders: widget.folders,
-                                                  child: BundleScope(
-                                                    bundles: widget.bundles,
-                                                    child: PersonScope(
-                                                      store: widget.store,
-                                                      platform: widget.profile,
-                                                      onChangesSent:
-                                                          _alarms.replan,
-                                                      child: TagSearchScope(
-                                                        onSearch: _searchTag,
-                                                        child: AppLinkScope(
-                                                          onOpen: _links.open,
-                                                          onPick: _pickLink,
-                                                          child: AlarmSyncScope(
-                                                            alarms: _alarms,
-                                                            child: HomeShortcutsScope(
-                                                              shortcuts: widget
-                                                                  .shortcuts,
-                                                              child:
-                                                                  child ??
-                                                                  const SizedBox.shrink(),
+                              child: PrintScope(
+                                printing: widget.printing,
+                                child: AttachmentReaderScope(
+                                  reader: _attachmentReader,
+                                  child: AttachmentScope(
+                                    notes: _notes,
+                                    child: CalendarScope(
+                                      calendar: widget.calendar,
+                                      child: CalendarMirrorScope(
+                                        mirror: _mirror,
+                                        child: AppointmentScope(
+                                          source: widget.appointments,
+                                          child: DraftsScope(
+                                            drafts: _drafts,
+                                            child: LockScope(
+                                              lock: _lock,
+                                              child: PairingScope(
+                                                pairing: widget.pairing,
+                                                child: AutoSyncScope(
+                                                  sync: _autoSync,
+                                                  child: FolderScope(
+                                                    folders: widget.folders,
+                                                    child: BundleScope(
+                                                      bundles: widget.bundles,
+                                                      child: PersonScope(
+                                                        store: widget.store,
+                                                        platform:
+                                                            widget.profile,
+                                                        onChangesSent:
+                                                            _alarms.replan,
+                                                        child: TagSearchScope(
+                                                          onSearch: _searchTag,
+                                                          child: AppLinkScope(
+                                                            onOpen: _links.open,
+                                                            onPick: _pickLink,
+                                                            child: AlarmSyncScope(
+                                                              alarms: _alarms,
+                                                              child: HomeShortcutsScope(
+                                                                shortcuts: widget
+                                                                    .shortcuts,
+                                                                child:
+                                                                    child ??
+                                                                    const SizedBox.shrink(),
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
