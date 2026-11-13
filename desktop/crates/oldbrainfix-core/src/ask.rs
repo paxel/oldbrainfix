@@ -140,7 +140,7 @@ impl Provider {
 }
 
 /// The host of `url` with its port, without scheme, user and path.
-fn host_of(url: &str) -> &str {
+pub(crate) fn host_of(url: &str) -> &str {
     let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
     let rest = rest.split(['/', '?', '#']).next().unwrap_or_default();
     rest.rsplit_once('@').map_or(rest, |(_, host)| host)

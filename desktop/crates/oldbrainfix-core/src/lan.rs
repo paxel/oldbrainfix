@@ -473,6 +473,29 @@ impl Request {
         drop(self.reply.send(response));
     }
 
+    /// A request as the host hands it over, for the tests of what answers
+    /// it, and where its answer goes.
+    #[cfg(test)]
+    pub(crate) fn handed_over(
+        method: &str,
+        path: &str,
+        headers: Vec<(String, String)>,
+        body: Vec<u8>,
+        challenged: bool,
+    ) -> (Request, Receiver<Response>) {
+        let (reply, answered) = channel();
+        let request = Request {
+            method: method.into(),
+            path: path.into(),
+            headers,
+            body,
+            from: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            challenged,
+            reply,
+        };
+        (request, answered)
+    }
+
     /// The Profile the Device asking to sync sent of its person, for a
     /// `POST /sync` of a joiner invited (ADR 0017), checked and with its
     /// picture made again; none without one that holds its key.

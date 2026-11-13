@@ -5499,6 +5499,161 @@ fn pair_codes_are_written_and_read_as_the_dart_core_does() -> TestResult {
     Ok(())
 }
 
+/// The reply `item` of `ask.json` describes with its fields.
+fn ask_reply_of(
+    item: &Value,
+) -> Result<oldbrainfix_core::lan_ask::AskReply, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::ask::Unready;
+    use oldbrainfix_core::lan_ask::{Answered, AskFailure, AskReply};
+    let review = item["review"].as_bool().ok_or("review")?;
+    if let Some(answer) = item.get("answer") {
+        let notes = answer["notes"]
+            .as_array()
+            .ok_or("notes")?
+            .iter()
+            .map(|n| n.as_str().map(str::to_string).ok_or("a note"))
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(AskReply {
+            outcome: Ok(Answered {
+                text: answer["text"].as_str().ok_or("text")?.to_string(),
+                notes,
+                cut: answer["cut"].as_bool().ok_or("cut")?,
+            }),
+            review,
+        });
+    }
+    let message = item["message"].as_str().ok_or("message")?.to_string();
+    let unready = match item["unready"].as_str() {
+        None => None,
+        Some("noModel") => Some(Unready::NoModel),
+        Some("noKey") => Some(Unready::NoKey),
+        Some("badUrl") => Some(Unready::BadUrl),
+        Some(other) => return Err(format!("unready {other}").into()),
+    };
+    let failure = match item["failure"].as_str().ok_or("failure")? {
+        "unready" => AskFailure::Unready(unready),
+        "key" => AskFailure::Key(message),
+        "provider" => AskFailure::Provider(
+            u16::try_from(item["status"].as_u64().ok_or("status")?)?,
+            message,
+        ),
+        "network" => AskFailure::Network(message),
+        "unreadable" => AskFailure::Unreadable(message),
+        "rounds" => AskFailure::Rounds,
+        "refused" => AskFailure::Refused,
+        "stopped" => AskFailure::Stopped,
+        "busy" => AskFailure::Busy,
+        "unknown" => AskFailure::Unknown,
+        other => return Err(format!("failure {other}").into()),
+    };
+    Ok(AskReply {
+        outcome: Err(failure),
+        review,
+    })
+}
+
+#[test]
+fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::ask::{Exchange, Protocol, Unready};
+    use oldbrainfix_core::lan_ask::{AskReply, ProviderShown, Question};
+    use oldbrainfix_core::pairing::HandAddress;
+    let fixture = read_json(&fixtures().join("ask.json"))?;
+    let text = |v: &Value, k: &str| -> Result<String, Box<dyn std::error::Error>> {
+        Ok(v[k].as_str().ok_or(format!("{k} is text"))?.to_string())
+    };
+    for item in fixture["questions"].as_array().ok_or("questions")? {
+        let earlier = item["earlier"]
+            .as_array()
+            .ok_or("earlier")?
+            .iter()
+            .map(|e| {
+                Some(Exchange {
+                    question: e[0].as_str()?.to_string(),
+                    answer: e[1].as_str()?.to_string(),
+                })
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or("an exchange")?;
+        let question = Question {
+            question: text(item, "question")?,
+            earlier,
+        };
+        let body = text(item, "body")?;
+        assert_eq!(question.to_json().to_string(), body);
+        assert_eq!(
+            Question::from_json(&serde_json::from_str(&body)?),
+            Some(question)
+        );
+    }
+    for item in fixture["providers"].as_array().ok_or("providers")? {
+        let shown = ProviderShown {
+            protocol: match text(item, "protocol")?.as_str() {
+                "openai" => Protocol::OpenAi,
+                _ => Protocol::Anthropic,
+            },
+            model: text(item, "model")?,
+            host: text(item, "host")?,
+            unready: match item["unready"].as_str() {
+                None => None,
+                Some("noModel") => Some(Unready::NoModel),
+                Some("noKey") => Some(Unready::NoKey),
+                Some(_) => Some(Unready::BadUrl),
+            },
+        };
+        let body = text(item, "body")?;
+        assert_eq!(shown.to_json().to_string(), body);
+        assert_eq!(
+            ProviderShown::from_json(&serde_json::from_str(&body)?),
+            Some(shown)
+        );
+    }
+    for item in fixture["replies"].as_array().ok_or("replies")? {
+        let reply = ask_reply_of(item)?;
+        let body = text(item, "body")?;
+        assert_eq!(reply.to_json().to_string(), body);
+        assert_eq!(
+            AskReply::from_json(&serde_json::from_str(&body)?),
+            Some(reply)
+        );
+    }
+    for item in fixture["later"].as_array().ok_or("later")? {
+        let body = text(item, "body")?;
+        assert_eq!(
+            AskReply::from_json(&serde_json::from_str(&body)?),
+            Some(ask_reply_of(item)?),
+            "{body}"
+        );
+    }
+    for body in fixture["notReplies"].as_array().ok_or("notReplies")? {
+        let body = body.as_str().ok_or("a body")?;
+        assert_eq!(
+            AskReply::from_json(&serde_json::from_str(body)?),
+            None,
+            "{body}"
+        );
+    }
+    for item in fixture["addresses"].as_array().ok_or("addresses")? {
+        let typed = text(item, "typed")?;
+        let read = HandAddress::parse(&typed);
+        assert_eq!(
+            read.as_ref().map(|a| a.host.as_str()),
+            item["host"].as_str(),
+            "{typed}"
+        );
+        assert_eq!(
+            read.as_ref().and_then(|a| a.port).map(u64::from),
+            item["port"].as_u64(),
+            "{typed}"
+        );
+        assert_eq!(
+            read.as_ref().map(HandAddress::text).as_deref(),
+            item["text"].as_str(),
+            "{typed}"
+        );
+    }
+    Ok(())
+}
+
 #[test]
 fn files_and_values_of_a_later_version_read_as_the_dart_core_reads_them() -> TestResult {
     use oldbrainfix_core::Error;

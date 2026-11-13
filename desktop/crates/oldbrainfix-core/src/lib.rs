@@ -40,6 +40,7 @@ pub mod imports;
 pub mod join;
 pub mod keys;
 pub mod lan;
+pub mod lan_ask;
 pub mod markdown;
 pub mod named_places;
 pub mod note_history;

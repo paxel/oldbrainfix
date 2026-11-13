@@ -28,6 +28,7 @@ export 'src/host_identity.dart';
 export 'src/ics.dart';
 export 'src/imports.dart';
 export 'src/lan.dart';
+export 'src/lan_ask.dart';
 export 'src/lan_host.dart';
 export 'src/locks.dart';
 export 'src/markdown.dart';

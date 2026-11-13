@@ -316,6 +316,26 @@ void main() {
       auto.dispose();
     });
 
+    testWidgets('a computer mDNS does not find is tried at its address by '
+        'hand, then where it was last (#267)', (tester) async {
+      pairDesk();
+      phone.setHandAddress(desk.deviceId, 'desk.tail1234.ts.net:4711');
+      failure = SyncFailure.unreachable;
+      final auto = autoSync();
+      auto.shown();
+      await tester.pump();
+      expect(joined, [
+        ('desk.tail1234.ts.net', 4711, 'Pixel'),
+        ('192.168.1.5', 4000, 'Pixel'),
+      ]);
+      // Reached there, it is not tried elsewhere.
+      failure = null;
+      joined.clear();
+      await wait(tester, const Duration(minutes: 1));
+      expect(joined, [('desk.tail1234.ts.net', 4711, 'Pixel')]);
+      auto.dispose();
+    });
+
     testWidgets('a computer showing up is synced where it was found', (
       tester,
     ) async {

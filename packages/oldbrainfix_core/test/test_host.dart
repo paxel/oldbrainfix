@@ -59,6 +59,15 @@ class TestHost {
   var requests = 0;
   final nonces = <String>[];
 
+  /// What this host answers a question and the provider query with, as
+  /// a desktop does (#267); without them it answers none, as a phone.
+  AskReply? Function(Map<String, Object?> body)? answering;
+  DesktopProvider? provider;
+
+  /// The asking bodies that reached it, and whose they were.
+  final asked = <Map<String, Object?>>[];
+  final askers = <String>[];
+
   TestHost(this.store, {this.pin = '246810', this.name = 'Desk'});
 
   int get port => _server.port;
@@ -113,6 +122,31 @@ class TestHost {
           );
       if (!paired && req.headers.value(pinHeader) != pin) {
         res.statusCode = HttpStatus.forbidden;
+        return;
+      }
+      if (path == askPath || path == providerPath) {
+        final answer = answering;
+        final shown = provider;
+        if (answer == null || shown == null) {
+          res.statusCode = HttpStatus.notFound;
+          return;
+        }
+        // Only the user's own paired Devices ask, with their proof.
+        if (!paired || !store.isOwnDevice(joiner)) {
+          res.statusCode = HttpStatus.forbidden;
+          res.write('declined');
+          return;
+        }
+        askers.add(joiner);
+        res.headers.contentType = ContentType.json;
+        if (path == providerPath) {
+          res.write(jsonEncode(shown.toJson()));
+          return;
+        }
+        final sent = (jsonDecode(utf8.decode(body)) as Map)
+            .cast<String, Object?>();
+        asked.add(sent);
+        res.write(jsonEncode(answer(sent)?.toJson()));
         return;
       }
       if (req.method == 'GET' && path == '/vector') {

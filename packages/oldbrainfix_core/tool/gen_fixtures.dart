@@ -7443,6 +7443,179 @@ Map<String, Object?> _crypto() {
 }
 
 /// Pair codes the desktop must write and read the same.
+/// The phone's question through the desktop (#267): each body as the
+/// Dart core writes it, with what it holds, for the desktop core to write
+/// the same bytes and read the same back.
+Map<String, Object?> _ask() {
+  Map<String, Object?> reply(AskReply reply) => {
+    'body': jsonEncode(reply.toJson()),
+    if (reply.answer case final answer?)
+      'answer': {'text': answer.text, 'notes': answer.notes, 'cut': answer.cut}
+    else ...{
+      'failure': reply.failure?.name,
+      'message': reply.message,
+      'status': reply.status,
+      'unready': reply.unready?.name,
+    },
+    'review': reply.review,
+  };
+  const passport = 'note:0a1b2c3d4e5f60718293a4b5c6d7e8f9';
+  return {
+    'questions': [
+      for (final (question, earlier) in [
+        ('Where is my passport?', <AskExchange>[]),
+        (
+          'Und jetzt? „Pass“ im Ordner 📁',
+          [
+            const AskExchange(
+              'Do I have a passport?',
+              'Yes: [Passport](oldbrainfix://note/$passport).\n'
+                  'It says "valid until 2031".',
+            ),
+            const AskExchange('Where?', 'In the blue folder.'),
+          ],
+        ),
+      ])
+        {
+          'question': question,
+          'earlier': [
+            for (final e in earlier) [e.question, e.answer],
+          ],
+          'body': jsonEncode(askBody(question, earlier)),
+        },
+    ],
+    'providers': [
+      for (final provider in const [
+        DesktopProvider(
+          protocol: AskProtocol.anthropic,
+          model: 'claude-opus-5-5',
+          host: 'api.anthropic.com',
+        ),
+        DesktopProvider(
+          protocol: AskProtocol.openai,
+          model: 'qwen3:32b',
+          host: 'llm.example.org:8443',
+        ),
+        DesktopProvider(
+          protocol: AskProtocol.openai,
+          model: '',
+          host: 'localhost:11434',
+          unready: AskUnready.noModel,
+        ),
+        DesktopProvider(
+          protocol: AskProtocol.anthropic,
+          model: 'claude-opus-5-5',
+          host: 'api.anthropic.com',
+          unready: AskUnready.noKey,
+        ),
+      ])
+        {
+          'protocol': provider.protocol.name,
+          'model': provider.model,
+          'host': provider.host,
+          'unready': provider.unready?.name,
+          'body': jsonEncode(provider.toJson()),
+        },
+    ],
+    'replies': [
+      for (final r in const [
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'In the [blue folder](oldbrainfix://note/$passport).',
+            notes: [passport],
+          ),
+        ),
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'Filed into Health; it waits for your review. Ärzte: …',
+            notes: [passport, 'note:ffff'],
+            cut: true,
+          ),
+          review: true,
+        ),
+        AskReply.failed(AskFailure.unready, unready: AskUnready.noKey),
+        AskReply.failed(AskFailure.unready, unready: AskUnready.badUrl),
+        AskReply.failed(AskFailure.unready),
+        AskReply.failed(AskFailure.key, message: 'invalid x-api-key: …'),
+        AskReply.failed(
+          AskFailure.provider,
+          status: 529,
+          message: 'Overloaded "now"',
+          review: true,
+        ),
+        AskReply.failed(AskFailure.network, message: 'timed out'),
+        AskReply.failed(AskFailure.unreadable, message: 'no content'),
+        AskReply.failed(AskFailure.rounds),
+        AskReply.failed(AskFailure.refused),
+        AskReply.failed(AskFailure.stopped),
+        AskReply.failed(AskFailure.busy, review: true),
+        AskReply.failed(AskFailure.unknown),
+      ])
+        reply(r),
+    ],
+    // What a later desktop may say, as this build reads it.
+    'later': [
+      for (final body in [
+        {'failure': 'quota', 'message': 'later', 'review': true},
+        {'failure': 'unready', 'review': false, 'unready': 'noLicence'},
+        {'failure': 'provider', 'message': 'm', 'review': false, 'status': -1},
+        {
+          'answer': {
+            'cut': 'yes',
+            'notes': ['note:1', 2],
+            'text': 'T',
+          },
+          'review': 1,
+          'later': true,
+        },
+      ])
+        {...reply(AskReply.fromJson(body)!), 'body': jsonEncode(body)},
+    ],
+    'notReplies': [
+      for (final body in [
+        <String, Object?>{},
+        {'answer': 'text'},
+        {
+          'answer': <String, Object?>{'notes': <String>[]},
+        },
+        {'failure': 4},
+      ])
+        jsonEncode(body),
+    ],
+    'addresses': [
+      for (final typed in [
+        'Desk.Tail1234.ts.net',
+        ' 100.101.102.103:4711 ',
+        '[FD7A:115C::1]:80',
+        'fd7a::1',
+        'https://desk.local:4711/x?y',
+        'HTTP://192.168.1.5',
+        'desk.',
+        '',
+        'desk:0',
+        'desk:+80',
+        'desk:0x50',
+        'desk:65536',
+        'desk:080',
+        'a b',
+        'ftp://desk',
+        '[desk]:1',
+        '[fd7a::1]x',
+        'me@desk',
+        'desk:',
+        'des\u212A',
+        'dësk',
+      ])
+        {
+          'typed': typed,
+          'host': HandAddress.parse(typed)?.host,
+          'port': HandAddress.parse(typed)?.port,
+          'text': HandAddress.parse(typed)?.text,
+        },
+    ],
+  };
+}
+
 Map<String, Object?> _pairCodes() {
   final fp = [for (var i = 0; i < 32; i++) (i * 7 + 3) & 0xff];
   final codes = [
@@ -10735,6 +10908,11 @@ Future<void> main(List<String> args) async {
     'and what was skipped, by reason.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, what is no code and codes of a later version (ADR 0034).\n'
+    '- `ask.json`: the phone\'s question through the desktop (#267, ADR '
+    '0051): question bodies with their earlier exchanges, the provider as '
+    'the phone learns it, answers and every kind of failure as bodies with '
+    'what they hold, replies of a later desktop, and addresses typed by '
+    'hand for a paired Device as read or refused.\n'
     '- `later_formats.json`: what files and values of a later version '
     '(ADR 0034) come to: Sent Items, Backup header lines, the opened keys '
     'and Profiles files of the shared folder and local settings, with '
@@ -11054,6 +11232,7 @@ Future<void> main(List<String> args) async {
     File('${root.path}/pair_codes.json'),
     '${_json.convert(_pairCodes())}\n',
   );
+  _write(File('${root.path}/ask.json'), '${_json.convert(_ask())}\n');
   _write(File('${root.path}/keys.json'), '${_json.convert(_keys())}\n');
   _write(File('${root.path}/crypto.json'), '${_json.convert(_crypto())}\n');
   _write(

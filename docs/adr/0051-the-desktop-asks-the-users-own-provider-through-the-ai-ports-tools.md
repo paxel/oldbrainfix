@@ -41,3 +41,18 @@ The model is told to link every Note it uses as an app link (ADR 0046), `[title]
 - What the model finds and reads reaches the provider: the names of the Areas, Topics and tags, the Routines and Reminders with their check-offs when it lists them, the titles and excerpts of the Notes found, and the Notes read in full with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context. Nothing Hidden from AI does, a count included.
 - Asking leaves sync running; only a change the model drafts pauses it, until the review.
 - A small local model may search poorly or get a tool's arguments wrong; it hears what went wrong and may try again, and the question ends after 24 rounds.
+
+## The phone asks through the desktop (#267)
+
+Amended by #267 (Q640, Q641): the phone holds no provider and no key; it asks the user's own desktop over the paired connection (ADR 0003), and the desktop runs the question as the panel does. The wire and who may ask are in ADR 0003.
+
+- The desktop asks with its own provider and key, on its clock, through `Store::ask` (`Store::answer_question` in `lan_ask.rs`): the same tools, the same system prompt, Hidden from AI out of every request, the earlier exchanges the phone sends asked before the question, as the panel's follow-ups. A change the model makes is a draft of the AI Task, reviewed on the desktop only; the answer says whether a review now waits, read after the question, so that one that failed after a draft says so too.
+- The phone gets the answer's text and the ids of the Notes it links, which open on the phone, and whether it was cut off; not the ids of the Notes the tools read. A question not answered comes back with its kind and, for a refused key, another error of the provider, no reply from it or one that could not be read, the provider's message.
+- The key never leaves the desktop: the provider is named to the phone by its protocol, model and host alone, and every message of a failure has the key and the user and query of the address replaced before it goes out, since a provider may repeat the key it refused and an error the address.
+- Before the first question the phone names the provider and what is sent and asks the user's permission (guideline 5.1.2(i)); "Keep as Note" saves the question and the answer on the phone as on the desktop. That screen is the phone's.
+
+### Consequences
+
+- A phone's question reads the desktop's Notes, those Hidden from AI aside, and reaches the desktop's provider; the desktop must be running, at home or through the user's VPN.
+- One question at a time on the desktop: a second phone asking meanwhile hears that the desktop is busy.
+- A phone's question that opened an AI Task and left it without a change declines it at its end, as the panel does; unlike the panel, it does not see whether the AI port's client works in that task meanwhile without having changed anything yet.

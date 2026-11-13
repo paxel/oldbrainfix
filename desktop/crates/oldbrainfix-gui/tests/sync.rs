@@ -382,6 +382,105 @@ fn the_paired_host_runs_only_while_a_paired_device_syncs_on_its_own() -> TestRes
 }
 
 #[test]
+fn a_paired_phones_question_is_answered_by_the_ask_desk_beside_the_syncs() -> TestResult {
+    use oldbrainfix_core::ask::{Reply, Request, Transport};
+    use oldbrainfix_core::lan::{NONCE_HEADER, PROOF_HEADER, paired_proof_bytes};
+    use oldbrainfix_core::lan_ask::{ASK_PATH, AskDesk, AskReply, Question};
+    use oldbrainfix_gui::auto_sync::{PairedHosting, Syncing};
+    /// A provider that answers at once.
+    struct Answers;
+    impl Transport for Answers {
+        fn post(&self, _: &Request) -> Result<Reply, String> {
+            let body = serde_json::json!({
+                "content": [{"text": "In the blue folder.", "type": "text"}],
+                "stop_reason": "end_turn",
+            });
+            Ok(Reply {
+                status: 200,
+                body: body.to_string(),
+            })
+        }
+    }
+    let desk = Arc::new(store(1)?);
+    let phone = store(2)?;
+    // Paired once by code: the phone's key verified, the phone remembered.
+    let first = sync_request(&phone, &HashMap::new(), "Pixel", "", "")?;
+    desk.serve_sync(first.to_string().as_bytes(), "Desk")?;
+    pair(&desk, &phone.device_id()?)?;
+    desk.set_ask_key("sk-test")?;
+    let mut hosting = PairedHosting::new(IpAddr::V4(Ipv4Addr::LOCALHOST), false);
+    hosting.set_asking(AskDesk::new(
+        desk.clone(),
+        Arc::new(Answers),
+        Arc::new(|t: chrono::DateTime<chrono::Utc>| t.naive_utc()),
+        || {},
+    ));
+    hosting.check(&desk);
+    let port = hosting.port().ok_or("hosting")?;
+    let desk_id = desk.device_id()?;
+    let asked = std::thread::spawn(move || -> Result<(u16, String), String> {
+        let fail = |e: &dyn std::fmt::Display| e.to_string();
+        let config = ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .disable_verification(true)
+                    .build(),
+            )
+            .http_status_as_error(false)
+            .build();
+        let agent = ureq::Agent::new_with_config(config);
+        let base = format!("https://127.0.0.1:{port}");
+        let mut challenge = agent
+            .get(format!("{base}/challenge"))
+            .call()
+            .map_err(|e| fail(&e))?;
+        let nonce: serde_json::Value = serde_json::from_str(
+            &challenge
+                .body_mut()
+                .read_to_string()
+                .map_err(|e| fail(&e))?,
+        )
+        .map_err(|e| fail(&e))?;
+        let nonce = nonce["nonce"].as_str().unwrap_or_default().to_string();
+        let proof = phone
+            .signing_key()
+            .map_err(|e| fail(&e))?
+            .sign(&paired_proof_bytes(&desk_id, &nonce));
+        let question = Question {
+            question: "Where is my passport?".into(),
+            earlier: Vec::new(),
+        };
+        let mut res = agent
+            .post(format!("{base}{ASK_PATH}"))
+            .header(DEVICE_HEADER, phone.device_id().map_err(|e| fail(&e))?)
+            .header(NONCE_HEADER, nonce)
+            .header(PROOF_HEADER, proof)
+            .content_type("application/json")
+            .send(question.to_json().to_string().as_bytes())
+            .map_err(|e| fail(&e))?;
+        let text = res.body_mut().read_to_string().map_err(|e| fail(&e))?;
+        Ok((res.status().as_u16(), text))
+    });
+    let syncing = Syncing::default();
+    for _ in 0..400 {
+        if asked.is_finished() {
+            break;
+        }
+        let sessions = hosting.step(&desk, "Desk", Duration::from_millis(25), &syncing);
+        assert!(sessions.is_empty());
+    }
+    let (status, text) = asked.join().map_err(|_| "asker")??;
+    assert_eq!(status, 200, "{text}");
+    let reply = AskReply::from_json(&serde_json::from_str(&text)?).ok_or("a reply")?;
+    assert_eq!(
+        reply.outcome.map(|a| a.text),
+        Ok("In the blue folder.".to_string())
+    );
+    assert!(!text.contains("sk-test"));
+    Ok(())
+}
+
+#[test]
 fn a_paired_device_can_be_kept_from_syncing_on_its_own() -> TestResult {
     let desk = store(1)?;
     pair(&desk, "phone")?;

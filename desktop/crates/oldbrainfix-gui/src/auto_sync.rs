@@ -4,7 +4,10 @@
 //! on every address of this computer, its port kept from run to run,
 //! and its mDNS record says where it is. Paired phones sync with it
 //! without the PIN, proven by their keys ([`Store::serve_paired`]); the
-//! PIN stays for the first Pairing in the Sync dialogs.
+//! PIN stays for the first Pairing in the Sync dialogs. A paired phone of
+//! the user asks its questions there too (#267): those go to the
+//! [`AskDesk`], which answers them on a thread of its own while the
+//! syncs go on.
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -14,6 +17,7 @@ use std::time::{Duration, Instant};
 use oldbrainfix_core::Store;
 use oldbrainfix_core::discovery::Advertiser;
 use oldbrainfix_core::lan::{Host, Session};
+use oldbrainfix_core::lan_ask::{self, AskDesk};
 
 /// How often it looks whether a paired Device syncs on its own.
 pub const CHECK_EVERY: Duration = Duration::from_secs(5);
@@ -106,6 +110,8 @@ pub struct PairedHosting {
     /// Whether the record goes out; not in tests.
     advertise: bool,
     checked: Option<Instant>,
+    /// Where the phone's questions go; without it, they are not offered.
+    asking: Option<AskDesk>,
     /// What went wrong last, for the log.
     pub error: Option<String>,
 }
@@ -124,8 +130,14 @@ impl PairedHosting {
             bind,
             advertise,
             checked: None,
+            asking: None,
             error: None,
         }
+    }
+
+    /// Answers the phone's questions with `desk`.
+    pub fn set_asking(&mut self, desk: AskDesk) {
+        self.asking = Some(desk);
     }
 
     pub fn hosting(&self) -> bool {
@@ -195,6 +207,14 @@ impl PairedHosting {
         let mut sessions = Vec::new();
         let mut next = host.wait_request(wait);
         while let Some(request) = next {
+            if lan_ask::is_ask(&request) {
+                match &self.asking {
+                    Some(desk) => desk.take(request),
+                    None => request.reply(oldbrainfix_core::lan::Response::status(404)),
+                }
+                next = host.next_request();
+                continue;
+            }
             match syncing.during(|| store.serve_paired(&request, name)) {
                 Ok((response, session)) => {
                     request.reply(response);
@@ -212,17 +232,21 @@ impl PairedHosting {
 }
 
 /// Runs the paired host until `stop`, as this Device named `name`, each
-/// answer as a sync of `syncing`; `synced` hears of every completed
-/// session. Conflicts that came in are kept to be announced the next
-/// time the window looks.
+/// answer as a sync of `syncing`, the phone's questions answered by
+/// `asking`; `synced` hears of every completed session. Conflicts that
+/// came in are kept to be announced the next time the window looks.
 pub fn run(
     store: &Store,
     name: &str,
     stop: &AtomicBool,
     syncing: &Syncing,
+    asking: Option<AskDesk>,
     mut synced: impl FnMut(&Session),
 ) {
     let mut hosting = PairedHosting::default();
+    if let Some(desk) = asking {
+        hosting.set_asking(desk);
+    }
     // Told once, not every few seconds while it lasts.
     let mut told: Option<String> = None;
     while !stop.load(Ordering::Relaxed) {

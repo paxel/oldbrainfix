@@ -478,31 +478,40 @@ class AutoSync extends ChangeNotifier {
           if (_disposed) return;
           if (!due.contains(device.id)) continue;
           final found = _found[device.id];
-          final host = found?.host ?? device.host;
-          final port = found?.port ?? device.port;
-          if (host == null || port == null) continue;
-          try {
-            final result = await _work(
-              () => runner.join(
-                store,
-                device,
-                host: host,
-                port: port,
-                name: name,
-              ),
-            );
-            _schedule.succeeded(device.id, clock());
-            _synced.add(device.id);
-            if (result.session.conflicts.isNotEmpty && !_disposed) {
-              _conflicts += result.session.conflicts.length;
-              notifyListeners();
+          // Where mDNS found it, else at its address by hand, else where
+          // it was last (#267).
+          final addresses = store.pairedAddresses(
+            device,
+            found: found == null ? null : (host: found.host, port: found.port),
+          );
+          for (final at in addresses) {
+            try {
+              final result = await _work(
+                () => runner.join(
+                  store,
+                  device,
+                  host: at.host,
+                  port: at.port,
+                  name: name,
+                ),
+              );
+              _schedule.succeeded(device.id, clock());
+              _synced.add(device.id);
+              if (result.session.conflicts.isNotEmpty && !_disposed) {
+                _conflicts += result.session.conflicts.length;
+                notifyListeners();
+              }
+              break;
+            } on SyncException catch (e) {
+              // An update is needed: announced once, tried again all the
+              // same.
+              _noteUpdate(store, device.id, e);
+              _takeUpdates();
+              if (e.needsUpdate) break;
+            } on Object {
+              // Not there, or not now: the next address, or the next
+              // occasion.
             }
-          } on SyncException catch (e) {
-            // An update is needed: announced once, tried again all the same.
-            _noteUpdate(store, device.id, e);
-            _takeUpdates();
-          } on Object {
-            // Not there, or not now: tried again on the next occasion.
           }
         }
       }
@@ -651,24 +660,33 @@ Future<void> _lanInBackground(
           for (final f in await platform.discover(look)) f.device: f,
         };
         for (final device in devices) {
-          final at = found[device.id]?.host ?? device.host;
-          final port = found[device.id]?.port ?? device.port;
-          if (at == null || port == null) continue;
-          try {
-            final result = await join(
-              store,
-              device,
-              host: at,
-              port: port,
-              name: name,
-            );
-            synced.add(device.id);
-            took(result.session);
-          } on SyncException catch (e) {
-            // Kept to be announced when the app opens.
-            _noteUpdate(store, device.id, e);
-          } on Object {
-            // Not there now: tried again within the window, or next run.
+          final seen = found[device.id];
+          // Where mDNS found it, else at its address by hand, else where
+          // it was last (#267).
+          final addresses = store.pairedAddresses(
+            device,
+            found: seen == null ? null : (host: seen.host, port: seen.port),
+          );
+          for (final at in addresses) {
+            try {
+              final result = await join(
+                store,
+                device,
+                host: at.host,
+                port: at.port,
+                name: name,
+              );
+              synced.add(device.id);
+              took(result.session);
+              break;
+            } on SyncException catch (e) {
+              // Kept to be announced when the app opens.
+              _noteUpdate(store, device.id, e);
+              if (e.needsUpdate) break;
+            } on Object {
+              // Not there now: the next address, tried again within the
+              // window, or next run.
+            }
           }
         }
       }

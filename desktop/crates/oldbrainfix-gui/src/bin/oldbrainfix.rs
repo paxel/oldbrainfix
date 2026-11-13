@@ -37,6 +37,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
+use oldbrainfix_core::ask;
+use oldbrainfix_core::lan_ask::AskDesk;
 use oldbrainfix_core::{
     APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store, ThemeChoice,
 };
@@ -819,24 +821,49 @@ fn run() -> Result<i32, String> {
     // window's (#225): the alerts plan again after it (a Done elsewhere
     // closes the notification here), the window reads the log again.
     let auto_stop = Arc::new(AtomicBool::new(false));
+    // A paired phone's question runs on a connection and a thread of its
+    // own (#267); a change its model drafts shows as the AI Task's review
+    // once the window reads the log again.
+    let asking = {
+        let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let window = window.clone();
+        AskDesk::new(
+            own_store(&dir, &store),
+            Arc::new(ask::Web::new()),
+            Arc::new(local_wall),
+            move || {
+                shown.changed_elsewhere();
+                changes.fetch_add(1, Ordering::SeqCst);
+                let _ = events.send(Event::Wake);
+                wake(&window);
+            },
+        )
+    };
     let auto_sync = {
         let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
         let store = own_store(&dir, &store);
         let (stop, wake_window, syncing) = (auto_stop.clone(), waker(&window), syncing.clone());
         std::thread::spawn(move || {
-            auto_sync::run(&store, &device_name(), &stop, &syncing, |session| {
-                // Another person's Profile alone counts too: the window's
-                // People were read on its own connection.
-                if !session.applied.is_empty()
-                    || session.profile.changed()
-                    || session.people_changed
-                {
-                    shown.changed_elsewhere();
-                    changes.fetch_add(1, Ordering::SeqCst);
-                    let _ = events.send(Event::Wake);
-                }
-                wake_window();
-            });
+            auto_sync::run(
+                &store,
+                &device_name(),
+                &stop,
+                &syncing,
+                Some(asking),
+                |session| {
+                    // Another person's Profile alone counts too: the window's
+                    // People were read on its own connection.
+                    if !session.applied.is_empty()
+                        || session.profile.changed()
+                        || session.people_changed
+                    {
+                        shown.changed_elsewhere();
+                        changes.fetch_add(1, Ordering::SeqCst);
+                        let _ = events.send(Event::Wake);
+                    }
+                    wake_window();
+                },
+            );
         })
     };
     // The shared folder syncs every half minute while the app runs, at

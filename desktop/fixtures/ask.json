@@ -1,0 +1,345 @@
+{
+  "questions": [
+    {
+      "question": "Where is my passport?",
+      "earlier": [],
+      "body": "{\"earlier\":[],\"question\":\"Where is my passport?\"}"
+    },
+    {
+      "question": "Und jetzt? „Pass“ im Ordner 📁",
+      "earlier": [
+        [
+          "Do I have a passport?",
+          "Yes: [Passport](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\nIt says \"valid until 2031\"."
+        ],
+        [
+          "Where?",
+          "In the blue folder."
+        ]
+      ],
+      "body": "{\"earlier\":[{\"answer\":\"Yes: [Passport](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\\nIt says \\\"valid until 2031\\\".\",\"question\":\"Do I have a passport?\"},{\"answer\":\"In the blue folder.\",\"question\":\"Where?\"}],\"question\":\"Und jetzt? „Pass“ im Ordner 📁\"}"
+    }
+  ],
+  "providers": [
+    {
+      "protocol": "anthropic",
+      "model": "claude-opus-5-5",
+      "host": "api.anthropic.com",
+      "unready": null,
+      "body": "{\"host\":\"api.anthropic.com\",\"model\":\"claude-opus-5-5\",\"protocol\":\"anthropic\",\"ready\":true}"
+    },
+    {
+      "protocol": "openai",
+      "model": "qwen3:32b",
+      "host": "llm.example.org:8443",
+      "unready": null,
+      "body": "{\"host\":\"llm.example.org:8443\",\"model\":\"qwen3:32b\",\"protocol\":\"openai\",\"ready\":true}"
+    },
+    {
+      "protocol": "openai",
+      "model": "",
+      "host": "localhost:11434",
+      "unready": "noModel",
+      "body": "{\"host\":\"localhost:11434\",\"model\":\"\",\"protocol\":\"openai\",\"ready\":false,\"unready\":\"noModel\"}"
+    },
+    {
+      "protocol": "anthropic",
+      "model": "claude-opus-5-5",
+      "host": "api.anthropic.com",
+      "unready": "noKey",
+      "body": "{\"host\":\"api.anthropic.com\",\"model\":\"claude-opus-5-5\",\"protocol\":\"anthropic\",\"ready\":false,\"unready\":\"noKey\"}"
+    }
+  ],
+  "replies": [
+    {
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\"},\"review\":false}",
+      "answer": {
+        "text": "In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).",
+        "notes": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "cut": false
+      },
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"cut\":true,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\",\"note:ffff\"],\"text\":\"Filed into Health; it waits for your review. Ärzte: …\"},\"review\":true}",
+      "answer": {
+        "text": "Filed into Health; it waits for your review. Ärzte: …",
+        "notes": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9",
+          "note:ffff"
+        ],
+        "cut": true
+      },
+      "review": true
+    },
+    {
+      "body": "{\"failure\":\"unready\",\"review\":false,\"unready\":\"noKey\"}",
+      "failure": "unready",
+      "message": "",
+      "status": 0,
+      "unready": "noKey",
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"unready\",\"review\":false,\"unready\":\"badUrl\"}",
+      "failure": "unready",
+      "message": "",
+      "status": 0,
+      "unready": "badUrl",
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"unready\",\"review\":false}",
+      "failure": "unready",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"key\",\"message\":\"invalid x-api-key: …\",\"review\":false}",
+      "failure": "key",
+      "message": "invalid x-api-key: …",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"provider\",\"message\":\"Overloaded \\\"now\\\"\",\"review\":true,\"status\":529}",
+      "failure": "provider",
+      "message": "Overloaded \"now\"",
+      "status": 529,
+      "unready": null,
+      "review": true
+    },
+    {
+      "body": "{\"failure\":\"network\",\"message\":\"timed out\",\"review\":false}",
+      "failure": "network",
+      "message": "timed out",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"unreadable\",\"message\":\"no content\",\"review\":false}",
+      "failure": "unreadable",
+      "message": "no content",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"rounds\",\"review\":false}",
+      "failure": "rounds",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"refused\",\"review\":false}",
+      "failure": "refused",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"stopped\",\"review\":false}",
+      "failure": "stopped",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"busy\",\"review\":true}",
+      "failure": "busy",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": true
+    },
+    {
+      "body": "{\"failure\":\"unknown\",\"review\":false}",
+      "failure": "unknown",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": false
+    }
+  ],
+  "later": [
+    {
+      "body": "{\"failure\":\"quota\",\"message\":\"later\",\"review\":true}",
+      "failure": "unknown",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": true
+    },
+    {
+      "body": "{\"failure\":\"unready\",\"review\":false,\"unready\":\"noLicence\"}",
+      "failure": "unready",
+      "message": "",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"provider\",\"message\":\"m\",\"review\":false,\"status\":-1}",
+      "failure": "provider",
+      "message": "m",
+      "status": 0,
+      "unready": null,
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"cut\":\"yes\",\"notes\":[\"note:1\",2],\"text\":\"T\"},\"review\":1,\"later\":true}",
+      "answer": {
+        "text": "T",
+        "notes": [
+          "note:1"
+        ],
+        "cut": false
+      },
+      "review": false
+    }
+  ],
+  "notReplies": [
+    "{}",
+    "{\"answer\":\"text\"}",
+    "{\"answer\":{\"notes\":[]}}",
+    "{\"failure\":4}"
+  ],
+  "addresses": [
+    {
+      "typed": "Desk.Tail1234.ts.net",
+      "host": "desk.tail1234.ts.net",
+      "port": null,
+      "text": "desk.tail1234.ts.net"
+    },
+    {
+      "typed": " 100.101.102.103:4711 ",
+      "host": "100.101.102.103",
+      "port": 4711,
+      "text": "100.101.102.103:4711"
+    },
+    {
+      "typed": "[FD7A:115C::1]:80",
+      "host": "fd7a:115c::1",
+      "port": 80,
+      "text": "[fd7a:115c::1]:80"
+    },
+    {
+      "typed": "fd7a::1",
+      "host": "fd7a::1",
+      "port": null,
+      "text": "[fd7a::1]"
+    },
+    {
+      "typed": "https://desk.local:4711/x?y",
+      "host": "desk.local",
+      "port": 4711,
+      "text": "desk.local:4711"
+    },
+    {
+      "typed": "HTTP://192.168.1.5",
+      "host": "192.168.1.5",
+      "port": null,
+      "text": "192.168.1.5"
+    },
+    {
+      "typed": "desk.",
+      "host": "desk.",
+      "port": null,
+      "text": "desk."
+    },
+    {
+      "typed": "",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "desk:0",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "desk:+80",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "desk:0x50",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "desk:65536",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "desk:080",
+      "host": "desk",
+      "port": 80,
+      "text": "desk:80"
+    },
+    {
+      "typed": "a b",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "ftp://desk",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "[desk]:1",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "[fd7a::1]x",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "me@desk",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "desk:",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "desK",
+      "host": null,
+      "port": null,
+      "text": null
+    },
+    {
+      "typed": "dësk",
+      "host": null,
+      "port": null,
+      "text": null
+    }
+  ]
+}
