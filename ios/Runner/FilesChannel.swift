@@ -30,7 +30,7 @@ enum FilesChannel {
         FilePicker.shared.pick(into: picked, result)
       case "open":
         result(
-          FileOpener.shared.open(
+          AttachmentOpener.shared.open(
             path: args["path"] as? String ?? "", type: args["type"] as? String ?? ""))
       case "pdfPages":
         let path = call.arguments as? String ?? ""
@@ -144,8 +144,8 @@ final class FilePicker: NSObject, UIDocumentPickerDelegate {
 
 /// Opens a Note's file written into the exports with another app: iOS's
 /// own menu of the apps that take it, beside a preview.
-final class FileOpener: NSObject, UIDocumentInteractionControllerDelegate {
-  static let shared = FileOpener()
+final class AttachmentOpener: NSObject, UIDocumentInteractionControllerDelegate {
+  static let shared = AttachmentOpener()
 
   /// Held while its menu shows; iOS keeps no reference of its own.
   private var shown: UIDocumentInteractionController?
