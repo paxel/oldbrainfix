@@ -440,7 +440,10 @@ fn a_dialog_closes_by_its_button_esc_and_back_and_leads_back_to_the_one_it_came_
     harness.state_mut().open(Page::Settings);
     harness.run();
     assert!(harness.query_by_label("Back to Settings").is_none());
-    harness.get_by_label("About Old Brain Fix").click();
+    // Below the AI cards, out of the dialog's view.
+    harness
+        .get_by_label("About Old Brain Fix")
+        .click_accesskit();
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::About));
     harness.get_by_label("Open-source licenses").click();

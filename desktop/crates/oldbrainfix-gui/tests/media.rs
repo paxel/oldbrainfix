@@ -555,6 +555,8 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
     let mut harness = settings(app);
     harness.run();
     std::thread::sleep(StdDuration::from_millis(100));
+    // The speech model's card lies below the AI cards, out of the
+    // dialog's view: its buttons are clicked as a screen reader does.
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2, "no model yet");
     assert!(shows(&harness, "Speech model"));
     assert!(shows(&harness, "No speech model yet"));
@@ -566,7 +568,7 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
         &harness,
         "Better with English words in German speech, but slower, and it needs more memory."
     ));
-    harness.get_by_label("Small, 488 MB").click();
+    harness.get_by_label("Small, 488 MB").click_accesskit();
     harness.run();
     assert!(eventually(|| speech.outcome().is_some()));
     harness.run();
@@ -575,7 +577,9 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
         "That is not the expected speech model, so it was not kept."
     ));
     // A file of the user's own that is not the model is refused alike.
-    harness.get_by_label("Use a file of my own").click();
+    harness
+        .get_by_label("Use a file of my own")
+        .click_accesskit();
     harness.run();
     assert!(eventually(|| speech.status() == Status::Missing));
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2);
@@ -637,7 +641,7 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     app.open(Page::Settings);
     let mut harness = settings(app);
     harness.run();
-    harness.get_by_label("Base, 148 MB").click();
+    harness.get_by_label("Base, 148 MB").click_accesskit();
     // A download in progress repaints, so step instead of waiting for stillness.
     harness.run_steps(4);
     assert!(eventually(|| speech.current() == Some(WhisperModel::Base)));
@@ -651,7 +655,7 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
         .untranscribed()
         .is_ok_and(|w| w.is_empty())));
     // The small one downloads while the base one stays in use.
-    harness.get_by_label("Small, 488 MB").click();
+    harness.get_by_label("Small, 488 MB").click_accesskit();
     // A download repaints to show how far it came.
     harness.run_steps(3);
     assert!(matches!(

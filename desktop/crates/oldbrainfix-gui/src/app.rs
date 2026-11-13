@@ -75,7 +75,9 @@ use egui::{
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::ai_port::{AiPort, Reach, Wake, docker_bridge};
+use oldbrainfix_core::ai_tools::ToolOutput;
 use oldbrainfix_core::app_link::AppLink;
+use oldbrainfix_core::ask::{self, Conversation, Provider, ToolCall};
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
@@ -107,6 +109,7 @@ use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::{Event, OccurrenceWanted};
 use crate::all_routines_view::{self, AllRoutinesAction};
 use crate::app_links;
+use crate::ask_view::{self, AskAsked, AskFields, AskPanel, AskSetting};
 use crate::attachment_view::{self, HeldFile};
 use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
@@ -237,6 +240,10 @@ pub enum Selection {
     /// the Areas.
     Tags,
     Trash,
+    /// The Ask panel (#267, ADR 0051): questions about the Notes to the
+    /// provider the user entered, answered with links to the Notes they
+    /// came from; reached by AI ▸ Ask… (Ctrl+K).
+    Ask,
 }
 
 /// A dialog over the window that holds what was a view of its own
@@ -759,6 +766,8 @@ struct View {
     ai_task: Option<String>,
     /// The AI Task's review, while it shows.
     ai_review: Option<ReviewShown>,
+    /// The provider the Ask panel asks, while it shows (#267).
+    ask_provider: Option<Provider>,
 }
 
 impl View {
@@ -1360,6 +1369,13 @@ enum Action {
     Fold(String, bool),
     /// Opens the Settings at the AI port's card: AI ▸ AI port… (#279).
     OpenAiPort,
+    /// Shows the Ask panel in the list, the cursor in its question field:
+    /// AI ▸ Ask… and Ctrl+K (#267).
+    OpenAsk,
+    /// What was asked of the Ask panel (#267).
+    Ask(AskAsked),
+    /// Keeps a change of the Ask panel's provider on this Device (#267).
+    AskSetting(AskSetting),
     /// Folds the Topics of this Area in the sidebar, or unfolds them, and
     /// keeps that on this Device (#279).
     FoldArea(String, bool),
@@ -2168,6 +2184,17 @@ pub struct App {
     shown: bool,
     /// The client whose config was copied last while the port is open.
     ai_copied: Option<Client>,
+    /// The Ask panel's questions and answers while it shows (#267).
+    ask: AskPanel,
+    /// The question asked off the window's thread, its tools answered
+    /// on it.
+    ask_run: Option<AskRun>,
+    /// What the Ask panel's requests go through: the network, or a fake
+    /// provider in the tests.
+    ask_transport: Arc<dyn ask::Transport>,
+    /// The provider's card as typed, read from the store when the Settings
+    /// first show it.
+    ask_fields: Option<AskFields>,
     /// Asks the system's dialog for an alarm sound file, titled as given.
     sound_picker: FolderPicker,
     /// The alarm sound file last looked at and whether it rings or the
@@ -2194,6 +2221,25 @@ pub struct App {
     /// What a Note window was asked that the main window does (#287):
     /// showing a place or a dialog, opening another Note.
     for_main: Vec<Action>,
+}
+
+/// A question asked off the window's thread (#267): the provider's
+/// requests run there, the tools the model calls cross to the window,
+/// which answers them on its own thread as the AI port's are.
+struct AskRun {
+    question: String,
+    arrives: std::sync::mpsc::Receiver<AskArrived>,
+    outputs: Sender<Vec<ToolOutput>>,
+    /// The AI Task waiting before it was asked.
+    before: Option<String>,
+    /// The AI Task its changes go into.
+    task: Option<String>,
+}
+
+/// What comes from the thread asking.
+enum AskArrived {
+    Tools(Vec<ToolCall>),
+    Done(Result<ask::Answer, ask::AskError>),
 }
 
 /// A Note in a window of its own (#287): the App showing it and its
@@ -2612,6 +2658,10 @@ impl App {
             profile_defaults: Box::new(login::apply_system_defaults),
             help_version: None,
             ai_port: None,
+            ask: AskPanel::default(),
+            ask_run: None,
+            ask_transport: Arc::new(ask::Web::new()),
+            ask_fields: None,
             redraw: None,
             shown: true,
             ai_copied: None,
@@ -5092,6 +5142,245 @@ impl App {
         }
     }
 
+    /// The Ask panel (#267): its provider, the question field and the
+    /// answers.
+    fn ask_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let Some(provider) = &self.view.ask_provider else {
+            return;
+        };
+        let shown = ask_view::PanelShown {
+            provider,
+            task_waits: self.view.ai_task.is_some(),
+            reviews: self.ai_port.is_none(),
+        };
+        let mut asked = Vec::new();
+        ask_view::page(ui, &self.t, tones, &mut self.ask, shown, &mut asked);
+        actions.extend(asked.into_iter().map(Action::Ask));
+    }
+
+    /// Lets the Ask panel's requests go through `transport`, as the tests
+    /// fake a provider (#267).
+    pub fn set_ask_transport(&mut self, transport: Arc<dyn ask::Transport>) {
+        self.ask_transport = transport;
+    }
+
+    /// The Ask panel's questions and answers (#267).
+    pub fn ask_panel(&self) -> &AskPanel {
+        &self.ask
+    }
+
+    /// What was asked of the Ask panel (#267).
+    fn ask_asked(&mut self, asked: AskAsked) -> oldbrainfix_core::Result<()> {
+        match asked {
+            AskAsked::Ask => self.ask_question()?,
+            AskAsked::Stop => {
+                // What was asked goes back into the field.
+                if let Some(question) = self.ask_stop()? {
+                    self.ask.question = question;
+                }
+                self.ask.focus = true;
+            }
+            AskAsked::StartOver => {
+                self.ask_stop()?;
+                self.ask.exchanges.clear();
+                self.ask.focus = true;
+            }
+            AskAsked::Keep(at) => {
+                let Some(asked) = self.ask.exchanges.get(at) else {
+                    return Ok(());
+                };
+                let answer = &asked.answer;
+                if asked.kept.is_some() {
+                    return Ok(());
+                }
+                // The question its first line, the answer with its links
+                // after it, as Markdown.
+                let text = format!("{}\n\n{}", asked.question.trim(), answer.text.trim());
+                let note = Notes::new(&self.store).capture_as(
+                    &text,
+                    oldbrainfix_core::text_format::MARKDOWN,
+                    None,
+                    None,
+                )?;
+                if let Some(asked) = self.ask.exchanges.get_mut(at) {
+                    asked.kept = Some(note.id);
+                }
+            }
+            AskAsked::OpenNote(id) => self.act(Action::SelectNote(id))?,
+            AskAsked::Review => self.act(Action::Ai(AiAction::Review))?,
+            AskAsked::Settings => {
+                self.settings_section = Some((ASK_SECTION.to_string(), 2));
+                self.act(Action::OpenPage(Page::Settings))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Asks the question typed in the Ask panel, after those answered: off
+    /// the window's thread when it can be woken, else here and at once,
+    /// as in the tests.
+    fn ask_question(&mut self) -> oldbrainfix_core::Result<()> {
+        let question = self.ask.question.trim().to_string();
+        let provider = self.store.ask_provider()?;
+        if question.is_empty() || self.ask_run.is_some() || provider.unready().is_some() {
+            return Ok(());
+        }
+        let now = (self.wall)(self.store.now())
+            .format("%Y-%m-%d %H:%M, %A")
+            .to_string();
+        let mut conversation = Conversation::new(provider, &self.ask.earlier(), &question, &now);
+        self.ask.question.clear();
+        let Some(redraw) = self.redraw.clone() else {
+            let asked = self
+                .store
+                .ask(&mut conversation, &*self.ask_transport, &*self.wall);
+            self.ask_answered(question, asked.map(|a| a.answer));
+            return Ok(());
+        };
+        let (to_window, arrives) = std::sync::mpsc::channel();
+        let (outputs, from_window) = std::sync::mpsc::channel::<Vec<ToolOutput>>();
+        let transport = self.ask_transport.clone();
+        std::thread::spawn(move || {
+            let done = ask::run(&mut conversation, &*transport, |calls| {
+                to_window.send(AskArrived::Tools(calls.to_vec())).ok()?;
+                redraw();
+                from_window.recv().ok()
+            });
+            drop(to_window.send(AskArrived::Done(done)));
+            redraw();
+        });
+        let before = self.store.ai_task()?;
+        self.ask.asking = Some(question.clone());
+        self.ask_run = Some(AskRun {
+            question,
+            arrives,
+            outputs,
+            task: before.clone(),
+            before,
+        });
+        Ok(())
+    }
+
+    /// Answers the tools the thread asking waits for, on this thread as
+    /// the AI as the store sees it, and takes in its answer once it is in;
+    /// the window looks again shortly while it runs.
+    fn ask_arrived(&mut self, ctx: &egui::Context) {
+        let Some(run) = &mut self.ask_run else {
+            return;
+        };
+        let mut done = None;
+        let mut answered = false;
+        loop {
+            match run.arrives.try_recv() {
+                Ok(AskArrived::Tools(calls)) => {
+                    let outputs = self.store.ask_calls(&calls, &*self.wall, &mut run.task);
+                    drop(run.outputs.send(outputs));
+                    answered = true;
+                }
+                Ok(AskArrived::Done(answer)) => {
+                    done = Some(answer);
+                    break;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    done = Some(Err(ask::AskError::Stopped));
+                    break;
+                }
+            }
+        }
+        if let Some(done) = done {
+            let question = run.question.clone();
+            self.ask_finished();
+            self.ask_answered(question, done);
+            self.refresh();
+        } else {
+            if answered {
+                self.refresh();
+            }
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        }
+    }
+
+    /// Ends the question asked off the window's thread: an AI Task it
+    /// opened and left without a change is declined, so sync goes on.
+    /// Its question, if one was asked.
+    fn ask_finished(&mut self) -> Option<String> {
+        let run = self.ask_run.take()?;
+        self.ask.asking = None;
+        if run.before.is_none()
+            && self.ai_port.is_none()
+            && let Some(task) = &run.task
+            && let Err(e) = self.store.drop_empty_ai_task(task)
+        {
+            self.error = Some(e.to_string());
+        }
+        Some(run.question)
+    }
+
+    /// Stops waiting for the answer; the thread asking hears it with its
+    /// next tools, and what it then brings is dropped. The question
+    /// stopped.
+    fn ask_stop(&mut self) -> oldbrainfix_core::Result<Option<String>> {
+        let question = self.ask_finished();
+        self.refresh();
+        Ok(question)
+    }
+
+    /// Shows the answer to `question` in the Ask panel, with the Notes it
+    /// links that are here, by their titles. A question not answered goes
+    /// back into the field, and why is announced at the top (UI laws,
+    /// "Announcements"), but for one stopped.
+    fn ask_answered(&mut self, question: String, done: Result<ask::Answer, ask::AskError>) {
+        self.ask.focus = true;
+        let answer = match done {
+            Ok(answer) => answer,
+            Err(why) => {
+                let t = self.t;
+                let provider = self
+                    .store
+                    .ask_provider()
+                    .map(|p| p.name())
+                    .unwrap_or_default();
+                if let Some((cause, fix, details)) = ask_view::failure(&t, &provider, &why) {
+                    self.announce_failure(
+                        t.ask_failed(),
+                        t.ask_failed_title(),
+                        (&cause, &fix),
+                        details,
+                    );
+                }
+                if self.ask.question.trim().is_empty() {
+                    self.ask.question = question;
+                }
+                return;
+            }
+        };
+        let notes = Notes::new(&self.store);
+        let mut sources = Vec::new();
+        for id in &answer.notes {
+            if let Ok(Some(note)) = notes.by_id(id)
+                && !note.is_trashed()
+            {
+                let title = row_title(&self.t, Some(&note));
+                let first = title.lines().next().unwrap_or_default().to_string();
+                sources.push((id.clone(), first));
+            }
+        }
+        self.ask.exchanges.push(ask_view::Asked {
+            question,
+            answer,
+            sources,
+            kept: None,
+        });
+    }
+
+    /// The list left the Ask panel: its question stops and its answers
+    /// go, but what was kept as a Note.
+    fn ask_left(&mut self) {
+        self.ask_finished();
+        self.ask = AskPanel::default();
+    }
+
     /// The LAN session the Sync dialogs host.
     pub fn sync_host(&self) -> &SyncHost {
         &self.sync
@@ -5717,6 +6006,7 @@ impl App {
             | Selection::Frogs
             | Selection::AllRoutines
             | Selection::Tags
+            | Selection::Ask
             | Selection::History(_) => Vec::new(),
             Selection::All => self
                 .store
@@ -6301,6 +6591,11 @@ impl App {
                 _ => None,
             },
             ai_task,
+            ask_provider: if self.selection == Selection::Ask {
+                Some(self.store.ask_provider()?)
+            } else {
+                None
+            },
         })
     }
 
@@ -6710,6 +7005,32 @@ impl App {
                 self.settings_section = Some((AI_PORT_SECTION.to_string(), 2));
                 self.act(Action::OpenPage(Page::Settings))?;
             }
+            Action::OpenAsk => {
+                // In the list, the dialogs over it closed, what was typed
+                // kept.
+                if self.quick_open {
+                    self.act(Action::CloseQuickNote)?;
+                }
+                if self.selected_note.is_some() {
+                    self.act(Action::CloseNote)?;
+                }
+                self.pages.clear();
+                if self.selection != Selection::Ask {
+                    self.go(Selection::Ask);
+                }
+                self.ask.focus = true;
+            }
+            Action::Ask(asked) => self.ask_asked(asked)?,
+            Action::AskSetting(setting) => match setting {
+                AskSetting::Protocol(protocol) => {
+                    self.store.set_ask_protocol(protocol)?;
+                    // Each protocol keeps its own fields.
+                    self.ask_fields = None;
+                }
+                AskSetting::Url(url) => self.store.set_ask_url(&url)?,
+                AskSetting::Model(model) => self.store.set_ask_model(&model)?,
+                AskSetting::Key(key) => self.store.set_ask_key(&key)?,
+            },
             Action::FoldArea(area, folded) => {
                 // Nothing kept means unfolded, the default.
                 let setting = format!("{AREA_FOLDED}{area}");
@@ -9668,6 +9989,10 @@ impl App {
     /// person filter of its own, as on the phone, and its list scrolls
     /// to where it was, a new one to the top.
     fn arrive(&mut self, to: Selection, left: Left) {
+        // The answers go once the list shows another place (#267).
+        if self.selection == Selection::Ask && to != Selection::Ask {
+            self.ask_left();
+        }
         if to != self.selection {
             self.query = left.query;
             self.people = left.people;
@@ -9693,6 +10018,7 @@ impl App {
             Selection::Frogs => vec![here(t.frogs_title())],
             Selection::Tags => vec![here(t.tags_title())],
             Selection::Trash => vec![here(t.trash_title())],
+            Selection::Ask => vec![here(t.ask_title())],
             Selection::AllRoutines => vec![agenda(), here(t.all_routines_title())],
             Selection::History(_) => vec![
                 agenda(),
@@ -9858,6 +10184,7 @@ impl App {
     pub fn show(&mut self, ui: &mut Ui) {
         self.agenda_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
+        self.ask_arrived(ui.ctx());
         // However its page went, what a Backup opened held goes with it.
         self.backup_notes_left();
         self.feedback.busy = self.pack_saving();
@@ -10169,6 +10496,11 @@ impl App {
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
+                }
+                // The Ask panel (#267), taken before a text field's own
+                // Ctrl+K (delete to the line's end) sees it.
+                if i.consume_key(Modifiers::COMMAND, Key::K) {
+                    actions.push(Action::OpenAsk);
                 }
                 // F2 renames the Area or Topic shown (#279); in a text
                 // field and over a menu it rests.
@@ -10598,6 +10930,7 @@ impl App {
                 | Action::OpenPage(_)
                 | Action::PageInto(_)
                 | Action::NewNote
+                | Action::OpenAsk
                 | Action::Back
                 | Action::Forward => self.for_main.push(action),
                 action => self.apply(action),
@@ -11803,10 +12136,12 @@ impl App {
                 };
                 menu_entries(ui, [last], actions);
             });
-            // The AI port (#279): its card in the Settings, and the review
-            // of the AI Task that waits, greyed while none does.
+            // The Ask panel (#267), the AI port (#279): its card in the
+            // Settings, and the review of the AI Task that waits, greyed
+            // while none does.
             ui.menu_button(RichText::new(t.menu_ai()).color(text), |ui| {
                 let items = [
+                    (t.menu_ask(), keys(Key::K), true, Action::OpenAsk),
                     (t.menu_ai_port(), None, true, Action::OpenAiPort),
                     (
                         t.ai_review_title(),
@@ -12572,6 +12907,7 @@ impl App {
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Tags => self.t.tags_title().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
+            Selection::Ask => self.t.ask_title().to_string(),
             Selection::Place(id) => self
                 .view
                 .areas
@@ -12779,6 +13115,7 @@ impl App {
             Selection::SentItemsWaiting => return self.held_pane(ui, tones, actions),
             Selection::AreaOffersWaiting => return self.offers_pane(ui, tones, actions),
             Selection::AiReview => return self.ai_review_pane(ui, tones, actions),
+            Selection::Ask => return self.ask_pane(ui, tones, actions),
             Selection::Frogs => {
                 let mut asked = Vec::new();
                 let view = &self.view;
@@ -15374,6 +15711,34 @@ impl App {
                     actions.push(Action::Ai(asked));
                 }
             }
+            // The Ask panel's provider (#267): one setting, as the AI
+            // port's card is.
+            let [asks] = settings_search::rows(
+                q,
+                Some(t.ask_settings_title()),
+                [&[
+                    t.ask_settings_intro(),
+                    t.ask_anthropic(),
+                    t.ask_openai(),
+                    t.ask_url(),
+                    t.ask_model(),
+                    t.ask_key(),
+                ]],
+            );
+            if asks {
+                found = true;
+                if self.ask_fields.is_none()
+                    && let Ok(provider) = self.store.ask_provider()
+                {
+                    self.ask_fields = Some(AskFields::of(&provider));
+                }
+                if let Some(fields) = &mut self.ask_fields {
+                    let at = section.as_deref() == Some(ASK_SECTION);
+                    if let Some(changed) = ask_view::settings_card(ui, &t, tones, fields, at) {
+                        actions.push(Action::AskSetting(changed));
+                    }
+                }
+            }
             let [feedback] = settings_search::rows(
                 q,
                 None,
@@ -16277,6 +16642,10 @@ const BLOCKED_OPEN: &str = "peopleBlockedOpen";
 /// Where AI ▸ AI port… opens the Settings (#279): at the AI port's card,
 /// which no app link names.
 const AI_PORT_SECTION: &str = "ai port";
+
+/// Where the Ask panel opens the Settings when its provider cannot be
+/// asked (#267): at the provider's card, which no app link names.
+const ASK_SECTION: &str = "ask";
 
 /// What the settings of this Device start with that keep an Area's Topics
 /// folded in the sidebar, the Area's id after it (#279); none kept means

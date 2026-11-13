@@ -841,9 +841,10 @@ fn with_done_reminders_trashed_done_moves_the_note_to_the_trash() -> TestResult 
     harness.run();
     harness.get_by_label("Settings… Ctrl+,").click();
     harness.run();
+    // Below the AI cards, out of the dialog's view.
     harness
         .get_by_label("Move a Note to the Trash when its one-time Reminder is done")
-        .click();
+        .click_accesskit();
     harness.run();
     let store = harness.state().store();
     assert!(PersonSettings::new(store).trashes_done_reminder()?);
@@ -918,9 +919,10 @@ fn with_checked_items_hidden_a_done_occurrence_leaves_the_agenda() -> TestResult
     harness.get_by_label("Settings… Ctrl+,").click();
     harness.run();
     assert!(shows(&harness, "Agenda"));
+    // Below the AI cards, out of the dialog's view.
     harness
         .get_by_label("Hide what's checked on the Agenda")
-        .click();
+        .click_accesskit();
     harness.run();
     assert!(DeviceSettings::new(harness.state().store()).agenda_hides_checked()?);
     harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);

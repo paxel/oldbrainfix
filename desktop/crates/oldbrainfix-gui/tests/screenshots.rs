@@ -93,6 +93,10 @@ struct Texts {
     /// A Note with a typo, and its text as an AI Task fixes it.
     typo: &'static str,
     fixed: &'static str,
+    /// A question in the Ask panel (#267), and its answer from the
+    /// tyres' Note, `{id}` its id.
+    ask_question: &'static str,
+    ask_answer: &'static str,
     /// The menu bar's Note menu.
     note_menu: &'static str,
     /// The first start's "New to Old Brain Fix".
@@ -175,6 +179,8 @@ const EN: Texts = Texts {
     add_here: "Add here",
     typo: "Pick up the parcel for Dana at the post office tomorow",
     fixed: "Pick up the parcel for Dana at the post office tomorrow",
+    ask_question: "Where are the winter tyres?",
+    ask_answer: "In the cellar, on the left shelf, with the wheel bolts ([Winter tyres](oldbrainfix://note/{id})).",
     note_menu: "Note",
     new_here: "New to Old Brain Fix",
     file_menu: "File",
@@ -239,6 +245,8 @@ const DE: Texts = Texts {
     add_here: "Hier hinzufügen",
     typo: "Packet für Dana morgen bei der Post abhohlen",
     fixed: "Paket für Dana morgen bei der Post abholen",
+    ask_question: "Wo sind die Winterreifen?",
+    ask_answer: "Im Keller, im linken Regal, mit den Radschrauben ([Winterreifen](oldbrainfix://note/{id})).",
     note_menu: "Notiz",
     new_here: "Neu bei Old Brain Fix",
     file_menu: "Datei",
@@ -2307,5 +2315,69 @@ fn desktop_frames(
         store.drafting(&task, || notes.edit(&parcel.id, texts.fixed))
     })?);
     problems.extend(match_frame(&mut harness, &box_frame("ai-port"))?);
+    drop(harness);
+    problems.extend(ask_frame(texts, language, theme, &box_frame("ask"))?);
     Ok(problems)
+}
+
+/// A provider for the frames: it searches, reads the Note `note` and
+/// answers `answer` (#267).
+struct FrameProvider(Mutex<Vec<serde_json::Value>>);
+
+impl oldbrainfix_core::ask::Transport for FrameProvider {
+    fn post(
+        &self,
+        _: &oldbrainfix_core::ask::Request,
+    ) -> Result<oldbrainfix_core::ask::Reply, String> {
+        let body = self.0.lock().pop().ok_or("no reply")?;
+        Ok(oldbrainfix_core::ask::Reply {
+            status: 200,
+            body: body.to_string(),
+        })
+    }
+}
+
+/// The Ask panel (#267): a question answered from the tyres' Note, with
+/// its link and the Note it came from, as the frame `path`.
+fn ask_frame(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    path: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let mut harness = Box::new(window_with(texts, language, theme, |store, _| {
+        store.set_ask_key("sk-ant-frames")
+    })?);
+    let tyres = Notes::new(harness.state().store())
+        .all()?
+        .into_iter()
+        .find(|n| n.text == texts.filed[4])
+        .ok_or("the tyres' Note")?;
+    let answer = texts.ask_answer.replace("{id}", &tyres.id);
+    let call = |name: &str, input: serde_json::Value| {
+        serde_json::json!({
+            "content": [{"id": name, "input": input, "name": name, "type": "tool_use"}],
+            "stop_reason": "tool_use",
+        })
+    };
+    let replies = vec![
+        serde_json::json!({"content": [{"text": answer, "type": "text"}], "stop_reason": "end_turn"}),
+        call("read_note", serde_json::json!({"id": tyres.id})),
+        call(
+            "find_notes",
+            serde_json::json!({"words": ["tyres", "Reifen"]}),
+        ),
+    ];
+    harness
+        .state_mut()
+        .set_ask_transport(Arc::new(FrameProvider(Mutex::new(replies))));
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::K);
+    harness.run();
+    harness
+        .get_by(|n| n.is_focused())
+        .type_text(texts.ask_question);
+    harness.run();
+    harness.key_press(egui::Key::Enter);
+    harness.run();
+    match_frame(&mut harness, path)
 }

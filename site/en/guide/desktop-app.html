@@ -1,4 +1,4 @@
-<!-- page: title="The desktop app" track="guide" order=10 summary="Old Brain Fix on Linux, Windows and macOS: installing it, the window and its cards, the Note dialog, the menu bar, dialogs and keys, the tray and the start at login, the capture popup, the hotkey and oldbrainfix capture, drag and drop, notifications, Transcripts, sync with the phone, the AI port, the theme and the size, and what only the phone has." -->
+<!-- page: title="The desktop app" track="guide" order=10 summary="Old Brain Fix on Linux, Windows and macOS: installing it, the window and its cards, the Note dialog, the menu bar, dialogs and keys, the tray and the start at login, the capture popup, the hotkey and oldbrainfix capture, drag and drop, notifications, Transcripts, sync with the phone, the AI port, asking about the Notes, the theme and the size, and what only the phone has." -->
 <p class="lede">
   The desktop app runs on Linux, Windows and macOS and holds the same Notes, Areas and Routines as
   the phone once the two are paired. It is a window with a menu bar, the places on the left and the
@@ -299,7 +299,7 @@
   <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Theme</strong> (see <a href="#change-the-theme-and-the-size">Change the theme and the size</a>).</li>
   <li><strong>Area</strong>, for the Area or Topic the list shows: <strong>Rename</strong> (F2), <strong>Colour and icon</strong>, <strong>Share…</strong>, <strong>People</strong>, <strong>Export as Pack…</strong>, <strong>Hidden from AI</strong>, <strong>Move up</strong> (Alt+Up), <strong>Move down</strong> (Alt+Down) and <strong>Delete</strong>, as its right-click in the sidebar offers them. Each is greyed where that menu leaves it out, such as Colour and icon, Share…, People, Hidden from AI, Move up and Move down for a Topic, Hidden from AI for a Shared Area, Move up for the first Area and Move down for the last, and all of them while no Area or Topic shows or a dialog, the Note dialog too, lies over the list.</li>
   <li><strong>Note</strong>, for the Note in the Note dialog: <strong>File into…</strong> (Ctrl+M), which asks for the Area or Topic and, while no Note is open, files the cards selected in the list, <strong>Merge into…</strong> (Ctrl+Shift+M), <strong>Importance</strong>, <strong>Routine…</strong>, <strong>Reminder…</strong>, <strong>Frog</strong> and <strong>Session</strong>, <strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong>, <strong>Make it a Tally</strong>, <strong>Send to a person</strong>, <strong>Copy as text</strong>, <strong>Export as Pack…</strong>, <strong>History</strong> and <strong>Delete</strong>, in the Trash <strong>Restore</strong> in its place while no Note is open. Frog, Session and Make it a Tally show in Advanced only. They are greyed while no Note is open, but File into…, Merge into…, Importance, Delete and Restore while cards are selected, which they act on, and each one where the Note dialog does not offer it either.</li>
-  <li><strong>AI</strong>: <strong>AI port…</strong> opens the Settings at the AI port's card, and <strong>Review the AI Task</strong> shows the review of the AI Task that waits, greyed while none waits or the port is open (see <a href="#open-the-ai-port">Open the AI port</a>).</li>
+  <li><strong>AI</strong>: <strong>Ask…</strong> (Ctrl+K) shows the Ask panel in the list (see <a href="#ask-about-your-notes">Ask about your Notes</a>), <strong>AI port…</strong> opens the Settings at the AI port's card, and <strong>Review the AI Task</strong> shows the review of the AI Task that waits, greyed while none waits or the port is open (see <a href="#open-the-ai-port">Open the AI port</a>).</li>
   <li><strong>Sync</strong>: <strong>Sync now</strong>, <strong>Pair a Device</strong>, <strong>People</strong>, <strong>Profile</strong> and <strong>Backups…</strong>, each a dialog (see <a href="#close-a-dialog-or-go-back-in-it">Close a dialog or go back in it</a>).</li>
   <li><strong>Help</strong>: <strong>User guide</strong> opens this page in the browser; <strong>About Old Brain Fix</strong> shows the version, the documentation and privacy policy, the source code and every third-party component with its licence.</li>
 </ul>
@@ -363,7 +363,7 @@
 <ul>
   <li><strong>Alt+Left, the mouse's back button or the back arrow above the list</strong>: the place the list showed before, as a browser goes back, with the search, the person filter and the scroll position it was left with. In a dialog opened from another it leads back to that one, and otherwise closes the dialog, the Note dialog and the quick note keeping what was typed, and the Routine editor, a Tally entry and the New Tally and Session pages saving a change as Esc does; a photo or table shown full screen closes.</li>
   <li><strong>Alt+Right, the mouse's forward button or the forward arrow</strong>: the place back came from, as it was left. Showing another place forgets what lay ahead; a place shown anew from the sidebar or the path starts with an empty search, at the top.</li>
-  <li><strong>Ctrl+N, Ctrl+F, Ctrl+M, Ctrl+Shift+M and Ctrl+,</strong> (Cmd on macOS): New Note, Find, File into…, Merge into… and Settings…, as in the menu bar; also while the cursor is in a text field and over the Note dialog, not while another dialog is open, but Ctrl+F over the Settings, which puts the cursor into their search field.</li>
+  <li><strong>Ctrl+N, Ctrl+F, Ctrl+M, Ctrl+Shift+M, Ctrl+K and Ctrl+,</strong> (Cmd on macOS): New Note, Find, File into…, Merge into…, Ask… and Settings…, as in the menu bar; also while the cursor is in a text field and over the Note dialog, not while another dialog is open, but Ctrl+F over the Settings, which puts the cursor into their search field.</li>
   <li><strong>F2</strong>: renames the Area or Topic the list shows, as <strong>Area ▸ Rename</strong>; not while the cursor is in a text field or a dialog is open.</li>
   <li><strong>Alt+Up and Alt+Down</strong>: move the Area the list shows one place up or down in your own order of the Areas, as <strong>Area ▸ Move up</strong> and <strong>Move down</strong>, also a Shared Area, whose others keep their own order; not while the cursor is in a text field or a dialog is open. In a Line of a Checklist they move the Line instead.</li>
   <li><strong>Over the cards of a Note list</strong>, while no dialog is open and the cursor is in no field: Up and Down select the next card, Shift+Up and Shift+Down extend the selection, Ctrl+A (Cmd+A on macOS) selects all cards, Enter opens the Note of the card reached last, Delete moves the cards selected to the Trash without asking, for Ctrl+Z to bring back, and 1, 2 and 3 make them Important, Normal or Unimportant. Down in the search field goes to the first card found. The card selected scrolls into view, and after an action Up and Down go on from it while it still shows, so Unsorted is sorted with Down, Ctrl+M, a few letters of the place and Enter for each Note. In the Trash Delete and the digits do nothing. The Note menu shows Delete and the digits beside its entries while they act on the cards selected.</li>
@@ -386,7 +386,7 @@
 <box-tab device="phone" alt="The Agenda on the phone, which has no tray">
 <li>Use the desktop app for this; the phone has no tray.</li>
 </box-tab>
-<box-tab device="desktop" alt="The desktop Settings as a dialog over the Agenda: under This computer Notifications on this computer, Start at login and Bigger text and icons, then the AI port with Who may connect, About Old Brain Fix and Quick capture with the hotkey Ctrl+Alt+N">
+<box-tab device="desktop" alt="The desktop Settings as a dialog over the Agenda: under This computer Notifications on this computer, Start at login and Bigger text and icons, then the AI port with Who may connect and the Ask panel with Anthropic (Claude) and OpenAI-compatible">
 <li>Close the window.</li>
 <li>Click the tray icon to open it again.</li>
 <li>Right-click the tray icon for its menu.</li>
@@ -635,6 +635,50 @@
   the Trash setting among them. It sets a Note's text format, sets up Tallies, Sessions, Checklists,
   Shopping Lists and Frogs, and turns a Checklist into a Shopping List and back, each as a change that
   waits for the review. What you recorded it only reads.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="ask">
+<h2>Ask about your Notes</h2>
+<p>Ask an AI model of your choice about your Notes, answered with links to them.</p>
+<box-tab device="phone" alt="Sync on the phone: Scan the code, the Pair code field with Sync now, and Show this Device's code">
+<li>Mark private Notes and Areas <strong>Hidden from AI</strong>.</li>
+<li>Sync the phone with the computer.</li>
+<li>Ask in the desktop app.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Ask panel: the question Where are the winter tyres?, the answer with a link to the Note, From these Notes with the Note's title, and Keep as Note">
+<li>Enter provider, model and API key under <strong>Ask panel</strong> in the Settings.</li>
+<li>Press Ctrl+K, or click <strong>AI ▸ Ask…</strong>.</li>
+<li>Type your question and press Enter.</li>
+<li>Click a Note under <strong>From these Notes</strong> to open it.</li>
+<li>Click <strong>Keep as Note</strong> to keep the answer.</li>
+</box-tab>
+<box-more>
+<p>
+  Only the desktop asks. Old Brain Fix provides no model and no account: under <strong>Ask panel</strong>
+  in the Settings you choose <strong>Anthropic (Claude)</strong> or an OpenAI-compatible provider such
+  as DeepSeek, OpenRouter, Ollama or LM Studio, with its base URL (empty asks Ollama on this computer),
+  the model and your own API key, which a model on this computer does not need. The key stays on this
+  computer: it is not synced and is in no Backup. An <code>http://</code> address is allowed only on
+  this computer or the home network.
+</p>
+<p>
+  The line under the heading names the provider and the model. The model searches your Notes several
+  times with its own words, reads the Notes it uses and links them in its answer; a click on a link, or
+  on a title under <strong>From these Notes</strong>, opens the Note over the panel. Only what the model
+  finds and reads is sent to the provider: the names of your Areas, Topics and tags, your Routines and Reminders with their check-offs when it lists them, the titles and short excerpts of the Notes its searches find, and the Notes it reads in full, with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context (when and where a Note was captured, the calendar event and the Bluetooth device). Notes and Areas Hidden from AI are never
+  sent, not even as a count. Asking does not pause sync.
+</p>
+<p>
+  A question after an answer is asked after it, so you can ask on. <strong>Start over</strong> drops
+  the questions asked, and <strong>Stop</strong> puts a question back into the field, as does a question that gets no answer,
+  and the top then says why. The answers are
+  gone once the list shows another place; <strong>Keep as Note</strong> saves the question and its
+  answer, with its links, as a new Note in Unsorted. When you ask the model to change something, such
+  as "sort what's new" into Areas and Topics, its changes wait as an AI Task: the panel says so, and
+  <strong>Review</strong> shows them to accept or reject as a whole (see
+  <a href="#open-the-ai-port">Open the AI port</a>). Sync waits until you decide.
 </p>
 </box-more>
 </guide-box>

@@ -19,6 +19,7 @@ pub mod alerts;
 pub mod all_routines_view;
 pub mod app;
 pub mod app_links;
+pub mod ask_view;
 pub mod attachment_view;
 pub mod auto_sync;
 pub mod autostart;

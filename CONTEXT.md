@@ -318,8 +318,12 @@ Changes the user sees as if they were kept, which are kept only once the user ac
 _Avoid_: draft, staging, preview (a preview shows without keeping anything)
 
 **AI Task**:
-One job the user hands to an AI model of their choice through the desktop's AI port, such as fixing typos or removing everything about a topic. Everything it changes is a Pending Change, reviewed together when the user says it is done and accepted or rejected as a whole. One at a time; sync waits meanwhile.
+One job the user hands to an AI model of their choice through the desktop's AI port, such as fixing typos or removing everything about a topic, or what a model changes when asked to in the Ask panel, such as filing what is new. Everything it changes is a Pending Change, reviewed together when the user says it is done and accepted or rejected as a whole. One at a time; sync waits meanwhile.
 _Avoid_: agent, assistant, chat, AI mode
+
+**Ask panel**:
+Where the user asks the desktop about their Notes (AI ▸ Ask…): the question goes to a provider the user entered with their own API key, Anthropic or an OpenAI-compatible one such as a local Ollama, whose model searches and reads the Notes through the AI port's tools and answers with links to the Notes it came from. Only what the model finds and reads is sent, never what is Hidden from AI. Asking pauses no sync; a change the model makes, such as filing what is new, waits as an AI Task for review. An answer is gone once the panel is left, unless kept as a Note (ADR 0051). German: Fragen-Ansicht.
+_Avoid_: chat, assistant, copilot, AI search
 
 ### Privacy
 

@@ -316,8 +316,12 @@ _Avoid_: Zusammenstoß, Merge-Konflikt
 _Avoid_: Entwurf, Zwischenstand, Vorschau (eine Vorschau zeigt, ohne etwas zu behalten)
 
 **KI-Aufgabe** [AI Task]:
-Eine Arbeit, die du über den KI-Port des Computers einem KI-Modell deiner Wahl gibst, etwa Tippfehler zu beheben oder alles über ein Thema zu entfernen. Alles, was sie ändert, ist eine ausstehende Änderung; sie werden zusammen geprüft, wenn du sagst, dass sie fertig ist, und als Ganzes angenommen oder abgelehnt. Eine nach der anderen; der Abgleich wartet so lange.
+Eine Arbeit, die du über den KI-Port des Computers einem KI-Modell deiner Wahl gibst, etwa Tippfehler zu beheben oder alles über ein Thema zu entfernen, oder was ein Modell ändert, wenn du es in der Fragen-Ansicht darum bittest, etwa das Neue abzulegen. Alles, was sie ändert, ist eine ausstehende Änderung; sie werden zusammen geprüft, wenn du sagst, dass sie fertig ist, und als Ganzes angenommen oder abgelehnt. Eine nach der anderen; der Abgleich wartet so lange.
 _Avoid_: Agent, Assistent, Chat, KI-Modus
+
+**Fragen-Ansicht** [Ask panel]:
+Wo du den Computer zu deinen Notizen fragst (KI ▸ Fragen …): Die Frage geht an einen Anbieter, den du mit deinem eigenen API-Schlüssel eingetragen hast, Anthropic oder einen OpenAI-kompatiblen wie ein lokales Ollama, dessen Modell die Notizen über die Werkzeuge des KI-Ports sucht und liest und mit Links zu den Notizen antwortet, aus denen es die Antwort hat. Gesendet wird nur, was das Modell findet und liest, nie was vor KI verborgen ist. Das Fragen hält keinen Abgleich an; eine Änderung des Modells, etwa das Ablegen des Neuen, wartet als KI-Aufgabe auf deine Prüfung. Eine Antwort ist weg, sobald du die Ansicht verlässt, außer du behältst sie als Notiz.
+_Avoid_: Chat, Assistent, Copilot, KI-Suche
 
 ## Privatsphäre
 

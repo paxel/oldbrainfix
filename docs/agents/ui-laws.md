@@ -1390,11 +1390,33 @@ replace a law of Both apps where they say so. A desktop law marked
   line shows the gap the Area goes into; let go where it stands or
   away from the Areas, it stays and nothing is written. A card dropped
   on an Area's row files there instead.
-- **The AI menu leads to the AI port** (#279): AI port… opens the
-  Settings at the AI port's card, and Review the AI Task shows the
-  review of the AI Task that waits, greyed while none waits or the port
-  is open. Ask… joins it with the Ask panel (#267); until then it is
-  left out, not greyed.
+- **The AI menu leads to the AI port** (#279): Ask… (Ctrl+K, #267)
+  shows the Ask panel, AI port… opens the Settings at the AI port's
+  card, and Review the AI Task shows the review of the AI Task that
+  waits, greyed while none waits or the port is open.
+- **The Ask panel is a place in the list** (#267, ADR 0051), reached
+  by Ask… and Ctrl+K, which also work while typing and over the Note
+  dialog and put the cursor into its question field. Under its heading
+  a line names the provider and the model and says that only what the
+  model finds and reads is sent, never what is Hidden from AI; while
+  the provider cannot be asked, the line says what is missing in the
+  error colour with "Settings…", which opens the Settings at the
+  provider's card. Enter or Ask (Ctrl+Enter) asks; while it waits,
+  Stop puts the question back into the field. The answers stand under
+  the field, the newest first, each with its question, its text as a
+  formatted text whose links open their Notes, "From these Notes" with
+  each Note's title as a link, and Keep as Note, then "Kept as a Note"
+  opening it. A question not answered goes back into the field and is
+  announced at the top, its tap the cause, the fix and the provider's
+  message. A Note
+  opens in the Note dialog over the panel, which stays. A follow-up is
+  asked after the earlier answers; Start over drops them, and so does
+  showing another place. While an AI Task waits, a line says that its
+  changes wait for review with sync, beside Review. The provider's
+  card in the Settings sits after the AI port's: the protocol as
+  radio buttons, the base URL only for an OpenAI-compatible provider
+  with its error under it, the model, the API key hidden as typed, and
+  that the key stays on this computer.
 - **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
   Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the
   desktop's offer to undo, with no announcement: Edit ▸ Undo is first in its menu and greyed while

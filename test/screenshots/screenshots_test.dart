@@ -2739,6 +2739,14 @@ void main() {
             expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
           });
 
+          // Asking (#267) is the desktop's: the phone marks what is hidden
+          // and syncs with the computer first.
+          boxFrame(desktop178, 'ask', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(tester, t);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
           boxFrame(desktop178, 'look', (tester) async {
             final t = await start(tester, seed());
             await openSettings(tester, t);

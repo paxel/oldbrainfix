@@ -15,6 +15,7 @@ pub mod ai_task;
 pub mod ai_tools;
 pub mod alarms;
 pub mod app_link;
+pub mod ask;
 pub mod backup;
 pub mod blobs;
 pub mod blocks;

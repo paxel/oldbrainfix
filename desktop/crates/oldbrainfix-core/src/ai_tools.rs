@@ -223,6 +223,31 @@ pub fn tools() -> Vec<Value> {
             &[],
         ),
         tool(
+            "find_notes",
+            "Finds Notes by words, for asking about them (#267): each word is searched as list_notes searches (text, Sections, Transcripts, Photo Texts, attached files' names and Attachment Texts, Tally entries' lines and list Lines, ignoring case), and the Notes holding most of the words come first, then the newest. Each Note found names its id, title (its first line), capture time, Area or Topic, the words it holds and a short excerpt of its text; read_note reads it in full. Search again with other words, synonyms and spellings when little is found. Neither the trash nor merged Notes count.",
+            true,
+            json!({
+                "limit": {"description": "How many Notes at most, 20 when left out, at most 50", "type": "integer"},
+                "place": string("Only the Notes in this Area or Topic (an Area's Topics included)"),
+                "words": {
+                    "description": "The words or phrases to look for; a phrase is found as written",
+                    "items": {"type": "string"},
+                    "type": "array",
+                },
+            }),
+            &["words"],
+        ),
+        tool(
+            "list_new",
+            "Lists what is new since a time (#267): the Notes captured since then and those given an Amend or a merged Note since then, newest first, each with its id, title (its first line), capture time, when it was last amended, its Area or Topic or that it is Unsorted, and a short excerpt of its text; read_note reads it in full. Neither the trash nor merged Notes count.",
+            true,
+            json!({
+                "limit": {"description": "How many Notes at most, 50 when left out, at most 200", "type": "integer"},
+                "since": string("From when: a day, YYYY-MM-DD, on this computer's clock, or a time, ISO 8601 such as 2026-11-07T09:30:00Z"),
+            }),
+            &["since"],
+        ),
+        tool(
             "list_routines",
             "Lists the Routines and Reminders, of one Note or all, each Session with its pool, count and picking rule; those in the trash on request.",
             true,
@@ -721,6 +746,39 @@ fn data_tools() -> Vec<Value> {
     ]
 }
 
+/// The tools the Ask panel offers its model (#267, ADR 0051): finding
+/// and reading Notes, what is new, the Areas, Topics, tags and Routines
+/// with their check-offs, and filing what is new, which an AI Task
+/// drafts. Not `list_notes`, which hands out every Note's text at once,
+/// nor `read_photo`: only what the model finds and reads is sent.
+pub const ASK_TOOLS: [&str; 12] = [
+    "find_notes",
+    "list_new",
+    "read_note",
+    "read_attachment_text",
+    "list_places",
+    "list_tags",
+    "list_routines",
+    "read_check_offs",
+    "file_note",
+    "add_area",
+    "add_topic",
+    "edit_note",
+];
+
+/// The tools of [`ASK_TOOLS`], with their input schemas, as [`tools`]
+/// names them.
+pub fn ask_tools() -> Vec<Value> {
+    tools()
+        .into_iter()
+        .filter(|t| {
+            t.get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|n| ASK_TOOLS.contains(&n))
+        })
+        .collect()
+}
+
 /// Whether `name` is a tool of [`tools`].
 pub fn is_tool(name: &str) -> bool {
     tools()
@@ -828,6 +886,86 @@ fn note_summary(note: &Note, kind: &NoteKind) -> Value {
         "trashed": note.is_trashed(),
         "unsorted": note.is_unsorted(),
     })
+}
+
+/// How many Notes `find_notes` and `list_new` give when not told, and at
+/// most (#267).
+const FIND_LIMIT: usize = 20;
+const FIND_MAX: usize = 50;
+const NEW_LIMIT: usize = 50;
+const NEW_MAX: usize = 200;
+/// The characters of a title and an excerpt the asking tools give.
+const TITLE_CHARS: usize = 100;
+const EXCERPT_CHARS: usize = 240;
+
+/// The `limit` asked for, `default` when left out, from 1 to `most`.
+fn limit_arg(args: &Value, default: usize, most: usize) -> usize {
+    args.get("limit")
+        .and_then(Value::as_u64)
+        .map_or(default, |n| usize::try_from(n).unwrap_or(most))
+        .clamp(1, most)
+}
+
+/// The text of `note` as it reads: a formatted text without its marks.
+fn reads_as(note: &Note) -> String {
+    if note.text_format == text_format::MARKDOWN {
+        crate::markdown::plain(&note.text)
+    } else {
+        note.text.clone()
+    }
+}
+
+/// The first `most` characters of `text`, "…" after them when cut.
+fn cut_to(text: &str, most: usize) -> String {
+    let mut out: String = text.chars().take(most).collect();
+    if text.chars().nth(most).is_some() {
+        out.push('…');
+    }
+    out
+}
+
+/// A Note as the asking tools list it (#267): its id, title, capture
+/// time and where it is filed, without its text.
+fn found_json(note: &Note) -> Value {
+    let text = reads_as(note);
+    let title = text.lines().map(str::trim).find(|l| !l.is_empty());
+    json!({
+        "captured": dart_iso(note.captured),
+        "id": note.id,
+        "place": note.place,
+        "title": cut_to(title.unwrap_or_default(), TITLE_CHARS),
+        "unsorted": note.is_unsorted(),
+    })
+}
+
+/// A short part of the text of `note`: around the first place it holds
+/// `word`, ignoring case, else its start; on one line.
+fn excerpt(note: &Note, word: Option<&str>) -> String {
+    let text: String = reads_as(note)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let chars: Vec<char> = text.chars().collect();
+    let lower: Vec<char> = chars
+        .iter()
+        .map(|c| c.to_lowercase().next().unwrap_or(*c))
+        .collect();
+    let at = word
+        .map(|w| w.to_lowercase().chars().collect::<Vec<char>>())
+        .filter(|w| !w.is_empty())
+        .and_then(|w| lower.windows(w.len()).position(|part| part == w.as_slice()))
+        .unwrap_or(0);
+    let start = at.saturating_sub(EXCERPT_CHARS / 4);
+    let part: String = chars.iter().skip(start).take(EXCERPT_CHARS).collect();
+    let mut out = if start > 0 {
+        format!("…{part}")
+    } else {
+        part
+    };
+    if start + EXCERPT_CHARS < chars.len() {
+        out.push('…');
+    }
+    out
 }
 
 /// What a Note is besides its text: `plain`, `checklist`,
@@ -1121,6 +1259,38 @@ impl Store {
             }
         });
         Ok(done.unwrap_or_else(|e| ToolOutput::failed(&e.to_string())))
+    }
+
+    /// Answers the call of the Ask panel's tool `name` ([`ASK_TOOLS`])
+    /// with `args` (#267, ADR 0051), as the AI sees the store. A tool that
+    /// reads runs in no AI Task, so asking does not pause sync; the first
+    /// change opens the AI Task ([`Store::open_ai_task`]) into `task`,
+    /// where it and every later one are drafted as [`Store::ai_tool`]
+    /// drafts them. A tool the panel does not offer, or one that fails,
+    /// says why in an output marked as an error.
+    pub fn ask_tool(
+        &self,
+        name: &str,
+        args: &Value,
+        wall: &WallClock,
+        task: &mut Option<String>,
+    ) -> Result<ToolOutput> {
+        if !ASK_TOOLS.contains(&name) {
+            return Ok(ToolOutput::failed(&format!("no tool {name}")));
+        }
+        if reads_only(name) {
+            let done = self.for_ai(|| self.ai_read(name, args, wall));
+            return Ok(done.unwrap_or_else(|e| ToolOutput::failed(&e.to_string())));
+        }
+        let id = match task {
+            Some(id) => id.clone(),
+            None => {
+                let id = self.open_ai_task()?;
+                *task = Some(id.clone());
+                id
+            }
+        };
+        self.ai_tool(&id, name, args, wall)
     }
 
     /// The Tallies, open Frogs and Sessions, by their Notes.
@@ -1486,6 +1656,106 @@ impl Store {
                 // Area Locks are the phone's: nothing is closed here.
                 let tree = TagTree::new(self).tree(&HashSet::new())?;
                 ToolOutput::json(&Value::Array(tree.iter().map(node).collect()))
+            }
+            "find_notes" => {
+                let words: Vec<String> = strings_arg(args, "words")?
+                    .into_iter()
+                    .map(|w| w.trim().to_string())
+                    .filter(|w| !w.is_empty())
+                    .collect();
+                if words.is_empty() {
+                    return Err(Error::Invalid("words holds no word".into()));
+                }
+                let place = optional_text(args, "place");
+                let limit = limit_arg(args, FIND_LIMIT, FIND_MAX);
+                let search = Search::new(self);
+                // By id: the Note and the words it holds, in the order
+                // asked.
+                let mut found: BTreeMap<String, (Note, Vec<&str>)> = BTreeMap::new();
+                for word in &words {
+                    for note in search.notes(word, place)? {
+                        found
+                            .entry(note.id.clone())
+                            .or_insert_with(|| (note, Vec::new()))
+                            .1
+                            .push(word);
+                    }
+                }
+                let total = found.len();
+                let mut hits: Vec<(Note, Vec<&str>)> = found.into_values().collect();
+                hits.sort_by(|(a, wa), (b, wb)| {
+                    wb.len()
+                        .cmp(&wa.len())
+                        .then_with(|| b.captured.cmp(&a.captured))
+                        .then_with(|| a.id.cmp(&b.id))
+                });
+                let notes: Vec<Value> = hits
+                    .iter()
+                    .take(limit)
+                    .map(|(note, held)| {
+                        let mut out = found_json(note);
+                        if let Some(all) = out.as_object_mut() {
+                            all.insert(
+                                "excerpt".into(),
+                                json!(excerpt(note, held.first().copied())),
+                            );
+                            all.insert("words".into(), json!(held));
+                        }
+                        out
+                    })
+                    .collect();
+                ToolOutput::json(&json!({"found": total, "notes": notes}))
+            }
+            "list_new" => {
+                let since = text_arg(args, "since")?;
+                let limit = limit_arg(args, NEW_LIMIT, NEW_MAX);
+                // A day counts on this computer's clock, from its start.
+                let after = |at: DateTime<Utc>| -> Result<bool> {
+                    match Day::parse(since) {
+                        Some(day) => Ok(Day::of(wall(at)) >= day),
+                        None => Ok(at
+                            >= parse_time(since).map_err(|_| {
+                                Error::Invalid(
+                                    "since is no day YYYY-MM-DD nor ISO 8601 time".into(),
+                                )
+                            })?),
+                    }
+                };
+                let all = notes.all()?;
+                let ids: Vec<String> = all.iter().map(|n| n.id.clone()).collect();
+                let sections = notes.sections_of(&ids)?;
+                let mut hits = Vec::new();
+                for note in all {
+                    let amended = sections
+                        .get(&note.id)
+                        .into_iter()
+                        .flatten()
+                        .map(|s| s.captured)
+                        .max();
+                    let amended = match amended {
+                        Some(at) if after(at)? => Some(at),
+                        _ => None,
+                    };
+                    if after(note.captured)? || amended.is_some() {
+                        let newest = amended.map_or(note.captured, |at| at.max(note.captured));
+                        hits.push((newest, note, amended));
+                    }
+                }
+                hits.sort_by(|(a, na, _), (b, nb, _)| b.cmp(a).then_with(|| na.id.cmp(&nb.id)));
+                let total = hits.len();
+                let notes: Vec<Value> = hits
+                    .iter()
+                    .take(limit)
+                    .map(|(_, note, amended)| {
+                        let mut out = found_json(note);
+                        if let Some(all) = out.as_object_mut() {
+                            all.insert("amended".into(), json!(amended.map(dart_iso)));
+                            all.insert("excerpt".into(), json!(excerpt(note, None)));
+                        }
+                        out
+                    })
+                    .collect();
+                ToolOutput::json(&json!({"found": total, "notes": notes}))
             }
             "list_routines" => {
                 let routines = Routines::new(self);
@@ -3784,6 +4054,133 @@ mod tests {
             &json!({"from": "October"}),
         )?;
         assert!(bad.is_error);
+        Ok(())
+    }
+
+    #[test]
+    fn find_notes_ranks_the_notes_holding_most_words_first_with_an_excerpt() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let one = notes.capture("Insurance: the bike is covered", None, None)?;
+        let both = notes.capture(
+            "Bike insurance letter\nThe policy number is 77-3",
+            None,
+            None,
+        )?;
+        notes.capture("Groceries", None, None)?;
+        let gone = notes.capture("Bike trip insurance", None, None)?;
+        notes.trash(&gone.id)?;
+        let out = json_of(&call(
+            &store,
+            "t",
+            "find_notes",
+            &json!({"words": ["insurance", "policy", "  "]}),
+        )?)?;
+        assert_eq!(out["found"], 2);
+        assert_eq!(out["notes"][0]["id"], json!(both.id));
+        assert_eq!(out["notes"][0]["title"], "Bike insurance letter");
+        assert_eq!(out["notes"][0]["words"], json!(["insurance", "policy"]));
+        assert_eq!(out["notes"][1]["id"], json!(one.id));
+        assert!(
+            out["notes"][0]["excerpt"]
+                .as_str()
+                .is_some_and(|e| e.contains("policy number is 77-3"))
+        );
+        assert!(out["notes"][0].get("text").is_none());
+        let limited = json_of(&call(
+            &store,
+            "t",
+            "find_notes",
+            &json!({"words": ["insurance"], "limit": 1}),
+        )?)?;
+        assert_eq!(limited["notes"].as_array().map(Vec::len), Some(1));
+        assert_eq!(limited["found"], 2);
+        assert!(call(&store, "t", "find_notes", &json!({"words": []}))?.is_error);
+        Ok(())
+    }
+
+    #[test]
+    fn list_new_lists_the_notes_captured_or_amended_since_newest_first() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let old = notes.capture("Old Note", None, None)?;
+        let older = notes.capture("Older Note", None, None)?;
+        let fresh = notes.capture("Fresh Note", None, None)?;
+        let since = dart_iso(fresh.captured);
+        notes.amend(&old.id, "A new line")?;
+        let out = json_of(&call(&store, "t", "list_new", &json!({"since": since}))?)?;
+        assert_eq!(out["found"], 2);
+        assert_eq!(out["notes"][0]["id"], json!(old.id));
+        assert!(out["notes"][0]["amended"].is_string());
+        assert_eq!(out["notes"][1]["id"], json!(fresh.id));
+        assert_eq!(out["notes"][1]["unsorted"], true);
+        assert!(out["notes"][1]["amended"].is_null());
+        let today = json_of(&call(
+            &store,
+            "t",
+            "list_new",
+            &json!({"since": "2026-01-01"}),
+        )?)?;
+        assert_eq!(today["found"], 3);
+        let later = json_of(&call(
+            &store,
+            "t",
+            "list_new",
+            &json!({"since": "2026-01-02"}),
+        )?)?;
+        assert_eq!(later["found"], 0);
+        assert!(call(&store, "t", "list_new", &json!({"since": "soon"}))?.is_error);
+        let _ = older;
+        Ok(())
+    }
+
+    #[test]
+    fn the_asking_tools_leave_out_what_is_hidden_from_ai() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let area = Places::new(&store).add_area("Diary")?;
+        let shown = notes.capture("Tax return 2026", None, None)?;
+        let hidden = notes.capture("Tax debts, private", None, None)?;
+        let filed = notes.capture("Tax adviser's letter", Some(&area.id), None)?;
+        notes.amend(&shown.id, "tax receipts")?;
+        store.set_hidden_from_ai(&hidden.id, true)?;
+        store.set_hidden_from_ai(&area.id, true)?;
+        let found = call(&store, "t", "find_notes", &json!({"words": ["tax"]}))?;
+        let new = call(&store, "t", "list_new", &json!({"since": "2026-01-01"}))?;
+        for out in [&found, &new] {
+            assert_eq!(json_of(out)?["found"], 1);
+            let text = format!("{out:?}");
+            assert!(!text.contains(&hidden.id) && !text.contains(&filed.id));
+            assert!(!text.contains("private") && !text.contains("adviser"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn the_ask_panel_reads_without_an_ai_task_and_drafts_its_first_change_into_one() -> TestResult {
+        let store = store();
+        let note = Notes::new(&store).capture("Dentist", None, None)?;
+        let area = Places::new(&store).add_area("Health")?;
+        let mut task = None;
+        let read = store.ask_tool("read_note", &json!({"id": note.id}), &utc, &mut task)?;
+        assert!(!read.is_error);
+        assert_eq!((task.clone(), store.ai_task()?), (None, None));
+        assert!(!store.sync_paused()?);
+        // What the panel does not offer, it refuses.
+        for unoffered in ["list_notes", "read_photo", "trash_note", "no_such"] {
+            let out = store.ask_tool(unoffered, &json!({}), &utc, &mut task)?;
+            assert!(out.is_error, "{unoffered}");
+        }
+        assert_eq!(task, None);
+        let filed = store.ask_tool(
+            "file_note",
+            &json!({"id": note.id, "place": area.id}),
+            &utc,
+            &mut task,
+        )?;
+        assert!(!filed.is_error, "{filed:?}");
+        assert_eq!(task, store.ai_task()?);
+        assert!(task.is_some() && store.sync_paused()?);
         Ok(())
     }
 }

@@ -1575,6 +1575,27 @@ mod tests {
     }
 
     #[test]
+    fn the_ask_panels_provider_and_key_stay_out_of_a_backup() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let old = full(dir.path())?;
+        old.set_ask_key("sk-ant-never-backed-up")?;
+        old.set_ask_protocol(crate::ask::Protocol::OpenAi)?;
+        old.set_ask_url("https://openrouter.ai/api/v1")?;
+        old.set_ask_model("deepseek-chat")?;
+        old.set_ask_key("sk-or-never-backed-up")?;
+        let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+        let path = dir.path().join(format!("b.{EXTENSION}"));
+        write_backup(&old, &path, &mut system_random)?;
+        let header = read_header(&path)?.ok_or(damaged_err())?;
+        let key = unlock(&header, None, Some(&code))?.ok_or(damaged_err())?;
+        let store = device(dir.path(), "new", &held(20), 2)?;
+        restore(&store, &path, &key)?;
+        assert!(store.local_settings_with_prefix("ask:")?.is_empty());
+        assert_eq!(store.ask_provider()?.key, "");
+        Ok(())
+    }
+
+    #[test]
     fn a_playback_speed_not_offered_here_or_not_written_as_text_is_passed_over() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let old = full(dir.path())?;

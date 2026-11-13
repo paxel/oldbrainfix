@@ -93,6 +93,15 @@ Each line names what the app does with the data and why that is not
   Drive, Möbius Sync) is the user's choice and cannot read them.
 - **Links on the About page** (the site, GitHub, Ko-fi, mail) open in
   the browser or mail app; the app sends nothing with them.
+- **The desktop's Ask panel** (#267, ADR 0051) is not the iPhone app's:
+  the desktop sends a question, and what its model finds and reads in
+  the Notes, to the AI provider the user entered with their own key,
+  never to the developer, and nothing Hidden from AI. The iPhone app
+  talks to no AI provider, so guideline 5.1.2(i) and the label stay as
+  they are. The phone's question through the user's desktop (#267,
+  next step) reaches a provider and brings in 5.1.2(i): before the
+  first question the phone must name the provider and what is sent and
+  ask permission; answer these questions again then.
 
 ## Privacy Policy URL
 
