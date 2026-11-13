@@ -211,9 +211,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       _zoom.value = Matrix4.identity();
       // Pages out of reach go, and a neighbour drawn zoomed goes back to
       // the size it shows at.
-      for (final index in _drawn.keys.toList()) {
+      for (final MapEntry(key: index, value: drawn)
+          in _drawn.entries.toList()) {
         if ((index - page).abs() > 1 ||
-            (index != page && _drawn[index]!.width > _wanted(index) * 1.25)) {
+            (index != page && drawn.width > _wanted(index) * 1.25)) {
           _forget(index);
         }
       }
