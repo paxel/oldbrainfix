@@ -318,6 +318,7 @@ jobs:
         if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       - name: Core — analyze and test
         if: env.TESTED_BEFORE_MERGE != 'true'
@@ -443,6 +444,7 @@ jobs:
         if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       - name: The third-party licence lists are current
         if: env.TESTED_BEFORE_MERGE != 'true'
@@ -529,6 +531,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       # RustO for Photo Texts is Rust, cross-built by the APK build.
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
@@ -744,6 +747,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       - name: Render the iPhone frames from the seeded data
         run: |
@@ -862,6 +866,7 @@ jobs:
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       # RustO and whisper.cpp for the device, as in ios.yml (#239).
       - if: steps.secrets.outputs.ready == 'true'

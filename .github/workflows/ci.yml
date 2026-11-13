@@ -33,6 +33,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       - name: Core — analyze and test
         working-directory: packages/oldbrainfix_core
@@ -143,6 +144,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       - name: The fixture corpus the desktop core is tested against is current
         working-directory: packages/oldbrainfix_core
@@ -272,6 +274,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       # RustO for Photo Texts is Rust, cross-built by the APK build.
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
