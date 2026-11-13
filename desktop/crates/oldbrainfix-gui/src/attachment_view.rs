@@ -80,6 +80,52 @@ pub fn read_paths<'p>(paths: impl IntoIterator<Item = (String, &'p Path)>) -> Re
     read
 }
 
+/// The endings of files the system's programs only show or play (#267):
+/// documents without macros, pictures, sound, video and a `.zip`, whose
+/// opening lists what it holds. Any other, an `.exe`, a script, a
+/// shortcut, a web page or a picture that runs script (`.svg`) among
+/// them, could run a program and is asked about first.
+const SAFE_ENDINGS: &[&str] = &[
+    "pdf", "txt", "md", "markdown", "csv", "odt", "ods", "odp", "docx", "xlsx", "pptx", "epub",
+    "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "bmp", "tif", "tiff", "mp3",
+    "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "mp4", "m4v", "mov", "webm", "mkv", "avi",
+    "zip",
+];
+
+/// The ending of the file `name` as its copy to open gets it: what
+/// follows its last dot, in lower case, when that is one to eight ASCII
+/// letters and digits; none otherwise, as for `a.exe.`, `a.exe ` or a
+/// name without a dot.
+pub fn ending(name: &str) -> Option<String> {
+    let (_, after) = name.rsplit_once('.')?;
+    let fits = (1..=8).contains(&after.len()) && after.bytes().all(|b| b.is_ascii_alphanumeric());
+    fits.then(|| after.to_ascii_lowercase())
+}
+
+/// Whether the file `name` opens without a question: its ending is one
+/// of the [`SAFE_ENDINGS`]. Its media type does not count, as the
+/// system picks the program by the ending its copy gets.
+pub fn opens_safely(name: &str) -> bool {
+    ending(name).is_some_and(|e| SAFE_ENDINGS.contains(&e.as_str()))
+}
+
+/// The name of the copy of the file `hash` named `name` that the
+/// system's program opens: made of the hash's first sixteen hex digits
+/// and the file's [`ending`], so no part of a name another person gave
+/// reaches the system but that ending.
+pub fn copy_name(hash: &str, name: &str) -> String {
+    let stem: String = hash
+        .chars()
+        .filter(char::is_ascii_hexdigit)
+        .take(16)
+        .collect();
+    let stem = if stem.is_empty() { "file".into() } else { stem };
+    match ending(name) {
+        Some(ending) => format!("{stem}.{ending}"),
+        None => stem,
+    }
+}
+
 /// The icon of a file of `kind`, as on the phone: a PDF, a text
 /// document, a table, plain text or Markdown, any other file.
 pub fn icon(kind: FileKind) -> char {
@@ -307,6 +353,68 @@ mod tests {
         assert_eq!(read.refused.len(), 2);
         assert!(read.refused[0].starts_with("b.bin: "));
         Ok(())
+    }
+
+    #[test]
+    fn only_files_that_only_show_open_without_a_question() {
+        for safe in [
+            "Lease.pdf",
+            "SCAN.PDF",
+            "a.b.docx",
+            "notes.md",
+            "song.mp3",
+            "photos.zip",
+        ] {
+            assert!(opens_safely(safe), "{safe}");
+        }
+        for risky in [
+            "setup.exe",
+            "SETUP.EXE",
+            "Lease.pdf.exe",
+            "run.bat",
+            "run.cmd",
+            "a.ps1",
+            "a.vbs",
+            "a.js",
+            "a.msi",
+            "a.lnk",
+            "a.scr",
+            "a.jar",
+            "a.sh",
+            "a.desktop",
+            "a.app",
+            "a.command",
+            "a.AppImage",
+            "a.apk",
+            "page.html",
+            "drawing.svg",
+            "macro.docm",
+            "a.exe.",
+            "a.exe ",
+            "a.pdf ",
+            "a.txt:b.exe",
+            "README",
+            "",
+            ".pdf.",
+        ] {
+            assert!(!opens_safely(risky), "{risky:?}");
+        }
+    }
+
+    #[test]
+    fn a_copy_is_named_by_its_hash_and_a_clean_ending_alone() {
+        let hash = "0123456789abcdef0123456789abcdef";
+        assert_eq!(copy_name(hash, "Lease.PDF"), "0123456789abcdef.pdf");
+        assert_eq!(
+            copy_name(hash, "x\" & calc & \".exe"),
+            "0123456789abcdef.exe"
+        );
+        assert_eq!(copy_name(hash, "a.exe "), "0123456789abcdef");
+        assert_eq!(copy_name(hash, "a.p d f"), "0123456789abcdef");
+        assert_eq!(copy_name(hash, "a.toolongending"), "0123456789abcdef");
+        // A hash that is no hash leaves nothing of itself but hex digits.
+        assert_eq!(copy_name("../../x", "a.txt"), "file.txt");
+        assert_eq!(copy_name("ab/../cd", "a"), "abcd");
     }
 
     #[test]

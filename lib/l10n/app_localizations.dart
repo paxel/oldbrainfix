@@ -9830,6 +9830,36 @@ abstract class AppLocalizations {
   /// **'Open {name}'**
   String openFile(String name);
 
+  /// Title of the one question before an Attachment of a kind that could run a program opens (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'Open this file?'**
+  String get fileRiskTitle;
+
+  /// The question before an Attachment of a kind that could run a program, such as an .exe or a script, opens on the computer (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'\"{file}\" could run a program. Open it anyway?'**
+  String fileRiskQuestion(String file);
+
+  /// The question before an Attachment that is an Android app (.apk) opens on the phone (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'\"{file}\" could install an app. Open it anyway?'**
+  String fileRiskAppQuestion(String file);
+
+  /// Under that question: the person who added the file, when another person did (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'{person} added it.'**
+  String fileRiskAddedBy(String person);
+
+  /// Button of that question that opens the file (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'Open anyway'**
+  String get fileRiskOpen;
+
   /// Announcement at the top when an attached file could not be opened; its tap gives the reason.
   ///
   /// In en, this message translates to:

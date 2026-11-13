@@ -1079,8 +1079,11 @@ replace a law of Both apps where they say so. A desktop law marked
   or Markdown, any other file), its name, its size and its pages when
   they were counted. A tap opens it with the system's app for its type,
   asking nothing, as the file is the Note's own (unlike a file link,
-  #261); a file whose bytes have not synced yet, or one no app opens, is
-  announced. Its Attachment Text shows under it as a Photo Text does:
+  #261), except an Android app (`.apk`, `.apks`, `.apkm`, `.xapk` or
+  the media type of one), which asks once first: "… could install an
+  app. Open it anyway?", with the person who added it when another
+  person did; a file whose bytes have not synced yet, or one no app
+  opens, is announced. Its Attachment Text shows under it as a Photo Text does:
   dimmed, labelled "Attachment Text" in the detailed view and whole
   there, its first three lines in the compact view. While a computer is
   to read it (a PDF of more than ten pages or not counted, a larger
@@ -1420,8 +1423,9 @@ replace a law of Both apps where they say so. A desktop law marked
   Create, Send, the Routine editor's, a Session's and a Tally's pages
   included), and only while it may be pressed; Merge into… merges into
   the first Note found once something is typed, File into… takes its
-  first row as Enter does; a question whose answer deletes or discards
-  keeps Ctrl+Enter from it (Q665). The first field of a dialog takes the
+  first row as Enter does; a question whose answer deletes or discards,
+  or opens a file that could run a program (#267), keeps Ctrl+Enter
+  from it (Q665). The first field of a dialog takes the
   keyboard as it opens, where it has one (the Routine editor's text, else
   its When line, a Tally's pages, Send feedback, a person's name for me);
   the Page dialogs of sections (Settings, Profile, People, Backups, Sync,
@@ -1549,10 +1553,17 @@ replace a law of Both apps where they say so. A desktop law marked
 - **An Attachment shows on its card and in the Note dialog** (#267,
   ADR 0047), as on the phone (Phone ▸ Cards): a row with the icon of its
   kind, its name, its size and its pages; a click on it opens a copy
-  with the system's program for its type, asking nothing, and selects no
-  card; one whose bytes are not here yet, or that no program opens, is
-  announced. Its Attachment Text shows dimmed under it, "Attachment
-  Text" over it on a full card and in the Note dialog, where it selects
+  with the system's program for its type and selects no card. The copy
+  is named by the file's hash and its ending alone, and the program is
+  started without a shell (`ShellExecuteW`, `open`, `xdg-open`), as for
+  a file link. Documents, pictures, sound, video and `.zip` open without
+  asking; any other ending, or none, could run a program and asks once
+  first, also for the user's own file: "… could run a program. Open it
+  anyway?", with the person who added it when another person did, and
+  only a click on Open anyway answers it. One
+  whose bytes are not here yet, or that no program opens, is announced.
+  Its Attachment Text shows dimmed under it, "Attachment Text" over it
+  on a full card and in the Note dialog, where it selects
   to be copied, its first three lines on a compact card. The computer
   reads the text of every file waiting, those left to it by a phone
   too, on a thread of its own, a PDF page by page with its scanned pages

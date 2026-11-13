@@ -378,6 +378,58 @@ void main() {
     expect(announcements.visible, 'An Attachment was not opened.');
   });
 
+  testWidgets('an app (.apk) asks before it opens, once, and Cancel '
+      'opens nothing', (tester) async {
+    notes.capture(
+      'Game',
+      files: [NewFile(name: 'game.apk', bytes: bytesOf('PK'))],
+    );
+    // A name that says PDF and the media type of an app asks too.
+    notes.capture(
+      'Lease',
+      files: [
+        NewFile(
+          name: 'Lease.pdf',
+          bytes: bytesOf('PK'),
+          mediaType: apkMediaType,
+        ),
+      ],
+    );
+    await allNotes(tester);
+    await tap(tester, find.text('game.apk'));
+    expect(find.text('Open this file?'), findsOneWidget);
+    expect(
+      find.text('"game.apk" could install an app. Open it anyway?'),
+      findsOneWidget,
+    );
+    await tap(tester, find.text('Cancel'));
+    await settle(tester);
+    expect(files.opened, isEmpty);
+    await tap(tester, find.text('game.apk'));
+    await tap(tester, key('fileRiskOpen'));
+    await settle(tester);
+    expect(files.opened.single.bytes, utf8.encode('PK'));
+
+    await tap(tester, find.text('Lease.pdf'));
+    expect(find.text('Open this file?'), findsOneWidget);
+    await tap(tester, find.text('Cancel'));
+    await settle(tester);
+    expect(files.opened, hasLength(1));
+  });
+
+  test('only an app is asked about on the phone', () {
+    Attachment file(String name, [String type = '']) => Attachment.read(
+      'abc',
+      jsonEncode({'name': name, 'type': type, 'size': 1}),
+    );
+    expect(mayInstall(file('game.APK')), isTrue);
+    expect(mayInstall(file('bundle.xapk')), isTrue);
+    expect(mayInstall(file('a.pdf', apkMediaType)), isTrue);
+    expect(mayInstall(file('Lease.pdf', 'application/pdf')), isFalse);
+    expect(mayInstall(file('setup.exe')), isFalse);
+    expect(mayInstall(file('apk')), isFalse);
+  });
+
   testWidgets('the editor removes the Attachment Text at once with an undo, '
       'and the file after asking once, its text staying', (tester) async {
     final id = notes

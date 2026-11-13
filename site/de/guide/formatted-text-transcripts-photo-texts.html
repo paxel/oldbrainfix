@@ -506,7 +506,9 @@
   die größer als 256 MB ist, wird nicht angehängt, und die App sagt es oben. Eine Notiz, die nur aus
   einer Datei gemacht wurde, zeigt die Datei als ihre Karte und heißt nach ihr, auch in Alarmen. Ein
   Tippen auf einen Anhang öffnet ihn mit der App des Handys, die diese Art öffnet; einer, der noch
-  nicht auf das Handy synchronisiert ist oder den keine App öffnet, wird oben gemeldet.
+  nicht auf das Handy synchronisiert ist oder den keine App öffnet, wird oben gemeldet. Eine
+  Android-App (<code>.apk</code>) fragt zuerst „Trotzdem öffnen?“ und nennt, wer sie angehängt hat,
+  wenn es eine andere Person war.
 </p>
 <p>
   Der Text einer Datei wird gelesen, wo ihr Format es erlaubt: der eigene Text eines PDFs und, mit
@@ -532,7 +534,9 @@
   im Notiz-Dialog und <strong>Aus Datei…</strong> in der Schnellnotiz wählen Dateien im Dialog des
   Systems. Ein Klick auf eine Datei öffnet eine Kopie mit dem Programm, das der Computer für ihre Art
   hat; eine, die noch nicht auf den Computer synchronisiert ist oder die kein Programm öffnet, wird
-  oben gemeldet. Der Computer liest im Hintergrund den Text jeder wartenden Datei, auch ein längeres
+  oben gemeldet. Eine Datei, die ein Programm starten könnte, etwa eine <code>.exe</code>, ein Skript
+  oder eine Verknüpfung, fragt zuerst „Trotzdem öffnen?“ und nennt, wer sie angehängt hat, wenn es
+  eine andere Person war; Dokumente, Bilder, Ton, Video und <code>.zip</code>-Dateien öffnen sofort. Der Computer liest im Hintergrund den Text jeder wartenden Datei, auch ein längeres
   PDF oder eine größere Datei, die ein Handy ihm überlassen hat, und der Text kommt mit dem
   Synchronisieren auf das Handy. Eine Datei, deren Text sich nicht lesen lässt, bekommt keinen und
   wird erst mit <strong>Text erneut lesen</strong> wieder gelesen. Der Notiz-Dialog hat unter jeder

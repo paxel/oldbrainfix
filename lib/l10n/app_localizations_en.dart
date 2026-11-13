@@ -6037,6 +6037,27 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get fileRiskTitle => 'Open this file?';
+
+  @override
+  String fileRiskQuestion(String file) {
+    return '\"$file\" could run a program. Open it anyway?';
+  }
+
+  @override
+  String fileRiskAppQuestion(String file) {
+    return '\"$file\" could install an app. Open it anyway?';
+  }
+
+  @override
+  String fileRiskAddedBy(String person) {
+    return '$person added it.';
+  }
+
+  @override
+  String get fileRiskOpen => 'Open anyway';
+
+  @override
   String get fileNotOpened => 'An Attachment was not opened.';
 
   @override

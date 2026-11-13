@@ -80,6 +80,7 @@ pub mod starter_set_view;
 pub mod store_needs_update;
 pub mod sync_line;
 pub mod sync_view;
+pub mod system_open;
 pub mod system_theme;
 pub mod table_grid;
 pub mod table_view;

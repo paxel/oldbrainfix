@@ -2202,7 +2202,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return [
       for (final file in files) ...[
         const SizedBox(height: 16),
-        AttachmentRow(key: ValueKey('file:${file.hash}'), file: file),
+        AttachmentRow(
+          key: ValueKey('file:${file.hash}'),
+          file: file,
+          noteId: id,
+        ),
         AttachmentText(file: file, text: texts[file.hash]),
         ...takeOver(file.hash, texts[file.hash]),
         if (_fileTextRemovable.contains((id, file.hash)))

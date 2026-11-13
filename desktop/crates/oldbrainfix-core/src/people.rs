@@ -796,6 +796,32 @@ impl Store {
         }
     }
 
+    /// The person who added the file `hash` to the Note or Section
+    /// `entity`, as their Profile shows, as the Dart core's `fileAddedBy`:
+    /// the first of another person's Devices that wrote its `file:` field,
+    /// through the key of the Device, in a Shared Area the person its
+    /// grant names, as for [`Store::ticked_by`]. None for a file the
+    /// user's own Devices added, for a writer not known, and for a blocked
+    /// person (ADR 0021).
+    pub fn file_added_by(&self, entity: &str, hash: &str) -> Result<Option<Profile>> {
+        let field = crate::notes::keys::file(hash);
+        for e in self.history(entity)? {
+            if e.field != field {
+                continue;
+            }
+            if let Writer::Theirs(author) = self.device_writer(&e.device, entity)? {
+                if self
+                    .blocked_ids()?
+                    .contains(&self.resolve_person(&author.id)?)
+                {
+                    return Ok(None);
+                }
+                return Ok(Some(self.with_override(author)?));
+            }
+        }
+        Ok(None)
+    }
+
     /// Whether the person filter of the browser keeps the Note or
     /// Section `entity` (#53), as the Dart core's `wroteBy`: with
     /// `filter.me`, the user's own, written on any of their Devices or
@@ -1263,6 +1289,52 @@ mod tests {
             ann.author_of(&theirs.id)?.map(|p| p.name),
             Some("Ben".into())
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_is_named_by_the_person_whose_device_added_it() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let area = household(&ann, &ben)?;
+        let file = |name| crate::NewFile {
+            name,
+            media_type: "",
+            bytes: name.as_bytes(),
+            pages: None,
+        };
+        let mine = Notes::new(&ann).capture_with_files(
+            "Milk",
+            Some(&area),
+            None,
+            &[],
+            &[],
+            &[file("list.txt")],
+        )?;
+        let theirs = Notes::new(&ben).capture_with_files(
+            "Eggs",
+            Some(&area),
+            None,
+            &[],
+            &[],
+            &[file("setup.exe")],
+        )?;
+        sync(&ben, &ann)?;
+        let hash = |note: &Note| note.attachments.first().map(|a| a.hash.clone());
+        let mine_hash = hash(&mine).ok_or("a file")?;
+        let theirs_hash = hash(&theirs).ok_or("a file")?;
+        assert_eq!(ann.file_added_by(&mine.id, &mine_hash)?, None);
+        assert_eq!(
+            ann.file_added_by(&theirs.id, &theirs_hash)?.map(|p| p.name),
+            Some("Ben".into())
+        );
+        assert_eq!(ben.file_added_by(&theirs.id, &theirs_hash)?, None);
+        assert_eq!(
+            ben.file_added_by(&mine.id, &mine_hash)?.map(|p| p.name),
+            Some("Ann".into())
+        );
+        // A file the Note does not hold was added by nobody.
+        assert_eq!(ann.file_added_by(&theirs.id, &mine_hash)?, None);
         Ok(())
     }
 

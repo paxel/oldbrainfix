@@ -62,12 +62,20 @@ String aloneFileTitle(BuildContext context, Attachment file) =>
 /// An Attachment of a Note (#267, ADR 0047): the icon of its kind, its
 /// name and size; a tap opens it with the system's app ([openAttachment]).
 /// [large] draws the name as a card's title, for a Note made from the
-/// file alone.
+/// file alone. [noteId] names the Note that holds it, so the question
+/// before an app opens says who added it; null for a file held for a
+/// Note not saved yet.
 class AttachmentRow extends StatelessWidget {
   final Attachment file;
   final bool large;
+  final String? noteId;
 
-  const AttachmentRow({super.key, required this.file, this.large = false});
+  const AttachmentRow({
+    super.key,
+    required this.file,
+    this.large = false,
+    this.noteId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +91,9 @@ class AttachmentRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: notes == null
             ? null
-            : () => unawaited(openAttachment(context, notes, file)),
+            : () => unawaited(
+                openAttachment(context, notes, file, noteId: noteId),
+              ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: ConstrainedBox(
@@ -210,15 +220,61 @@ class AttachmentScope extends InheritedWidget {
       notes != oldWidget.notes;
 }
 
+/// The media type Android installs an app from.
+const apkMediaType = 'application/vnd.android.package-archive';
+
+/// Whether [file] is an Android app, which the phone would offer to
+/// install when it opens (#267): its name ends in `.apk`, `.apks`,
+/// `.apkm` or `.xapk`, or its media type is that of an app.
+bool mayInstall(Attachment file) {
+  final name = file.name.trim().toLowerCase();
+  const endings = ['.apk', '.apks', '.apkm', '.xapk'];
+  return endings.any(name.endsWith) ||
+      file.mediaType.trim().toLowerCase() == apkMediaType;
+}
+
 /// Opens [file] of [notes] with the system's app for its type: written
-/// where the app hands files to other apps first. A file whose bytes are
-/// not on this Device yet, or one no app opens, is announced at the top.
+/// where the app hands files to other apps first. On Android an app
+/// ([mayInstall]) asks first, once, naming the file and, for the Note
+/// [noteId] another person's Device added it to, that person. A file
+/// whose bytes are not on this Device yet, or one no app opens, is
+/// announced at the top.
 Future<void> openAttachment(
   BuildContext context,
   Notes notes,
-  Attachment file,
-) async {
+  Attachment file, {
+  String? noteId,
+}) async {
   final t = context.t;
+  if (defaultTargetPlatform == TargetPlatform.android && mayInstall(file)) {
+    final by = noteId == null
+        ? null
+        : notes.store.fileAddedBy(noteId, file.hash)?.name;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.fileRiskTitle),
+        content: Text(
+          [
+            t.fileRiskAppQuestion(file.name.isEmpty ? t.attachment : file.name),
+            if (by != null && by.isNotEmpty) t.fileRiskAddedBy(by),
+          ].join('\n'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            key: const ValueKey('fileRiskOpen'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.fileRiskOpen),
+          ),
+        ],
+      ),
+    );
+    if (yes != true || !context.mounted) return;
+  }
   final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
   final bundles = BundleScope.of(context);

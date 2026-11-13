@@ -477,6 +477,25 @@ void main() {
       expect(ben.tickedBy(h.note, tick), isNull);
     });
 
+    test('a file is named by the person whose Device added it', () {
+      final h = household(AreaRole.member);
+      NewFile file(String name) =>
+          NewFile(name: name, bytes: Uint8List.fromList(utf8.encode(name)));
+      final mine = Notes(ann)
+          .capture('Milk', place: h.topic, files: [file('list.txt')]);
+      final theirs = Notes(ben)
+          .capture('Eggs', place: h.area, files: [file('setup.exe')]);
+      exchange(ben, ann);
+      final mineHash = mine.attachments.single.hash;
+      final theirsHash = theirs.attachments.single.hash;
+      expect(ann.fileAddedBy(mine.id, mineHash), isNull);
+      expect(ann.fileAddedBy(theirs.id, theirsHash)?.name, 'Ben');
+      expect(ben.fileAddedBy(theirs.id, theirsHash), isNull);
+      expect(ben.fileAddedBy(mine.id, mineHash)?.name, 'Ann');
+      // A file the Note does not hold was added by nobody.
+      expect(ann.fileAddedBy(theirs.id, mineHash), isNull);
+    });
+
     test('a Manager does everything, and Managers change roles', () {
       final h = household(AreaRole.member);
       Notes(ben).edit(h.note, 'Too early');

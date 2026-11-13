@@ -258,22 +258,12 @@ pub fn desktop_entry_name(text: &str) -> Option<String> {
     None
 }
 
-/// Opens `file` with the app the system has for its type: `xdg-open`
-/// on Linux, `open` on macOS and the shell's `start` on Windows. Whether
-/// it could be started.
+/// Opens `file` with the app the system has for its type, without a
+/// shell ([`crate::system_open`]): `xdg-open` on Linux, `open` on macOS
+/// and `ShellExecuteW` on Windows. Whether it could be started.
 pub fn open_file(file: &Path) -> bool {
-    let mut command = if cfg!(target_os = "windows") {
-        let mut c = Command::new("cmd");
-        c.args(["/C", "start", ""]).arg(file);
-        c
-    } else if cfg!(target_os = "macos") {
-        let mut c = Command::new("open");
-        c.arg(file);
-        c
-    } else {
-        let mut c = Command::new("xdg-open");
-        c.arg(file);
-        c
+    let Some(mut command) = crate::system_open::command(file) else {
+        return crate::system_open::shell_execute(file).is_ok();
     };
     command
         .stdin(Stdio::null())

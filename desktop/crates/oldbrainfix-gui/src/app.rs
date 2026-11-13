@@ -857,6 +857,15 @@ enum Dialog {
         path: String,
         app: String,
     },
+    /// The one question before an Attachment of a kind that could run a
+    /// program opens (#267): the Note, the file's hash, its name and the
+    /// person who added it, "" for the user's own or one not known.
+    RiskyFile {
+        note: String,
+        hash: String,
+        name: String,
+        by: String,
+    },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
         area: Option<String>,
@@ -1399,6 +1408,9 @@ enum Action {
     /// Opens the Attachment with this hash of the Note with this id with
     /// the system's program for it (#267).
     OpenAttachment(String, String),
+    /// Opens it as [`Action::OpenAttachment`] does, once its question was
+    /// answered "Open anyway" (#267).
+    OpenAttachmentAnyway(String, String),
     /// Marks the Note or Area with this id Hidden from AI (`true`), where
     /// it may be marked, or takes the mark off (#267, ADR 0049).
     HideFromAi(String, bool),
@@ -6527,7 +6539,11 @@ impl App {
                     self.act(Action::NewNote)?;
                 }
             }
-            Action::OpenAttachment(note, hash) => self.open_attachment(&note, &hash),
+            Action::OpenAttachment(note, hash) => self.open_attachment(&note, &hash, false),
+            Action::OpenAttachmentAnyway(note, hash) => {
+                self.dialog = None;
+                self.open_attachment(&note, &hash, true);
+            }
             Action::HideFromAi(id, on) => {
                 // A sync since it was read may have shared it; taking the
                 // mark off is never refused.
@@ -9204,11 +9220,12 @@ impl App {
     }
 
     /// Opens the Attachment `hash` of the Note `note` with the system's
-    /// program for it (#267), asking nothing, as the file is the Note's
-    /// own: a copy written where other programs read, in a folder of its
-    /// own so two files of one name stay apart. One whose bytes are not
+    /// program for it (#267): a copy written where other programs read,
+    /// named by its hash and its ending alone ([`attachment_view::copy_name`]).
+    /// One of a kind that could run a program asks first, once, naming
+    /// the file and who added it, unless `asked`. One whose bytes are not
     /// here yet, or that no program opens, is announced at the top.
-    fn open_attachment(&mut self, note: &str, hash: &str) {
+    fn open_attachment(&mut self, note: &str, hash: &str, asked: bool) {
         let t = self.t;
         let notes = Notes::new(&self.store);
         let name = notes
@@ -9217,8 +9234,24 @@ impl App {
             .flatten()
             .and_then(|n| n.attachments.into_iter().find(|a| a.hash == hash))
             .map(|a| a.name)
-            .filter(|n| !n.is_empty())
-            .unwrap_or_else(|| "file".to_string());
+            .unwrap_or_default();
+        if !asked && !attachment_view::opens_safely(&name) {
+            // Who added it only names them: a failed read asks all the same.
+            let by = self
+                .store
+                .file_added_by(note, hash)
+                .ok()
+                .flatten()
+                .map(|p| p.name)
+                .unwrap_or_default();
+            self.dialog = Some(Dialog::RiskyFile {
+                note: note.to_string(),
+                hash: hash.to_string(),
+                name,
+                by,
+            });
+            return;
+        }
         let said = (t.file_not_opened(), t.file_not_opened_title());
         let Some(bytes) = notes.file_bytes(hash) else {
             self.announce_failure(
@@ -9230,8 +9263,8 @@ impl App {
             return;
         };
         let (opener, dir) = &self.photo_opener;
-        let folder = dir.join(hash.get(..16).unwrap_or(hash));
-        let opened = photo_out::copy_to_open(&folder, &name, &bytes).and_then(|path| opener(&path));
+        let copy = attachment_view::copy_name(hash, &name);
+        let opened = photo_out::copy_to_open(dir, &copy, &bytes).and_then(|path| opener(&path));
         if let Err(e) = opened {
             self.announce_failure(
                 said.0,
@@ -13778,6 +13811,33 @@ impl App {
                             cancel(ui, &t, actions);
                             if theme::main_action(ui, true, t.file_link_open()) {
                                 actions.push(Action::OpenLinkedFile(file.clone()));
+                            }
+                        });
+                    }
+                    Dialog::RiskyFile {
+                        note,
+                        hash,
+                        name,
+                        by,
+                    } => {
+                        title(ui, t.file_risk_title());
+                        let text = ui.visuals().text_color();
+                        let shown = if name.is_empty() {
+                            t.attachment()
+                        } else {
+                            name.as_str()
+                        };
+                        ui.label(RichText::new(t.file_risk_question(shown)).color(text));
+                        if !by.is_empty() {
+                            ui.label(RichText::new(t.file_risk_added_by(by)).color(text));
+                        }
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            // A click only: Ctrl+Enter, as for a question
+                            // that deletes, never starts a program.
+                            if theme::primary(ui, true, t.file_risk_open()).clicked() {
+                                actions
+                                    .push(Action::OpenAttachmentAnyway(note.clone(), hash.clone()));
                             }
                         });
                     }

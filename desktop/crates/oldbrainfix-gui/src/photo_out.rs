@@ -1,13 +1,15 @@
 //! A photo of a Note handed to another program from the desktop (#149):
 //! a copy of it written for "Open in another program", and the system's
-//! own opener started on it, `xdg-open` on Linux (the OpenURI portal
-//! inside the Flatpak), `open` on macOS and `start` on Windows. Only the
-//! standard library, so it is type-checked for every system.
+//! own opener started on it without a shell ([`crate::system_open`]),
+//! `xdg-open` on Linux (the OpenURI portal inside the Flatpak), `open`
+//! on macOS and `ShellExecuteW` on Windows.
 
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
+
+use crate::system_open;
 
 /// How long an opener is waited for to say it found no program; one
 /// that runs on, as some show the photo themselves, is left running.
@@ -32,7 +34,10 @@ pub fn copy_to_open(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<PathBuf>
 /// Opens the file `path` in the program the system has for it; an
 /// error when the opener cannot be started or says it found none.
 pub fn open_with_system(path: &Path) -> io::Result<()> {
-    let mut child = opener(path)
+    let Some(mut command) = system_open::command(path) else {
+        return system_open::shell_execute(path);
+    };
+    let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -51,36 +56,6 @@ pub fn open_with_system(path: &Path) -> io::Result<()> {
     // Still running: it opened the photo itself. Reaped when it ends.
     std::thread::spawn(move || child.wait());
     Ok(())
-}
-
-/// The system's opener for `path`.
-#[cfg(target_os = "macos")]
-fn opener(path: &Path) -> Command {
-    let mut command = Command::new("open");
-    command.arg(path);
-    command
-}
-
-/// The system's opener for `path`: `start` with an empty window title,
-/// without a console window.
-#[cfg(windows)]
-fn opener(path: &Path) -> Command {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let mut command = Command::new("cmd");
-    command
-        .args(["/C", "start", ""])
-        .raw_arg(format!("\"{}\"", path.display()))
-        .creation_flags(CREATE_NO_WINDOW);
-    command
-}
-
-/// The system's opener for `path`.
-#[cfg(not(any(windows, target_os = "macos")))]
-fn opener(path: &Path) -> Command {
-    let mut command = Command::new("xdg-open");
-    command.arg(path);
-    command
 }
 
 #[cfg(test)]

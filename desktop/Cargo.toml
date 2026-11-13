@@ -17,8 +17,8 @@ repository = "https://github.com/paxel/oldbrainfix"
 
 # No unsafe and no panics (#229, Q555 (a), Q560 (a)). `unsafe_code` is
 # `deny`, not `forbid`: a `forbid` cannot be lifted by the module-level
-# `allow` the two FFI modules (oldbrainfix-whisper's lib.rs and
-# oldbrainfix-gui's login.rs) need. Tests may unwrap, expect, panic and
+# `allow` the three FFI modules (oldbrainfix-whisper's lib.rs and
+# oldbrainfix-gui's login.rs and system_open.rs) need. Tests may unwrap, expect, panic and
 # index (clippy.toml; the files in tests/ allow them at the top).
 [workspace.lints.rust]
 unsafe_code = "deny"

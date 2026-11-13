@@ -296,10 +296,100 @@ fn a_click_on_an_attachment_opens_a_copy_with_the_systems_program() -> TestResul
     harness.run();
     let seen = opened.borrow();
     assert_eq!(seen.len(), 1);
-    assert!(seen[0].0.ends_with("Lease.pdf"));
+    // The copy is named by the file's hash and its ending alone.
+    let hash = &captured.attachments[0].hash;
+    let copy = seen[0].0.file_name().and_then(|n| n.to_str()).unwrap();
+    assert_eq!(copy, format!("{}.pdf", &hash[..16]));
     assert_eq!(seen[0].1, bytes);
-    // Nothing selected or opened besides.
+    // A PDF opens without a question; nothing selected or opened besides.
+    assert!(!shows(&harness, "Open this file?"));
     assert!(!harness.state().note_open());
+    Ok(())
+}
+
+#[test]
+fn a_file_that_could_run_a_program_asks_first_once() -> TestResult {
+    let store = store()?;
+    let bytes = b"MZ not really a program".to_vec();
+    let file = NewFile {
+        name: "Lease.pdf.exe",
+        media_type: "application/pdf",
+        bytes: &bytes,
+        pages: None,
+    };
+    let captured = Notes::new(&store).capture_with_files("", None, None, &[], &[], &[file])?;
+    let hash = captured.attachments[0].hash.clone();
+    let opened = Opened::default();
+    let mut harness = window(store.clone(), Vec::new(), &opened);
+    harness.get_by_label("Open Lease.pdf.exe").click();
+    harness.run();
+    // Its media type says PDF, its ending a program: it asks, naming it.
+    assert!(shows(&harness, "Open this file?"));
+    assert!(shows(
+        &harness,
+        "\"Lease.pdf.exe\" could run a program. Open it anyway?"
+    ));
+    // The user's own file names nobody.
+    assert!(
+        harness
+            .query_all_by_label_contains("added it.")
+            .next()
+            .is_none()
+    );
+    assert!(opened.borrow().is_empty());
+    // Cancel opens nothing.
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    assert!(!shows(&harness, "Open this file?"));
+    assert!(opened.borrow().is_empty());
+    // Asked again on the next click, and "Open anyway" opens it once.
+    harness.get_by_label("Open Lease.pdf.exe").click();
+    harness.run();
+    harness.get_by_label("Open anyway").click();
+    harness.run();
+    assert!(!shows(&harness, "Open this file?"));
+    let seen = opened.borrow();
+    assert_eq!(seen.len(), 1);
+    let copy = seen[0].0.file_name().and_then(|n| n.to_str()).unwrap();
+    assert_eq!(copy, format!("{}.exe", &hash[..16]));
+    assert_eq!(seen[0].1, bytes);
+    Ok(())
+}
+
+#[test]
+fn the_question_comes_over_the_note_dialog_and_cancel_leaves_the_note_open() -> TestResult {
+    let store = store()?;
+    let file = NewFile {
+        name: "fix.sh",
+        media_type: "",
+        bytes: b"echo hi",
+        pages: None,
+    };
+    let note = Notes::new(&store).capture_with_files("Tap", None, None, &[], &[], &[file])?;
+    let opened = Opened::default();
+    let mut harness = window(store.clone(), Vec::new(), &opened);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    assert!(harness.state().note_open());
+    // The row in the Note dialog, drawn after the card's.
+    let rows: Vec<_> = harness.query_all_by_label("Open fix.sh").collect();
+    rows.last().ok_or("the dialog's row")?.click_accesskit();
+    harness.run();
+    assert!(shows(
+        &harness,
+        "\"fix.sh\" could run a program. Open it anyway?"
+    ));
+    // Ctrl+Enter, the key of a dialog's main action, opens nothing here.
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
+    harness.run();
+    assert!(opened.borrow().is_empty());
+    assert!(shows(&harness, "Open this file?"));
+    // Cancel: the question goes, the Note dialog stays.
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    assert!(!shows(&harness, "Open this file?"));
+    assert!(harness.state().note_open());
+    assert!(opened.borrow().is_empty());
     Ok(())
 }
 
