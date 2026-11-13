@@ -53,6 +53,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop beendet ein Start der aktualisierten App eine ältere Version, die noch im Infobereich läuft, und läuft an ihrer Stelle, statt das Fenster der älteren Version zu öffnen, bis sie beendet wurde.
 - Auf einem schmalen Handy brechen die Tage und Uhrzeiten in der Verpasst-Übersicht und der Anteil neben jeder Einhaltung im Verlauf einer Routine in eine zweite Zeile um, statt über den Bildschirmrand hinauszulaufen.
 
+### Sicherheit
+
+- Das Handy und der Desktop bringen SQLite 3.54.1 mit, das CVE-2026-119375 im SQLite früherer Versionen behebt.
+
 ## [0.5.1] - 2026-11-08
 
 ### Behoben

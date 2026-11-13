@@ -54,6 +54,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, a start of an updated app ends an older version still running in the tray and runs in its place, instead of opening the older version's window until it was quit.
 - On a narrow phone, the days and times in the Missed Summary and the share beside each Adherence figure in a Routine's history wrap onto a second line instead of running off the screen.
 
+### Security
+
+- The phone and the desktop ship SQLite 3.54.1, which fixes CVE-2026-119375 in the SQLite of earlier versions.
+
 ---
 
 Historical changes have been moved to [OLDER_CHANGES.md](OLDER_CHANGES.md).
