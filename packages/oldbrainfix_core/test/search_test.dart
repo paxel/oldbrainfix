@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -109,6 +112,73 @@ void main() {
     notes.amend(note.id, 'sauce');
     notes.trash(note.id);
     expect(search.notes('sauce'), isEmpty);
+  });
+
+  test('among finds trashed Notes as the search finds Notes, in the order '
+      'given', () {
+    final text = capture('Old sauce recipe');
+    now = now.add(const Duration(minutes: 1));
+    final voice = notes.capture(
+      '',
+      recordings: [Uint8List.fromList(utf8.encode('voice'))],
+    );
+    notes.setTranscript(
+      voice.id,
+      voice.recordings.single,
+      'Pick up the parcel',
+    );
+    now = now.add(const Duration(minutes: 1));
+    final photo = notes.capture(
+      '',
+      photos: [Uint8List.fromList(utf8.encode('photo'))],
+    );
+    notes.setPhotoText(photo.id, photo.photos.single, 'RECEIPT 12,50');
+    final amended = capture('Saturday');
+    now = now.add(const Duration(minutes: 1));
+    notes.amend(amended.id, 'Bring the bags');
+    final host = capture('Errands');
+    final merged = capture('Opening hours');
+    notes.merge(merged.id, host.id);
+    final tally = capture('Push-ups');
+    final tallies = Tallies(store);
+    final reps = tallies.addField(tally.id, name: 'times', unit: 'times');
+    tallies.add(tally.id, values: {reps: 20}, line: 'after work');
+    final checklist = capture('Trip\nTent\nSleeping bag');
+    Checklists(store).make(checklist.id);
+    final shopping = capture('Shop\nOat milk');
+    ShoppingLists(store).make(shopping.id);
+    // Live, so never among the trash's.
+    final live = capture('Fresh sauce');
+    for (final note in [
+      text,
+      voice,
+      photo,
+      amended,
+      host,
+      tally,
+      checklist,
+      shopping,
+    ]) {
+      notes.trash(note.id);
+    }
+    final trashed = notes.trashed();
+    List<String> ids(String query, List<Note> scope) => [
+      for (final n in search.among(query, scope)) n.id,
+    ];
+    expect(ids('SAUCE', trashed), [text.id]);
+    expect(ids('parcel', trashed), [voice.id]);
+    expect(ids('receipt', trashed), [photo.id]);
+    expect(ids('bags', trashed), [amended.id]);
+    expect(ids('opening', trashed), [host.id]);
+    expect(ids('after work', trashed), [tally.id]);
+    expect(ids('sleeping', trashed), [checklist.id]);
+    expect(ids('oat', trashed), [shopping.id]);
+    expect(search.notes('sauce').length, 1);
+    // In the order given, whatever it is; a blank query keeps all.
+    final given = trashed.reversed.toList();
+    expect(ids('  ', given), [for (final n in given) n.id]);
+    expect(ids('sauce', [text, live]), [text.id, live.id]);
+    expect(ids('sauce', const []), isEmpty);
   });
 
   test('Section text counts only inside the searched Area or Topic', () {

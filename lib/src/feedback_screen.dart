@@ -16,6 +16,7 @@ import 'l10n.dart';
 import 'look.dart' show ControlBelow;
 import 'pack_screen.dart';
 import 'page_bar.dart';
+import 'place_names.dart';
 import 'system_bars.dart';
 
 /// Send feedback (#214, Q536 (a)): Settings ▸ "Send feedback" is a page
@@ -244,11 +245,14 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   /// while one is picked.
   Future<void> _pickNotes() async {
     final lock = LockScope.of(context);
+    final t = context.t;
+    // The Areas in the person's own order, as on the Areas list (#280).
     final pack = _pack ??= widget.store.packOfAll(
       closed: {
         for (final area in Places(widget.store).areas())
           if (lock?.isAreaClosed(area.id) ?? false) area.id,
       },
+      shown: (a) => areaName(t, a),
     );
     await Navigator.of(context).push(
       MaterialPageRoute<void>(

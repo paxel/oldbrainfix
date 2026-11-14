@@ -142,6 +142,88 @@ class AlarmPlanTest {
     }
 
     @Test
+    fun aSkipTappedButNotAppliedNoLongerRingsNorNags() {
+        val skip = Action(1, EventQueue.KIND_SKIP, "routine:r", "2026-10-24T08:00", 0, 0, "pills", "08:00")
+        val effective = AlarmPlan.effective(listOf(nagging()), listOf(skip))
+        assertEquals(emptyList<Alarm>(), effective)
+        assertNull(AlarmPlan.next(effective, berlin, 0, utc(2026, 10, 24, 6, 5)))
+        assertFalse(AlarmPlan.keepsRinging(effective, "routine:r", "2026-10-24T08:00"))
+    }
+
+    @Test
+    fun aTomorrowTappedButNotAppliedRingsTheDayAfterAtTheSameTime() {
+        val tomorrow = Action(1, EventQueue.KIND_TOMORROW, "routine:r", "2026-10-24T08:00", 0, 0, "pills", "08:00")
+        val moved = AlarmPlan.effective(listOf(nagging()), listOf(tomorrow)).single()
+        assertEquals("occurrence:routine:r@2026-10-25T08:00", moved.id)
+        assertEquals("2026-10-25T08:00", moved.occurrence)
+        assertEquals(listOf(2026, 10, 25, 8, 0), moved.local)
+        assertEquals(listOf(2026, 10, 25, 14, 0), moved.end)
+        assertEquals(10 * 60_000L, moved.renagMs)
+        // Today it rings no more; tomorrow at 08:00, the clocks gone back meanwhile.
+        assertEquals(utc(2026, 10, 25, 7), AlarmPlan.next(listOf(moved), berlin, 0, utc(2026, 10, 24, 6, 5)))
+    }
+
+    @Test
+    fun aTomorrowOfASnoozeOrAtTheMonthsEndMovesTheOccurrence() {
+        val tomorrow = Action(1, EventQueue.KIND_TOMORROW, "routine:r", "2026-10-31T21:30", 0, 0, "pills", "21:30")
+        val snoozed = Alarm(
+            "snooze:routine:r@2026-10-31T21:30", "routine:r", "2026-10-31T21:30",
+            null, utc(2026, 10, 31, 21), "pills", "21:30",
+        )
+        val moved = AlarmPlan.effective(listOf(snoozed), listOf(tomorrow)).single()
+        assertEquals("2026-11-01T21:30", moved.occurrence)
+        assertEquals(listOf(2026, 11, 1, 21, 30), moved.local)
+        assertNull(moved.at)
+        assertEquals("2027-01-01", AlarmPlan.movedKey("2026-12-31"))
+        assertEquals("2028-02-29T07:00", AlarmPlan.movedKey("2028-02-28T07:00"))
+        assertNull(AlarmPlan.movedKey("someday"))
+    }
+
+    @Test
+    fun aMovedOccurrenceIsMissedWhenTheNextOneStartsAsBefore() {
+        // On Saturdays: Missed when next Saturday's starts, the moved one too.
+        val weekly = nagging().copy(end = listOf(2026, 10, 31, 8, 0))
+        val tomorrow = Action(1, EventQueue.KIND_TOMORROW, "routine:r", "2026-10-24T08:00", 0, 0, "pills", "08:00")
+        val moved = AlarmPlan.effective(listOf(weekly), listOf(tomorrow)).single()
+        assertEquals(listOf(2026, 10, 31, 8, 0), moved.end)
+    }
+
+    @Test
+    fun anAllDayOccurrenceMovesWithTheTimeItRangAt() {
+        val allDay = Alarm(
+            "occurrence:routine:r@2026-10-24", "routine:r", "2026-10-24",
+            listOf(2026, 10, 24, 9, 0), null, "pills", "",
+            end = listOf(2026, 10, 25, 0, 0),
+        )
+        val tomorrow = Action(1, EventQueue.KIND_TOMORROW, "routine:r", "2026-10-24", 0, 0, "pills", "")
+        val moved = AlarmPlan.effective(listOf(allDay), listOf(tomorrow)).single()
+        assertEquals("2026-10-25", moved.occurrence)
+        assertEquals(listOf(2026, 10, 25, 9, 0), moved.local)
+        assertEquals(listOf(2026, 10, 26, 0, 0), moved.end)
+    }
+
+    @Test
+    fun aTomorrowWhoseDayAfterIsPlannedAlreadyAddsNothing() {
+        val plan = listOf(
+            occurrence("2026-10-24T08:00", listOf(2026, 10, 24, 8, 0)),
+            Alarm("occurrence:routine:r@2026-10-25T08:00", "routine:r", "2026-10-25T08:00", listOf(2026, 10, 25, 8, 0), null, "pills", "08:00"),
+        )
+        val tomorrow = Action(1, EventQueue.KIND_TOMORROW, "routine:r", "2026-10-24T08:00", 0, 0, "pills", "08:00")
+        assertEquals(
+            listOf("2026-10-25T08:00"),
+            AlarmPlan.effective(plan, listOf(tomorrow)).map { it.occurrence },
+        )
+    }
+
+    @Test
+    fun notTodayOffersTomorrowOnlyForAnOccurrenceOfTodayOrLater() {
+        assertTrue(AlarmPlan.offersTomorrow("2026-10-24T08:00", "2026-10-24"))
+        assertTrue(AlarmPlan.offersTomorrow("2026-10-25", "2026-10-24"))
+        // A Re-nag after midnight of yesterday's Occurrence.
+        assertFalse(AlarmPlan.offersTomorrow("2026-10-23T22:00", "2026-10-24"))
+    }
+
+    @Test
     fun anOccurrenceAndItsSnoozeShareOneNotification() {
         assertEquals(
             AlarmPlan.notificationId("routine:r", "2026-10-24T08:00"),

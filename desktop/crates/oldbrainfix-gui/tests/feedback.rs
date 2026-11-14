@@ -3,8 +3,9 @@
 //! and Notes as a Pack not; the preview shows exactly the text Mail's
 //! link carries and "Save as file…" writes; Mail waits for words and for
 //! a text that fits a mail link; Notes ticked open the Pack's tree,
-//! nothing ticked, and "Save the Pack…" saves the Notes ticked to be
-//! attached. Nothing leaves without a click.
+//! nothing ticked, its Areas in the person's own order, and "Save the
+//! Pack…" saves the Notes ticked to be attached. Nothing leaves without
+//! a click.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -20,7 +21,7 @@ use std::sync::{Arc, Mutex};
 use egui::accesskit::{Role, Toggled};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
-use oldbrainfix_core::{Notes, Places, SigningKey, Store};
+use oldbrainfix_core::{Notes, PersonSettings, Places, SigningKey, Store};
 use oldbrainfix_gui::feedback_view::{self, FeedbackFacts, MAIL_BODY_LIMIT};
 use oldbrainfix_gui::{App, Page, Selection};
 
@@ -228,6 +229,27 @@ fn notes_picked_in_the_packs_tree_are_saved_as_a_pack_to_attach() -> TestResult 
         .click();
     harness.run();
     assert!(!shows(&harness, "Save the Pack…"));
+    Ok(())
+}
+
+#[test]
+fn the_packs_tree_lists_the_areas_in_the_persons_own_order() -> TestResult {
+    let desk = store()?;
+    let places = Places::new(&desk);
+    let health = places.add_area("Health")?;
+    let work = places.add_area("Work")?;
+    Notes::new(&desk).capture("Drink water", Some(&health.id), None)?;
+    Notes::new(&desk).capture("Send the report", Some(&work.id), None)?;
+    // Moved first, before Health by name (#280).
+    PersonSettings::new(&desk).set_area_order(&[work.id])?;
+    let dir = tempfile::tempdir()?;
+    let Opened { mut harness, .. } = open(desk, dir.path());
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Notes as a Pack")
+        .click();
+    harness.run();
+    // The tree's rows, drawn after the sidebar's.
+    assert!(last(&harness, "Work").rect().top() < last(&harness, "Health").rect().top());
     Ok(())
 }
 

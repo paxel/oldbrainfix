@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
+import 'package:oldbrainfix/src/note_card.dart' show Spawn;
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
@@ -186,6 +187,71 @@ void main() {
       expect(find.text('done 0 / skipped 0 this week'), findsOneWidget);
       expect(find.textContaining('morning moves'), findsNothing);
     });
+    testWidgets('of a Session Note counts the runs skipped, not those '
+        'Missed, and its next run is one Tomorrow added (#269)', (
+      tester,
+    ) async {
+      final pool = notes.capture('Push-ups').id;
+      Tallies(store).addField(pool, name: 'Done', unit: 'times', target: 20);
+      now = DateTime.utc(2026, 10, 19, 6);
+      final daily = Sessions(store).spawn(
+        notes.capture('Sport').id,
+        Schedule(
+          start: Day(2026, 10, 19),
+          times: [ClockTime(7, 0)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        pool: [pool],
+        count: 1,
+        rule: SessionRule.rolling,
+      );
+      final weekly = Sessions(store).spawn(
+        notes.capture('Swim').id,
+        Schedule(
+          start: Day(2026, 10, 3),
+          times: [ClockTime(7, 0)],
+          rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=SA'),
+        ),
+        pool: [pool],
+        count: 1,
+        rule: SessionRule.rolling,
+      );
+      now = DateTime.utc(2026, 10, 24, 8);
+      final routines = Routines(store);
+      // Sunday the 18th starts the week: the 19th to the 21st and the
+      // 23rd Missed, the 22nd skipped, today's still due.
+      routines.skip(daily.id, Occurrence(Day(2026, 10, 22), ClockTime(7, 0)));
+      routines.tomorrow(
+        weekly.id,
+        Occurrence(Day(2026, 10, 24), ClockTime(7, 0)),
+      );
+      await openCompact(tester);
+
+      final sport = cardOf('Sport').first;
+      expect(
+        find.descendant(
+          of: sport,
+          matching: find.text('done 0 / skipped 1 this week'),
+        ),
+        findsOneWidget,
+      );
+      final swim = cardOf('Swim').first;
+      expect(
+        find.descendant(
+          of: swim,
+          matching: find.text('Next: Sun, 10/25/2026 07:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: swim,
+          matching: find.text('done 0 / skipped 1 this week'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('of a Session Note shows the next run of any of its Routines '
         'and this week\'s done and skipped over all of them', (tester) async {
       final pool = notes.capture('Push-ups').id;
@@ -294,6 +360,63 @@ void main() {
       expect(find.byType(MergeIntoScreen), findsOneWidget);
     });
 
+    testWidgets('offers Routine…, Reminder…, Frog and Session… between '
+        'File into… and Merge into…, and Routine… opens its editor (#281)', (
+      tester,
+    ) async {
+      notes.capture('Call the plumber');
+      await openCompact(tester);
+
+      await tap(tester, key('note-menu'));
+      final order = [
+        key('note-file'),
+        key('note-spawn-routine'),
+        key('note-spawn-reminder'),
+        key('note-spawn-frog'),
+        key('note-spawn-session'),
+        key('note-merge'),
+      ];
+      for (var i = 1; i < order.length; i++) {
+        expect(
+          tester.getTopLeft(order[i]).dy,
+          greaterThan(tester.getTopLeft(order[i - 1]).dy),
+          reason: 'step $i',
+        );
+      }
+      expect(find.text('Routine…'), findsOneWidget);
+      expect(find.text('Reminder…'), findsOneWidget);
+      expect(find.text('Session…'), findsOneWidget);
+      await tap(tester, key('note-spawn-routine'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+    });
+
+    testWidgets('offers no Session… on a Checklist (#281)', (tester) async {
+      final id = notes.capture('Before the trip').id;
+      Checklists(store).make(id);
+      await openCompact(tester);
+
+      await tap(tester, key('note-menu'));
+      expect(key('note-spawn-routine'), findsOneWidget);
+      expect(key('note-spawn-reminder'), findsOneWidget);
+      expect(key('note-spawn-frog'), findsOneWidget);
+      // Only a plain Note becomes a Session (ADR 0039).
+      expect(key('note-spawn-session'), findsNothing);
+    });
+
+    testWidgets('offers only Routine… and Reminder… in Simple (#281)', (
+      tester,
+    ) async {
+      notes.capture('Call the plumber');
+      store.advanced = false;
+      await openCompact(tester);
+
+      await tap(tester, key('note-menu'));
+      expect(key('note-spawn-routine'), findsOneWidget);
+      expect(key('note-spawn-reminder'), findsOneWidget);
+      expect(key('note-spawn-frog'), findsNothing);
+      expect(key('note-spawn-session'), findsNothing);
+    });
+
     testWidgets('of a detailed card leaves them to the action row', (
       tester,
     ) async {
@@ -304,8 +427,77 @@ void main() {
       await tap(tester, key('note-menu'));
       expect(key('note-file'), findsNothing);
       expect(key('note-merge'), findsNothing);
+      for (final spawn in Spawn.values) {
+        expect(key('note-spawn-${spawn.name}'), findsNothing);
+      }
       expect(find.byTooltip('File into…'), findsOneWidget);
       expect(find.byTooltip('Merge into…'), findsOneWidget);
+    });
+  });
+
+  group('Share… in a card\'s ⋮ (#281)', () {
+    testWidgets('opens a small menu of Send, Share, Copy and Export as Pack, '
+        'which the ⋮ no longer lists itself', (tester) async {
+      notes.capture('Call the plumber');
+      await start(tester);
+      await openAllNotes(tester);
+
+      await tap(tester, key('note-menu'));
+      const shares = ['note-send', 'note-share', 'note-copy', 'note-pack'];
+      for (final share in shares) {
+        expect(key(share), findsNothing, reason: share);
+      }
+      await tap(tester, key('note-share-menu'));
+      expect(key('note-share-menu'), findsNothing);
+      for (final share in shares) {
+        expect(key(share), findsOneWidget, reason: share);
+      }
+      for (final words in [
+        'Send to a person',
+        'Share to an app',
+        'Copy text',
+        'Export as Pack…',
+      ]) {
+        expect(find.text(words), findsOneWidget, reason: words);
+      }
+    });
+
+    testWidgets('is in the ⋮ of a compact card too', (tester) async {
+      notes.capture('Call the plumber');
+      await openCompact(tester);
+
+      await tap(tester, key('note-menu'));
+      await tap(tester, key('note-share-menu'));
+      expect(key('note-copy'), findsOneWidget);
+    });
+  });
+
+  group('the pencil (#281)', () {
+    testWidgets('of a detailed card opens the Note editor in one tap', (
+      tester,
+    ) async {
+      notes.capture('Call the plumber');
+      await start(tester);
+      await openAllNotes(tester);
+
+      final pencil = find.descendant(
+        of: key('note-actions'),
+        matching: key('note-pencil'),
+      );
+      expect(pencil, findsOneWidget);
+      expect(find.byTooltip('Edit'), findsOneWidget);
+      await tap(tester, pencil);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+    });
+
+    testWidgets('is not on a compact card, whose ⋮ keeps Edit', (tester) async {
+      notes.capture('Call the plumber');
+      await openCompact(tester);
+
+      expect(key('note-pencil'), findsNothing);
+      await tap(tester, key('note-menu'));
+      await tap(tester, key('note-edit'));
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
     });
   });
 

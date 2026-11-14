@@ -542,10 +542,70 @@ void main() {
       expect(key('shopping-rename'), findsNothing);
       expect(find.text('Reappear time'), findsNothing);
       await tap(tester, key('shopping-delete'));
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tap(tester, key('checklist-delete-confirm'));
+      // It asks nothing: the announcement at the top undoes it (#268).
+      expect(find.byType(AlertDialog), findsNothing);
       expect(shown(note), isEmpty);
       expect(find.byType(BottomSheet), findsNothing);
+      await tap(tester, find.text('Line deleted'));
+      expect(shown(note), ['[x] Milk']);
+    });
+
+    testWidgets('⋮ on an open Line moves it among the open ones, its row '
+        'with it; a struck one stays (#283)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nBread\nEggs\nTea').id;
+      lists.make(note);
+      final bread = idOf(note, 'Bread');
+      lists.check(bread, deviceWallClock);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      final tea = idOf(note, 'Tea');
+      await lineMenu(tester, milk);
+      expect(key('shopping-up'), findsNothing);
+      await tap(tester, key('shopping-down'));
+      expect(shown(note), ['Eggs', 'Milk', 'Tea', '[x] Bread']);
+      expect(top(tester, milk), greaterThan(top(tester, eggs)));
+      // Never among the struck ones.
+      await lineMenu(tester, tea);
+      expect(key('shopping-down'), findsNothing);
+      await tap(tester, key('shopping-up'));
+      expect(shown(note), ['Eggs', 'Tea', 'Milk', '[x] Bread']);
+      await lineMenu(tester, bread);
+      expect(key('shopping-up'), findsNothing);
+      expect(key('shopping-down'), findsNothing);
+      await closeMenu(tester);
+      // Checked here, Tea keeps its row; Milk moves past it.
+      await tap(tester, key('checklist-check-$tea'));
+      await lineMenu(tester, milk);
+      await tap(tester, key('shopping-up'));
+      expect(shown(note), ['Milk', 'Eggs', '[x] Bread', '[x] Tea']);
+      expect(top(tester, milk), lessThan(top(tester, eggs)));
+      expect(top(tester, eggs), lessThan(top(tester, tea)));
+      expect(top(tester, tea), lessThan(top(tester, bread)));
+    });
+
+    testWidgets('a deleted Line comes back from the folded "Removed Lines" '
+        '(#268)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      expect(key('lines-removed'), findsNothing);
+      await lineMenu(tester, milk);
+      await tap(tester, key('shopping-delete'));
+      expect(shown(note), ['Eggs']);
+      await tester.ensureVisible(key('lines-removed'));
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Removed Lines'));
+      await tester.ensureVisible(key('line-restore-$milk'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('line-restore-$milk'));
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(key('lines-removed'), findsNothing);
+      // The announcement has nothing left to undo.
+      await tap(tester, find.text('Line deleted'));
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('a Line just typed has its ⋮ once it holds text, and each '
@@ -570,7 +630,6 @@ void main() {
       await type(tester, 'new-2', 'Salt', 4);
       await lineMenu(tester, 'new-2');
       await tap(tester, key('shopping-delete'));
-      await tap(tester, key('checklist-delete-confirm'));
       expect(shown(note), ['Milk', 'Tea']);
       expect(key('shopping-field-new-2'), findsNothing);
     });

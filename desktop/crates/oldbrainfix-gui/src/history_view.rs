@@ -1,10 +1,13 @@
 //! A Routine's History (Q400), as the phone's `RoutineHistoryScreen`:
 //! its Note and schedule; its Streak, current and longest, with the last
 //! seven days as dots, unless this Device's Settings switched Streaks
-//! off; its Adherence this week, this month and over the last 30 days;
-//! and the Log of every Occurrence, the latest first, Done (when, early
-//! or late), Missed or still due, with the snoozes this Device recorded.
-//! It only reads.
+//! off; its Adherence this week, this month and over the last 30 days,
+//! with what was skipped beside it (#269); and the Log of every
+//! Occurrence, the latest first, Done (when, early or late), Missed,
+//! skipped or still due, with the snoozes this Device recorded. It only
+//! reads.
+
+use std::collections::BTreeSet;
 
 use chrono::{DateTime, Utc};
 use egui::{Color32, RichText, Sense, Ui, WidgetInfo, WidgetType};
@@ -33,6 +36,8 @@ pub struct HistoryShown {
     pub history: RoutineHistory,
     /// Whether this Device shows Streaks.
     pub streaks: bool,
+    /// The keys of the Occurrences Not today ▸ Tomorrow skipped (#269).
+    pub tomorrow: BTreeSet<String>,
 }
 
 /// The week's first day in `t`'s language, 1 for Monday to 7 for
@@ -89,7 +94,8 @@ pub fn page(ui: &mut Ui, t: &L10n, tones: Tones, shown: Option<&HistoryShown>, w
             ui.label(RichText::new(t.history_empty()).color(text));
         }
         for entry in history.entries.iter().rev() {
-            log_row(ui, t, tones, entry, wall);
+            let tomorrow = shown.tomorrow.contains(&entry.occurrence.key());
+            log_row(ui, t, tones, (entry, tomorrow), wall);
         }
     });
 }
@@ -117,7 +123,7 @@ fn streak_panel(ui: &mut Ui, t: &L10n, tones: Tones, history: &RoutineHistory) {
 }
 
 /// One day as a dot under its weekday: all Done, partly, Missed, still
-/// due, or nothing due; a screen reader says which.
+/// due, all skipped, or nothing due; a screen reader says which.
 fn day_dot(ui: &mut Ui, t: &L10n, tones: Tones, tally: &DayTally) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -131,6 +137,9 @@ fn day_dot(ui: &mut Ui, t: &L10n, tones: Tones, tally: &DayTally) {
         (icons::STATUS_MISSED, error, t.day_missed(&day))
     } else if tally.open > 0 {
         (icons::PICK_OPEN, tones.accent, t.day_open(&day))
+    } else if tally.done == 0 {
+        // Skips leave the day as they leave the Adherence (#269).
+        (icons::DAY_SKIPPED, weak, t.day_skipped(&day))
     } else {
         (icons::STATUS_DONE, tones.accent, t.day_all_done(&day))
     };
@@ -154,7 +163,9 @@ fn tertiary(ui: &Ui) -> Color32 {
     }
 }
 
-/// The Adherence this week, this month and over the last 30 days.
+/// The Adherence this week, this month and over the last 30 days, each
+/// with what was skipped in it beside it, never part of the share
+/// (#269).
 fn adherence_panel(ui: &mut Ui, t: &L10n, history: &RoutineHistory) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -166,6 +177,10 @@ fn adherence_panel(ui: &mut Ui, t: &L10n, history: &RoutineHistory) {
     ] {
         ui.horizontal(|ui| {
             ui.label(RichText::new(label).color(text));
+            if adherence.skipped > 0 {
+                let skipped = format!("· {}", t.adherence_skipped(adherence.skipped as i64));
+                ui.label(RichText::new(skipped).small().color(weak));
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 match adherence_figures(t, adherence) {
                     None => drop(ui.label(RichText::new(t.adherence_none()).color(text))),
@@ -189,13 +204,21 @@ fn adherence_figures(t: &L10n, adherence: Adherence) -> Option<(String, String)>
     ))
 }
 
-/// One Occurrence in the Log: when it was due, and what came of it.
-fn log_row(ui: &mut Ui, t: &L10n, tones: Tones, entry: &HistoryEntry, wall: &WallClock) {
+/// One Occurrence in the Log: when it was due, and what came of it;
+/// `tomorrow` when Not today ▸ Tomorrow skipped it (#269).
+fn log_row(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    (entry, tomorrow): (&HistoryEntry, bool),
+    wall: &WallClock,
+) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let (icon, colour) = match entry.status {
         OccurrenceStatus::Done => (icons::STATUS_DONE, tones.accent),
         OccurrenceStatus::Missed => (icons::STATUS_MISSED, ui.visuals().error_fg_color),
+        OccurrenceStatus::Skipped => (icons::DAY_SKIPPED, weak),
         OccurrenceStatus::Open => (icons::PICK_OPEN, tones.accent),
         OccurrenceStatus::Coming => (icons::CONTEXT_WHEN, weak),
     };
@@ -211,7 +234,10 @@ fn log_row(ui: &mut Ui, t: &L10n, tones: Tones, entry: &HistoryEntry, wall: &Wal
                 occurrence_time(t, occurrence)
             );
             ui.label(RichText::new(due).color(text));
-            ui.label(RichText::new(outcome(t, entry, wall)).color(weak));
+            ui.label(RichText::new(outcome(t, (entry, tomorrow), wall)).color(weak));
+            if entry.moved {
+                ui.label(RichText::new(t.occurrence_from_day_before()).color(weak));
+            }
             if let Some(until) = entry.snoozed_until {
                 let line = t.log_snoozed(&when(t, until, occurrence.day, wall));
                 ui.label(RichText::new(line).color(weak));
@@ -220,12 +246,14 @@ fn log_row(ui: &mut Ui, t: &L10n, tones: Tones, entry: &HistoryEntry, wall: &Wal
     });
 }
 
-/// What came of `entry`: Done when (early or late), Missed, due or still
-/// to come.
-pub fn outcome(t: &L10n, entry: &HistoryEntry, wall: &WallClock) -> String {
+/// What came of `entry`: Done when (early or late), Missed, skipped,
+/// with `tomorrow` the day after instead (#269), due or still to come.
+pub fn outcome(t: &L10n, (entry, tomorrow): (&HistoryEntry, bool), wall: &WallClock) -> String {
     let Some(done_at) = entry.done_at else {
         return match entry.status {
             OccurrenceStatus::Missed => t.log_missed(),
+            OccurrenceStatus::Skipped if tomorrow => t.log_skipped_tomorrow(),
+            OccurrenceStatus::Skipped => t.log_skipped(),
             OccurrenceStatus::Coming => t.log_coming(),
             _ => t.log_open(),
         }

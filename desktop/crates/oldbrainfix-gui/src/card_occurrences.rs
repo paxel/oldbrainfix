@@ -4,8 +4,8 @@
 //! its Routines and Reminders that ticks it as the Agenda row's does; at
 //! the top of the Note dialog, over its name, the Occurrence the Note
 //! asks to check off, "Due 15:00" or "Missed" with its day, with Done,
-//! and for a one-time Reminder, the Note's only one, "Done and move to
-//! trash".
+//! Snooze and Not today (#269), and for a one-time Reminder, the Note's
+//! only one, "Done and move to trash".
 
 use std::collections::HashMap;
 
@@ -17,6 +17,7 @@ use oldbrainfix_core::{
 
 use crate::checklist_view::paint_box;
 use crate::l10n::L10n;
+use crate::occurrence_answers::{self, Answer, Answers};
 use crate::schedule_text::{day_text, occurrence_time};
 use crate::theme::{self, Tones};
 
@@ -66,18 +67,25 @@ fn checks(store: &Store, row: &AgendaRow) -> Result<bool> {
 }
 
 /// Paints the boxes of `shown` on a card, each with its time, struck
-/// through once Done: the card lies over them, so [`card_clicks`] takes
+/// through once Done or skipped, a skipped one saying so, "08:00 ·
+/// Skipped" (#269): the card lies over them, so [`card_clicks`] takes
 /// their clicks once the card is. Where each box lies.
 pub fn card_rows(ui: &mut Ui, t: &L10n, tones: Tones, shown: &[CardOccurrence]) -> Vec<egui::Rect> {
     let mut rects = Vec::new();
     for o in shown {
         ui.horizontal(|ui| {
             let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
-            paint_box(ui, tones, rect, o.row.done().is_some(), false);
-            let mut time = RichText::new(occurrence_time(t, &o.row.occurrence))
+            let done = o.row.done().is_some();
+            let skipped = !done && o.row.skipped().is_some();
+            paint_box(ui, tones, rect, done, false);
+            let mut words = occurrence_time(t, &o.row.occurrence);
+            if skipped {
+                words = format!("{words} · {}", t.occurrence_skipped());
+            }
+            let mut time = RichText::new(words)
                 .size(14.0)
                 .color(ui.visuals().text_color());
-            if o.row.done().is_some() {
+            if done || skipped {
                 time = time.strikethrough();
             }
             ui.label(time);
@@ -134,6 +142,8 @@ pub enum OpenAsked {
     Done(String, Occurrence),
     /// Check it off and move the Note with its one Reminder to the trash.
     DoneAndTrash(String, Occurrence),
+    /// Snooze it, skip it or move it to tomorrow (#269).
+    Answer(String, Occurrence, Answer),
 }
 
 /// What the line of `open` says: "Due 15:00", with its day when it is
@@ -149,9 +159,11 @@ pub fn open_text(t: &L10n, open: &OpenOccurrence, today: Day) -> String {
 }
 
 /// The lines at the top of the Note dialog, over its name (#215): of
-/// each Occurrence in `open` its text and Done, and "Done and move to
-/// trash" for a one-time Reminder where `trashes` allows it: the Note's
-/// only Routine or Reminder, the Note this Device's to move.
+/// each Occurrence in `open` its text and Done; Snooze while it is not
+/// Missed and Not today (#269), each opening its choices under it,
+/// Tomorrow only for an Occurrence of today or later; and "Done and move
+/// to trash" for a one-time Reminder where `trashes` allows it: the
+/// Note's only Routine or Reminder, the Note this Device's to move.
 pub fn open_lines(
     ui: &mut Ui,
     t: &L10n,
@@ -166,6 +178,32 @@ pub fn open_lines(
             let id = o.routine.id.clone();
             if theme::primary(ui, true, t.mark_done()).clicked() {
                 asked = Some(OpenAsked::Done(id.clone(), o.occurrence));
+            }
+            // Snooze rings from now on: not for one Missed.
+            let snooze = Answers {
+                snooze: true,
+                ..Answers::default()
+            };
+            let not_today = Answers {
+                not_today: true,
+                tomorrow: o.occurrence.day >= today,
+                ..Answers::default()
+            };
+            let mut picked = None;
+            for (shown, label, answers) in [
+                (!o.missed, t.snooze(), snooze),
+                (true, t.not_today(), not_today),
+            ] {
+                if !shown {
+                    continue;
+                }
+                let button = ui.button(RichText::new(label).color(text));
+                egui::Popup::menu(&button).show(|ui| {
+                    picked = picked.or(occurrence_answers::entries(ui, t, answers));
+                });
+            }
+            if let Some(answer) = picked {
+                asked = Some(OpenAsked::Answer(id.clone(), o.occurrence, answer));
             }
             if trashes
                 && o.routine.is_reminder()

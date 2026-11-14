@@ -8,6 +8,8 @@
     <string name="capture_photo">Fotonotiz</string>
     <string name="capture_all">Sprache, Text, Foto</string>
     <string name="capture_widget_description">Öffnet die Erfassung mit einem Tipp.</string>
+    <!-- A Tally's home-screen shortcut without a name (#284). -->
+    <string name="tally_shortcut">Strichliste</string>
     <string name="agenda_widget">Agenda</string>
     <string name="agenda_widget_description">Die Tage, die die Agenda zeigt, mit Kästchen zum Abhaken für heute.</string>
     <string name="agenda_widget_open_app">Öffne Old Brain Fix, um zu sehen, was heute ansteht.</string>
@@ -16,4 +18,5 @@
     <string name="crash_body">Old Brain Fix ist auf einen unerwarteten Fehler gestoßen und musste beendet werden. Deine gespeicherten Notizen sind sicher. Öffne die App wieder, und wenn es wieder passiert, schick den Bericht, damit es behoben werden kann.</string>
     <string name="crash_send_report">Bericht an den Entwickler senden</string>
     <string name="crash_close">Schließen</string>
+    <string name="print_failed">Old Brain Fix konnte die gedruckten Seiten nicht aufbewahren.</string>
 </resources>

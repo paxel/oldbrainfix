@@ -446,22 +446,28 @@ class _SyncScreenState extends State<SyncScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(t.bundleIntro),
       ),
-      ControlBelow(
-        padding: EdgeInsets.zero,
-        title: Text(t.bundleFor),
-        control: DropdownButton<String?>(
-          key: const ValueKey('bundle-for'),
-          isExpanded: true,
-          value: chosen,
-          items: [
-            for (final device in _paired)
-              DropdownMenuItem(value: device.id, child: Text(device.name)),
-            DropdownMenuItem(child: Text(t.bundleEverything)),
-          ],
-          onChanged: _bundleBusy
-              ? null
-              : (id) => setState(() => _bundleFor = id),
-        ),
+      Text(t.bundleFor),
+      // Device names are the user's own: radio buttons (UI laws,
+      // "Dialogs and pages"); "" stands for everything.
+      RadioColumn<String>(
+        key: const ValueKey('bundle-for'),
+        value: chosen ?? '',
+        options: [
+          for (final device in _paired)
+            RadioOption(
+              key: ValueKey('bundle-for-${device.id}'),
+              value: device.id,
+              title: Text(device.name),
+            ),
+          RadioOption(
+            key: const ValueKey('bundle-for-everything'),
+            value: '',
+            title: Text(t.bundleEverything),
+          ),
+        ],
+        onChanged: _bundleBusy
+            ? null
+            : (id) => setState(() => _bundleFor = id.isEmpty ? null : id),
       ),
       const SizedBox(height: 8),
       Wrap(
@@ -614,12 +620,120 @@ class _SyncScreenState extends State<SyncScreen> {
           value: widget.store.autoSyncOn(device.id),
           onChanged: (on) => _setAuto(device, on),
         ),
+      // Where a VPN reaches one's own Device (#267); another person's is
+      // reached on the local network only.
+      if (device.fingerprint.isNotEmpty && !device.shared)
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(40, 0, 0, 8),
+          child: HandAddressField(
+            key: ValueKey('address-${device.id}'),
+            store: widget.store,
+            device: device.id,
+          ),
+        ),
     ],
     if (FolderScope.of(context).available) ..._folder(t, when),
     if (BundleScope.of(context).available) ..._bundle(t),
     const SizedBox(height: 16),
     Text(t.syncSettingsStay),
   ];
+}
+
+/// The address by hand of the paired Device [device] (#267, ADR 0003),
+/// such as its Tailscale name, which sync and the questions to the
+/// desktop try when the local network does not find it. A valid address
+/// is kept as it is typed, an empty field removes it; one that is none
+/// keeps the address before and says why under the field once the field
+/// is left or submitted.
+class HandAddressField extends StatefulWidget {
+  final Store store;
+  final String device;
+
+  const HandAddressField({
+    super.key,
+    required this.store,
+    required this.device,
+  });
+
+  @override
+  State<HandAddressField> createState() => _HandAddressFieldState();
+}
+
+class _HandAddressFieldState extends State<HandAddressField> {
+  late final _text = TextEditingController(
+    text: widget.store.handAddress(widget.device)?.text ?? '',
+  );
+  final _focus = FocusNode();
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_left);
+  }
+
+  @override
+  void dispose() {
+    _focus
+      ..removeListener(_left)
+      ..dispose();
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _left() {
+    if (!_focus.hasFocus) _check();
+  }
+
+  void _changed(String typed) {
+    final taken = widget.store.setHandAddress(widget.device, typed);
+    if (taken && _error != null) setState(() => _error = null);
+  }
+
+  /// Says under the field why what is typed is no address.
+  void _check() {
+    final typed = _text.text;
+    final error = widget.store.setHandAddress(widget.device, typed)
+        ? null
+        : handAddressError(context.t, typed);
+    if (error != _error) setState(() => _error = error);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return TextField(
+      key: const ValueKey('hand-address'),
+      controller: _text,
+      focusNode: _focus,
+      autocorrect: false,
+      enableSuggestions: false,
+      keyboardType: TextInputType.url,
+      textCapitalization: TextCapitalization.none,
+      onChanged: _changed,
+      onSubmitted: (_) => _check(),
+      decoration: InputDecoration(
+        labelText: t.handAddressLabel,
+        helperText: t.handAddressHelp,
+        helperMaxLines: 4,
+        errorText: _error,
+        errorMaxLines: 3,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+}
+
+/// Why [typed] is no address by hand: its port, when the rest would be
+/// one, else that it is none.
+String handAddressError(AppLocalizations t, String typed) {
+  final text = typed.trim();
+  final colon = text.lastIndexOf(':');
+  final bracket = text.lastIndexOf(']');
+  final host = colon > bracket ? text.substring(0, colon) : null;
+  return host != null && host.isNotEmpty && HandAddress.parse(host) != null
+      ? t.handAddressBadPort
+      : t.handAddressInvalid;
 }
 
 /// What a sync that needs an update ([UpdateNotices]) says at the top:

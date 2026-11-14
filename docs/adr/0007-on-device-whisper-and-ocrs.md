@@ -43,3 +43,7 @@ Neither engine reads the upside-down letter or the chalk handwriting. At the def
 ## whisper.cpp as a pinned submodule (#247)
 
 Amended by #247 (ADR 0045): the whisper.cpp sources both apps build are no longer copied under `android/app/src/main/cpp/whisper`; they are the git submodule `third_party/whisper.cpp`, pinned to upstream's release v1.9.5, the same sources as the copy, byte for byte. The phone's CMake and the desktop's `build.rs` build from it, the Flatpak fetches it at the pinned commit, and OSV-Scanner checks that commit.
+
+## Who reads a file's text (ADR 0047)
+
+Amended by #267 (Q645): the text of an attached file is its Attachment Text. A PDF's scanned pages are read with RustO as photos are, the pages handed on by `oldbrainfix-pdf` as pictures; a PDF's own text and the text of office and text files are read without the OCR. The Device that attaches a file reads it when it is no PDF of more than 10 pages and no other file of more than 10 MiB; it writes down that a larger one is left to a computer (`computer` in the file's field), which reads it once it has the file, and the text syncs back. Desktop OCR takes about 0.3 s a page (#118); the phone's was never measured, so its limit is set once it is.

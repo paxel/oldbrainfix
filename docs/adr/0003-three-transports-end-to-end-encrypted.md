@@ -21,3 +21,23 @@ Amended for #105: phones and tablets host LAN sync as the computer does, so two 
 
 - Two phones meet in the background only while one runs its background sync and hosts and the other's run looks for it; with Android's period of about 15 minutes this can take several periods. With the app open on either, they sync within a minute.
 - Every Device that joined once holds a certificate, also one that never shows a code.
+
+## A file of up to 256 MiB (#267)
+
+Amended by #267 (ADR 0047): over the local network a blob may now weigh 256 MiB, as much as a bundle and a Backup carry of one (`MAX_BLOB_BYTES` in `lan.rs`, `maxBlobBytes` in `lan.dart`), up from 64 MiB, both as a host takes it and as a joining Device reads it back (`join.rs`, `lan.dart`), so an attached file of any size that can be attached syncs by every transport. A sync body of entries stays at 64 MiB.
+
+## The phone's question and an address by hand (#267)
+
+Amended by #267 (Q640, Q641, ADR 0051): the phone asks the user's own desktop about the Notes over the paired connection, and a paired Device can be given an address by hand for a VPN.
+
+- **The question** goes to the desktop's paired host, as a sync does: the certificate must be the one pinned for that Device before anything is sent, and every request carries the phone's proof over a fresh nonce from `GET /challenge`. `GET /ask/provider` answers with the provider the desktop asks (`protocol`, `model`, the `host` of its address with its port, `ready`, and `unready` with the reason while it is not), never its key nor the whole address; the phone shows it before the first question. `POST /ask` carries `question` and `earlier`, the earlier exchanges of the same conversation as `question` and `answer` texts. The desktop answers with 200 and either `answer` (`text`, `notes`, `cut`, and `unchecked`, true when a link to a Note its model did not read was removed, ADR 0051, #294, and false when missing) or `failure` (`unready`, `key`, `provider`, `network`, `unreadable`, `rounds`, `refused`, `stopped`, `busy`), with `message` and `status` where the kind has them; `review` says whether changes of an AI Task now wait for the review on the desktop. A kind the phone does not know reads as an unknown failure. The keys are written in order, and the Dart core (`lan_ask.dart`) and the desktop core (`lan_ask.rs`) write the same bytes (fixture `ask.json`).
+- **Who may ask**: only the user's own paired Devices, with their switch for automatic sync on, as for a paired sync. Another person's Device, paired by invite, is declined, on the desktop and before anything is sent on the phone: the question reads every Note that is not Hidden from AI. A Device that does not answer questions (another phone, an older desktop) answers 404.
+- **Off the sync's thread**: the request crosses the host's channel as every other; the desktop answers a question on a thread of its own (`AskDesk`), one at a time, another meanwhile hearing `busy`, so syncs go on while the provider thinks. Questions are answered while sync waits for a review too, as asking syncs nothing.
+- **An address by hand**: a paired Device can be given an address, such as a Tailscale name or an address of a VPN, with an optional port (`host`, `host:port`, `[v6]:port`; a port in digits from 1 to 65535). It is a local setting of the Device that keeps it (`address:<device id>`), never synced, and goes with the Device when it is forgotten. The phone tries, in turn, where mDNS found the Device, the address by hand (with the port the Device was last found at when none is typed), and where it was found last. A Device is reached outside the local network only at its address by hand; the pinned certificate decides there as everywhere, and a sync through it does not replace the address the Device was found at.
+- The sync format stays 4: the new requests are paths of their own, and an older desktop answers them with 404.
+
+### Considered Options
+
+- Asking without the auto-sync proof, by PIN (rejected: anyone on the network holding a PIN could read the Notes through the user's provider).
+- A relay or remote access built into the app (rejected, Q641): a VPN the user runs outside the app carries the paired connection, and the app builds no server to secure.
+- Trying the address by hand only after the address found last (rejected: away from home the old address costs a connection timeout before every sync).

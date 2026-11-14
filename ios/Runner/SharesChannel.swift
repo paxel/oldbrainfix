@@ -176,7 +176,7 @@ enum SharesChannel {
   /// The oldest share as the `shared` answer, or nil.
   private static func takeShared() -> [String: Any]? {
     guard let inbox = ShareInbox.directory(),
-      let taken = ShareInbox.takeShare(from: inbox)
+      let taken = ShareInbox.takeShare(from: inbox, attachments: FilesChannel.picked)
     else { return nil }
     var answer: [String: Any] = [
       "text": taken.text,
@@ -184,6 +184,7 @@ enum SharesChannel {
         FlutterStandardTypedData(bytes: $0)
       },
       "recordings": [Any](),
+      "files": taken.files.map { ["path": $0.path, "name": $0.name, "type": $0.type] },
     ]
     if let subject = taken.subject { answer["subject"] = subject }
     return answer

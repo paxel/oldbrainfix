@@ -72,6 +72,8 @@ void main() {
   Future<void> shareFromCard(WidgetTester tester) async {
     await allNotes(tester);
     await tap(tester, find.byKey(const ValueKey('note-menu')).first);
+    // Under Share… (#281).
+    await tap(tester, find.byKey(const ValueKey('note-share-menu')));
     expect(find.text('Send to a person'), findsOneWidget);
     await tap(tester, find.byKey(const ValueKey('note-share')));
     // The files are written outside the test's fake time.

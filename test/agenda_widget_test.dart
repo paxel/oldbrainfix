@@ -464,8 +464,8 @@ void main() {
       ]);
     });
 
-    test('a Checklist\'s open Lines under its name, each checkable '
-        '(#209)', () {
+    test('a Checklist\'s open Lines under its name, each checkable, one '
+        'checked today struck for the day (#209, #276)', () {
       final id = trip();
       final lists = Checklists(store);
       final passport = lists.byNote(id)!.lines.first;
@@ -473,15 +473,17 @@ void main() {
 
       final today = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
 
-      expect(titles(today), ['Before the trip', 'Tickets']);
-      expect(today.first.toMap(), {
+      expect(titles(today), ['Before the trip', 'Passport', 'Tickets']);
+      expect([for (final row in today) row.done], [false, true, false]);
+      final shown = today.where((row) => row.title != 'Passport').toList();
+      expect(shown.first.toMap(), {
         'kind': 'checklist',
         'title': 'Before the trip',
         'done': false,
         'block': 'lists',
       });
       final tickets = lists.byNote(id)!.lines.last;
-      expect(today[1].toMap(), {
+      expect(shown[1].toMap(), {
         'kind': 'checklistLine',
         'title': 'Tickets',
         'done': false,
@@ -591,10 +593,31 @@ void main() {
             .id,
       );
 
+      // Checked today, a Line stays struck after the open ones (#276).
+      lists.check(lines.first.lineId!, deviceWallClock);
+      final struck = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
+      expect(titles(struck), ['Groceries', 'Eggs', 'Rice', 'Milk']);
+      expect(struck.last.toMap(), {
+        'kind': 'shopping',
+        'title': 'Milk',
+        'done': true,
+        'checks': true,
+        'indent': 1,
+        'line': lines.first.lineId,
+        'block': 'lists',
+      });
+      store.agendaHidesChecked = true;
+      expect(titles(snapshot().days['2026-10-24']), [
+        'Groceries',
+        'Eggs',
+        'Rice',
+      ]);
+      store.agendaHidesChecked = false;
+
       lists.setOnAgenda(id, ShoppingOnAgenda.off);
       expect(snapshot().days['2026-10-24'], isEmpty);
 
-      // Without an open Line it never shows.
+      // Without an open Line it never shows as its count.
       lists.setOnAgenda(id, ShoppingOnAgenda.count);
       for (final line in lists.byNote(id, deviceWallClock)!.open) {
         lists.check(line.id, deviceWallClock);
@@ -896,10 +919,13 @@ void main() {
         [true, false],
       );
       expect(alarms.acknowledged, 1);
+      // Struck for the day, as on the Agenda (#276).
       expect(titles(alarms.agendas.last.days['2026-10-24']), [
         'Before the trip',
+        'Passport',
         'Tickets',
       ]);
+      expect(alarms.agendas.last.days['2026-10-24']?[1].done, isTrue);
     });
 
     testWidgets('tapping a Session\'s pick opens its entry form (#209)', (

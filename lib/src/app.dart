@@ -12,6 +12,8 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_links.dart';
+import 'attachment_reader.dart';
+import 'attachment_views.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
 import 'areas_screen.dart';
@@ -26,11 +28,13 @@ import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'file_platform.dart';
 import 'failure_dialog.dart';
 import 'first_start_screen.dart';
 import 'folder_platform.dart';
 import 'frame_times.dart';
 import 'help_notes.dart';
+import 'home_shortcuts.dart';
 import 'home_pages.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
@@ -38,13 +42,16 @@ import 'location.dart';
 import 'lock_platform.dart';
 import 'lock_screen.dart';
 import 'look.dart';
+import 'note_editor_screen.dart';
 import 'nudge_screen.dart';
+import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
 import 'place_names.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
+import 'print_platform.dart';
 import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
@@ -60,6 +67,7 @@ import 'starter_set_screen.dart';
 import 'sync_platform.dart';
 import 'sync_runner.dart';
 import 'sync_screen.dart';
+import 'tally_entry_screen.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
@@ -87,6 +95,14 @@ class OldBrainFixApp extends StatefulWidget {
   /// given.
   final PhotoPlatform photos;
 
+  /// The Device's file picker, the system's apps that open a file, and
+  /// the PDF reader of the native library (#267); none when not given.
+  final FilePlatform files;
+
+  /// Android's print service for Print to Old Brain Fix (#293); none when
+  /// not given, as on the iPhone.
+  final PrintPlatform printing;
+
   /// The Device's microphone and playback of voice recordings; none when
   /// not given.
   final VoicePlatform voice;
@@ -98,6 +114,9 @@ class OldBrainFixApp extends StatefulWidget {
   /// The quick entry points asking for a capture screen; none when not
   /// given.
   final CaptureRequests requests;
+
+  /// A Tally's shortcuts on the home screen (#284); none when not given.
+  final HomeShortcuts shortcuts;
 
   /// Whisper and its model for Transcripts; none when not given.
   final SpeechPlatform speech;
@@ -180,9 +199,12 @@ class OldBrainFixApp extends StatefulWidget {
     this.location = const NoLocation(),
     this.alarms = const NoAlarms(),
     this.photos = const NoPhotos(),
+    this.files = const NoFiles(),
+    this.printing = const NoPrinting(),
     this.voice = const NoVoice(),
     this.context = const NoContext(),
     this.requests = const NoCaptureRequests(),
+    this.shortcuts = const NoHomeShortcuts(),
     this.speech = const NoSpeech(),
     this.ocr = const NoOcr(),
     this.calendar = const NoCalendar(),
@@ -248,6 +270,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
+  late final AttachmentReader _attachmentReader;
   late final _profile = OwnProfileModel(
     store: widget.store,
     platform: widget.profile,
@@ -274,6 +297,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     unawaited(_speechModel.check());
     // Photo Texts come in the background too, never holding Capture up.
     _photoReader = PhotoReader(notes: _notes, platform: widget.ocr);
+    // And Attachment Texts, the PDFs' scans through the same OCR (#267).
+    _attachmentReader = AttachmentReader(
+      notes: _notes,
+      files: widget.files,
+      ocr: widget.ocr,
+    );
     // The own Profile from the phone's name, asking nothing; on the first
     // start only once it is past its first screen (ADR 0017), so a Device
     // being added takes the Profile of the user's other Devices.
@@ -289,6 +318,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _transcriber.dispose();
     _speechModel.dispose();
     _photoReader.dispose();
+    _attachmentReader.dispose();
     _lock.dispose();
     _profile.dispose();
     _pager.dispose();
@@ -373,36 +403,57 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                           transcriber: _transcriber,
                           child: PhotoReaderScope(
                             reader: _photoReader,
-                            child: CalendarScope(
-                              calendar: widget.calendar,
-                              child: CalendarMirrorScope(
-                                mirror: _mirror,
-                                child: AppointmentScope(
-                                  source: widget.appointments,
-                                  child: DraftsScope(
-                                    drafts: _drafts,
-                                    child: LockScope(
-                                      lock: _lock,
-                                      child: PairingScope(
-                                        pairing: widget.pairing,
-                                        child: AutoSyncScope(
-                                          sync: _autoSync,
-                                          child: FolderScope(
-                                            folders: widget.folders,
-                                            child: BundleScope(
-                                              bundles: widget.bundles,
-                                              child: PersonScope(
-                                                store: widget.store,
-                                                platform: widget.profile,
-                                                onChangesSent: _alarms.replan,
-                                                child: TagSearchScope(
-                                                  onSearch: _searchTag,
-                                                  child: AppLinkScope(
-                                                    onOpen: _links.open,
-                                                    onPick: _pickLink,
-                                                    child:
-                                                        child ??
-                                                        const SizedBox.shrink(),
+                            child: FileScope(
+                              files: widget.files,
+                              child: PrintScope(
+                                printing: widget.printing,
+                                child: AttachmentReaderScope(
+                                  reader: _attachmentReader,
+                                  child: AttachmentScope(
+                                    notes: _notes,
+                                    child: CalendarScope(
+                                      calendar: widget.calendar,
+                                      child: CalendarMirrorScope(
+                                        mirror: _mirror,
+                                        child: AppointmentScope(
+                                          source: widget.appointments,
+                                          child: DraftsScope(
+                                            drafts: _drafts,
+                                            child: LockScope(
+                                              lock: _lock,
+                                              child: PairingScope(
+                                                pairing: widget.pairing,
+                                                child: AutoSyncScope(
+                                                  sync: _autoSync,
+                                                  child: FolderScope(
+                                                    folders: widget.folders,
+                                                    child: BundleScope(
+                                                      bundles: widget.bundles,
+                                                      child: PersonScope(
+                                                        store: widget.store,
+                                                        platform:
+                                                            widget.profile,
+                                                        onChangesSent:
+                                                            _alarms.replan,
+                                                        child: TagSearchScope(
+                                                          onSearch: _searchTag,
+                                                          child: AppLinkScope(
+                                                            onOpen: _links.open,
+                                                            onPick: _pickLink,
+                                                            child: AlarmSyncScope(
+                                                              alarms: _alarms,
+                                                              child: HomeShortcutsScope(
+                                                                shortcuts: widget
+                                                                    .shortcuts,
+                                                                child:
+                                                                    child ??
+                                                                    const SizedBox.shrink(),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -449,6 +500,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     lock: _lock,
     routes: _routes,
     requests: widget.requests,
+    shortcuts: widget.shortcuts,
     bundles: widget.bundles,
     profile: _profile,
     speech: _speechModel,
@@ -509,14 +561,15 @@ class RouteStack extends NavigatorObserver {
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
 /// tapped, the Unsorted list when the Agenda widget's Unsorted
-/// count was and a pick's entry form when its pick was, and imports the bundles other apps opened with this one
+/// count was and a pick's entry form when its pick was, a Tally's entry
+/// page when its shortcut on the home screen was (#284), and imports the bundles other apps opened with this one
 /// and opens the Profile card links tapped in them.
 /// While the App Lock is locked, the lock screen stands in
 /// front of the Agenda, which still opens Capture for shares and quick
 /// entry points; what was open of the browser goes when the app locks
 /// again, while Capture and the full-screen alarm stay, and the Nudge
-/// screen, the Unsorted list and a pick's entry form wait for the
-/// unlock.
+/// screen, the Unsorted list, a pick's entry form and a Tally's entry
+/// page wait for the unlock.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -528,6 +581,7 @@ class _Home extends StatefulWidget {
   final AppLock lock;
   final RouteStack routes;
   final CaptureRequests requests;
+  final HomeShortcuts shortcuts;
   final BundlePlatform bundles;
   final OwnProfileModel profile;
   final SpeechModel speech;
@@ -548,6 +602,7 @@ class _Home extends StatefulWidget {
     required this.lock,
     required this.routes,
     required this.requests,
+    required this.shortcuts,
     required this.bundles,
     required this.profile,
     required this.speech,
@@ -605,6 +660,15 @@ class _HomeState extends State<_Home> {
   var _changesWaiting = false;
   var _unsortedWaiting = false;
   WidgetPick? _pickWaiting;
+  OpenedOccurrence? _occurrenceWaiting;
+
+  /// The Note of the Tally whose shortcut was tapped while locked (#284).
+  String? _tallyWaiting;
+
+  /// Whether the user came from a Tally's shortcut and has not left the
+  /// app since: only then does closing its entry page go back.
+  var _fromShortcut = false;
+  late final StreamSubscription<void> _tallyAsked;
 
   /// Whether the bundles of the Changes Nudge are going out now.
   var _sendingChanges = false;
@@ -623,12 +687,16 @@ class _HomeState extends State<_Home> {
     _bundlesOpened = widget.bundles.opened.listen(
       (_) => unawaited(_importOpened()),
     );
+    _tallyAsked = widget.shortcuts.arrived.listen(
+      (_) => unawaited(_tallyOpened()),
+    );
     widget.profile.addListener(_profileMade);
     widget.alarms.addListener(_ringChanged);
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_changesOpened);
     widget.alarms.addListener(_unsortedOpened);
     widget.alarms.addListener(_pickOpened);
+    widget.alarms.addListener(_occurrenceOpened);
     widget.lock.addListener(_lockChanged);
     widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
@@ -641,6 +709,8 @@ class _HomeState extends State<_Home> {
       widget.autoSync.shown();
       // A bundle, Sent Item or Profile card file that opened the app.
       unawaited(_importOpened());
+      // A Tally's shortcut that opened the app (#284).
+      unawaited(_tallyOpened());
       unawaited(_autoBackupStart());
       // Past the first start already: what this version's help Notes
       // still owe (#180), an update's What's new among them.
@@ -690,6 +760,8 @@ class _HomeState extends State<_Home> {
   void _hidden() {
     // A sync out of sight is not announced; one after coming back is.
     _syncingSaid = true;
+    // Back later from anywhere else, the app stays when the page closes.
+    _fromShortcut = false;
     widget.lock.hidden();
     unawaited(widget.alarms.refresh());
     widget.autoSync.hidden();
@@ -766,12 +838,14 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_changesOpened);
     widget.alarms.removeListener(_unsortedOpened);
     widget.alarms.removeListener(_pickOpened);
+    widget.alarms.removeListener(_occurrenceOpened);
     widget.lock.removeListener(_lockChanged);
     widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
     widget.autoSync.removeListener(_updatesNeeded);
     widget.autoSync.syncing.removeListener(_syncing);
     unawaited(_bundlesOpened.cancel());
+    unawaited(_tallyAsked.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
     super.dispose();
@@ -863,6 +937,14 @@ class _HomeState extends State<_Home> {
       _pickWaiting = null;
       unawaited(_openPick(pick));
     }
+    if (_occurrenceWaiting case final opened?) {
+      _occurrenceWaiting = null;
+      unawaited(_openOccurrence(opened));
+    }
+    if (_tallyWaiting case final noteId?) {
+      _tallyWaiting = null;
+      unawaited(_openTally(noteId));
+    }
   }
 
   /// Removes every route over the Agenda up to the first that needs no
@@ -890,6 +972,7 @@ class _HomeState extends State<_Home> {
       photo: way == CaptureWay.photo,
       gallery: way == CaptureWay.gallery,
       paste: way == CaptureWay.paste,
+      file: way == CaptureWay.file,
       onChanged: () {},
     ),
   );
@@ -1011,6 +1094,92 @@ class _HomeState extends State<_Home> {
     }
     await openPick(context, widget.notes, today, picked);
     lock?.closeAreas();
+  }
+
+  /// Opens the Note of an Occurrence whose notification was tapped
+  /// (#270); behind the App Lock it waits for the unlock.
+  void _occurrenceOpened() {
+    if (!mounted) return;
+    final opened = widget.alarms.takeOccurrenceOpened();
+    if (opened == null) return;
+    if (widget.lock.locked) {
+      _occurrenceWaiting = opened;
+      return;
+    }
+    unawaited(_openOccurrence(opened));
+  }
+
+  /// Opens the editor of the Note of [opened]'s Routine, as a tap on its
+  /// row on the Agenda does: its locked Area first. A Routine or Note no
+  /// longer there, or in the trash, opens nothing, the Agenda being open.
+  Future<void> _openOccurrence(OpenedOccurrence opened) async {
+    final store = widget.store;
+    final routine = Routines(store).byId(opened.routineId);
+    if (routine == null || routine.isTrashed) return;
+    final note = widget.notes.byId(routine.noteId);
+    if (note == null || note.isTrashed) return;
+    final lock = LockScope.of(context);
+    final areaId = AreaLocks(store).lockedAreaOf(note);
+    if (areaId != null) {
+      final area = widget.places.areaById(areaId);
+      final open = await openLockedArea(
+        context,
+        lock,
+        areaId,
+        area == null ? '' : areaName(context.t, area),
+      );
+      if (!open || !mounted) return;
+    }
+    await openNote(context, widget.notes, widget.places, note);
+    lock?.closeAreas();
+  }
+
+  /// Opens the entry page of the Tally whose shortcut on the home screen
+  /// was tapped (#284); behind the App Lock it waits for the unlock, as a
+  /// pick's entry form does.
+  Future<void> _tallyOpened() async {
+    final noteId = await widget.shortcuts.take();
+    if (noteId == null || !mounted) return;
+    _fromShortcut = true;
+    if (widget.lock.locked) {
+      _tallyWaiting = noteId;
+      return;
+    }
+    await _openTally(noteId);
+  }
+
+  /// Opens the entry page of the Tally of [noteId], its locked Area
+  /// first, and once it closes, saved or not, goes back to where the
+  /// user was, as long as they came from the shortcut and did not leave
+  /// the app meanwhile. A Tally deleted, in the trash or no longer this
+  /// Device's to add to opens only the app, and says so at the top.
+  Future<void> _openTally(String noteId) async {
+    final store = widget.store;
+    final note = widget.notes.byId(noteId);
+    if (note == null ||
+        note.isTrashed ||
+        !Tallies(store).isTally(noteId) ||
+        !store.mayWriteIn(noteId)) {
+      AnnouncementsScope.of(context)?.announce(context.t.tallyShortcutGone);
+      return;
+    }
+    final lock = LockScope.of(context);
+    final areaId = AreaLocks(store).lockedAreaOf(note);
+    if (areaId != null) {
+      final area = widget.places.areaById(areaId);
+      final open = await openLockedArea(
+        context,
+        lock,
+        areaId,
+        area == null ? '' : areaName(context.t, area),
+      );
+      if (!open || !mounted) return;
+    }
+    await addTallyEntry(context, widget.notes, noteId);
+    lock?.closeAreas();
+    if (!mounted || !_fromShortcut) return;
+    _fromShortcut = false;
+    await widget.shortcuts.leave();
   }
 
   /// Plants what the user kept of the Starter Set and keeps Simple or
@@ -1207,6 +1376,7 @@ class _HomeState extends State<_Home> {
                 places: widget.places,
                 trail: widget.trail,
                 onBack: _pager.showAgenda,
+                pageShown: _pager.shown,
               ),
             ),
           ),

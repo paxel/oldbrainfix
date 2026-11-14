@@ -8,7 +8,10 @@
 //! may mean as suggestions under it (#159), and the rule follows its kind
 //! until it is picked. Save files the Tally where the page was opened
 //! from, Unsorted for none, with every row that has a name; rows left
-//! without one are dropped. Leaving without Save makes nothing.
+//! without one are dropped. Leaving it by Esc, a click beside it or back
+//! saves as Save does once something was typed or picked (#275); while
+//! it can't be saved it asks once whether to discard it. Left as it
+//! opened, or by Cancel, it makes nothing.
 
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::tally_units;
@@ -17,6 +20,7 @@ use oldbrainfix_core::{Notes, Store, Tallies, TallyRule, UnitSystem};
 use crate::app::{chip_row, embossed};
 use crate::icons;
 use crate::l10n::L10n;
+use crate::leave_saves::Leaving;
 use crate::setting_badges::{BadgeValue, badge, badge_dialog, badge_row};
 use crate::tally_unit_match::{self, UnitNames};
 use crate::tally_view::{self, kind_name};
@@ -94,6 +98,24 @@ impl FieldDraft {
         tally_units::parse_shown(text, &self.unit(system), system)
     }
 
+    /// Whether nothing was typed or picked in it.
+    fn blank(&self) -> bool {
+        self.name.trim().is_empty()
+            && self.unit_text.trim().is_empty()
+            && self.picked.is_none()
+            && !self.rule_picked
+            && !self.check
+            && self.target.trim().is_empty()
+    }
+
+    /// Whether its target is typed but no number, for a field with a
+    /// name.
+    fn target_wrong(&self, system: UnitSystem) -> bool {
+        !self.name.trim().is_empty()
+            && !self.target.trim().is_empty()
+            && self.target(system).is_none()
+    }
+
     /// The rule follows the kind of unit until it is picked.
     fn unit_changed(&mut self, system: UnitSystem) {
         if !self.rule_picked {
@@ -111,6 +133,9 @@ pub struct TallyPage {
     /// Tally made, ticked in its pool.
     pub for_session: bool,
     name: String,
+    /// The name as the page opened, to tell on leaving whether anything
+    /// changed (#275).
+    name_opened: String,
     fields: Vec<FieldDraft>,
     name_missing: bool,
     fields_missing: bool,
@@ -137,6 +162,7 @@ impl TallyPage {
             place,
             for_session,
             name: String::new(),
+            name_opened: String::new(),
             fields: vec![FieldDraft::new(1)],
             name_missing: false,
             fields_missing: false,
@@ -151,8 +177,50 @@ impl TallyPage {
     /// The page with its name starting as `name`, such as the tags a
     /// Session's pool is filtered by (#220).
     pub fn with_name(mut self, name: String) -> TallyPage {
+        self.name_opened = name.clone();
         self.name = name;
         self
+    }
+
+    /// Whether anything was typed or picked since the page opened
+    /// (#275); a row added and left empty is nothing.
+    pub fn changed(&self) -> bool {
+        self.name.trim() != self.name_opened.trim() || !self.fields.iter().all(FieldDraft::blank)
+    }
+
+    /// Whether Save would make the Tally: a name, a field with a name and
+    /// no target that is no number.
+    pub fn valid(&self) -> bool {
+        !self.name.trim().is_empty()
+            && self.fields.iter().any(|f| !f.name.trim().is_empty())
+            && !self.fields.iter().any(|f| f.target_wrong(self.system))
+    }
+
+    /// What leaving the page comes to (#275).
+    pub fn leaving(&self) -> Leaving {
+        Leaving::of(self.changed(), self.valid())
+    }
+
+    /// Says what to fix and gives the first field to fix the keyboard, as
+    /// Save and Keep editing do; whether anything needs fixing.
+    pub fn show_what_to_fix(&mut self) -> bool {
+        let system = self.system;
+        self.name_missing = self.name.trim().is_empty();
+        self.fields_missing = self.fields.iter().all(|f| f.name.trim().is_empty());
+        for field in &mut self.fields {
+            field.target_invalid = field.target_wrong(system);
+        }
+        self.focus = if self.name_missing {
+            Some(Id::new(NAME_FIELD))
+        } else if self.fields_missing {
+            self.fields.first().map(|f| field_id(f.key))
+        } else {
+            self.fields
+                .iter()
+                .find(|f| f.target_invalid)
+                .map(|f| field_id(f.key))
+        };
+        self.name_missing || self.fields_missing || self.fields.iter().any(|f| f.target_invalid)
     }
 
     /// The name as typed, without the blanks around it.
@@ -165,34 +233,11 @@ impl TallyPage {
     /// order; the new Note's id, or `None` while something needs fixing,
     /// which then says so and takes the keyboard.
     pub fn save(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<String>> {
+        if self.show_what_to_fix() {
+            return Ok(None);
+        }
         let name = self.name.trim().to_string();
         let system = self.system;
-        self.name_missing = name.is_empty();
-        let kept: Vec<usize> = self
-            .fields
-            .iter()
-            .enumerate()
-            .filter(|(_, f)| !f.name.trim().is_empty())
-            .map(|(i, _)| i)
-            .collect();
-        self.fields_missing = kept.is_empty();
-        for (i, field) in self.fields.iter_mut().enumerate() {
-            field.target_invalid = kept.contains(&i)
-                && !field.target.trim().is_empty()
-                && field.target(system).is_none();
-        }
-        if self.name_missing {
-            self.focus = Some(Id::new(NAME_FIELD));
-            return Ok(None);
-        }
-        if self.fields_missing {
-            self.focus = self.fields.first().map(|f| field_id(f.key));
-            return Ok(None);
-        }
-        if let Some(field) = self.fields.iter().find(|f| f.target_invalid) {
-            self.focus = Some(field_id(field.key));
-            return Ok(None);
-        }
         let fields: Vec<&FieldDraft> = self
             .fields
             .iter()
@@ -240,7 +285,7 @@ impl TallyPage {
                 ui.add_space(4.0);
                 ui.label(RichText::new(t.new_tally()).size(18.0).strong().color(text));
                 ui.horizontal_wrapped(|ui| {
-                    if theme::primary(ui, true, t.save()).clicked() {
+                    if theme::main_action(ui, true, t.save()) {
                         intent = Some(PageIntent::Save);
                     }
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {

@@ -1,8 +1,20 @@
+# Every check of a commit, once per tree and before the merge (#234).
+#
+# On a push to any branch but summer. A pull request's required checks are
+# the checks of its head commit, which the push already ran, so a push with
+# a pull request open runs once. summer gets no run after a merge: its
+# ruleset requires a branch to be up to date before merging, so the merged
+# tree is the head's tree that passed here.
+#
+# On a pull request only for one from a fork, whose commits are never
+# pushed here. A pull request from a branch of this repository skips every
+# job under another name ("… (runs on push)"), so no skipped job stands in
+# for a required check the push run has to pass.
 name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches-ignore: [summer]
   pull_request:
 
 # Read-only by default; a job that writes asks for more itself.
@@ -11,7 +23,8 @@ permissions:
 
 jobs:
   test:
-    name: Analyze & test
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Analyze & test (runs on push)' || 'Analyze & test' }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -20,6 +33,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       - name: Core — analyze and test
         working-directory: packages/oldbrainfix_core
@@ -34,8 +48,19 @@ jobs:
           flutter pub get
           flutter analyze --fatal-infos
           flutter test
+      # The app, the core and the tools, after both pub gets: the
+      # package config sets the language version, and with it the style.
+      - name: Dart format
+        run: dart format --output=none --set-exit-if-changed .
       - name: No untranslated strings
         run: test "$(tr -d '[:space:]' < build/untranslated.json)" = "{}"
+      # The generated lib/l10n/app_localizations*.dart are committed; the
+      # runner regenerates them, so a stale copy would pass unseen.
+      - name: The generated localizations are current
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n
+          test -z "$(git status --porcelain -- lib/l10n)"
       # The user guide's frames are committed (#134): each is drawn again
       # from the seeded data and compared, with a little slack for
       # rasterising; a changed screen fails until tool/guide-frames.sh has
@@ -61,7 +86,8 @@ jobs:
   # tool/osv_gate.py decides. Ignores live in the osv-scanner.toml beside
   # each lockfile. The weekly Security run stays stricter.
   osv-scanner:
-    name: Vulnerable dependencies (OSV-Scanner)
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Vulnerable dependencies (OSV-Scanner) (runs on push)' || 'Vulnerable dependencies (OSV-Scanner)' }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -92,7 +118,8 @@ jobs:
         run: python3 tool/whisper_pin.py
 
   desktop:
-    name: Desktop (Rust)
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Desktop (Rust) (runs on push)' || 'Desktop (Rust)' }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     # Forty test binaries with full debug info filled the runner's disk, and
     # the linker died with a bus error; line tables keep backtraces readable.
@@ -117,6 +144,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       - name: The fixture corpus the desktop core is tested against is current
         working-directory: packages/oldbrainfix_core
@@ -154,7 +182,8 @@ jobs:
   # The Flatpak (#45): the files Flathub gets are current and pass its
   # linters, and the manifest builds from source for both arches.
   flatpak-files:
-    name: Flatpak files (cargo sources, metainfo, lint)
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Flatpak files (cargo sources, metainfo, lint) (runs on push)' || 'Flatpak files (cargo sources, metainfo, lint)' }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     env:
       # flatpak-builder-lint and appstreamcli, as Flathub runs them; the
@@ -172,9 +201,9 @@ jobs:
         run: |
           desktop/packaging/flatpak/cargo-sources.sh
           git diff --exit-code -- desktop/packaging/flatpak/cargo-sources.json
-      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing and iPhone icon tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing, iPhone icon, tested tree and Sonar gate tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon test_tested_tree test_sonar_gate
       - name: Render the files as Flathub gets them
         run: |
           ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
@@ -192,7 +221,8 @@ jobs:
             flatpak-builder-lint manifest io.github.paxel.oldbrainfix.yml'
 
   flatpak:
-    name: Flatpak from source (${{ matrix.arch }})
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Flatpak from source (runs on push)' || format('Flatpak from source ({0})', matrix.arch) }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     needs: flatpak-files
     strategy:
       matrix:
@@ -229,7 +259,8 @@ jobs:
             --exceptions --user-exceptions /exceptions.json repo /repo
 
   apk:
-    name: Debug APK
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Debug APK (runs on push)' || 'Debug APK' }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     needs: test
     steps:
@@ -243,17 +274,19 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       # RustO for Photo Texts is Rust, cross-built by the APK build.
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
-          components: clippy
+          components: rustfmt, clippy
       - run: cargo install cargo-ndk --locked --version 4.1.2
       # The crate's own lints (#229) with -D warnings, as for the desktop.
-      - name: OCR library — lint and unit tests
+      - name: OCR library — format, lint and unit tests
         working-directory: android/ocr
         run: |
+          cargo fmt --check
           cargo clippy --all-targets --locked -- -D warnings
           cargo test --locked
       - run: flutter pub get

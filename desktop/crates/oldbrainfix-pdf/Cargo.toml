@@ -1,0 +1,25 @@
+[package]
+name = "oldbrainfix-pdf"
+description = "Reads the text of a PDF and the scans of its pages without one, for Old Brain Fix's Attachment Texts (ADR 0047)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# Not published, which also keeps it out of the third-party licences.
+publish = false
+
+[lib]
+name = "oldbrainfix_pdf"
+
+# Pure Rust and nothing else, so the phones' native library can build it
+# too (ADR 0047).
+[dependencies]
+# FlateDecode streams, and the PNG a scanned page is handed on as.
+flate2 = "1.1"
+crc32fast = "1.5"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[lints]
+workspace = true

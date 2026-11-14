@@ -22,9 +22,9 @@ use rustls::{DigitallySignedStruct, SignatureScheme};
 use serde_json::Value;
 
 use crate::lan::{
-    DEVICE_HEADER, FORMAT_HEADER, FormatRange, INVITE_HEADER, Joining, MAX_ENTRIES_BYTES,
-    OWN_FORMATS, PIN_HEADER, PairInfo, Session, TYPED_FINGERPRINT_BYTES, apply_answer_as,
-    fingerprint_of, is_private_host, sync_request_as,
+    DEVICE_HEADER, FORMAT_HEADER, FormatRange, INVITE_HEADER, Joining, MAX_BLOB_BYTES,
+    MAX_ENTRIES_BYTES, OWN_FORMATS, PIN_HEADER, PairInfo, Session, TYPED_FINGERPRINT_BYTES,
+    apply_answer_as, fingerprint_of, is_private_host, sync_request_as,
 };
 use crate::pairing::PairedDevice;
 use crate::store::Store;
@@ -368,7 +368,13 @@ impl Client {
         tls.write_all(head.as_bytes()).map_err(broken)?;
         tls.write_all(body).map_err(broken)?;
         tls.flush().map_err(broken)?;
-        read_answer(&mut BufReader::new(tls)).map_err(broken)
+        // A blob may weigh more than a sync body (ADR 0003, 0047).
+        let limit = if path.starts_with("/blob/") {
+            MAX_BLOB_BYTES
+        } else {
+            MAX_ENTRIES_BYTES
+        };
+        read_answer(&mut BufReader::new(tls), limit).map_err(broken)
     }
 }
 
@@ -382,8 +388,8 @@ enum Broken {
 }
 
 /// Reads one answer: by its length, in chunks, or up to the end, never
-/// more than [`MAX_ENTRIES_BYTES`].
-fn read_answer<R: BufRead>(reader: &mut R) -> std::io::Result<(u16, Answer)> {
+/// more than `limit` bytes.
+fn read_answer<R: BufRead>(reader: &mut R, limit: usize) -> std::io::Result<(u16, Answer)> {
     let mut line = String::new();
     reader.read_line(&mut line)?;
     let status: u16 = line
@@ -414,10 +420,9 @@ fn read_answer<R: BufRead>(reader: &mut R) -> std::io::Result<(u16, Answer)> {
         .is_some_and(|v| v.to_lowercase().contains("chunked"));
     let length: Option<usize> = answer.header("content-length").and_then(|v| v.parse().ok());
     let body = if chunked {
-        crate::lan::read_chunked(reader, MAX_ENTRIES_BYTES)?
-            .ok_or_else(|| std::io::Error::other("too long"))?
+        crate::lan::read_chunked(reader, limit)?.ok_or_else(|| std::io::Error::other("too long"))?
     } else if let Some(length) = length {
-        if length > MAX_ENTRIES_BYTES {
+        if length > limit {
             return Err(std::io::Error::other("too long"));
         }
         let mut body = vec![0u8; length];
@@ -425,16 +430,14 @@ fn read_answer<R: BufRead>(reader: &mut R) -> std::io::Result<(u16, Answer)> {
         body
     } else {
         let mut body = Vec::new();
-        let read = reader
-            .take(MAX_ENTRIES_BYTES as u64 + 1)
-            .read_to_end(&mut body);
+        let read = reader.take(limit as u64 + 1).read_to_end(&mut body);
         // A host that closes without saying goodbye still said it all.
         if let Err(e) = read
             && body.is_empty()
         {
             return Err(e);
         }
-        if body.len() > MAX_ENTRIES_BYTES {
+        if body.len() > limit {
             return Err(std::io::Error::other("too long"));
         }
         body
@@ -494,160 +497,4 @@ impl ServerCertVerifier for Pinned {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::Notes;
-    use crate::lan::{Host, decode_pair_code};
-    use crate::signing::SigningKey;
-    use crate::store::tests::ticking;
-    use std::net::Ipv4Addr;
-    use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::thread::JoinHandle;
-
-    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
-
-    fn open(path: &Path, seed: u8) -> Result<Store> {
-        Store::open(path, ticking(), move || {
-            Ok(SigningKey::from_seed([seed; 32]))
-        })
-    }
-
-    /// A phone's host as the Dart core runs it: the store answers every
-    /// request and remembers every joiner.
-    fn serve_until(
-        path: PathBuf,
-        host: Host,
-        stop: Arc<AtomicBool>,
-    ) -> JoinHandle<Result<Vec<Session>>> {
-        std::thread::spawn(move || {
-            let store = open(&path, 1)?;
-            let mut sessions = Vec::new();
-            while !stop.load(Ordering::Relaxed) {
-                let Some(request) = host.wait_request(Duration::from_millis(20)) else {
-                    continue;
-                };
-                let (response, session) = store.serve(&request, "Phone")?;
-                request.reply(response);
-                if let Some(session) = session {
-                    store.remember_joiner(&session)?;
-                    sessions.push(session);
-                }
-            }
-            Ok(sessions)
-        })
-    }
-
-    fn failure(result: Result<JoinResult>) -> Option<SyncFailure> {
-        match result {
-            Err(Error::Sync(failure)) => Some(failure),
-            _ => None,
-        }
-    }
-
-    #[test]
-    fn the_desktop_joins_a_phone_by_the_code_it_types() -> TestResult {
-        let dir = tempfile::tempdir()?;
-        let phone_path = dir.path().join("phone.db");
-        let identity = {
-            let phone = open(&phone_path, 1)?;
-            Notes::new(&phone).capture_with(
-                "From the phone",
-                None,
-                None,
-                &[b"phone".to_vec()],
-                &[],
-            )?;
-            phone.tls_identity()?
-        };
-        let host = Host::start(&identity, "246810", Some(IpAddr::V4(Ipv4Addr::LOCALHOST)))?;
-        let code = host.pair_code(true);
-        let stop = Arc::new(AtomicBool::new(false));
-        let served = serve_until(phone_path.clone(), host, stop.clone());
-
-        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
-        Notes::new(&desk).capture_with("From the desk", None, None, &[], &[b"desk".to_vec()])?;
-        let info = decode_pair_code(&code).ok_or("a code")?;
-        let joined = lan_sync(&desk, &info, "Desk");
-        stop.store(true, Ordering::Relaxed);
-        let sessions = served.join().map_err(|_| "host thread")??;
-        let joined = joined?;
-        assert_eq!(joined.session.name, "Phone");
-        assert_eq!((joined.blobs_received, joined.blobs_sent), (1, 1));
-        assert!(joined.entries_sent > 0);
-
-        let phone = open(&phone_path, 1)?;
-        for store in [&desk, &phone] {
-            let mut texts: Vec<String> = Notes::new(store)
-                .all()?
-                .into_iter()
-                .map(|n| n.text)
-                .collect();
-            texts.sort();
-            assert_eq!(texts, ["From the desk", "From the phone"]);
-            assert!(store.missing_blobs()?.is_empty());
-        }
-        // The desk keeps the phone's whole certificate from a typed code,
-        // and the phone the desk's, so either joins the other later.
-        let on_desk = desk.paired_device(&phone.device_id()?)?.ok_or("paired")?;
-        assert_eq!(on_desk.fingerprint, hex::encode(&identity.fingerprint));
-        assert_eq!(on_desk.port, Some(info.port));
-        let desk_print = hex::encode(desk.tls_identity()?.fingerprint);
-        assert_eq!(
-            sessions.first().and_then(|s| s.fingerprint.clone()),
-            Some(desk_print.clone())
-        );
-        let on_phone = phone.paired_device(&desk.device_id()?)?.ok_or("paired")?;
-        assert_eq!(on_phone.fingerprint, desk_print);
-        assert_eq!(desk.held_by(&phone.device_id()?)?, desk.version_vector()?);
-        Ok(())
-    }
-
-    #[test]
-    fn another_certificate_a_wrong_pin_and_other_networks_are_refused() -> TestResult {
-        let dir = tempfile::tempdir()?;
-        let phone_path = dir.path().join("phone.db");
-        let identity = open(&phone_path, 1)?.tls_identity()?;
-        let host = Host::start(&identity, "246810", Some(IpAddr::V4(Ipv4Addr::LOCALHOST)))?;
-        let info = decode_pair_code(&host.pair_code(true)).ok_or("a code")?;
-        let port = host.port();
-        let stop = Arc::new(AtomicBool::new(false));
-        let served = serve_until(phone_path.clone(), host, stop.clone());
-        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
-
-        let other = PairInfo {
-            fingerprint: vec![0; TYPED_FINGERPRINT_BYTES],
-            ..info.clone()
-        };
-        let wrong_host = failure(lan_sync(&desk, &other, "Desk"));
-        let wrong_pin = failure(lan_sync(
-            &desk,
-            &PairInfo {
-                pin: "000000".into(),
-                ..info.clone()
-            },
-            "Desk",
-        ));
-        stop.store(true, Ordering::Relaxed);
-        served.join().map_err(|_| "host thread")??;
-        assert_eq!(wrong_host, Some(SyncFailure::WrongHost));
-        assert_eq!(wrong_pin, Some(SyncFailure::WrongPin));
-        assert!(desk.paired_devices()?.is_empty());
-
-        let public = PairInfo {
-            host: "8.8.8.8".into(),
-            ..info.clone()
-        };
-        assert_eq!(
-            failure(lan_sync(&desk, &public, "Desk")),
-            Some(SyncFailure::NotPrivate)
-        );
-        // Nobody hosts there any more.
-        let gone = PairInfo { port, ..info };
-        assert_eq!(
-            failure(lan_sync(&desk, &gone, "Desk")),
-            Some(SyncFailure::Unreachable)
-        );
-        Ok(())
-    }
-}
+mod tests;

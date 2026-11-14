@@ -37,13 +37,15 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
+use oldbrainfix_core::ask;
+use oldbrainfix_core::lan_ask::AskDesk;
 use oldbrainfix_core::{
     APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store, ThemeChoice,
 };
-use oldbrainfix_gui::alerts::{self, Alerts, Event};
+use oldbrainfix_gui::alerts::{self, Alerts, Event, OccurrenceWanted};
 use oldbrainfix_gui::app::BIGGER_ZOOM;
 use oldbrainfix_gui::auto_sync::{self, Syncing};
-use oldbrainfix_gui::autostart::Autostart;
+use oldbrainfix_gui::autostart::{Autostart, TRAY_ARG};
 use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
 use oldbrainfix_gui::enrich::{
@@ -51,10 +53,12 @@ use oldbrainfix_gui::enrich::{
 };
 use oldbrainfix_gui::folder_sync;
 use oldbrainfix_gui::hotkey::{self, Hotkey};
+use oldbrainfix_gui::instance::Way;
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
 use oldbrainfix_gui::login;
 use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
+use oldbrainfix_gui::older_app::OlderAppView;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
 use oldbrainfix_gui::ring::SpeakerRinger;
 use oldbrainfix_gui::speech::SpeechModel;
@@ -63,6 +67,7 @@ use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
 use oldbrainfix_gui::system_theme::SystemTheme;
 use oldbrainfix_gui::theme;
 use oldbrainfix_gui::tray::{self, Command, OnClose, Tray};
+use oldbrainfix_gui::window_sizes::{self, WindowPlace};
 use oldbrainfix_gui::{App, instance, local_wall};
 
 /// The window's context while it is open, to wake it from other threads.
@@ -116,6 +121,25 @@ struct Native {
     new_popup: NewPopup,
     popup: Option<CapturePopup>,
     system_theme: SystemTheme,
+    /// Where the window is kept (#278), and where and how large it was
+    /// while it showed last, as it was kept until then.
+    store: Arc<Store>,
+    place: WindowPlace,
+}
+
+impl Native {
+    /// Notes where and how large the window is while it shows (#278).
+    fn note_place(&mut self, ctx: &egui::Context) {
+        let zoom = ctx.zoom_factor();
+        self.place = ctx.input(|i| window_sizes::noticed(self.place, i.viewport(), zoom));
+    }
+
+    /// Keeps where and how large the window was, for the next start.
+    fn keep_place(&self) {
+        if let Err(e) = window_sizes::keep_window(&self.store, &self.place) {
+            eprintln!("window size: {e}");
+        }
+    }
 }
 
 impl eframe::App for Native {
@@ -125,7 +149,10 @@ impl eframe::App for Native {
         self.system_theme.hand_to(ctx);
         for command in waiting(&self.commands) {
             match command {
-                Command::Open => focus(ctx),
+                Command::Open => {
+                    focus(ctx);
+                    self.app.set_shown(true);
+                }
                 // The window stays where it is, so the keyboard goes back
                 // to whatever had it once the popup closes.
                 Command::Capture => match &mut self.popup {
@@ -143,13 +170,16 @@ impl eframe::App for Native {
         // Without a tray it stays, or nothing would bring it back.
         if std::mem::take(&mut self.start_hidden) && tray {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            self.app.set_shown(false);
         }
         if ctx.input(|i| i.viewport().close_requested()) {
+            self.keep_place();
             let quitting = self.quit.load(Ordering::SeqCst);
             match tray::on_close(tray, tray::IN_EVENT_LOOP, quitting) {
                 OnClose::Hide => {
                     ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                    self.app.set_shown(false);
                     // Kept as closing the window keeps it.
                     self.app.flush();
                 }
@@ -169,6 +199,7 @@ impl eframe::App for Native {
                     self.popup = None;
                     self.app.edit_note(&id);
                     focus(ctx);
+                    self.app.set_shown(true);
                 }
             }
         }
@@ -176,6 +207,8 @@ impl eframe::App for Native {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.app.show(ui);
+        // Drawn only while it shows, not while in the tray.
+        self.note_place(ui.ctx());
         let ctx = ui.ctx();
         // File ▸ Quick note: the popup, as the hotkey opens it.
         if self.app.take_quick_note() {
@@ -198,6 +231,7 @@ impl eframe::App for Native {
             popup.leave();
         }
         self.app.flush();
+        self.keep_place();
     }
 }
 
@@ -278,6 +312,8 @@ struct Shell {
     new_popup: NewPopup,
     transcriber: Enricher,
     reader: Enricher,
+    /// The Attachment Texts' (#267).
+    files_reader: Enricher,
     speech: SpeechModel,
     folder_wanted: Arc<AtomicBool>,
     /// Whether a sync of this Device runs, for the line under the menu
@@ -288,6 +324,9 @@ struct Shell {
     /// Raised by a click on the Changes Nudge, for the window to save the
     /// bundles.
     changes_wanted: Arc<AtomicBool>,
+    /// Given the Routine by a click on an Occurrence's notification, for
+    /// the window to open its Note.
+    occurrence_wanted: OccurrenceWanted,
     /// Files for the window to open.
     handed: Arc<Mutex<Vec<std::path::PathBuf>>>,
     tray: TrayHeld,
@@ -302,9 +341,13 @@ struct Shell {
 
 impl Shell {
     /// Runs `app` in a native window with `viewport` until it closes.
+    /// Runs `app` in a window opened as `viewport` says; one `placed`
+    /// where it was left (#278) is centred instead where it no longer
+    /// lies on a monitor enough to grab it.
     fn run(
         &self,
         viewport: egui::ViewportBuilder,
+        placed: Option<egui::Rect>,
         app: Box<dyn eframe::App + '_>,
     ) -> Result<(), String> {
         let options = eframe::NativeOptions {
@@ -318,6 +361,43 @@ impl Shell {
             Box::new(move |cc| {
                 if let Ok(mut held) = window.lock() {
                     *held = Some(cc.egui_ctx.clone());
+                }
+                // Made, still hidden, it knows the monitors: where it
+                // was left lies on none of them enough to grab it, as
+                // when the monitor it was on is gone, it is centred on
+                // the main one (#278). Where the system tells no
+                // monitors it stays.
+                if let (Some(placed), Some(window)) = (placed, cc.winit_window()) {
+                    let monitors: Vec<egui::Rect> = window
+                        .available_monitors()
+                        .map(|m| {
+                            let scale = m.scale_factor() as f32;
+                            let (at, size) = (m.position(), m.size());
+                            egui::Rect::from_min_size(
+                                egui::pos2(at.x as f32, at.y as f32) / scale,
+                                egui::vec2(size.width as f32, size.height as f32) / scale,
+                            )
+                        })
+                        .collect();
+                    let main = window
+                        .primary_monitor()
+                        .or_else(|| window.available_monitors().next());
+                    if let Some(main) = main
+                        && !window_sizes::on_a_monitor(placed, &monitors)
+                    {
+                        // In the monitor's pixels, as the window moves.
+                        let (at, size, outer) = (main.position(), main.size(), window.outer_size());
+                        let screen = egui::Rect::from_min_size(
+                            egui::pos2(at.x as f32, at.y as f32),
+                            egui::vec2(size.width as f32, size.height as f32),
+                        );
+                        let outer = egui::vec2(outer.width as f32, outer.height as f32);
+                        let centred = window_sizes::centred(outer, screen);
+                        let mut to = at;
+                        to.x = centred.x.round() as i32;
+                        to.y = centred.y.round() as i32;
+                        window.set_outer_position(to);
+                    }
                 }
                 // On the main thread with its event loop running, where
                 // Windows and macOS put a tray up.
@@ -339,12 +419,15 @@ impl Shell {
         let mut app = App::new(self.store.clone(), self.locale);
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
+        let window = self.window.clone();
+        app.set_redraw(Arc::new(move || wake(&window)));
         app.set_folder_wanted(self.folder_wanted.clone());
         app.set_syncing(self.syncing.clone());
         let agenda = self.agenda_store.clone();
         app.set_agenda_store(move || agenda.clone());
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
+        app.set_occurrence_wanted(self.occurrence_wanted.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
@@ -367,13 +450,24 @@ impl Shell {
             Some(self.reader.clone()),
             Some(self.speech.clone()),
         );
+        app.set_attachment_reader(Some(self.files_reader.clone()));
         let quit = Arc::new(AtomicBool::new(false));
-        let viewport = egui::ViewportBuilder::default()
+        // Where and as large as it was left on this computer (#278),
+        // read again at every opening.
+        let kept = window_sizes::window(&self.store);
+        let mut viewport = egui::ViewportBuilder::default()
             .with_title(app.t().app_title())
             // The app id a launcher entry's StartupWMClass names.
             .with_app_id(APP_ID)
-            .with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([800.0, 480.0]);
+            .with_inner_size(kept.size)
+            .with_min_inner_size(window_sizes::MIN_WINDOW)
+            .with_maximized(kept.maximized);
+        if let Some(at) = kept.position {
+            viewport = viewport.with_position(at);
+        }
+        let placed = kept
+            .position
+            .map(|at| egui::Rect::from_min_size(at, kept.size));
         let native = Native {
             app,
             commands: self.commands.clone(),
@@ -383,8 +477,10 @@ impl Shell {
             new_popup: self.new_popup.clone(),
             popup: None,
             system_theme: self.system_theme.clone(),
+            store: self.store.clone(),
+            place: kept,
         };
-        self.run(viewport, Box::new(native))?;
+        self.run(viewport, placed, Box::new(native))?;
         // Where the tray lives in the window's event loop, its end is the
         // app's: nothing hears the tray or the hotkey after it.
         Ok(quit.load(Ordering::SeqCst) || self.tray.borrow().is_none() || tray::IN_EVENT_LOOP)
@@ -414,7 +510,7 @@ impl Shell {
             zoom: Some(zoom),
             system_theme: self.system_theme.clone(),
         };
-        self.run(viewport, Box::new(window))?;
+        self.run(viewport, None, Box::new(window))?;
         Ok(next.get())
     }
 }
@@ -428,6 +524,71 @@ impl eframe::App for Refusal {
         App::install(ui.ctx());
         self.0.show(ui);
     }
+}
+
+struct OlderApp(OlderAppView);
+
+impl eframe::App for OlderApp {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        App::install(ui.ctx());
+        self.0.show(ui);
+    }
+}
+
+/// An older app asked to make way for this start did not go: says so
+/// on the command line and, for a start that would show the window, the
+/// tray or the popup, in a window of its own, until it is closed; runs
+/// nothing else, so reminders never come twice. The exit code.
+fn older_stays(locale: &'static str, launch: &Launch) -> Result<i32, String> {
+    let view = OlderAppView::new(locale);
+    let t = view.t();
+    eprintln!(
+        "oldbrainfix: {} {}",
+        t.older_app_stays(),
+        t.older_app_stays_fix()
+    );
+    if !matches!(
+        launch,
+        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_)
+    ) {
+        return Ok(cli::FAILED);
+    }
+    let viewport = egui::ViewportBuilder::default()
+        .with_title(t.app_title())
+        .with_app_id(APP_ID)
+        .with_inner_size([640.0, 360.0]);
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
+    eframe::run_native(
+        APP_NAME,
+        options,
+        Box::new(move |_| Ok(Box::new(OlderApp(view)))),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(cli::FAILED)
+}
+
+/// After an older app made way for a capture or an import, which end
+/// on their own: the app runs on in the tray, as the older one did, so
+/// reminders go on. `code` passes through.
+fn run_on(way: Way, code: i32) -> i32 {
+    if way != Way::Replaced {
+        return code;
+    }
+    let started = std::env::current_exe().and_then(|exe| {
+        std::process::Command::new(exe)
+            .arg(TRAY_ARG)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+    });
+    if let Err(e) = started {
+        eprintln!("oldbrainfix: {e}");
+    }
+    code
 }
 
 /// Opens the store in `dir`.
@@ -539,22 +700,33 @@ fn run() -> Result<i32, String> {
         println!("{}", t.cli_usage());
         return Ok(cli::OK);
     }
+    // Neither the running app nor the database is asked.
+    if launch == Launch::Version {
+        println!("{}", cli::version_line());
+        return Ok(cli::OK);
+    }
     let dir = oldbrainfix_gui::data_dir().ok_or("no data directory for this user")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let socket = dir.join("instance.sock");
     // Files for the window to open: from `open`, and later starts.
     let handed: Arc<Mutex<Vec<std::path::PathBuf>>> = Arc::default();
+    // An older app running goes first (#290), before this start opens
+    // the database; one of this version or newer takes the wish below.
+    let way = instance::make_way(&socket, env!("CARGO_PKG_VERSION"), instance::QUIT_WAIT);
+    if way == Way::Stays {
+        return older_stays(locale, &launch);
+    }
     let first = match launch {
-        Launch::Text(text) => return Ok(capture_text(&dir, &socket, &t, &text)),
+        Launch::Text(text) => return Ok(run_on(way, capture_text(&dir, &socket, &t, &text))),
         Launch::Stdin => {
             let mut text = String::new();
             if let Err(e) = std::io::stdin().read_to_string(&mut text) {
                 eprintln!("oldbrainfix: {}", t.cli_failed(&e.to_string()));
-                return Ok(cli::FAILED);
+                return Ok(run_on(way, cli::FAILED));
             }
-            return Ok(capture_text(&dir, &socket, &t, &text));
+            return Ok(run_on(way, capture_text(&dir, &socket, &t, &text)));
         }
-        Launch::Import(file) => return Ok(import_file(&dir, &socket, &t, &file)),
+        Launch::Import(file) => return Ok(run_on(way, import_file(&dir, &socket, &t, &file))),
         Launch::Open(file) => {
             // The running app has a working directory of its own.
             let path = std::path::absolute(&file).unwrap_or_else(|_| file.into());
@@ -566,7 +738,7 @@ fn run() -> Result<i32, String> {
             }
             Some(Command::Open)
         }
-        Launch::Window | Launch::Help => Some(Command::Open),
+        Launch::Window | Launch::Help | Launch::Version => Some(Command::Open),
         Launch::Popup => Some(Command::Capture),
         // A login start adds nothing to a running app.
         Launch::Tray => None,
@@ -611,12 +783,14 @@ fn run() -> Result<i32, String> {
     let changes = Arc::new(AtomicU64::new(0));
     let unsorted_wanted = Arc::new(AtomicBool::new(false));
     let changes_wanted = Arc::new(AtomicBool::new(false));
+    let occurrence_wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
     {
         let store = store.clone();
         let notifier = DesktopNotifier::new(events_tx.clone());
         let mut alerts = Alerts::new(Box::new(notifier), t, changes.clone());
         alerts.set_unsorted_wanted(unsorted_wanted.clone());
         alerts.set_changes_wanted(changes_wanted.clone());
+        alerts.set_occurrence_wanted(occurrence_wanted.clone());
         alerts.set_ringer(Box::new(SpeakerRinger::new()));
         let open = command_tx.clone();
         let wake_window = waker(&window);
@@ -647,24 +821,49 @@ fn run() -> Result<i32, String> {
     // window's (#225): the alerts plan again after it (a Done elsewhere
     // closes the notification here), the window reads the log again.
     let auto_stop = Arc::new(AtomicBool::new(false));
+    // A paired phone's question runs on a connection and a thread of its
+    // own (#267); a change its model drafts shows as the AI Task's review
+    // once the window reads the log again.
+    let asking = {
+        let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let window = window.clone();
+        AskDesk::new(
+            own_store(&dir, &store),
+            Arc::new(ask::Web::new()),
+            Arc::new(local_wall),
+            move || {
+                shown.changed_elsewhere();
+                changes.fetch_add(1, Ordering::SeqCst);
+                let _ = events.send(Event::Wake);
+                wake(&window);
+            },
+        )
+    };
     let auto_sync = {
         let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
         let store = own_store(&dir, &store);
         let (stop, wake_window, syncing) = (auto_stop.clone(), waker(&window), syncing.clone());
         std::thread::spawn(move || {
-            auto_sync::run(&store, &device_name(), &stop, &syncing, |session| {
-                // Another person's Profile alone counts too: the window's
-                // People were read on its own connection.
-                if !session.applied.is_empty()
-                    || session.profile.changed()
-                    || session.people_changed
-                {
-                    shown.changed_elsewhere();
-                    changes.fetch_add(1, Ordering::SeqCst);
-                    let _ = events.send(Event::Wake);
-                }
-                wake_window();
-            });
+            auto_sync::run(
+                &store,
+                &device_name(),
+                &stop,
+                &syncing,
+                Some(asking),
+                |session| {
+                    // Another person's Profile alone counts too: the window's
+                    // People were read on its own connection.
+                    if !session.applied.is_empty()
+                        || session.profile.changed()
+                        || session.people_changed
+                    {
+                        shown.changed_elsewhere();
+                        changes.fetch_add(1, Ordering::SeqCst);
+                        let _ = events.send(Event::Wake);
+                    }
+                    wake_window();
+                },
+            );
         })
     };
     // The shared folder syncs every half minute while the app runs, at
@@ -731,15 +930,24 @@ fn run() -> Result<i32, String> {
         Box::new(OcrEngine::default()),
         enriched(),
     );
+    // Its own RustO for the scanned pages of PDFs (#267).
+    let files_reader = Enricher::spawn(
+        store.clone(),
+        Kind::AttachmentTexts,
+        Box::new(OcrEngine::default()),
+        enriched(),
+    );
     let saved: Saved = {
         let (changes, events, window) = (changes.clone(), events_tx.clone(), window.clone());
         let (transcriber, reader, speech) = (transcriber.clone(), reader.clone(), speech.clone());
+        let files_reader = files_reader.clone();
         Arc::new(move || {
             changes.fetch_add(1, Ordering::SeqCst);
             let _ = events.send(Event::Wake);
             wake(&window);
             // A voice Note from the popup is transcribed without the window.
             reader.kick();
+            files_reader.kick();
             if speech.current().is_some() {
                 transcriber.kick();
             }
@@ -842,11 +1050,13 @@ fn run() -> Result<i32, String> {
         new_popup,
         transcriber,
         reader,
+        files_reader,
         speech,
         folder_wanted,
         syncing,
         unsorted_wanted,
         changes_wanted,
+        occurrence_wanted,
         handed,
         tray: tray.clone(),
         tray_wanted: RefCell::new(tray_wanted),

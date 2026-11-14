@@ -8,9 +8,10 @@
 //! a whole, holds the connection on its own, so two threads never write
 //! into each other's transaction or take the same dseq.
 //!
-//! Photo and voice recording bytes live outside the log, content-addressed
-//! by SHA-256: `photos` and `audio` directories next to the database file,
-//! as the Dart core keeps them, or memory for an in-memory store.
+//! Photo, voice recording and attached file bytes live outside the log,
+//! content-addressed by SHA-256: `photos`, `audio` and `files`
+//! directories next to the database file, as the Dart core keeps them,
+//! or memory for an in-memory store.
 //!
 //! Pending Changes (ADR 0022) lie beside it, in a `pending` directory:
 //! every read of what the log holds now ([`Store::history`],
@@ -256,6 +257,8 @@ pub struct Store {
     ids: IdMaker,
     photos: Box<dyn Blobs>,
     audio: Box<dyn Blobs>,
+    /// The files attached to Notes (ADR 0047), kept as they are.
+    files: Box<dyn Blobs>,
     /// What the roles of the Shared Areas allow, worked out after every
     /// change ([`Store::judged`]).
     judged: Mutex<Option<Arc<JudgedLog>>>,
@@ -278,8 +281,9 @@ pub struct Store {
     /// The pending sets held, and what is worked out from the shown ones
     /// after every change. Never held while the connection is taken.
     pending: Mutex<PendingState>,
-    /// The pending set each thread drafts into ([`Store::drafting`]) and
-    /// the threads that read the log alone ([`Store::log_only`]).
+    /// The pending set each thread drafts into ([`Store::drafting`]), the
+    /// threads that read the log alone ([`Store::log_only`]) and those
+    /// that read as the AI ([`Store::for_ai`]).
     pub(crate) scopes: Mutex<crate::ai_task::Scopes>,
 }
 
@@ -298,21 +302,22 @@ impl Store {
         let dir = path.parent().unwrap_or(Path::new("."));
         let photos = Box::new(FileBlobs::new(dir.join("photos"))?);
         let audio = Box::new(FileBlobs::new(dir.join("audio"))?);
+        let files = Box::new(FileBlobs::new(dir.join("files"))?);
         let pending = Box::new(FilePendingFiles::new(dir.join("pending")));
-        Self::init(db, clock, new_key, photos, audio, pending)
+        Self::init(db, clock, new_key, [photos, audio, files], pending)
     }
 
     /// Opens a throwaway in-memory store (tests).
     pub fn in_memory(clock: Clock, new_key: impl FnOnce() -> Result<SigningKey>) -> Result<Store> {
         let photos = Box::<MemoryBlobs>::default();
         let audio = Box::<MemoryBlobs>::default();
+        let files = Box::<MemoryBlobs>::default();
         let pending = Box::<MemoryPendingFiles>::default();
         Self::init(
             Connection::open_in_memory()?,
             clock,
             new_key,
-            photos,
-            audio,
+            [photos, audio, files],
             pending,
         )
     }
@@ -321,8 +326,7 @@ impl Store {
         db: Connection,
         clock: Clock,
         new_key: impl FnOnce() -> Result<SigningKey>,
-        photos: Box<dyn Blobs>,
-        audio: Box<dyn Blobs>,
+        [photos, audio, files]: [Box<dyn Blobs>; 3],
         pending_files: Box<dyn PendingFiles>,
     ) -> Result<Store> {
         // Read before anything is written: a database of a newer version
@@ -345,6 +349,7 @@ impl Store {
             ids: Box::new(random_id),
             photos,
             audio,
+            files,
             judged: Mutex::new(None),
             generation: std::sync::atomic::AtomicU64::new(0),
             worked_out: Mutex::new(WorkedOut::default()),
@@ -430,18 +435,19 @@ impl Store {
     /// they show changes, as the Dart core's `workedOut`: the log, or the
     /// shown pending sets. An entry another store open on the same file
     /// wrote counts too, by the log's high-water mark. Inside
-    /// [`Store::log_only`], which shows the log alone, it is worked out
-    /// anew and not kept.
+    /// [`Store::log_only`], which shows the log alone, and inside
+    /// [`Store::for_ai`], which leaves out what is Hidden from AI, it is
+    /// worked out anew and not kept.
     pub(crate) fn worked_out<T: Send + Sync + 'static>(
         &self,
         key: &'static str,
         build: impl FnOnce() -> Result<T>,
     ) -> Result<Arc<T>> {
-        let log_only = self.reads_log_only();
+        let fresh = self.reads_log_only() || self.reads_for_ai();
         // Read before the lock is taken: a write takes the connection
         // first, then this lock.
         let seq = self.current_seq()?;
-        if !log_only {
+        if !fresh {
             let mut worked = self.worked_out.lock();
             if worked.seq != seq {
                 worked.seq = seq;
@@ -455,7 +461,7 @@ impl Store {
         }
         let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
         let value = Arc::new(build()?);
-        if !log_only {
+        if !fresh {
             let after = self.current_seq()?;
             let mut worked = self.worked_out.lock();
             // Kept only when nothing changed while it was worked out.
@@ -638,33 +644,52 @@ impl Store {
         self.audio.get(hash)
     }
 
-    /// Whether the bytes of the `kind` (`photo` or `audio`) blob `hash`
-    /// are here, without reading them.
-    pub fn has_blob(&self, kind: &str, hash: &str) -> bool {
+    // ------------------------------------------------------------- files
+
+    /// Keeps the bytes of a file attached to a Note as they are and
+    /// returns the hash they are kept under (ADR 0047). The same file
+    /// twice is kept once.
+    pub fn put_file(&self, bytes: &[u8]) -> Result<String> {
+        self.refuse_while_drafting()?;
+        let hash = hex::encode(Sha256::digest(bytes));
+        self.files.put(&hash, bytes)?;
+        Ok(hash)
+    }
+
+    /// The bytes of the attached file `hash`, or `None` when they are
+    /// not here.
+    pub fn file(&self, hash: &str) -> Option<Vec<u8>> {
+        self.files.get(hash)
+    }
+
+    /// The blobs of `kind`: `photo`, `audio` or `file`.
+    fn blobs_of(&self, kind: &str) -> Option<&dyn Blobs> {
         match kind {
-            "photo" => self.photos.has(hash),
-            "audio" => self.audio.has(hash),
-            _ => false,
+            "photo" => Some(self.photos.as_ref()),
+            "audio" => Some(self.audio.as_ref()),
+            "file" => Some(self.files.as_ref()),
+            _ => None,
         }
     }
 
-    /// The bytes of the `kind` (`photo` or `audio`) blob `hash`.
+    /// Whether the bytes of the `kind` (`photo`, `audio` or `file`) blob
+    /// `hash` are here, without reading them.
+    pub fn has_blob(&self, kind: &str, hash: &str) -> bool {
+        self.blobs_of(kind).is_some_and(|b| b.has(hash))
+    }
+
+    /// The bytes of the `kind` (`photo`, `audio` or `file`) blob `hash`.
     pub fn blob(&self, kind: &str, hash: &str) -> Option<Vec<u8>> {
-        match kind {
-            "photo" => self.photos.get(hash),
-            "audio" => self.audio.get(hash),
-            _ => None,
-        }
+        self.blobs_of(kind)?.get(hash)
     }
 
     /// Lets go of the bytes of the `kind` blob `hash`; returns whether
     /// they were here. Only the log says when that is right (ADR 0020).
     pub fn drop_blob(&self, kind: &str, hash: &str) -> Result<bool> {
         self.refuse_while_drafting()?;
-        match kind {
-            "photo" => self.photos.remove(hash),
-            "audio" => self.audio.remove(hash),
-            _ => Ok(false),
+        match self.blobs_of(kind) {
+            Some(blobs) => blobs.remove(hash),
+            None => Ok(false),
         }
     }
 
@@ -676,10 +701,9 @@ impl Store {
         if hex::encode(Sha256::digest(bytes)) != hash {
             return Ok(false);
         }
-        match kind {
-            "photo" => self.photos.put(hash, bytes)?,
-            "audio" => self.audio.put(hash, bytes)?,
-            _ => return Ok(false),
+        match self.blobs_of(kind) {
+            Some(blobs) => blobs.put(hash, bytes)?,
+            None => return Ok(false),
         }
         Ok(true)
     }
@@ -925,6 +949,15 @@ impl Store {
         // As SQLite orders text: by its bytes.
         if more {
             logged.sort();
+        }
+        if self.reads_for_ai() {
+            let mut left = Vec::with_capacity(logged.len());
+            for (entity, field) in logged {
+                if !self.ai_hides(&entity)? {
+                    left.push((entity, field));
+                }
+            }
+            logged = left;
         }
         Ok(logged)
     }
@@ -1233,6 +1266,26 @@ impl Store {
 
     /// The entities whose id starts with `prefix`, sorted.
     pub fn entities_with_prefix(&self, prefix: &str) -> Result<Vec<String>> {
+        let mut found = self.entities_with_prefix_all(prefix)?;
+        if self.reads_for_ai() {
+            found = self.left_for_ai(found)?;
+        }
+        Ok(found)
+    }
+
+    /// What the AI sees of `ids` ([`Store::for_ai`]): those not Hidden
+    /// from AI.
+    fn left_for_ai(&self, ids: Vec<String>) -> Result<Vec<String>> {
+        let mut left = Vec::with_capacity(ids.len());
+        for id in ids {
+            if !self.ai_hides(&id)? {
+                left.push(id);
+            }
+        }
+        Ok(left)
+    }
+
+    fn entities_with_prefix_all(&self, prefix: &str) -> Result<Vec<String>> {
         let mut logged: Vec<String> = {
             let db = self.db.lock();
             let mut stmt = db.prepare(&format!(
@@ -1264,6 +1317,9 @@ impl Store {
         #[cfg(test)]
         self.history_reads
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.ai_hides(entity)? {
+            return Ok(Vec::new());
+        }
         let shown = self.shown()?;
         if shown.is_empty() {
             return self.logged_history(entity);
@@ -1287,6 +1343,9 @@ impl Store {
     /// pending change among them: what decides where an entity is
     /// sealed, and what the user's own Devices wrote.
     pub fn logged_history(&self, entity: &str) -> Result<Vec<Entry>> {
+        if self.ai_hides(entity)? {
+            return Ok(Vec::new());
+        }
         let all = self.entries(
             &format!("SELECT * FROM entries WHERE {APPLIED} AND entity = ? ORDER BY seq"),
             params![entity],
@@ -1369,7 +1428,7 @@ impl Store {
         let mut ids: Vec<&str> = Vec::new();
         let mut wanted = std::collections::HashSet::new();
         for id in entities {
-            if wanted.insert(id) {
+            if !self.ai_hides(id)? && wanted.insert(id) {
                 ids.push(id);
             }
         }
@@ -1447,9 +1506,21 @@ impl Store {
         Ok(out)
     }
 
+    /// The connection, for the search index's own tables beside the log
+    /// (ADR 0048), held while `body` runs; nothing else reads or writes
+    /// through it.
+    pub(crate) fn with_connection<T>(
+        &self,
+        body: impl FnOnce(&Connection) -> Result<T>,
+    ) -> Result<T> {
+        let db = self.db.lock();
+        body(&db)
+    }
+
     /// Entities whose `$type` was `ty` at some time, the shown pending
-    /// sets included.
-    fn ever_of_type(&self, ty: &str) -> Result<Vec<String>> {
+    /// sets included, in the order [`Store::entities_of_type`] keeps:
+    /// also for a list of some of them in that order (ADR 0048).
+    pub(crate) fn ever_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let mut ids: Vec<String> = {
             let db = self.db.lock();
             let mut stmt = db.prepare(&format!(
@@ -1463,6 +1534,9 @@ impl Store {
             if e.field == "$type" && e.value.as_deref() == Some(ty) && !ids.contains(&e.entity) {
                 ids.push(e.entity.clone());
             }
+        }
+        if self.reads_for_ai() {
+            ids = self.left_for_ai(ids)?;
         }
         Ok(ids)
     }
@@ -1778,391 +1852,4 @@ pub fn later_setting(value: &str) -> bool {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
-    use super::*;
-    use crate::signing::verify_signature;
-    use chrono::TimeZone;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicI64, Ordering as AtomicOrdering};
-
-    /// A clock that starts at 2026-01-01 10:00 UTC and moves one second
-    /// per read.
-    pub fn ticking() -> Clock {
-        let ticks = Arc::new(AtomicI64::new(0));
-        Box::new(move || {
-            let n = ticks.fetch_add(1, AtomicOrdering::SeqCst) + 1;
-            let start = Utc.with_ymd_and_hms(2026, 1, 1, 10, 0, 0).single();
-            start.unwrap_or_default() + chrono::Duration::seconds(n)
-        })
-    }
-
-    pub fn store() -> Store {
-        match Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32]))) {
-            Ok(s) => s,
-            Err(e) => panic!("store: {e}"),
-        }
-    }
-
-    #[test]
-    fn it_reads_the_fields_of_many_entities_in_one_query_as_one_by_one() -> Result<()> {
-        let store = store();
-        let on = |d: u32| Utc.with_ymd_and_hms(2026, 5, d, 0, 0, 0).single();
-        store.append("note:a", "text", Some("new"), on(2))?;
-        store.append("note:a", "text", Some("old"), on(1))?;
-        store.append("note:a", "place", Some("home"), None)?;
-        store.append("note:b", "text", Some("b"), None)?;
-        store.append("note:b", "text", None, None)?;
-        let ids: Vec<String> = (0..1200).map(|i| format!("note:x{i}")).collect();
-        for id in &ids {
-            store.append(id, "text", Some(id), None)?;
-        }
-        // Shown pending changes count as they do one by one.
-        let set = store.open_pending("ai-task", true, None)?;
-        store.draft_pending(&set, "note:a", "place", Some("work"), None)?;
-        store.draft_pending(&set, "note:c", "text", Some("drafted"), None)?;
-        let mut all = vec!["note:a", "note:b", "note:c", "note:none"];
-        all.extend(ids.iter().map(String::as_str));
-        let before = store.history_reads.load(AtomicOrdering::SeqCst);
-        let read = store.current_fields_of(all.iter().copied())?;
-        assert_eq!(store.history_reads.load(AtomicOrdering::SeqCst) - before, 1);
-        let mut one_by_one = HashMap::new();
-        for id in &all {
-            let fields = store.current_fields(id)?;
-            if fields.iter().next().is_some() {
-                one_by_one.insert(id.to_string(), fields);
-            }
-        }
-        assert!(!read.contains_key("note:none"));
-        assert_eq!(read, one_by_one);
-        assert_eq!(
-            read.get("note:a"),
-            Some(&Fields::new(vec![
-                ("text".into(), Some("new".into())),
-                ("place".into(), Some("work".into())),
-            ]))
-        );
-        assert!(store.current_fields_of([])?.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn it_reads_the_fields_of_every_entity_of_a_type_in_one_query_as_one_by_one() -> Result<()> {
-        let store = store();
-        for i in 0..30 {
-            let id = format!("thing:{i}");
-            store.append(&id, "$type", Some("thing"), None)?;
-            store.append(&id, "text", Some(&format!("t{i}")), None)?;
-        }
-        store.append("thing:0", "$type", Some("other"), None)?;
-        store.append("other:a", "$type", Some("other"), None)?;
-        // Shown pending changes count as they do one by one.
-        let set = store.open_pending("ai-task", true, None)?;
-        store.draft_pending(&set, "thing:new", "$type", Some("thing"), None)?;
-        store.draft_pending(&set, "thing:1", "text", Some("drafted"), None)?;
-        let before = store.history_reads.load(AtomicOrdering::SeqCst);
-        let read = store.current_fields_of_type("thing")?;
-        assert_eq!(store.history_reads.load(AtomicOrdering::SeqCst) - before, 1);
-        let mut one_by_one = HashMap::new();
-        for id in store.entities_of_type("thing")? {
-            let fields = store.current_fields(&id)?;
-            one_by_one.insert(id, fields);
-        }
-        assert_eq!(read, one_by_one);
-        assert!(!read.contains_key("thing:0"));
-        assert!(read.contains_key("thing:new"));
-        assert_eq!(
-            read.get("thing:1"),
-            Some(&Fields::new(vec![
-                ("$type".into(), Some("thing".into())),
-                ("text".into(), Some("drafted".into())),
-            ]))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_setting_a_later_version_wrote_is_kept_as_it_is_and_noted() -> Result<()> {
-        use crate::sync::{SETTINGS_SOURCE, UpdateNeeded};
-        let store = store();
-        let later = r#"{"generation":3,"v":2}"#;
-        let listed = r#"[{"v":1},{"id":"a","v":"2"}]"#;
-        store.set_local_setting("folderRead:x", later)?;
-        store.set_local_setting("changes:x", listed)?;
-        assert!(store.take_update_notices()?.is_empty());
-        store.set_local_setting("folderRead:x", r#"{"generation":1,"lines":{}}"#)?;
-        store.remove_local_setting("changes:x")?;
-        store.forget_folder_reads()?;
-        assert_eq!(store.local_setting("folderRead:x")?.as_deref(), Some(later));
-        assert_eq!(store.local_setting("changes:x")?.as_deref(), Some(listed));
-        assert_eq!(
-            store.take_update_notices()?,
-            vec![(SETTINGS_SOURCE.to_string(), UpdateNeeded::Here)]
-        );
-        // Version 1, said or not, and what is no object of a later one
-        // are this version's.
-        for mine in [
-            r#"{"v":1}"#,
-            r#"[{"v":1},2]"#,
-            r#""v""#,
-            "2",
-            "not json",
-            r#"{"a":{"v":2}}"#,
-        ] {
-            store.set_local_setting("k", mine)?;
-            store.set_local_setting("k", "next")?;
-            assert_eq!(store.local_setting("k")?.as_deref(), Some("next"), "{mine}");
-            store.remove_local_setting("k")?;
-        }
-        // The own Profile's record has a rule of its own.
-        store.set_local_setting("profile", r#"{"id":"p","v":2,"version":1}"#)?;
-        store.set_local_setting("profile", r#"{"id":"p","version":2}"#)?;
-        assert_eq!(
-            store.local_setting("profile")?.as_deref(),
-            Some(r#"{"id":"p","version":2}"#)
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn own_entries_are_signed_and_verify_under_the_device_key() -> Result<()> {
-        let store = store();
-        store.set_local_setting("author", "Ada")?;
-        let e = store.append("note:a", "text", Some("hello"), None)?;
-        let bytes = entry_bytes(
-            &e.device,
-            e.dseq,
-            &e.entity,
-            &e.field,
-            e.value.as_deref(),
-            &e.date,
-            &e.author,
-            &e.recorded,
-            e.ctx.as_deref(),
-        );
-        let key = store.signing_key()?;
-        assert!(verify_signature(
-            &key.public_key(),
-            &bytes,
-            e.sig.as_deref()
-        ));
-        assert_eq!(store.device_id()?, device_id_from_key(&key.public_key()));
-        assert_eq!(e.author, "Ada");
-        assert_eq!(e.date, "2026-01-01T10:00:01.000Z");
-        Ok(())
-    }
-
-    #[test]
-    fn the_latest_date_wins_not_the_latest_append() -> Result<()> {
-        let store = store();
-        let day = |d| Utc.with_ymd_and_hms(2026, 5, d, 0, 0, 0).single();
-        store.append("note:a", "text", Some("new"), day(2))?;
-        store.append("note:a", "text", Some("old"), day(1))?;
-        assert_eq!(store.current("note:a", "text")?.as_deref(), Some("new"));
-        store.append("note:a", "text", None, day(3))?;
-        assert_eq!(store.current("note:a", "text")?, None);
-        Ok(())
-    }
-
-    #[test]
-    fn dseq_counts_up_and_a_held_entry_is_not_taken_twice() -> Result<()> {
-        let store = store();
-        store.append("note:a", "text", Some("1"), None)?;
-        let e = store.append("note:a", "text", Some("2"), None)?;
-        assert_eq!(e.dseq, 2);
-        assert_eq!(store.version_vector()?.get(&e.device), Some(&2));
-        assert!(!store.insert(&e.wire())?);
-        let mut other = e.wire();
-        other.device = "other".into();
-        assert!(store.insert(&other)?);
-        assert_eq!(store.all_entries()?.len(), 3);
-        assert_eq!(e.id(), format!("{}:2", e.device));
-        Ok(())
-    }
-
-    #[test]
-    fn the_device_identity_survives_a_reopen() -> Result<()> {
-        let dir = tempfile::tempdir().map_err(|e| Error::Invalid(e.to_string()))?;
-        let path = dir.path().join("oldbrainfix.db");
-        let first = Store::open(&path, ticking(), SigningKey::generate)?;
-        let device = first.device_id()?;
-        first.append("note:a", "text", Some("kept"), None)?;
-        drop(first);
-        let again = Store::open(&path, ticking(), || {
-            Err(Error::Invalid("no new key on reopen".into()))
-        })?;
-        assert_eq!(again.device_id()?, device);
-        assert_eq!(again.current("note:a", "text")?.as_deref(), Some("kept"));
-        Ok(())
-    }
-
-    /// A store with one Note in `dir`, closed again.
-    fn saved(dir: &Path) -> Result<std::path::PathBuf> {
-        let path = dir.join("oldbrainfix.db");
-        let store = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
-        store.append("note:a", "text", Some("kept"), None)?;
-        drop(store);
-        Ok(path)
-    }
-
-    fn version_of(path: &Path) -> Result<i64> {
-        Ok(Connection::open(path)?.query_row("PRAGMA user_version", [], |r| r.get(0))?)
-    }
-
-    fn set_version(path: &Path, version: i64) -> Result<()> {
-        Ok(Connection::open(path)?.execute_batch(&format!("PRAGMA user_version = {version}"))?)
-    }
-
-    /// Every file under `dir`, with its bytes.
-    fn files(dir: &Path) -> Result<std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>> {
-        let mut found = std::collections::BTreeMap::new();
-        let mut dirs = vec![dir.to_path_buf()];
-        while let Some(next) = dirs.pop() {
-            for entry in std::fs::read_dir(next)? {
-                let path = entry?.path();
-                if path.is_dir() {
-                    dirs.push(path);
-                } else {
-                    found.insert(path.clone(), std::fs::read(&path)?);
-                }
-            }
-        }
-        Ok(found)
-    }
-
-    #[test]
-    fn the_database_version_is_recorded() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let path = saved(dir.path())?;
-        assert_eq!(version_of(&path)?, STORE_VERSION);
-        assert_eq!(STORE_VERSION, 1);
-        Ok(())
-    }
-
-    #[test]
-    fn a_database_from_before_the_version_keeps_its_log_and_gets_it() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let path = saved(dir.path())?;
-        set_version(&path, 0)?;
-        let store = Store::open(&path, ticking(), || {
-            Err(Error::Invalid("no new key on reopen".into()))
-        })?;
-        assert_eq!(store.current("note:a", "text")?.as_deref(), Some("kept"));
-        drop(store);
-        assert_eq!(version_of(&path)?, 1);
-        Ok(())
-    }
-
-    #[test]
-    fn a_database_a_newer_version_saved_is_not_opened_and_nothing_changes() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let path = saved(dir.path())?;
-        // The directories beside it are made again only by an open that
-        // goes ahead.
-        std::fs::remove_dir_all(dir.path().join("photos"))?;
-        std::fs::remove_dir_all(dir.path().join("audio"))?;
-        for newer in [2, 1000, -1] {
-            set_version(&path, newer)?;
-            let before = files(dir.path())?;
-            let opened = Store::open(&path, ticking(), || {
-                Err(Error::Invalid("no new key on reopen".into()))
-            });
-            assert!(
-                matches!(opened, Err(Error::StoreNeedsUpdate(v)) if v == newer),
-                "{newer}"
-            );
-            assert_eq!(files(dir.path())?, before, "{newer}");
-            assert!(!dir.path().join("photos").exists());
-            assert_eq!(version_of(&path)?, newer);
-        }
-        set_version(&path, 1)?;
-        let store = Store::open(&path, ticking(), || {
-            Err(Error::Invalid("no new key on reopen".into()))
-        })?;
-        assert_eq!(store.current("note:a", "text")?.as_deref(), Some("kept"));
-        Ok(())
-    }
-
-    #[test]
-    fn ids_are_random_unless_counted_and_a_failed_batch_leaves_nothing() -> Result<()> {
-        let mut store = store();
-        let a = store.new_id()?;
-        assert_eq!(a.len(), 32);
-        assert_ne!(a, store.new_id()?);
-        store.set_id_maker(Box::new(|| Ok("1".into())));
-        assert_eq!(store.new_id()?, "1");
-        let failed: Result<()> = store.batch(|| {
-            store.append("note:a", "text", Some("lost"), None)?;
-            Err(Error::Invalid("on purpose".into()))
-        });
-        assert!(failed.is_err());
-        assert!(store.all_entries()?.is_empty());
-        store.batch(|| store.append("note:a", "text", Some("kept"), None))?;
-        assert_eq!(store.all_entries()?.len(), 1);
-        Ok(())
-    }
-
-    #[test]
-    fn a_batch_inside_a_batch_joins_it() -> Result<()> {
-        let store = store();
-        let before = store.generation.load(std::sync::atomic::Ordering::SeqCst);
-        store.batch(|| {
-            store.append("note:a", "text", Some("one"), None)?;
-            store.batch(|| store.append("note:b", "text", Some("two"), None))?;
-            assert_eq!(store.current("note:b", "text")?.as_deref(), Some("two"));
-            store.append("note:c", "text", Some("three"), None)
-        })?;
-        assert_eq!(store.all_entries()?.len(), 3);
-        let after = store.generation.load(std::sync::atomic::Ordering::SeqCst);
-        // Each append counts once, the batch once at its end, not twice.
-        assert_eq!(after - before, 4);
-        let failed: Result<()> = store.batch(|| {
-            store.append("note:d", "text", Some("four"), None)?;
-            store.batch(|| {
-                store.append("note:e", "text", Some("five"), None)?;
-                Err(Error::Invalid("on purpose".into()))
-            })
-        });
-        assert!(failed.is_err());
-        assert_eq!(store.all_entries()?.len(), 3, "the outer write is gone too");
-        assert_eq!(store.current("note:d", "text")?, None);
-        store.batch(|| store.append("note:f", "text", Some("six"), None))?;
-        assert_eq!(store.all_entries()?.len(), 4, "the next batch commits");
-        Ok(())
-    }
-
-    #[test]
-    fn blobs_lie_next_to_the_database_by_their_hash() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let store = Store::open(&dir.path().join("oldbrainfix.db"), ticking(), || {
-            Ok(SigningKey::from_seed([1; 32]))
-        })?;
-        let photo = store.put_photo(b"not a jpeg")?;
-        let audio = store.put_audio(b"RIFF....WAVE")?;
-        assert_eq!(
-            photo,
-            hex::encode(Sha256::digest(b"not a jpeg")),
-            "the photo's hash"
-        );
-        assert_eq!(
-            std::fs::read(dir.path().join("photos").join(&photo))?,
-            b"not a jpeg"
-        );
-        assert_eq!(
-            std::fs::read(dir.path().join("audio").join(&audio))?,
-            b"RIFF....WAVE"
-        );
-        assert_eq!(store.photo(&photo).as_deref(), Some(&b"not a jpeg"[..]));
-        assert_eq!(store.audio(&photo), None);
-        assert!(store.has_blob("photo", &photo) && store.has_blob("audio", &audio));
-        assert!(!store.has_blob("audio", &photo) && !store.has_blob("photo", "../x"));
-        assert!(store.all_entries()?.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn text_orders_by_utf16_code_units_like_dart() {
-        // U+FF5E sorts after U+1F600 in UTF-16, before it by code point.
-        assert_eq!(utf16_cmp("\u{FF5E}", "\u{1F600}"), Ordering::Greater);
-        assert_eq!(utf16_cmp("a", "b"), Ordering::Less);
-    }
-}
+pub(crate) mod tests;

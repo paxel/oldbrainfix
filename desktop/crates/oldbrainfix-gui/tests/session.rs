@@ -277,6 +277,29 @@ fn a_click_on_a_pick_records_an_entry_prefilled_with_its_targets() -> TestResult
 }
 
 #[test]
+fn a_picks_field_without_a_target_starts_with_the_latest_own_value() -> TestResult {
+    let device = device()?;
+    let push_ups = &device.tallies[0];
+    let tallies = Tallies::new(&device.store);
+    let seconds = tallies.add_field(push_ups, "Seconds", "times", None, None)?;
+    tallies.add(push_ups, &BTreeMap::from([(seconds, 45.0)]), "", None)?;
+    spawn(&device)?;
+    let mut harness = window(&device.store, None);
+    let t = L10n::new("en");
+    harness
+        .query_all_by_label_contains("Push-ups 20 times")
+        .find(|n| n.accesskit_node().role() == Role::Button)
+        .ok_or("the pick")?
+        .click_accesskit();
+    harness.run();
+    assert!(shows(&harness, t.tally_new_entry()));
+    // Prefilled as any new entry (#276).
+    assert_eq!(holds(&harness, "Push-ups").as_deref(), Some("20"));
+    assert_eq!(holds(&harness, "Seconds").as_deref(), Some("45"));
+    Ok(())
+}
+
+#[test]
 fn once_every_pick_has_an_entry_the_box_stays_checked() -> TestResult {
     let device = device()?;
     let id = spawn(&device)?;

@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'lan_ask.dart';
 import 'nudges.dart';
 import 'schedule.dart';
+import 'schedule_sentence.dart';
 import 'shopping_lists.dart';
 import 'store.dart';
 import 'tally_units.dart';
@@ -65,6 +67,12 @@ extension DeviceSettings on Store {
   static const _unitSystem = 'unitSystem';
   static const _shoppingAgenda = 'shoppingAgenda';
   static const _quickNoteNudgeButtonsOff = 'quickNoteNudgeButtonsOff';
+  static const _lastShoppingList = 'lastShoppingList';
+  static const _recentlyFiledInto = 'recentlyFiledInto';
+  static const _askAllowed = 'askAllowed';
+
+  /// How many places filed into File into… shows at its top (#272).
+  static const recentPlacesKept = 3;
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -82,6 +90,9 @@ extension DeviceSettings on Store {
   /// When all-day Occurrences start to ring when nothing else is set
   /// (#201).
   static final defaultAllDayFrom = ClockTime(15, 0);
+
+  /// When the day starts without Quiet Hours (#271).
+  static final defaultDayStart = ClockTime(9, 0);
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -165,6 +176,22 @@ extension DeviceSettings on Store {
   bool get quietHoursOn => localSetting(_quietHoursOff) != 'true';
 
   set quietHoursOn(bool on) => setLocalSetting(_quietHoursOff, '${!on}');
+
+  /// When this Device's day starts, at which a Reminder for "tomorrow"
+  /// rings (#271): when its Quiet Hours end, or 09:00 while they are
+  /// switched off or empty.
+  ClockTime get dayStart {
+    final quiet = quietHours;
+    return quietHoursOn && quiet.start != quiet.end
+        ? quiet.end
+        : defaultDayStart;
+  }
+
+  /// Now by the store's clock on [wallClock], with this Device's
+  /// [dayStart]: what the schedule sentence's relative words and the
+  /// quick Reminder chips are read at (#271).
+  SentenceNow sentenceNow(WallClock wallClock) =>
+      SentenceNow.at(wallClock(clock().toUtc()), dayStart);
 
   /// From when on this Device an all-day Occurrence rings, on the wall
   /// clock; before that it only shows on the Agenda (#201).
@@ -267,6 +294,78 @@ extension DeviceSettings on Store {
 
   set quickNoteNudgeButtonsOn(bool on) =>
       setLocalSetting(_quickNoteNudgeButtonsOff, '${!on}');
+
+  /// The Note id of the Shopping List a capture on this Device went into
+  /// last, at the top of the lists to pick from (#276); null for none. It
+  /// may name a list gone since.
+  String? get lastShoppingList => switch (localSetting(_lastShoppingList)) {
+    final id? when id.isNotEmpty => id,
+    _ => null,
+  };
+
+  set lastShoppingList(String? noteId) => noteId == null
+      ? removeLocalSetting(_lastShoppingList)
+      : setLocalSetting(_lastShoppingList, noteId);
+
+  /// The ids of the Areas and Topics this Device last filed into, the
+  /// latest first, at most [recentPlacesKept] (#272). They may name a
+  /// place deleted since; File into… shows only those it lists.
+  List<String> get recentlyFiledInto {
+    try {
+      if (jsonDecode(localSetting(_recentlyFiledInto) ?? '[]')
+          case final List<Object?> ids) {
+        return [
+          ...{...ids.whereType<String>()},
+        ].take(recentPlacesKept).toList();
+      }
+    } on FormatException {
+      // A broken setting names none.
+    }
+    return [];
+  }
+
+  /// Puts [placeId] first among [recentlyFiledInto], once, and forgets
+  /// the oldest beyond [recentPlacesKept].
+  void filedInto(String placeId) => setLocalSetting(
+    _recentlyFiledInto,
+    jsonEncode(
+      [
+        placeId,
+        ...recentlyFiledInto.where((id) => id != placeId),
+      ].take(recentPlacesKept).toList(),
+    ),
+  );
+
+  /// Whether the user allowed this Device to send questions through the
+  /// desktop to [provider] (#267, App Store guideline 5.1.2(i)): once for
+  /// each protocol, host and model, as an OpenAI-compatible host such as
+  /// OpenRouter hands a question on to the model's maker. Another
+  /// provider asks again.
+  bool askAllowed(DesktopProvider provider) =>
+      _askAllowedList.contains(_askKey(provider));
+
+  /// Keeps that the user allowed questions to [provider].
+  void allowAsking(DesktopProvider provider) {
+    final key = _askKey(provider);
+    final kept = _askAllowedList;
+    if (kept.contains(key)) return;
+    setLocalSetting(_askAllowed, jsonEncode([...kept, key]));
+  }
+
+  List<String> get _askAllowedList {
+    try {
+      if (jsonDecode(localSetting(_askAllowed) ?? '[]')
+          case final List<Object?> keys) {
+        return keys.whereType<String>().toList();
+      }
+    } on FormatException {
+      // A broken setting allows none.
+    }
+    return [];
+  }
+
+  static String _askKey(DesktopProvider provider) =>
+      jsonEncode([provider.protocol.name, provider.host, provider.model]);
 
   /// The system this Device shows the known units of Tallies in, when
   /// one was chosen; null follows the region.

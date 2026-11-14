@@ -6,7 +6,8 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::entry::{dart_iso, parse_time};
 use crate::nudges::QuietHours;
-use crate::schedule::ClockTime;
+use crate::schedule::{ClockTime, WallClock};
+use crate::schedule_sentence::SentenceNow;
 use crate::shopping_lists::ShoppingAgenda;
 use crate::store::Store;
 use crate::tally_units::{self, UnitSystem};
@@ -30,7 +31,12 @@ const STREAKS_OFF: &str = "streaksOff";
 const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
+const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
+const RECENTLY_FILED_INTO: &str = "recentlyFiledInto";
+
+/// How many places filed into File into… shows at its top (#272).
+pub const RECENT_PLACES_KEPT: usize = 3;
 
 /// Which theme this Device shows: the system's, or a fixed one, as the
 /// Dart core's `ThemeChoice`.
@@ -152,6 +158,9 @@ pub const DEFAULT_ALL_DAY_FROM: ClockTime = ClockTime {
     minute: 0,
 };
 
+/// When the day starts without Quiet Hours (#271).
+pub const DEFAULT_DAY_START: ClockTime = ClockTime { hour: 9, minute: 0 };
+
 /// This Device's settings in the store's local settings.
 pub struct DeviceSettings<'a> {
     store: &'a Store,
@@ -226,6 +235,25 @@ impl<'a> DeviceSettings<'a> {
     pub fn set_quiet_hours_on(&self, on: bool) -> Result<()> {
         self.store
             .set_local_setting(QUIET_HOURS_OFF, &(!on).to_string())
+    }
+
+    /// When this Device's day starts, at which a Reminder for "tomorrow"
+    /// rings (#271): when its Quiet Hours end, or 09:00 while they are
+    /// switched off or empty.
+    pub fn day_start(&self) -> Result<ClockTime> {
+        let quiet = self.quiet_hours()?;
+        Ok(if self.quiet_hours_on()? && quiet.start != quiet.end {
+            quiet.end
+        } else {
+            DEFAULT_DAY_START
+        })
+    }
+
+    /// Now by the store's clock on `wall`, with this Device's
+    /// [`day_start`](Self::day_start): what the schedule sentence's
+    /// relative words and the quick Reminder chips are read at (#271).
+    pub fn sentence_now(&self, wall: &WallClock) -> Result<SentenceNow> {
+        Ok(SentenceNow::at(wall(self.store.now()), self.day_start()?))
     }
 
     /// From when on this Device an all-day Occurrence rings, on the
@@ -330,6 +358,23 @@ impl<'a> DeviceSettings<'a> {
     pub fn set_quick_note_nudge_buttons_on(&self, on: bool) -> Result<()> {
         self.store
             .set_local_setting(QUICK_NOTE_NUDGE_BUTTONS_OFF, &(!on).to_string())
+    }
+
+    /// The Note id of the Shopping List a capture on this Device went into
+    /// last, at the top of the lists to pick from (#276); `None` for none.
+    /// It may name a list gone since.
+    pub fn last_shopping_list(&self) -> Result<Option<String>> {
+        Ok(self
+            .store
+            .local_setting(LAST_SHOPPING_LIST)?
+            .filter(|id| !id.is_empty()))
+    }
+
+    pub fn set_last_shopping_list(&self, note_id: Option<&str>) -> Result<()> {
+        match note_id {
+            Some(id) => self.store.set_local_setting(LAST_SHOPPING_LIST, id),
+            None => self.store.remove_local_setting(LAST_SHOPPING_LIST),
+        }
     }
 
     /// When the desktop last showed what was due; `None` before the first
@@ -450,208 +495,39 @@ impl<'a> DeviceSettings<'a> {
         self.store
             .set_local_setting(PLAYBACK_SPEED, &speed_text(speed))
     }
+
+    /// The ids of the Areas and Topics this Device last filed into, the
+    /// latest first, at most [`RECENT_PLACES_KEPT`] (#272). They may name
+    /// a place deleted since; File into… shows only those it lists.
+    pub fn recently_filed_into(&self) -> Result<Vec<String>> {
+        let kept = self.store.local_setting(RECENTLY_FILED_INTO)?;
+        let ids = match kept.as_deref().map(serde_json::from_str) {
+            Some(Ok(serde_json::Value::Array(ids))) => ids,
+            _ => return Ok(Vec::new()),
+        };
+        let mut recent: Vec<String> = Vec::new();
+        for id in ids.iter().filter_map(serde_json::Value::as_str) {
+            if recent.len() < RECENT_PLACES_KEPT && !recent.iter().any(|r| r == id) {
+                recent.push(id.to_owned());
+            }
+        }
+        Ok(recent)
+    }
+
+    /// Puts `place_id` first among [`Self::recently_filed_into`], once,
+    /// and forgets the oldest beyond [`RECENT_PLACES_KEPT`].
+    pub fn filed_into(&self, place_id: &str) -> Result<()> {
+        let mut recent = vec![place_id.to_owned()];
+        recent.extend(
+            self.recently_filed_into()?
+                .into_iter()
+                .filter(|id| id != place_id),
+        );
+        recent.truncate(RECENT_PLACES_KEPT);
+        let json = serde_json::to_string(&recent).map_err(|e| Error::Invalid(e.to_string()))?;
+        self.store.set_local_setting(RECENTLY_FILED_INTO, &json)
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn settings_fall_back_to_their_defaults() -> Result<()> {
-        let store = crate::store::tests::store();
-        let settings = DeviceSettings::new(&store);
-        assert_eq!(settings.renag_interval()?, Duration::minutes(10));
-        assert_eq!(settings.nudge_repeat()?, Duration::hours(1));
-        assert_eq!(settings.quiet_hours()?, DEFAULT_QUIET_HOURS);
-        assert!(settings.quiet_hours_on()?);
-        assert_eq!(settings.all_day_from()?, DEFAULT_ALL_DAY_FROM);
-        assert!(settings.alerts_on()?);
-        assert!(settings.autostart_on()?);
-        assert!(settings.streaks_on()?);
-        assert!(!settings.agenda_hides_checked()?);
-        assert!(!settings.fat_fingers()?);
-        for control in QuickNoteControl::ALL {
-            assert!(!settings.quick_note_shows(control)?, "{control:?}");
-        }
-        assert!(settings.quick_note_nudge_buttons_on()?);
-        assert_eq!(settings.capture_hotkey()?, DEFAULT_CAPTURE_HOTKEY);
-        assert_eq!(settings.missed_seen()?, None);
-        assert_eq!(settings.theme()?, ThemeChoice::System);
-        store.set_local_setting(THEME, "sepia")?;
-        assert_eq!(settings.theme()?, ThemeChoice::System);
-        store.set_local_setting(RENAG_MINUTES, "0")?;
-        assert_eq!(settings.renag_interval()?, Duration::minutes(10));
-        store.set_local_setting(QUIET_HOURS, "23:00")?;
-        assert_eq!(settings.quiet_hours()?, DEFAULT_QUIET_HOURS);
-        store.set_local_setting(ALL_DAY_FROM, "noon")?;
-        assert_eq!(settings.all_day_from()?, DEFAULT_ALL_DAY_FROM);
-        Ok(())
-    }
-
-    #[test]
-    fn settings_keep_what_they_are_set_to() -> Result<()> {
-        let store = crate::store::tests::store();
-        let settings = DeviceSettings::new(&store);
-        settings.set_renag_interval(Duration::minutes(5))?;
-        settings.set_nudge_repeat(Duration::minutes(30))?;
-        let quiet = QuietHours {
-            start: ClockTime {
-                hour: 23,
-                minute: 30,
-            },
-            end: ClockTime { hour: 6, minute: 0 },
-        };
-        settings.set_quiet_hours(quiet)?;
-        settings.set_quiet_hours_on(false)?;
-        let half_past_eleven = ClockTime {
-            hour: 11,
-            minute: 30,
-        };
-        settings.set_all_day_from(half_past_eleven)?;
-        assert_eq!(settings.all_day_from()?, half_past_eleven);
-        assert_eq!(store.local_setting(ALL_DAY_FROM)?.as_deref(), Some("11:30"));
-        settings.set_alerts_on(false)?;
-        settings.set_autostart_on(false)?;
-        settings.set_streaks_on(false)?;
-        assert_eq!(settings.renag_interval()?, Duration::minutes(5));
-        assert_eq!(settings.nudge_repeat()?, Duration::minutes(30));
-        assert_eq!(settings.quiet_hours()?, quiet);
-        assert_eq!(
-            store.local_setting(QUIET_HOURS)?.as_deref(),
-            Some("23:30-06:00")
-        );
-        assert!(!settings.quiet_hours_on()?);
-        assert!(!settings.alerts_on()?);
-        assert!(!settings.autostart_on()?);
-        assert!(!settings.streaks_on()?);
-        assert_eq!(store.local_setting(STREAKS_OFF)?.as_deref(), Some("true"));
-        settings.set_streaks_on(true)?;
-        assert!(settings.streaks_on()?);
-        // The Agenda strikes through what is checked until this Device
-        // hides it (#217), under the Dart core's key.
-        settings.set_agenda_hides_checked(true)?;
-        assert!(settings.agenda_hides_checked()?);
-        assert_eq!(
-            store.local_setting(AGENDA_HIDE_CHECKED)?.as_deref(),
-            Some("true")
-        );
-        settings.set_agenda_hides_checked(false)?;
-        assert!(!settings.agenda_hides_checked()?);
-        store.set_local_setting(AGENDA_HIDE_CHECKED, "garbled")?;
-        assert!(!settings.agenda_hides_checked()?);
-        // Text and icons keep their size until this Device makes them
-        // bigger (#224), under the Dart core's key.
-        settings.set_fat_fingers(true)?;
-        assert!(settings.fat_fingers()?);
-        assert_eq!(store.local_setting(FAT_FINGERS)?.as_deref(), Some("true"));
-        settings.set_fat_fingers(false)?;
-        assert!(!settings.fat_fingers()?);
-        store.set_local_setting(FAT_FINGERS, "garbled")?;
-        assert!(!settings.fat_fingers()?);
-        for control in QuickNoteControl::ALL {
-            settings.set_quick_note_shows(control, true)?;
-            assert!(settings.quick_note_shows(control)?, "{control:?}");
-            assert_eq!(store.local_setting(control.key())?.as_deref(), Some("true"));
-            settings.set_quick_note_shows(control, false)?;
-            assert!(!settings.quick_note_shows(control)?, "{control:?}");
-        }
-        assert_eq!(
-            store.local_setting("quickNoteFormatBar")?.as_deref(),
-            Some("false")
-        );
-        settings.set_quick_note_nudge_buttons_on(false)?;
-        assert!(!settings.quick_note_nudge_buttons_on()?);
-        assert_eq!(
-            store
-                .local_setting(QUICK_NOTE_NUDGE_BUTTONS_OFF)?
-                .as_deref(),
-            Some("true")
-        );
-        settings.set_quick_note_nudge_buttons_on(true)?;
-        assert!(settings.quick_note_nudge_buttons_on()?);
-        settings.set_capture_hotkey("Super+Shift+K")?;
-        assert_eq!(settings.capture_hotkey()?, "Super+Shift+K");
-        let now = store.now();
-        settings.set_missed_seen(Some(now))?;
-        assert_eq!(settings.missed_seen()?, Some(now));
-        settings.set_missed_seen(None)?;
-        assert_eq!(settings.missed_seen()?, None);
-        for choice in ThemeChoice::ALL {
-            settings.set_theme(choice)?;
-            assert_eq!(settings.theme()?, choice);
-        }
-        settings.set_theme(ThemeChoice::Light)?;
-        assert_eq!(store.local_setting(THEME)?.as_deref(), Some("light"));
-        Ok(())
-    }
-
-    #[test]
-    fn occurrences_ring_with_the_own_sound_until_one_is_chosen() -> Result<()> {
-        let store = crate::store::tests::store();
-        let settings = DeviceSettings::new(&store);
-        assert_eq!(settings.alarm_sound()?, None);
-        let chosen = "/home/someone/Music/bell.ogg";
-        settings.set_alarm_sound(Some(chosen))?;
-        assert_eq!(settings.alarm_sound()?.as_deref(), Some(chosen));
-        assert_eq!(store.local_setting(ALARM_SOUND)?.as_deref(), Some(chosen));
-        settings.set_alarm_sound(Some("  "))?;
-        assert_eq!(settings.alarm_sound()?, None);
-        assert_eq!(store.local_setting(ALARM_SOUND)?, None);
-        settings.set_alarm_sound(Some(chosen))?;
-        settings.set_alarm_sound(None)?;
-        assert_eq!(settings.alarm_sound()?, None);
-        store.set_local_setting(ALARM_SOUND, "")?;
-        assert_eq!(settings.alarm_sound()?, None);
-        Ok(())
-    }
-
-    #[test]
-    fn the_agenda_showed_a_row_per_shopping_list_with_lines_back_unless_another_way_was_chosen()
-    -> Result<()> {
-        let store = crate::store::tests::store();
-        let settings = DeviceSettings::new(&store);
-        assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
-        // As a version before #186 wrote it.
-        for way in ShoppingAgenda::ALL {
-            store.set_local_setting(SHOPPING_AGENDA, way.code())?;
-            assert_eq!(settings.shopping_agenda()?, way);
-        }
-        store.set_local_setting(SHOPPING_AGENDA, "sideways")?;
-        assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
-        Ok(())
-    }
-
-    #[test]
-    fn recordings_play_at_normal_speed_until_this_device_chooses_one() -> Result<()> {
-        let store = crate::store::tests::store();
-        let settings = DeviceSettings::new(&store);
-        assert_eq!(settings.playback_speed()?, 1.0);
-        assert_eq!(settings.chosen_playback_speed()?, None);
-        settings.set_playback_speed(0.75)?;
-        assert_eq!(settings.playback_speed()?, 0.75);
-        assert_eq!(
-            store.local_setting(PLAYBACK_SPEED)?.as_deref(),
-            Some("0.75")
-        );
-        settings.set_playback_speed(2.0)?;
-        assert_eq!(store.local_setting(PLAYBACK_SPEED)?.as_deref(), Some("2.0"));
-        assert!(settings.set_playback_speed(1.25).is_err());
-        assert_eq!(settings.playback_speed()?, 2.0);
-        Ok(())
-    }
-
-    #[test]
-    fn the_playback_speed_kept_before_carries_over_as_it_is() -> Result<()> {
-        let store = crate::store::tests::store();
-        let settings = DeviceSettings::new(&store);
-        // As the desktop and the phone wrote it in 0.1.1.
-        store.set_local_setting(PLAYBACK_SPEED, "1.5")?;
-        assert_eq!(settings.playback_speed()?, 1.5);
-        for kept in ["7", "fast", "1.25", ""] {
-            store.set_local_setting(PLAYBACK_SPEED, kept)?;
-            assert_eq!(settings.playback_speed()?, 1.0, "{kept}");
-            assert_eq!(settings.chosen_playback_speed()?, None, "{kept}");
-        }
-        Ok(())
-    }
-}
+mod tests;

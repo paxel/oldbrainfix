@@ -47,6 +47,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureFanClose => 'Close';
 
   @override
+  String get captureLongPressHint => 'write a Note at once';
+
+  @override
+  String get captureLongPressAction => 'Write a Note at once';
+
+  @override
   String get photoMissing => 'Photo not on this device';
 
   @override
@@ -149,6 +155,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileInto => 'File into…';
+
+  @override
+  String get fileIntoFilterHint => 'Filter Areas and Topics';
+
+  @override
+  String get fileIntoRecent => 'Filed into recently';
+
+  @override
+  String get fileIntoNewArea => 'New Area…';
+
+  @override
+  String get fileIntoNewTopic => 'New Topic…';
+
+  @override
+  String get fileIntoNoMatch => 'No Area or Topic matches.';
 
   @override
   String get firstStartTitle => 'Welcome to Old Brain Fix';
@@ -433,6 +454,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reminder => 'Reminder';
 
   @override
+  String get spawnRoutine => 'Routine…';
+
+  @override
+  String get spawnReminder => 'Reminder…';
+
+  @override
+  String get spawnSession => 'Session…';
+
+  @override
   String get newRoutine => 'New Routine';
 
   @override
@@ -459,6 +489,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduleSentenceAdvanced => 'Switch to Simple to type.';
+
+  @override
+  String quickInAnHour(String time) {
+    return 'In 1 h, $time';
+  }
+
+  @override
+  String quickTonight(String time) {
+    return 'Tonight $time';
+  }
+
+  @override
+  String quickTomorrow(String time) {
+    return 'Tomorrow $time';
+  }
+
+  @override
+  String quickInAWeek(String time) {
+    return 'In a week, $time';
+  }
 
   @override
   String get scheduleSimple => 'Simple';
@@ -771,6 +821,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get snooze60 => '1 h';
+
+  @override
+  String get notToday => 'Not today';
+
+  @override
+  String get editSchedule => 'Edit schedule';
+
+  @override
+  String get notTodayQuestion => 'Skip it, or tomorrow at the same time?';
+
+  @override
+  String get skip => 'Skip';
+
+  @override
+  String get notTodayTomorrow => 'Tomorrow';
+
+  @override
+  String get occurrenceSkipped => 'Skipped';
+
+  @override
+  String get occurrenceTomorrowInstead => 'The day after instead';
+
+  @override
+  String get occurrenceFromDayBefore => 'From the day before';
 
   @override
   String get alarmsBanner =>
@@ -1330,6 +1404,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logOpen => 'Due, not Done yet';
 
   @override
+  String daySkipped(String day) {
+    return '$day: skipped';
+  }
+
+  @override
+  String adherenceSkipped(int count) {
+    return '$count skipped';
+  }
+
+  @override
+  String get logSkipped => 'Skipped';
+
+  @override
+  String get logSkippedTomorrow => 'Skipped, the day after instead';
+
+  @override
   String get logComing => 'Still to come';
 
   @override
@@ -1483,6 +1573,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.';
 
   @override
+  String get settingsSearchHint => 'Search Settings';
+
+  @override
+  String settingsSearchNothing(String query) {
+    return 'No setting matches “$query”.';
+  }
+
+  @override
   String get settingsLook => 'Look';
 
   @override
@@ -1545,6 +1643,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSpeechModelDetail => 'For Transcripts of voice Notes.';
+
+  @override
+  String get printService => 'Print to Old Brain Fix';
+
+  @override
+  String get printServiceOn =>
+      'On. Print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.';
+
+  @override
+  String get printServiceOff =>
+      'Off. Turn on Old Brain Fix in Android\'s print settings to print pages into a Note.';
+
+  @override
+  String get printServiceUnknown =>
+      'Turn on Old Brain Fix in Android\'s print settings. Then print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.';
+
+  @override
+  String get printServiceOpen => 'Open print settings';
 
   @override
   String get settingsCalendar => 'Calendar';
@@ -3381,6 +3497,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addTallyEntry => 'Add entry';
 
   @override
+  String get addToHomeScreen => 'Add to home screen';
+
+  @override
+  String get addToHomeScreenIphone => 'Add to the app icon';
+
+  @override
+  String get tallyShortcutNotTaken => 'This home screen takes no shortcuts.';
+
+  @override
+  String tallyShortcutOnIcon(String name) {
+    return '$name is in the app icon\'s menu: touch and hold the icon on the Home Screen.';
+  }
+
+  @override
+  String get tallyShortcutGone => 'This Tally is no longer there.';
+
+  @override
   String get makeChecklist => 'Make it a Checklist';
 
   @override
@@ -4020,6 +4153,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToShoppingList => 'Add to a Shopping List';
 
   @override
+  String addToNamedShoppingList(String list) {
+    return 'Add to $list';
+  }
+
+  @override
   String captureChoiceShopping(String list) {
     return 'Shopping List: $list';
   }
@@ -4396,6 +4534,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareToApp => 'Share to an app';
+
+  @override
+  String get shareNote => 'Share…';
 
   @override
   String get noteNotShared => 'The Note was not shared.';
@@ -4850,7 +4991,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, Photo, Voice, Gallery, Paste, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
+      'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -5699,4 +5840,581 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get feedbackNotSentTitle => 'Feedback not shared';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get undoNoteTrashed => 'Moved to the Trash';
+
+  @override
+  String get undoLineDeleted => 'Line deleted';
+
+  @override
+  String get undoEntryDeleted => 'Entry deleted';
+
+  @override
+  String get undoFrogTrashed => 'Frog moved to the Trash';
+
+  @override
+  String get undoRoutineTrashed => 'Routine moved to the Trash';
+
+  @override
+  String get undoReminderTrashed => 'Reminder moved to the Trash';
+
+  @override
+  String get undoPackFromRemoved => '“From” label removed';
+
+  @override
+  String get undoTranscriptRemoved => 'Transcript removed';
+
+  @override
+  String get undoPhotoTextRemoved => 'Photo Text removed';
+
+  @override
+  String get undoSkipped => 'Skipped';
+
+  @override
+  String get undoTomorrow => 'The day after instead';
+
+  @override
+  String get linesRemoved => 'Removed Lines';
+
+  @override
+  String get selectNotes => 'Select';
+
+  @override
+  String get selectNote => 'Select this Note';
+
+  @override
+  String get stopSelecting => 'Stop selecting';
+
+  @override
+  String notesSelected(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get leaveDiscardTitle => 'Discard changes?';
+
+  @override
+  String get leaveDiscardBody =>
+      'It can\'t be saved as it is, so leaving drops it.';
+
+  @override
+  String get leaveDiscard => 'Discard';
+
+  @override
+  String get leaveKeepEditing => 'Keep editing';
+
+  @override
+  String get backupOpenTitle => 'Take Notes back';
+
+  @override
+  String get backupOpenIntro =>
+      'Open a Backup to bring Notes back from it, such as a Note deleted for good or an earlier version of a list. They come back as copies in new Areas; nothing else changes.';
+
+  @override
+  String get backupOpen => 'Open a Backup…';
+
+  @override
+  String get backupOpenPageTitle => 'Open a Backup';
+
+  @override
+  String get backupOpenUnlockIntro =>
+      'Open it with your passphrase or with the recovery key from the Recovery Sheet. Nothing is restored: you pick the Notes to take back.';
+
+  @override
+  String get backupOpenStart => 'Open';
+
+  @override
+  String get backupOpenWorking => 'Opening… this takes a moment.';
+
+  @override
+  String get backupNotOpened => 'The Backup was not opened.';
+
+  @override
+  String get backupNotOpenedTitle => 'Backup not opened';
+
+  @override
+  String get backupOpenDamagedFix =>
+      'Nothing was changed; try an older Backup.';
+
+  @override
+  String get backupNotesHint =>
+      'Tick the Notes to take back. Each comes back as a copy in a new Area, with its files; the Notes on this Device stay as they are.';
+
+  @override
+  String backupNotesLocked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'The Notes of $count locked Areas are left out until you unlock them.',
+      one: 'The Notes of a locked Area are left out until you unlock it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupNotesUnlock => 'Unlock and show them';
+
+  @override
+  String get backupNotesUnlockTitle => 'Show the Notes of locked Areas';
+
+  @override
+  String get backupNoteTrashed => 'In the Trash';
+
+  @override
+  String get backupSuffix => 'Backup';
+
+  @override
+  String get backupNoArea => 'From a Backup';
+
+  @override
+  String get backupNotesNotAdded => 'The Notes were not added.';
+
+  @override
+  String get backupNotesNotAddedTitle => 'Notes not added';
+
+  @override
+  String get backupAddDamagedCause =>
+      'The Backup file changed or could not be read again since it was opened.';
+
+  @override
+  String get backupAddDamagedFix => 'Nothing was added; open the Backup again.';
+
+  @override
+  String get tagsTitle => 'Tags';
+
+  @override
+  String get tagsNone =>
+      'No tags yet. A word with # in front in a Note, such as #garden or #life/health, shows here.';
+
+  @override
+  String tagNotes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes',
+      one: '1 Note',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get tagUnfold => 'Show the tags below';
+
+  @override
+  String get tagFold => 'Hide the tags below';
+
+  @override
+  String get hiddenFromAi => 'Hidden from AI';
+
+  @override
+  String get hiddenFromAiByArea => 'Off, hidden by its Area';
+
+  @override
+  String get hiddenFromAiRefusedTitle => 'Hidden from AI';
+
+  @override
+  String hiddenFromAiRefusedBody(String names) {
+    return '$names: hidden from AI. What is hidden from AI is not given to other people. Show it to the AI first.';
+  }
+
+  @override
+  String get hiddenFromAiShow => 'Show to the AI';
+
+  @override
+  String get file => 'File';
+
+  @override
+  String get attachFile => 'Attach a file';
+
+  @override
+  String get attachmentTextLabel => 'Attachment Text';
+
+  @override
+  String get attachmentTextFromComputer =>
+      'The text follows from the computer.';
+
+  @override
+  String attachmentPages(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pages',
+      one: '1 page',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String openFile(String name) {
+    return 'Open $name';
+  }
+
+  @override
+  String get fileRiskTitle => 'Open this file?';
+
+  @override
+  String fileRiskQuestion(String file) {
+    return '\"$file\" could run a program. Open it anyway?';
+  }
+
+  @override
+  String fileRiskAppQuestion(String file) {
+    return '\"$file\" could install an app. Open it anyway?';
+  }
+
+  @override
+  String fileRiskAddedBy(String person) {
+    return '$person added it.';
+  }
+
+  @override
+  String get fileRiskOpen => 'Open anyway';
+
+  @override
+  String get fileNotOpened => 'An Attachment was not opened.';
+
+  @override
+  String get fileNotOpenedTitle => 'Attachment not opened';
+
+  @override
+  String get fileNotHereCause => 'The Attachment is not on this Device yet.';
+
+  @override
+  String get fileNotHereFix => 'It comes with the next sync; nothing is lost.';
+
+  @override
+  String get fileNoAppCause =>
+      'No app on this Device opens files of this kind.';
+
+  @override
+  String get fileNoAppFix =>
+      'Install an app for it, or open the Attachment on the computer.';
+
+  @override
+  String get fileNotAttached => 'A file was not attached.';
+
+  @override
+  String get fileNotAttachedTitle => 'File not attached';
+
+  @override
+  String get fileTooLargeCause =>
+      'It is larger than 256 MB, the most a file can be.';
+
+  @override
+  String get fileUnreadableCause => 'It could not be read on this Device.';
+
+  @override
+  String get fileNotAttachedFix =>
+      'Nothing was written; the file is still where it was.';
+
+  @override
+  String get removeFileKeepText => 'Remove Attachment, keep text';
+
+  @override
+  String get removeFileQuestion =>
+      'Remove this Attachment and keep its Attachment Text?';
+
+  @override
+  String get undoAttachmentTextRemoved => 'Attachment Text removed';
+
+  @override
+  String get fileReadAgainFailed =>
+      'The text of an Attachment could not be read.';
+
+  @override
+  String get fileReadAgainFailedTitle => 'Attachment not read';
+
+  @override
+  String get fileReadAgainCause =>
+      'This Attachment could not be read on this Device.';
+
+  @override
+  String get attachment => 'Attachment';
+
+  @override
+  String hiddenFromAiAreaFirst(String names) {
+    return '$names: hidden from AI. A Note in an Area hidden from AI is not given to other people. Take the mark off in the Area\'s menu in the Areas list first.';
+  }
+
+  @override
+  String get captureNotFiledHidden => 'A Note was not filed.';
+
+  @override
+  String get captureNotFiledHiddenTitle => 'Note not filed';
+
+  @override
+  String get captureNotFiledHiddenCause =>
+      'It is hidden from AI, and what is hidden from AI does not go into a Shared Area.';
+
+  @override
+  String get captureNotFiledHiddenFix =>
+      'It stays where it was; take the mark off, then file it.';
+
+  @override
+  String get phoneAskTitle => 'Ask';
+
+  @override
+  String get phoneAskLooking => 'Looking for your computer…';
+
+  @override
+  String get phoneAskTryAgain => 'Try again';
+
+  @override
+  String get phoneAskHint => 'Ask about your Notes';
+
+  @override
+  String get phoneAskButton => 'Ask';
+
+  @override
+  String get phoneAskStartOver => 'Start over';
+
+  @override
+  String phoneAskAsking(String provider) {
+    return 'Waiting for the answer from $provider…';
+  }
+
+  @override
+  String phoneAskSends(String computer, String provider, String model) {
+    return 'Questions go through $computer to $provider, model $model. Only what the model finds and reads in your Notes is sent there, never what is Hidden from AI.';
+  }
+
+  @override
+  String get phoneAskTaskWaits =>
+      'Changes the AI made wait for your review on the computer. Sync with it waits until you decide there.';
+
+  @override
+  String get phoneAskFromNotes => 'From these Notes';
+
+  @override
+  String get phoneAskKeep => 'Keep as Note';
+
+  @override
+  String get phoneAskKept => 'Kept as a Note';
+
+  @override
+  String get phoneAskCut => 'The answer was cut off at its length limit.';
+
+  @override
+  String get phoneAskUnchecked => 'A source could not be checked.';
+
+  @override
+  String phoneAskUnreadyCause(String provider) {
+    return '$provider is not set up on the computer yet.';
+  }
+
+  @override
+  String get phoneAskUnreadyFix =>
+      'Set up the provider under Ask panel in the computer\'s Settings.';
+
+  @override
+  String get phoneAskUnreadyModel =>
+      'Name a model under Ask panel in the computer\'s Settings.';
+
+  @override
+  String get phoneAskUnreadyKey =>
+      'Enter the API key under Ask panel in the computer\'s Settings.';
+
+  @override
+  String get phoneAskUnreadyUrl =>
+      'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.';
+
+  @override
+  String get phoneAskConsentTitle => 'Before your first question';
+
+  @override
+  String phoneAskConsentIntro(
+    String computer,
+    String provider,
+    String model,
+    String host,
+  ) {
+    return 'Your questions go from this phone to your computer $computer, which sends them to $provider, model $model, at $host.';
+  }
+
+  @override
+  String phoneAskConsentWhat(String provider) {
+    return 'What $provider receives:';
+  }
+
+  @override
+  String get phoneAskConsentQuestion =>
+      'Your question, and the questions and answers before it when you ask on.';
+
+  @override
+  String get phoneAskConsentNames =>
+      'The names of your Areas, Topics and tags.';
+
+  @override
+  String get phoneAskConsentRoutines =>
+      'Your Routines and Reminders with their check-offs, when the model lists them.';
+
+  @override
+  String get phoneAskConsentFound =>
+      'The titles and short excerpts of the Notes its searches find.';
+
+  @override
+  String get phoneAskConsentRead =>
+      'The Notes it reads in full, with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context (when and where a Note was captured, the calendar event and the Bluetooth device).';
+
+  @override
+  String phoneAskConsentNever(String provider) {
+    return 'Nothing Hidden from AI is sent, not even as a count. $provider handles what it receives under its own terms; Old Brain Fix and its developer receive nothing.';
+  }
+
+  @override
+  String get phoneAskConsentAgain =>
+      'Nothing is sent until you allow it. When the computer asks another provider or model, this phone asks you again.';
+
+  @override
+  String get phoneAskAllow => 'Allow';
+
+  @override
+  String get phoneAskFailed => 'The question was not answered.';
+
+  @override
+  String get phoneAskFailedTitle => 'Not answered';
+
+  @override
+  String phoneAskKeyRefused(String provider) {
+    return '$provider refused the computer\'s API key.';
+  }
+
+  @override
+  String get phoneAskKeyFix =>
+      'Check the API key under Ask panel in the computer\'s Settings.';
+
+  @override
+  String phoneAskProviderFailed(String provider) {
+    return '$provider answered the computer with an error.';
+  }
+
+  @override
+  String get phoneAskProviderFix =>
+      'Check the model\'s name in the computer\'s Settings, or ask again later.';
+
+  @override
+  String phoneAskNoReply(String provider) {
+    return 'No answer came from $provider to the computer.';
+  }
+
+  @override
+  String get phoneAskNoReplyFix =>
+      'Check the computer\'s network and the provider\'s address in its Settings, then ask again.';
+
+  @override
+  String phoneAskUnreadable(String provider) {
+    return 'The answer from $provider could not be read on the computer.';
+  }
+
+  @override
+  String get phoneAskUnreadableFix =>
+      'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.';
+
+  @override
+  String get phoneAskTooManyRounds =>
+      'The model searched too long without answering.';
+
+  @override
+  String get phoneAskNarrowerFix => 'Ask a narrower question.';
+
+  @override
+  String get phoneAskRefused => 'The model declined to answer this question.';
+
+  @override
+  String get phoneAskOtherWordsFix => 'Ask it in other words.';
+
+  @override
+  String get phoneAskStopped => 'The computer stopped waiting for the answer.';
+
+  @override
+  String get phoneAskAgainFix => 'Ask again.';
+
+  @override
+  String get phoneAskBusy => 'The computer is answering another question.';
+
+  @override
+  String get phoneAskBusyFix => 'Ask again in a moment.';
+
+  @override
+  String get phoneAskUnknown =>
+      'The computer answered in a way this version cannot read.';
+
+  @override
+  String get phoneAskUpdatePhoneFix =>
+      'Install the latest Old Brain Fix on this phone.';
+
+  @override
+  String get phoneAskNoComputer =>
+      'No computer of yours is paired with this phone.';
+
+  @override
+  String get phoneAskNoComputerFix =>
+      'Pair your computer under Profile ▸ Sync with another Device, then ask.';
+
+  @override
+  String get phoneAskUnreachable => 'No computer of yours answered.';
+
+  @override
+  String get phoneAskUnreachableFix =>
+      'Start Old Brain Fix on the computer and join its network or your VPN; through Tailscale, give it an address by hand under Profile ▸ Sync with another Device.';
+
+  @override
+  String get phoneAskWrongHost =>
+      'Another device answered at your computer\'s address.';
+
+  @override
+  String get phoneAskWrongHostFix =>
+      'Check the address by hand under Profile ▸ Sync with another Device, or pair the computer again.';
+
+  @override
+  String get phoneAskDeclined => 'Your computer does not let this phone ask.';
+
+  @override
+  String get phoneAskDeclinedFix =>
+      'On the computer, switch on Sync automatically for this phone under Sync.';
+
+  @override
+  String get phoneAskNotOffered =>
+      'None of your paired Devices answers questions.';
+
+  @override
+  String get phoneAskNotOfferedFix =>
+      'Install the latest Old Brain Fix on your computer; a phone answers no questions.';
+
+  @override
+  String get phoneAskTimedOut => 'Your computer did not answer in time.';
+
+  @override
+  String get phoneAskTimedOutFix =>
+      'Check that the computer is on and awake, then ask again.';
+
+  @override
+  String get phoneAskBrokeOff => 'The connection to your computer broke off.';
+
+  @override
+  String get handAddressLabel => 'Address by hand';
+
+  @override
+  String get handAddressHelp =>
+      'For a VPN such as Tailscale: its name or address there, such as desk.tail1234.ts.net, with :port if needed. Tried when this network does not find it.';
+
+  @override
+  String get handAddressInvalid =>
+      'Not an address. Type a name or an IP address, with :port if needed.';
+
+  @override
+  String get handAddressBadPort => 'The port must be a number from 1 to 65535.';
+
+  @override
+  String pdfPageOf(int page, int pages) {
+    return 'Page $page of $pages';
+  }
+
+  @override
+  String get openInOtherApp => 'Open in another app';
 }

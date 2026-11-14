@@ -238,7 +238,17 @@ void main() {
 
       await tap(tester, menuOf('Milk'));
       expect(find.text('Show ticks'), findsOneWidget);
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+      expect(
+        tester
+            .widget<Switch>(
+              find.descendant(
+                of: key('note-show-ticks'),
+                matching: find.byType(Switch),
+              ),
+            )
+            .value,
+        isFalse,
+      );
       await tap(tester, key('note-show-ticks'));
       expect(store.localSetting(showTicksKey(id)), 'true');
       // After the ticked box only; the other Note shows none.
@@ -249,7 +259,17 @@ void main() {
       expect(store.localSetting(showTicksKey(other)), isNull);
 
       await tap(tester, menuOf('Milk'));
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+      expect(
+        tester
+            .widget<Switch>(
+              find.descendant(
+                of: key('note-show-ticks'),
+                matching: find.byType(Switch),
+              ),
+            )
+            .value,
+        isTrue,
+      );
       await tap(tester, key('note-show-ticks'));
       expect(find.textContaining('You, ', findRichText: true), findsNothing);
     });

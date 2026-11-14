@@ -34,6 +34,7 @@
 		B23900000000000000000011 /* german-receipt.jpg in Resources */ = {isa = PBXBuildFile; fileRef = B23900000000000000000010 /* german-receipt.jpg */; };
 		B24000000000000000000002 /* FolderRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000001 /* FolderRules.swift */; };
 		B24000000000000000000004 /* ZipReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000003 /* ZipReader.swift */; };
+		B26700000000000000000002 /* FilesChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26700000000000000000001 /* FilesChannel.swift */; };
 		B24000000000000000000006 /* FolderChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000005 /* FolderChannel.swift */; };
 		B24000000000000000000008 /* SyncRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000007 /* SyncRecords.swift */; };
 		B2400000000000000000000A /* SyncChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000009 /* SyncChannel.swift */; };
@@ -169,6 +170,7 @@
 		B2390000000000000000000E /* SpeechFilesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechFilesTests.swift; sourceTree = "<group>"; };
 		B24000000000000000000001 /* FolderRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderRules.swift; sourceTree = "<group>"; };
 		B24000000000000000000003 /* ZipReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZipReader.swift; sourceTree = "<group>"; };
+		B26700000000000000000001 /* FilesChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesChannel.swift; sourceTree = "<group>"; };
 		B24000000000000000000005 /* FolderChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderChannel.swift; sourceTree = "<group>"; };
 		B24000000000000000000007 /* SyncRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecords.swift; sourceTree = "<group>"; };
 		B24000000000000000000009 /* SyncChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncChannel.swift; sourceTree = "<group>"; };
@@ -334,6 +336,7 @@
 				B2390000000000000000000A /* rusto */,
 				B24000000000000000000001 /* FolderRules.swift */,
 				B24000000000000000000003 /* ZipReader.swift */,
+				B26700000000000000000001 /* FilesChannel.swift */,
 				B24000000000000000000005 /* FolderChannel.swift */,
 				B24000000000000000000007 /* SyncRecords.swift */,
 				B24000000000000000000009 /* SyncChannel.swift */,
@@ -629,6 +632,7 @@
 				B23900000000000000000008 /* VoiceChannel.swift in Sources */,
 				B24000000000000000000002 /* FolderRules.swift in Sources */,
 				B24000000000000000000004 /* ZipReader.swift in Sources */,
+				B26700000000000000000002 /* FilesChannel.swift in Sources */,
 				B24000000000000000000006 /* FolderChannel.swift in Sources */,
 				B24000000000000000000008 /* SyncRecords.swift in Sources */,
 				B2400000000000000000000A /* SyncChannel.swift in Sources */,

@@ -2,6 +2,12 @@
 
 Changes of versions before the current one, moved here from [CHANGELOG.md](CHANGELOG.md) on each version bump.
 
+## [0.5.1] - 2026-11-08
+
+### Fixed
+
+- On the iPhone, the app shows the Old Brain Fix icon, the question and exclamation mark over a box, on the home screen and in the App Store instead of a stand-in logo.
+
 ## [0.5.0] - 2026-11-07
 
 ### Added

@@ -74,8 +74,10 @@ use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, PopupCloseBehavior,
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
-use oldbrainfix_core::ai_port::{AiPort, Reach, docker_bridge};
+use oldbrainfix_core::ai_port::{AiPort, Reach, Wake, docker_bridge};
+use oldbrainfix_core::ai_tools::ToolOutput;
 use oldbrainfix_core::app_link::AppLink;
+use oldbrainfix_core::ask::{self, Conversation, Provider, ToolCall};
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
@@ -92,7 +94,7 @@ use oldbrainfix_core::sent::{
 use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
+    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Attachment, Blob, BoxState, Boxes,
     CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
     ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
@@ -104,13 +106,17 @@ use oldbrainfix_core::{
 
 use crate::about_view;
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
-use crate::alerts::Event;
+use crate::alerts::{Event, OccurrenceWanted};
 use crate::all_routines_view::{self, AllRoutinesAction};
 use crate::app_links;
+use crate::ask_view::{self, AskAsked, AskFields, AskPanel, AskSetting};
+use crate::attachment_view::{self, HeldFile};
 use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
 use crate::background;
-use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
+use crate::backup_view::{
+    self, BackupAction, BackupNotes, BackupNotesAction, Passphrase, Welcome, WelcomeAction,
+};
 use crate::backups;
 use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
@@ -118,9 +124,12 @@ use crate::capture_choices::{
 use crate::card_glance;
 use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
-use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep, ShownLine};
+use crate::checklist_view::{
+    self, CardMenu, ChecklistAction, ChecklistShown, LineStep, RemovedAsk, ShownLine,
+};
 use crate::enrich::Enricher;
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
+use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
@@ -131,18 +140,21 @@ use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::keep_import::KeepSource;
 use crate::l10n::{self, L10n};
+use crate::leave_saves::{self, Leaving};
 use crate::line_editing::{Listed, TypedLines};
 use crate::login;
 use crate::media::{
-    Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
-    photo_extension, photo_from_file,
+    Clipboard, FromFile, Player, Recorder, SOUND_EXTENSIONS, from_file, photo_extension,
+    photo_from_file,
 };
 use crate::media_view::{
-    self, Generated, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer, Voice,
+    self, Generated, Made, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer, Voice,
 };
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
 use crate::note_history_view;
+use crate::note_window::{self, Alone, Shown};
+use crate::occurrence_answers::{self, Answer, Answers};
 use crate::pack_view::{self, PackAsk};
 use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
@@ -157,6 +169,7 @@ use crate::session_view::{self, PicksShown, SessionAction, SessionCardShown, Ses
 use crate::setting_badges::{
     BadgeValue, badge, badge_dialog, badge_row, badge_switch, menu_entry, switch_icon,
 };
+use crate::settings_search;
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
@@ -168,6 +181,7 @@ use crate::sync_view::{
 };
 use crate::table_grid::{self, GridLook, Grids};
 use crate::table_view::{self, Opening, TableView};
+use crate::tag_tree_view::{self, TagAsked};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
@@ -175,9 +189,23 @@ use crate::tally_view::{
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::text_menu::{self, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
+use crate::undo::Undo;
+use crate::vault_view::{self, VaultDone, VaultJob};
+use crate::window_sizes;
+use oldbrainfix_core::tag_tree::TagTree;
+
+/// What a place was left with (#278), for back and forward to show it
+/// so again, as a browser shows a page again: its search, its person
+/// filter and how far its list was scrolled.
+#[derive(Debug, Clone, Default)]
+struct Left {
+    query: String,
+    people: PersonFilter,
+    scroll: f32,
+}
 
 /// What the middle pane shows.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Selection {
     /// The Occurrences of today and the six days after, the Missed
     /// Summary and the Unsorted count.
@@ -208,7 +236,14 @@ pub enum Selection {
     /// The Area or Topic with this id; an Area lists its Notes without a
     /// Topic, and its search also finds its Topics' Notes.
     Place(String),
+    /// Every tag of the Notes by its levels (#267), reached by Tags below
+    /// the Areas.
+    Tags,
     Trash,
+    /// The Ask panel (#267, ADR 0051): questions about the Notes to the
+    /// provider the user entered, answered with links to the Notes they
+    /// came from; reached by AI ▸ Ask… (Ctrl+K).
+    Ask,
 }
 
 /// A dialog over the window that holds what was a view of its own
@@ -233,6 +268,9 @@ pub enum Page {
     People,
     /// The Backups and the recovery sheet; Sync ▸ Backups….
     Backups,
+    /// A Backup opened to take Notes back from it (#285): Open a
+    /// Backup… on the Backups dialog or in the File menu.
+    BackupNotes,
     /// The LAN sync this Device hosts while it shows, the Conflicts, the
     /// shared folder, the bundles and the paired Devices; Sync ▸ Sync now.
     Sync,
@@ -265,6 +303,12 @@ enum Clip {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DraggedNotes(pub Vec<String>);
 
+/// What an Area's row in the sidebar carries while it is dragged: the
+/// Area's id, for its new place in the person's own order (#280). A
+/// card's drop files, this one's moves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DraggedArea(String);
+
 /// A Note with the Area and Topic it is filed in, and the Profile of the
 /// other person who wrote it; none for the user's own.
 #[derive(Debug, Clone)]
@@ -296,13 +340,17 @@ struct Row {
     /// For a Routine spawned from a Checklist its Lines as checked for
     /// this Occurrence, and whether this Device may check them (#121).
     lines: Option<(Checklist, bool)>,
+    /// What its menu offers to answer it with (#269), as read.
+    answers: Answers,
 }
 
 /// A Shopping List's group on today's Agenda (#123, #186, #208): its
-/// heading, the list's title, and its open `lines` under it; or, as
-/// chosen for it, the heading alone saying how many are open,
-/// "Groceries: 3 open". With the Area its Note is filed in and whether
-/// this Device may check its Lines.
+/// heading, the list's title, and its open `lines` under it, then those
+/// checked today, by id in `struck`, which stay struck for the day
+/// unless this Device hides what is checked (#276); or, as chosen for
+/// it, the heading alone saying how many are open, "Groceries: 3 open".
+/// With the Area its Note is filed in and whether this Device may check
+/// its Lines.
 #[derive(Debug, Clone)]
 struct ShoppingRow {
     note_id: String,
@@ -310,12 +358,14 @@ struct ShoppingRow {
     /// What the heading says.
     text: String,
     lines: Vec<ShoppingLine>,
+    struck: HashSet<String>,
     checks: bool,
 }
 
 /// A Checklist's group on today's Agenda (#143, #208), shaped as a
 /// Shopping List's: its Note, Area, what its heading says and its open
-/// Lines under it; with no Lines the heading says how many are open,
+/// Lines under it, with those checked today unless this Device hides
+/// what is checked (#276); with no Lines the heading says how many are open,
 /// "Packing: 3 of 7 open". With whether this Device may check them.
 #[derive(Debug, Clone)]
 struct ChecklistRow {
@@ -329,12 +379,37 @@ struct ChecklistRow {
 /// The Lines a Checklist shows under its heading on the Agenda (#208): a
 /// Checklist Routine's Occurrence every Line, checked ones struck
 /// through, or only its open ones where this Device `hides_checked`
-/// (#217); a Checklist without a Routine its open ones. The one place
-/// that decides it.
-fn agenda_lines(list: &Checklist, hides_checked: bool) -> Vec<ShownLine> {
+/// (#217); a Checklist without a Routine its open ones, and those checked
+/// `today` struck for the day (#276), a Line with a group while a Line of
+/// it shows. The one place that decides it.
+fn agenda_lines(
+    list: &Checklist,
+    hides_checked: bool,
+    today: Option<(Day, &oldbrainfix_core::WallClock)>,
+) -> Vec<ShownLine> {
+    if list.on.is_some() && !hides_checked {
+        return checklist_view::shown_lines(list);
+    }
+    let mut shown: HashSet<&str> = list
+        .lines
+        .iter()
+        .filter(|line| {
+            !line.checked
+                || (!hides_checked && today.is_some_and(|(day, wall)| line.checked_on(day, wall)))
+        })
+        .map(|line| line.id.as_str())
+        .collect();
+    // A group's Line shows over the Lines of its group that show.
+    let parents: Vec<&str> = list
+        .lines
+        .iter()
+        .filter(|line| shown.contains(line.id.as_str()))
+        .filter_map(|line| line.parent.as_deref())
+        .collect();
+    shown.extend(parents);
     checklist_view::shown_lines(list)
         .into_iter()
-        .filter(|line| (list.on.is_some() && !hides_checked) || !line.checked)
+        .filter(|line| shown.contains(line.id.as_str()))
         .collect()
 }
 
@@ -342,6 +417,7 @@ fn agenda_lines(list: &Checklist, hides_checked: bool) -> Vec<ShownLine> {
 /// every pick or from every Line checked.
 fn shown_done(row: &Row) -> bool {
     row.row.done().is_some()
+        || row.row.skipped().is_some()
         || matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
         || row
             .lines
@@ -357,7 +433,8 @@ struct AgendaView {
     /// choose (#123).
     shopping: Vec<ShoppingRow>,
     /// Today's rows of the Checklists without a Routine that show on this
-    /// person's Agenda and have open Lines, oldest capture first (#143).
+    /// person's Agenda and have open Lines or Lines checked today, oldest
+    /// capture first (#143, #276).
     checklists: Vec<ChecklistRow>,
     tomorrow: Vec<Row>,
     /// The days after tomorrow, each with its rows.
@@ -414,6 +491,24 @@ enum PackDid {
     /// The Pack saved, from the export or, with `true`, from Send
     /// feedback.
     Saved(std::result::Result<(), String>, bool),
+    /// The Backup at the path opened to take Notes back from it (#285);
+    /// none when what was typed does not open it.
+    BackupOpened(
+        std::path::PathBuf,
+        oldbrainfix_core::Result<Option<backup::OpenedBackup>>,
+    ),
+    /// The Notes ticked on a Backup opened added (#285).
+    BackupAdded(oldbrainfix_core::Result<oldbrainfix_core::PackAdded>),
+}
+
+/// What a Pack's work off the window's thread is doing: opening a Pack,
+/// which the line under the menu bar says, saving one, which greys
+/// Save…, or reading a Backup opened (#285), which its page shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PackWork {
+    Opening,
+    Saving,
+    Backup,
 }
 
 /// The file at `path` as far as it may be a Pack (#165).
@@ -463,6 +558,12 @@ fn show_ticks_key(note: &str) -> String {
 #[derive(Debug, Clone, Default)]
 struct View {
     areas: Vec<(Area, Vec<Topic>)>,
+    /// The Areas whose Topics this Device keeps folded in the sidebar
+    /// (#279), by id.
+    folded: HashSet<String>,
+    /// How many Notes Unsorted holds, beside its name in the sidebar
+    /// (#279).
+    unsorted: usize,
     /// What this Device may do in each Area, and who shares the shared
     /// ones.
     access: std::collections::HashMap<String, AreaAccess>,
@@ -530,6 +631,23 @@ struct View {
     /// cards, a table full screen (#128): its to change, not in the
     /// trash, in a format known here.
     card_changes: HashSet<String>,
+    /// The Notes listed this Device may change ([`Store::may_change`]),
+    /// in the trash too: what a selection acts on (#273).
+    card_may: HashSet<String>,
+    /// The Notes listed or shown that are Hidden from AI, by their own
+    /// mark or another's (#267, ADR 0049), which a shield shows.
+    hidden_notes: BTreeSet<String>,
+    /// The Areas marked Hidden from AI, and those that may be marked, in
+    /// no Shared Area (#267).
+    hidden_areas: HashSet<String>,
+    hideable_areas: HashSet<String>,
+    /// The badge Hidden from AI of the Note shown, while offered: its
+    /// own mark and whether another, its Area's, hides it (#267).
+    note_hidden: Option<(bool, bool)>,
+    /// The tag tree while it shows, and the tags the search offers for
+    /// the "#…" typed into it (#267).
+    tag_tree: Vec<oldbrainfix_core::tag_tree::TagNode>,
+    tag_suggestions: Vec<String>,
     /// How the boxes of each Note's and Section's text listed or shown
     /// show (ADR 0035), by its id: their states, and with Show ticks on
     /// what each says after it.
@@ -648,6 +766,8 @@ struct View {
     ai_task: Option<String>,
     /// The AI Task's review, while it shows.
     ai_review: Option<ReviewShown>,
+    /// The provider the Ask panel asks, while it shows (#267).
+    ask_provider: Option<Provider>,
 }
 
 impl View {
@@ -661,6 +781,32 @@ impl View {
             .flat_map(|(_, topics)| topics)
             .find(|t| t.id == id)
     }
+
+    /// Where Move up, or else Move down, puts the Area `id` in the order
+    /// the sidebar shows (#280), counted after it was taken out: none for
+    /// the Area at that end, which stays, and for no Area.
+    fn area_step(&self, id: &str, up: bool) -> Option<usize> {
+        let at = self.areas.iter().position(|(a, _)| a.id == id)?;
+        if up {
+            at.checked_sub(1)
+        } else {
+            (at + 1 < self.areas.len()).then_some(at + 1)
+        }
+    }
+}
+
+/// Where an Area dragged from `from` in the sidebar goes when let go
+/// over the gap `slot` between its rows, 0 above the first and the
+/// number of Areas below the last (#280): its index once taken out,
+/// none in the gaps beside it, where it stays and nothing is written.
+fn area_dropped_at(from: usize, slot: usize) -> Option<usize> {
+    if slot == from || slot == from + 1 {
+        None
+    } else if slot > from {
+        Some(slot - 1)
+    } else {
+        Some(slot)
+    }
 }
 
 /// A notice that an update is needed, announced at the top once.
@@ -672,6 +818,14 @@ struct UpdateNotice {
     /// What needs the update, and the full text.
     cause: String,
     details: String,
+}
+
+/// What File into… files (#272): these Notes, or the Note being
+/// captured.
+#[derive(Debug, Clone, PartialEq)]
+enum Filing {
+    Notes(Vec<String>),
+    Capture,
 }
 
 /// A dialog over the window.
@@ -713,6 +867,15 @@ enum Dialog {
         path: String,
         app: String,
     },
+    /// The one question before an Attachment of a kind that could run a
+    /// program opens (#267): the Note, the file's hash, its name and the
+    /// person who added it, "" for the user's own or one not known.
+    RiskyFile {
+        note: String,
+        hash: String,
+        name: String,
+        by: String,
+    },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
         area: Option<String>,
@@ -729,34 +892,12 @@ enum Dialog {
         area: String,
     },
     Delete(Deleting),
-    /// Picking the Note to merge the selected one into, by id and text.
+    /// Picking the Note to merge `notes` into, by id and text: the
+    /// selected one, or the cards selected (#273).
     Merge {
+        notes: Vec<String>,
         query: String,
         others: Vec<(String, String)>,
-    },
-    /// Whether the selected Note goes to the trash with its Routines and
-    /// Reminders, as `question` names them; `linked` while it has any.
-    TrashNote {
-        question: String,
-        linked: bool,
-    },
-    /// Whether the edited Routine or Reminder goes to the trash.
-    DeleteRoutine {
-        question: String,
-    },
-    /// Whether the Frog `id` goes to the trash; its Note stays.
-    DeleteFrog {
-        id: String,
-    },
-    /// Whether the Tally's entry `id` goes; it can be restored.
-    DeleteEntry {
-        id: String,
-    },
-    /// Whether the Line `id` of a Checklist goes, or of a Shopping List
-    /// `for_good` (#122).
-    DeleteLine {
-        id: String,
-        for_good: bool,
     },
     /// Sharing the Area `area`: the role the other person gets, and the
     /// People it can go to from afar (#108).
@@ -790,12 +931,12 @@ enum Dialog {
         area: String,
     },
     /// Sending the Note `note`: to one of `recipients`, encrypted, or to
-    /// anyone (`None`), signed only. One sent before (`update`) goes as
-    /// an update, or as its cancellation with `cancel`.
+    /// anyone, signed only. One sent before (`update`) goes as an update,
+    /// or as its cancellation with `cancel`.
     Send {
         note: String,
         recipients: Vec<Recipient>,
-        picked: Option<usize>,
+        picked: SendTo,
         update: bool,
         cancel: bool,
     },
@@ -828,11 +969,6 @@ enum Dialog {
         claim: bool,
         worked: pack_view::Worked,
     },
-    /// Whether the "From `name`" badge of the Note `note` goes (#165).
-    RemovePackFrom {
-        note: String,
-        name: String,
-    },
     /// A stranger's Sent Item held until "Show" (#91): only who it is
     /// from, and, while "Decline and block" asks, the Shared Areas
     /// blocking them leaves.
@@ -850,19 +986,22 @@ enum Dialog {
         person: String,
         question: String,
     },
-    /// Whether the photo (`photo`) or voice recording `hash` of the Note
+    /// What is Hidden from AI in the way of giving something to other
+    /// people (#267, ADR 0049): the marks, named; with `area_first` one
+    /// is of an Area not given itself, whose mark comes off in its own
+    /// menu only; and what to do again once they are off.
+    HiddenFromAi {
+        marks: Vec<String>,
+        names: String,
+        area_first: bool,
+        retry: Box<Action>,
+    },
+    /// Whether the photo, voice recording or file `hash` of the Note
     /// `note` goes while its text stays (ADR 0020).
     RemoveMedia {
         note: String,
         hash: String,
-        photo: bool,
-    },
-    /// Whether the Photo Text (`photo`) or Transcript of `hash` of the
-    /// Note `note` goes while its file stays (ADR 0025).
-    RemoveText {
-        note: String,
-        hash: String,
-        photo: bool,
+        made: Made,
     },
     /// Whether the captured `detail` of the Note or Section `id` goes
     /// while the capture time stays (ADR 0037).
@@ -898,10 +1037,15 @@ enum Dialog {
     /// Google Keep export, each with what it does, or that it reads
     /// while it runs.
     Import,
+    /// File ▸ Export as vault… (#267): what it writes and how far it is;
+    /// closing it leaves the vault being written, announced when done.
+    Vault,
     /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Notes
-    /// `notes` go into, the selected ones together (#148).
+    /// go into, the selected ones together (#148), or the Note being
+    /// captured, picked with a filter (#272).
     FileInto {
-        notes: Vec<String>,
+        into: Filing,
+        picker: Box<FileIntoPicker>,
     },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
@@ -923,6 +1067,9 @@ enum Dialog {
     },
     /// Whether every change of the AI Task is rejected (#112).
     RejectAi,
+    /// "Discard changes?" on leaving an edit dialog whose change can't be
+    /// saved (#275).
+    Discard(Leave),
     /// The name of a new Checklist, Shopping List or Frog made from "+"
     /// (#161).
     NewKind {
@@ -956,6 +1103,8 @@ enum NoteBadge {
     /// The reappear time of the Shopping List's Line in `reappear_line`
     /// (#195).
     Reappear,
+    /// Hidden from AI (#267).
+    HiddenFromAi,
 }
 
 /// The dialogs back closes, or leads back from, on top of the others
@@ -976,10 +1125,41 @@ impl TopDialog {
         match self {
             TopDialog::Note => Action::CloseNote,
             TopDialog::QuickNote => Action::CloseQuickNote,
-            TopDialog::Editor => Action::Editor(Intent::Close),
-            TopDialog::TallyForm => Action::TallyForm(FormIntent::Close),
-            TopDialog::TallyPage => Action::TallyPage(PageIntent::Close),
+            TopDialog::Editor => Action::Leave(Leave::Editor),
+            TopDialog::TallyForm => Action::Leave(Leave::TallyForm),
+            TopDialog::TallyPage => Action::Leave(Leave::TallyPage),
             TopDialog::Page => Action::PageBack,
+        }
+    }
+}
+
+/// The edit dialogs that save on leaving (#275, UI laws, "Navigation"):
+/// Esc, a click beside them, Alt+Left and the mouse's back button.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Leave {
+    /// The Routine or Reminder editor, and the Session pages it draws.
+    Editor,
+    /// The entry page; the field page closes as Cancel does.
+    TallyForm,
+    TallyPage,
+}
+
+impl Leave {
+    /// What its Save asks.
+    fn save(self) -> Action {
+        match self {
+            Leave::Editor => Action::Editor(Intent::Save),
+            Leave::TallyForm => Action::TallyForm(FormIntent::Save),
+            Leave::TallyPage => Action::TallyPage(PageIntent::Save),
+        }
+    }
+
+    /// What closing it without saving asks.
+    fn close(self) -> Action {
+        match self {
+            Leave::Editor => Action::Editor(Intent::Close),
+            Leave::TallyForm => Action::TallyForm(FormIntent::Close),
+            Leave::TallyPage => Action::TallyPage(PageIntent::Close),
         }
     }
 }
@@ -1016,6 +1196,32 @@ enum ChangesSent {
     Paused,
     /// Not saved: whose, and the full text of why.
     Failed(String),
+}
+
+/// Whom the send dialog sends a Note to: nobody picked yet, so Send
+/// waits (#288), anyone, signed only, or the person at this index of
+/// its recipients, encrypted to them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SendTo {
+    Nobody,
+    Anyone,
+    Person(usize),
+}
+
+impl SendTo {
+    /// Where the dialog starts: with nobody listed only anyone is left;
+    /// an update starts at the person this Device last sent the Note to
+    /// (`sent_to`, a [`Recipient::id`]) while they are listed, else at
+    /// nobody, so a private Note never goes to whoever is listed first.
+    fn first(recipients: &[Recipient], sent_to: Option<&str>) -> Self {
+        if recipients.is_empty() {
+            return Self::Anyone;
+        }
+        recipients
+            .iter()
+            .position(|r| Some(r.id.as_str()) == sent_to)
+            .map_or(Self::Nobody, Self::Person)
+    }
 }
 
 /// A person in People an Area can go to from afar (#108): with a Device
@@ -1078,6 +1284,12 @@ enum Action {
     CloseQuickNote,
     /// Closes the Note dialog, keeping what was typed (#146).
     CloseNote,
+    /// Opens the Note in a window of its own beside the main window, or
+    /// brings its window forward where it has one (#287).
+    OpenWindow(String),
+    /// Keeps the Note window on top of the other windows, or no more
+    /// (#287).
+    KeepOnTop(bool),
     /// Opens the small editor of a badge of the Note dialog, or closes
     /// it (#160).
     Badge(Option<NoteBadge>),
@@ -1089,6 +1301,13 @@ enum Action {
     CreateNamed,
     /// Something asked of the New Tally page (#161).
     TallyPage(PageIntent),
+    /// Leaves an edit dialog (#275): unchanged it closes, a change that
+    /// can be saved is saved, one that can't asks "Discard changes?".
+    Leave(Leave),
+    /// Discard: the dialog closes without saving.
+    Discard(Leave),
+    /// Keep editing: the dialog stays and says what to fix.
+    KeepEditing(Leave),
     /// File ▸ Quick note: the capture popup, as the hotkey opens it.
     QuickNote,
     /// File ▸ Quit: the app ends, also where the tray would keep it.
@@ -1098,6 +1317,9 @@ enum Action {
     Find,
     /// Edit ▸ Cut, Copy or Paste, on the field the cursor was in.
     Clip(Clip),
+    /// Edit ▸ Undo, and Ctrl+Z outside a text field (#268): takes back
+    /// the last delete, check-off, filing or Merge.
+    Undo,
     /// Help ▸ User guide: the guide's desktop page in the browser.
     OpenGuide,
     /// Sync ▸ Sync now: the Sync dialog, and the shared folder synced at
@@ -1106,21 +1328,61 @@ enum Action {
     /// Asks where the Notes with these ids are filed (Note ▸ File into…,
     /// Ctrl+M, a card's right-click), together (#148).
     AskFileInto(Vec<String>),
+    /// The Settings' Record keys: starts recording the hotkey, or with
+    /// `false` stops it (#283).
+    RecordHotkey(bool),
+    /// File into…'s answer (#272): the place picked, or the new one to
+    /// make and file into.
+    FileIntoPicked(Picked),
+    /// From naming a new place in File into… back to its list.
+    FileIntoBack,
     /// A click on a card (#148): as its [`Pick`] says, it selects this
     /// card alone, adds or takes it away, or selects the run up to it.
     PickCard(String, Pick),
     /// Esc over the list: no card selected.
     ClearCards,
+    /// Down (`down`) or Up over the list (#274): the next card selected
+    /// alone, or with Shift (`on`) the selection run on to it; it scrolls
+    /// into view.
+    StepCards {
+        down: bool,
+        on: bool,
+    },
+    /// Ctrl+A over the list (#274): every card shown selected.
+    SelectAllCards,
     /// File ▸ Import…: asks which Import.
     AskImport,
+    /// File ▸ Export as vault… (#267): asks for the folder, then writes
+    /// the vault off the window's thread.
+    ExportVault,
     /// Opens the Note in the Note dialog (#146): a double-click on its
     /// card or Edit (#114).
     SelectNote(String),
+    /// Opens the Checklist or Shopping List of this Note in the Note
+    /// dialog with the keyboard in a new empty Line after its open ones,
+    /// as a click on its group's heading on the Agenda does (#276).
+    StartLine(String),
     /// Switches the card of this Note to its other view, in place, and
     /// keeps that on this Device until the list's switch changes (#189).
     SwitchView(String),
     /// Keeps a fold of a card open, by its setting, or forgets it (#189).
     Fold(String, bool),
+    /// Opens the Settings at the AI port's card: AI ▸ AI port… (#279).
+    OpenAiPort,
+    /// Shows the Ask panel in the list, the cursor in its question field:
+    /// AI ▸ Ask… and Ctrl+K (#267).
+    OpenAsk,
+    /// What was asked of the Ask panel (#267).
+    Ask(AskAsked),
+    /// Keeps a change of the Ask panel's provider on this Device (#267).
+    AskSetting(AskSetting),
+    /// Folds the Topics of this Area in the sidebar, or unfolds them, and
+    /// keeps that on this Device (#279).
+    FoldArea(String, bool),
+    /// Puts this Area at that index of the person's own order of the
+    /// Areas, counted after it was taken out, on all of their Devices
+    /// (#280).
+    MoveArea(String, usize),
     /// Switches every card of the list shown to the compact view or the
     /// detailed one and keeps the choice for that list on this Device
     /// (#114, #189).
@@ -1155,13 +1417,32 @@ enum Action {
     /// Plays recordings at this speed from now on, the one playing
     /// included, and keeps it on this Device.
     Speed(f64),
-    /// Asks the system's dialog for pictures and sound files and holds
-    /// them on the capture field.
+    /// Asks the system's dialog for files of any kind and holds them on
+    /// the capture field.
     PickFiles,
+    /// "Attach a file…" (#267): asks the system's dialog for files and
+    /// does with them what a drop does.
+    AttachFiles,
     /// Holds these files, by name and content, on the capture field for
     /// one Note with what is typed: the pictures as photos, the sound
-    /// files as voice recordings; anything else is left alone.
+    /// files as voice recordings, any other file as an Attachment
+    /// (#267); with the Note dialog open, they go onto its Note.
     Files(Vec<(String, Vec<u8>)>),
+    /// Opens the Attachment with this hash of the Note with this id with
+    /// the system's program for it (#267).
+    OpenAttachment(String, String),
+    /// Opens it as [`Action::OpenAttachment`] does, once its question was
+    /// answered "Open anyway" (#267).
+    OpenAttachmentAnyway(String, String),
+    /// Marks the Note or Area with this id Hidden from AI (`true`), where
+    /// it may be marked, or takes the mark off (#267, ADR 0049).
+    HideFromAi(String, bool),
+    /// "Show to the AI" in the question Hidden from AI asks: takes the
+    /// marks it named off and does again what they were in the way of.
+    ShowToAi,
+    /// Merges the Notes into the Note with this id as Merge into… does
+    /// once one is picked: again, after the question Hidden from AI.
+    MergeAgain(Vec<String>, String),
     /// Shows why the recordings announced could not be transcribed.
     ShowUntranscribable,
     /// The search over the Notes shown changed.
@@ -1213,8 +1494,19 @@ enum Action {
         notes: Vec<String>,
         place: String,
     },
+    /// Moves the selected Note to the trash with its Routines and
+    /// Reminders, without asking (#262, #268).
     Trash,
     Restore,
+    /// The cards selected, or the one right-clicked (#273): into the
+    /// trash together, with one undo.
+    TrashNotes(Vec<String>),
+    /// Back from the trash together (#273).
+    RestoreNotes(Vec<String>),
+    /// This Importance for each of them (#273).
+    ImportanceOf(Vec<String>, Importance),
+    /// Asks which Note they are merged into, together (#273).
+    AskMergeNotes(Vec<String>),
     /// Merges the selected Note into this one.
     Merge(String),
     NewArea,
@@ -1241,9 +1533,15 @@ enum Action {
     /// checks off the Occurrence of the open Note's one Reminder, moves
     /// the Note with it to the trash and closes the dialog.
     DoneAndTrash(String, Occurrence),
+    /// Snooze or Not today on the Occurrence of the Routine (#269), from
+    /// the Agenda row's menu or the Note dialog's Due line.
+    Answer(String, Occurrence, Answer),
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
+    /// A click on the notification of an Occurrence of this Routine
+    /// (#270): its Note opens in the Note dialog, while it is there.
+    OpenNotified(String),
     /// Saves one calendar file of every Routine and Reminder, in the
     /// order their page lists them (#115).
     ExportRoutines,
@@ -1277,17 +1575,11 @@ enum Action {
     /// ticked.
     SessionPoolTally,
     Editor(Intent),
-    /// Deletes the edited Routine, asked.
-    DeleteRoutine,
-    /// Deletes the selected Note with its Routines and Reminders, asked.
-    TrashNote,
     RestoreRoutine(String),
     /// Something asked of a Frog or the Frog view (#101).
     Frog(FrogAction),
     /// Spawns a Frog from the Note with this id.
     SpawnFrog(String),
-    /// Moves the Frog the dialog asks about to the trash.
-    DeleteFrog,
     RestoreFrog(String),
     /// Something asked of the Tally setup in the Note dialog (#103,
     /// #190).
@@ -1297,8 +1589,6 @@ enum Action {
     CardTally(String, TallyAction),
     /// Something asked of the field page or the entry page.
     TallyForm(FormIntent),
-    /// Removes the entry the dialog asks about.
-    DeleteEntry,
     /// Something asked of a Checklist, on a card or in the editor (#120).
     Checklist(ChecklistAction),
     /// Something asked of a Shopping List, on a card or in the editor
@@ -1330,8 +1620,6 @@ enum Action {
     /// Stores what was typed into the Lines of the Note shown and drops
     /// those left empty, as the editor is left (#141).
     LeaveLines,
-    /// Deletes the Line the dialog asks about.
-    DeleteLine,
     Setting(Setting),
     /// Asks the system's dialog for the sound file Occurrences ring with.
     PickAlarmSound,
@@ -1358,9 +1646,8 @@ enum Action {
     Feedback(FeedbackAsk),
     /// File ▸ Open Pack…: asks for the file and opens it (#165).
     OpenPack,
-    /// Asks whether the "From …" badge of the Note goes (#165).
-    AskRemovePackFrom(String),
-    /// Removes the "From …" badge of the Note (#165).
+    /// Removes the "From …" badge of the Note (#165), without asking
+    /// (#268).
     RemovePackFrom(String),
     /// Saves the Note of the send dialog as a Sent Item.
     SendNote,
@@ -1427,7 +1714,7 @@ enum Action {
     AskRemoveMedia {
         note: String,
         hash: String,
-        photo: bool,
+        made: Made,
     },
     /// Removes the photo or recording asked about and keeps its text.
     RemoveMedia,
@@ -1445,28 +1732,26 @@ enum Action {
     TakeOver {
         note: String,
         hash: String,
-        photo: bool,
+        made: Made,
         append: bool,
     },
-    /// Asks whether the Photo Text (`photo`) or Transcript of `hash` of
-    /// the Note `note` goes while its file stays.
-    AskRemoveText {
+    /// Removes the Photo Text (`photo`) or Transcript of `hash` of the
+    /// Note `note` while its file stays, without asking (#268).
+    RemoveText {
         note: String,
         hash: String,
-        photo: bool,
+        made: Made,
     },
-    /// Removes the Photo Text or Transcript asked about.
-    RemoveText,
     /// Reads the photo (`photo`) or transcribes the recording `hash` of
     /// the Note `note` again.
     Again {
         note: String,
         hash: String,
-        photo: bool,
+        made: Made,
     },
     /// Shows why reading a photo (`true`) or transcribing a recording
     /// again brought no text.
-    ShowAgainFailed(bool),
+    ShowAgainFailed(Made),
     /// Shows the dialog behind the notice at the top.
     ShowNoticeDialog,
     /// Shows what went wrong, announced at the top.
@@ -1475,6 +1760,8 @@ enum Action {
     ShowUpdate,
     /// Something asked of the Backups dialog.
     Backup(BackupAction),
+    /// Something asked on the page of a Backup opened (#285).
+    BackupNotes(BackupNotesAction),
     /// Something asked of the own Profile in the Profile dialog.
     Profile(ProfileAction),
     /// Opens another person's Profile (#52).
@@ -1564,8 +1851,22 @@ pub struct App {
     /// The table shown full screen over the window, while one is (#128).
     table: Option<TableView>,
     /// Where back and forward lead through the places the list showed
-    /// (#145).
-    nav: Navigation<Selection>,
+    /// (#145), each as it was left (#278).
+    nav: Navigation<Selection, Left>,
+    /// How far the list of the place shown is scrolled, as it was drawn
+    /// last, for back and forward to bring again (#278).
+    list_offset: f32,
+    /// How far the list of the place just reached is to be scrolled,
+    /// until it is drawn (#278).
+    scroll_restore: Option<f32>,
+    /// The sidebar's width as kept on this computer (#278), and as it
+    /// was drawn last.
+    sidebar_kept: f32,
+    sidebar_shown: f32,
+    /// The Note dialog's size as kept on this computer (#278), none for
+    /// the first start's, and as it was drawn last.
+    note_kept: Option<egui::Vec2>,
+    note_shown: Option<egui::Vec2>,
     /// The dialogs holding what were views of their own, the one shown
     /// last; back leads through the others (#145).
     pages: Vec<Page>,
@@ -1577,6 +1878,12 @@ pub struct App {
     /// quick note's field or the search, until it has it.
     capture_focus: bool,
     search_focus: bool,
+    /// The tags of the tag tree whose levels below show (#267), by
+    /// [`tag_tree_view::key`]: a view only, kept while the app runs.
+    tags_unfolded: HashSet<String>,
+    /// The card Up or Down selected (#274), until the list scrolled it
+    /// into view.
+    scroll_card: Option<String>,
     /// File ▸ Quit and File ▸ Quick note, for the native window to do.
     quit_wanted: bool,
     quick_note_wanted: bool,
@@ -1643,11 +1950,15 @@ pub struct App {
     badge: Option<NoteBadge>,
     /// The Shopping List Line whose reappear time dialog is open (#195).
     reappear_line: Option<String>,
+    /// What Ctrl+Z and Edit ▸ Undo take back: the last delete, check-off,
+    /// filing or Merge (#268).
+    undo: Option<Undo>,
     /// The Note whose text took a paste that looks like code, while
     /// "Keep as code" waits under it (#213).
     code_offer: Option<String>,
     /// Whether the Lines of the Note opened next are to be typed in at
-    /// once: a Checklist or Shopping List just made (#161).
+    /// once: a Checklist or Shopping List just made (#161), or opened from
+    /// its group's heading on the Agenda (#276).
     start_lines: bool,
     /// Whose entries each Tally shows, by its Note, once picked (#190);
     /// the default until then.
@@ -1657,6 +1968,9 @@ pub struct App {
     /// last opened offers (#120).
     lines: TypedLines,
     card_menu: Option<CardMenu>,
+    /// What the same menu offers of Routines, Reminders, Frogs and
+    /// Sessions (#281).
+    card_spawns: Option<CardSpawns>,
     /// The region the system reports, an ISO country code, which picks
     /// the units Tallies show unless this Device chose them.
     region: Option<String>,
@@ -1677,6 +1991,8 @@ pub struct App {
     hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>,
     /// The hotkey as typed in the Settings.
     hotkey_text: String,
+    /// Whether the Settings record the hotkey from the keys pressed.
+    hotkey_recording: HotkeyRecording,
     /// The microphone, the speakers and the clipboard, where there are.
     recorder: Option<Box<dyn Recorder>>,
     player: Option<Box<dyn Player>>,
@@ -1690,6 +2006,10 @@ pub struct App {
     /// The pictures pasted, chosen or dropped, held on the capture field
     /// until its Note is saved.
     held_photos: Vec<Vec<u8>>,
+    /// The files chosen or dropped that are no picture nor sound file,
+    /// held on the capture field as its Note's Attachments until it is
+    /// saved (#267).
+    held_files: Vec<HeldFile>,
     /// Why recordings held from files cannot be transcribed here, said
     /// once their Note is saved.
     held_problems: Vec<(oldbrainfix_whisper::Problem, String)>,
@@ -1702,6 +2022,8 @@ pub struct App {
     /// The background threads making Transcripts and Photo Texts.
     transcriber: Option<Enricher>,
     reader: Option<Enricher>,
+    /// The background thread reading the Attachment Texts (#267).
+    files_reader: Option<Enricher>,
     /// The speech model the Transcripts need, and whether one was in use
     /// when last looked at.
     speech: Option<SpeechModel>,
@@ -1735,14 +2057,17 @@ pub struct App {
     /// it, the window reads it itself.
     agenda_reads: Option<AgendaReads>,
     /// The Pack work running on threads of their own, on connections
-    /// the Agenda's opener hands them, with whether each opens a Pack.
-    pack_work: Vec<(std::sync::mpsc::Receiver<PackDone>, bool)>,
+    /// the Agenda's opener hands them, with what each does.
+    pack_work: Vec<(std::sync::mpsc::Receiver<PackDone>, PackWork)>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
     /// Raised by a click on the Changes Nudge: the bundles of the people
     /// waiting are to be saved (#109).
     changes_wanted: Option<Arc<AtomicBool>>,
+    /// Holds the Routine whose Occurrence's notification was clicked:
+    /// its Note is to open (#270).
+    occurrence_wanted: Option<OccurrenceWanted>,
     /// Ask the system's dialogs where to save a bundle and which one to
     /// import.
     bundle_saver: FileSaver,
@@ -1753,6 +2078,11 @@ pub struct App {
     /// Asks the system's dialog for the zip of a Google Takeout export.
     import_zip_picker: FolderPicker,
     import: FolderImport,
+    /// Asks the system's dialog for the folder a vault goes into, or is
+    /// rebuilt from (#267).
+    vault_picker: FolderPicker,
+    /// The vault being written or rebuilt off the window's thread.
+    vault: VaultJob,
     /// Asks where to save a Sent Item.
     item_saver: FileSaver,
     /// Asks where to save the own Profile card file (#144).
@@ -1789,6 +2119,11 @@ pub struct App {
     /// scrolled to for the frames it is kept, while the dialog finds its
     /// size.
     settings_section: Option<(String, u8)>,
+    /// What is typed into the search at the top of the Settings (#282),
+    /// kept into About or Send feedback and back, gone when they close.
+    settings_query: String,
+    /// Ctrl+F over the Settings: the cursor goes into their search.
+    settings_find: bool,
     /// Syncs that need an update of the app here or on another Device,
     /// and settings a newer version saved that were kept (ADR 0034), each
     /// announced once, which Device behind the click (ADR 0019).
@@ -1812,7 +2147,7 @@ pub struct App {
     untranscribable: Vec<(oldbrainfix_whisper::Problem, String)>,
     /// Whether reading a photo (`true`) or transcribing a recording again
     /// last brought no text, announced at the top until clicked.
-    again_failed: Option<bool>,
+    again_failed: Option<Made>,
     /// The dialog a person's Profile opened over, shown again after it.
     dialog_behind: Option<Dialog>,
     /// "Which one is you?" was put off until the Profile dialog asks again.
@@ -1826,6 +2161,12 @@ pub struct App {
     /// Ask where to save the Recovery Sheet and which Backup to restore.
     sheet_saver: FileSaver,
     backup_opener: FolderPicker,
+    /// Asks which Backup to take Notes back from, starting in the
+    /// Backups folder (#285).
+    backup_notes_opener: FilePickerIn,
+    /// The Backup opened to take Notes back from it, while its page is
+    /// among the dialogs (#285).
+    backup_notes: Option<BackupNotes>,
     /// Makes the own Profile from this computer's login, or fills in the
     /// defaults of one there (ADR 0017).
     profile_defaults: ProfileDefaults,
@@ -1835,13 +2176,82 @@ pub struct App {
     /// The AI port while it is open (#112, ADR 0026): closed by "Done,
     /// review" or when the window goes.
     ai_port: Option<AiPort>,
+    /// Wakes the window from another thread, so what arrives there is
+    /// answered without the window polling for it (#292).
+    redraw: Option<Wake>,
+    /// Whether the window is on screen: false while hidden into the tray,
+    /// when nothing it draws is seen and no animation needs frames (#292).
+    shown: bool,
     /// The client whose config was copied last while the port is open.
     ai_copied: Option<Client>,
+    /// The Ask panel's questions and answers while it shows (#267).
+    ask: AskPanel,
+    /// The question asked off the window's thread, its tools answered
+    /// on it.
+    ask_run: Option<AskRun>,
+    /// What the Ask panel's requests go through: the network, or a fake
+    /// provider in the tests.
+    ask_transport: Arc<dyn ask::Transport>,
+    /// The provider's card as typed, read from the store when the Settings
+    /// first show it.
+    ask_fields: Option<AskFields>,
     /// Asks the system's dialog for an alarm sound file, titled as given.
     sound_picker: FolderPicker,
     /// The alarm sound file last looked at and whether it rings or the
     /// own chime rings in its place, decoded once per file chosen.
     sound_rung: Option<(String, Rung)>,
+    /// The Notes open in windows of their own beside this one (#287),
+    /// each shown by an App of its own drawn as a viewport of this
+    /// window's.
+    note_windows: Vec<NoteWindow>,
+    /// What this App holds of being such a window, while it is one.
+    alone: Option<Alone>,
+    /// Bumped by the window and its Note windows as each reads the log
+    /// anew or did something, shared by them: the others read it again
+    /// (#287). What it was as this App read it last.
+    writes: Arc<AtomicU64>,
+    seen_writes: u64,
+    /// Whether a window can be kept on top here: not on Wayland (#287).
+    pin_works: bool,
+    /// How many Note windows were opened, each having its own viewport
+    /// and its own ids for the fields of its Lines (#287); where those
+    /// ids start here.
+    windows_opened: u64,
+    lines_base: u64,
+    /// What a Note window was asked that the main window does (#287):
+    /// showing a place or a dialog, opening another Note.
+    for_main: Vec<Action>,
+}
+
+/// A question asked off the window's thread (#267): the provider's
+/// requests run there, the tools the model calls cross to the window,
+/// which answers them on its own thread as the AI port's are.
+struct AskRun {
+    question: String,
+    arrives: std::sync::mpsc::Receiver<AskArrived>,
+    outputs: Sender<Vec<ToolOutput>>,
+    /// The AI Task waiting before it was asked.
+    before: Option<String>,
+    /// The AI Task its changes go into.
+    task: Option<String>,
+}
+
+/// What comes from the thread asking.
+enum AskArrived {
+    Tools(Vec<ToolCall>),
+    Done(Result<ask::Answer, ask::AskError>),
+}
+
+/// A Note in a window of its own (#287): the App showing it and its
+/// viewport, and whether it is to come forward.
+struct NoteWindow {
+    app: Box<App>,
+    viewport: egui::ViewportId,
+    size: egui::Vec2,
+    forward: bool,
+    /// Opened this frame: drawn from the next, once the dialog it may
+    /// have shown in is gone.
+    fresh: bool,
 }
 
 /// Makes or fills in the own Profile in a store with this computer's
@@ -1850,6 +2260,10 @@ pub type ProfileDefaults = Box<dyn Fn(&Store) -> oldbrainfix_core::Result<Profil
 
 /// Asks for a folder, or a file to open, with the dialog's title.
 pub type FolderPicker = Box<dyn Fn(&str) -> Option<std::path::PathBuf>>;
+
+/// Asks for a file to open, with the dialog's title and the folder it
+/// starts in.
+pub type FilePickerIn = Box<dyn Fn(&str, Option<&std::path::Path>) -> Option<std::path::PathBuf>>;
 
 /// Asks for files to open, with the dialog's title; none when cancelled.
 pub type FilesPicker = Box<dyn Fn(&str) -> Vec<std::path::PathBuf>>;
@@ -1956,16 +2370,11 @@ fn picture_dialog(title: &str) -> rfd::FileDialog {
         .add_filter(title, &["jpg", "jpeg", "png", "webp"])
 }
 
-/// The open dialog's filter for "From file…": pictures and sound files.
+/// The open dialog of "From file…" and "Attach a file…".
 fn files_dialog(title: &str) -> rfd::FileDialog {
-    let both: Vec<&str> = PICTURE_EXTENSIONS
-        .iter()
-        .chain(SOUND_EXTENSIONS.iter())
-        .copied()
-        .collect();
-    rfd::FileDialog::new()
-        .set_title(title)
-        .add_filter(title, &both)
+    // Any file: a picture becomes a photo, a sound file a recording, any
+    // other an Attachment (#267).
+    rfd::FileDialog::new().set_title(title)
 }
 
 /// The open dialog's filter for an alarm sound.
@@ -2046,12 +2455,26 @@ impl App {
     /// The window over `store`, speaking `locale`, showing the Agenda on
     /// the system's local time.
     pub fn new(store: impl Into<Arc<Store>>, locale: &str) -> App {
-        let store = store.into();
+        let mut app = App::bare(store.into(), locale);
+        app.refresh();
+        // An AI Task left when the window went waits for its review.
+        match app.review_ai() {
+            Ok(()) => app.refresh(),
+            Err(e) => app.error = Some(e.to_string()),
+        }
+        app
+    }
+
+    /// The App over `store` before it read anything.
+    fn bare(store: Arc<Store>, locale: &str) -> App {
         let read_at = store.now();
         // Normal speed when it cannot be read.
         let speed = DeviceSettings::new(&store).playback_speed().unwrap_or(1.0);
         // The system's when it cannot be read.
         let theme = DeviceSettings::new(&store).theme().unwrap_or_default();
+        // As they were left on this computer (#278).
+        let sidebar = window_sizes::sidebar_width(&store).unwrap_or(window_sizes::DEFAULT_SIDEBAR);
+        let note_kept = window_sizes::note_dialog_size(&store);
         let mut app = App {
             store,
             wall: Arc::new(local_wall),
@@ -2065,11 +2488,19 @@ impl App {
             viewer: None,
             table: None,
             nav: Navigation::default(),
+            list_offset: 0.0,
+            scroll_restore: None,
+            sidebar_kept: sidebar,
+            sidebar_shown: sidebar,
+            note_kept,
+            note_shown: None,
             pages: Vec::new(),
             last_field: None,
             clip: None,
             capture_focus: false,
             search_focus: false,
+            tags_unfolded: HashSet::new(),
+            scroll_card: None,
             quit_wanted: false,
             quick_note_wanted: false,
             theme,
@@ -2101,11 +2532,13 @@ impl App {
             quick_open: false,
             badge: None,
             reappear_line: None,
+            undo: None,
             code_offer: None,
             start_lines: false,
             tally_whose: HashMap::new(),
             lines: TypedLines::default(),
             card_menu: None,
+            card_spawns: None,
             region: region_of(sys_locale::get_locale().as_deref()),
             changes: None,
             seen_changes: 0,
@@ -2116,18 +2549,21 @@ impl App {
             all_day_text: String::new(),
             hotkey: None,
             hotkey_text: String::new(),
+            hotkey_recording: HotkeyRecording::default(),
             recorder: None,
             player: None,
             playing: None,
             speed,
             recorded: Vec::new(),
             held_photos: Vec::new(),
+            held_files: Vec::new(),
             held_problems: Vec::new(),
             clipboard: None,
             paste_empty: false,
             paste_held: false,
             transcriber: None,
             reader: None,
+            files_reader: None,
             speech: None,
             speech_ready: false,
             model_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_file()),
@@ -2145,6 +2581,7 @@ impl App {
             pack_work: Vec::new(),
             unsorted_wanted: None,
             changes_wanted: None,
+            occurrence_wanted: None,
             bundle_saver: Box::new(|title, name| {
                 bundle_dialog(title).set_file_name(name).save_file()
             }),
@@ -2152,6 +2589,8 @@ impl App {
             import_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             import_zip_picker: Box::new(|title| zip_dialog(title).pick_file()),
             import: FolderImport::default(),
+            vault_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
+            vault: VaultJob::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
             pack_saver: Box::new(|title, name| pack_dialog(title).set_file_name(name).save_file()),
@@ -2187,6 +2626,8 @@ impl App {
             notice: None,
             notice_dialog: None,
             settings_section: None,
+            settings_query: String::new(),
+            settings_find: false,
             updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
             card_form: CardForm::default(),
@@ -2205,23 +2646,136 @@ impl App {
                 sheet_dialog(title).set_file_name(name).save_file()
             }),
             backup_opener: Box::new(|title| backup_dialog(title).pick_file()),
+            backup_notes_opener: Box::new(|title, folder| {
+                let dialog = backup_dialog(title);
+                match folder {
+                    Some(folder) => dialog.set_directory(folder),
+                    None => dialog,
+                }
+                .pick_file()
+            }),
+            backup_notes: None,
             profile_defaults: Box::new(login::apply_system_defaults),
             help_version: None,
             ai_port: None,
+            ask: AskPanel::default(),
+            ask_run: None,
+            ask_transport: Arc::new(ask::Web::new()),
+            ask_fields: None,
+            redraw: None,
+            shown: true,
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
             sound_rung: None,
+            note_windows: Vec::new(),
+            alone: None,
+            writes: Arc::new(AtomicU64::new(0)),
+            seen_writes: 0,
+            pin_works: note_window::pin_works_here(),
+            windows_opened: 0,
+            lines_base: 0,
+            for_main: Vec::new(),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
-        app.refresh();
-        // An AI Task left when the window went waits for its review.
-        match app.review_ai() {
-            Ok(()) => app.refresh(),
-            Err(e) => app.error = Some(e.to_string()),
-        }
         app
+    }
+
+    /// The App of a window of its own showing only the Note `note`
+    /// (#287), speaking `locale`, as the main window opens one; whether it
+    /// can be kept on top of the others in `pin_works`. Its frames are
+    /// drawn by [`App::show_note_window`].
+    pub fn for_note_window(store: Arc<Store>, locale: &str, note: &str, pin_works: bool) -> App {
+        let mut app = App::alone_app(store, L10n::new(locale), note, (pin_works, 1));
+        app.refresh();
+        app
+    }
+
+    /// Opens the Note `id` in a window of its own (#287), as the Note
+    /// dialog's button and the card's menu do.
+    pub fn open_in_window(&mut self, id: &str) {
+        self.apply(Action::OpenWindow(id.to_string()));
+    }
+
+    /// The log, shared with the windows of the Notes (#287).
+    pub fn shared_store(&self) -> Arc<Store> {
+        self.store.clone()
+    }
+
+    /// As [`App::for_note_window`], the `serial`th window opened, before
+    /// it read anything: the ids of the fields of its Lines start apart
+    /// from every other window's.
+    fn alone_app(store: Arc<Store>, t: L10n, note: &str, (pin_works, serial): (bool, u64)) -> App {
+        let mut app = App::bare(store, "en");
+        app.t = t;
+        app.alone = Some(Alone::of(note, pin_works));
+        app.pin_works = pin_works;
+        app.lines_base = serial << 32;
+        app.lines = TypedLines::keyed_after(app.lines_base);
+        // No list shows, so none is read beyond what costs nothing.
+        app.selection = Selection::SentItemsWaiting;
+        app.selected_note = Some(note.to_string());
+        app
+    }
+
+    /// The Notes open in windows of their own (#287), in the order they
+    /// opened.
+    pub fn note_windows(&self) -> Vec<&str> {
+        self.note_windows
+            .iter()
+            .filter_map(|w| w.app.alone.as_ref().map(|a| a.note.as_str()))
+            .collect()
+    }
+
+    /// The App showing the Note `note` in its own window, while it has
+    /// one (#287).
+    pub fn note_window(&self, note: &str) -> Option<&App> {
+        self.note_windows
+            .iter()
+            .map(|w| &*w.app)
+            .find(|app| app.alone.as_ref().is_some_and(|a| a.note == note))
+    }
+
+    /// The window the Note `note` shows in as it is drawn, while it has
+    /// one (#287).
+    pub fn note_window_viewport(&self, note: &str) -> Option<egui::ViewportBuilder> {
+        let window = self
+            .note_windows
+            .iter()
+            .find(|w| w.app.alone.as_ref().is_some_and(|a| a.note == note))?;
+        Some(window.app.note_window_builder(window.size))
+    }
+
+    /// Whether this App's Note window is kept on top of the others, while
+    /// it is one (#287).
+    pub fn kept_on_top(&self) -> Option<bool> {
+        self.alone.as_ref().map(Alone::kept_on_top)
+    }
+
+    /// Closes the Note window of `note`, as its cross does (#287).
+    pub fn close_note_window(&mut self, note: &str) {
+        for window in &mut self.note_windows {
+            if let Some(alone) = &mut window.app.alone
+                && alone.note == note
+            {
+                alone.close_asked = true;
+            }
+        }
+    }
+
+    /// Whether a window can be kept on top of the others here, as the
+    /// Note windows opened from now on find it (#287): not on Wayland.
+    pub fn set_pin_works(&mut self, works: bool) {
+        self.pin_works = works;
+    }
+
+    /// The window this App's Note shows in, opened as large as `size`.
+    fn note_window_builder(&self, size: egui::Vec2) -> egui::ViewportBuilder {
+        let note = self.view.detail.as_ref().map(|(p, _)| &p.note);
+        let text = note.map(|n| n.visible_text()).unwrap_or_default();
+        let title = note_window::title(&text, self.t.app_title());
+        note_window::viewport(&title, size, self.kept_on_top().unwrap_or(false))
     }
 
     /// Shows the known units of Tallies as `region`, an ISO country code,
@@ -2304,11 +2858,35 @@ impl App {
         self.import.running()
     }
 
+    /// Asks `picker` for the folder a vault goes into, or is rebuilt
+    /// from, instead of the system's dialog; tests hand in a path.
+    pub fn set_vault_picker(&mut self, picker: FolderPicker) {
+        self.vault_picker = picker;
+    }
+
+    /// Whether a vault is being written or rebuilt.
+    pub fn vault_running(&self) -> bool {
+        self.vault.running()
+    }
+
+    /// Whether File ▸ Export as vault… may start: none is written, and
+    /// neither is the AI port open nor an AI Task waiting for its review,
+    /// so no draft goes into the vault as a Note.
+    fn may_export_vault(&self) -> bool {
+        !self.vault.running() && self.ai_port.is_none() && self.view.ai_task.is_none()
+    }
+
     /// Hands in the dialogs asking where to save the Recovery Sheet and
     /// which Backup to restore.
     pub fn set_backup_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
         self.sheet_saver = saver;
         self.backup_opener = opener;
+    }
+
+    /// Hands in the dialog asking which Backup to take Notes back from,
+    /// given the folder it starts in (#285).
+    pub fn set_backup_notes_opener(&mut self, opener: FilePickerIn) {
+        self.backup_notes_opener = opener;
     }
 
     /// Makes the own Profile with `defaults` instead of this computer's
@@ -2378,6 +2956,7 @@ impl App {
                 }
             }
             BackupAction::Weekly(on) => self.store.set_backups_weekly(on)?,
+            BackupAction::OpenNotes => self.open_backup_notes()?,
             BackupAction::Now => match backups::now(&self.store) {
                 // Shown as the last Backup on the card: no announcement
                 // (UI laws).
@@ -2425,8 +3004,9 @@ impl App {
             }
             WelcomeAction::Synced => self.welcomed()?,
             WelcomeAction::Back => {
-                // A join under way finishes first: what it brings is kept.
-                if self.sync.joining() {
+                // A join or a rebuild under way finishes first: what it
+                // brings is kept.
+                if self.sync.joining() || self.vault.running() {
                     return Ok(());
                 }
                 // Left after a sync went through: on, as with Continue.
@@ -2460,6 +3040,19 @@ impl App {
                             "backup: no Backup header in the file picked".into(),
                         ),
                     }
+                }
+            }
+            WelcomeAction::Rebuild => {
+                if self.vault.running() {
+                    return Ok(());
+                }
+                if let Some(folder) = (self.vault_picker)(t.vault_rebuild_pick_title()) {
+                    let root = t.import_area_name(&folder_name(&folder));
+                    self.vault.rebuild(self.store.clone(), folder, root);
+                    if let Some(welcome) = &mut self.welcome {
+                        welcome.rebuilding = Some((0, 0));
+                    }
+                    self.notice = None;
                 }
             }
             WelcomeAction::Restore => {
@@ -2517,6 +3110,49 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// Announces how a vault job ended: an export written or not; a
+    /// rebuild answers the first start, or goes back to its choices
+    /// saying why.
+    fn vault_done(&mut self, done: VaultDone) {
+        let t = self.t;
+        match done {
+            VaultDone::Exported(Ok(exported)) => {
+                self.announce_done(
+                    t.vault_written(),
+                    vault_view::exported_details(&t, &exported),
+                );
+            }
+            VaultDone::Exported(Err(e)) => self.announce_failure(
+                t.vault_not_written(),
+                t.vault_not_written_title(),
+                (t.vault_not_written_cause(), t.nothing_lost_fix()),
+                format!("vault: {e}"),
+            ),
+            VaultDone::Rebuilt(Ok(rebuilt)) => {
+                if let Err(e) = self.welcomed() {
+                    eprintln!("first start: {e}");
+                }
+                self.announce_done(t.vault_rebuilt(), vault_view::rebuilt_details(&t, &rebuilt));
+                self.refresh();
+                if let Some(wake) = &self.wake {
+                    drop(wake.send(Event::Wake));
+                }
+            }
+            VaultDone::Rebuilt(Err(e)) => {
+                if let Some(welcome) = &mut self.welcome {
+                    welcome.rebuilding = None;
+                }
+                let (cause, fix) = vault_view::rebuild_failure(&t, &e);
+                self.announce_failure(
+                    t.vault_not_rebuilt(),
+                    t.vault_not_rebuilt_title(),
+                    (cause, fix),
+                    format!("vault: {e}"),
+                );
+            }
+        }
     }
 
     /// The first start's view is answered: new with the Starter Set
@@ -3045,7 +3681,7 @@ impl App {
             }
             PackFile::Large => {
                 let path = path.to_path_buf();
-                self.pack_aside(true, move |store| {
+                self.pack_aside(PackWork::Opening, move |store| {
                     let opened = read_pack_file(&path).map(|bytes| store.open_pack(&bytes));
                     PackDid::Opened(opened, path)
                 });
@@ -3097,7 +3733,7 @@ impl App {
     /// Opens the Pack `bytes` of the file at `path` (#165) off the
     /// window's thread.
     fn open_pack(&mut self, bytes: Vec<u8>, path: std::path::PathBuf) {
-        self.pack_aside(true, move |store| {
+        self.pack_aside(PackWork::Opening, move |store| {
             PackDid::Opened(Some(store.open_pack(&bytes)), path)
         });
     }
@@ -3105,9 +3741,13 @@ impl App {
     /// Runs `work` on a Pack on a thread of its own, on a connection the
     /// Agenda's opener hands it (#207), its result taken in by
     /// [`App::pack_arrived`]; without the opener, the window runs it
-    /// itself. `opening` when it opens a Pack: the line under the menu
-    /// bar shows meanwhile.
-    fn pack_aside(&mut self, opening: bool, work: impl FnOnce(&Store) -> PackDid + Send + 'static) {
+    /// itself. `kind` says what it does: while it opens a Pack, the line
+    /// under the menu bar shows.
+    fn pack_aside(
+        &mut self,
+        kind: PackWork,
+        work: impl FnOnce(&Store) -> PackDid + Send + 'static,
+    ) {
         let Some(open) = self.agenda_reads.as_ref().map(|reads| reads.open.clone()) else {
             let done = work(&self.store);
             self.pack_done(done);
@@ -3121,17 +3761,21 @@ impl App {
             let wrote = before.is_some_and(|before| store.current_seq().ok() != Some(before));
             drop(sent.send(PackDone { done, wrote }));
         });
-        self.pack_work.push((arrives, opening));
+        self.pack_work.push((arrives, kind));
     }
 
     /// Whether a Pack is being opened off the window's thread.
     fn pack_opening(&self) -> bool {
-        self.pack_work.iter().any(|(_, opening)| *opening)
+        self.pack_work
+            .iter()
+            .any(|(_, kind)| *kind == PackWork::Opening)
     }
 
     /// Whether a Pack is being saved off the window's thread.
     fn pack_saving(&self) -> bool {
-        self.pack_work.iter().any(|(_, opening)| !*opening)
+        self.pack_work
+            .iter()
+            .any(|(_, kind)| *kind == PackWork::Saving)
     }
 
     /// Takes in what the Pack threads did once it is in; the window
@@ -3169,6 +3813,8 @@ impl App {
             PackDid::Opened(None, path) => self.import_bundle(&path),
             PackDid::Saved(saved, false) => self.pack_saved(saved),
             PackDid::Saved(saved, true) => self.feedback_saved(saved),
+            PackDid::BackupOpened(path, opened) => self.backup_notes_opened(&path, opened),
+            PackDid::BackupAdded(added) => self.backup_notes_added(added),
         }
     }
 
@@ -3246,7 +3892,9 @@ impl App {
         let written = match asked {
             FeedbackAsk::Notes(on) => {
                 if on && self.feedback.pack.is_none() {
-                    self.feedback.pack = Some(self.store.pack_of_all(&HashSet::new())?);
+                    // The Areas in the person's own order (#280).
+                    let shown = |a: &Area| area_name(&t, a);
+                    self.feedback.pack = Some(self.store.pack_of_all_by(&HashSet::new(), shown)?);
                 }
                 self.feedback.notes = on;
                 return Ok(());
@@ -3274,7 +3922,7 @@ impl App {
                     path.set_extension(packs::EXTENSION);
                 }
                 let (pack, ticks) = (pack.clone(), self.feedback.ticks.clone());
-                self.pack_aside(false, move |store| {
+                self.pack_aside(PackWork::Saving, move |store| {
                     PackDid::Saved(write_pack_file(store, &pack, &ticks, false, &path), true)
                 });
                 return Ok(());
@@ -3319,7 +3967,7 @@ impl App {
             path.set_extension(packs::EXTENSION);
         }
         let (pack, ticks, profile) = (pack.as_ref().clone(), ticks.clone(), *profile);
-        self.pack_aside(false, move |store| {
+        self.pack_aside(PackWork::Saving, move |store| {
             PackDid::Saved(write_pack_file(store, &pack, &ticks, profile, &path), false)
         });
     }
@@ -3340,6 +3988,188 @@ impl App {
                 (t.pack_not_written_cause(), t.nothing_lost_fix()),
                 format!("pack: {e}"),
             ),
+        }
+    }
+
+    /// Open a Backup… (#285): the file asked for in the Backups folder,
+    /// then, for a Backup, its page over the Backups dialog, or alone
+    /// from the File menu; a file that is none, or of a later format, is
+    /// announced at the top, why behind the click.
+    fn open_backup_notes(&mut self) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let folder = self
+            .store
+            .backup_folder()
+            .ok()
+            .flatten()
+            .map(std::path::PathBuf::from);
+        let Some(path) = (self.backup_notes_opener)(t.restore_open_title(), folder.as_deref())
+        else {
+            return Ok(());
+        };
+        let (cause, details) = match backup::read_header(&path) {
+            Ok(Some(header)) => {
+                self.backup_notes = Some(BackupNotes::new(path, header));
+                return self.act(if self.page() == Some(Page::Backups) {
+                    Action::PageInto(Page::BackupNotes)
+                } else {
+                    Action::OpenPage(Page::BackupNotes)
+                });
+            }
+            Err(oldbrainfix_core::Error::Backup(backup::Problem::NeedsUpdate)) => (
+                (t.restore_needs_update(), t.update_open_again_fix()),
+                "backup: a Backup of a later format",
+            ),
+            _ => (
+                (t.restore_not_a_backup(), t.restore_pick_fix()),
+                "backup: no Backup header in the file picked",
+            ),
+        };
+        self.announce_failure(
+            t.backup_not_opened(),
+            t.backup_not_opened_title(),
+            cause,
+            details.into(),
+        );
+        Ok(())
+    }
+
+    /// The page of a Backup opened is gone from the dialogs: so is what
+    /// it held (#285).
+    fn backup_notes_left(&mut self) {
+        if !self.pages.contains(&Page::BackupNotes) {
+            self.backup_notes = None;
+        }
+    }
+
+    /// Open or Add on the page of a Backup opened (#285), off the
+    /// window's thread: the passphrase's key is slow to make on purpose,
+    /// and the whole file is read each time.
+    fn backup_notes_action(&mut self, asked: BackupNotesAction) {
+        let Some(state) = &mut self.backup_notes else {
+            return;
+        };
+        if state.busy {
+            return;
+        }
+        match asked {
+            BackupNotesAction::Open => {
+                let code = state.code.trim().to_string();
+                // Said red under the field.
+                if !code.is_empty() && oldbrainfix_core::recovery::decode_code(&code).is_none() {
+                    state.code_invalid = true;
+                    return;
+                }
+                let passphrase = state.passphrase.clone();
+                let (path, header) = (state.path.clone(), state.header.clone());
+                state.busy = true;
+                let t = self.t;
+                self.pack_aside(PackWork::Backup, move |store| {
+                    let key = if code.is_empty() {
+                        backup::unlock(&header, Some(&passphrase), None)
+                    } else {
+                        backup::unlock(&header, None, Some(&code))
+                    };
+                    // The desktop has no Area Locks: no Area is closed.
+                    let opened = key.and_then(|key| {
+                        key.map(|key| {
+                            backup::open_notes(store, &path, &key, &HashSet::new(), |a| {
+                                area_name(&t, a)
+                            })
+                        })
+                        .transpose()
+                    });
+                    PackDid::BackupOpened(path, opened)
+                });
+            }
+            BackupNotesAction::Add => {
+                let Some(opened) = state.opened.as_deref().cloned() else {
+                    return;
+                };
+                let ticks = state.ticks.clone();
+                state.busy = true;
+                let (t, wall) = (self.t, self.wall.clone());
+                self.pack_aside(PackWork::Backup, move |store| {
+                    PackDid::BackupAdded(backup::add_notes(
+                        store,
+                        &opened,
+                        &ticks,
+                        &*wall,
+                        t.backup_suffix(),
+                        t.backup_no_area(),
+                    ))
+                });
+            }
+        }
+    }
+
+    /// The Backup at `path` read (#285): its Notes on its page, or why it
+    /// did not open, announced at the top of the page, which stays for
+    /// another try. Closed meanwhile, or opened again, it shows nothing.
+    fn backup_notes_opened(
+        &mut self,
+        path: &std::path::Path,
+        opened: oldbrainfix_core::Result<Option<backup::OpenedBackup>>,
+    ) {
+        let t = self.t;
+        let waiting = |s: &&mut BackupNotes| s.busy && s.opened.is_none() && s.path == path;
+        let Some(state) = self.backup_notes.as_mut().filter(waiting) else {
+            return;
+        };
+        let (cause, details) = match opened {
+            Ok(Some(opened)) => {
+                state.show(opened);
+                return;
+            }
+            Ok(None) => (
+                (t.restore_wrong(), t.restore_wrong_fix()),
+                "backup: the passphrase or recovery key does not open it".to_string(),
+            ),
+            Err(e) => (backup_view::open_refusal(&t, &e), format!("backup: {e}")),
+        };
+        state.busy = false;
+        self.announce_failure(
+            t.backup_not_opened(),
+            t.backup_not_opened_title(),
+            cause,
+            details,
+        );
+    }
+
+    /// Add on a Backup opened done (#285): announced as a Pack's, its page
+    /// closed back to the Backups dialog; a failure leaves the page open
+    /// and the log as it was.
+    fn backup_notes_added(&mut self, added: oldbrainfix_core::Result<oldbrainfix_core::PackAdded>) {
+        let t = self.t;
+        match added {
+            Ok(added) => {
+                // Not a page opened again meanwhile.
+                let adding = self
+                    .backup_notes
+                    .as_ref()
+                    .is_some_and(|s| s.busy && s.opened.is_some());
+                if adding && self.page() == Some(Page::BackupNotes) {
+                    self.pages.pop();
+                }
+                self.backup_notes_left();
+                self.notice = Some(t.pack_added(added.notes as i64));
+            }
+            Err(e) => {
+                if let Some(state) = &mut self.backup_notes {
+                    state.busy = false;
+                }
+                let cause = if matches!(e, oldbrainfix_core::Error::Backup(_)) {
+                    t.backup_add_damaged_cause()
+                } else {
+                    t.restore_failed_cause()
+                };
+                self.announce_failure(
+                    t.backup_notes_not_added(),
+                    t.backup_notes_not_added_title(),
+                    (cause, t.backup_add_damaged_fix()),
+                    format!("backup: {e}"),
+                );
+            }
         }
     }
 
@@ -3566,8 +4396,18 @@ impl App {
     }
 
     /// Saves the Note of the send dialog as a Sent Item where the user
-    /// says: encrypted to the person picked, else signed only.
+    /// says: encrypted to the person picked, else signed only; nothing
+    /// while nobody is picked, the dialog stays.
     fn send_note(&mut self) -> oldbrainfix_core::Result<()> {
+        if matches!(
+            self.dialog,
+            Some(Dialog::Send {
+                picked: SendTo::Nobody,
+                ..
+            })
+        ) {
+            return Ok(());
+        }
         let Some(Dialog::Send {
             note,
             recipients,
@@ -3591,8 +4431,18 @@ impl App {
         if path.extension().is_none_or(|e| e != sent::EXTENSION) {
             path.set_extension(sent::EXTENSION);
         }
-        let to = picked.and_then(|i| recipients.get(i));
-        let bytes = self.store.send_note(&note, to, cancel)?;
+        let to = match picked {
+            SendTo::Person(i) => recipients.get(i),
+            SendTo::Nobody | SendTo::Anyone => None,
+        };
+        let bytes = match self.store.send_note(&note, to, cancel) {
+            // Marked on another Device meanwhile.
+            Err(oldbrainfix_core::Error::HiddenFromAi(marks)) => {
+                self.ask_hidden(marks, None, Action::StartSend(note));
+                return Ok(());
+            }
+            sent => sent?,
+        };
         let t = self.t;
         match std::fs::write(&path, bytes) {
             Ok(()) => self.notice = Some(t.sent_saved().to_string()),
@@ -3671,6 +4521,10 @@ impl App {
         }
         let shared = match self.store.share_area_with(&area, &person, role, transport) {
             Ok(shared) => shared,
+            Err(oldbrainfix_core::Error::HiddenFromAi(marks)) => {
+                self.ask_hidden(marks, Some(&area), Action::Share(area.clone()));
+                return Ok(());
+            }
             Err(e) => {
                 self.announce_afar_failed(&e);
                 return Ok(());
@@ -4153,6 +5007,12 @@ impl App {
         self.changes_wanted = Some(wanted);
     }
 
+    /// Opens the Note dialog of the Note of the Routine a click on an
+    /// Occurrence's notification put into `wanted` (#270).
+    pub fn set_occurrence_wanted(&mut self, wanted: OccurrenceWanted) {
+        self.occurrence_wanted = Some(wanted);
+    }
+
     /// Syncs through the shared folder now: on the folder thread, or here
     /// when there is none.
     fn folder_now(&mut self) -> oldbrainfix_core::Result<()> {
@@ -4195,7 +5055,11 @@ impl App {
         match asked {
             AiAction::Open => {
                 if self.ai_port.is_none() {
-                    match AiPort::open(&self.store) {
+                    let opened = match &self.redraw {
+                        Some(redraw) => AiPort::open_waking(&self.store, redraw.clone()),
+                        None => AiPort::open(&self.store),
+                    };
+                    match opened {
                         Ok(port) => self.ai_port = Some(port),
                         // The card says so; nothing opened.
                         Err(oldbrainfix_core::Error::NoDockerBridge) => return Ok(()),
@@ -4278,6 +5142,245 @@ impl App {
         }
     }
 
+    /// The Ask panel (#267): its provider, the question field and the
+    /// answers.
+    fn ask_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let Some(provider) = &self.view.ask_provider else {
+            return;
+        };
+        let shown = ask_view::PanelShown {
+            provider,
+            task_waits: self.view.ai_task.is_some(),
+            reviews: self.ai_port.is_none(),
+        };
+        let mut asked = Vec::new();
+        ask_view::page(ui, &self.t, tones, &mut self.ask, shown, &mut asked);
+        actions.extend(asked.into_iter().map(Action::Ask));
+    }
+
+    /// Lets the Ask panel's requests go through `transport`, as the tests
+    /// fake a provider (#267).
+    pub fn set_ask_transport(&mut self, transport: Arc<dyn ask::Transport>) {
+        self.ask_transport = transport;
+    }
+
+    /// The Ask panel's questions and answers (#267).
+    pub fn ask_panel(&self) -> &AskPanel {
+        &self.ask
+    }
+
+    /// What was asked of the Ask panel (#267).
+    fn ask_asked(&mut self, asked: AskAsked) -> oldbrainfix_core::Result<()> {
+        match asked {
+            AskAsked::Ask => self.ask_question()?,
+            AskAsked::Stop => {
+                // What was asked goes back into the field.
+                if let Some(question) = self.ask_stop()? {
+                    self.ask.question = question;
+                }
+                self.ask.focus = true;
+            }
+            AskAsked::StartOver => {
+                self.ask_stop()?;
+                self.ask.exchanges.clear();
+                self.ask.focus = true;
+            }
+            AskAsked::Keep(at) => {
+                let Some(asked) = self.ask.exchanges.get(at) else {
+                    return Ok(());
+                };
+                let answer = &asked.answer;
+                if asked.kept.is_some() {
+                    return Ok(());
+                }
+                // The question its first line, the answer with its links
+                // after it, as Markdown.
+                let text = format!("{}\n\n{}", asked.question.trim(), answer.text.trim());
+                let note = Notes::new(&self.store).capture_as(
+                    &text,
+                    oldbrainfix_core::text_format::MARKDOWN,
+                    None,
+                    None,
+                )?;
+                if let Some(asked) = self.ask.exchanges.get_mut(at) {
+                    asked.kept = Some(note.id);
+                }
+            }
+            AskAsked::OpenNote(id) => self.act(Action::SelectNote(id))?,
+            AskAsked::Review => self.act(Action::Ai(AiAction::Review))?,
+            AskAsked::Settings => {
+                self.settings_section = Some((ASK_SECTION.to_string(), 2));
+                self.act(Action::OpenPage(Page::Settings))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Asks the question typed in the Ask panel, after those answered: off
+    /// the window's thread when it can be woken, else here and at once,
+    /// as in the tests.
+    fn ask_question(&mut self) -> oldbrainfix_core::Result<()> {
+        let question = self.ask.question.trim().to_string();
+        let provider = self.store.ask_provider()?;
+        if question.is_empty() || self.ask_run.is_some() || provider.unready().is_some() {
+            return Ok(());
+        }
+        let now = (self.wall)(self.store.now())
+            .format("%Y-%m-%d %H:%M, %A")
+            .to_string();
+        let mut conversation = Conversation::new(provider, &self.ask.earlier(), &question, &now);
+        self.ask.question.clear();
+        let Some(redraw) = self.redraw.clone() else {
+            let asked = self
+                .store
+                .ask(&mut conversation, &*self.ask_transport, &*self.wall);
+            self.ask_answered(question, asked.map(|a| a.answer));
+            return Ok(());
+        };
+        let (to_window, arrives) = std::sync::mpsc::channel();
+        let (outputs, from_window) = std::sync::mpsc::channel::<Vec<ToolOutput>>();
+        let transport = self.ask_transport.clone();
+        std::thread::spawn(move || {
+            let done = ask::run(&mut conversation, &*transport, |calls| {
+                to_window.send(AskArrived::Tools(calls.to_vec())).ok()?;
+                redraw();
+                from_window.recv().ok()
+            });
+            drop(to_window.send(AskArrived::Done(done)));
+            redraw();
+        });
+        let before = self.store.ai_task()?;
+        self.ask.asking = Some(question.clone());
+        self.ask_run = Some(AskRun {
+            question,
+            arrives,
+            outputs,
+            task: before.clone(),
+            before,
+        });
+        Ok(())
+    }
+
+    /// Answers the tools the thread asking waits for, on this thread as
+    /// the AI as the store sees it, and takes in its answer once it is in;
+    /// the window looks again shortly while it runs.
+    fn ask_arrived(&mut self, ctx: &egui::Context) {
+        let Some(run) = &mut self.ask_run else {
+            return;
+        };
+        let mut done = None;
+        let mut answered = false;
+        loop {
+            match run.arrives.try_recv() {
+                Ok(AskArrived::Tools(calls)) => {
+                    let outputs = self.store.ask_calls(&calls, &*self.wall, &mut run.task);
+                    drop(run.outputs.send(outputs));
+                    answered = true;
+                }
+                Ok(AskArrived::Done(answer)) => {
+                    done = Some(answer);
+                    break;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    done = Some(Err(ask::AskError::Stopped));
+                    break;
+                }
+            }
+        }
+        if let Some(done) = done {
+            let question = run.question.clone();
+            self.ask_finished();
+            self.ask_answered(question, done);
+            self.refresh();
+        } else {
+            if answered {
+                self.refresh();
+            }
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        }
+    }
+
+    /// Ends the question asked off the window's thread: an AI Task it
+    /// opened and left without a change is declined, so sync goes on.
+    /// Its question, if one was asked.
+    fn ask_finished(&mut self) -> Option<String> {
+        let run = self.ask_run.take()?;
+        self.ask.asking = None;
+        if run.before.is_none()
+            && self.ai_port.is_none()
+            && let Some(task) = &run.task
+            && let Err(e) = self.store.drop_empty_ai_task(task)
+        {
+            self.error = Some(e.to_string());
+        }
+        Some(run.question)
+    }
+
+    /// Stops waiting for the answer; the thread asking hears it with its
+    /// next tools, and what it then brings is dropped. The question
+    /// stopped.
+    fn ask_stop(&mut self) -> oldbrainfix_core::Result<Option<String>> {
+        let question = self.ask_finished();
+        self.refresh();
+        Ok(question)
+    }
+
+    /// Shows the answer to `question` in the Ask panel, with the Notes it
+    /// links that are here, by their titles. A question not answered goes
+    /// back into the field, and why is announced at the top (UI laws,
+    /// "Announcements"), but for one stopped.
+    fn ask_answered(&mut self, question: String, done: Result<ask::Answer, ask::AskError>) {
+        self.ask.focus = true;
+        let answer = match done {
+            Ok(answer) => answer,
+            Err(why) => {
+                let t = self.t;
+                let provider = self
+                    .store
+                    .ask_provider()
+                    .map(|p| p.name())
+                    .unwrap_or_default();
+                if let Some((cause, fix, details)) = ask_view::failure(&t, &provider, &why) {
+                    self.announce_failure(
+                        t.ask_failed(),
+                        t.ask_failed_title(),
+                        (&cause, &fix),
+                        details,
+                    );
+                }
+                if self.ask.question.trim().is_empty() {
+                    self.ask.question = question;
+                }
+                return;
+            }
+        };
+        let notes = Notes::new(&self.store);
+        let mut sources = Vec::new();
+        for id in &answer.notes {
+            if let Ok(Some(note)) = notes.by_id(id)
+                && !note.is_trashed()
+            {
+                let title = row_title(&self.t, Some(&note));
+                let first = title.lines().next().unwrap_or_default().to_string();
+                sources.push((id.clone(), first));
+            }
+        }
+        self.ask.exchanges.push(ask_view::Asked {
+            question,
+            answer,
+            sources,
+            kept: None,
+        });
+    }
+
+    /// The list left the Ask panel: its question stops and its answers
+    /// go, but what was kept as a Note.
+    fn ask_left(&mut self) {
+        self.ask_finished();
+        self.ask = AskPanel::default();
+    }
+
     /// The LAN session the Sync dialogs host.
     pub fn sync_host(&self) -> &SyncHost {
         &self.sync
@@ -4287,6 +5390,27 @@ impl App {
     pub fn watch_changes(&mut self, changes: Arc<AtomicU64>) {
         self.seen_changes = changes.load(Ordering::SeqCst);
         self.changes = Some(changes);
+    }
+
+    /// Whether the window is on screen; the shell tells when it hides it
+    /// into the tray and brings it back.
+    pub fn set_shown(&mut self, shown: bool) {
+        self.shown = shown;
+        // Hidden, it hears no keys to record (#283).
+        if !shown {
+            self.record_hotkey(false);
+        }
+    }
+
+    /// Whether what the window draws is seen: shown and not minimised.
+    fn drawn(&self, ctx: &egui::Context) -> bool {
+        self.shown && ctx.input(|i| i.viewport().minimized != Some(true))
+    }
+
+    /// How another thread wakes the window: the AI port's tool calls
+    /// are then answered when they come, not polled for.
+    pub fn set_redraw(&mut self, redraw: Wake) {
+        self.redraw = Some(redraw);
     }
 
     /// Tells `wake` after every change made here.
@@ -4335,6 +5459,13 @@ impl App {
         self.kick();
     }
 
+    /// The thread reading the Attachment Texts of the files waiting, every
+    /// one of them, as a computer reads those left to it too (#267, Q645).
+    pub fn set_attachment_reader(&mut self, reader: Option<Enricher>) {
+        self.files_reader = reader;
+        self.kick();
+    }
+
     /// Whether a voice recording runs.
     pub fn recording(&self) -> bool {
         self.recorder.as_ref().is_some_and(|r| r.recording())
@@ -4344,6 +5475,16 @@ impl App {
     pub fn set_query(&mut self, query: &str) {
         self.query = query.to_string();
         self.refresh();
+    }
+
+    /// What the Notes shown are searched for.
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    /// How far the list shown is scrolled, as it was drawn last (#278).
+    pub fn list_scrolled(&self) -> f32 {
+        self.list_offset
     }
 
     /// Whose Notes the middle shows (#53).
@@ -4360,6 +5501,9 @@ impl App {
     /// Transcripts only once a speech model is in use.
     fn kick(&mut self) {
         if let Some(reader) = &self.reader {
+            reader.kick();
+        }
+        if let Some(reader) = &self.files_reader {
             reader.kick();
         }
         let ready = self.speech.as_ref().is_none_or(|s| s.current().is_some());
@@ -4496,6 +5640,8 @@ impl App {
     /// quick note's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the open Note's edited text.
     pub fn flush(&mut self) {
+        // The Note windows go with the window (#287).
+        self.close_note_windows();
         if !self.capture.trim().is_empty() || self.recording() || self.holds_media() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
@@ -4547,7 +5693,7 @@ impl App {
             && view.area(id).is_none()
             && view.topic(id).is_none()
         {
-            self.arrive(Selection::All);
+            self.arrive(Selection::All, Left::default());
             read = self.read();
         }
         // A Routine gone meanwhile has no History to show: back where it
@@ -4555,8 +5701,12 @@ impl App {
         if let (Ok(view), Selection::History(_)) = (&read, &self.selection)
             && view.history.is_none()
         {
-            let back = self.nav.back(self.selection.clone());
-            self.arrive(back.unwrap_or(Selection::Agenda));
+            let left = self.left();
+            let (to, left) = self
+                .nav
+                .back(self.selection.clone(), left)
+                .unwrap_or((Selection::Agenda, Left::default()));
+            self.arrive(to, left);
             read = self.read();
         }
         // Back and forward lead to no place gone meanwhile.
@@ -4616,10 +5766,14 @@ impl App {
             (None, None) => (None, (false, &none)),
         };
         self.lines.arrange(detail, listed, rights);
-        // A list just made: its first Line takes the keyboard (#161).
+        // A list just made, or opened from its group's heading on the
+        // Agenda: a new Line after its open ones takes the keyboard
+        // (#161, #276).
         if self.start_lines && self.lines.note.is_some() && self.lines.note == self.selected_note {
             self.start_lines = false;
-            self.lines.focus_empty_row();
+            if let Some(listed) = listed {
+                self.lines.start_row(listed);
+            }
         }
         if self.view.detail.is_none() {
             self.badge = None;
@@ -4635,9 +5789,17 @@ impl App {
                 capture_choices::may_spawn(&self.store, place.as_deref()).unwrap_or(true);
         }
         self.read_at = self.store.now();
-        self.arrived = self.conflicts_arrived();
+        // A Note window (#287) leaves what is announced to the main one.
+        let main = self.alone.is_none();
+        if main {
+            self.arrived = self.conflicts_arrived();
+        }
         // What the hosts and the folder found that needs an update.
-        for (source, update) in self.store.take_update_notices().unwrap_or_default() {
+        let updates = match main {
+            true => self.store.take_update_notices().unwrap_or_default(),
+            false => Vec::new(),
+        };
+        for (source, update) in updates {
             let text = update_notice_text(&self.t, &self.store, &source, update);
             let details = format!("update needed: {update:?} ({source})");
             self.updates.push_back(UpdateNotice {
@@ -4649,7 +5811,9 @@ impl App {
         // "Which one is you?" opens once it comes up, and goes once it was
         // answered here or on another Device.
         match (&self.view.profile_question, &self.dialog) {
-            (Some(_), None) if !self.question_later => self.dialog = Some(Dialog::WhichProfile),
+            (Some(_), None) if main && !self.question_later => {
+                self.dialog = Some(Dialog::WhichProfile)
+            }
             (None, Some(Dialog::WhichProfile)) => self.dialog = None,
             _ => {}
         }
@@ -4713,7 +5877,11 @@ impl App {
             self.text_focus = true;
         }
         // The Agenda as it is now, on its thread where it has one (#207).
-        self.read_agenda_aside();
+        if main {
+            self.read_agenda_aside();
+            // Read anew: the Note windows read too (#287).
+            self.seen_writes = self.writes.fetch_add(1, Ordering::SeqCst) + 1;
+        }
         self.kick();
     }
 
@@ -4732,6 +5900,7 @@ impl App {
             schedule: schedule_text(&self.t, &routine.schedule),
             history: routines.history(&routine, &*self.wall, week_start)?,
             streaks: DeviceSettings::new(&self.store).streaks_on()?,
+            tomorrow: routine.tomorrow.clone(),
         }))
     }
 
@@ -4785,6 +5954,17 @@ impl App {
         self.arrived
     }
 
+    /// The sidebar's width as drawn last (#278).
+    pub fn sidebar_width(&self) -> f32 {
+        self.sidebar_shown
+    }
+
+    /// The Note dialog's size as drawn last, none before it opened
+    /// (#278).
+    pub fn note_dialog_size(&self) -> Option<egui::Vec2> {
+        self.note_shown
+    }
+
     fn read(&self) -> oldbrainfix_core::Result<View> {
         let notes = Notes::new(&self.store);
         let places = Places::new(&self.store);
@@ -4794,7 +5974,10 @@ impl App {
         let mut names = std::collections::HashMap::new();
         let mut shown_people = std::collections::HashMap::new();
         let mut mine = std::collections::HashMap::new();
-        for area in places.areas()? {
+        // In the person's own order (#280), the sidebar's and every list
+        // of Areas read from here.
+        let t = self.t;
+        for area in PersonSettings::new(&self.store).areas_in_order_by(|a| area_name(&t, a))? {
             let topics = places.topics(&area.id)?;
             access.insert(area.id.clone(), self.store.access_in(&area.id, None)?);
             if let Some(grants) = self.store.grants_of(&area.id)? {
@@ -4814,17 +5997,33 @@ impl App {
         let routines = Routines::new(&self.store);
         let search = Search::new(&self.store);
         let shown = match &self.selection {
+            // A Note window shows its Note alone (#287).
+            _ if self.alone.is_some() => Vec::new(),
             Selection::Agenda
             | Selection::SentItemsWaiting
             | Selection::AreaOffersWaiting
             | Selection::AiReview
             | Selection::Frogs
             | Selection::AllRoutines
+            | Selection::Tags
+            | Selection::Ask
             | Selection::History(_) => Vec::new(),
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
-            Selection::Unsorted => self.store.notes_by(notes.unsorted()?, &self.people)?,
+            Selection::Unsorted => {
+                // Its search (#274) keeps the list's order, oldest first.
+                let mut unsorted = notes.unsorted()?;
+                if !self.query.trim().is_empty() {
+                    let found: HashSet<String> = search
+                        .notes(&self.query, None)?
+                        .into_iter()
+                        .map(|n| n.id)
+                        .collect();
+                    unsorted.retain(|n| found.contains(&n.id));
+                }
+                self.store.notes_by(unsorted, &self.people)?
+            }
             Selection::Place(id) => {
                 let found = search.notes(&self.query, Some(id))?;
                 // A Topic's Notes show inside the Topic; a search in its
@@ -4840,7 +6039,8 @@ impl App {
                 };
                 self.store.notes_by(found, &self.people)?
             }
-            Selection::Trash => notes.trashed()?,
+            // Its search (#274) keeps the trash's order.
+            Selection::Trash => search.among(&self.query, notes.trashed()?)?,
         };
         let store = &self.store;
         let place = |note: Note| place_note(store, &places, note);
@@ -4903,10 +6103,44 @@ impl App {
                 sessions.insert(id.clone());
             }
         }
+        // What a shield marks, read once for all of them (ADR 0049).
+        let hidden_notes = store.hidden_from_ai_among(
+            placed
+                .iter()
+                .chain(detail.as_ref().map(|(p, _)| p))
+                .map(|p| p.note.id.as_str()),
+        )?;
+        let marks = store.hidden_from_ai_marks()?;
+        let hidden_areas: HashSet<String> = areas
+            .iter()
+            .filter(|(a, _)| marks.contains(&a.id))
+            .map(|(a, _)| a.id.clone())
+            .collect();
+        let mut hideable_areas = HashSet::new();
+        for (area, _) in &areas {
+            if store.may_hide_from_ai(&area.id)? {
+                hideable_areas.insert(area.id.clone());
+            }
+        }
+        let note_hidden = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => {
+                let id = &p.note.id;
+                let own = marks.contains(id);
+                let by = store.hidden_from_ai_by(id)?;
+                let other = by.iter().any(|m| m != id);
+                (own || store.may_hide_from_ai(id)?).then_some((own, other))
+            }
+            _ => None,
+        };
         let mut card_changes = HashSet::new();
+        let mut card_may = HashSet::new();
         for p in &placed {
             let note = &p.note;
-            if !note.is_trashed() && note.text_editable && store.may_change(&note.id)? {
+            if !store.may_change(&note.id)? {
+                continue;
+            }
+            card_may.insert(note.id.clone());
+            if !note.is_trashed() && note.text_editable {
                 card_changes.insert(note.id.clone());
             }
         }
@@ -5125,6 +6359,25 @@ impl App {
                     }
                 }
             }
+            // The Attachments the same way (#267), a file without text of
+            // its kind read again never.
+            let note = (&p.note.id, &p.note.attachments);
+            let merged = sections.iter().map(|s| (&s.id, &s.attachments));
+            for (id, files) in std::iter::once(note).chain(merged) {
+                let changes = self.store.may_change(id)?;
+                for file in files {
+                    let key = (id.clone(), file.hash.clone());
+                    if notes.may_remove_attachment(id, &file.hash)? {
+                        removable.insert(key.clone());
+                    }
+                    if notes.may_remove_attachment_text(id, &file.hash)? {
+                        text_removable.insert(key.clone());
+                    }
+                    if changes && file.kind().has_text() && notes.has_file(&file.hash) {
+                        remakeable.insert(key);
+                    }
+                }
+            }
         }
         let agenda = match self.selection {
             // Read on a thread of its own where the window has one, the
@@ -5155,6 +6408,23 @@ impl App {
                 }
             }
             trashed_frogs.sort_by_key(|(frog, ..)| std::cmp::Reverse(frog.trashed));
+        }
+        // The trash's search (#274) finds its Routines and Frogs by their
+        // Note, as it finds the cards; one whose Note is gone it does not.
+        if self.selection == Selection::Trash && !self.query.trim().is_empty() {
+            let theirs: Vec<Note> = trashed_routines
+                .iter()
+                .filter_map(|(_, note)| note.clone())
+                .chain(trashed_frogs.iter().filter_map(|(_, note, _)| note.clone()))
+                .collect();
+            let found: HashSet<String> = search
+                .among(&self.query, theirs)?
+                .into_iter()
+                .map(|n| n.id)
+                .collect();
+            let kept = |note: &Option<Note>| note.as_ref().is_some_and(|n| found.contains(&n.id));
+            trashed_routines.retain(|(_, note)| kept(note));
+            trashed_frogs.retain(|(_, note, _)| kept(note));
         }
         let mut all_routines = Vec::new();
         if self.selection == Selection::AllRoutines {
@@ -5209,6 +6479,14 @@ impl App {
         }
         Ok(View {
             areas,
+            folded: self
+                .store
+                .local_settings_with_prefix(AREA_FOLDED)?
+                .into_iter()
+                .filter(|(_, v)| v == "true")
+                .filter_map(|(k, _)| k.strip_prefix(AREA_FOLDED).map(str::to_string))
+                .collect(),
+            unsorted: notes.unsorted()?.len(),
             access,
             people,
             names,
@@ -5238,6 +6516,17 @@ impl App {
             sessions,
             card_sessions,
             card_changes,
+            card_may,
+            hidden_notes,
+            hidden_areas,
+            hideable_areas,
+            note_hidden,
+            tag_tree: match self.selection {
+                // The desktop has no Area Locks: nothing is closed.
+                Selection::Tags => TagTree::new(store).tree(&HashSet::new())?,
+                _ => Vec::new(),
+            },
+            tag_suggestions: self.tag_suggestions()?,
             box_looks,
             box_ticks,
             show_ticks,
@@ -5302,12 +6591,29 @@ impl App {
                 _ => None,
             },
             ai_task,
+            ask_provider: if self.selection == Selection::Ask {
+                Some(self.store.ask_provider()?)
+            } else {
+                None
+            },
         })
     }
 
     /// Does `action`, reads the log again and announces what went wrong.
     fn apply(&mut self, action: Action) {
         let done = self.act(action);
+        // One place per Note (#287): a Note open in its own window comes
+        // forward there, not in the dialog.
+        if let Some(id) = &self.selected_note
+            && let Some(window) = self
+                .note_windows
+                .iter_mut()
+                .find(|w| w.app.alone.as_ref().is_some_and(|a| a.note == *id))
+        {
+            window.forward = true;
+            self.selected_note = None;
+            self.start_lines = false;
+        }
         // The session runs exactly while the Sync or Pair dialog shows,
         // or the first start's adding of a Device of one's own.
         let adding = self.welcome.as_ref().is_some_and(|w| w.adding);
@@ -5335,6 +6641,11 @@ impl App {
         if let Some(wake) = &self.wake {
             drop(wake.send(Event::Wake));
         }
+        // What a Note window did, the main window and the others read
+        // (#287).
+        if self.alone.is_some() {
+            self.seen_writes = self.writes.fetch_add(1, Ordering::SeqCst) + 1;
+        }
     }
 
     fn act(&mut self, action: Action) -> oldbrainfix_core::Result<()> {
@@ -5344,6 +6655,7 @@ impl App {
                 | Action::NewTopic(_)
                 | Action::Rename(_)
                 | Action::StartMerge
+                | Action::AskMergeNotes(_)
                 | Action::Share(_)
         ) {
             self.focus = true;
@@ -5360,6 +6672,9 @@ impl App {
             Action::OpenPage(page) => {
                 self.save_text()?;
                 self.pages = vec![page];
+                // Opened anew, the Settings show everything (#282).
+                self.settings_query.clear();
+                self.backup_notes_left();
             }
             Action::PageInto(page) => {
                 if page == Page::Feedback {
@@ -5369,8 +6684,13 @@ impl App {
             }
             Action::PageBack => {
                 self.pages.pop();
+                self.backup_notes_left();
             }
-            Action::ClosePage => self.pages.clear(),
+            Action::ClosePage => {
+                self.pages.clear();
+                self.settings_query.clear();
+                self.backup_notes_left();
+            }
             Action::NewNote => {
                 // One dialog at a time: the Note open is kept and closed.
                 self.leave_note()?;
@@ -5387,21 +6707,74 @@ impl App {
                 self.capture_focus = false;
             }
             Action::CloseNote => self.leave_note()?,
+            Action::OpenWindow(id) => self.open_note_window(&id)?,
+            Action::KeepOnTop(on) => {
+                if let Some(alone) = &mut self.alone {
+                    alone.on_top = on;
+                }
+            }
             Action::Badge(open) => self.badge = open,
             Action::Add(kind) => self.add(kind)?,
             Action::CreateNamed => self.create_named()?,
             Action::TallyPage(intent) => self.tally_page_action(intent)?,
+            Action::Leave(from) => {
+                let leaving = match from {
+                    Leave::Editor => self.editor.as_ref().map(RoutineEditor::leaving),
+                    Leave::TallyForm => self.tally_form.as_ref().map(|form| match form {
+                        TallyForm::Entry(form) => form.leaving(),
+                        TallyForm::Field(_) => Leaving::Close,
+                    }),
+                    Leave::TallyPage => self.tally_page.as_ref().map(TallyPage::leaving),
+                };
+                match leaving {
+                    Some(Leaving::Close) => return self.act(from.close()),
+                    Some(Leaving::Save) => return self.act(from.save()),
+                    Some(Leaving::Ask) => self.dialog = Some(Dialog::Discard(from)),
+                    None => {}
+                }
+            }
+            Action::Discard(from) => {
+                self.dialog = None;
+                return self.act(from.close());
+            }
+            Action::KeepEditing(from) => {
+                self.dialog = None;
+                match from {
+                    Leave::Editor => {
+                        if let Some(editor) = &mut self.editor {
+                            editor.show_what_to_fix();
+                        }
+                    }
+                    Leave::TallyForm => {
+                        if let Some(TallyForm::Entry(form)) = &mut self.tally_form {
+                            form.show_what_to_fix();
+                        }
+                    }
+                    Leave::TallyPage => {
+                        if let Some(page) = &mut self.tally_page {
+                            page.show_what_to_fix();
+                        }
+                    }
+                }
+            }
             Action::QuickNote => self.quick_note_wanted = true,
             Action::Quit => self.quit_wanted = true,
             Action::Find => {
                 self.leave_note()?;
-                // All Notes, an Area and a Topic have the search.
-                if !matches!(self.selection, Selection::All | Selection::Place(_)) {
+                // All Notes, Unsorted, an Area, a Topic and the trash have
+                // the search (#274), the list shown searched.
+                if !self.searches() {
                     self.go(Selection::All);
                 }
                 self.search_focus = true;
             }
             Action::Clip(clip) => self.clip = Some(clip),
+            Action::Undo => {
+                if let Some(undo) = self.undo.take() {
+                    self.save_text()?;
+                    undo.apply(&self.store)?;
+                }
+            }
             Action::OpenGuide => self.open_url = Some(about_view::guide_url(self.t.locale())),
             Action::SyncNow => {
                 self.save_text()?;
@@ -5410,7 +6783,14 @@ impl App {
                     self.folder_now()?;
                 }
             }
-            Action::AskFileInto(notes) => self.dialog = Some(Dialog::FileInto { notes }),
+            Action::AskFileInto(notes) => self.ask_file_into(Filing::Notes(notes))?,
+            Action::RecordHotkey(on) => self.record_hotkey(on),
+            Action::FileIntoPicked(picked) => self.file_into_picked(picked)?,
+            Action::FileIntoBack => {
+                if let Some(Dialog::FileInto { picker, .. }) = &mut self.dialog {
+                    picker.back();
+                }
+            }
             Action::PickCard(id, pick) => {
                 let order = self.shown_cards();
                 match pick {
@@ -5420,6 +6800,15 @@ impl App {
                 }
             }
             Action::ClearCards => self.cards.clear(),
+            Action::StepCards { down, on } => {
+                let order = self.shown_cards();
+                self.scroll_card = if on {
+                    self.cards.step_on(&order, down)
+                } else {
+                    self.cards.step(&order, down)
+                };
+            }
+            Action::SelectAllCards => self.cards.select_all(&self.shown_cards()),
             Action::AskImport => self.dialog = Some(Dialog::Import),
             Action::SelectNote(id) => {
                 // One dialog at a time: the quick note is kept and closed.
@@ -5432,6 +6821,10 @@ impl App {
                 self.selected_note = Some(id);
                 self.editor = None;
                 self.tally_form = None;
+            }
+            Action::StartLine(id) => {
+                self.act(Action::SelectNote(id))?;
+                self.start_lines = true;
             }
             Action::Capture(nudge_in) => {
                 // A running recording is ended and kept first; held
@@ -5502,20 +6895,61 @@ impl App {
                 DeviceSettings::new(&self.store).set_playback_speed(speed)?;
             }
             Action::PickFiles => {
-                let files = (self.files_picker)(self.t.from_file_title())
-                    .into_iter()
-                    .filter_map(|path| {
-                        let bytes = std::fs::read(&path).ok()?;
-                        Some((file_name(&path), bytes))
-                    })
-                    .collect();
-                self.hold_files(files);
+                let paths = (self.files_picker)(self.t.from_file_title());
+                let read = self.read_files(&paths);
+                self.hold_files(read);
+            }
+            Action::AttachFiles => {
+                let paths = (self.files_picker)(self.t.attach_file_title());
+                let read = self.read_files(&paths);
+                return self.act(Action::Files(read));
             }
             Action::Files(files) => {
-                // They wait in the quick note, with what is typed (#146).
+                // Onto the Note open they are its own (#267); else they
+                // wait in the quick note, with what is typed (#146).
+                // Only while the Note dialog lies on top: over the quick
+                // note or a Page they wait for a new Note.
+                let on_top = self.top_dialog() == Some(TopDialog::Note) && self.dialog.is_none();
+                if let Some(note) = self
+                    .note_menu()
+                    .filter(|n| n.changes && on_top)
+                    .map(|n| n.id)
+                {
+                    self.save_text()?;
+                    return self.attach_to(&note, files);
+                }
                 self.hold_files(files);
                 if self.holds_media() && !self.quick_open {
                     self.act(Action::NewNote)?;
+                }
+            }
+            Action::OpenAttachment(note, hash) => self.open_attachment(&note, &hash, false),
+            Action::OpenAttachmentAnyway(note, hash) => {
+                self.dialog = None;
+                self.open_attachment(&note, &hash, true);
+            }
+            Action::HideFromAi(id, on) => {
+                // A sync since it was read may have shared it; taking the
+                // mark off is never refused.
+                if !on || self.store.may_hide_from_ai(&id)? {
+                    self.store.set_hidden_from_ai(&id, on)?;
+                }
+            }
+            Action::ShowToAi => {
+                if let Some(Dialog::HiddenFromAi {
+                    marks,
+                    area_first: false,
+                    retry,
+                    ..
+                }) = self.dialog.take()
+                {
+                    let store = &self.store;
+                    store.batch(|| {
+                        marks
+                            .iter()
+                            .try_for_each(|m| store.set_hidden_from_ai(m, false))
+                    })?;
+                    return self.act(*retry);
                 }
             }
             Action::ShowUntranscribable => {
@@ -5566,6 +7000,50 @@ impl App {
                 } else {
                     self.store.remove_local_setting(&setting)?;
                 }
+            }
+            Action::OpenAiPort => {
+                self.settings_section = Some((AI_PORT_SECTION.to_string(), 2));
+                self.act(Action::OpenPage(Page::Settings))?;
+            }
+            Action::OpenAsk => {
+                // In the list, the dialogs over it closed, what was typed
+                // kept.
+                if self.quick_open {
+                    self.act(Action::CloseQuickNote)?;
+                }
+                if self.selected_note.is_some() {
+                    self.act(Action::CloseNote)?;
+                }
+                self.pages.clear();
+                if self.selection != Selection::Ask {
+                    self.go(Selection::Ask);
+                }
+                self.ask.focus = true;
+            }
+            Action::Ask(asked) => self.ask_asked(asked)?,
+            Action::AskSetting(setting) => match setting {
+                AskSetting::Protocol(protocol) => {
+                    self.store.set_ask_protocol(protocol)?;
+                    // Each protocol keeps its own fields.
+                    self.ask_fields = None;
+                }
+                AskSetting::Url(url) => self.store.set_ask_url(&url)?,
+                AskSetting::Model(model) => self.store.set_ask_model(&model)?,
+                AskSetting::Key(key) => self.store.set_ask_key(&key)?,
+            },
+            Action::FoldArea(area, folded) => {
+                // Nothing kept means unfolded, the default.
+                let setting = format!("{AREA_FOLDED}{area}");
+                if folded {
+                    self.store.set_local_setting(&setting, "true")?;
+                } else {
+                    self.store.remove_local_setting(&setting)?;
+                }
+            }
+            Action::MoveArea(area, index) => {
+                let t = self.t;
+                PersonSettings::new(&self.store)
+                    .move_area_by(&area, index, |a| area_name(&t, a))?;
             }
             Action::SwitchView(id) => {
                 if let Some(key) = self.cards_key() {
@@ -5742,34 +7220,45 @@ impl App {
                 self.amend.clear();
             }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
-            Action::File { notes: ids, place } => self.file_notes(&ids, &place)?,
+            Action::File { notes: ids, place } => {
+                let done = self.file_notes(&ids, &place);
+                self.unless_hidden(done, None, Action::File { notes: ids, place })?;
+            }
             Action::Trash => {
                 self.save_text()?;
-                let linked = Routines::new(&self.store).of_note(&selected)?;
-                let question = match linked.as_slice() {
-                    [] => self.t.delete_note_question().to_string(),
-                    [one] if one.is_reminder() => {
-                        self.t.delete_note_reminder_question().to_string()
-                    }
-                    _ => self.t.delete_note_linked_question(linked.len() as i64),
-                };
-                self.dialog = Some(Dialog::TrashNote {
-                    question,
-                    linked: !linked.is_empty(),
-                });
-            }
-            Action::TrashNote => {
-                // Its Routines and Reminders always go with it (#262).
-                Routines::new(&self.store).trash_note(&selected)?;
-                self.dialog = None;
+                // Its Routines and Reminders always go with it (#262) and
+                // come back with its undo (#268).
+                let listed = Notes::new(&self.store)
+                    .by_id(&selected)?
+                    .is_some_and(|n| !n.is_trashed());
+                if listed {
+                    Routines::new(&self.store).trash_note(&selected)?;
+                    self.undo = Some(Undo::Note(selected.clone()));
+                }
             }
             Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
-            Action::Merge(into) => {
-                self.save_text()?;
-                Notes::new(&self.store).merge(&selected, &into)?;
-                self.dialog = None;
-                self.selected_note = Some(into);
+            Action::TrashNotes(ids) => self.trash_notes(&ids)?,
+            Action::RestoreNotes(ids) => self.restore_notes(&ids)?,
+            Action::ImportanceOf(ids, importance) => self.importance_of(&ids, importance)?,
+            Action::AskMergeNotes(ids) => {
+                let others = self.merge_candidates("", &ids)?;
+                self.dialog = Some(Dialog::Merge {
+                    notes: ids,
+                    query: String::new(),
+                    others,
+                });
             }
+            Action::Merge(into) => {
+                let merging = match self.dialog.take() {
+                    Some(Dialog::Merge { notes, .. }) => notes,
+                    other => {
+                        self.dialog = other;
+                        Vec::new()
+                    }
+                };
+                self.merge_picked(merging, into)?;
+            }
+            Action::MergeAgain(merging, into) => self.merge_picked(merging, into)?,
             Action::NewArea => {
                 self.dialog = Some(Dialog::NewPlace {
                     area: None,
@@ -5793,15 +7282,17 @@ impl App {
             Action::Look(area) => self.dialog = Some(Dialog::Look { area }),
             Action::Delete(id) => self.dialog = Some(Dialog::Delete(self.deleting(&id)?)),
             Action::StartMerge => {
-                let others = self.merge_candidates("", &selected)?;
+                let merging = vec![selected.clone()];
+                let others = self.merge_candidates("", &merging)?;
                 self.dialog = Some(Dialog::Merge {
+                    notes: merging,
                     query: String::new(),
                     others,
                 });
             }
             Action::MergeQuery => {
-                if let Some(Dialog::Merge { query, .. }) = &self.dialog {
-                    let found = self.merge_candidates(&query.clone(), &selected)?;
+                if let Some(Dialog::Merge { notes, query, .. }) = &self.dialog {
+                    let found = self.merge_candidates(&query.clone(), &notes.clone())?;
                     if let Some(Dialog::Merge { others, .. }) = &mut self.dialog {
                         *others = found;
                     }
@@ -5840,14 +7331,16 @@ impl App {
             }
             Action::Back => {
                 self.save_text()?;
-                if let Some(to) = self.nav.back(self.selection.clone()) {
-                    self.arrive(to);
+                let left = self.left();
+                if let Some((to, left)) = self.nav.back(self.selection.clone(), left) {
+                    self.arrive(to, left);
                 }
             }
             Action::Forward => {
                 self.save_text()?;
-                if let Some(to) = self.nav.forward(self.selection.clone()) {
-                    self.arrive(to);
+                let left = self.left();
+                if let Some((to, left)) = self.nav.forward(self.selection.clone(), left) {
+                    self.arrive(to, left);
                 }
             }
             Action::Toggle(routine, occurrence) => {
@@ -5868,6 +7361,20 @@ impl App {
                 routines.mark_done(&routine, &occurrence, None)?;
                 // The Reminder goes with it, and comes back with it.
                 routines.trash_note(&selected)?;
+                self.undo = Some(Undo::Done {
+                    routine,
+                    occurrence,
+                    trashed: Some(selected.clone()),
+                });
+            }
+            Action::Answer(routine, occurrence, answer) => {
+                let at = (routine.as_str(), &occurrence);
+                // Ctrl+Z takes a Skip or Tomorrow back (#268).
+                if let Some(undo) =
+                    occurrence_answers::answer(&self.store, &*self.wall, at, answer)?
+                {
+                    self.undo = Some(undo);
+                }
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
             Action::ExportRoutines => {
@@ -5904,6 +7411,23 @@ impl App {
                     self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
                     self.tally_form = None;
                 }
+            }
+            Action::OpenNotified(id) => {
+                let routines = Routines::new(&self.store);
+                let Some(routine) = routines.by_id(&id)?.filter(|r| !r.is_trashed()) else {
+                    return Ok(());
+                };
+                // Gone or in the trash, it opens just the window.
+                let Some(note) = routines.note(&routine)?.filter(|n| !n.is_trashed()) else {
+                    return Ok(());
+                };
+                // A Routine editor or Tally form open keeps its draft, over
+                // the Note dialog.
+                let (editor, tally_form) = (self.editor.take(), self.tally_form.take());
+                let opened = self.act(Action::SelectNote(note.id));
+                self.editor = editor;
+                self.tally_form = tally_form;
+                opened?;
             }
             Action::NewRoutine { note, reminder } => {
                 self.save_text()?;
@@ -6022,16 +7546,12 @@ impl App {
                         .unwrap_or_default();
                     self.tally_page = Some(TallyPage::new(place, true, system).with_name(text));
                 }
+                // Without asking; Ctrl+Z brings it back (#268).
                 Intent::Delete => {
-                    let reminder = self.editor.as_ref().is_some_and(RoutineEditor::once);
-                    let question = if reminder {
-                        self.t.delete_reminder_question()
-                    } else {
-                        self.t.delete_routine_question()
-                    };
-                    self.dialog = Some(Dialog::DeleteRoutine {
-                        question: question.to_string(),
-                    });
+                    if let Some(id) = self.editor.take().and_then(|e| e.routine) {
+                        Routines::new(&self.store).trash(&id)?;
+                        self.undo = Some(Undo::Routine(id));
+                    }
                 }
                 Intent::Close => self.editor = None,
                 Intent::OpenNote(id) => {
@@ -6044,41 +7564,16 @@ impl App {
                     return self.act(Action::Select(Selection::History(id)));
                 }
             },
-            Action::DeleteRoutine => {
-                self.dialog = None;
-                if let Some(id) = self.editor.take().and_then(|e| e.routine) {
-                    Routines::new(&self.store).trash(&id)?;
-                }
-            }
             Action::RestoreRoutine(id) => Routines::new(&self.store).restore(&id)?,
             Action::Frog(asked) => self.frog_action(asked)?,
             Action::SpawnFrog(note) => {
                 self.save_text()?;
                 Frogs::new(&self.store).spawn(&note)?;
             }
-            Action::DeleteFrog => {
-                if let Some(Dialog::DeleteFrog { id }) = self.dialog.take() {
-                    Frogs::new(&self.store).trash(&id)?;
-                }
-            }
             Action::RestoreFrog(id) => Frogs::new(&self.store).restore(&id)?,
             Action::Tally(asked) => self.tally_action(None, asked)?,
             Action::CardTally(note, asked) => self.tally_action(Some(note), asked)?,
             Action::TallyForm(intent) => self.tally_form_action(intent)?,
-            Action::DeleteEntry => {
-                if let Some(Dialog::DeleteEntry { id }) = self.dialog.take() {
-                    let tallies = Tallies::new(&self.store);
-                    // A sync while the dialog was open may have taken it.
-                    if tallies.entry_by_id(&id)?.is_some_and(|e| !e.is_trashed()) {
-                        tallies.trash_entry(&id)?;
-                    }
-                    if let Some(TallyForm::Entry(form)) = &self.tally_form
-                        && form.entry.as_ref().is_some_and(|e| e.id == id)
-                    {
-                        self.tally_form = None;
-                    }
-                }
-            }
             Action::Checklist(asked) => self.checklist_action(asked)?,
             Action::Shopping(asked) => self.shopping_action(asked)?,
             Action::Tick { entity, id, to } => {
@@ -6139,15 +7634,6 @@ impl App {
                     .set_local_setting(&show_ticks_key(&note), if on { "true" } else { "false" })?;
             }
             Action::LeaveLines => self.lines.leave(&self.store, &*self.wall)?,
-            Action::DeleteLine => {
-                if let Some(Dialog::DeleteLine { id, .. }) = self.dialog.take() {
-                    if self.line_of(&id)?.is_some() {
-                        Checklists::new(&self.store).delete(&id)?;
-                    } else if self.shopping_line_of(&id)?.is_some() {
-                        ShoppingLists::new(&self.store).delete(&id)?;
-                    }
-                }
-            }
             Action::Setting(setting) => self.set(setting)?,
             Action::PickAlarmSound => {
                 if let Some(path) = (self.sound_picker)(self.t.alarm_sound_pick()) {
@@ -6190,6 +7676,16 @@ impl App {
                     self.import.start(self.store.clone(), folder, name, area);
                 }
             }
+            Action::ExportVault => {
+                if self.may_export_vault()
+                    && let Some(parent) = (self.vault_picker)(self.t.vault_export_pick_title())
+                {
+                    self.vault
+                        .export(self.store.clone(), parent, self.t, self.wall.clone());
+                    // Its dialog says how far it is meanwhile.
+                    self.dialog = Some(Dialog::Vault);
+                }
+            }
             Action::Sync(SyncAction::ImportKeep) => {
                 if !self.import.running() {
                     self.dialog = Some(Dialog::ImportKeep);
@@ -6216,6 +7712,7 @@ impl App {
             Action::OpenFile(path) => self.open_file(&path),
             Action::SendWaitingChanges => self.send_waiting_changes()?,
             Action::Backup(asked) => self.backup(asked)?,
+            Action::BackupNotes(asked) => self.backup_notes_action(asked),
             Action::Profile(asked) => self.profile_action(asked)?,
             Action::OpenPerson(id) => self.open_person(id, SendBack::No)?,
             Action::Person(asked) => self.person_action(asked)?,
@@ -6223,8 +7720,15 @@ impl App {
             Action::Ai(asked) => self.ai_action(asked)?,
             Action::StartSend(id) => {
                 self.save_text()?;
+                // Asked before whom (#267).
+                let marks = self.store.hidden_from_ai_by(&id)?;
+                if !marks.is_empty() {
+                    self.ask_hidden(marks, None, Action::StartSend(id));
+                    return Ok(());
+                }
                 let recipients = self.store.sent_item_recipients()?;
-                let picked = (!recipients.is_empty()).then_some(0);
+                let sent_to = self.store.last_sent_to(&id)?;
+                let picked = SendTo::first(&recipients, sent_to.as_deref());
                 let update = self.store.was_sent(&id)?;
                 self.dialog = Some(Dialog::Send {
                     note: id,
@@ -6245,7 +7749,10 @@ impl App {
             }
             Action::ExportPack(from) => {
                 self.save_text()?;
-                self.export_pack(&from)?;
+                let done = self.export_pack(&from);
+                // Packed whole, an Area's own mark comes off with it.
+                let area = self.view.area(&from).map(|a| a.id.clone());
+                self.unless_hidden(done, area.as_deref(), Action::ExportPack(from))?;
             }
             Action::Pack(asked) => self.pack_action(asked)?,
             Action::Feedback(asked) => self.feedback_action(asked)?,
@@ -6254,17 +7761,11 @@ impl App {
                     self.open_file(&path);
                 }
             }
-            Action::AskRemovePackFrom(note) => {
-                if let Some(from) = self.store.pack_from(&note)? {
-                    let name = profile_view::display_name(&self.t, &from.name).to_string();
-                    self.dialog = Some(Dialog::RemovePackFrom { note, name });
-                }
-            }
             Action::RemovePackFrom(note) => {
-                if matches!(self.dialog, Some(Dialog::RemovePackFrom { .. })) {
-                    self.dialog = None;
+                if self.store.pack_from(&note)?.is_some() {
+                    self.store.remove_pack_from(&note)?;
+                    self.undo = Some(Undo::PackFrom(note));
                 }
-                self.store.remove_pack_from(&note)?;
             }
             Action::AcceptSent => match self.dialog.take() {
                 Some(Dialog::HeldSentItem { held, .. }) => self.accept_held(&held.id, false)?,
@@ -6374,6 +7875,13 @@ impl App {
                 }
             }
             Action::Share(area) => {
+                // Asked before whom (#267): an Area hidden or holding a
+                // Note hidden from AI is not shared.
+                let marks = self.store.hidden_from_ai_in(&area)?;
+                if !marks.is_empty() {
+                    self.ask_hidden(marks, Some(&area), Action::Share(area.clone()));
+                    return Ok(());
+                }
                 let afar = self.afar_people()?;
                 self.dialog = Some(Dialog::Share {
                     area,
@@ -6426,7 +7934,14 @@ impl App {
             }
             Action::StartInvite => {
                 if let Some(Dialog::Share { area, role, .. }) = self.dialog.clone() {
-                    let area = self.store.share(&area)?;
+                    // Marked on another Device meanwhile.
+                    let area = match self.store.share(&area) {
+                        Err(oldbrainfix_core::Error::HiddenFromAi(marks)) => {
+                            self.ask_hidden(marks, Some(&area), Action::Share(area.clone()));
+                            return Ok(());
+                        }
+                        shared => shared?,
+                    };
                     self.dialog = None;
                     self.save_text()?;
                     // Whoever joins with this Device's code gets the Area.
@@ -6461,17 +7976,21 @@ impl App {
                     self.dialog = Some(Dialog::People { area });
                 }
             }
-            Action::AskRemoveMedia { note, hash, photo } => {
+            Action::AskRemoveMedia { note, hash, made } => {
                 self.save_text()?;
-                self.dialog = Some(Dialog::RemoveMedia { note, hash, photo });
+                self.dialog = Some(Dialog::RemoveMedia { note, hash, made });
             }
             Action::RemoveMedia => {
-                if let Some(Dialog::RemoveMedia { note, hash, photo }) = self.dialog.take() {
+                if let Some(Dialog::RemoveMedia { note, hash, made }) = self.dialog.take() {
                     // A sync while the dialog was open may have taken it
                     // already.
-                    if photo {
+                    if made == Made::Photo {
                         if notes.may_remove_photo(&note, &hash)? {
                             notes.remove_photo(&note, &hash)?;
+                        }
+                    } else if made == Made::File {
+                        if notes.may_remove_attachment(&note, &hash)? {
+                            notes.remove_attachment(&note, &hash)?;
                         }
                     } else if notes.may_remove_recording(&note, &hash)? {
                         if self.playing.as_deref() == Some(hash.as_str()) {
@@ -6496,7 +8015,7 @@ impl App {
             Action::TakeOver {
                 note,
                 hash,
-                photo,
+                made,
                 append,
             } => {
                 self.save_text()?;
@@ -6504,10 +8023,10 @@ impl App {
                 let Some(target) = notes.by_id(&note)? else {
                     return Ok(());
                 };
-                let texts = if photo {
-                    &target.photo_texts
-                } else {
-                    &target.transcripts
+                let texts = match made {
+                    Made::Photo => &target.photo_texts,
+                    Made::Recording => &target.transcripts,
+                    Made::File => &target.attachment_texts,
                 };
                 let Some(generated) = texts.get(&hash).filter(|g| !g.trim().is_empty()) else {
                     return Ok(());
@@ -6526,29 +8045,43 @@ impl App {
                     field.text = written;
                 }
             }
-            Action::AskRemoveText { note, hash, photo } => {
+            Action::RemoveText { note, hash, made } => {
                 self.save_text()?;
-                self.dialog = Some(Dialog::RemoveText { note, hash, photo });
-            }
-            Action::RemoveText => {
-                if let Some(Dialog::RemoveText { note, hash, photo }) = self.dialog.take() {
-                    // A sync while the dialog was open may have taken it
-                    // already.
-                    if photo {
-                        if notes.may_remove_photo_text(&note, &hash)? {
-                            notes.remove_photo_text(&note, &hash)?;
-                        }
-                    } else if notes.may_remove_transcript(&note, &hash)? {
-                        notes.remove_transcript(&note, &hash)?;
+                let notes = Notes::new(&self.store);
+                // The text is kept for the undo, which writes it back.
+                let held = notes.by_id(&note)?.and_then(|n| {
+                    let texts = match made {
+                        Made::Photo => n.photo_texts,
+                        Made::Recording => n.transcripts,
+                        Made::File => n.attachment_texts,
+                    };
+                    texts.get(&hash).cloned()
+                });
+                let may = match made {
+                    Made::Photo => notes.may_remove_photo_text(&note, &hash)?,
+                    Made::Recording => notes.may_remove_transcript(&note, &hash)?,
+                    Made::File => notes.may_remove_attachment_text(&note, &hash)?,
+                };
+                if let Some(text) = held.filter(|_| may) {
+                    match made {
+                        Made::Photo => notes.remove_photo_text(&note, &hash)?,
+                        Made::Recording => notes.remove_transcript(&note, &hash)?,
+                        Made::File => notes.remove_attachment_text(&note, &hash)?,
                     }
+                    self.undo = Some(Undo::Text {
+                        note,
+                        hash,
+                        made,
+                        text,
+                    });
                 }
             }
-            Action::Again { note, hash, photo } => {
+            Action::Again { note, hash, made } => {
                 self.save_text()?;
-                let enricher = if photo {
-                    &self.reader
-                } else {
-                    &self.transcriber
+                let enricher = match made {
+                    Made::Photo => &self.reader,
+                    Made::Recording => &self.transcriber,
+                    Made::File => &self.files_reader,
                 };
                 if let Some(enricher) = enricher {
                     enricher.again(Blob {
@@ -6592,23 +8125,30 @@ impl App {
                 }
             }
             Action::ShowNoticeDialog | Action::ShowError | Action::ShowUpdate => {}
-            Action::ShowAgainFailed(photo) => {
+            Action::ShowAgainFailed(made) => {
                 self.again_failed = None;
                 let t = self.t;
-                self.dialog = Some(if photo {
-                    Dialog::Failure {
+                self.dialog = Some(match made {
+                    Made::Photo => Dialog::Failure {
                         title: t.read_text_again_failed_title().into(),
                         cause: t.read_text_again_failed_cause().into(),
                         fix: t.generated_text_again_fix().into(),
                         details: "read again: no Photo Text".into(),
-                    }
-                } else {
-                    Dialog::Failure {
+                    },
+                    Made::Recording => Dialog::Failure {
                         title: t.transcribe_again_failed_title().into(),
                         cause: t.transcribe_again_failed_cause().into(),
                         fix: t.generated_text_again_fix().into(),
                         details: "transcribe again: no Transcript".into(),
-                    }
+                    },
+                    // A file reads always; only one whose bytes are not
+                    // here brings no text.
+                    Made::File => Dialog::Failure {
+                        title: t.file_read_again_failed_title().into(),
+                        cause: t.file_not_here_cause().into(),
+                        fix: t.generated_text_again_fix().into(),
+                        details: "read again: the file is not on this computer".into(),
+                    },
                 });
             }
             Action::Sync(SyncAction::AutoSync(id, on)) => self.store.set_auto_sync(&id, on)?,
@@ -6636,7 +8176,7 @@ impl App {
     fn frog_action(&mut self, asked: FrogAction) -> oldbrainfix_core::Result<()> {
         // What was typed into the Note dialog first, as its Frog badge
         // eats or removes from there (#259).
-        if matches!(asked, FrogAction::Toggle(_) | FrogAction::AskDelete(_)) {
+        if matches!(asked, FrogAction::Toggle(_) | FrogAction::Delete(_)) {
             self.save_text()?;
         }
         let frogs = Frogs::new(&self.store);
@@ -6646,11 +8186,18 @@ impl App {
                     frogs.unmark_done(&id)?;
                 } else {
                     frogs.mark_done(&id, None)?;
+                    self.undo = Some(Undo::FrogEaten(id));
                 }
             }
             FrogAction::Another(id) => frogs.another(&*self.wall, &id)?,
             FrogAction::OpenNote(id) => return self.act(Action::SelectNote(id)),
-            FrogAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteFrog { id }),
+            // Without asking; Ctrl+Z brings it back (#268).
+            FrogAction::Delete(id) => {
+                if frogs.by_id(&id)?.is_some_and(|f| !f.is_trashed()) {
+                    frogs.trash(&id)?;
+                    self.undo = Some(Undo::Frog(id));
+                }
+            }
             FrogAction::OpenView => return self.act(Action::Select(Selection::Frogs)),
             FrogAction::DoneOpen(open) => {
                 let value = if open { "true" } else { "false" };
@@ -6687,10 +8234,17 @@ impl App {
                 };
                 let today = Day::today(self.store.now(), &*self.wall);
                 let system = self.unit_system()?;
+                let mine = self.own_entries(&tally, entry.is_none())?;
                 self.save_text()?;
                 self.editor = None;
                 self.selected_note = Some(note_id);
-                let form = EntryForm::new(&tally, entry, (system, today), &*self.wall, &self.t);
+                let form = EntryForm::new(
+                    &tally,
+                    (entry, &mine),
+                    (system, today),
+                    &*self.wall,
+                    &self.t,
+                );
                 self.tally_form = Some(TallyForm::Entry(form.for_pick(&session, occurrence)));
             }
             SessionAction::Another {
@@ -6700,6 +8254,77 @@ impl App {
             } => Sessions::new(&self.store).another(&session, &occurrence, &note_id)?,
         }
         Ok(())
+    }
+
+    /// Starts recording the hotkey in the Settings, the key held let go
+    /// meanwhile so that it reaches the window, or with `on` false stops
+    /// it (#283).
+    fn record_hotkey(&mut self, on: bool) {
+        if self.hotkey_recording.on == on {
+            return;
+        }
+        self.hotkey_recording.on = on;
+        if let Some(hotkey) = &self.hotkey {
+            hotkey.borrow_mut().pause(on);
+        }
+    }
+
+    /// While the Settings record the hotkey (#283), the keys pressed are
+    /// taken before anything else hears them, so none of the app's own
+    /// works: a chord is kept as the hotkey, Esc stops recording, any
+    /// other key waits for one. Hidden, minimised or left for another
+    /// window, the window hears no keys, and recording stops.
+    fn recorded_hotkey(&mut self, ui: &mut Ui, actions: &mut Vec<Action>) {
+        if !self.hotkey_recording.on {
+            return;
+        }
+        let left = ui.input(|i| i.viewport().focused == Some(false));
+        if left || !self.drawn(ui.ctx()) {
+            self.record_hotkey(false);
+            return;
+        }
+        let mut cancelled = false;
+        let mut chord = None;
+        ui.input_mut(|i| {
+            let held = i.modifiers;
+            i.events.retain(|event| {
+                // Ctrl+C, Ctrl+X and Ctrl+V come as copy, cut and paste.
+                let pressed = match event {
+                    egui::Event::Key {
+                        key,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => Some((*key, *modifiers)),
+                    egui::Event::Copy => Some((Key::C, held)),
+                    egui::Event::Cut => Some((Key::X, held)),
+                    egui::Event::Paste(_) => Some((Key::V, held)),
+                    egui::Event::Key { .. } | egui::Event::Text(_) => None,
+                    _ => return true,
+                };
+                if let Some((key, modifiers)) = pressed
+                    && !cancelled
+                    && chord.is_none()
+                {
+                    if key == Key::Escape && modifiers.is_none() {
+                        cancelled = true;
+                    }
+                    chord = Chord::pressed(key, modifiers);
+                }
+                false
+            });
+        });
+        if cancelled || chord.is_some() {
+            self.record_hotkey(false);
+            ui.ctx().request_repaint();
+        }
+        if let Some(chord) = chord {
+            self.hotkey_text = chord.to_string();
+            let stored = DeviceSettings::new(&self.store).capture_hotkey().ok();
+            if stored.as_deref() != Some(self.hotkey_text.as_str()) {
+                actions.push(Action::Setting(Setting::Hotkey(chord.to_string())));
+            }
+        }
     }
 
     /// Does what was asked of a Checklist, on a card or in the editor
@@ -6763,22 +8388,83 @@ impl App {
                     LineStep::Down => checklist_view::move_down(&self.store, &list, &line)?,
                     LineStep::Indent => lists.indent(&id, true)?,
                     LineStep::Outdent => lists.indent(&id, false)?,
+                    // Without asking; Ctrl+Z and "Removed Lines" bring it
+                    // back (#268).
                     LineStep::Delete => {
-                        self.dialog = Some(Dialog::DeleteLine {
+                        lists.delete(&id)?;
+                        self.undo = Some(Undo::Line {
+                            note: list.note_id.clone(),
                             id,
-                            for_good: false,
+                            shopping: false,
                         });
                     }
                 }
             }
             ChecklistAction::Menu(note) => {
-                self.card_menu = match Notes::new(&self.store).by_id(&note)? {
-                    Some(note) => Some(checklist_view::card_menu(&self.store, &note, &*self.wall)?),
+                let note = Notes::new(&self.store).by_id(&note)?;
+                self.card_menu = match &note {
+                    Some(note) => Some(checklist_view::card_menu(&self.store, note, &*self.wall)?),
+                    None => None,
+                };
+                self.card_spawns = match &note {
+                    Some(note) => Some(self.card_spawns(note)?),
                     None => None,
                 };
             }
+            ChecklistAction::Removed(asked) => self.removed_lines(asked, false)?,
+            ChecklistAction::Drop(from, before) => {
+                // A new Line is stored first, and what was typed, so the
+                // drop lands among the Lines as shown (#283).
+                let Some(shown) = self.lines.keyed(from).map(|row| row.shown_id()) else {
+                    return Ok(());
+                };
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &shown)? else {
+                    return Ok(());
+                };
+                self.lines.keep(&self.store, &*self.wall)?;
+                let before = match before {
+                    Some(key) => match self.lines.keyed(key).and_then(|row| row.id.clone()) {
+                        Some(id) => Some(id),
+                        None => return Ok(()),
+                    },
+                    None => None,
+                };
+                let Some((list, line)) = self.line_of(&id)? else {
+                    return Ok(());
+                };
+                checklist_view::move_before(&self.store, &list, &line, before.as_deref())?;
+            }
         }
         Ok(())
+    }
+
+    /// What a card's menu offers of the Note `note`'s Routines (#281), as
+    /// the Note menu and the "+" badge do: Routine… and Reminder… for who
+    /// may set them up (ADR 0013), in Advanced also Frog while it has none
+    /// open and Session… on a plain Note without Code text (#197, #213).
+    fn card_spawns(&self, note: &Note) -> oldbrainfix_core::Result<CardSpawns> {
+        let schedules = !note.is_trashed()
+            && self
+                .store
+                .may_manage(self.store.area_of(&note.id)?.as_deref())?;
+        let advanced = schedules && self.view.advanced;
+        let frog_open = advanced
+            && Frogs::new(&self.store)
+                .of_note(&note.id)?
+                .iter()
+                .any(|f| !f.is_done());
+        let plain = advanced
+            && NoteKind::of(&self.store, &note.id)? == NoteKind::Plain
+            && note.text_format != text_format::CODE;
+        let marked = self.store.is_marked_hidden_from_ai(&note.id)?;
+        let hides = !note.is_trashed() && (marked || self.store.may_hide_from_ai(&note.id)?);
+        Ok(CardSpawns {
+            note: note.id.clone(),
+            schedules,
+            frog: advanced && !frog_open,
+            session: plain,
+            hidden: hides.then_some(marked),
+        })
     }
 
     /// Does what was asked of a Shopping List, on a card or in the
@@ -6794,8 +8480,9 @@ impl App {
                 let Some(line) = self.lines.stored_id(&self.store, &*self.wall, &line)? else {
                     return Ok(());
                 };
-                // A sync meanwhile may have taken it.
-                if let Some(shown) = self.shopping_line_of(&line)?
+                // A sync meanwhile may have taken it; one checked Once
+                // is brought back from gone, as from the Agenda (#276).
+                if let Some(shown) = self.shopping_line_of(&line, !checked)?
                     && lists.may_check(&shown.note_id)?
                 {
                     if checked {
@@ -6812,7 +8499,10 @@ impl App {
                     return Ok(());
                 };
                 self.lines.keep(&self.store, &*self.wall)?;
-                if self.shopping_line_of(&id)?.is_none() || !lists.may_edit(&id)? {
+                let Some(shown) = self.shopping_line_of(&id, false)? else {
+                    return Ok(());
+                };
+                if !lists.may_edit(&id)? {
                     return Ok(());
                 }
                 match step {
@@ -6821,10 +8511,56 @@ impl App {
                         self.badge = Some(NoteBadge::Reappear);
                     }
                     ShopStep::Reappear(reappear) => lists.set_reappear(&id, reappear)?,
+                    // The editor asks them as a drop, among the open rows
+                    // as they show (#283).
+                    ShopStep::Up | ShopStep::Down => {}
+                    // Without asking; Ctrl+Z and "Removed Lines" bring it
+                    // back (#268).
                     ShopStep::Delete => {
-                        self.dialog = Some(Dialog::DeleteLine { id, for_good: true });
+                        lists.delete(&id)?;
+                        self.undo = Some(Undo::Line {
+                            note: shown.note_id.clone(),
+                            id,
+                            shopping: true,
+                        });
                     }
                 }
+            }
+            ShoppingAction::Removed(asked) => self.removed_lines(asked, true)?,
+            ShoppingAction::Drop(from, before) => {
+                // A new Line is stored first, and what was typed, so the
+                // move lands among the Lines as shown (#283).
+                let Some(shown) = self.lines.keyed(from).map(|row| row.shown_id()) else {
+                    return Ok(());
+                };
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &shown)? else {
+                    return Ok(());
+                };
+                self.lines.keep(&self.store, &*self.wall)?;
+                let before = match before {
+                    Some(key) => match self.lines.keyed(key).and_then(|row| row.id.clone()) {
+                        Some(id) => Some(id),
+                        None => return Ok(()),
+                    },
+                    None => None,
+                };
+                // A sync meanwhile may have struck or taken either.
+                let open = |id: &str| -> oldbrainfix_core::Result<bool> {
+                    Ok(self.shopping_line_of(id, false)?.is_some_and(|l| !l.struck))
+                };
+                if !open(&id)?
+                    || !lists.may_edit(&id)?
+                    || before.as_deref().is_some_and(|b| b == id)
+                {
+                    return Ok(());
+                }
+                if let Some(before) = &before
+                    && !open(before)?
+                {
+                    return Ok(());
+                }
+                lists.move_line(&id, &*self.wall, before.as_deref())?;
+                self.lines.move_row(&id, before.as_deref());
             }
             ShoppingAction::OnAgenda(note, shows) => {
                 // It may have gone to the trash or back to a plain Note
@@ -6863,7 +8599,7 @@ impl App {
                 // Its rows start again from the Lines of the new list, what
                 // was typed kept above.
                 if shown {
-                    self.lines = TypedLines::default();
+                    self.lines = TypedLines::keyed_after(self.lines_base);
                 }
             }
             Kind::Checklist => {
@@ -7096,13 +8832,42 @@ impl App {
         Ok(())
     }
 
-    /// The Line `id` of a Shopping List, while it shows there (#122).
-    fn shopping_line_of(&self, id: &str) -> oldbrainfix_core::Result<Option<ShoppingLine>> {
+    /// The Line `id` of a Shopping List, while it shows there (#122), or
+    /// with `gone` while it is gone, checked Once (#276).
+    fn shopping_line_of(
+        &self,
+        id: &str,
+        gone: bool,
+    ) -> oldbrainfix_core::Result<Option<ShoppingLine>> {
         let Some(note) = self.store.current(id, checklist_keys::NOTE)? else {
             return Ok(None);
         };
         let list = ShoppingLists::new(&self.store).by_note(&note, &*self.wall)?;
-        Ok(list.and_then(|list| list.line(id).cloned()))
+        Ok(list.and_then(|list| {
+            list.line(id)
+                .or_else(|| {
+                    gone.then(|| list.gone().iter().find(|l| l.id == id))
+                        .flatten()
+                })
+                .cloned()
+        }))
+    }
+
+    /// The user's own entries of `tally`, newest first, which a new entry
+    /// starts from (#276); none unless `new`.
+    fn own_entries(
+        &self,
+        tally: &oldbrainfix_core::Tally,
+        new: bool,
+    ) -> oldbrainfix_core::Result<Vec<oldbrainfix_core::TallyEntry>> {
+        if !new {
+            return Ok(Vec::new());
+        }
+        let mine = PersonFilter {
+            me: true,
+            ..PersonFilter::default()
+        };
+        Tallies::new(&self.store).entries(&tally.note_id, &mine)
     }
 
     /// The Line `id` with its Checklist, while it shows in one.
@@ -7162,17 +8927,18 @@ impl App {
                     _ => None,
                 };
                 let today = Day::today(self.store.now(), &*self.wall);
+                let mine = self.own_entries(&tally, entry.is_none())?;
                 self.save_text()?;
                 self.editor = None;
                 self.tally_form = Some(TallyForm::Entry(EntryForm::new(
                     &tally,
-                    entry,
+                    (entry, &mine),
                     (system, today),
                     &*self.wall,
                     &self.t,
                 )));
             }
-            TallyAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteEntry { id }),
+            TallyAction::Delete(id) => self.delete_entry(&id)?,
             TallyAction::Restore(id) => tallies.restore_entry(&id)?,
             TallyAction::Whose(whose) => {
                 self.tally_whose.insert(note, whose);
@@ -7238,9 +9004,8 @@ impl App {
                 if let TallyForm::Entry(form) = form
                     && let Some(entry) = &form.entry
                 {
-                    self.dialog = Some(Dialog::DeleteEntry {
-                        id: entry.id.clone(),
-                    });
+                    let id = entry.id.clone();
+                    self.delete_entry(&id)?;
                 }
             }
         }
@@ -7266,6 +9031,7 @@ impl App {
         let held = Held {
             photos,
             recordings: &recordings,
+            files: &self.held_files,
             transcribes: self.transcribes(),
         };
         let (captured, said) = capture_choices::save(
@@ -7290,6 +9056,7 @@ impl App {
         self.capture.clear();
         self.recorded.clear();
         self.held_photos.clear();
+        self.held_files.clear();
         // Added to what still waits to be clicked, so none goes unsaid.
         self.untranscribable.append(&mut self.held_problems);
         self.capture_choices = CaptureChoices::default();
@@ -7325,7 +9092,7 @@ impl App {
 
     /// Whether photos or recordings wait on the capture field.
     fn holds_media(&self) -> bool {
-        !self.recorded.is_empty() || !self.held_photos.is_empty()
+        !self.recorded.is_empty() || !self.held_photos.is_empty() || !self.held_files.is_empty()
     }
 
     /// Whether a recording captured now gets its Transcript here: with
@@ -7338,7 +9105,8 @@ impl App {
     /// it holds a photo or a recording that gets no Transcript here.
     fn capture_lists(&self) -> &[ListTitle] {
         let voice = self.recording() || !self.recorded.is_empty();
-        let photo = !self.held_photos.is_empty();
+        // No Line holds a file either (#267).
+        let photo = !self.held_photos.is_empty() || !self.held_files.is_empty();
         capture_choices::shopping_offer(&self.view.capture_lists, photo, voice, self.transcribes())
     }
 
@@ -7357,7 +9125,8 @@ impl App {
 
     /// Does what was asked of the capture's buttons or its choices: a
     /// Routine, Reminder, Session or Tally opens its page in a dialog over
-    /// the quick note, which hands its choice back to the capture (#113).
+    /// the quick note, which hands its choice back to the capture (#113),
+    /// and File into… its dialog (#272).
     fn capture_choice(&mut self, asked: Ask) -> oldbrainfix_core::Result<()> {
         let place = self.capture_place();
         match self.capture_choices.take(asked, &self.store)? {
@@ -7377,6 +9146,7 @@ impl App {
                 self.tally_form = None;
                 self.editor = Some(editor);
             }
+            Some(Opens::FileInto) => self.ask_file_into(Filing::Capture)?,
             Some(Opens::Tally) => {
                 self.save_text()?;
                 self.editor = None;
@@ -7397,13 +9167,148 @@ impl App {
         occurrence: &Occurrence,
     ) -> oldbrainfix_core::Result<()> {
         let trashes = Routines::new(&self.store).trashes_when_done(routine)?;
-        if let Some(note) = trashes
+        if let Some(note) = &trashes
             && self.selected_note.as_deref() == Some(note.as_str())
         {
             self.leave_note()?;
         }
-        Routines::new(&self.store).check_off(routine, occurrence, None)?;
+        let trashed = Routines::new(&self.store).check_off(routine, occurrence, None)?;
+        // Ctrl+Z unchecks it, and brings back the Note it took to the
+        // trash (#268).
+        self.undo = Some(Undo::Done {
+            routine: routine.to_string(),
+            occurrence: *occurrence,
+            trashed: trashed.then_some(trashes).flatten(),
+        });
         Ok(())
+    }
+
+    /// Does what "Removed Lines" of the open Checklist, or with
+    /// `shopping` Shopping List, was asked (#268): Restore brings the Line
+    /// back while it is still deleted and this Device may change it.
+    fn removed_lines(&mut self, asked: RemovedAsk, shopping: bool) -> oldbrainfix_core::Result<()> {
+        match asked {
+            RemovedAsk::Open(open) => {
+                let value = if open { "true" } else { "false" };
+                self.store
+                    .set_local_setting(checklist_view::LINES_REMOVED_OPEN, value)?;
+            }
+            RemovedAsk::Restore(id) => {
+                let note = self.selected_note.clone().unwrap_or_default();
+                Undo::Line { note, id, shopping }.apply(&self.store)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Removes the Tally's entry `id` without asking, and closes its page
+    /// if it shows; Ctrl+Z and "Removed entries" bring it back (#268).
+    fn delete_entry(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        let tallies = Tallies::new(&self.store);
+        if tallies.entry_by_id(id)?.is_some_and(|e| !e.is_trashed()) {
+            tallies.trash_entry(id)?;
+            self.undo = Some(Undo::Entry(id.to_string()));
+        }
+        if let Some(TallyForm::Entry(form)) = &self.tally_form
+            && form.entry.as_ref().is_some_and(|e| e.id == id)
+        {
+            self.tally_form = None;
+        }
+        Ok(())
+    }
+
+    /// Opens the Note `id` in a window of its own (#287), what was typed
+    /// into it in the dialog kept, or brings its window forward where it
+    /// has one. A Note in the trash, and a Note window, opens none.
+    fn open_note_window(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        if let Some(window) = self
+            .note_windows
+            .iter_mut()
+            .find(|w| w.app.alone.as_ref().is_some_and(|a| a.note == id))
+        {
+            window.forward = true;
+            return Ok(());
+        }
+        let listed = Notes::new(&self.store)
+            .by_id(id)?
+            .is_some_and(|n| !n.is_trashed() && !n.is_merged());
+        if self.alone.is_some() || !listed {
+            return Ok(());
+        }
+        if self.selected_note.as_deref() == Some(id) {
+            self.leave_note()?;
+        }
+        self.windows_opened += 1;
+        let serial = self.windows_opened;
+        let mut app = App::alone_app(self.store.clone(), self.t, id, (self.pin_works, serial));
+        app.wall = self.wall.clone();
+        app.region = self.region.clone();
+        app.speed = self.speed;
+        app.changes = self.changes.clone();
+        app.seen_changes = self.seen_changes;
+        app.wake = self.wake.clone();
+        app.redraw = self.redraw.clone();
+        app.writes = self.writes.clone();
+        app.seen_writes = self.writes.load(Ordering::SeqCst);
+        // Read with what is lent to it while it draws.
+        self.lend(&mut app);
+        app.refresh();
+        self.lend(&mut app);
+        self.note_windows.push(NoteWindow {
+            app: Box::new(app),
+            viewport: note_window::viewport_id(serial),
+            size: window_sizes::note_window_size(&self.store),
+            forward: false,
+            fresh: true,
+        });
+        Ok(())
+    }
+
+    /// Lends the App of a Note window (#287) what there is one of: the
+    /// one Undo slot (#268), the microphone, the speakers, the clipboard,
+    /// the threads making texts, the system's dialogs and the openers.
+    /// Called again, it takes them back.
+    fn lend(&mut self, to: &mut App) {
+        use std::mem::swap;
+        swap(&mut self.undo, &mut to.undo);
+        swap(&mut self.recorder, &mut to.recorder);
+        swap(&mut self.player, &mut to.player);
+        swap(&mut self.playing, &mut to.playing);
+        swap(&mut self.clipboard, &mut to.clipboard);
+        swap(&mut self.transcriber, &mut to.transcriber);
+        swap(&mut self.reader, &mut to.reader);
+        swap(&mut self.files_reader, &mut to.files_reader);
+        swap(&mut self.speech, &mut to.speech);
+        swap(&mut self.url_opener, &mut to.url_opener);
+        swap(&mut self.linked_file_opener, &mut to.linked_file_opener);
+        swap(&mut self.files_picker, &mut to.files_picker);
+        swap(&mut self.item_saver, &mut to.item_saver);
+        swap(&mut self.pack_saver, &mut to.pack_saver);
+        swap(&mut self.calendar_saver, &mut to.calendar_saver);
+        swap(&mut self.markdown_saver, &mut to.markdown_saver);
+        swap(&mut self.photo_saver, &mut to.photo_saver);
+        swap(&mut self.photo_opener, &mut to.photo_opener);
+    }
+
+    /// Closes every Note window (#287), what was typed into each kept, as
+    /// the main window closes or hides into the tray.
+    fn close_note_windows(&mut self) {
+        for mut window in std::mem::take(&mut self.note_windows) {
+            self.lend(&mut window.app);
+            // A dialog over its Note leaves as leaving it saves (#275).
+            if let Some(top) = window.app.top_dialog().filter(|t| *t != TopDialog::Note) {
+                window.app.apply(top.back());
+            }
+            if let Err(e) = window.app.leave_note() {
+                self.error = Some(e.to_string());
+            }
+            self.lend(&mut window.app);
+            if let Some(size) = window.app.alone.as_ref().and_then(|a| a.size)
+                && let Err(e) = window_sizes::keep_note_window_size(&self.store, size)
+            {
+                eprintln!("Note window size: {e}");
+            }
+        }
     }
 
     /// Closes the Note dialog, keeping what was typed into it: its text,
@@ -7613,22 +9518,200 @@ impl App {
                     }
                     self.recorded.push(bytes);
                 }
-                None => {}
+                // Any other file is attached (#267); no Line holds one.
+                None => {
+                    self.held_files.push(HeldFile::new(name, bytes));
+                    self.capture_choices.shopping = None;
+                }
             }
         }
     }
 
-    /// The Notes the Note `selected` can be merged into that the core's
-    /// search finds for `query`, by id and the title they show under.
+    /// The files dropped onto this window this frame: those of the app's
+    /// own kinds (a bundle, Sent Item, Profile card or Pack) by their
+    /// paths, to open, and every other one read whole in the order
+    /// dropped, told by its size before it is read; one too large or
+    /// unreadable is announced (#267).
+    fn dropped(&mut self, ui: &Ui) -> (Vec<std::path::PathBuf>, Vec<(String, Vec<u8>)>) {
+        let dropped = ui.input(|i| i.raw.dropped_files.clone());
+        let mut own = Vec::new();
+        let mut read = attachment_view::ReadFiles::default();
+        for file in &dropped {
+            let path = file.path.as_deref();
+            let ours = path.and_then(|p| p.extension()).is_some_and(|e| {
+                e == bundle::EXTENSION
+                    || e == sent::EXTENSION
+                    || e == cards::EXTENSION
+                    || e == packs::EXTENSION
+            });
+            match (&file.bytes, path) {
+                (_, Some(path)) if ours => own.push(path.to_path_buf()),
+                (Some(bytes), _) => read.files.push((file.name.clone(), bytes.to_vec())),
+                (None, Some(path)) => {
+                    let one = attachment_view::read_paths([(file_name(path), path)]);
+                    read.files.extend(one.files);
+                    read.refused.extend(one.refused);
+                    read.too_large |= one.too_large;
+                }
+                (None, None) => {}
+            }
+        }
+        self.announce_not_attached(&read);
+        (own, read.files)
+    }
+
+    /// The tags the search field offers (#267, Q639): while what is typed
+    /// starts with "#", the tags of the tag tree starting with it, the one
+    /// typed exactly left out, at most [`tag_tree_view::SUGGESTIONS`], the
+    /// tree's order kept; none in the Trash, whose Notes the tree leaves
+    /// out.
+    fn tag_suggestions(&self) -> oldbrainfix_core::Result<Vec<String>> {
+        let wanted = self.query.trim().to_lowercase();
+        if !wanted.starts_with('#') || !self.searches() || self.selection == Selection::Trash {
+            return Ok(Vec::new());
+        }
+        Ok(TagTree::new(&self.store)
+            .suggestions(&self.query, &HashSet::new())?
+            .into_iter()
+            .map(|node| node.tag)
+            .filter(|tag| tag.to_lowercase() != wanted)
+            .take(tag_tree_view::SUGGESTIONS)
+            .collect())
+    }
+
+    /// The files at `paths`, picked or dropped, read whole; those larger
+    /// than a file may be, or that cannot be read, are left out and
+    /// announced at the top (#267), nothing of them written.
+    fn read_files(&mut self, paths: &[std::path::PathBuf]) -> Vec<(String, Vec<u8>)> {
+        let read = attachment_view::read_paths(paths.iter().map(|p| (file_name(p), p.as_path())));
+        self.announce_not_attached(&read);
+        read.files
+    }
+
+    /// Says at the top that files of `read` were left out, when any were;
+    /// its click gives why.
+    fn announce_not_attached(&mut self, read: &attachment_view::ReadFiles) {
+        if read.refused.is_empty() {
+            return;
+        }
+        let t = self.t;
+        let cause = if read.too_large {
+            t.file_too_large_cause()
+        } else {
+            t.file_unreadable_cause()
+        };
+        self.announce_failure(
+            t.file_not_attached(),
+            t.file_not_attached_title(),
+            (cause, t.file_not_attached_fix()),
+            read.refused.join("\n"),
+        );
+    }
+
+    /// Adds `files` to the Note `note` open in the Note dialog (#267): a
+    /// picture as its photo and a sound file as its voice recording, as
+    /// they become one of a new Note, any other file as its Attachment.
+    fn attach_to(
+        &mut self,
+        note: &str,
+        files: Vec<(String, Vec<u8>)>,
+    ) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        for (name, bytes) in files {
+            match from_file(&name, &bytes) {
+                Some(FromFile::Photo(photo)) => {
+                    notes.add_photo(note, &photo)?;
+                }
+                Some(FromFile::Recording { bytes, problem }) => {
+                    if let Some(problem) = problem {
+                        self.untranscribable
+                            .push((problem, problem_line(problem, &name)));
+                    }
+                    notes.add_recording(note, &bytes)?;
+                }
+                None => {
+                    let held = HeldFile::new(name, bytes);
+                    notes.attach_file(note, &held.new_file())?;
+                }
+            }
+        }
+        self.kick();
+        Ok(())
+    }
+
+    /// Opens the Attachment `hash` of the Note `note` with the system's
+    /// program for it (#267): a copy written where other programs read,
+    /// named by its hash and its ending alone ([`attachment_view::copy_name`]).
+    /// One of a kind that could run a program asks first, once, naming
+    /// the file and who added it, unless `asked`. One whose bytes are not
+    /// here yet, or that no program opens, is announced at the top.
+    fn open_attachment(&mut self, note: &str, hash: &str, asked: bool) {
+        let t = self.t;
+        let notes = Notes::new(&self.store);
+        let name = notes
+            .by_id(note)
+            .ok()
+            .flatten()
+            .and_then(|n| n.attachments.into_iter().find(|a| a.hash == hash))
+            .map(|a| a.name)
+            .unwrap_or_default();
+        if !asked && !attachment_view::opens_safely(&name) {
+            // Who added it only names them: a failed read asks all the same.
+            let by = self
+                .store
+                .file_added_by(note, hash)
+                .ok()
+                .flatten()
+                .map(|p| p.name)
+                .unwrap_or_default();
+            self.dialog = Some(Dialog::RiskyFile {
+                note: note.to_string(),
+                hash: hash.to_string(),
+                name,
+                by,
+            });
+            return;
+        }
+        let said = (t.file_not_opened(), t.file_not_opened_title());
+        let Some(bytes) = notes.file_bytes(hash) else {
+            self.announce_failure(
+                said.0,
+                said.1,
+                (t.file_not_here_cause(), t.file_not_here_fix()),
+                format!("file {hash}: its bytes are not on this computer yet"),
+            );
+            return;
+        };
+        let (opener, dir) = &self.photo_opener;
+        let copy = attachment_view::copy_name(hash, &name);
+        let opened = photo_out::copy_to_open(dir, &copy, &bytes).and_then(|path| opener(&path));
+        if let Err(e) = opened {
+            self.announce_failure(
+                said.0,
+                said.1,
+                (t.file_no_program_cause(), t.file_no_program_fix()),
+                format!("file {hash}: {e}"),
+            );
+        }
+    }
+
+    /// The Notes the Notes `merging` can be merged into that the core's
+    /// search finds for `query`, by id and the title they show under: a
+    /// single one is not offered itself, several are, as one of them
+    /// picked takes the others in (#273).
     fn merge_candidates(
         &self,
         query: &str,
-        selected: &str,
+        merging: &[String],
     ) -> oldbrainfix_core::Result<Vec<(String, String)>> {
+        let alone = match merging {
+            [one] => Some(one.as_str()),
+            _ => None,
+        };
         Ok(Search::new(&self.store)
             .notes(query, None)?
             .into_iter()
-            .filter(|n| n.id != selected)
+            .filter(|n| Some(n.id.as_str()) != alone)
             .map(|n| (n.id.clone(), row_title(&self.t, Some(&n))))
             .collect())
     }
@@ -7887,18 +9970,36 @@ impl App {
     /// Shows `to` in the list, back leading to the place it leaves
     /// (#145).
     fn go(&mut self, to: Selection) {
-        self.nav.went(self.selection.clone(), &to);
-        self.arrive(to);
+        let left = self.left();
+        self.nav.went(self.selection.clone(), left, &to);
+        self.arrive(to, Left::default());
     }
 
-    /// Shows `to` in the list; every level has a search and a person
-    /// filter of its own, as on the phone.
-    fn arrive(&mut self, to: Selection) {
+    /// What the place shown is left with (#278).
+    fn left(&self) -> Left {
+        Left {
+            query: self.query.clone(),
+            people: self.people.clone(),
+            scroll: self.list_offset,
+        }
+    }
+
+    /// Shows `to` in the list as it was `left` (#278), a place new to
+    /// the history with an empty `left`: every level has a search and a
+    /// person filter of its own, as on the phone, and its list scrolls
+    /// to where it was, a new one to the top.
+    fn arrive(&mut self, to: Selection, left: Left) {
+        // The answers go once the list shows another place (#267).
+        if self.selection == Selection::Ask && to != Selection::Ask {
+            self.ask_left();
+        }
         if to != self.selection {
-            self.query.clear();
-            self.people = PersonFilter::default();
+            self.query = left.query;
+            self.people = left.people;
             // The cards selected were those of the list left (#148).
             self.cards.clear();
+            self.list_offset = left.scroll;
+            self.scroll_restore = Some(left.scroll);
         }
         self.selection = to;
     }
@@ -7915,7 +10016,9 @@ impl App {
             Selection::All => vec![here(t.all_notes_title())],
             Selection::Unsorted => vec![here(t.unsorted())],
             Selection::Frogs => vec![here(t.frogs_title())],
+            Selection::Tags => vec![here(t.tags_title())],
             Selection::Trash => vec![here(t.trash_title())],
+            Selection::Ask => vec![here(t.ask_title())],
             Selection::AllRoutines => vec![agenda(), here(t.all_routines_title())],
             Selection::History(_) => vec![
                 agenda(),
@@ -8081,16 +10184,23 @@ impl App {
     pub fn show(&mut self, ui: &mut Ui) {
         self.agenda_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
+        self.ask_arrived(ui.ctx());
+        // However its page went, what a Backup opened held goes with it.
+        self.backup_notes_left();
         self.feedback.busy = self.pack_saving();
         self.show_theme(ui.ctx());
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
+        // Recording the hotkey, the keys are its alone (#283).
+        self.recorded_hotkey(ui, &mut actions);
         // A notification's Done or a new minute changes what shows.
         let changed = self
             .changes
             .as_ref()
             .map(|c| c.load(Ordering::SeqCst))
             .is_some_and(|c| c != self.seen_changes);
+        // Or a Note window did something (#287).
+        let changed = changed || self.writes.load(Ordering::SeqCst) != self.seen_writes;
         if changed || self.store.now() - self.read_at >= Duration::seconds(30) {
             if let Some(c) = &self.changes {
                 self.seen_changes = c.load(Ordering::SeqCst);
@@ -8100,12 +10210,17 @@ impl App {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_secs(30));
         // What was asked to be read again and brought no text.
-        for (enricher, photo) in [(&self.transcriber, false), (&self.reader, true)] {
+        let enrichers = [
+            (&self.transcriber, Made::Recording),
+            (&self.reader, Made::Photo),
+            (&self.files_reader, Made::File),
+        ];
+        for (enricher, made) in enrichers {
             if enricher
                 .as_ref()
                 .is_some_and(|e| !e.take_failed().is_empty())
             {
-                self.again_failed = Some(photo);
+                self.again_failed = Some(made);
             }
         }
         // A voice capture went into its Shopping List, or stayed a Note.
@@ -8128,17 +10243,22 @@ impl App {
             if asked != self.sync.asking().is_some() {
                 ui.ctx().request_repaint();
             }
+            // Hidden, a phone pairing still gets its answer, only slower.
+            let pace = if self.drawn(ui.ctx()) { 100 } else { 1000 };
             ui.ctx()
-                .request_repaint_after(std::time::Duration::from_millis(100));
+                .request_repaint_after(std::time::Duration::from_millis(pace));
         }
         // The AI port's tool calls are answered on this thread, while the
-        // window idles too; what they drafted shows at once.
+        // window idles too; what they drafted shows at once. The port wakes
+        // the window for each call; without a way to wake it, it is polled.
         if let Some(port) = &self.ai_port {
             if port.answer_waiting(&self.store, &*self.wall) > 0 {
                 self.refresh();
             }
-            ui.ctx()
-                .request_repaint_after(std::time::Duration::from_millis(100));
+            if self.redraw.is_none() {
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(100));
+            }
         }
         // A typed code being joined, also after leaving the Sync dialogs: its
         // answer is taken in when it comes.
@@ -8198,6 +10318,26 @@ impl App {
                     .request_repaint_after(std::time::Duration::from_millis(100)),
             }
         }
+        // A vault being written or rebuilt, also after its dialog closed:
+        // its answer is announced when it comes, how far it is meanwhile.
+        if self.vault.running() {
+            match self.vault.finished() {
+                Some(done) => {
+                    if self.dialog == Some(Dialog::Vault) {
+                        self.dialog = None;
+                    }
+                    self.vault_done(done);
+                    ui.ctx().request_repaint();
+                }
+                None => {
+                    if let Some(welcome) = &mut self.welcome {
+                        welcome.rebuilding = Some(self.vault.progress());
+                    }
+                    ui.ctx()
+                        .request_repaint_after(std::time::Duration::from_millis(100));
+                }
+            }
+        }
         // Hosting that could not start, or a session that choked, is
         // announced once, its full text behind the click.
         if let Some((started, details)) = self.sync.take_error() {
@@ -8222,26 +10362,12 @@ impl App {
                 self.playing = None;
             }
         }
-        // Pictures and sound files dropped onto the window become a
-        // Note; a bundle file is imported, a Sent Item previewed, a
-        // Profile card file and a Pack opened, as are the files handed
-        // over from outside.
-        let dropped = ui.input(|i| i.raw.dropped_files.clone());
-        let (files, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
-            file.path.as_ref().is_some_and(|p| {
-                p.extension().is_some_and(|e| {
-                    e == bundle::EXTENSION
-                        || e == sent::EXTENSION
-                        || e == cards::EXTENSION
-                        || e == packs::EXTENSION
-                })
-            })
-        });
-        for file in files {
-            if let Some(path) = file.path {
-                actions.push(Action::OpenFile(path));
-            }
-        }
+        // Files dropped onto the window wait in the quick note for one Note,
+        // or go onto the Note open (#267); a bundle file is imported, a
+        // Sent Item previewed, a Profile card file and a Pack opened, as
+        // are the files handed over from outside.
+        let (own, files) = self.dropped(ui);
+        actions.extend(own.into_iter().map(Action::OpenFile));
         if let Some(handed) = &self.handed
             && let Ok(mut handed) = handed.lock()
             && !handed.is_empty()
@@ -8266,20 +10392,14 @@ impl App {
             actions.push(Action::SendWaitingChanges);
             ui.ctx().request_repaint();
         }
-        let files: Vec<(String, Vec<u8>)> = dropped
-            .iter()
-            .filter_map(|file| {
-                let name = file
-                    .path
-                    .as_deref()
-                    .map_or_else(|| file.name.clone(), file_name);
-                match (&file.bytes, &file.path) {
-                    (Some(bytes), _) => Some((name, bytes.to_vec())),
-                    (None, Some(path)) => std::fs::read(path).ok().map(|bytes| (name, bytes)),
-                    (None, None) => None,
-                }
-            })
-            .collect();
+        if let Some(routine) = self
+            .occurrence_wanted
+            .as_ref()
+            .and_then(|wanted| wanted.lock().ok().and_then(|mut held| held.take()))
+        {
+            actions.push(Action::OpenNotified(routine));
+            ui.ctx().request_repaint();
+        }
         if !files.is_empty() {
             actions.push(Action::Files(files));
         }
@@ -8339,6 +10459,19 @@ impl App {
             || self.top_dialog().is_some_and(|top| top != TopDialog::Note);
         if self.welcome.is_none() && !over {
             let filing = self.file_into_notes();
+            let merging = self.merge_action();
+            let typing = ui.ctx().text_edit_focused();
+            let renames = self
+                .place_menu()
+                .filter(|p| p.manages && !typing && !egui::Popup::is_any_open(ui.ctx()))
+                .map(|p| p.id);
+            // Alt+Up and Alt+Down move the Area shown in the person's own
+            // order, whoever manages it (#280); taken before the list's
+            // Up and Down, which take them with Alt too.
+            let moves = self
+                .place_menu()
+                .filter(|p| p.area && !typing && !egui::Popup::is_any_open(ui.ctx()))
+                .map(|p| p.id);
             // Esc over the list drops the cards selected (#148); over a
             // dialog or menu it is theirs, in a field the field's.
             let clears = self.top_dialog().is_none()
@@ -8355,13 +10488,48 @@ impl App {
                 if i.consume_key(Modifiers::COMMAND, Key::F) {
                     actions.push(Action::Find);
                 }
+                // In a text field Ctrl+Z is the field's, undoing what was
+                // typed (#268); Ctrl+Shift+Z, a redo elsewhere, undoes
+                // nothing.
+                if !typing && !i.modifiers.shift && i.consume_key(Modifiers::COMMAND, Key::Z) {
+                    actions.push(Action::Undo);
+                }
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
                 }
-                if let Some(notes) = filing.filter(|_| i.consume_key(Modifiers::COMMAND, Key::M)) {
+                // The Ask panel (#267), taken before a text field's own
+                // Ctrl+K (delete to the line's end) sees it.
+                if i.consume_key(Modifiers::COMMAND, Key::K) {
+                    actions.push(Action::OpenAsk);
+                }
+                // F2 renames the Area or Topic shown (#279); in a text
+                // field and over a menu it rests.
+                if let Some(id) = renames.filter(|_| i.consume_key(Modifiers::NONE, Key::F2)) {
+                    actions.push(Action::Rename(id));
+                }
+                if let Some(id) = &moves {
+                    for (key, up) in [(Key::ArrowUp, true), (Key::ArrowDown, false)] {
+                        // At an end the Area stays.
+                        if i.consume_key(Modifiers::ALT, key)
+                            && let Some(index) = self.view.area_step(id, up)
+                        {
+                            actions.push(Action::MoveArea(id.clone(), index));
+                        }
+                    }
+                }
+                // Ctrl+Shift+M before Ctrl+M, which takes it with Shift too
+                // (#274).
+                let shift = i.modifiers.shift;
+                let shift_m = Modifiers::COMMAND | Modifiers::SHIFT;
+                if let Some(merge) = merging.filter(|_| shift && i.consume_key(shift_m, Key::M)) {
+                    actions.push(merge);
+                } else if let Some(notes) =
+                    filing.filter(|_| !shift && i.consume_key(Modifiers::COMMAND, Key::M))
+                {
                     actions.push(Action::AskFileInto(notes));
                 }
             });
+            self.list_keys(ui.ctx(), &mut actions);
         }
         // The field the cursor is in, for Edit's Cut, Copy and Paste,
         // which take the cursor out of it.
@@ -8385,9 +10553,16 @@ impl App {
                 )
                 .show(ui, |ui| self.menu_bar(ui, &mut actions));
             // Under it, while a sync of this Device runs (#225).
-            if self.syncing.as_ref().is_some_and(Syncing::running) {
+            // Not while hidden: nobody sees it, and it would keep asking for frames.
+            let drawn = self.drawn(ui.ctx());
+            if drawn
+                && self
+                    .syncing
+                    .as_ref()
+                    .is_some_and(|s| s.shows_line(sync_line::LIMIT))
+            {
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
-            } else if self.pack_opening() {
+            } else if drawn && self.pack_opening() {
                 // And while a Pack opens off the window's thread.
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.pack_opening());
             }
@@ -8405,18 +10580,40 @@ impl App {
             self.welcome_view(ui, tones, actions);
             return;
         }
-        egui::Panel::left("places")
+        // As wide as it was left (#278), the list keeping room in a
+        // smaller window.
+        let room = (ui.available_width() - 360.0).max(window_sizes::MIN_SIDEBAR);
+        let sidebar = egui::Panel::left("places")
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .resizable(true)
-            .default_size(260.0)
-            .min_size(180.0)
+            .default_size(self.sidebar_kept.min(room))
+            .min_size(window_sizes::MIN_SIDEBAR)
             .show(ui, |ui| self.places_pane(ui, tones, &mut actions));
+        self.sidebar_shown = sidebar.response.rect.width();
+        // Kept once its border is let go, as egui names the border.
+        let border = ui
+            .ctx()
+            .read_response(Id::new("places").with("__resize"))
+            .is_some_and(|r| r.drag_stopped());
+        if border && (self.sidebar_shown - self.sidebar_kept).abs() >= 1.0 {
+            self.sidebar_kept = self.sidebar_shown;
+            if let Err(e) = window_sizes::keep_sidebar_width(&self.store, self.sidebar_shown) {
+                eprintln!("sidebar width: {e}");
+            }
+        }
+        // The place just reached scrolls to where it was left (#278).
+        if let Some(offset) = self.scroll_restore.take() {
+            ui.data_mut(|d| d.insert_temp(Id::new(LIST_RESTORE), (offset, RESTORE_FRAMES)));
+        }
         egui::CentralPanel::default()
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .show(ui, |ui| {
                 self.nav_row(ui, &mut actions);
                 self.notes_pane(ui, tones, &mut actions);
             });
+        if let Some(offset) = ui.data_mut(|d| d.remove_temp::<f32>(Id::new(LIST_OFFSET))) {
+            self.list_offset = offset;
+        }
         // The dialogs of what were views, under the dialogs they open.
         self.page_dialog(ui.ctx(), tones, &mut actions);
         // The Note open (#146), and the quick note, under the pages and
@@ -8463,6 +10660,13 @@ impl App {
         for action in actions {
             self.apply(action);
         }
+        // The Notes in windows of their own, beside this one (#287).
+        self.show_note_windows(ui.ctx());
+        // Once the Settings no longer show Record keys, recording stops
+        // (#283).
+        if !std::mem::take(&mut self.hotkey_recording.drawn) {
+            self.record_hotkey(false);
+        }
         self.show_theme(ui.ctx());
         if let Some(text) = self.copy.take() {
             ui.ctx().copy_text(text);
@@ -8487,6 +10691,313 @@ impl App {
         }
     }
 
+    /// Draws each Note window (#287) as a viewport of this window's, with
+    /// what is lent to it, and does what each asked of this window; a
+    /// window closed keeps its size for the next.
+    fn show_note_windows(&mut self, ctx: &egui::Context) {
+        if self.note_windows.is_empty() {
+            return;
+        }
+        let mut windows = std::mem::take(&mut self.note_windows);
+        let mut asked = Vec::new();
+        let mut closed = false;
+        windows.retain_mut(|window| {
+            if std::mem::take(&mut window.fresh) {
+                ctx.request_repaint();
+                return true;
+            }
+            if std::mem::take(&mut window.forward) {
+                ctx.send_viewport_cmd_to(window.viewport, egui::ViewportCommand::Focus);
+            }
+            self.lend(&mut window.app);
+            let builder = window.app.note_window_builder(window.size);
+            let app = &mut window.app;
+            let shown = ctx.show_viewport_immediate(window.viewport, builder, |ui, class| {
+                app.note_window_frame(ui, class)
+            });
+            self.lend(&mut window.app);
+            asked.append(&mut window.app.for_main);
+            if shown == Shown::Open {
+                return true;
+            }
+            closed = true;
+            // What went wrong as it closed, announced here.
+            if let Some(e) = window.app.error.take() {
+                self.error = Some(e);
+            }
+            if let Some(size) = window.app.alone.as_ref().and_then(|a| a.size)
+                && let Err(e) = window_sizes::keep_note_window_size(&self.store, size)
+            {
+                eprintln!("Note window size: {e}");
+            }
+            false
+        });
+        windows.append(&mut self.note_windows);
+        self.note_windows = windows;
+        // What a window closing kept, and what one asked of this window,
+        // shows here at once.
+        if closed {
+            self.refresh();
+        }
+        if closed || !asked.is_empty() {
+            ctx.request_repaint();
+        }
+        for action in asked {
+            self.apply(action);
+        }
+    }
+
+    /// Draws this App's Note in its own window (#287), at the window's
+    /// root, as the frames of the guide show it; whether it stays open.
+    pub fn show_note_window(&mut self, ui: &mut Ui) -> Shown {
+        self.note_window_frame(ui, egui::ViewportClass::Root)
+    }
+
+    /// A frame of the Note window this App is (#287): the Note as its
+    /// dialog shows it, Keep on top above it, the dialogs it opens over
+    /// it. It closes, what was typed kept, by its cross, and as its Note
+    /// goes to the trash, is deleted or merged, here or elsewhere.
+    fn note_window_frame(&mut self, ui: &mut Ui, class: egui::ViewportClass) -> Shown {
+        let Some(note) = self.alone.as_ref().map(|a| a.note.clone()) else {
+            return Shown::Closed;
+        };
+        // What the main window or another did, a notification's Done,
+        // the clock.
+        let changed = self
+            .changes
+            .as_ref()
+            .map(|c| c.load(Ordering::SeqCst))
+            .is_some_and(|c| c != self.seen_changes)
+            || self.writes.load(Ordering::SeqCst) != self.seen_writes;
+        if changed || self.store.now() - self.read_at >= Duration::seconds(30) {
+            if let Some(c) = &self.changes {
+                self.seen_changes = c.load(Ordering::SeqCst);
+            }
+            self.seen_writes = self.writes.load(Ordering::SeqCst);
+            self.refresh();
+        }
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(30));
+        // Embedded, as in tests, the system has no cross of its own to
+        // click and the input is the main window's.
+        let native = class != egui::ViewportClass::EmbeddedWindow;
+        if native
+            && ui.input(|i| i.viewport().close_requested())
+            && let Some(alone) = &mut self.alone
+        {
+            alone.close_asked = true;
+        }
+        if self.alone.as_ref().is_some_and(|a| a.close_asked) {
+            // A dialog over the Note leaves as leaving it does (#275):
+            // saved, or asked about, the window staying for the answer.
+            if let Some(top) = self.top_dialog().filter(|t| *t != TopDialog::Note) {
+                self.apply(top.back());
+            }
+            let asking = self.top_dialog().is_some_and(|t| t != TopDialog::Note)
+                || matches!(self.dialog, Some(Dialog::Discard(_)));
+            if !asking {
+                if let Err(e) = self.leave_note() {
+                    self.error = Some(e.to_string());
+                }
+                return Shown::Closed;
+            }
+            if let Some(alone) = &mut self.alone {
+                alone.close_asked = false;
+            }
+            if native {
+                ui.ctx()
+                    .send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            }
+        }
+        if self.note_window_gone(&note) {
+            return Shown::Closed;
+        }
+        let tones = theme::tones(ui.visuals());
+        let mut actions = Vec::new();
+        // Files dropped onto it go onto its Note while nothing lies over
+        // it (#267); the app's own open in the main window. Embedded, the
+        // drops are the main window's.
+        if native {
+            let (own, files) = self.dropped(ui);
+            self.for_main.extend(own.into_iter().map(Action::OpenFile));
+            if !files.is_empty() && self.top_dialog() == Some(TopDialog::Note) {
+                actions.push(Action::Files(files));
+            }
+        }
+        let typing = ui.ctx().text_edit_focused();
+        let top = self.top_dialog();
+        if self.dialog.is_none() && self.badge.is_none() && self.viewer.is_none() {
+            if self.table.is_some() {
+                // Back closes the table shown full screen.
+                let back = ui.input_mut(|i| {
+                    i.pointer.button_pressed(PointerButton::Extra1)
+                        || (!typing && i.consume_key(Modifiers::ALT, Key::ArrowLeft))
+                });
+                if back {
+                    actions.push(Action::Table(table_view::Asked::Close));
+                }
+            } else if let Some(top) = top.filter(|t| *t != TopDialog::Note) {
+                // Back leads out of a dialog opened over the Note; over
+                // the Note itself it goes nowhere.
+                let back = ui.input_mut(|i| {
+                    i.pointer.button_pressed(PointerButton::Extra1)
+                        || (!typing && i.consume_key(Modifiers::ALT, Key::ArrowLeft))
+                });
+                if back {
+                    actions.push(top.back());
+                }
+            } else if !typing
+                && ui.input_mut(|i| !i.modifiers.shift && i.consume_key(Modifiers::COMMAND, Key::Z))
+            {
+                // Ctrl+Z outside a text field, as in the main window (#268).
+                actions.push(Action::Undo);
+            }
+        } else if self.viewer.is_some() {
+            let back = ui.input_mut(|i| {
+                i.pointer.button_pressed(PointerButton::Extra1)
+                    | i.consume_key(Modifiers::ALT, Key::ArrowLeft)
+            });
+            if back {
+                actions.push(Action::ClosePhoto);
+            }
+        }
+        let t = self.t;
+        let (on_top, pin_works) = self
+            .alone
+            .as_ref()
+            .map_or((false, false), |a| (a.on_top, a.pin_works));
+        let frame = Frame::NONE
+            .fill(tones.background)
+            .inner_margin(Margin::same(16));
+        frame.show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            if self.announces_in() == Announcer::Note {
+                self.announcements(ui, tones, &mut actions);
+            }
+            // Over the others, where that can be asked (UI laws, "The
+            // window").
+            let text = ui.visuals().text_color();
+            let weak = ui.visuals().weak_text_color();
+            let mut kept = on_top && pin_works;
+            let label = RichText::new(t.note_window_keep_on_top()).color(text);
+            let pin = ui
+                .add_enabled_ui(pin_works, |ui| theme::checkbox(ui, &mut kept, label))
+                .inner;
+            if pin.clicked() && pin_works {
+                actions.push(Action::KeepOnTop(kept));
+            }
+            if !pin_works {
+                let why = t.note_window_keep_on_top_wayland();
+                ui.label(RichText::new(why).small().color(weak));
+            }
+            self.note_editor(ui, tones, &mut actions);
+        });
+        let ctx = ui.ctx().clone();
+        self.badge_dialog(&ctx, tones, &mut actions);
+        self.editor_dialog(&ctx, tones, &mut actions);
+        self.tally_page_dialog(&ctx, tones, &mut actions);
+        if !matches!(self.dialog, Some(Dialog::BoxHistory { .. })) {
+            self.dialog(&ctx, tones, &mut actions);
+        }
+        if let Some(table) = &mut self.table {
+            if let Some(ticking) = &self.view.table_ticking {
+                table.set_ticking(ticking.clone());
+            }
+            let asked = table.show(&ctx, &self.t, tones);
+            actions.extend(asked.into_iter().map(Action::Table));
+        }
+        if matches!(self.dialog, Some(Dialog::BoxHistory { .. })) {
+            self.dialog(&ctx, tones, &mut actions);
+        }
+        if let Some(viewer) = &mut self.viewer {
+            match media_view::photo_viewer(&ctx, &self.t, (&mut self.photos, &self.store), viewer) {
+                Some(Viewed::Close) => actions.push(Action::ClosePhoto),
+                Some(Viewed::Out(out)) => actions.push(Action::PhotoOut(viewer.hash.clone(), out)),
+                None => {}
+            }
+        }
+        read_text::menu(&ctx, &self.t);
+        if let Some(link) = text_marks_view::take_app_link(&ctx) {
+            actions.push(Action::FollowLink(link));
+        }
+        for action in actions {
+            // A place, a search, a link and the dialogs of what were
+            // views show in the main window.
+            match action {
+                Action::Select(_)
+                | Action::SearchFor(_)
+                | Action::FollowLink(_)
+                | Action::OpenPage(_)
+                | Action::PageInto(_)
+                | Action::NewNote
+                | Action::OpenAsk
+                | Action::Back
+                | Action::Forward => self.for_main.push(action),
+                action => self.apply(action),
+            }
+        }
+        // Whatever else moved the list or opened such a dialog here.
+        if self.selection != Selection::SentItemsWaiting {
+            let to = std::mem::replace(&mut self.selection, Selection::SentItemsWaiting);
+            self.for_main.push(Action::Select(to));
+        }
+        for page in std::mem::take(&mut self.pages) {
+            self.for_main.push(Action::OpenPage(page));
+        }
+        if let Some(text) = self.copy.take() {
+            ctx.copy_text(text);
+        }
+        if let Some(url) = self.open_url.take() {
+            match &self.url_opener {
+                Some(opener) => opener(&url),
+                None => ctx.open_url(egui::OpenUrl::new_tab(url)),
+            }
+        }
+        // As large as it is, for the next one to open at: in the app's
+        // points, which the zoom enlarges as the window opens.
+        let size = match native {
+            true => ctx.viewport_rect().size(),
+            false => ui.min_rect().size(),
+        };
+        if let Some(alone) = &mut self.alone {
+            alone.size = Some(size);
+        }
+        // Another Note opened from this one shows in the main window's
+        // dialog; this one was left.
+        match self.selected_note.clone() {
+            Some(id) if id == note => {}
+            other => {
+                if let Some(id) = other {
+                    self.selected_note = None;
+                    self.for_main.push(Action::SelectNote(id));
+                }
+                return Shown::Closed;
+            }
+        }
+        if self.note_window_gone(&note) {
+            return Shown::Closed;
+        }
+        Shown::Open
+    }
+
+    /// Whether this Note window's Note is gone as last read (#287): in
+    /// the trash, deleted or merged, here or on another Device. What was
+    /// typed into it is kept first.
+    fn note_window_gone(&mut self, note: &str) -> bool {
+        let shown = self
+            .view
+            .detail
+            .as_ref()
+            .is_some_and(|(p, _)| p.note.id == note && !p.note.is_trashed());
+        if shown {
+            return false;
+        }
+        if let Err(e) = self.leave_note() {
+            self.error = Some(e.to_string());
+        }
+        true
+    }
+
     fn places_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let advanced = self.view.advanced;
@@ -8494,9 +11005,15 @@ impl App {
             .id_salt("places")
             .show(ui, |ui| {
                 let text = ui.visuals().text_color();
+                // Unsorted, the one list that asks to be emptied, says how
+                // many it holds (#279).
+                let unsorted = match self.view.unsorted {
+                    0 => t.unsorted().to_string(),
+                    count => t.sidebar_unsorted(count as i64),
+                };
                 let rows = [
                     (Selection::Agenda, icons::AGENDA, t.agenda_title()),
-                    (Selection::Unsorted, icons::UNSORTED, t.unsorted()),
+                    (Selection::Unsorted, icons::UNSORTED, unsorted.as_str()),
                     (Selection::All, icons::ALL_NOTES, t.all_notes_title()),
                     (Selection::Frogs, icons::FROG, t.frogs_title()),
                 ];
@@ -8516,12 +11033,37 @@ impl App {
                     }
                 });
                 ui.add_space(4.0);
+                let mut blocks = Vec::new();
                 for (area, topics) in &self.view.areas {
                     let colour = area_colour(area.colour.as_deref()).unwrap_or(text);
                     let icon = icons::area_icon(area.icon.as_deref()).map(|i| (i, colour));
                     let on = self.selection == Selection::Place(area.id.clone());
-                    let resp = row(ui, tones, on, 0.0, icon, &area_name(&t, area), true);
+                    let name = area_name(&t, area);
+                    // Dragged by its row into the person's own order
+                    // (#280); a card dropped on it files.
+                    let resp = row(ui, tones, on, 0.0, icon, &name, true)
+                        .interact(Sense::click_and_drag());
+                    // A shield before its chevron while it is Hidden from
+                    // AI (#267).
+                    if self.view.hidden_areas.contains(&area.id) {
+                        let room = if topics.is_empty() { 18.0 } else { 44.0 };
+                        let shield = egui::Rect::from_center_size(
+                            egui::pos2(resp.rect.right() - room, resp.rect.center().y),
+                            egui::vec2(18.0, 18.0),
+                        );
+                        hidden_mark(ui, &t, shield, Id::new(("hidden", &area.id)));
+                    }
+                    if resp.drag_started() {
+                        egui::DragAndDrop::set_payload(ui.ctx(), DraggedArea(area.id.clone()));
+                    }
                     place_row(&resp, &area.id, actions);
+                    // The chevron at its end folds or unfolds its Topics,
+                    // which this Device keeps (#279).
+                    let folded = self.view.folded.contains(&area.id);
+                    if !topics.is_empty() && area_fold(ui, &t, resp.rect, (&name, &area.id), folded)
+                    {
+                        actions.push(Action::FoldArea(area.id.clone(), !folded));
+                    }
                     let access = self.view.access.get(&area.id).copied();
                     let manages =
                         matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager));
@@ -8557,13 +11099,18 @@ impl App {
                                 (t.share_area(), Action::Share(area.id.clone())),
                             ]);
                         }
+                        // The order is the person's own, so every Area
+                        // moves, a Shared one too; not past an end
+                        // (#280).
+                        for (label, up) in [(t.area_move_up(), true), (t.area_move_down(), false)] {
+                            if let Some(index) = self.view.area_step(&area.id, up) {
+                                items.push((label, Action::MoveArea(area.id.clone(), index)));
+                            }
+                        }
                         // Copies of what anyone may read (#165).
                         items.push((t.export_as_pack(), Action::ExportPack(area.id.clone())));
                         if people.is_some() {
                             items.push((t.people_title(), Action::People(area.id.clone())));
-                        }
-                        if manages {
-                            items.push((t.delete(), Action::Delete(area.id.clone())));
                         }
                         for (label, action) in items {
                             if ui.button(RichText::new(label).color(text)).clicked() {
@@ -8572,9 +11119,25 @@ impl App {
                                 ui.close();
                             }
                         }
+                        // In no Shared Area, or to take the mark off (#267),
+                        // before Delete as in the Area menu.
+                        if let Some(asked) = hidden_entry(ui, &t, &self.view, &area.id) {
+                            actions.push(asked);
+                            ui.close();
+                        }
+                        if manages && ui.button(RichText::new(t.delete()).color(text)).clicked() {
+                            actions.push(Action::Delete(area.id.clone()));
+                            ui.close();
+                        }
                     });
+                    let row_rect = resp.rect;
                     for topic in topics {
                         let on = self.selection == Selection::Place(topic.id.clone());
+                        // A folded Area still shows the Topic shown, which
+                        // the sidebar marks.
+                        if folded && !on {
+                            continue;
+                        }
                         let resp = row(ui, tones, on, 24.0, None, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
                         // Export as Pack… for anyone who may read it
@@ -8596,6 +11159,18 @@ impl App {
                             }
                         });
                     }
+                    blocks.push(AreaRows {
+                        id: area.id.clone(),
+                        row: row_rect,
+                        bottom: ui.min_rect().bottom(),
+                    });
+                }
+                area_drop(ui, tones, &blocks, actions);
+                // Every tag by its levels (#267, Q623).
+                let on = self.selection == Selection::Tags;
+                let tags = Some((icons::TAG, text));
+                if row(ui, tones, on, 0.0, tags, t.tags_title(), false).clicked() {
+                    actions.push(Action::Select(Selection::Tags));
                 }
                 ui.add_space(12.0);
                 let on = self.selection == Selection::Trash;
@@ -8639,13 +11214,13 @@ impl App {
                         actions.push(Action::ShowUntranscribable);
                     }
                 });
-        } else if let Some(photo) = self.again_failed {
+        } else if let Some(made) = self.again_failed {
             // Reading or transcribing again brought no text; the click
             // shows why.
-            let text = if photo {
-                self.t.read_text_again_failed()
-            } else {
-                self.t.transcribe_again_failed()
+            let text = match made {
+                Made::Photo => self.t.read_text_again_failed(),
+                Made::Recording => self.t.transcribe_again_failed(),
+                Made::File => self.t.file_read_again_failed(),
             };
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
@@ -8654,7 +11229,7 @@ impl App {
                     let label = egui::Label::new(RichText::new(text).color(colour))
                         .sense(egui::Sense::click());
                     if ui.add(label).clicked() {
-                        actions.push(Action::ShowAgainFailed(photo));
+                        actions.push(Action::ShowAgainFailed(made));
                     }
                 });
         } else if let Some(notice) = self.notice.clone() {
@@ -8768,6 +11343,35 @@ impl App {
         })
     }
 
+    /// What the Area menu may do to the Area or Topic the list shows
+    /// (#279), as the sidebar's right-click offers it: none while another
+    /// place shows or a dialog lies over the list, the Note dialog and a
+    /// photo or table full screen too.
+    fn place_menu(&self) -> Option<PlaceMenu> {
+        let Selection::Place(id) = &self.selection else {
+            return None;
+        };
+        if self.top_dialog().is_some()
+            || self.dialog.is_some()
+            || self.badge.is_some()
+            || self.viewer.is_some()
+            || self.table.is_some()
+        {
+            return None;
+        }
+        let (area, of_area) = match self.view.area(id) {
+            Some(area) => (area.id.clone(), true),
+            None => (self.view.topic(id)?.area_id.clone(), false),
+        };
+        let access = self.view.access.get(&area).copied();
+        Some(PlaceMenu {
+            id: id.clone(),
+            area: of_area,
+            manages: matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager)),
+            shared: self.view.people.contains_key(&area),
+        })
+    }
+
     /// The Note Ctrl+M files: the one shown, where it may be filed.
     fn note_menu_note(&self) -> Option<String> {
         self.note_menu().filter(|n| n.changes).map(|n| n.id)
@@ -8786,9 +11390,112 @@ impl App {
         Some(self.cards.in_order(&self.shown_cards()))
     }
 
+    /// The cards selected that the Note menu's Merge into…, Importance,
+    /// Delete and Restore act on while no Note is open (#273): those this
+    /// Device may change, in the list's order.
+    fn menu_cards(&self) -> Vec<String> {
+        if self.note_open() {
+            return Vec::new();
+        }
+        let mut chosen = self.cards.in_order(&self.shown_cards());
+        chosen.retain(|id| self.view.card_may.contains(id));
+        chosen
+    }
+
     /// The ids of the Notes the list shows, in its order.
     fn shown_cards(&self) -> Vec<String> {
         self.view.notes.iter().map(|p| p.note.id.clone()).collect()
+    }
+
+    /// Whether the list shown has a search field: All Notes, Unsorted
+    /// and the trash (#274), an Area and a Topic.
+    fn searches(&self) -> bool {
+        matches!(
+            self.selection,
+            Selection::All | Selection::Unsorted | Selection::Place(_) | Selection::Trash
+        )
+    }
+
+    /// What Merge into… and Ctrl+Shift+M merge (#274): the Note in the
+    /// Note dialog where it may be changed, else the cards selected
+    /// outside the trash; none where nothing is.
+    fn merge_action(&self) -> Option<Action> {
+        if self.note_menu().is_some_and(|n| n.changes) {
+            return Some(Action::StartMerge);
+        }
+        let chosen = self.menu_cards();
+        (!chosen.is_empty() && self.selection != Selection::Trash)
+            .then_some(Action::AskMergeNotes(chosen))
+    }
+
+    /// The keys over the cards of a Note list (#274), as the pointer
+    /// acts on them: Up and Down select the next card, with Shift they run
+    /// the selection on, Ctrl+A selects all, Enter opens the card reached
+    /// last, Delete moves the selection to the trash, 1, 2 and 3 make it
+    /// Important, Normal or Unimportant; Down in the search goes into the
+    /// cards found. Only with no dialog, menu or Note on top and no field
+    /// or other widget holding the keyboard, which then has the keys; in
+    /// the trash Delete and the digits do nothing.
+    fn list_keys(&self, ctx: &egui::Context, actions: &mut Vec<Action>) {
+        let list = matches!(
+            self.selection,
+            Selection::All | Selection::Unsorted | Selection::Place(_) | Selection::Trash
+        );
+        if !list
+            || self.view.notes.is_empty()
+            || self.top_dialog().is_some()
+            || egui::Popup::is_any_open(ctx)
+        {
+            return;
+        }
+        let search = Id::new("search");
+        if ctx.memory(|m| m.has_focus(search)) {
+            if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::ArrowDown)) {
+                ctx.memory_mut(|m| m.surrender_focus(search));
+                actions.push(Action::ClearCards);
+                actions.push(Action::StepCards {
+                    down: true,
+                    on: false,
+                });
+            }
+            return;
+        }
+        if ctx.memory(|m| m.focused().is_some()) {
+            return;
+        }
+        let chosen = self.menu_cards();
+        let weighs = !chosen.is_empty() && self.selection != Selection::Trash;
+        let opens = self.cards.cursor().map(str::to_string);
+        ctx.input_mut(|i| {
+            for (key, down) in [(Key::ArrowDown, true), (Key::ArrowUp, false)] {
+                if i.consume_key(Modifiers::SHIFT, key) {
+                    actions.push(Action::StepCards { down, on: true });
+                } else if i.consume_key(Modifiers::NONE, key) {
+                    actions.push(Action::StepCards { down, on: false });
+                }
+            }
+            if i.consume_key(Modifiers::COMMAND, Key::A) {
+                actions.push(Action::SelectAllCards);
+            }
+            if let Some(id) = opens.filter(|_| i.consume_key(Modifiers::NONE, Key::Enter)) {
+                actions.push(Action::SelectNote(id));
+            }
+            // On a Mac keyboard the key named delete is Backspace.
+            let deletes = i.consume_key(Modifiers::NONE, Key::Delete)
+                || (cfg!(target_os = "macos") && i.consume_key(Modifiers::NONE, Key::Backspace));
+            if weighs && deletes {
+                actions.push(Action::TrashNotes(chosen.clone()));
+            }
+            for (key, importance) in [
+                (Key::Num1, Importance::Important),
+                (Key::Num2, Importance::Normal),
+                (Key::Num3, Importance::Unimportant),
+            ] {
+                if weighs && i.consume_key(Modifiers::NONE, key) {
+                    actions.push(Action::ImportanceOf(chosen.clone(), importance));
+                }
+            }
+        });
     }
 
     /// Files the Notes `ids` into the Area or Topic `place` in one go
@@ -8797,6 +11504,47 @@ impl App {
     /// person's in a Shared Area where it is a Member, one in the trash,
     /// and every one where this Device may not write in `place`, such as
     /// an Area it was taken out of (ADR 0013); how many stayed is told.
+    /// File into… (#272) for `into`, over the Areas shown.
+    fn ask_file_into(&mut self, into: Filing) -> oldbrainfix_core::Result<()> {
+        let picker = FileIntoPicker::read(&self.store, &self.t, &self.view.areas)?;
+        self.dialog = Some(Dialog::FileInto {
+            into,
+            picker: Box::new(picker),
+        });
+        Ok(())
+    }
+
+    /// Files what File into… was for into the place picked, a new one
+    /// made first, which stays even when a Note captured is not saved.
+    fn file_into_picked(&mut self, picked: Picked) -> oldbrainfix_core::Result<()> {
+        let place = match picked {
+            Picked::Place(place) => place,
+            Picked::Make { area, name } => file_into::make(&self.store, area.as_deref(), &name)?,
+            Picked::Close => {
+                self.dialog = None;
+                return Ok(());
+            }
+        };
+        match self.dialog.take() {
+            Some(Dialog::FileInto {
+                into: Filing::Notes(notes),
+                ..
+            }) => {
+                let done = self.file_notes(&notes, &place);
+                self.unless_hidden(done, None, Action::File { notes, place })?;
+            }
+            Some(Dialog::FileInto {
+                into: Filing::Capture,
+                ..
+            }) => {
+                self.capture_choice(Ask::FileInto(place))?;
+                self.capture_focus = true;
+            }
+            other => self.dialog = other,
+        }
+        Ok(())
+    }
+
     fn file_notes(&mut self, ids: &[String], place: &str) -> oldbrainfix_core::Result<()> {
         let notes = Notes::new(&self.store);
         let into = self.store.may_write_in(place)?;
@@ -8807,9 +11555,22 @@ impl App {
                 moving.push(id.as_str());
             }
         }
+        // Where each was, for Ctrl+Z (#268); one from Unsorted goes back
+        // there.
+        let mut before = Vec::new();
+        for id in &moving {
+            let was = notes.by_id(id)?.and_then(|n| n.place);
+            before.push((id.to_string(), was));
+        }
         self.store
             .batch(|| moving.iter().try_for_each(|id| notes.file(id, place)))?;
-        self.cards.clear();
+        if !moving.is_empty() {
+            self.undo = Some(Undo::Filed(before));
+            // Filed by File into… or a drag alike, it is filed into last
+            // (#272).
+            DeviceSettings::new(&self.store).filed_into(place)?;
+        }
+        self.cards.end();
         let stayed = ids.len() - moving.len();
         let t = self.t;
         if stayed == 0 {
@@ -8829,10 +11590,182 @@ impl App {
         Ok(())
     }
 
-    /// The menu bar (#145): File, Edit, View, Note, Sync and Help, each
-    /// entry with its keys where it has some, the Note menu's greyed
-    /// while no Note is open, but File into… for the cards selected
-    /// (#148). A pick closes its menu, also one by keyboard or screen
+    /// Moves the Notes `ids` to the trash in one go (#273), each with its
+    /// Routines and Reminders, without asking; Ctrl+Z brings all of them
+    /// back. One in the trash already or this Device may not change
+    /// stays.
+    fn trash_notes(&mut self, ids: &[String]) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let mut going = Vec::new();
+        for id in ids {
+            let listed = notes.by_id(id)?.is_some_and(|n| !n.is_trashed());
+            if listed && self.store.may_change(id)? {
+                going.push(id.clone());
+            }
+        }
+        self.cards.end();
+        if going.is_empty() {
+            return Ok(());
+        }
+        let routines = Routines::new(&self.store);
+        self.store
+            .batch(|| going.iter().try_for_each(|id| routines.trash_note(id)))?;
+        self.undo = Some(Undo::Notes(going));
+        Ok(())
+    }
+
+    /// Brings the Notes `ids` back from the trash in one go (#273), each
+    /// with the Routines and Reminders that went with it.
+    fn restore_notes(&mut self, ids: &[String]) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let mut back = Vec::new();
+        for id in ids {
+            let trashed = notes.by_id(id)?.is_some_and(|n| n.is_trashed());
+            if trashed && self.store.may_change(id)? {
+                back.push(id.as_str());
+            }
+        }
+        self.cards.end();
+        let routines = Routines::new(&self.store);
+        self.store
+            .batch(|| back.iter().try_for_each(|id| routines.restore_note(id)))
+    }
+
+    /// Gives the Notes `ids` the Importance `importance` in one go
+    /// (#273); one that has it already writes nothing.
+    fn importance_of(
+        &mut self,
+        ids: &[String],
+        importance: Importance,
+    ) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let mut setting = Vec::new();
+        for id in ids {
+            let other = notes
+                .by_id(id)?
+                .is_some_and(|n| !n.is_trashed() && n.importance != importance);
+            if other && self.store.may_change(id)? {
+                setting.push(id.as_str());
+            }
+        }
+        self.cards.end();
+        self.store.batch(|| {
+            setting
+                .iter()
+                .try_for_each(|id| notes.set_importance(id, importance))
+        })
+    }
+
+    /// Merges the Notes `ids` into the Note `into` in one go (#273), as
+    /// Merge into… for the cards selected asks; `into` among them takes
+    /// the others in. One a sync took out of the lists meanwhile, or this
+    /// Device may not change, stays; Ctrl+Z takes back all of them.
+    fn merge_notes(&mut self, ids: &[String], into: &str) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let listed = |id: &str| -> oldbrainfix_core::Result<bool> {
+            Ok(notes
+                .by_id(id)?
+                .is_some_and(|n| !n.is_trashed() && !n.is_merged()))
+        };
+        let mut going = Vec::new();
+        for id in ids {
+            if id != into && listed(id)? && self.store.may_change(id)? {
+                going.push(id.as_str());
+            }
+        }
+        if going.is_empty() || !listed(into)? {
+            self.cards.end();
+            return Ok(());
+        }
+        // Refused as Hidden from AI, the selection stays (#267).
+        let merged = notes.merge_all(&going, into)?;
+        self.cards.end();
+        self.undo = Some(Undo::Merged(merged));
+        Ok(())
+    }
+
+    /// Merges the Notes `merging` into the Note `into`, picked in Merge
+    /// into…: the Note open into it, or the cards selected in one go. A
+    /// Merge refused as Hidden from AI asks first (#267).
+    fn merge_picked(&mut self, merging: Vec<String>, into: String) -> oldbrainfix_core::Result<()> {
+        let selected = self.selected_note.clone().unwrap_or_default();
+        let done = if self.note_open() && merging == [selected.as_str()] {
+            self.save_text()?;
+            let done = Notes::new(&self.store).merge(&selected, &into);
+            if done.is_ok() {
+                self.undo = Some(Undo::Merge(selected.clone()));
+                self.selected_note = Some(into.clone());
+            }
+            done
+        } else {
+            self.merge_notes(&merging, &into)
+        };
+        self.unless_hidden(done, None, Action::MergeAgain(merging, into))
+    }
+
+    /// `done`, or the question Hidden from AI asks when it was refused as
+    /// such (#267, ADR 0049): the marks in the way named, `area` the Area
+    /// being given if one is, and `retry` what "Show to the AI" does again.
+    fn unless_hidden(
+        &mut self,
+        done: oldbrainfix_core::Result<()>,
+        area: Option<&str>,
+        retry: Action,
+    ) -> oldbrainfix_core::Result<()> {
+        match done {
+            Err(oldbrainfix_core::Error::HiddenFromAi(marks)) => {
+                self.ask_hidden(marks, area, retry);
+                Ok(())
+            }
+            other => other,
+        }
+    }
+
+    /// Asks once whether to show to the AI what the `marks` hide, as it is
+    /// about to be given to other people (UI laws, "Something Hidden from
+    /// AI is not given away"): only the Notes' marks come off, and the
+    /// Area's when it is the Area `area` given itself; another Area's mark
+    /// is only named, with where it comes off, so one click never shows
+    /// that Area's other Notes to the AI.
+    fn ask_hidden(&mut self, marks: Vec<String>, area: Option<&str>, retry: Action) {
+        let kept: Vec<String> = marks
+            .iter()
+            .filter(|m| !m.starts_with("note:") && Some(m.as_str()) != area)
+            .cloned()
+            .collect();
+        let area_first = !kept.is_empty();
+        let names = self.hidden_names(if area_first { &kept } else { &marks });
+        self.dialog = Some(Dialog::HiddenFromAi {
+            marks,
+            names,
+            area_first,
+            retry: Box::new(retry),
+        });
+    }
+
+    /// What the marks `marks` stand for, as the question names them: an
+    /// Area by its name, a Note by its first line; one gone by nothing.
+    fn hidden_names(&self, marks: &[String]) -> String {
+        let notes = Notes::new(&self.store);
+        let names: Vec<String> = marks
+            .iter()
+            .filter_map(|id| {
+                if let Some(area) = self.view.area(id) {
+                    return Some(area_name(&self.t, area));
+                }
+                let note = notes.by_id(id).ok()??;
+                let title = row_title(&self.t, Some(&note));
+                Some(title.lines().next().unwrap_or_default().trim().to_string())
+            })
+            .collect();
+        l10n::names_text(&self.t, &names)
+    }
+
+    /// The menu bar (#145): File, Edit, View, Area (#279), Note, AI
+    /// (#279), Sync and Help, each entry with its keys where it has some,
+    /// the Note menu's greyed while no Note is open, but File into… for
+    /// the cards selected (#148), the Area menu's while no Area or Topic
+    /// shows. A pick closes its menu, also one by keyboard or screen
     /// reader.
     fn menu_bar(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
         let t = self.t;
@@ -8840,30 +11773,70 @@ impl App {
         let ctx = ui.ctx().clone();
         // As the system writes them: Ctrl+N, or ⌘N on macOS; the comma as
         // a comma.
-        let keys = |key: Key| {
-            let shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, key);
+        let keys_with = |modifiers: Modifiers, key: Key| {
+            let shortcut = egui::KeyboardShortcut::new(modifiers, key);
             Some(ctx.format_shortcut(&shortcut).replace("Comma", ","))
         };
+        let keys = |key: Key| keys_with(Modifiers::COMMAND, key);
         let note = self.note_menu();
         let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
-        // File into… also files the cards selected in the list (#148).
+        // File into… also files the cards selected in the list (#148),
+        // and Merge into…, Importance and Delete, or Restore in the
+        // trash, act on them (#273).
         let filing = self.file_into_notes();
+        let chosen = self.menu_cards();
+        let in_trash = self.selection == Selection::Trash;
+        let listed = !chosen.is_empty() && !in_trash;
+        let open = note.as_ref().is_some_and(|n| n.changes);
+        let restores = self.view.may.changes
+            && self
+                .view
+                .detail
+                .as_ref()
+                .is_some_and(|(p, _)| p.note.is_trashed());
+        let merge = if open {
+            Action::StartMerge
+        } else {
+            Action::AskMergeNotes(chosen.clone())
+        };
+        // Delete and 1 to 3 stand beside the entries where they act on the
+        // cards selected (#274), as over the list; not on the Note open.
+        let list_keys = listed && !open;
         let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
         let cards = self.cards_key().is_some();
+        let place = self.place_menu();
+        let reviews = self.ai_port.is_none() && self.view.ai_task.is_some();
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
                 let items = [
                     (t.menu_new_note(), keys(Key::N), true, Action::NewNote),
+                    // Onto the Note open, else a new one (#267).
+                    (t.attach_file_menu(), None, true, Action::AttachFiles),
                     (t.settings_quick_note(), None, true, Action::QuickNote),
                     (t.menu_import(), None, true, Action::AskImport),
                     (t.menu_open_pack(), None, true, Action::OpenPack),
+                    (
+                        t.backup_open(),
+                        None,
+                        true,
+                        Action::Backup(BackupAction::OpenNotes),
+                    ),
                     (
                         t.save_as_markdown(),
                         None,
                         may(|n| n.amends),
                         Action::SaveAsMarkdown(id.clone()),
+                    ),
+                    // Greyed while one is written, and while the AI port is
+                    // open or its Task waits, whose drafts are no Notes yet
+                    // (#267).
+                    (
+                        t.menu_export_vault(),
+                        None,
+                        self.may_export_vault(),
+                        Action::ExportVault,
                     ),
                 ];
                 menu_entries(ui, items, actions);
@@ -8871,6 +11844,14 @@ impl App {
                 menu_entries(ui, [(t.tray_quit(), None, true, Action::Quit)], actions);
             });
             ui.menu_button(RichText::new(t.menu_edit()).color(text), |ui| {
+                // The last delete, check-off, filing or Merge (#268).
+                let undoes = self.undo.is_some();
+                menu_entries(
+                    ui,
+                    [(t.undo(), keys(Key::Z), undoes, Action::Undo)],
+                    actions,
+                );
+                ui.separator();
                 let items = [
                     (t.menu_cut(), None, field, Action::Clip(Clip::Cut)),
                     (t.menu_copy(), None, field, Action::Clip(Clip::Copy)),
@@ -8932,6 +11913,74 @@ impl App {
                     }
                 });
             });
+            // The Area or Topic the list shows, as the sidebar's
+            // right-click offers it (#279); F2 renames.
+            ui.menu_button(RichText::new(t.menu_area()).color(text), |ui| {
+                let id = place.as_ref().map(|p| p.id.clone()).unwrap_or_default();
+                let manages = place.as_ref().is_some_and(|p| p.manages);
+                let of_area = place.as_ref().is_some_and(|p| p.area && p.manages);
+                let shared = place.as_ref().is_some_and(|p| p.area && p.shared);
+                let items = [
+                    (
+                        t.rename(),
+                        keys_with(Modifiers::NONE, Key::F2),
+                        manages,
+                        Action::Rename(id.clone()),
+                    ),
+                    (t.area_look(), None, of_area, Action::Look(id.clone())),
+                    (t.share_area(), None, of_area, Action::Share(id.clone())),
+                    (t.people_title(), None, shared, Action::People(id.clone())),
+                    // Copies of what anyone may read (#165).
+                    (
+                        t.export_as_pack(),
+                        None,
+                        place.is_some(),
+                        Action::ExportPack(id.clone()),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                // An Area's own mark (#267), greyed where the right-click
+                // leaves it out: a Topic, and an Area shared unmarked.
+                let area = place.as_ref().filter(|p| p.area);
+                let on = area.is_some_and(|p| self.view.hidden_areas.contains(&p.id));
+                let offered = on || area.is_some_and(|p| self.view.hideable_areas.contains(&p.id));
+                let switched = ui.add_enabled_ui(offered, |ui| hidden_switch(ui, &t, &id, on));
+                if let Some(asked) = switched.inner {
+                    actions.push(asked);
+                    ui.close();
+                }
+                ui.separator();
+                // Any Area moves, a Shared one too; not past an end
+                // (#280).
+                let step = |up| {
+                    place
+                        .as_ref()
+                        .filter(|p| p.area)
+                        .and_then(|p| self.view.area_step(&p.id, up))
+                };
+                let (up, down) = (step(true), step(false));
+                let items = [
+                    (
+                        t.area_move_up(),
+                        keys_with(Modifiers::ALT, Key::ArrowUp),
+                        up.is_some(),
+                        Action::MoveArea(id.clone(), up.unwrap_or_default()),
+                    ),
+                    (
+                        t.area_move_down(),
+                        keys_with(Modifiers::ALT, Key::ArrowDown),
+                        down.is_some(),
+                        Action::MoveArea(id.clone(), down.unwrap_or_default()),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                menu_entries(
+                    ui,
+                    [(t.delete(), None, manages, Action::Delete(id.clone()))],
+                    actions,
+                );
+            });
             ui.menu_button(RichText::new(t.menu_note()).color(text), |ui| {
                 let items = [
                     (
@@ -8940,6 +11989,29 @@ impl App {
                         filing.is_some(),
                         Action::AskFileInto(filing.clone().unwrap_or_default()),
                     ),
+                    (
+                        t.merge_into(),
+                        keys_with(Modifiers::COMMAND | Modifiers::SHIFT, Key::M),
+                        open || listed,
+                        merge,
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                let weighs = open || listed;
+                ui.add_enabled_ui(weighs, |ui| {
+                    ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
+                        // One that has it already writes nothing.
+                        if let Some(importance) = importance_entries(ui, &t, list_keys) {
+                            let weighed = if open {
+                                vec![id.clone()]
+                            } else {
+                                chosen.clone()
+                            };
+                            actions.push(Action::ImportanceOf(weighed, importance));
+                        }
+                    });
+                });
+                let items = [
                     (
                         t.menu_routine(),
                         None,
@@ -9040,11 +12112,45 @@ impl App {
                     actions,
                 );
                 ui.separator();
-                menu_entries(
-                    ui,
-                    [(t.delete(), None, may(|n| n.changes), Action::Trash)],
-                    actions,
-                );
+                // In the trash its Notes are restored instead, as the
+                // Note dialog restores the one open there.
+                let last = if restores {
+                    (t.restore(), None, true, Action::Restore)
+                } else if in_trash && !open {
+                    (
+                        t.restore(),
+                        None,
+                        !chosen.is_empty(),
+                        Action::RestoreNotes(chosen.clone()),
+                    )
+                } else if open {
+                    (t.delete(), None, true, Action::Trash)
+                } else {
+                    let delete = keys_with(Modifiers::NONE, Key::Delete);
+                    (
+                        t.delete(),
+                        delete,
+                        listed,
+                        Action::TrashNotes(chosen.clone()),
+                    )
+                };
+                menu_entries(ui, [last], actions);
+            });
+            // The Ask panel (#267), the AI port (#279): its card in the
+            // Settings, and the review of the AI Task that waits, greyed
+            // while none does.
+            ui.menu_button(RichText::new(t.menu_ai()).color(text), |ui| {
+                let items = [
+                    (t.menu_ask(), keys(Key::K), true, Action::OpenAsk),
+                    (t.menu_ai_port(), None, true, Action::OpenAiPort),
+                    (
+                        t.ai_review_title(),
+                        None,
+                        reviews,
+                        Action::Ai(AiAction::Review),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
             });
             ui.menu_button(RichText::new(t.menu_sync()).color(text), |ui| {
                 let items = [
@@ -9187,6 +12293,13 @@ impl App {
                     Page::Profile | Page::People | Page::Backups => {
                         self.profile_pane(ui, tones, actions, page);
                     }
+                    Page::BackupNotes => {
+                        if let Some(state) = &mut self.backup_notes {
+                            let mut asked = None;
+                            backup_view::notes_page(ui, &t, &self.wall, state, &mut asked);
+                            actions.extend(asked.map(Action::BackupNotes));
+                        }
+                    }
                     Page::Sync | Page::Pair => {
                         let wall = self.wall.clone();
                         let pair = page == Page::Pair;
@@ -9241,14 +12354,22 @@ impl App {
         {
             actions.push(Action::CloseNote);
         }
-        let size = egui::vec2(
-            (under.width() - 120.0).clamp(320.0, 760.0),
-            (under.height() - 60.0).max(240.0),
-        );
+        // As large as it was left on this computer (#278), in the room
+        // the window has.
+        let size = window_sizes::note_dialog(self.note_kept, under.size());
+        self.note_shown = Some(size);
+        // The Note a window of its own can show: not one in the trash.
+        let windowed = self
+            .view
+            .detail
+            .as_ref()
+            .filter(|(p, _)| !p.note.is_trashed())
+            .map(|(p, _)| p.note.id.clone());
         let frame = Frame::NONE
             .fill(tones.background)
             .corner_radius(theme::CARD_RADIUS)
             .inner_margin(Margin::same(16));
+        let mut resized = None;
         egui::Area::new(Id::new("note dialog"))
             .order(egui::Order::Foreground)
             .fixed_pos(under.min)
@@ -9289,6 +12410,15 @@ impl App {
                                         {
                                             actions.push(Action::CloseNote);
                                         }
+                                        // Beside the list, in a window of
+                                        // its own (#287).
+                                        let open = t.note_window_open();
+                                        if let Some(id) = &windowed
+                                            && icon_button(ui, icons::OPEN_IN_NEW, open, text)
+                                                .clicked()
+                                        {
+                                            actions.push(Action::OpenWindow(id.clone()));
+                                        }
                                     },
                                 );
                             });
@@ -9296,7 +12426,16 @@ impl App {
                         });
                     },
                 );
+                // Its edges and corners resize it, over what lies at them.
+                resized = note_dialog_edges(ui, shown, size);
             });
+        if let Some((wanted, done)) = resized {
+            let wanted = window_sizes::note_dialog(Some(wanted), under.size());
+            self.note_kept = Some(wanted);
+            if done && let Err(e) = window_sizes::keep_note_dialog_size(&self.store, wanted) {
+                eprintln!("Note dialog size: {e}");
+            }
+        }
         self.badge_dialog(ctx, tones, actions);
     }
 
@@ -9535,6 +12674,25 @@ impl App {
                 }
                 None => true,
             },
+            NoteBadge::HiddenFromAi => {
+                let (own, other) = self.view.note_hidden.unwrap_or_default();
+                let mut on = own;
+                let setting = t.hidden_from_ai();
+                let icon = (icons::HIDDEN_FROM_AI, None);
+                badge_dialog(ctx, shown, icon, setting, |ui| {
+                    if !own && other {
+                        let weak = ui.visuals().weak_text_color();
+                        ui.label(
+                            RichText::new(t.hidden_from_ai_by_area())
+                                .small()
+                                .color(weak),
+                        );
+                    }
+                    if badge_switch(ui, &t, setting, &mut on) {
+                        actions.push(Action::HideFromAi(note.id.clone(), on));
+                    }
+                })
+            }
             NoteBadge::Ticks => {
                 let mut on = self.view.show_ticks.contains(&note.id);
                 let setting = t.box_show_ticks();
@@ -9606,8 +12764,10 @@ impl App {
 
     /// The Routine or Reminder editor, the New Session page and a Tally's
     /// field or entry page, each as a dialog over the window, over the
-    /// Note or the quick note they were opened from. Esc, a click beside
-    /// it and Cancel leave it without saving.
+    /// Note or the quick note they were opened from. Esc and a click
+    /// beside it leave it as back does (#275): the editor and the entry
+    /// page save a change that can be saved and ask about one that can't;
+    /// the field page, and Cancel on any, close without saving.
     fn editor_dialog(&mut self, ctx: &egui::Context, tones: Tones, actions: &mut Vec<Action>) {
         if self.editor.is_none() && self.tally_form.is_none() {
             return;
@@ -9623,6 +12783,7 @@ impl App {
             .corner_radius(theme::CARD_RADIUS)
             .inner_margin(Margin::same(16));
         let shown_now = (self.wall)(self.store.now());
+        let now = crate::routine_editor::sentence_now(&self.store, &*self.wall);
         let mut asked = None;
         let modal = egui::Modal::new(Id::new("editor"))
             .frame(frame)
@@ -9630,24 +12791,26 @@ impl App {
                 ui.set_width(size.x);
                 ui.set_height(size.y);
                 if let Some(editor) = &mut self.editor {
-                    asked = editor.show(ui, &t, tones, shown_now).map(Action::Editor);
+                    asked = editor
+                        .show(ui, &t, tones, shown_now, &now)
+                        .map(Action::Editor);
                 } else if let Some(form) = &mut self.tally_form {
                     asked = form.show(ui, &t, tones).map(Action::TallyForm);
                 }
             });
         actions.extend(asked);
         if modal.should_close() {
-            actions.push(if self.editor.is_some() {
-                Action::Editor(Intent::Close)
+            actions.push(Action::Leave(if self.editor.is_some() {
+                Leave::Editor
             } else {
-                Action::TallyForm(FormIntent::Close)
-            });
+                Leave::TallyForm
+            }));
         }
     }
 
     /// The New Tally page (#161), as a dialog over the window or over the
-    /// New Session page it was opened from. Leaving it without Save makes
-    /// nothing.
+    /// New Session page it was opened from. Esc and a click beside it
+    /// leave it as back does, saving what can be saved (#275).
     fn tally_page_dialog(&mut self, ctx: &egui::Context, tones: Tones, actions: &mut Vec<Action>) {
         let Some(page) = &mut self.tally_page else {
             return;
@@ -9672,7 +12835,7 @@ impl App {
             });
         actions.extend(asked.map(Action::TallyPage));
         if modal.should_close() {
-            actions.push(Action::TallyPage(PageIntent::Close));
+            actions.push(Action::Leave(Leave::TallyPage));
         }
     }
 
@@ -9742,7 +12905,9 @@ impl App {
             Selection::History(_) => self.t.history_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
+            Selection::Tags => self.t.tags_title().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
+            Selection::Ask => self.t.ask_title().to_string(),
             Selection::Place(id) => self
                 .view
                 .areas
@@ -9765,7 +12930,7 @@ impl App {
     /// it what of the Note card's buttons (#113) this Device switched on
     /// in Settings ▸ Quick note, whose choices show at the top, not saved
     /// yet, and under them the Nudge times, Ctrl+Enter taking the 1 h
-    /// one; a Note filed or with something set up, or where the Nudge
+    /// one and Ctrl+1 to 3 each of them (#277); a Note filed or with something set up, or where the Nudge
     /// buttons are switched off, gets one Save instead, nudging only an
     /// Unsorted Note. With a Shopping List picked in "More", the lines go
     /// into it instead of a Note (#124). The format bar shows over the
@@ -9791,12 +12956,13 @@ impl App {
         let has_recorder = self.recorder.is_some();
         let has_clipboard = self.clipboard.is_some();
         embossed(ui, tones, false, None, |ui| {
-            let focused = ui.memory(|m| m.has_focus(id));
-            if focused
-                && (!self.capture.trim().is_empty() || self.holds_media())
-                && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
+            // Ctrl+Enter saves, and Ctrl+1 to 3 with the Nudge buttons'
+            // times while they show (#277).
+            let nudges = !sorted && quick.nudge_buttons;
+            if (!self.capture.trim().is_empty() || self.holds_media())
+                && let Some(nudge_in) = capture_choices::nudge_key(ui, nudges)
             {
-                actions.push(Action::Capture(Notes::default_nudge()));
+                actions.push(Action::Capture(nudge_in));
             }
             // Announcements and choices go to the top (UI laws).
             let shown = (place_chip, self.view.capture_lists.as_slice());
@@ -9868,6 +13034,13 @@ impl App {
                     ui.label(RichText::new(t.photo()).color(text));
                 });
             }
+            for file in &self.held_files {
+                ui.horizontal(|ui| {
+                    let kind = oldbrainfix_core::file_text::kind_of(&file.name, "");
+                    icons::show(ui, attachment_view::icon(kind), 18.0, text);
+                    ui.label(RichText::new(&file.name).color(text));
+                });
+            }
             if has_recorder {
                 match media_view::voice_button(ui, &t, recording) {
                     Some(Voice::Record) => actions.push(Action::Record),
@@ -9897,7 +13070,7 @@ impl App {
                 return;
             }
             ui.add_space(4.0);
-            let offer = (self.view.areas.as_slice(), spawns, self.capture_lists());
+            let offer = (spawns, self.capture_lists());
             let row = (&quick, true);
             match capture_choices::action_row(ui, &t, &self.capture_choices, offer, row) {
                 Some(RowAsk::Choice(asked)) => actions.push(Action::CaptureChoice(asked)),
@@ -9921,18 +13094,18 @@ impl App {
             }
             ui.label(RichText::new(t.nudge_heading()).strong().color(text));
             ui.horizontal(|ui| {
-                let choices = [
-                    (t.snooze10(), Duration::minutes(10)),
-                    (t.snooze30(), Duration::minutes(30)),
-                    (t.snooze60(), Notes::default_nudge()),
-                ];
-                for (label, nudge_in) in choices {
+                let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
+                for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times()) {
                     if ui.button(RichText::new(label).color(text)).clicked() {
                         actions.push(Action::Capture(nudge_in));
                     }
                 }
             });
-            ui.label(RichText::new(t.capture_keys_hint()).small().color(weak));
+            ui.label(
+                RichText::new(t.capture_nudge_keys_hint())
+                    .small()
+                    .color(weak),
+            );
         });
     }
 
@@ -9942,6 +13115,7 @@ impl App {
             Selection::SentItemsWaiting => return self.held_pane(ui, tones, actions),
             Selection::AreaOffersWaiting => return self.offers_pane(ui, tones, actions),
             Selection::AiReview => return self.ai_review_pane(ui, tones, actions),
+            Selection::Ask => return self.ask_pane(ui, tones, actions),
             Selection::Frogs => {
                 let mut asked = Vec::new();
                 let view = &self.view;
@@ -9968,6 +13142,23 @@ impl App {
             }
             Selection::History(_) => {
                 history_view::page(ui, &self.t, tones, self.view.history.as_ref(), &*self.wall);
+                return;
+            }
+            Selection::Tags => {
+                let mut asked = Vec::new();
+                let tree = (self.view.tag_tree.as_slice(), &self.tags_unfolded);
+                tag_tree_view::page(ui, &self.t, tones, tree, &mut asked);
+                for asked in asked {
+                    match asked {
+                        TagAsked::Search(tag) => actions.push(Action::SearchFor(tag)),
+                        TagAsked::Fold(key, true) => {
+                            self.tags_unfolded.insert(key);
+                        }
+                        TagAsked::Fold(key, false) => {
+                            self.tags_unfolded.remove(&key);
+                        }
+                    }
+                }
                 return;
             }
             _ => {}
@@ -9997,8 +13188,10 @@ impl App {
         ui.add_space(8.0);
         let hint = match &self.selection {
             Selection::All => Some(self.t.search_all_hint()),
+            Selection::Unsorted => Some(self.t.search_unsorted_hint()),
             Selection::Place(id) if self.view.area(id).is_some() => Some(self.t.search_area_hint()),
             Selection::Place(_) => Some(self.t.search_topic_hint()),
+            Selection::Trash => Some(self.t.search_trash_hint()),
             _ => None,
         };
         if let Some(hint) = hint {
@@ -10027,6 +13220,22 @@ impl App {
                     actions.push(Action::Search);
                 }
             });
+            // The tags starting with the "#…" typed (#267, Q639).
+            if let Some(tag) = tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions) {
+                // The cursor after it, to type on.
+                let end = tag.chars().count();
+                self.query = tag;
+                let id = Id::new("search");
+                let mut state =
+                    egui::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
+                let at = egui::text::CCursor::new(end);
+                state
+                    .cursor
+                    .set_char_range(Some(egui::text::CCursorRange::one(at)));
+                state.store(ui.ctx(), id);
+                self.search_focus = true;
+                actions.push(Action::Search);
+            }
             ui.add_space(8.0);
         }
         let trash = self.selection == Selection::Trash;
@@ -10040,7 +13249,10 @@ impl App {
             self.trashed_frogs(ui, tones, actions);
         }
         if self.view.notes.is_empty() {
-            let empty = if trash {
+            let empty = if !self.query.trim().is_empty() {
+                // A search that finds nothing, not an empty list.
+                self.t.nothing_found()
+            } else if trash {
                 self.t.trash_empty()
             } else {
                 self.t.no_notes_yet()
@@ -10052,7 +13264,9 @@ impl App {
             }
             return;
         }
-        let output = list_scroll(ui, "notes", |ui| {
+        // Each place's list scrolls on its own (#278).
+        let place = self.selection.clone();
+        let output = list_scroll(ui, ("notes", place), |ui| {
             // Room for the emboss around every card.
             ui.spacing_mut().item_spacing.y = 16.0;
             ui.add_space(4.0);
@@ -10063,6 +13277,8 @@ impl App {
             // A list with its switch has the view button on its cards
             // (#189).
             let switches = self.cards_key().is_some();
+            // The card Up or Down selected comes into view (#274), once.
+            let scroll_to = self.scroll_card.take();
             for placed in &self.view.notes {
                 let id = &placed.note.id;
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
@@ -10091,13 +13307,16 @@ impl App {
                     session: self.view.sessions.contains(id),
                     session_shown: self.view.card_sessions.get(id),
                     menu: self.card_menu.as_ref(),
+                    spawns: self.card_spawns.as_ref(),
                     changes: self.view.card_changes.contains(id),
+                    may: self.view.card_may.contains(id),
                     boxes: CardBoxes {
                         looks: &self.view.box_looks,
                         ticks: &self.view.box_ticks,
                         show: self.view.show_ticks.contains(id),
                     },
                     today: self.view.card_today.get(id).map_or(&[], Vec::as_slice),
+                    hidden: self.view.hidden_notes.contains(id),
                 };
                 let clicks = note_card(
                     ui,
@@ -10108,6 +13327,9 @@ impl App {
                     look,
                     media,
                 );
+                if scroll_to.as_deref() == Some(id.as_str()) {
+                    clicks.card.scroll_to_me(None);
+                }
                 // Dragged, the card takes the cards selected with it when
                 // it is one of them (#148).
                 if draggable && clicks.card.drag_started() {
@@ -10128,12 +13350,21 @@ impl App {
                         .map(|asked| Action::CardTally(id.clone(), asked)),
                 );
                 actions.extend(clicks.session.into_iter().map(Action::Session));
-                if let Some(Action::AskFileInto(_)) = clicks.picked {
-                    // The right-click's File into… files the cards selected
-                    // with it.
-                    actions.push(Action::AskFileInto(self.cards.moving(id, &order)));
-                } else if let Some(picked) = clicks.picked {
-                    actions.push(picked);
+                if let Some(picked) = clicks.picked {
+                    // The right-click's File into…, Merge into…,
+                    // Importance, Move to trash and Restore act on the
+                    // cards selected with it (#148, #273).
+                    let along = || self.cards.moving(id, &order);
+                    actions.push(match picked {
+                        Action::AskFileInto(_) => Action::AskFileInto(along()),
+                        Action::AskMergeNotes(_) => Action::AskMergeNotes(along()),
+                        Action::ImportanceOf(_, importance) => {
+                            Action::ImportanceOf(along(), importance)
+                        }
+                        Action::TrashNotes(_) => Action::TrashNotes(along()),
+                        Action::RestoreNotes(_) => Action::RestoreNotes(along()),
+                        other => other,
+                    });
                 } else if let Some(tag) = clicks.tag {
                     actions.push(Action::SearchFor(tag));
                 } else if let Some((routine, occurrence)) = clicks.occurrence {
@@ -10154,6 +13385,8 @@ impl App {
                     }
                 } else if let Some(hash) = clicks.photo {
                     actions.push(Action::ViewPhoto(hash));
+                } else if let Some((of, hash)) = clicks.attachment {
+                    actions.push(Action::OpenAttachment(of, hash));
                 } else if let (Some(author), Some(profile)) = (clicks.author, &placed.author)
                     && author.clicked()
                 {
@@ -10367,6 +13600,7 @@ impl App {
             view: &self.view,
             transcriber: self.transcriber.as_ref().filter(|_| heard),
             reader: self.reader.as_ref(),
+            files: self.files_reader.as_ref(),
         };
         let offering = &offering;
         // Its boxes and its Sections' (ADR 0035): how they show, and
@@ -10397,6 +13631,9 @@ impl App {
                     }
                     Some(OpenAsked::DoneAndTrash(routine, occurrence)) => {
                         actions.push(Action::DoneAndTrash(routine, occurrence));
+                    }
+                    Some(OpenAsked::Answer(routine, occurrence, answer)) => {
+                        actions.push(Action::Answer(routine, occurrence, answer));
                     }
                     None => {}
                 }
@@ -10476,7 +13713,9 @@ impl App {
                     }
                     let code = note.text_format == text_format::CODE;
                     let field = EditedText {
-                        id: Id::new("note text"),
+                        // By its Note: another may show in a window of
+                        // its own meanwhile (#287).
+                        id: Id::new(("note text", &note.id)),
                         of: &note.id,
                         section: false,
                         stored: &note.text,
@@ -10541,6 +13780,7 @@ impl App {
                     on_agenda: checklist.and_then(|c| c.on_agenda),
                     shopping_on_agenda: shopping.and_then(|s| s.on_agenda),
                     ticks: has_boxes.then_some(show_ticks),
+                    hidden: self.view.note_hidden,
                     session: session_setup.map(|s| (s, makes_session)),
                     may,
                     frog: note_frog,
@@ -10561,7 +13801,8 @@ impl App {
                     &note.removed_photos,
                     &note.removed_recordings,
                 ];
-                if media.iter().any(|m| !m.is_empty()) {
+                let files = !note.attachments.is_empty() || !note.removed_attachments.is_empty();
+                if media.iter().any(|m| !m.is_empty()) || files {
                     embossed(ui, tones, false, None, |ui| {
                         let media = Media {
                             id: &note.id,
@@ -10570,6 +13811,11 @@ impl App {
                                 &note.recordings,
                                 &note.removed_recordings,
                                 &note.transcripts,
+                            ),
+                            files: (
+                                &note.attachments,
+                                &note.removed_attachments,
+                                &note.attachment_texts,
                             ),
                         };
                         let shown = (&mut *cache, &**store, offering);
@@ -10582,6 +13828,17 @@ impl App {
                             actions,
                         );
                     });
+                }
+                // Files of any kind onto this Note, as a drop on the dialog
+                // brings them (#267).
+                if may.changes && !trashed {
+                    let attach = ui.horizontal(|ui| {
+                        icons::show(ui, icons::ATTACH_FILE, 20.0, text);
+                        ui.button(RichText::new(t.attach_file_menu()).color(text))
+                    });
+                    if attach.inner.clicked() {
+                        actions.push(Action::AttachFiles);
+                    }
                 }
                 for (at, section) in sections.iter().enumerate() {
                     embossed(ui, tones, false, None, |ui| {
@@ -10673,6 +13930,11 @@ impl App {
                                 &section.removed_recordings,
                                 &section.transcripts,
                             ),
+                            files: (
+                                &section.attachments,
+                                &section.removed_attachments,
+                                &section.attachment_texts,
+                            ),
                         };
                         let shown = (&mut *cache, &**store, offering);
                         editor_media(
@@ -10715,7 +13977,7 @@ impl App {
                     // The format bar goes with the field (UI laws), as on
                     // the phone's "Add to Note": without ☐, which the
                     // Note's text puts in.
-                    let id = Id::new("amend");
+                    let id = Id::new(("amend", &note.id));
                     let focused = ui.memory(|m| m.has_focus(id));
                     // Its tables as grids, as in the Note's text (#257).
                     let unticked = BoxLook::default();
@@ -10931,6 +14193,7 @@ impl App {
         let pictures = &mut self.pictures;
         let person_square = &mut self.person_square;
         let importing = self.import.kind();
+        let vault = self.vault.running().then(|| self.vault.progress());
         let frame = Frame::NONE
             .fill(tones.card)
             .corner_radius(theme::CARD_RADIUS)
@@ -11012,8 +14275,35 @@ impl App {
                         ui.label(RichText::new(t.file_link_question(path, shown)).color(text));
                         ui.horizontal(|ui| {
                             cancel(ui, &t, actions);
-                            if theme::primary(ui, true, t.file_link_open()).clicked() {
+                            if theme::main_action(ui, true, t.file_link_open()) {
                                 actions.push(Action::OpenLinkedFile(file.clone()));
+                            }
+                        });
+                    }
+                    Dialog::RiskyFile {
+                        note,
+                        hash,
+                        name,
+                        by,
+                    } => {
+                        title(ui, t.file_risk_title());
+                        let text = ui.visuals().text_color();
+                        let shown = if name.is_empty() {
+                            t.attachment()
+                        } else {
+                            name.as_str()
+                        };
+                        ui.label(RichText::new(t.file_risk_question(shown)).color(text));
+                        if !by.is_empty() {
+                            ui.label(RichText::new(t.file_risk_added_by(by)).color(text));
+                        }
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            // A click only: Ctrl+Enter, as for a question
+                            // that deletes, never starts a program.
+                            if theme::primary(ui, true, t.file_risk_open()).clicked() {
+                                actions
+                                    .push(Action::OpenAttachmentAnyway(note.clone(), hash.clone()));
                             }
                         });
                     }
@@ -11041,66 +14331,8 @@ impl App {
                     }
                     Dialog::Look { area } => look_form(ui, &t, view.area(area), actions),
                     Dialog::Delete(deleting) => delete_form(ui, &t, deleting, actions),
-                    Dialog::Merge { query, others } => {
+                    Dialog::Merge { query, others, .. } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
-                    }
-                    Dialog::TrashNote { question, linked } => {
-                        title(ui, question);
-                        let text = ui.visuals().text_color();
-                        let detail = if *linked {
-                            t.delete_note_linked_detail()
-                        } else {
-                            t.delete_note_detail()
-                        };
-                        ui.label(RichText::new(detail).color(text));
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::TrashNote);
-                            }
-                        });
-                    }
-                    Dialog::DeleteRoutine { question } => {
-                        title(ui, question);
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::DeleteRoutine);
-                            }
-                        });
-                    }
-                    Dialog::DeleteFrog { .. } => {
-                        title(ui, t.delete_frog_question());
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::DeleteFrog);
-                            }
-                        });
-                    }
-                    Dialog::DeleteEntry { .. } => {
-                        title(ui, t.delete_entry_question());
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::DeleteEntry);
-                            }
-                        });
-                    }
-                    Dialog::DeleteLine { for_good, .. } => {
-                        title(ui, t.checklist_delete_question());
-                        // The verb of the menu it came from.
-                        let verb = if *for_good {
-                            t.shopping_delete_for_good()
-                        } else {
-                            t.delete()
-                        };
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, verb) {
-                                actions.push(Action::DeleteLine);
-                            }
-                        });
                     }
                     Dialog::Share { area, role, afar } => {
                         let shown = view
@@ -11202,15 +14434,6 @@ impl App {
                         pack_view::import_form(ui, &t, shown, form, &mut asked);
                         actions.extend(asked.map(Action::Pack));
                     }
-                    Dialog::RemovePackFrom { note, name } => {
-                        title(ui, &t.remove_pack_from(name));
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.remove()) {
-                                actions.push(Action::RemovePackFrom(note.clone()));
-                            }
-                        });
-                    }
                     Dialog::SentItem {
                         opened,
                         blocking: Some(areas),
@@ -11267,13 +14490,38 @@ impl App {
                             }
                         });
                     }
-                    Dialog::RemoveMedia { photo, .. } => {
+                    Dialog::HiddenFromAi {
+                        names, area_first, ..
+                    } => {
+                        let text = ui.visuals().text_color();
+                        ui.horizontal(|ui| {
+                            icons::show(ui, icons::HIDDEN_FROM_AI, 22.0, text);
+                            title(ui, t.hidden_from_ai_refused_title());
+                        });
+                        if *area_first {
+                            let said = t.hidden_from_ai_area_first_desktop(names);
+                            ui.label(RichText::new(said).color(text));
+                            if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                                actions.push(Action::CloseDialog);
+                            }
+                        } else {
+                            let said = t.hidden_from_ai_refused_body(names);
+                            ui.label(RichText::new(said).color(text));
+                            ui.horizontal(|ui| {
+                                cancel(ui, &t, actions);
+                                if theme::main_action(ui, true, t.hidden_from_ai_show()) {
+                                    actions.push(Action::ShowToAi);
+                                }
+                            });
+                        }
+                    }
+                    Dialog::RemoveMedia { made, .. } => {
                         title(
                             ui,
-                            if *photo {
-                                t.remove_photo_question()
-                            } else {
-                                t.remove_recording_question()
+                            match made {
+                                Made::Photo => t.remove_photo_question(),
+                                Made::Recording => t.remove_recording_question(),
+                                Made::File => t.remove_file_question(),
                             },
                         );
                         let text = ui.visuals().text_color();
@@ -11301,24 +14549,6 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.remove()) {
                                 actions.push(Action::RemoveCaptured);
-                            }
-                        });
-                    }
-                    Dialog::RemoveText { photo, .. } => {
-                        title(
-                            ui,
-                            if *photo {
-                                t.remove_photo_text_question()
-                            } else {
-                                t.remove_transcript_question()
-                            },
-                        );
-                        let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.remove_generated_text_detail()).color(text));
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.remove()) {
-                                actions.push(Action::RemoveText);
                             }
                         });
                     }
@@ -11354,6 +14584,7 @@ impl App {
                                 pictures,
                                 person,
                                 (*comparing, name, *back),
+                                focus,
                                 &mut asked,
                             );
                             if ui
@@ -11451,48 +14682,33 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
-                    Dialog::FileInto { notes } => {
-                        // Several selected: how many go (#148).
-                        match notes.len() {
-                            1 => title(ui, t.file_into()),
-                            n => title(ui, &t.file_notes_into(n as i64)),
-                        }
+                    Dialog::Vault => {
+                        title(ui, t.vault_export_title());
                         let text = ui.visuals().text_color();
                         let weak = ui.visuals().weak_text_color();
-                        egui::ScrollArea::vertical()
-                            .max_height(420.0)
-                            .show(ui, |ui| {
-                                for (area, topics) in &view.areas {
-                                    let places = std::iter::once((
-                                        area.id.clone(),
-                                        area_name(&t, area),
-                                        0.0,
-                                    ))
-                                    .chain(
-                                        topics
-                                            .iter()
-                                            .map(|p| (p.id.clone(), topic_name(&t, p), 24.0)),
-                                    );
-                                    for (place, name, indent) in places {
-                                        ui.horizontal(|ui| {
-                                            ui.add_space(indent);
-                                            let button =
-                                                egui::Button::new(RichText::new(name).color(text));
-                                            if ui.add(button).clicked() {
-                                                actions.push(Action::CloseDialog);
-                                                actions.push(Action::File {
-                                                    notes: notes.clone(),
-                                                    place,
-                                                });
-                                            }
-                                        });
-                                    }
-                                }
-                                if view.areas.is_empty() {
-                                    ui.label(RichText::new(t.no_areas_yet()).color(weak));
-                                }
+                        ui.label(RichText::new(t.vault_export_detail()).color(text));
+                        if let Some((done, total)) = vault {
+                            ui.horizontal(|ui| {
+                                ui.add(egui::Spinner::new());
+                                let said = t.vault_writing(done as i64, total as i64);
+                                ui.label(RichText::new(said).small().color(weak));
                             });
-                        cancel(ui, &t, actions);
+                        }
+                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
+                    Dialog::FileInto { into, picker } => {
+                        // Several selected: how many go (#148).
+                        match into {
+                            Filing::Notes(notes) if notes.len() != 1 => {
+                                title(ui, &t.file_notes_into(notes.len() as i64));
+                            }
+                            _ => title(ui, t.file_into()),
+                        }
+                        if let Some(picked) = picker.show(ui, &t) {
+                            actions.push(Action::FileIntoPicked(picked));
+                        }
                     }
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);
@@ -11504,6 +14720,11 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
+                    Dialog::Discard(from) => match leave_saves::question(ui, &t) {
+                        Some(true) => actions.push(Action::Discard(*from)),
+                        Some(false) => actions.push(Action::KeepEditing(*from)),
+                        None => {}
+                    },
                     Dialog::RejectAi => {
                         title(ui, t.ai_reject_question());
                         let text = ui.visuals().text_color();
@@ -11551,6 +14772,10 @@ impl App {
                 | Dialog::Person {
                     asking: Some(_), ..
                 } => Action::CancelBlock,
+                // Naming a new place goes back to the list (#272).
+                Dialog::FileInto { picker, .. } if picker.naming() => Action::FileIntoBack,
+                // Left, the question keeps the edit (#275).
+                Dialog::Discard(from) => Action::KeepEditing(*from),
                 _ => Action::CloseDialog,
             });
         }
@@ -11796,6 +15021,12 @@ impl App {
                             backup_view::card(ui, &t, store, wall, backup_form, &mut backup);
                             actions.extend(backup.into_iter().map(Action::Backup));
                         });
+                        // Take Notes back (#285), set up or not.
+                        embossed(ui, tones, false, None, |ui| {
+                            if backup_view::notes_card(ui, &t) {
+                                actions.push(Action::Backup(BackupAction::OpenNotes));
+                            }
+                        });
                     }
                     // People (#52): every Profile kept here, each opening
                     // it; the blocked ones (#90) in a fold of their own,
@@ -11861,6 +15092,8 @@ impl App {
             asking: None,
             back,
         });
+        // Its name field takes the keyboard (#277).
+        self.focus = true;
         Ok(())
     }
 
@@ -12305,7 +15538,37 @@ impl App {
             }
         };
         ui.heading(RichText::new(t.settings_title()).color(text));
-        ui.label(RichText::new(t.settings_intro()).color(weak));
+        // The search above the page it filters (#282), staying while the
+        // page scrolls; Ctrl+F puts the cursor into it, nothing on opening.
+        let finds = ui.ctx().memory(|m| m.top_modal_layer()) == Some(ui.layer_id())
+            && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::F));
+        self.settings_find |= finds;
+        let searched = self.settings_query.clone();
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::SEARCH, 20.0, weak);
+            let field = ui.add(
+                TextEdit::singleline(&mut self.settings_query)
+                    .id(Id::new("settings search"))
+                    .hint_text(t.settings_search_hint())
+                    .text_color(text)
+                    .desired_width(ui.available_width() - 32.0),
+            );
+            name_field(ui, &field, t.settings_search_hint());
+            text_menu::show(ui, &t, &field, &self.settings_query);
+            if std::mem::take(&mut self.settings_find) {
+                field.request_focus();
+            }
+            if !self.settings_query.is_empty()
+                && icon_button(ui, icons::CLOSE, t.clear_search(), text).clicked()
+            {
+                self.settings_query.clear();
+            }
+        });
+        let typed = self.settings_query.trim().to_string();
+        let query = settings_search::query_of(&typed);
+        if query.is_empty() {
+            ui.label(RichText::new(t.settings_intro()).color(weak));
+        }
         ui.add_space(8.0);
         let quiet_text = &mut self.quiet_text;
         let all_day_text = &mut self.all_day_text;
@@ -12313,6 +15576,7 @@ impl App {
             .all_day_from()
             .unwrap_or(oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM);
         let hotkey_text = &mut self.hotkey_text;
+        let hotkey_recording = &mut self.hotkey_recording;
         let stored_hotkey = settings
             .capture_hotkey()
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
@@ -12352,37 +15616,91 @@ impl App {
                 );
             }
         };
-        egui::ScrollArea::vertical()
+        let q = query.as_str();
+        // Whether a search shows any setting, for the line that says
+        // when none does.
+        let mut found = false;
+        let mut scroll = egui::ScrollArea::vertical()
             .id_salt("settings")
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.y = 16.0;
-                ui.add_space(4.0);
+            .auto_shrink([false, false]);
+        // A new search starts at the top.
+        if self.settings_query != searched {
+            scroll = scroll.vertical_scroll_offset(0.0);
+        }
+        scroll.show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 16.0;
+            ui.add_space(4.0);
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_computer()),
+                [
+                    &[t.alerts_switch(), t.alerts_detail()],
+                    &[t.autostart_switch(), t.autostart_detail()],
+                    &[t.bigger_switch(), t.bigger_detail()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_computer(), "computer");
-                    let mut on = alerts;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.alerts_switch()).color(text))
+                    if shows[0] {
+                        let mut on = alerts;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.alerts_switch()).color(text),
+                        )
                         .changed()
-                    {
-                        actions.push(Action::Setting(Setting::Alerts(on)));
+                        {
+                            actions.push(Action::Setting(Setting::Alerts(on)));
+                        }
+                        ui.label(RichText::new(t.alerts_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.alerts_detail()).small().color(weak));
-                    let mut on = autostart;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.autostart_switch()).color(text))
+                    if shows[1] {
+                        let mut on = autostart;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.autostart_switch()).color(text),
+                        )
                         .changed()
-                    {
-                        actions.push(Action::Setting(Setting::Autostart(on)));
+                        {
+                            actions.push(Action::Setting(Setting::Autostart(on)));
+                        }
+                        ui.label(RichText::new(t.autostart_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.autostart_detail()).small().color(weak));
-                    let mut on = bigger;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.bigger_switch()).color(text))
+                    if shows[2] {
+                        let mut on = bigger;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.bigger_switch()).color(text),
+                        )
                         .changed()
-                    {
-                        actions.push(Action::Setting(Setting::Bigger(on)));
+                        {
+                            actions.push(Action::Setting(Setting::Bigger(on)));
+                        }
+                        ui.label(RichText::new(t.bigger_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.bigger_detail()).small().color(weak));
                 });
+            }
+            // The AI port's card is one setting: who may connect and
+            // opening the port.
+            let [port] = settings_search::rows(
+                q,
+                Some(t.ai_port_title()),
+                [&[
+                    t.ai_port_intro(),
+                    t.ai_reach_heading(),
+                    t.ai_reach_local(),
+                    t.ai_reach_docker(),
+                    t.ai_port_open(),
+                ]],
+            );
+            if port {
+                found = true;
                 let ai_shown = ai_view::PortShown {
+                    at: section.as_deref() == Some(AI_PORT_SECTION),
                     url: ai_url.as_deref(),
                     waiting: ai_waiting,
                     copied: ai_copied,
@@ -12392,6 +15710,42 @@ impl App {
                 if let Some(asked) = ai_view::port_card(ui, &t, tones, ai_shown) {
                     actions.push(Action::Ai(asked));
                 }
+            }
+            // The Ask panel's provider (#267): one setting, as the AI
+            // port's card is.
+            let [asks] = settings_search::rows(
+                q,
+                Some(t.ask_settings_title()),
+                [&[
+                    t.ask_settings_intro(),
+                    t.ask_anthropic(),
+                    t.ask_openai(),
+                    t.ask_url(),
+                    t.ask_model(),
+                    t.ask_key(),
+                ]],
+            );
+            if asks {
+                found = true;
+                if self.ask_fields.is_none()
+                    && let Ok(provider) = self.store.ask_provider()
+                {
+                    self.ask_fields = Some(AskFields::of(&provider));
+                }
+                if let Some(fields) = &mut self.ask_fields {
+                    let at = section.as_deref() == Some(ASK_SECTION);
+                    if let Some(changed) = ask_view::settings_card(ui, &t, tones, fields, at) {
+                        actions.push(Action::AskSetting(changed));
+                    }
+                }
+            }
+            let [feedback] = settings_search::rows(
+                q,
+                None,
+                [&[t.feedback_title(), t.feedback_settings_detail()]],
+            );
+            if feedback {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     if ui
                         .button(RichText::new(t.feedback_title()).color(text))
@@ -12405,6 +15759,11 @@ impl App {
                             .color(weak),
                     );
                 });
+            }
+            let [about] =
+                settings_search::rows(q, None, [&[t.about_title(), t.about_settings_detail()]]);
+            if about {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     if ui
                         .button(RichText::new(t.about_title()).color(text))
@@ -12414,132 +15773,167 @@ impl App {
                     }
                     ui.label(RichText::new(t.about_settings_detail()).small().color(weak));
                 });
+            }
+            // The hotkey is one setting, with the command beside it.
+            let [capture] = settings_search::rows(
+                q,
+                Some(t.quick_capture_heading()),
+                [&[t.hotkey_label(), t.hotkey_record(), t.capture_command()]],
+            );
+            if capture {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);
+                    quick_capture_card(
+                        ui,
+                        &t,
+                        (hotkey_text, hotkey_recording),
+                        (&stored_hotkey, hotkey_status),
+                        actions,
+                    );
                 });
+            }
+            let rows = quick_note_rows(&t, &quick);
+            let shows = quick_note_shows(q, &t, &rows);
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    quick_note_card(ui, &t, &quick, actions);
+                    quick_note_card(ui, &t, (&quick, &rows, &shows), actions);
                 });
-                if let Some(speech) = speech {
+            }
+            if let Some(speech) = speech {
+                // The speech model is one setting: the model chosen.
+                let [model] = settings_search::rows(
+                    q,
+                    Some(t.speech_model_title()),
+                    [&[
+                        t.speech_model_intro(),
+                        t.speech_model_choice(),
+                        t.speech_model_pick(),
+                    ]],
+                );
+                if model {
+                    found = true;
                     embossed(ui, tones, false, None, |ui| {
                         if let Some(asked) = media_view::speech_card(ui, &t, speech) {
                             actions.push(Action::Speech(asked));
                         }
                     });
                 }
+            }
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_alarms()),
+                [
+                    &[t.renag_device(), t.settings_renag_detail()],
+                    &[t.all_day_from(), t.all_day_from_detail()],
+                    &[t.alarm_sound(), t.alarm_sound_detail()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_alarms(), "alarms");
-                    let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
-                    if !choices.contains(&renag) {
-                        choices.push(renag);
-                        choices.sort();
-                    }
-                    minutes_choice(ui, t.renag_device(), &t, renag, &choices, |m| {
-                        actions.push(Action::Setting(Setting::Renag(m)));
-                    });
-                    ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(t.all_day_from()).color(text));
-                        let field = ui.add(
-                            TextEdit::singleline(all_day_text)
-                                .id(Id::new("all day from"))
-                                .hint_text(t.time_hint())
-                                .text_color(text)
-                                .desired_width(60.0),
-                        );
-                        text_menu::show(ui, &t, &field, all_day_text);
-                        if field.changed()
-                            && let Some(time) = ClockTime::parse(all_day_text.trim())
-                            && time != all_day_from
-                        {
-                            actions.push(Action::Setting(Setting::AllDayFrom(time)));
+                    if shows[0] {
+                        let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
+                        if !choices.contains(&renag) {
+                            choices.push(renag);
+                            choices.sort();
                         }
-                    });
-                    if ClockTime::parse(all_day_text.trim()).is_none() {
-                        ui.label(
-                            RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
-                        );
+                        minutes_choice(ui, t.renag_device(), &t, renag, &choices, |m| {
+                            actions.push(Action::Setting(Setting::Renag(m)));
+                        });
+                        ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
                     }
-                    ui.label(RichText::new(t.all_day_from_detail()).small().color(weak));
-                    alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    heading(ui, t.settings_nudges(), "nudges");
-                    ui.label(
-                        RichText::new(t.nudge_settings_explain())
-                            .small()
-                            .color(weak),
-                    );
-                    let mut choices: Vec<i64> = NUDGE_REPEAT_CHOICES.to_vec();
-                    if !choices.contains(&repeat) {
-                        choices.push(repeat);
-                        choices.sort();
-                    }
-                    minutes_choice(ui, t.nudge_repeat(), &t, repeat, &choices, |m| {
-                        actions.push(Action::Setting(Setting::NudgeRepeat(m)));
-                    });
-                    let mut on = quiet_on;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.quiet_hours()).color(text))
-                        .changed()
-                    {
-                        actions.push(Action::Setting(Setting::QuietOn(on)));
-                    }
-                    if !quiet_on {
-                        return;
-                    }
-                    let mut typed = None;
-                    ui.horizontal(|ui| {
-                        for (label, value, id, start) in [
-                            (t.quiet_from(), &mut quiet_text.0, "quiet from", true),
-                            (t.quiet_until(), &mut quiet_text.1, "quiet until", false),
-                        ] {
-                            ui.label(RichText::new(label).color(text));
+                    if shows[1] {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(t.all_day_from()).color(text));
                             let field = ui.add(
-                                TextEdit::singleline(value)
-                                    .id(Id::new(id))
+                                TextEdit::singleline(all_day_text)
+                                    .id(Id::new("all day from"))
                                     .hint_text(t.time_hint())
                                     .text_color(text)
                                     .desired_width(60.0),
                             );
-                            text_menu::show(ui, &t, &field, value);
+                            text_menu::show(ui, &t, &field, all_day_text);
                             if field.changed()
-                                && let Some(time) = ClockTime::parse(value.trim())
+                                && let Some(time) = ClockTime::parse(all_day_text.trim())
+                                && time != all_day_from
                             {
-                                typed = Some((start, time));
+                                actions.push(Action::Setting(Setting::AllDayFrom(time)));
                             }
+                        });
+                        if ClockTime::parse(all_day_text.trim()).is_none() {
+                            ui.label(
+                                RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
+                            );
                         }
-                    });
-                    if let Some((start, time)) = typed {
-                        let changed = if start {
-                            QuietHours {
-                                start: time,
-                                ..quiet
-                            }
-                        } else {
-                            QuietHours { end: time, ..quiet }
-                        };
-                        if changed != quiet {
-                            actions.push(Action::Setting(Setting::Quiet(changed)));
-                        }
+                        ui.label(RichText::new(t.all_day_from_detail()).small().color(weak));
                     }
-                    let unreadable = [&quiet_text.0, &quiet_text.1]
-                        .iter()
-                        .any(|v| ClockTime::parse(v.trim()).is_none());
-                    if unreadable {
-                        ui.label(
-                            RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
-                        );
+                    if shows[2] {
+                        alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
                     }
                 });
+            }
+            // The Quiet Hours are one setting with their From and Until.
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_nudges()),
+                [
+                    &[t.nudge_settings_explain()],
+                    &[t.nudge_repeat()],
+                    &[t.quiet_hours(), t.quiet_from(), t.quiet_until()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    heading(ui, t.settings_nudges(), "nudges");
+                    if shows[0] {
+                        ui.label(
+                            RichText::new(t.nudge_settings_explain())
+                                .small()
+                                .color(weak),
+                        );
+                    }
+                    if shows[1] {
+                        let mut choices: Vec<i64> = NUDGE_REPEAT_CHOICES.to_vec();
+                        if !choices.contains(&repeat) {
+                            choices.push(repeat);
+                            choices.sort();
+                        }
+                        minutes_choice(ui, t.nudge_repeat(), &t, repeat, &choices, |m| {
+                            actions.push(Action::Setting(Setting::NudgeRepeat(m)));
+                        });
+                    }
+                    if shows[2] {
+                        quiet_hours(ui, &t, (quiet_on, quiet), quiet_text, actions);
+                    }
+                });
+            }
+            let region = match region_units {
+                UnitSystem::Metric => t.unit_system_metric_name(),
+                UnitSystem::Imperial => t.unit_system_imperial_name(),
+            };
+            let region = t.unit_system_region(region);
+            // The units have no label of their own: found by their detail
+            // line and their options.
+            let [unit] = settings_search::rows(
+                q,
+                Some(t.settings_units()),
+                [&[
+                    t.settings_units_detail(),
+                    &region,
+                    t.unit_system_metric(),
+                    t.unit_system_imperial(),
+                ]],
+            );
+            if unit {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_units(), "units");
                     ui.label(RichText::new(t.settings_units_detail()).small().color(weak));
-                    let region = match region_units {
-                        UnitSystem::Metric => t.unit_system_metric_name(),
-                        UnitSystem::Imperial => t.unit_system_imperial_name(),
-                    };
                     let options = [
-                        (None, t.unit_system_region(region)),
+                        (None, region.clone()),
                         (Some(UnitSystem::Metric), t.unit_system_metric().to_string()),
                         (
                             Some(UnitSystem::Imperial),
@@ -12551,39 +15945,65 @@ impl App {
                         actions.push(Action::Setting(Setting::Units(chosen)));
                     }
                 });
+            }
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_agenda()),
+                [
+                    &[
+                        t.hide_checked_on_agenda(),
+                        t.hide_checked_on_agenda_detail_device(),
+                    ],
+                    &[t.trash_done_reminder(), t.trash_done_reminder_detail()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_agenda(), "agenda");
-                    let mut on = hides_checked;
-                    if theme::checkbox(
-                        ui,
-                        &mut on,
-                        RichText::new(t.hide_checked_on_agenda()).color(text),
-                    )
-                    .changed()
-                    {
-                        actions.push(Action::Setting(Setting::HideChecked(on)));
+                    if shows[0] {
+                        let mut on = hides_checked;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.hide_checked_on_agenda()).color(text),
+                        )
+                        .changed()
+                        {
+                            actions.push(Action::Setting(Setting::HideChecked(on)));
+                        }
+                        ui.label(
+                            RichText::new(t.hide_checked_on_agenda_detail_device())
+                                .small()
+                                .color(weak),
+                        );
                     }
-                    ui.label(
-                        RichText::new(t.hide_checked_on_agenda_detail_device())
-                            .small()
-                            .color(weak),
-                    );
-                    let mut on = trashes_done;
-                    if theme::checkbox(
-                        ui,
-                        &mut on,
-                        RichText::new(t.trash_done_reminder()).color(text),
-                    )
-                    .changed()
-                    {
-                        actions.push(Action::Setting(Setting::TrashDoneReminder(on)));
+                    if shows[1] {
+                        let mut on = trashes_done;
+                        if theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.trash_done_reminder()).color(text),
+                        )
+                        .changed()
+                        {
+                            actions.push(Action::Setting(Setting::TrashDoneReminder(on)));
+                        }
+                        ui.label(
+                            RichText::new(t.trash_done_reminder_detail())
+                                .small()
+                                .color(weak),
+                        );
                     }
-                    ui.label(
-                        RichText::new(t.trash_done_reminder_detail())
-                            .small()
-                            .color(weak),
-                    );
                 });
+            }
+            let [streak] = settings_search::rows(
+                q,
+                Some(t.settings_history()),
+                [&[t.show_streaks_device(), t.show_streaks_detail()]],
+            );
+            if streak {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.settings_history(), "history");
                     let mut on = streaks;
@@ -12598,8 +16018,22 @@ impl App {
                     }
                     ui.label(RichText::new(t.show_streaks_detail()).small().color(weak));
                 });
-                // Simple or Advanced, the person's (#197), last, so
-                // the settings of this computer come first.
+            }
+            // Simple or Advanced, the person's (#197), last, so the
+            // settings of this computer come first; found by its options.
+            let [features] = settings_search::rows(
+                q,
+                Some(t.features()),
+                [&[
+                    t.features_detail(),
+                    t.features_simple(),
+                    t.features_simple_detail(),
+                    t.features_advanced(),
+                    t.features_advanced_detail(),
+                ]],
+            );
+            if features {
+                found = true;
                 embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.features(), "features");
                     let mut picked = advanced;
@@ -12607,7 +16041,11 @@ impl App {
                         actions.push(Action::Setting(Setting::Advanced(picked)));
                     }
                 });
-            });
+            }
+            if !found {
+                ui.label(RichText::new(t.settings_search_nothing(&typed)).color(text));
+            }
+        });
     }
 
     /// The Routines and Reminders in the trash on their own, each with
@@ -12663,6 +16101,10 @@ impl App {
     /// The card's text next to the pointer while a card is dragged, and
     /// how many go while several are (#148).
     fn dragged(&self, ctx: &egui::Context, tones: Tones) {
+        if let Some(area) = egui::DragAndDrop::payload::<DraggedArea>(ctx) {
+            self.dragged_area(ctx, tones, &area.0);
+            return;
+        }
         let Some(dragged) = egui::DragAndDrop::payload::<DraggedNotes>(ctx) else {
             return;
         };
@@ -12697,20 +16139,176 @@ impl App {
                     });
             });
     }
+
+    /// The name of the Area `id` next to the pointer while its row is
+    /// dragged in the sidebar (#280).
+    fn dragged_area(&self, ctx: &egui::Context, tones: Tones, id: &str) {
+        let (Some(area), Some(pos)) = (self.view.area(id), ctx.pointer_interact_pos()) else {
+            return;
+        };
+        let name = area_name(&self.t, area);
+        ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+        egui::Area::new(Id::new("dragged"))
+            .order(egui::Order::Tooltip)
+            .fixed_pos(pos + egui::vec2(14.0, 14.0))
+            .interactable(false)
+            .show(ctx, |ui| {
+                Frame::NONE
+                    .fill(tones.card)
+                    .corner_radius(8)
+                    .inner_margin(Margin::same(8))
+                    .show(ui, |ui| {
+                        ui.set_max_width(240.0);
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(name).color(text));
+                    });
+            });
+    }
 }
 
 /// Selects the Area or Topic `place` when its row is clicked, and files
 /// the cards dropped on it there, all those dragged together (#148).
+/// The chevron at the end of the sidebar's row `rect` of the Area `area`
+/// (its name and id), which has Topics: whether it was clicked to fold
+/// them, or to unfold them while `folded` (#279); a screen reader hears
+/// what the click does.
+fn area_fold(ui: &mut Ui, t: &L10n, rect: egui::Rect, area: (&str, &str), folded: bool) -> bool {
+    let (name, id) = area;
+    let said = if folded {
+        t.area_topics_unfold(name)
+    } else {
+        t.area_topics_fold(name)
+    };
+    let chevron = egui::Rect::from_center_size(
+        egui::pos2(rect.right() - 18.0, rect.center().y),
+        egui::vec2(24.0, 24.0),
+    );
+    let resp = ui.interact(chevron, Id::new(("area fold", id)), Sense::click());
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &said));
+    if ui.is_rect_visible(chevron) {
+        theme::icon_button_back(ui, &resp, chevron);
+        let icon = if folded {
+            icons::EXPAND_MORE
+        } else {
+            icons::EXPAND_LESS
+        };
+        icons::paint(
+            ui.painter(),
+            chevron.shrink(2.0),
+            icon,
+            ui.visuals().weak_text_color(),
+        );
+    }
+    resp.on_hover_text(said).clicked()
+}
+
+/// The shield of what is Hidden from AI at `rect` (#267), which a screen
+/// reader and the tooltip name.
+fn hidden_mark(ui: &mut Ui, t: &L10n, rect: egui::Rect, id: Id) {
+    icons::paint(
+        ui.painter(),
+        rect,
+        icons::HIDDEN_FROM_AI,
+        ui.visuals().weak_text_color(),
+    );
+    let mark = ui.interact(rect, id, Sense::hover());
+    mark.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, t.hidden_from_ai()));
+    mark.on_hover_text(t.hidden_from_ai());
+}
+
+/// The switch Hidden from AI of the Note or Area `id` in a menu (#267,
+/// ADR 0049): ticked while it is marked itself, whose click takes the
+/// mark off; offered unticked while it may be marked, in no Shared Area,
+/// and left out otherwise. What its click asks.
+fn hidden_entry(ui: &mut Ui, t: &L10n, view: &View, id: &str) -> Option<Action> {
+    let on = view.hidden_areas.contains(id);
+    if !on && !view.hideable_areas.contains(id) {
+        return None;
+    }
+    hidden_switch(ui, t, id, on)
+}
+
+/// The checkbox "Hidden from AI" of the Note or Area `id`, ticked while
+/// `on`; what its click asks.
+fn hidden_switch(ui: &mut Ui, t: &L10n, id: &str, on: bool) -> Option<Action> {
+    let text = ui.visuals().text_color();
+    let mut ticked = on;
+    let label = RichText::new(t.hidden_from_ai()).color(text);
+    theme::checkbox(ui, &mut ticked, label)
+        .clicked()
+        .then(|| Action::HideFromAi(id.to_string(), !on))
+}
+
 fn place_row(resp: &egui::Response, place: &str, actions: &mut Vec<Action>) {
     if resp.clicked() {
         actions.push(Action::Select(Selection::Place(place.to_string())));
     }
-    if let Some(dragged) = resp.dnd_release_payload::<DraggedNotes>() {
+    // egui takes whatever is carried before it looks at its kind, so an
+    // Area dragged over the row stays carried for its own drop (#280).
+    let cards = egui::DragAndDrop::has_payload_of_type::<DraggedNotes>(&resp.ctx);
+    if cards && let Some(dragged) = resp.dnd_release_payload::<DraggedNotes>() {
         actions.push(Action::File {
             notes: dragged.0.clone(),
             place: place.to_string(),
         });
     }
+}
+
+/// An Area's rows in the sidebar, for where a dragged Area goes (#280):
+/// its id, its own row and the bottom of what follows it, its Topics
+/// and who shares it.
+struct AreaRows {
+    id: String,
+    row: egui::Rect,
+    bottom: f32,
+}
+
+/// The drop of an Area dragged by its row in the sidebar (#280): a line
+/// in the gap between the Areas it would go into, and its move there
+/// once let go. Away from the Areas, and in the gaps beside the Area
+/// itself, it stays and nothing is written.
+fn area_drop(ui: &mut Ui, tones: Tones, blocks: &[AreaRows], actions: &mut Vec<Action>) {
+    let Some(dragged) = egui::DragAndDrop::payload::<DraggedArea>(ui.ctx()) else {
+        return;
+    };
+    let (Some(first), Some(last), Some(pos)) = (
+        blocks.first(),
+        blocks.last(),
+        ui.ctx().pointer_interact_pos(),
+    ) else {
+        return;
+    };
+    let around = egui::Rect::from_x_y_ranges(
+        first.row.x_range(),
+        (first.row.top() - 15.0)..=(last.bottom + 15.0),
+    );
+    let Some(from) = blocks.iter().position(|b| b.id == dragged.0) else {
+        return;
+    };
+    // The gap above the first Area whose row's middle lies below the
+    // pointer: over an Area's Topics, the one after it.
+    let slot = blocks.iter().filter(|b| b.row.center().y < pos.y).count();
+    let Some(index) = area_dropped_at(from, slot).filter(|_| around.contains(pos)) else {
+        return;
+    };
+    let y = blocks
+        .get(slot)
+        .map_or(last.bottom + 2.0, |b| b.row.top() - 2.0);
+    let line = egui::Stroke::new(2.0, tones.accent);
+    ui.painter().hline(first.row.x_range(), y, line);
+    if ui.input(|i| i.pointer.any_released()) {
+        actions.push(Action::MoveArea(dragged.0.clone(), index));
+    }
+}
+
+/// What the Area menu may do to the Area or Topic shown (#279), by its
+/// id: whether it is an Area, whether this Device manages its Area and
+/// whether that is shared.
+struct PlaceMenu {
+    id: String,
+    area: bool,
+    manages: bool,
+    shared: bool,
 }
 
 /// What the Note menu may do to the Note shown (#145), by its id.
@@ -12724,6 +16322,31 @@ struct NoteMenu {
     checklist: bool,
     shopping: bool,
     tally: bool,
+}
+
+/// Important, Normal and Unimportant, as a menu's entries (#273), with
+/// `keys` each with the digit that sets it over the list (#274): the one
+/// picked, which closes the menu.
+fn importance_entries(ui: &mut Ui, t: &L10n, keys: bool) -> Option<Importance> {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let mut picked = None;
+    for (importance, label, key) in [
+        (Importance::Important, t.importance_important(), "1"),
+        (Importance::Normal, t.importance_normal(), "2"),
+        (Importance::Unimportant, t.importance_unimportant(), "3"),
+    ] {
+        let mut button = egui::Button::new(RichText::new(label).color(text));
+        // The digit that sets it over the list (#274).
+        if keys {
+            button = button.shortcut_text(RichText::new(key).color(weak));
+        }
+        if ui.add(button).clicked() {
+            picked = Some(importance);
+            ui.close();
+        }
+    }
+    picked
 }
 
 /// The entries of a menu of the menu bar: each label with its keys, if
@@ -12789,6 +16412,7 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
         Page::Profile => t.profile_title(),
         Page::People => t.people_title(),
         Page::Backups => t.profile_backups(),
+        Page::BackupNotes => t.backup_open_page_title(),
         Page::Sync => t.sync_title(),
         Page::Pair => t.menu_pair(),
     }
@@ -13015,6 +16639,19 @@ fn cancel(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
 /// open (#90), the phone's.
 const BLOCKED_OPEN: &str = "peopleBlockedOpen";
 
+/// Where AI ▸ AI port… opens the Settings (#279): at the AI port's card,
+/// which no app link names.
+const AI_PORT_SECTION: &str = "ai port";
+
+/// Where the Ask panel opens the Settings when its provider cannot be
+/// asked (#267): at the provider's card, which no app link names.
+const ASK_SECTION: &str = "ask";
+
+/// What the settings of this Device start with that keep an Area's Topics
+/// folded in the sidebar, the Area's id after it (#279); none kept means
+/// unfolded.
+const AREA_FOLDED: &str = "areaTopicsFolded:";
+
 /// The local setting that keeps the Frog view's "Done" section open, as
 /// the phone names it.
 const FROGS_DONE_OPEN: &str = "frogsDoneOpen";
@@ -13165,7 +16802,7 @@ fn name_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if theme::primary(ui, ready, verb).clicked() {
+        if theme::main_action(ui, ready, verb) {
             actions.push(done);
         }
     });
@@ -13192,7 +16829,7 @@ fn link_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if theme::primary(ui, ready, t.link_set()).clicked() {
+        if theme::main_action(ui, ready, t.link_set()) {
             actions.push(Action::SetLink);
         }
     });
@@ -13480,12 +17117,12 @@ fn area_offer_form(
 
 /// Asks whom a Note is sent to: one of the people whose keys are known
 /// here, encrypted to them, or anyone, signed only, with a hint that
-/// whoever holds the file can read it.
+/// whoever holds the file can read it. Send waits for a pick (#288).
 fn send_form(
     ui: &mut Ui,
     t: &L10n,
     recipients: &[Recipient],
-    (picked, update, cancelling): (&mut Option<usize>, bool, &mut bool),
+    (picked, update, cancelling): (&mut SendTo, bool, &mut bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -13502,12 +17139,16 @@ fn send_form(
     for (i, r) in recipients.iter().enumerate() {
         ui.radio_value(
             picked,
-            Some(i),
+            SendTo::Person(i),
             RichText::new(t.send_encrypted(profile_view::display_name(t, &r.name))).color(text),
         );
     }
-    ui.radio_value(picked, None, RichText::new(t.send_anyone()).color(text));
-    if picked.is_none() {
+    ui.radio_value(
+        picked,
+        SendTo::Anyone,
+        RichText::new(t.send_anyone()).color(text),
+    );
+    if *picked == SendTo::Anyone {
         ui.label(RichText::new(t.send_plain_hint()).color(text));
     }
     if update {
@@ -13517,10 +17158,7 @@ fn send_form(
     ui.label(RichText::new(t.send_what()).small().color(weak));
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if ui
-            .button(RichText::new(t.send_action()).color(text))
-            .clicked()
-        {
+        if theme::main_action(ui, *picked != SendTo::Nobody, t.send_action()) {
             actions.push(Action::SendNote);
         }
     });
@@ -14116,6 +17754,14 @@ fn merge_form(
     if field.changed() {
         actions.push(Action::MergeQuery);
     }
+    // Ctrl+Enter merges into the first Note found, once something is
+    // typed to find it by (#277).
+    if !query.trim().is_empty()
+        && let Some((id, _)) = others.first()
+        && theme::ctrl_enter(ui)
+    {
+        actions.push(Action::Merge(id.clone()));
+    }
     // The core's search, as on the phone: Transcripts, Photo Texts and
     // Sections count too.
     let mut shown = others.iter().peekable();
@@ -14158,15 +17804,23 @@ fn person_name(
     profile_view::display_name(t, name).to_string()
 }
 
+/// Whether the Settings record the hotkey from the keys pressed (#283),
+/// and whether its button was drawn since the keys were last read.
+#[derive(Debug, Default)]
+struct HotkeyRecording {
+    on: bool,
+    drawn: bool,
+}
+
 /// The Settings' card on the capture popup's hotkey and the
-/// `oldbrainfix capture` command: the chord as typed, and how the hotkey
-/// stands on this desktop.
+/// `oldbrainfix capture` command: the chord as typed, Record keys, which
+/// records it from the keys pressed (#283), and how the hotkey stands on
+/// this desktop.
 fn quick_capture_card(
     ui: &mut Ui,
     t: &L10n,
-    typed: &mut String,
-    stored: &str,
-    status: Option<hotkey::Status>,
+    (typed, recording): (&mut String, &mut HotkeyRecording),
+    (stored, status): (&str, Option<hotkey::Status>),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -14195,7 +17849,28 @@ fn quick_capture_card(
         {
             actions.push(Action::Setting(Setting::Hotkey(chord.to_string())));
         }
+        recording.drawn = true;
+        let label = if recording.on {
+            t.hotkey_recording()
+        } else {
+            t.hotkey_record()
+        };
+        let mut button = egui::Button::new(RichText::new(label).color(text));
+        if recording.on {
+            let ring = ui.visuals().selection.stroke.color;
+            button = button.stroke(egui::Stroke::new(2.0, ring));
+        }
+        let record = ui.add(button);
+        if record.clicked() {
+            actions.push(Action::RecordHotkey(!recording.on));
+        } else if recording.on && ui.input(|i| i.pointer.any_pressed()) && !record.hovered() {
+            // A click elsewhere stops it, as it leaves a field.
+            actions.push(Action::RecordHotkey(false));
+        }
     });
+    if recording.on {
+        ui.label(RichText::new(t.hotkey_recording_hint()).small().color(weak));
+    }
     let line = match (chord, status) {
         (None, _) => {
             ui.label(RichText::new(t.hotkey_invalid()).color(ui.visuals().error_fg_color));
@@ -14217,19 +17892,12 @@ fn quick_capture_card(
     ui.label(RichText::new(t.capture_command()).small().color(weak));
 }
 
-/// The Settings' card on what the quick note, its dialog in the window
-/// and the popup, shows besides its text (#142): one switch for each of the Note
-/// card's buttons and the format bar, off until switched on, and the
-/// Nudge buttons, on until switched off.
-fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<Action>) {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
-    ui.label(
-        RichText::new(t.settings_quick_note_detail_device())
-            .small()
-            .color(weak),
-    );
+/// A switch of the quick note's card: what it shows and its label.
+type QuickNoteSwitch = (QuickNoteControl, bool, &'static str);
+
+/// The switches of the Settings' card on the quick note (#142) offered
+/// here, one for each of the Note card's buttons and the format bar.
+fn quick_note_rows(t: &L10n, quick: &QuickNote) -> Vec<QuickNoteSwitch> {
     let switches = [
         (QuickNoteControl::FileInto, quick.file_into, t.file_into()),
         (
@@ -14253,21 +17921,67 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
             t.quick_note_format_bar(),
         ),
     ];
-    for (control, shows, label) in switches {
-        // The format bar, Frogs, Sessions and Tallies are offered only in
-        // Advanced (#197); the alarm clock offers a Routine or Reminder
-        // without the switch (#223).
-        if matches!(
-            control,
-            QuickNoteControl::FormatBar | QuickNoteControl::Schedule
-        ) && !quick.advanced
-        {
+    // The format bar, Frogs, Sessions and Tallies are offered only in
+    // Advanced (#197); the alarm clock offers a Routine or Reminder
+    // without the switch (#223).
+    switches
+        .into_iter()
+        .filter(|(control, _, _)| {
+            quick.advanced
+                || !matches!(
+                    control,
+                    QuickNoteControl::FormatBar | QuickNoteControl::Schedule
+                )
+        })
+        .collect()
+}
+
+/// Which rows of the quick note's card the search `query` shows (#282):
+/// its detail line, each of `switches` and the Nudge buttons, in order.
+fn quick_note_shows(query: &str, t: &L10n, switches: &[QuickNoteSwitch]) -> Vec<bool> {
+    let whole = settings_search::heading_matches(query, Some(t.settings_quick_note()));
+    let shows = |words: &[&str]| whole || settings_search::matches(words, query);
+    let mut rows = vec![shows(&[t.settings_quick_note_detail_device()])];
+    rows.extend(switches.iter().map(|(_, _, label)| shows(&[label])));
+    rows.push(shows(&[
+        t.quick_note_nudge_buttons(),
+        t.quick_note_nudge_buttons_detail(),
+    ]));
+    rows
+}
+
+/// The Settings' card on what the quick note, its dialog in the window
+/// and the popup, shows besides its text (#142): one switch for each of
+/// the Note card's `switches`, off until switched on, and the Nudge
+/// buttons, on until switched off; of them the rows `shows` (#282).
+fn quick_note_card(
+    ui: &mut Ui,
+    t: &L10n,
+    (quick, switches, shows): (&QuickNote, &[QuickNoteSwitch], &[bool]),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let shown = |row: usize| shows.get(row).copied().unwrap_or(true);
+    ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
+    if shown(0) {
+        ui.label(
+            RichText::new(t.settings_quick_note_detail_device())
+                .small()
+                .color(weak),
+        );
+    }
+    for (row, &(control, on, label)) in switches.iter().enumerate() {
+        if !shown(row + 1) {
             continue;
         }
-        let mut on = shows;
+        let mut on = on;
         if theme::checkbox(ui, &mut on, RichText::new(label).color(text)).changed() {
             actions.push(Action::Setting(Setting::QuickNote(control, on)));
         }
+    }
+    if !shown(switches.len() + 1) {
+        return;
     }
     let mut on = quick.nudge_buttons;
     if theme::checkbox(
@@ -14284,6 +17998,73 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
             .small()
             .color(weak),
     );
+}
+
+/// The Settings' Quiet Hours (`on` and the hours): their switch and,
+/// while on, their From and Until as `typed`, each kept once it reads as
+/// a time.
+fn quiet_hours(
+    ui: &mut Ui,
+    t: &L10n,
+    (on, quiet): (bool, QuietHours),
+    typed: &mut (String, String),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let mut switched = on;
+    if theme::checkbox(
+        ui,
+        &mut switched,
+        RichText::new(t.quiet_hours()).color(text),
+    )
+    .changed()
+    {
+        actions.push(Action::Setting(Setting::QuietOn(switched)));
+    }
+    if !on {
+        return;
+    }
+    let mut changed_to = None;
+    ui.horizontal(|ui| {
+        for (label, value, id, start) in [
+            (t.quiet_from(), &mut typed.0, "quiet from", true),
+            (t.quiet_until(), &mut typed.1, "quiet until", false),
+        ] {
+            ui.label(RichText::new(label).color(text));
+            let field = ui.add(
+                TextEdit::singleline(value)
+                    .id(Id::new(id))
+                    .hint_text(t.time_hint())
+                    .text_color(text)
+                    .desired_width(60.0),
+            );
+            text_menu::show(ui, t, &field, value);
+            if field.changed()
+                && let Some(time) = ClockTime::parse(value.trim())
+            {
+                changed_to = Some((start, time));
+            }
+        }
+    });
+    if let Some((start, time)) = changed_to {
+        let changed = if start {
+            QuietHours {
+                start: time,
+                ..quiet
+            }
+        } else {
+            QuietHours { end: time, ..quiet }
+        };
+        if changed != quiet {
+            actions.push(Action::Setting(Setting::Quiet(changed)));
+        }
+    }
+    let unreadable = [&typed.0, &typed.1]
+        .iter()
+        .any(|v| ClockTime::parse(v.trim()).is_none());
+    if unreadable {
+        ui.label(RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color));
+    }
 }
 
 /// The Settings' alarm sound (#102): the own chime or the file chosen,
@@ -14553,11 +18334,13 @@ fn read_agenda(
                 lines = Some((list, store.may_check_off(&row.routine.id)?));
             }
         }
+        let answers = occurrence_answers::answers(store, &row.routine, &row.occurrence, wall)?;
         Ok(Row {
             row,
             area,
             session,
             lines,
+            answers,
         })
     };
     // What shows as Done leaves where this Device hides it
@@ -14579,7 +18362,9 @@ fn read_agenda(
     }
     let frog_rows = shown_frogs(today.shown.clone())?;
     let mut shopping_rows = Vec::new();
-    for shown in shopping.agenda_rows(wall)? {
+    // The Lines checked today stay, struck for the day, unless this
+    // Device hides what is checked (#276).
+    for shown in shopping.agenda_rows_with(wall, !hides_checked)? {
         let Some(note) = notes.by_id(&shown.list.note_id)? else {
             continue;
         };
@@ -14588,23 +18373,33 @@ fn read_agenda(
             _ => t.shopping_heading().to_string(),
         };
         // As this person chose for the list (#186); one kept
-        // off is not among them.
-        let count = shown.lines.len() as i64;
+        // off is not among them, nor a count of none open.
+        let count = shown.list.open_count() as i64;
         let (lines, text) = match shown.shows {
             ShoppingOnAgenda::Lines => (shown.lines, title),
-            ShoppingOnAgenda::Count => (Vec::new(), t.shopping_row_open(&title, count)),
-            ShoppingOnAgenda::Off => continue,
+            ShoppingOnAgenda::Count if count > 0 => {
+                (Vec::new(), t.shopping_row_open(&title, count))
+            }
+            ShoppingOnAgenda::Count | ShoppingOnAgenda::Off => continue,
         };
+        let open: HashSet<&str> = shown.list.open().iter().map(|l| l.id.as_str()).collect();
+        let struck = lines
+            .iter()
+            .filter(|l| !open.contains(l.id.as_str()))
+            .map(|l| l.id.clone())
+            .collect();
         shopping_rows.push(ShoppingRow {
             area: place(note.clone())?.area,
             checks: shopping.may_check(&note.id)?,
             note_id: note.id,
             text,
             lines,
+            struck,
         });
     }
     let mut checklist_rows = Vec::new();
-    for row in lists.agenda_rows()? {
+    let day = Day::today(store.now(), wall);
+    for row in lists.agenda_rows_with((!hides_checked).then_some(wall))? {
         let Some(note) = notes.by_id(&row.list.note_id)? else {
             continue;
         };
@@ -14617,9 +18412,14 @@ fn read_agenda(
         let ChecklistAgendaRow { list, shows } = row;
         let lines = match shows {
             ListOnAgenda::Count => Vec::new(),
-            // Its checked Lines never show (#143).
-            _ => agenda_lines(&list, true),
+            // Its checked Lines show only on the day they were checked
+            // (#143, #276).
+            _ => agenda_lines(&list, hides_checked, Some((day, wall))),
         };
+        // Never a count of none open.
+        if lines.is_empty() && list.open_count() == 0 {
+            continue;
+        }
         let text = if lines.is_empty() {
             let (open, count) = (list.open_count() as i64, list.count() as i64);
             t.checklist_row_open(&title, open, count)
@@ -14719,7 +18519,7 @@ fn frogs_shown(
 pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
     match note {
         Some(note) if !note.text.trim().is_empty() => note.visible_text().trim().to_string(),
-        Some(note) => l10n::wordless(t, note.wordless()).to_string(),
+        Some(note) => l10n::wordless(t, note.wordless(), &note.wordless_name()),
         None => t.note_gone().to_string(),
     }
 }
@@ -14811,17 +18611,32 @@ fn agenda_entry(
     .inner
 }
 
+/// What a click on an Occurrence on the Agenda opens, its heading's text
+/// or a Checklist Routine's Line's words (#270): the Note dialog of its
+/// Note, whose Due line answers it; the editor of its Routine while the
+/// Note is gone or in the trash, the only place left to see it.
+fn occurrence_opens(row: &AgendaRow) -> Action {
+    match &row.note {
+        Some(note) if !note.is_trashed() => Action::SelectNote(note.id.clone()),
+        _ => Action::OpenRoutine(row.routine.id.clone()),
+    }
+}
+
 /// One Occurrence on the Agenda as a group (#208): the heading an
 /// embossed card's top, with the box to check it off, its time, its
 /// Note's text, its Area's colour and icon, and its ⋮; a click on the
-/// text opens its Routine, a right-click on it the menu of ⋮. Under it a
-/// Session's picks today, each with its box showing whether it has an
+/// text opens its Note ([`occurrence_opens`]), a right-click on it the
+/// menu of ⋮. A skipped
+/// one stays struck for the day, as a Done one, saying so under its
+/// text, and the one Tomorrow added says where it came from (#269).
+/// Under it a Session's picks today, each with its box showing whether it has an
 /// entry, its box and words opening its entry form, and "Another one"
 /// under each without one; how many it picks on later days. A Session's
 /// own box only shows Done: once every pick has an entry it checks
 /// itself, and nothing else checks it. A Routine spawned from a
 /// Checklist lists its Lines under it, checked for this Occurrence; once
-/// every Line is checked, its box stays checked too (#121). Where
+/// every Line is checked, its box stays checked too (#121), a Line's
+/// words opening what the heading opens. Where
 /// `hides_checked` (#217), the checked Lines and the picks with an entry
 /// are left out.
 fn agenda_row(
@@ -14836,6 +18651,7 @@ fn agenda_row(
     let routine = &row.row.routine;
     let occurrence = row.row.occurrence;
     let done = row.row.done().is_some();
+    let skipped = row.row.skipped().is_some();
     let colour = row
         .area
         .as_ref()
@@ -14870,10 +18686,13 @@ fn agenda_row(
                 ui.spacing_mut().item_spacing.y = 2.0;
                 ui.label(RichText::new(&time).strong().color(text));
                 let mut line = RichText::new(&title).size(15.0).color(text);
-                if done {
+                if done || skipped {
                     line = line.strikethrough();
                 }
                 ui.add(egui::Label::new(line).truncate());
+                if let Some(under) = answered_under(t, &row.row) {
+                    ui.label(RichText::new(under).color(weak));
+                }
                 match &row.session {
                     Some(SessionPart::Later(count)) => {
                         ui.label(RichText::new(t.session_picks(*count)).color(text));
@@ -14890,16 +18709,17 @@ fn agenda_row(
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
             open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &title));
             if open.clicked() {
-                actions.push(Action::OpenRoutine(routine.id.clone()));
+                actions.push(occurrence_opens(&row.row));
             }
             // The same menu from a right-click and from ⋮.
             let history = !routine.is_reminder();
+            let answers = row.answers;
             let mut picked = None;
-            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, history)));
+            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let more = icon_button(ui, icons::MORE_VERT, &t.occurrence_menu(&title), weak);
                 egui::Popup::menu(&more)
-                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, history)));
+                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
                 if let Some(icon) = row
                     .area
                     .as_ref()
@@ -14912,11 +18732,17 @@ fn agenda_row(
                 }
             });
             match picked {
+                Some(OccurrencePick::Schedule) => {
+                    actions.push(Action::OpenRoutine(routine.id.clone()));
+                }
                 Some(OccurrencePick::History) => {
                     actions.push(Action::Select(Selection::History(routine.id.clone())));
                 }
                 Some(OccurrencePick::Share) => {
                     actions.push(Action::ShareRoutine(routine.id.clone()));
+                }
+                Some(OccurrencePick::Answer(answer)) => {
+                    actions.push(Action::Answer(routine.id.clone(), occurrence, answer));
                 }
                 None => {}
             }
@@ -14926,7 +18752,7 @@ fn agenda_row(
             session_picks(ui, t, tones, (shown, hides_checked), actions);
         } else if let Some((list, checks)) = &row.lines {
             // The Lines go there too, checked for this Occurrence.
-            for line in agenda_lines(list, hides_checked) {
+            for line in agenda_lines(list, hides_checked, None) {
                 let id = Id::new(("row line", &routine.id, occurrence.key(), &line.id));
                 let shown = (id, line.text.as_str(), usize::from(line.in_group));
                 let clicks = agenda_entry(
@@ -14944,7 +18770,7 @@ fn agenda_row(
                     )));
                 }
                 if clicks.words {
-                    actions.push(Action::OpenRoutine(routine.id.clone()));
+                    actions.push(occurrence_opens(&row.row));
                 }
             }
         }
@@ -15009,7 +18835,8 @@ fn session_picks(
 
 /// The heading of a Shopping List's or Checklist's group: its kind's
 /// icon where a box would be, its `words`, a click on which opens the
-/// Note `note_id`, and its Area's icon.
+/// Note `note_id` with the keyboard in a new Line after its open ones
+/// (#276), and its Area's icon.
 fn list_heading(
     ui: &mut Ui,
     (icon, area, colour): (char, Option<&Area>, Option<Color32>),
@@ -15031,7 +18858,7 @@ fn list_heading(
             .on_hover_cursor(egui::CursorIcon::PointingHand);
         open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, words));
         if open.clicked() {
-            actions.push(Action::SelectNote(note_id.to_string()));
+            actions.push(Action::StartLine(note_id.to_string()));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(icon) = area.and_then(|a| icons::area_icon(a.icon.as_deref())) {
@@ -15042,10 +18869,11 @@ fn list_heading(
 }
 
 /// A Shopping List's group today (#123, #208): its title as the heading,
-/// with the cart and no box, and the Lines that came back today under it,
-/// each with its box, which strikes it and takes it off the Agenda; or,
-/// as chosen for it, the heading alone with how many are open. A click
-/// on a heading's or Line's words opens the Note.
+/// with the cart and no box, and its open Lines under it, then those
+/// checked today struck for the day (#276), each with its box, which
+/// checks or brings it back; or, as chosen for it, the heading alone with
+/// how many are open. A click on a Line's words opens the Note, on the
+/// heading's in a new Line (#276).
 fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<Action>) {
     let colour = row
         .area
@@ -15056,15 +18884,16 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
         list_heading(ui, icon, (&row.note_id, &row.text, "shopping row"), actions);
         for line in &row.lines {
             let id = Id::new(("shopping line", line.id.as_str()));
+            let struck = row.struck.contains(&line.id);
             let clicks = agenda_entry(
                 ui,
                 tones,
                 (id, &line.text, 0),
-                (false, false),
+                (struck, struck),
                 (row.checks, true),
             );
             if clicks.boxed {
-                let check = ShoppingAction::Check(line.id.clone(), true);
+                let check = ShoppingAction::Check(line.id.clone(), !struck);
                 actions.push(Action::Shopping(check));
             }
             if clicks.words {
@@ -15075,9 +18904,10 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
 }
 
 /// A Checklist's group today (#143, #208): its title as the heading,
-/// with the list's icon and no box, and its open Lines under it, each
-/// with its box, which checks it. A click on a heading's or Line's words
-/// opens the Note.
+/// with the list's icon and no box, and its open Lines under it with
+/// those checked today struck for the day (#276), each with its box,
+/// which checks or unchecks it. A click on a Line's words opens the
+/// Note, on the heading's in a new Line (#276).
 fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Vec<Action>) {
     let colour = row
         .area
@@ -15112,20 +18942,53 @@ fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Ve
     });
 }
 
+/// What shows under the text of an Agenda row Not today answered
+/// (#269): that it was skipped, or comes the day after instead, while it
+/// is not Done; on the one Tomorrow added, that it came from the day
+/// before.
+fn answered_under(t: &L10n, row: &AgendaRow) -> Option<&'static str> {
+    if row.skipped().is_some() && row.done().is_none() {
+        return Some(if row.routine.tomorrow.contains(&row.occurrence.key()) {
+            t.occurrence_tomorrow_instead()
+        } else {
+            t.occurrence_skipped()
+        });
+    }
+    row.moved().then(|| t.occurrence_from_day_before())
+}
+
 /// What was picked in an Occurrence's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OccurrencePick {
+    Schedule,
     History,
     Share,
+    Answer(Answer),
 }
 
 /// An Occurrence's menu, from a right-click on it or its ⋮, as the
-/// phone's: History for a Routine (`history`), and Share, which saves
-/// its Routine as the whole series with its end, or its Reminder, as a
-/// calendar file. What was picked.
-fn occurrence_menu(ui: &mut Ui, t: &L10n, history: bool) -> Option<OccurrencePick> {
+/// phone's: Snooze and Not today as far as `answers` allows (#269), each
+/// under its heading, then Edit schedule, which opens its Routine or
+/// Reminder editor (#270), History for a Routine (`history`), and Share,
+/// which saves its Routine as the whole series with its end, or its
+/// Reminder, as a calendar file. What was picked.
+fn occurrence_menu(
+    ui: &mut Ui,
+    t: &L10n,
+    history: bool,
+    answers: Answers,
+) -> Option<OccurrencePick> {
     let text = ui.visuals().text_color();
-    let mut picked = None;
+    let mut picked = occurrence_answers::entries(ui, t, answers).map(OccurrencePick::Answer);
+    if answers.any() {
+        ui.separator();
+    }
+    if ui
+        .button(RichText::new(t.edit_schedule()).color(text))
+        .clicked()
+    {
+        picked = Some(OccurrencePick::Schedule);
+    }
     if history
         && ui
             .button(RichText::new(t.history_title()).color(text))
@@ -15561,6 +19424,9 @@ struct BadgesShown<'a> {
     on_agenda: Option<ListOnAgenda>,
     shopping_on_agenda: Option<ShoppingOnAgenda>,
     ticks: Option<bool>,
+    /// Its own mark Hidden from AI and whether another hides it, while
+    /// the badge is offered (#267).
+    hidden: Option<(bool, bool)>,
     /// A Session Note's setup, for its rule and weekdays' badges, and
     /// whether this Device may change them (#191).
     session: Option<(&'a SessionSetup, bool)>,
@@ -15746,13 +19612,22 @@ fn note_badges(
         if badge(ui, look, icon, t.captured_heading(), value, true).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Captured)));
         }
-        // Who the Pack it came from is from, until removed (#165).
+        // Who the Pack it came from is from, until removed (#165): its
+        // click offers to remove it, which asks nothing (#268).
         if let Some(from) = &placed.pack_from {
-            let said = t.pack_from(profile_view::display_name(t, &from.name));
+            let name = profile_view::display_name(t, &from.name);
+            let said = t.pack_from(name);
             let icon = (pack_view::PACK_ICON, None);
             let value = Some(BadgeValue::Text(&said));
-            if badge(ui, look, icon, t.pack_title(), value, changes).clicked() {
-                actions.push(Action::AskRemovePackFrom(note.id.clone()));
+            let from_badge = badge(ui, look, icon, t.pack_title(), value, changes);
+            if changes {
+                let text = ui.visuals().text_color();
+                egui::Popup::menu(&from_badge).show(|ui| {
+                    if menu_entry(ui, (icons::TRASH, text), &t.remove_pack_from(name)).clicked() {
+                        actions.push(Action::RemovePackFrom(note.id.clone()));
+                        ui.close();
+                    }
+                });
             }
         }
         for routine in shown.routines {
@@ -15845,6 +19720,19 @@ fn note_badges(
                 actions.push(Action::Badge(Some(open)));
             }
         }
+        // Its own mark, or "Off, hidden by its Area" (#267).
+        if let Some((own, other)) = shown.hidden {
+            let value = match (own, other) {
+                (true, _) => t.setting_on(),
+                (false, true) => t.hidden_from_ai_by_area(),
+                (false, false) => t.setting_off(),
+            };
+            let value = Some(BadgeValue::Icon(switch_icon(own), value));
+            let icon = (icons::HIDDEN_FROM_AI, None);
+            if badge(ui, look, icon, t.hidden_from_ai(), value, true).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::HiddenFromAi)));
+            }
+        }
         // In a Shared Area only a Manager sets them up (ADR 0013).
         if !shown.may.schedules || trashed {
             return;
@@ -15909,7 +19797,7 @@ fn note_badges(
 /// The Frog's badge (#259): the frog, then Open, or Eaten today or
 /// yesterday; a click offers Eat now while it is open and this Device may
 /// check it off, and Remove the Frog for who may manage it (ADR 0013),
-/// which asks once, as the Frog view does. It only shows for others.
+/// which asks nothing, as in the Frog view (#268). It only shows for others.
 fn frog_badge(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -15939,7 +19827,7 @@ fn frog_badge(
             ui.close();
         }
         if shown.manages && menu_entry(ui, (icons::TRASH, text), t.frog_remove()).clicked() {
-            actions.push(Action::Frog(FrogAction::AskDelete(frog.id.clone())));
+            actions.push(Action::Frog(FrogAction::Delete(frog.id.clone())));
             ui.close();
         }
     });
@@ -15951,6 +19839,12 @@ struct Media<'a> {
     id: &'a str,
     photos: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
     recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
+    /// Its Attachments (#267).
+    files: (
+        &'a [Attachment],
+        &'a [Attachment],
+        &'a BTreeMap<String, String>,
+    ),
 }
 
 /// What the editor may offer under the photos and recordings it shows
@@ -15960,14 +19854,20 @@ struct Offering<'a> {
     view: &'a View,
     transcriber: Option<&'a Enricher>,
     reader: Option<&'a Enricher>,
+    /// The Attachment Texts' (#267).
+    files: Option<&'a Enricher>,
 }
 
 impl Offering<'_> {
-    /// What shows under the photo (`photo`) or recording `hash` of the
-    /// Note or Section `id` (ADR 0020, ADR 0025).
-    fn offers(&self, id: &str, hash: &str, photo: bool) -> Offers {
+    /// What shows under the photo, recording or file `hash` of the Note
+    /// or Section `id` (ADR 0020, ADR 0025).
+    fn offers(&self, id: &str, hash: &str, made: Made) -> Offers {
         let key = (id.to_string(), hash.to_string());
-        let engine = if photo { self.reader } else { self.transcriber };
+        let engine = match made {
+            Made::Photo => self.reader,
+            Made::Recording => self.transcriber,
+            Made::File => self.files,
+        };
         Offers {
             take_over: self.view.text_changeable.contains(id),
             remove_text: self.view.text_removable.contains(&key),
@@ -15995,29 +19895,29 @@ fn editor_media(
     let id = media.id;
     let (photos, removed_photos, photo_texts) = media.photos;
     let (recordings, removed_recordings, transcripts) = media.recordings;
-    let ask = |hash: String, photo: bool| Action::AskRemoveMedia {
+    let ask = |hash: String, made: Made| Action::AskRemoveMedia {
         note: id.to_string(),
         hash,
-        photo,
+        made,
     };
-    let text = |asked: Generated, photo: bool| {
+    let text = |asked: Generated, made: Made| {
         let note = id.to_string();
         match asked {
             Generated::TakeOver { hash, append } => Action::TakeOver {
                 note,
                 hash,
-                photo,
+                made,
                 append,
             },
-            Generated::Remove(hash) => Action::AskRemoveText { note, hash, photo },
-            Generated::Again(hash) => Action::Again { note, hash, photo },
+            Generated::Remove(hash) => Action::RemoveText { note, hash, made },
+            Generated::Again(hash) => Action::Again { note, hash, made },
         }
     };
-    let photo_offers = |hash: &str| offering.offers(id, hash, true);
+    let photo_offers = |hash: &str| offering.offers(id, hash, Made::Photo);
     match media_view::photos(ui, t, (cache, store), photos, photo_texts, &photo_offers) {
         Some(Photo::View(hash)) => actions.push(Action::ViewPhoto(hash)),
-        Some(Photo::Remove(hash)) => actions.push(ask(hash, true)),
-        Some(Photo::Text(asked)) => actions.push(text(asked, true)),
+        Some(Photo::Remove(hash)) => actions.push(ask(hash, Made::Photo)),
+        Some(Photo::Text(asked)) => actions.push(text(asked, Made::Photo)),
         Some(Photo::Out(hash, out)) => actions.push(Action::PhotoOut(hash, out)),
         None => {}
     }
@@ -16028,12 +19928,12 @@ fn editor_media(
         transcripts,
         (playing, transcribing, speed),
         (can_play, true),
-        &|hash| offering.offers(id, hash, false),
+        &|hash| offering.offers(id, hash, Made::Recording),
     );
     match asked {
         Some(Recording::Play(hash)) => actions.push(Action::Play(hash)),
-        Some(Recording::Remove(hash)) => actions.push(ask(hash, false)),
-        Some(Recording::Text(asked)) => actions.push(text(asked, false)),
+        Some(Recording::Remove(hash)) => actions.push(ask(hash, Made::Recording)),
+        Some(Recording::Text(asked)) => actions.push(text(asked, Made::Recording)),
         Some(Recording::Speed(speed)) => actions.push(Action::Speed(speed)),
         None => {}
     }
@@ -16042,11 +19942,26 @@ fn editor_media(
         t,
         (removed_photos, photo_texts),
         (removed_recordings, transcripts),
-        &|hash, photo| offering.offers(id, hash, photo),
+        &|hash, photo| offering.offers(id, hash, made_of(photo)),
         true,
     ) {
-        actions.push(text(asked, photo));
+        actions.push(text(asked, made_of(photo)));
     }
+    // Its files after them (#267).
+    let file_offers = |hash: &str| offering.offers(id, hash, Made::File);
+    match attachment_view::editor_files(ui, t, media.files, id, &file_offers) {
+        Some(attachment_view::Asked::Open(hash)) => {
+            actions.push(Action::OpenAttachment(id.to_string(), hash));
+        }
+        Some(attachment_view::Asked::Remove(hash)) => actions.push(ask(hash, Made::File)),
+        Some(attachment_view::Asked::Text(asked)) => actions.push(text(asked, Made::File)),
+        None => {}
+    }
+}
+
+/// A photo's (`photo`) or a recording's text.
+fn made_of(photo: bool) -> Made {
+    if photo { Made::Photo } else { Made::Recording }
 }
 
 /// What a card needs to show its photos and recordings.
@@ -16087,9 +20002,14 @@ struct CardLook<'a> {
     session: bool,
     session_shown: Option<&'a SessionCardShown>,
     menu: Option<&'a CardMenu>,
+    /// What that menu offers of Routines, read as it opens (#281).
+    spawns: Option<&'a CardSpawns>,
     /// Whether this Device may change its text, its tables full screen
     /// (#128).
     changes: bool,
+    /// Whether this Device may change it: merge, weight, trash or
+    /// restore it with the cards selected (#273).
+    may: bool,
     /// How the boxes of its text and its Sections' show, by id, those of
     /// them this Device may tick, and whether Show ticks is on for it
     /// (ADR 0035).
@@ -16097,6 +20017,23 @@ struct CardLook<'a> {
     /// Today's Occurrences of its Routines and Reminders, a box for each
     /// that ticks it as on the Agenda (#215).
     today: &'a [CardOccurrence],
+    /// Whether it is Hidden from AI, by its own mark or another's, which
+    /// a shield in its top row shows (#267).
+    hidden: bool,
+}
+
+/// What a card's menu offers of the Note's Routines (#281): Routine…
+/// and Reminder… with `schedules`, Frog with `frog` and Session… with
+/// `session`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CardSpawns {
+    note: String,
+    schedules: bool,
+    frog: bool,
+    session: bool,
+    /// The switch Hidden from AI, ticked while the Note is marked itself;
+    /// none while it may not be marked (#267).
+    hidden: Option<bool>,
 }
 
 /// The folds of a card this Device keeps open (UI laws, "Lists"; #189):
@@ -16141,6 +20078,9 @@ struct CardClicks {
     /// description, and whether it is open now (#189).
     folded: Option<(String, bool)>,
     photo: Option<String>,
+    /// The file clicked, by the Note or Section holding it and its hash
+    /// (#267).
+    attachment: Option<(String, String)>,
     check: Option<(String, bool)>,
     /// The box of today's Occurrence clicked, by its Routine (#215).
     occurrence: Option<(String, Occurrence)>,
@@ -16164,21 +20104,151 @@ struct CardClicks {
 /// window's edge, the list's "+" being at its top.
 pub(crate) const LIST_END: f32 = 24.0;
 
+/// How far into and beyond the Note dialog's edge its border grabs.
+const EDGE_IN: f32 = 4.0;
+const EDGE_OUT: f32 = 6.0;
+
+/// The Note dialog's edges and corners, `shown` around its content of
+/// `size` (#278): dragged, they resize it, both sides alike as it stays
+/// centred, the pointer staying on the edge. The size wanted while one
+/// is dragged, and whether it was let go.
+fn note_dialog_edges(
+    ui: &mut Ui,
+    shown: egui::Rect,
+    size: egui::Vec2,
+) -> Option<(egui::Vec2, bool)> {
+    use egui::CursorIcon;
+    let (inner, outer) = (shown.shrink(EDGE_IN), shown.expand(EDGE_OUT));
+    let corner = 2.0 * (EDGE_IN + EDGE_OUT);
+    let x = |left: bool| {
+        if left {
+            outer.left()..=inner.left()
+        } else {
+            inner.right()..=outer.right()
+        }
+    };
+    let y = |top: bool| {
+        if top {
+            outer.top()..=inner.top()
+        } else {
+            inner.bottom()..=outer.bottom()
+        }
+    };
+    // Each edge with the way it grows the dialog: -1 left or up, 1 right
+    // or down, 0 not.
+    let edges: [(&str, egui::Rect, egui::Vec2, CursorIcon); 8] = [
+        (
+            "left",
+            egui::Rect::from_x_y_ranges(x(true), inner.top() + corner..=inner.bottom() - corner),
+            egui::vec2(-1.0, 0.0),
+            CursorIcon::ResizeHorizontal,
+        ),
+        (
+            "right",
+            egui::Rect::from_x_y_ranges(x(false), inner.top() + corner..=inner.bottom() - corner),
+            egui::vec2(1.0, 0.0),
+            CursorIcon::ResizeHorizontal,
+        ),
+        (
+            "top",
+            egui::Rect::from_x_y_ranges(inner.left() + corner..=inner.right() - corner, y(true)),
+            egui::vec2(0.0, -1.0),
+            CursorIcon::ResizeVertical,
+        ),
+        (
+            "bottom",
+            egui::Rect::from_x_y_ranges(inner.left() + corner..=inner.right() - corner, y(false)),
+            egui::vec2(0.0, 1.0),
+            CursorIcon::ResizeVertical,
+        ),
+        (
+            "top left",
+            egui::Rect::from_min_max(outer.min, outer.min + egui::Vec2::splat(corner)),
+            egui::vec2(-1.0, -1.0),
+            CursorIcon::ResizeNwSe,
+        ),
+        (
+            "bottom right",
+            egui::Rect::from_min_max(outer.max - egui::Vec2::splat(corner), outer.max),
+            egui::vec2(1.0, 1.0),
+            CursorIcon::ResizeNwSe,
+        ),
+        (
+            "top right",
+            egui::Rect::from_min_max(
+                egui::pos2(outer.right() - corner, outer.top()),
+                egui::pos2(outer.right(), outer.top() + corner),
+            ),
+            egui::vec2(1.0, -1.0),
+            CursorIcon::ResizeNeSw,
+        ),
+        (
+            "bottom left",
+            egui::Rect::from_min_max(
+                egui::pos2(outer.left(), outer.bottom() - corner),
+                egui::pos2(outer.left() + corner, outer.bottom()),
+            ),
+            egui::vec2(-1.0, 1.0),
+            CursorIcon::ResizeNeSw,
+        ),
+    ];
+    let mut resized = None;
+    for (name, rect, grows, cursor) in edges {
+        // Not a stop for Tab: the keyboard has nothing to do there.
+        let edge = ui.interact(rect, Id::new("note dialog edge").with(name), Sense::DRAG);
+        if edge.hovered() || edge.dragged() {
+            ui.ctx().set_cursor_icon(cursor);
+        }
+        if edge.dragged() || edge.drag_stopped() {
+            // Centred, it grows on both sides by what the edge moved.
+            let wanted = size + edge.drag_delta() * grows * 2.0;
+            resized = Some((wanted, edge.drag_stopped()));
+        }
+    }
+    resized
+}
+
+/// Where the window's [`App`] hands the list of the place it reached
+/// how far to scroll (#278), with the frames left to try, and where the
+/// list drawn tells it how far it is scrolled.
+const LIST_RESTORE: &str = "list scroll restore";
+const LIST_OFFSET: &str = "list scroll offset";
+
+/// The frames a list keeps scrolling to where it was while it is
+/// shorter than that, its cards still finding their height (#278).
+const RESTORE_FRAMES: u8 = 10;
+
 /// A list's vertical scrolling, as every list of the window has it: the
-/// one place its end gets [`LIST_END`] of room (#158).
+/// one place its end gets [`LIST_END`] of room (#158), and where a place
+/// reached by back or forward scrolls to where it was left (#278).
 pub(crate) fn list_scroll<R>(
     ui: &mut Ui,
-    id: &str,
+    id: impl egui::AsIdSalt,
     content: impl FnOnce(&mut Ui) -> R,
 ) -> egui::scroll_area::ScrollAreaOutput<R> {
-    egui::ScrollArea::vertical()
+    let restore_id = Id::new(LIST_RESTORE);
+    let restore: Option<(f32, u8)> = ui.data_mut(|d| d.remove_temp(restore_id));
+    let mut area = egui::ScrollArea::vertical()
         .id_salt(id)
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            let shown = content(ui);
-            ui.add_space(LIST_END);
-            shown
-        })
+        .auto_shrink([false, false]);
+    if let Some((offset, _)) = restore {
+        area = area.vertical_scroll_offset(offset);
+    }
+    let output = area.show(ui, |ui| {
+        let shown = content(ui);
+        ui.add_space(LIST_END);
+        shown
+    });
+    let at = output.state.offset.y;
+    // Not as far as it was: tried again while its cards grow.
+    if let Some((offset, frames)) = restore
+        && at + 0.5 < offset
+        && frames > 0
+    {
+        ui.data_mut(|d| d.insert_temp(restore_id, (offset, frames - 1)));
+    }
+    ui.data_mut(|d| d.insert_temp(Id::new(LIST_OFFSET), at));
+    output
 }
 
 /// "+" at the top of a list (#146, #161): with one kind it makes that at
@@ -16303,7 +20373,8 @@ fn edited_text(
     let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
     if focused || in_cell {
         *editing = true;
-        if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
+        // Not past a dialog over the Note dialog, whose key it is (#277).
+        if theme::ctrl_enter(ui) {
             actions.push(Action::SaveText);
         }
     }
@@ -16767,12 +20838,12 @@ fn kinded_text(
         return;
     }
     // Enter in the name goes on at the start of the description.
-    if name_edit(ui, &t, (name, formatted, shown.boxes), actions) {
+    if name_edit(ui, &t, (name, &note.id), (formatted, shown.boxes), actions) {
         *editing = true;
         *focus = true;
         *select = Some((0, 0));
     }
-    let id = Id::new("note text");
+    let id = Id::new(("note text", &note.id));
     let open = *editing || ui.memory(|m| m.has_focus(id));
     if open {
         let field = EditedText {
@@ -16852,16 +20923,17 @@ fn kinded_text(
 fn name_edit(
     ui: &mut Ui,
     t: &L10n,
-    (name, formatted, boxes): (&mut String, bool, &BoxLook),
+    (name, of): (&mut String, &str),
+    (formatted, boxes): (bool, &BoxLook),
     actions: &mut Vec<Action>,
 ) -> bool {
-    let id = Id::new("note name");
+    let id = Id::new(("note name", of));
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let accent = ui.visuals().hyperlink_color;
     let code = ui.visuals().code_bg_color;
     let mut moved = false;
-    if ui.memory(|m| m.has_focus(id)) {
+    if ui.memory(|m| m.has_focus(id)) && theme::on_top(ui) {
         ui.input_mut(|i| {
             if i.consume_key(Modifiers::COMMAND, Key::Enter) {
                 actions.push(Action::SaveText);
@@ -17131,6 +21203,7 @@ fn note_card(
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;
     let mut view_rect = None;
+    let mut hidden_rect = None;
     // Where the fold of a Shopping List's struck Lines shows in the
     // detailed view, how many, and whether it is open (#189).
     let struck_id = Id::new(("card struck", &note.id));
@@ -17145,6 +21218,10 @@ fn note_card(
     // Lines and the status marks and tags of its text and of its
     // Sections'.
     let mut shown = Vec::new();
+    // Its files and its Sections', by the Note or Section holding them,
+    // with where their rows lie (#267).
+    let mut files_shown: Vec<(String, Attachment, egui::Rect)> = Vec::new();
+    let alone = note.alone_file().is_some();
     let mut boxes = Vec::new();
     let mut marks = Spots::default();
     let mut section_marks: Vec<(&Section, Spots)> = Vec::new();
@@ -17204,6 +21281,13 @@ fn note_card(
                     // place in the detailed view (#170, #189).
                     if look.switches {
                         view_rect = Some(
+                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                                .0,
+                        );
+                    }
+                    // Hidden from AI, by its own mark or another's (#267).
+                    if look.hidden {
+                        hidden_rect = Some(
                             ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
                                 .0,
                         );
@@ -17297,6 +21381,13 @@ fn note_card(
                         let boxes = look.boxes.look(part.id);
                         shown.extend(whole(ui, t, part, media, (boxes, &mut marks)));
                     }
+                    let files = (
+                        note.attachments.as_slice(),
+                        note.removed_attachments.as_slice(),
+                        &note.attachment_texts,
+                    );
+                    let drawn = attachment_view::card_files(ui, t, files, false, alone);
+                    files_shown.extend(drawn.into_iter().map(|(f, r)| (note.id.clone(), f, r)));
                     // Each part's Capture Context under its text (#170).
                     let line = capture_line(t, (note.captured, &note.context), None);
                     capture_meta(ui, t, &line, None, false);
@@ -17308,6 +21399,14 @@ fn note_card(
                         let media = (&mut *photos, store, transcribing);
                         let boxes = look.boxes.look(part.id);
                         shown.extend(whole(ui, t, part, media, (boxes, &mut spots)));
+                        let files = (
+                            section.attachments.as_slice(),
+                            section.removed_attachments.as_slice(),
+                            &section.attachment_texts,
+                        );
+                        let drawn = attachment_view::card_files(ui, t, files, false, false);
+                        files_shown
+                            .extend(drawn.into_iter().map(|(f, r)| (section.id.clone(), f, r)));
                         section_marks.push((section, spots));
                         let line =
                             capture_line(t, (section.captured, &section.context), Some(before));
@@ -17390,6 +21489,14 @@ fn note_card(
                 &|_, _| Offers::default(),
                 false,
             );
+            // Its files (#267): one alone is the card, titled by its name.
+            let files = (
+                note.attachments.as_slice(),
+                note.removed_attachments.as_slice(),
+                &note.attachment_texts,
+            );
+            let drawn = attachment_view::card_files(ui, t, files, true, alone);
+            files_shown.extend(drawn.into_iter().map(|(f, r)| (note.id.clone(), f, r)));
         });
         let rect = card.rect;
         if important {
@@ -17448,6 +21555,9 @@ fn note_card(
                 .on_hover_text(label)
         });
     let edit = ui.interact(edit_rect, Id::new(("edit", &note.id)), Sense::click());
+    if let Some(rect) = hidden_rect {
+        hidden_mark(ui, t, rect.shrink(2.0), Id::new(("hidden", &note.id)));
+    }
     edit.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.edit()));
     // A fold clicked open or closed, kept per Note on this Device (#189).
     let mut folded = None;
@@ -17520,11 +21630,20 @@ fn note_card(
     let mut menu_opened = resp.secondary_clicked();
     let mut picked = None;
     let menu = look.menu.filter(|m| m.note == note.id);
+    let spawns = look.spawns.filter(|s| s.note == note.id);
     let has_boxes = !note.boxes.is_empty() || look.sections.iter().any(|s| !s.boxes.is_empty());
     let mut entries = |ui: &mut Ui| {
         let text = ui.visuals().text_color();
         if ui.button(RichText::new(t.edit()).color(text)).clicked() {
             picked = Some(Action::SelectNote(note.id.clone()));
+        }
+        // Beside the list (#287), for this card alone.
+        if !note.is_trashed()
+            && ui
+                .button(RichText::new(t.note_window_open()).color(text))
+                .clicked()
+        {
+            picked = Some(Action::OpenWindow(note.id.clone()));
         }
         // With the cards selected along, as the list makes it (#148).
         if look.changes
@@ -17533,6 +21652,54 @@ fn note_card(
                 .clicked()
         {
             picked = Some(Action::AskFileInto(vec![note.id.clone()]));
+        }
+        // Its Routines after File into…, as the phone's compact ⋮ has
+        // them (#281); for this card alone.
+        if let Some(spawns) = spawns {
+            let id = || Some(note.id.clone());
+            let mut entries = Vec::new();
+            if spawns.schedules {
+                entries.push((
+                    t.spawn_routine(),
+                    Action::NewRoutine {
+                        note: id(),
+                        reminder: false,
+                    },
+                ));
+                entries.push((
+                    t.spawn_reminder(),
+                    Action::NewRoutine {
+                        note: id(),
+                        reminder: true,
+                    },
+                ));
+            }
+            if spawns.frog {
+                entries.push((t.frog(), Action::SpawnFrog(note.id.clone())));
+            }
+            if spawns.session {
+                entries.push((t.spawn_session(), Action::NewSession(id())));
+            }
+            for (label, action) in entries {
+                if ui.button(RichText::new(label).color(text)).clicked() {
+                    picked = Some(action);
+                }
+            }
+        }
+        // These too with the cards selected along (#273).
+        let one = || vec![note.id.clone()];
+        if look.may {
+            if ui
+                .button(RichText::new(t.merge_into()).color(text))
+                .clicked()
+            {
+                picked = Some(Action::AskMergeNotes(one()));
+            }
+            ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
+                if let Some(importance) = importance_entries(ui, t, false) {
+                    picked = Some(Action::ImportanceOf(one(), importance));
+                }
+            });
         }
         // A Shopping List's ways onto the Agenda before "Back to a plain
         // Note", as on the phone (#186).
@@ -17591,6 +21758,22 @@ fn note_card(
                 });
             }
         }
+        // Read as the menu opens, in no Shared Area or to take it off
+        // (#267).
+        if let Some(on) = spawns.and_then(|s| s.hidden)
+            && let Some(asked) = hidden_switch(ui, t, &note.id, on)
+        {
+            picked = Some(asked);
+        }
+        if look.may {
+            ui.separator();
+            if ui
+                .button(RichText::new(t.move_to_trash()).color(text))
+                .clicked()
+            {
+                picked = Some(Action::TrashNotes(one()));
+            }
+        }
         // A pick closes the menu, also one made with the keyboard or a
         // screen reader, which no pointer click closes.
         if picked.is_some() {
@@ -17614,6 +21797,16 @@ fn note_card(
         let more = more.on_hover_text(&label);
         egui::Popup::menu(&more).show(&mut entries);
         resp.context_menu(&mut entries);
+    } else if note.is_trashed() && look.may {
+        // In the trash a right-click restores it, with the cards selected
+        // along (#273); it has no ⋮.
+        resp.context_menu(|ui| {
+            let text = ui.visuals().text_color();
+            if ui.button(RichText::new(t.restore()).color(text)).clicked() {
+                picked = Some(Action::RestoreNotes(vec![note.id.clone()]));
+                ui.close();
+            }
+        });
     }
     if menu_opened {
         ui.ctx().request_repaint();
@@ -17624,6 +21817,14 @@ fn note_card(
         let id = Id::new(("photo", &note.id, i));
         if media_view::photo_click(ui, t, rect, id).clicked() {
             photo = Some(hash);
+        }
+    }
+    // A click on a file opens it with the system's program (#267).
+    let mut attachment = None;
+    for (of, file, rect) in files_shown {
+        let id = Id::new(("card file", &of, &file.hash));
+        if attachment_view::open_click(ui, t, &file, rect, id) {
+            attachment = Some((of, file.hash));
         }
     }
     let checks = look.checklist.is_some_and(|(_, checks)| checks)
@@ -17684,6 +21885,7 @@ fn note_card(
         view: view.on_hover_text(view_said),
         folded,
         photo,
+        attachment,
         check,
         occurrence,
         tick,
@@ -17763,68 +21965,4 @@ fn first_line(text: &str) -> Option<(usize, usize)> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::TimeZone;
-
-    #[test]
-    fn area_colours_read_as_the_phone_reads_them() {
-        assert_eq!(
-            area_colour(Some("6A1B9A")),
-            Some(Color32::from_rgb(0x6A, 0x1B, 0x9A))
-        );
-        assert_eq!(area_colour(Some("nope")), None);
-        assert_eq!(area_colour(None), None);
-    }
-
-    #[test]
-    fn a_bundle_for_a_person_is_named_after_them() {
-        let Some(day) = chrono::NaiveDate::from_ymd_opt(2026, 3, 4) else {
-            panic!("a valid date")
-        };
-        assert_eq!(
-            changes_file_name(day, "profile:1", "Ann-Marie Öz!"),
-            "oldbrainfix-2026-03-04-Ann-Marie-Öz.obfsync"
-        );
-        assert_eq!(
-            changes_file_name(day, "profile:1", " "),
-            "oldbrainfix-2026-03-04-profile-1.obfsync"
-        );
-    }
-
-    #[test]
-    fn a_report_mails_the_details_percent_encoded_and_names_no_file() {
-        let url = report_url("unreadable: .ogg\nunsupported");
-        assert!(
-            url.starts_with(
-                "mailto:taum@tuta.io?subject=Old%20Brain%20Fix%20problem%20report&body="
-            )
-        );
-        assert!(
-            url.ends_with("%0A%0Aunreadable%3A%20.ogg%0Aunsupported"),
-            "{url}"
-        );
-        assert_eq!(percent_encoded("ä &"), "%C3%A4%20%26");
-        let line = problem_line(oldbrainfix_whisper::Problem::Unsupported, "Dr. Ben.OGG");
-        assert_eq!(line, "unsupported: .OGG");
-        let line = problem_line(oldbrainfix_whisper::Problem::Unreadable, "voice");
-        assert_eq!(line, "unreadable");
-    }
-
-    #[test]
-    fn capture_times_read_in_the_apps_language() {
-        let at = Utc.with_ymd_and_hms(2026, 3, 4, 12, 0, 0).single();
-        let Some(at) = at else { panic!("a valid date") };
-        let local = at.with_timezone(&Local);
-        let en = when(&L10n::new("en"), at);
-        let de = when(&L10n::new("de"), at);
-        assert!(
-            en.starts_with(&local.format("%-m/%-d/%Y").to_string()),
-            "{en}"
-        );
-        assert!(
-            de.starts_with(&local.format("%-d.%-m.%Y").to_string()),
-            "{de}"
-        );
-    }
-}
+mod tests;

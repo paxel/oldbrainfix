@@ -1,0 +1,39 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000004",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:31.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "filed",
+          "before": "area:00000000000000000000000000000001",
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:07.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:07.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "captured",
+          "before": null,
+          "after": "Timesheet",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

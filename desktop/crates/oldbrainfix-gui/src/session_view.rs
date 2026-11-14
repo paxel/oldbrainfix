@@ -186,8 +186,8 @@ impl SessionCardShown {
     }
 }
 
-/// How often the Routines `runs` of a Session Note were Done and Missed
-/// in each of the last [`CARD_WEEKS`] weeks, this week first, up to
+/// How often the Routines `runs` of a Session Note were Done and
+/// skipped (#269) in each of the last [`CARD_WEEKS`] weeks, this week first, up to
 /// today, weeks starting as this Device's language has them; none
 /// without a Routine.
 fn weeks(
@@ -212,13 +212,13 @@ fn weeks(
     for i in 0..CARD_WEEKS {
         let from = start.add_days(-7 * i);
         let to = if i == 0 { today } else { from.add_days(6) };
-        let (mut done, mut missed) = (0, 0);
+        let (mut done, mut skipped) = (0, 0);
         for history in &histories {
             let week = history.adherence(from, to);
             done += week.done as i64;
-            missed += week.missed as i64;
+            skipped += week.skipped as i64;
         }
-        lines.push(t.session_history_week(&day_text(t, from), done, missed));
+        lines.push(t.session_history_week(&day_text(t, from), done, skipped));
     }
     Ok(lines)
 }

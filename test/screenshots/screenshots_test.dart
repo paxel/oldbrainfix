@@ -30,6 +30,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/ask_screen.dart';
 import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/appointments.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
@@ -41,6 +42,7 @@ import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/feedback_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
+import 'package:oldbrainfix/src/file_platform.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/frogs_screen.dart';
@@ -54,6 +56,7 @@ import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/pack_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
+import 'package:oldbrainfix/src/print_platform.dart';
 import 'package:oldbrainfix/src/profile_card.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -66,6 +69,7 @@ import 'package:oldbrainfix/src/speech_model_screen.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
+import 'package:oldbrainfix/src/tag_tree_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -73,6 +77,7 @@ import '../backup_test.dart' show DirFolders, quickKey;
 import '../bundle_test.dart' show FakeBundles;
 import '../fake_alarms.dart';
 import '../fake_appointments.dart';
+import '../fake_ask.dart';
 import '../fake_photos.dart';
 import '../fake_speech.dart';
 import '../fake_voice.dart';
@@ -153,6 +158,8 @@ typedef _Texts = ({
   String packTally,
   String packList,
   String packStretch,
+  String askQuestion,
+  String askAnswer,
 });
 
 const _en = (
@@ -242,6 +249,8 @@ const _en = (
   packTally: 'Laps',
   packList: 'Race day\nShoes\nStart number\nWater',
   packStretch: 'Stretch after running',
+  askQuestion: 'Where is the spare key?',
+  askAnswer: 'The spare key is with the [Müllers on the 2nd floor](%s).',
 );
 
 const _de = (
@@ -331,10 +340,54 @@ const _de = (
   packTally: 'Runden',
   packList: 'Lauftag\nSchuhe\nStartnummer\nWasser',
   packStretch: 'Nach dem Laufen dehnen',
+  askQuestion: 'Wo ist der Ersatzschlüssel?',
+  askAnswer: 'Der Ersatzschlüssel liegt bei [Müllers im 2. Stock](%s).',
 );
 
 /// A store seeded with a believable household, work and car life in
 /// [texts], as of [_now].
+/// The file picker of a phone, as every frame shows its File button and
+/// entry (#267); nothing is ever picked in a frame.
+class _GuideFiles implements FilePlatform {
+  const _GuideFiles();
+
+  @override
+  bool get pickable => true;
+
+  @override
+  Future<List<DeviceFile>> pickFiles() async => const [];
+
+  @override
+  Future<bool> open(String path, String type) async => false;
+
+  @override
+  Future<int?> pdfPages(String path) async => null;
+
+  @override
+  Future<PdfPage?> pdfPage(String path, int index) async => null;
+
+  @override
+  Future<List<Size>?> pdfLayout(String path) async => null;
+
+  @override
+  Future<Uint8List?> pdfRender(String path, int index, int width) async => null;
+}
+
+/// The print service of an Android phone, turned on (#293), as Settings
+/// shows its row in every frame.
+class _GuidePrinting implements PrintPlatform {
+  const _GuidePrinting();
+
+  @override
+  bool get available => true;
+
+  @override
+  Future<PrintServiceState> serviceState() async => PrintServiceState.on;
+
+  @override
+  Future<bool> openSettings() async => false;
+}
+
 class _Seeded {
   final Store store;
   final Routine snack;
@@ -984,6 +1037,7 @@ Future<AppLocalizations> _start(
   FolderPlatform folders = const NoFolders(),
   AppointmentSource appointments = const NoAppointments(),
   SpeechPlatform speech = const NoSpeech(),
+  PrintPlatform printing = const _GuidePrinting(),
   Size screen = _screen,
   FakeViewPadding padding = FakeViewPadding.zero,
 }) async {
@@ -1004,6 +1058,8 @@ Future<AppLocalizations> _start(
         alarms: alarms ?? FakeAlarms(),
         voice: FakeVoice(),
         photos: FakePhotos(),
+        files: const _GuideFiles(),
+        printing: printing,
         bundles: bundles,
         folders: folders,
         appointments: appointments,
@@ -1205,6 +1261,8 @@ void _storeScreenshots({required bool iphone}) {
           appointments: appointments,
           screen: screen,
           padding: iphone ? _iphoneSafeArea : FakeViewPadding.zero,
+          // Only Android lets an app be a printer (#293).
+          printing: iphone ? const NoPrinting() : const _GuidePrinting(),
         );
 
         Future<void> tap(WidgetTester tester, Finder finder) =>
@@ -1293,9 +1351,11 @@ void _storeScreenshots({required bool iphone}) {
         }
 
         frame('7-history.png', (tester) async {
-          final t = await start(tester, _Seeded(texts));
-          await tap(tester, find.text(texts.snack).first);
-          await tap(tester, find.byTooltip(t.historyTitle));
+          await start(tester, _Seeded(texts));
+          // From the row's menu, as a tap opens the Note (#270).
+          await tester.longPress(find.text(texts.snack).first);
+          await tester.pumpAndSettle();
+          await tap(tester, find.byKey(const ValueKey('row-history')));
           expect(find.byType(RoutineHistoryScreen), findsOneWidget);
           backArrow();
         });
@@ -1437,8 +1497,8 @@ void main() {
             expect(find.byKey(const ValueKey('restore-offer')), findsOneWidget);
           });
 
-          /// The phone's Settings scrolled to its Import rows, a folder
-          /// pickable.
+          /// The phone's Settings searched for its Import rows (#282), a
+          /// folder pickable.
           Future<void> importRows(WidgetTester tester) async {
             final dir = Directory('build/guide-import')
               ..createSync(recursive: true);
@@ -1454,18 +1514,17 @@ void main() {
             final settings = find.byKey(const ValueKey('deviceSettings'));
             await tester.ensureVisible(settings);
             await _tap(tester, settings);
-            final keep = find.byKey(const ValueKey('importKeep'));
-            await tester.scrollUntilVisible(
-              keep,
-              300,
-              scrollable: find
-                  .descendant(
-                    of: find.byType(SettingsScreen),
-                    matching: find.byType(Scrollable),
-                  )
-                  .first,
+            await tester.enterText(
+              find.descendant(
+                of: find.byKey(const ValueKey('settingsSearch')),
+                matching: find.byType(TextField),
+              ),
+              t.settingsImport,
             );
+            // The rows found, without the cursor blinking in the field.
+            FocusManager.instance.primaryFocus?.unfocus();
             await tester.pumpAndSettle();
+            expect(find.byKey(const ValueKey('importKeep')), findsOneWidget);
           }
 
           boxFrame('getting-started', 'import-folder', (tester) async {
@@ -1517,6 +1576,21 @@ void main() {
             ]) {
               seeded.store.setQuickNoteShows(control, true);
             }
+            // Filed into the Kitchen, then Work, before: on top (#272).
+            final places = Places(seeded.store);
+            final household = places.areas().firstWhere(
+              (a) => a.starter == 'household',
+            );
+            seeded.store
+              ..filedInto(
+                places
+                    .topics(household.id)
+                    .firstWhere((t) => t.starter == 'kitchen')
+                    .id,
+              )
+              ..filedInto(
+                places.areas().firstWhere((a) => a.starter == 'work').id,
+              );
             final t = await start(tester, seeded);
             await openTextCapture(tester);
             await tester.enterText(find.byType(TextField), texts.captureText);
@@ -1536,6 +1610,16 @@ void main() {
             await start(tester, seed());
             await _tap(tester, find.byKey(const ValueKey('unsortedBanner')));
             expect(find.byType(UnsortedScreen), findsOneWidget);
+            // Two of them ticked for File into… in the bar (#273).
+            await _tap(tester, find.byKey(const ValueKey('selectNotes')));
+            final boxes = find.byWidgetPredicate(
+              (w) =>
+                  w is Checkbox &&
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith('select-'),
+            );
+            await _tap(tester, boxes.at(0));
+            await _tap(tester, boxes.at(1));
           });
 
           /// The boiler's Note, with its two Amends, in the Note editor.
@@ -1560,11 +1644,12 @@ void main() {
             expect(find.byType(NoteHistoryScreen), findsOneWidget);
           });
 
-          // Routines and the Agenda (#173): a new Routine typed from the
-          // Agenda's bar, the snack's schedule on weekdays, its Re-nag
-          // and Escalation, a Reminder due now in its Note's editor, the
-          // Missed Summary, the snack's History, the Agenda with its
-          // groups, All Routines and Reminders and the Calendar page.
+          // Routines and the Agenda (#173): a new Reminder typed from the
+          // Agenda's bar with its chips, the snack's schedule on weekdays,
+          // its Re-nag and Escalation, a Reminder due now in its Note's
+          // editor, the Missed Summary, the snack's History, the Agenda
+          // with its groups, All Routines and Reminders and the Calendar
+          // page.
           boxFrame('routines-and-agenda', 'set-up', (tester) async {
             final t = await start(tester, seed());
             await _tap(tester, find.byTooltip(t.newRoutineTooltip));
@@ -1573,13 +1658,18 @@ void main() {
               texts.captureText,
             );
             await tester.pumpAndSettle();
-            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+            // Once, with the new Reminder's chips (#271).
+            await _tap(tester, find.text(t.repeatOnce));
+            expect(find.byKey(const ValueKey('quickReminders')), findsOne);
           });
 
-          /// The snack's Routine in its editor.
+          /// The snack's Routine in its editor, through its row's Edit
+          /// schedule (#270).
           Future<AppLocalizations> snackEditor(WidgetTester tester) async {
             final t = await start(tester, seed());
-            await _tap(tester, find.text(texts.snack).first);
+            await tester.longPress(find.text(texts.snack).first);
+            await tester.pumpAndSettle();
+            await _tap(tester, find.byKey(const ValueKey('row-schedule')));
             expect(find.byType(RoutineEditorScreen), findsOneWidget);
             return t;
           }
@@ -1986,6 +2076,35 @@ void main() {
             await search(tester, texts.search);
           });
 
+          // The tag tree (#267): the seeded tags and a nested one,
+          // unfolded to its last level.
+          boxFrame(texts175, 'tag-tree', (tester) async {
+            final seeded = seed();
+            final notes = Notes(seeded.store);
+            final (life, health, back) = language == 'de'
+                ? ('leben', 'gesundheit', 'rücken')
+                : ('life', 'health', 'back');
+            notes
+              ..capture('#$life/$health/$back')
+              ..capture('#$life/$health')
+              ..capture(language == 'de' ? '#garten' : '#garden');
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(const ValueKey('tags-row')));
+            expect(find.byType(TagTreeScreen), findsOneWidget);
+            await _tap(tester, find.byKey(ValueKey('tree-open-#$life')));
+            await _tap(
+              tester,
+              find.byKey(ValueKey('tree-open-#$life/$health')),
+            );
+          });
+
           /// The Speech model page, opened from Settings.
           Future<void> speechModel(WidgetTester tester) async {
             final t = await _start(
@@ -2030,6 +2149,76 @@ void main() {
             await tester.pumpAndSettle();
             await tester.ensureVisible(receipt.first);
             await tester.pumpAndSettle();
+          });
+
+          // A Note of one PDF alone, as its card (#267): its name and
+          // size, and its Attachment Text under it.
+          boxFrame(texts175, 'attachment', (tester) async {
+            final seeded = seed();
+            final notes = Notes(seeded.store);
+            final household = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'household')
+                .id;
+            final lease = notes.capture(
+              '',
+              place: household,
+              files: [
+                NewFile(
+                  name: language == 'de'
+                      ? 'Mietvertrag 2026.pdf'
+                      : 'Lease 2026.pdf',
+                  bytes: Uint8List(184320),
+                  mediaType: 'application/pdf',
+                  pages: 3,
+                ),
+              ],
+            );
+            notes.setAttachmentText(
+              lease.id,
+              notes.byId(lease.id)!.attachments.single.hash,
+              language == 'de'
+                  ? 'Mietvertrag\nDie Wohnung im 2. Stock wird ab dem '
+                        '1. Januar 2026 vermietet.\nMiete: 820 € im Monat'
+                  : 'Lease\nThe flat on the second floor is let from '
+                        '1 January 2026.\nRent: £820 a month',
+            );
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+          });
+
+          // Print to Old Brain Fix (#293): the phone's Settings searched
+          // for its row, the print service on.
+          boxFrame(texts175, 'print-in', (tester) async {
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            await tester.enterText(
+              find.descendant(
+                of: find.byKey(const ValueKey('settingsSearch')),
+                matching: find.byType(TextField),
+              ),
+              t.printService,
+            );
+            // The row found, without the cursor blinking in the field.
+            FocusManager.instance.primaryFocus?.unfocus();
+            await tester.pumpAndSettle();
+            expect(find.text(t.printServiceOn), findsOneWidget);
           });
 
           boxFrame(texts175, 'generated', (tester) async {
@@ -2154,6 +2343,8 @@ void main() {
                 matching: find.byKey(const ValueKey('note-menu')),
               ),
             );
+            // Send and Share to an app are under Share… (#281).
+            await _tap(tester, find.byKey(const ValueKey('note-share-menu')));
             return t;
           }
 
@@ -2358,7 +2549,14 @@ void main() {
           }
 
           boxFrame(privacy177, 'set-up', (tester) async {
-            final t = await start(tester, seed());
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              bundles: FakeBundles(Directory('build')),
+            );
             await openBackups(tester, t);
             expect(find.byKey(const ValueKey('set-up')), findsOneWidget);
           });
@@ -2381,6 +2579,7 @@ void main() {
               seeded.store,
               _guideDpr,
               folders: DirFolders(dir.path),
+              bundles: FakeBundles(Directory('build')),
             );
             await openBackups(tester, t);
             expect(find.byKey(const ValueKey('backup-now')), findsOneWidget);
@@ -2413,6 +2612,23 @@ void main() {
             await toPrivacy(tester, t);
             await _tap(tester, find.byKey(const ValueKey('areaLocks')));
             expect(find.byType(AreaLocksScreen), findsOneWidget);
+          });
+
+          // The Household's menu in the Areas list, its switch Hidden
+          // from AI (#267).
+          boxFrame(privacy177, 'hidden-from-ai', (tester) async {
+            final seeded = seed();
+            final household = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'household')
+                .id;
+            final t = await start(tester, seeded);
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(ValueKey('area-menu-$household')));
+            expect(
+              find.byKey(ValueKey('area-hidden-from-ai-$household')),
+              findsOneWidget,
+            );
           });
 
           boxFrame(privacy177, 'block', (tester) async {
@@ -2503,6 +2719,12 @@ void main() {
             expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
           });
 
+          // The phone shows one Note at a time: its editor (#287).
+          boxFrame(desktop178, 'note-window', (tester) async {
+            await boilerEditor(tester);
+            expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
+          });
+
           boxFrame(desktop178, 'menu-bar', (tester) async {
             // A Profile of fixed keys: its short code is the same on
             // every run.
@@ -2515,7 +2737,14 @@ void main() {
           });
 
           boxFrame(desktop178, 'dialogs', (tester) async {
-            final t = await start(tester, seed());
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              bundles: FakeBundles(Directory('build')),
+            );
             await openBackups(tester, t);
           });
 
@@ -2561,6 +2790,82 @@ void main() {
           boxFrame(desktop178, 'ai-port', (tester) async {
             final t = await sharingApp(tester, _Seeded(texts, conflict: true));
             await openSync(tester, t, find.text('Laptop'));
+          });
+
+          // The vault (#267) is the desktop's alone: the phone syncs with
+          // the computer first.
+          boxFrame(desktop178, 'vault', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(tester, t);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
+          // Asking (#267) is the desktop's: the phone marks what is hidden
+          // and syncs with the computer first.
+          // Asking the computer from the phone (#267): a question answered
+          // from the spare key's Note, the provider allowed before.
+          boxFrame(desktop178, 'ask', (tester) async {
+            final seeded = seed();
+            final store = seeded.store..allowAsking(fakeClaude);
+            final key = Notes(store)
+                .all()
+                .firstWhere((n) => n.text == texts.spareKey);
+            final link = AppLink(AppLinkKind.note, key.id).url;
+            await start(tester, seeded);
+            unawaited(
+              Navigator.of(tester.element(find.byType(AgendaScreen))).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AskScreen(
+                    store: store,
+                    asking: FakeAsking(
+                      answer: (_) => AskReply.answered(
+                        DesktopAnswer(
+                          text: texts.askAnswer.replaceFirst('%s', link),
+                          notes: [key.id],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('ask-question')),
+              texts.askQuestion,
+            );
+            await _tap(tester, find.byKey(const ValueKey('ask-button')));
+            FocusManager.instance.primaryFocus?.unfocus();
+            await tester.pumpAndSettle();
+            expect(find.byKey(ValueKey('ask-source-0-${key.id}')), findsOne);
+          });
+
+          // Asking from away (#267): the computer's Tailscale name as its
+          // address by hand on the Sync page.
+          boxFrame(desktop178, 'ask-away', (tester) async {
+            final seeded = _Seeded(texts);
+            seeded.store
+              ..rememberDevice(
+                PairedDevice(
+                  id: 'device:guide-desk',
+                  name: 'Desk',
+                  fingerprint: 'ab' * 32,
+                  host: '192.168.1.5',
+                  port: 4000,
+                  lastSync: _now,
+                ),
+              )
+              ..setHandAddress('device:guide-desk', 'desk.tail1234.ts.net');
+            final t = await sharingApp(tester, seeded);
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('address-device:guide-desk')),
+            );
+            // The computer's name and its switch above the field.
+            await tester.drag(notesList.last, const Offset(0, 260));
+            await tester.pumpAndSettle();
+            expect(find.byKey(const ValueKey('hand-address')), findsOne);
           });
 
           boxFrame(desktop178, 'look', (tester) async {

@@ -141,6 +141,55 @@ fn a_member_sees_who_shares_and_only_adds_to_someone_elses_note() -> TestResult 
     Ok(())
 }
 
+#[test]
+fn for_a_member_the_area_menu_offers_people_and_export_only() -> TestResult {
+    let (_ann, ben, area) = shared(AreaRole::Member)?;
+    let mut harness = harness(ben, Selection::Place(area));
+    // The menu bar's Area menu, ahead of the window's widgets (#279).
+    let open = |harness: &mut Harness<'_, App>| {
+        harness
+            .get_all_by_label("Area")
+            .next()
+            .ok_or("Area")?
+            .click();
+        harness.run();
+        Ok::<(), &str>(())
+    };
+    open(&mut harness)?;
+    let greyed = |label: &str| {
+        harness
+            .get_all_by_label(label)
+            .last()
+            .is_some_and(|n| n.accesskit_node().is_disabled())
+    };
+    for (entry, may) in [
+        ("Rename F2", false),
+        ("Colour and icon", false),
+        ("Share…", false),
+        ("People", true),
+        ("Export as Pack…", true),
+        ("Delete", false),
+    ] {
+        assert_eq!(!greyed(entry), may, "{entry}");
+    }
+    harness
+        .get_all_by_label("People")
+        .last()
+        .ok_or("People")?
+        .click();
+    harness.run();
+    // The People dialog's title, the menu closed.
+    assert_eq!(harness.query_all_by_label("People").count(), 1);
+    // F2 renames nothing a Member may not rename.
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(!shows(&harness, "People"), "the People dialog closed");
+    harness.key_press(egui::Key::F2);
+    harness.run();
+    assert!(!shows(&harness, "Rename"));
+    Ok(())
+}
+
 /// A phone with its own Profile named Ben, invited by the host on
 /// `port` with `pin`: the Notes it holds afterwards and the names of the
 /// Profiles of other people it keeps, or the refusal as its status and

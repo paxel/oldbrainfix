@@ -77,12 +77,6 @@ class RestoreScreen extends StatefulWidget {
 }
 
 class _RestoreScreenState extends State<RestoreScreen> {
-  final _passphrase = TextEditingController();
-  final _code = TextEditingController();
-
-  /// Whether the key typed is no recovery key; said under the field
-  /// until it changes.
-  var _codeInvalid = false;
   String? _path;
   BackupHeader? _header;
   var _busy = false;
@@ -102,8 +96,6 @@ class _RestoreScreenState extends State<RestoreScreen> {
 
   @override
   void dispose() {
-    _passphrase.dispose();
-    _code.dispose();
     _drop();
     super.dispose();
   }
@@ -172,54 +164,20 @@ class _RestoreScreenState extends State<RestoreScreen> {
     }
   }
 
-  /// Takes a photo of the Recovery Sheet and reads the key in its QR.
-  Future<void> _scan() async {
-    final t = context.t;
-    final photos = PhotoScope.of(context);
-    final pairing = PairingScope.of(context);
-    final photo = await photos.takePhoto();
-    if (!mounted || photo == null) return;
-    final code = await pairing.readQr(photo);
-    if (!mounted) return;
-    if (code == null || decodeRecoveryCode(code) == null) {
-      announceFailure(
-        context,
-        t.codeNotRead,
-        title: t.codeNotReadTitle,
-        cause: t.restoreNoCode,
-        fix: t.restoreNoCodeFix,
-        details: 'recovery key: none in the photo',
-      );
-      return;
-    }
-    setState(() {
-      _codeInvalid = false;
-      _code.text = code;
-    });
-  }
-
-  Future<void> _restore() async {
+  Future<void> _restore(String? passphrase, String? code) async {
     final t = context.t;
     final header = _header;
     final path = _path;
     if (header == null || path == null) return;
-    final code = _code.text.trim();
-    if (code.isNotEmpty && decodeRecoveryCode(code) == null) {
-      setState(() => _codeInvalid = true);
-      return;
-    }
-    setState(() {
-      _codeInvalid = false;
-      _busy = true;
-    });
+    setState(() => _busy = true);
     // Why nothing was restored, what to do, and the full text.
     (String, String, String)? failure;
     RestoreResult? result;
     try {
       final key = await unlockBackup(
         header,
-        passphrase: code.isEmpty ? _passphrase.text : null,
-        recoveryCode: code.isEmpty ? null : code,
+        passphrase: passphrase,
+        recoveryCode: code,
         derive: widget.derive,
       );
       if (key == null) {
@@ -232,16 +190,11 @@ class _RestoreScreenState extends State<RestoreScreen> {
         result = await restoreBackup(widget.store, path, key);
       }
     } on BackupException catch (e) {
-      final (cause, fix) = switch (e.problem) {
-        BackupProblem.notABackup => (t.restoreNotABackup, t.restorePickFix),
-        BackupProblem.needsUpdate => (
-          t.restoreNeedsUpdate,
-          t.updateOpenAgainFix,
-        ),
-        BackupProblem.wrongSecret => (t.restoreWrong, t.restoreWrongFix),
-        BackupProblem.damaged => (t.restoreDamagedCause, t.restoreDamagedFix),
-        BackupProblem.notEmpty => (t.restoreNotEmpty, t.restoreNotEmptyFix),
-      };
+      final (cause, fix) = backupRefusal(
+        t,
+        e.problem,
+        damagedFix: t.restoreDamagedFix,
+      );
       failure = (cause, fix, '$e');
     } on Object catch (e) {
       failure = (t.restoreFailedCause, t.restoreFailedFix, '$e');
@@ -257,82 +210,6 @@ class _RestoreScreenState extends State<RestoreScreen> {
     }
     announceDone(context, t.restoreDoneShort, t.restoreDone(result.entries));
     Navigator.of(context).pop(result);
-  }
-
-  List<Widget> _unlock(AppLocalizations t, BackupHeader header) {
-    final when = DateFormat.yMMMMd(Localizations.localeOf(context).toString())
-        .add_Hm();
-    return [
-      Text(
-        t.restoreFile(when.format(header.created.toLocal())),
-        style: Theme.of(context).textTheme.titleSmall,
-      ),
-      const SizedBox(height: 16),
-      TextField(
-        key: const ValueKey('restore-passphrase'),
-        controller: _passphrase,
-        enabled: !_busy,
-        obscureText: true,
-        autocorrect: false,
-        enableSuggestions: false,
-        decoration: InputDecoration(
-          labelText: t.backupPassphrase,
-          border: const OutlineInputBorder(),
-        ),
-        onSubmitted: (_) => _restore(),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: Text(t.restoreOr)),
-      ),
-      if (PhotoScope.of(context).available) ...[
-        FilledButton.tonalIcon(
-          key: const ValueKey('restore-scan'),
-          onPressed: _busy ? null : _scan,
-          icon: const Icon(Icons.qr_code_scanner),
-          label: Text(t.restoreScan),
-        ),
-        const SizedBox(height: 12),
-      ],
-      TextField(
-        key: const ValueKey('restore-code'),
-        controller: _code,
-        enabled: !_busy,
-        autocorrect: false,
-        enableSuggestions: false,
-        textCapitalization: TextCapitalization.characters,
-        decoration: InputDecoration(
-          labelText: t.restoreCodeLabel,
-          border: const OutlineInputBorder(),
-          errorText: _codeInvalid ? t.restoreInvalidCode : null,
-        ),
-        onChanged: (_) {
-          if (_codeInvalid) setState(() => _codeInvalid = false);
-        },
-        onSubmitted: (_) => _restore(),
-      ),
-      const SizedBox(height: 16),
-      Align(
-        alignment: Alignment.centerRight,
-        child: _busy
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(child: Text(t.restoreWorking)),
-                ],
-              )
-            : FilledButton(
-                key: const ValueKey('restore'),
-                onPressed: _restore,
-                child: Text(t.restoreStart),
-              ),
-      ),
-    ];
   }
 
   @override
@@ -363,7 +240,14 @@ class _RestoreScreenState extends State<RestoreScreen> {
             Align(alignment: Alignment.centerLeft, child: pick),
             const SizedBox(height: 16),
           ],
-          if (header != null) ..._unlock(t, header),
+          if (header != null)
+            BackupUnlockForm(
+              header: header,
+              busy: _busy,
+              action: t.restoreStart,
+              working: t.restoreWorking,
+              onUnlock: _restore,
+            ),
           if (found) ...[
             const SizedBox(height: 24),
             Wrap(
@@ -381,6 +265,184 @@ class _RestoreScreenState extends State<RestoreScreen> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Why a Backup was refused for [problem], and what to do: as restoring
+/// and opening one to take Notes back say it (#285), a damaged one with
+/// [damagedFix].
+(String, String) backupRefusal(
+  AppLocalizations t,
+  BackupProblem problem, {
+  required String damagedFix,
+}) => switch (problem) {
+  BackupProblem.notABackup => (t.restoreNotABackup, t.restorePickFix),
+  BackupProblem.needsUpdate => (t.restoreNeedsUpdate, t.updateOpenAgainFix),
+  BackupProblem.wrongSecret => (t.restoreWrong, t.restoreWrongFix),
+  BackupProblem.damaged => (t.restoreDamagedCause, damagedFix),
+  BackupProblem.notEmpty => (t.restoreNotEmpty, t.restoreNotEmptyFix),
+};
+
+/// The Backup [header] says when it was made, then the passphrase, the
+/// recovery key typed or scanned from the Recovery Sheet, and [action];
+/// [working] beside a spinner while [busy]. Hands [onUnlock] the
+/// passphrase, or the recovery key once it reads as one: restoring a
+/// Backup and opening one to take Notes back ask alike (#285).
+class BackupUnlockForm extends StatefulWidget {
+  final BackupHeader header;
+  final bool busy;
+  final String action;
+  final String working;
+  final void Function(String? passphrase, String? recoveryCode) onUnlock;
+
+  const BackupUnlockForm({
+    super.key,
+    required this.header,
+    required this.busy,
+    required this.action,
+    required this.working,
+    required this.onUnlock,
+  });
+
+  @override
+  State<BackupUnlockForm> createState() => _BackupUnlockFormState();
+}
+
+class _BackupUnlockFormState extends State<BackupUnlockForm> {
+  final _passphrase = TextEditingController();
+  final _code = TextEditingController();
+
+  /// Whether the key typed is no recovery key; said under the field
+  /// until it changes.
+  var _codeInvalid = false;
+
+  @override
+  void dispose() {
+    _passphrase.dispose();
+    _code.dispose();
+    super.dispose();
+  }
+
+  /// Takes a photo of the Recovery Sheet and reads the key in its QR.
+  Future<void> _scan() async {
+    final t = context.t;
+    final photos = PhotoScope.of(context);
+    final pairing = PairingScope.of(context);
+    final photo = await photos.takePhoto();
+    if (!mounted || photo == null) return;
+    final code = await pairing.readQr(photo);
+    if (!mounted) return;
+    if (code == null || decodeRecoveryCode(code) == null) {
+      announceFailure(
+        context,
+        t.codeNotRead,
+        title: t.codeNotReadTitle,
+        cause: t.restoreNoCode,
+        fix: t.restoreNoCodeFix,
+        details: 'recovery key: none in the photo',
+      );
+      return;
+    }
+    setState(() {
+      _codeInvalid = false;
+      _code.text = code;
+    });
+  }
+
+  void _unlock() {
+    if (widget.busy) return;
+    final code = _code.text.trim();
+    if (code.isNotEmpty && decodeRecoveryCode(code) == null) {
+      setState(() => _codeInvalid = true);
+      return;
+    }
+    if (_codeInvalid) setState(() => _codeInvalid = false);
+    widget.onUnlock(
+      code.isEmpty ? _passphrase.text : null,
+      code.isEmpty ? null : code,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final busy = widget.busy;
+    final when = DateFormat.yMMMMd(Localizations.localeOf(context).toString())
+        .add_Hm();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          t.restoreFile(when.format(widget.header.created.toLocal())),
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          key: const ValueKey('restore-passphrase'),
+          controller: _passphrase,
+          enabled: !busy,
+          obscureText: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            labelText: t.backupPassphrase,
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (_) => _unlock(),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Center(child: Text(t.restoreOr)),
+        ),
+        if (PhotoScope.of(context).available) ...[
+          FilledButton.tonalIcon(
+            key: const ValueKey('restore-scan'),
+            onPressed: busy ? null : _scan,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: Text(t.restoreScan),
+          ),
+          const SizedBox(height: 12),
+        ],
+        TextField(
+          key: const ValueKey('restore-code'),
+          controller: _code,
+          enabled: !busy,
+          autocorrect: false,
+          enableSuggestions: false,
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(
+            labelText: t.restoreCodeLabel,
+            border: const OutlineInputBorder(),
+            errorText: _codeInvalid ? t.restoreInvalidCode : null,
+          ),
+          onChanged: (_) {
+            if (_codeInvalid) setState(() => _codeInvalid = false);
+          },
+          onSubmitted: (_) => _unlock(),
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerRight,
+          child: busy
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(child: Text(widget.working)),
+                  ],
+                )
+              : FilledButton(
+                  key: const ValueKey('restore'),
+                  onPressed: _unlock,
+                  child: Text(widget.action),
+                ),
+        ),
+      ],
     );
   }
 }

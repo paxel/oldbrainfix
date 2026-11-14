@@ -33,12 +33,21 @@ replace a law of Both apps where they say so. A desktop law marked
   with its first Routine (#191). **Every Session pool list filters by
   tag** (#220), on this page, the Session Note's page and the Routine
   editor: the #tags of its Tallies' texts as filter chips above it,
-  those most Tallies carry first; the Tallies carrying any chip picked
-  show, ticks the filter hides stay and a line counts them, "New Tally"
+  those most Tallies carry first; the Tallies carrying any chip picked,
+  or a tag nested under it (`#sport/run` under `#sport`, #267), show,
+  ticks the filter hides stay and a line counts them, "New Tally"
   starts its name with the tags picked, and Rolling's order moves only
   unfiltered. The filter is a view, kept while the page is open, never
-  stored. Leaving a name dialog or one of
-  the pages without Create or Save makes nothing.
+  stored. Leaving a name dialog without Create makes nothing. **Leaving
+  saves what is valid and asks only about what isn't** (#275, Q658):
+  the Tally and Session pages, the Routine editor and a Tally entry,
+  left by Back, the swipe back or the bar's arrow, on the desktop by
+  Esc, a click beside the dialog, Alt+Left or the mouse's back button,
+  save as their Save does once something changed; when it can't be saved, a schedule that
+  never happens or an empty required value, they ask once "Discard
+  changes?", Discard or Keep editing, which shows what to fix. Left as
+  they opened they make nothing; a Tally made on the way stays. The
+  desktop's Cancel leaves without saving.
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
   bug. A menu opens where the finger is; choices that outgrow a menu
   are a page.
@@ -46,9 +55,10 @@ replace a law of Both apps where they say so. A desktop law marked
   person, asked on the first start's Starter Set page above the Areas,
   two radio buttons with Simple picked, and changed in Settings after
   the settings of the Device. **Simple hides only making**:
-  Tally, Session, Frog and Topic in "+", Frog and Session in every
-  spawn menu, New Session, Tally and Session in the kind badge, "Make
-  it a Tally", the format bar, and roles when sharing and in People.
+  Tally, Session, Frog and Topic in "+", New Topic… in File into…
+  (#272), Frog and Session in every spawn menu, New Session, Tally and
+  Session in the kind badge, "Make it a Tally", the format bar, and
+  roles when sharing and in People.
   What exists shows and works as in Advanced. Never chosen is Advanced.
 
 ### Clicks and taps
@@ -65,9 +75,12 @@ replace a law of Both apps where they say so. A desktop law marked
 - An announcement goes by itself or by a tap; it is never swiped away.
   A horizontal swipe stays navigation only.
 - An announcement says only that a job finished, failed or waits; the
-  tap opens the details. Values never go into an announcement.
+  tap opens the details, or, on an offer to undo, undoes. Values never
+  go into an announcement.
 - A quick local success the screen already shows (copied, saved) gets
-  no announcement.
+  no announcement. The one exception is the phone's offer to undo what
+  was just deleted, skipped or moved to tomorrow (#268, #269; see Phone,
+  "Announcements").
 - A failure's tap opens a dialog with cause, fix and the full text,
   Close and Report; the page it belongs to is a line inside, not a
   third button.
@@ -112,7 +125,7 @@ replace a law of Both apps where they say so. A desktop law marked
   waits for Accept or Decline, then today's all-day Occurrences, then the
   all-day appointments of the calendars picked, then the Shopping Lists'
   groups as the user chose for each list (today only, oldest capture
-  first, none for a list without open Lines), then the
+  first, none for a list without open Lines or Lines checked today), then the
   Checklists' groups (today only, oldest capture first), then today's timed
   Occurrences and timed appointments together by time (an Occurrence
   before an appointment at the same time), then the "Eat a frog" section
@@ -131,39 +144,62 @@ replace a law of Both apps where they say so. A desktop law marked
   Area's colour and icon and, on an Occurrence, ⋮; the entries are
   indented so their boxes stand where the heading's words begin, a Line
   under another Line one step further, and every entry looks alike: its
-  box and its words. A tap on a heading opens its list or Routine, a
-  tap on an entry's words what its heading opens (a pick its entry
-  form), a box checks its entry. One card holds a group. Which Lines a
+  box and its words. A tap on a heading opens its list or Note (#270:
+  an Occurrence's the editor of its Note, with its Due line once it
+  is due), a tap on
+  an entry's words what its heading opens (a pick its entry form; a
+  list's Line the list as it is, without the new Line its heading
+  starts, #276), a box checks its entry. One card holds a group. Which Lines a
   Checklist's group shows is decided in one place (`agendaLines`, on the
   desktop `agenda_lines`).
 - **Every Occurrence row has ⋮**, which opens the same menu as a long
-  press: History for a Routine, and Share, which hands the Routine as
+  press: **Snooze** (10 min, 30 min, 1 h) while it is due, started and
+  not yet Missed, and **Not today** (Skip, and Tomorrow) while it is
+  neither Done nor skipped and this Device may check it off (#269), each
+  under its heading; then **Edit schedule**, which opens the Routine or
+  Reminder editor (#270), as the Routine's badge in the Note editor
+  does; History for a Routine, and Share, which hands the Routine as
   its whole series with its end, or the Reminder, to another app as a
-  calendar file. A Masked row asks for its Area to open first.
+  calendar file. Edit schedule, History and Share ask a Masked row's
+  Area to open first; Snooze and Not today answer it as its box does.
 - **A Checklist without a Routine or Reminder is a group today** while
-  it has open Lines (#143, #208): its name as the heading, without a
-  box, and its open Lines under it, each with its box, which checks it;
-  or, as the user chose under **Show on the Agenda** in the ⋮ of its
-  card or in its badge in the editor (#219), the heading alone with the
-  count, "Before the trip: 3 of 7 open", or not at all: the three radio
-  choices of a Shopping List, there only for such a Checklist. A tap on
-  the heading or a Line's words opens the list. A Masked one is the
-  heading alone, "Private Checklist: 3 of 7 open".
+  it has open Lines or Lines checked today (#143, #208, #276): its name
+  as the heading, without a box, and its open Lines under it, each with
+  its box, which strikes it for the day, as an Occurrence: a Line
+  checked today stays struck in its place until the day ends, and its
+  box unchecks it; or, as the user chose under **Show on the Agenda** in
+  the ⋮ of its card or in its badge in the editor (#219), the heading
+  alone with the count, "Before the trip: 3 of 7 open", while a Line is
+  open, or not at all: the three radio choices of a Shopping List,
+  there only for such a Checklist. A tap on the heading opens the list
+  with the cursor in a new empty Line after the open ones, the keyboard
+  up (#276); a tap on a Line's words opens the list as it is. A Masked
+  one is the heading alone, "Private Checklist: 3 of 7 open".
 - **A Shopping List's group today** (#186, #208): its name as the
   heading, without a box, and its open Lines under it, each with its
-  box, which strikes it and takes it off the Agenda; chosen to show "one
-  row with the number of open Lines", or Masked, it is the heading
-  alone, "Weekly: 4 open". A tap on the heading or a Line's words opens
-  the list.
+  box, which strikes it for the day, as an Occurrence (#276): a Line
+  checked today stays struck under the open ones until the day ends,
+  also one checked Once, and its box brings it back; chosen to show
+  "one row with the number of open Lines", or Masked, it is the heading
+  alone, "Weekly: 4 open", while a Line is open. A tap on the heading
+  opens the list with the cursor in a new empty Line after the open
+  ones, the keyboard up (#276); a tap on a Line's words opens the list
+  as it is.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today
   stays on the Agenda for the day as Done, box checked and title struck
-  through; the box unchecks it. Checking off opens nothing. **Unless the
+  through; the box unchecks it. Checking off opens nothing. **A skipped
+  Occurrence stays for the day struck as skipped** (#269), "Skipped"
+  under its title, or "The day after instead" when Not today ▸ Tomorrow
+  skipped it; its box still checks it off. The one-time Occurrence
+  Tomorrow added shows the day after, at the same time, with "From the
+  day before" under its title. **Unless the
   Device hides what is checked** (#217): with "Hide what's checked on
   the Agenda" in Settings ▸ Agenda, off by default, a Done Occurrence, a
   checked Line and a pick with its entry leave the Agenda and the widget
-  at once instead of striking through, and a group with nothing left
+  at once instead of striking through, a skipped Occurrence with them,
+  and a group with nothing left
   goes with them, a Session's heading once it is Done and "Eat a frog"
   once today's Frog is eaten.
 - **Done can move its Note to the trash** (#211): with "Move a Note to
@@ -181,7 +217,7 @@ replace a law of Both apps where they say so. A desktop law marked
   in the order picked, each an entry with its box, checked and struck
   through once it has an entry, each Tally's name with its targets
   ("Push-ups 20 times"). The pick's box and words open its entry form,
-  prefilled with the targets; saving records it for this Occurrence.
+  prefilled as any new entry; saving records it for this Occurrence.
   Each pick without an entry offers "Another one" under it while the
   pool holds a Tally not picked. **The heading's box only shows Done**:
   it checks itself once every pick has an entry, removing an entry
@@ -234,9 +270,11 @@ replace a law of Both apps where they say so. A desktop law marked
   its name, the next run of any of its Routines and "done 4 / skipped 1
   this week" over all of them (#191); a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
-  the card** (File into, Routine, Merge); **its ⋮ sits top right** and
-  offers File into… and Merge into… after Edit, as far as the action row
-  would. In the detailed view a Shopping List shows its open Lines,
+  the card** (File into, Routine, Merge, the pencil); **its ⋮ sits top
+  right** and offers after Edit File into…, Routine…, Reminder…, in
+  Advanced Frog and Session… (#197), and Merge into…, as far as the
+  action row would (#281): the spawns only for who may set them up
+  (ADR 0013) and Session… only on a plain Note. In the detailed view a Shopping List shows its open Lines,
   tickable, the struck ones folded under them ("2 struck through") until
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
@@ -263,7 +301,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A card ticks today's Occurrences of its Note** (#215): in either
   view, under where it is filed and over its text, a box with the time
   for each of its Routines and Reminders with an Occurrence today, its
-  first one not Done, else its last one, Done and struck through. The box
+  first one neither Done nor skipped, else its last one, Done or
+  skipped ("08:00 · Skipped") and struck through. The box
   checks off and unchecks as the Agenda row's does and opens nothing; a
   Session's only shows Done, one Done from every Line checked stays
   checked, and where this Device may not check it off it only shows. A
@@ -272,14 +311,27 @@ replace a law of Both apps where they say so. A desktop law marked
   the name, for each Routine and Reminder of the Note an Occurrence due
   now, "Due 15:00" (with its day when it began on an earlier one), else
   its latest Missed one, "Missed" with its day and time, whether the
-  Missed Summary was seen or not, each with **Done**, and for a one-time
+  Missed Summary was seen or not, each with **Done**, beside it
+  **Snooze** while it is not Missed and **Not today** (#269), each
+  opening its choices where the finger is, Tomorrow only for an
+  Occurrence of today or later, and for a one-time
   Reminder that is the Note's only Routine or Reminder also **"Done and
   move to trash"**, where this Device may move the Note: it checks it
   off, moves the Note with the Reminder to the trash and closes the
   editor. On the desktop the same lines open the Note dialog, Done on the
   accent and "Done and move to trash" on the error colour.
-- **Copy text** in a card's ⋮ puts the text of the Note and of each
-  Section on the clipboard as they show, oldest first, a blank line
+- **A card's ⋮ on the phone stays short** (#281): Send to a person,
+  Share to an app, Copy text and Export as Pack… are one entry,
+  **Share…**, after Show ticks, which opens a small menu of the four at
+  the ⋮; the Importance is not in it (the editor's badge and the
+  selection change it, #182, #273).
+- **The detailed card's action row has a pencil** (#281), right before
+  its ⋮: one tap opens the Note editor, as the long press and ⋮ ▸ Edit
+  do. Where the card is too narrow for the whole row, as with Fat
+  fingers on a small phone, the pencil and ⋮ go onto a line of their own
+  under the other buttons, at the right, so no button is cut.
+- **Copy text** in a card's ⋮ (under Share… on the phone) puts the text
+  of the Note and of each Section on the clipboard as they show, oldest first, a blank line
   between them, and says nothing (#183).
 - **A Section's text is edited in place in the Note editor** (#183), in
   the same field and with the same format bar as the Note's text, by the
@@ -332,13 +384,15 @@ replace a law of Both apps where they say so. A desktop law marked
   yesterday, the frog with "Open", "Eaten today" or "Eaten yesterday",
   in Simple too, its tap offering at the finger Eat now while it is open
   and this Device may check it off and "Remove the Frog" for who may
-  manage it, which asks once as the Frog view does; for a Member an
+  manage it, which asks nothing and is undone as the Frog view's Delete
+  is (#268); for a Member an
   eaten one only shows; the kind, Plain Note included (#188); the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box; "From Ann" while
   a Pack brought the Note unclaimed (#164), `inventory_2` with the
-  name, its tap asking to remove it. A Tally's setup
+  name, its tap offering "Remove “From Ann”" at the finger, which asks
+  nothing and is undone (#268). A Tally's setup
   is the Tally's own badges, "One bar per" and "Counts in sets" (#264),
   each opening its small editor, then its fields (#190), each its name
   with its rule, unit and target as badges, as on the Tally page, a
@@ -384,7 +438,8 @@ replace a law of Both apps where they say so. A desktop law marked
   in either view, until "Remove “From Ann”" in the card's ⋮ or its badge
   in the Note editor takes it away.
 - **"Export as Pack…"** (#164) is in the menu of every Area and Topic,
-  for anyone who may read them, in a Note card's ⋮ after Copy text and
+  for anyone who may read them, in a Note card's ⋮ after Copy text
+  (under Share… on the phone, #281) and
   on the Note editor's bar after Share to an app (`inventory_2`). It
   opens the Pack's tree: Areas and Topics as headings, each Note with
   its kind's icon and its first line, under it its files with their
@@ -394,6 +449,23 @@ replace a law of Both apps where they say so. A desktop law marked
   sit on the bar, the size over the tree. A Pack opened shows the same
   tree, all ticked, under who it is from; its ticks ("Add my Profile",
   "Claim as mine") go below their text.
+- **"Open a Backup…"** (#285) is on the Backups page, in a card of its
+  own ("Take Notes back"), set up or not, and on the desktop also in the
+  File menu, its page then alone, without the way back to Backups. It
+  picks the file (on Android and the desktop the file picker starts in
+  the Backups folder), asks for the
+  passphrase or the recovery key as restoring does and refuses what
+  restoring refuses, announced at the top. Then the same page shows the
+  Pack's tree under the Backup's date: no Note ticked, everything under
+  each; a Note from the Backup's Trash says "In the Trash" under its
+  name, not by colour alone. The Notes of a locked Area closed now are
+  not in the tree; a line over it says so, never naming the Area, and
+  "Unlock and show them" asks for the PIN or biometrics and reads the
+  Backup again with their Notes, the ticks back at the start; the
+  Areas stay closed everywhere but on this page.
+  "Untick all" goes back to that start, "Add" is announced as a Pack's
+  and closes the page; a failed Add leaves the page open and the log as
+  it was.
 - An Area's colour and icon mark its cards, Agenda rows and alarms.
 - **Important** cards get an accent marker and a stronger emboss;
   **unimportant** ones are dimmed; normal is plain.
@@ -403,6 +475,28 @@ replace a law of Both apps where they say so. A desktop law marked
 - A dialog has one question and at most two actions plus Cancel. More
   than that is a page. A list to choose from (Areas, Topics, People) is
   a menu at the finger or a page, never a sheet.
+- **File into…** (#272), from a card, the browser or capture alike, is
+  a filter field over the Areas and Topics (focused on the desktop, not
+  on the phone), then "Filed into recently" with the last three places
+  this Device filed into (ADR 0008), the latest first, while nothing is
+  typed, then the Areas alphabetically, each with its Topics. An Area
+  whose name matches shows with all its Topics, else with those that
+  match. **"New Topic…" ends each Area** for who may set up a Topic
+  there, only in Advanced, never in a closed locked Area; **"New Area…"
+  ends the list**, also when it is empty or nothing matches. Each asks
+  the name (New Area… with the filter's text filled in), makes the
+  place and files into it at once, from capture too, where the place
+  stays when the Note is not saved; Cancel makes nothing and stays. A
+  place File into… does not list (deleted, a Topic of a closed locked
+  Area, a Shared Area the Device left) is not offered among the recent
+  ones either.
+- **The Shopping List pick** of Add to a Shopping List lists the lists
+  this Device may add to, oldest capture first, but the one a capture on
+  this Device went into last at the top (#276, ADR 0008).
+- **A Tally's new entry** starts with each number field's target, and a
+  field without one with the value of the user's latest entry that
+  holds one (#276), selected as the field takes the cursor, so typing
+  replaces it. Left as it opened, it writes nothing.
 - **A short single choice is choice chips, a long one radio buttons**
   (#226). A choice of one value whose options are fixed words of one to
   about four, at most about seven of them, with no detail line under
@@ -431,9 +525,22 @@ replace a law of Both apps where they say so. A desktop law marked
   word, the weekday names and times as suggestion chips under it; the
   words it does not understand are marked in the error colour, said
   under it, and change nothing. Left, or when a chip changes, it shows
-  the schedule again. On an Advanced schedule it is read-only, the
-  schedule's summary with "Switch to Simple to type". The sentence is
-  never stored.
+  the schedule again. It also reads a one-time Reminder in words that
+  count from now (#271): "today", "tonight", "tomorrow", "in N
+  minutes/hours/days/weeks" and their German words, "tomorrow" without a
+  time at the end of the Device's Quiet Hours (09:00 while off),
+  "tonight" at 19:00, against the store's clock. On an Advanced schedule
+  it is read-only, the schedule's summary with "Switch to Simple to
+  type". The sentence is never stored.
+- **A new Reminder offers its chips** (#271): on the phone and the
+  desktop, a new Reminder, or a new Routine set to Once in Simple, shows
+  a wrapping row of chips under the When line: In 1 h, Tonight (until
+  19:00), Tomorrow and In a week, each with its time, Tomorrow and In a
+  week at the end of the Quiet Hours. One tap or click sets the
+  schedule, read again at that moment, then Save; nothing is saved by
+  it. They are shortcuts that set a value, not a choice: none is shown
+  as selected, and on the desktop they are plain buttons. A saved
+  Reminder and a Session show none.
 - **Send feedback shows what it sends** (#214): Settings ▸ "Send
   feedback" is a page with a field for the words, ticks for what goes
   along (version, system and device, install method ticked at first;
@@ -446,16 +553,25 @@ replace a law of Both apps where they say so. A desktop law marked
   open Area, nothing ticked at first. Nothing leaves without the
   preview and a tap.
 - Two sentences at most in a dialog body. Concrete nouns, no metaphors.
-- Destructive actions (deleting a Note, an Area, a Routine) confirm
-  once, in a dialog whose confirm button carries the verb and the error
-  colour.
+- **Deleting for good confirms once; what can be restored is undone
+  instead** (#268, Q646 (c)). Emptying the Trash, deleting from the
+  Trash, deleting an Area, a Topic or a Named Place ask once, in a
+  dialog whose confirm button carries the verb and the error colour.
+  Deleting what comes back asks nothing: a Note moved to the Trash, a
+  Routine or Reminder, a Frog, a Tally entry, a Checklist or Shopping
+  List Line, the "From …" label, and a Transcript or Photo Text, which
+  can be made again. It goes at once and is undone at the moment of the
+  mistake: on the phone by the announcement at the top, on the desktop
+  by Ctrl+Z and Edit ▸ Undo. Done that moves a Note to the Trash
+  ("Done and move to trash", #211) is a check-off, not a delete: it
+  offers no undo on the phone, and the Note comes back from the Trash. The undo uses the restore that exists and writes
+  nothing more than it does; where it has nothing left to bring back,
+  it does nothing.
 - Deleting a Note takes its Routines and Reminders into the trash with
-  it, on every path and in both apps (#262): the one question names
-  them ("Delete this Note and its 1 Routine?", "… its 1 Reminder?",
-  "… its 3 Routines and Reminders?") and offers only Cancel and Delete;
-  restoring the Note brings them back. There is no "Delete only the
-  Note". All Routines and Reminders marks one whose Note is in the
-  trash or deleted.
+  it, on every path and in both apps (#262), and its undo, as restoring
+  the Note, brings them back. There is no "Delete only the Note". All
+  Routines and Reminders marks one whose Note is in the trash or
+  deleted.
 
 ### Text editor
 
@@ -533,7 +649,11 @@ replace a law of Both apps where they say so. A desktop law marked
   text row starting with its box, the rows close together, and the
   cursor moves between them. Cards only check them.
 - **A new list starts with one empty boxed Line**, the cursor in it. A
-  list this Device may add to always has a Line to type in.
+  list this Device may add to always has a Line to type in. **Opened
+  from its group's heading on the Agenda** (#276), a list starts with
+  the cursor in a new empty Line after its open Lines, the keyboard up
+  (on the desktop the keyboard's focus there); left unused, the Line is
+  dropped on leaving, as any empty one.
 - **Return** adds a new Line with an empty box under the cursor's Line,
   in the group of a Line with one; in the middle of a Line it moves the
   rest of the Line into the new one. **Backspace at the start** of a
@@ -546,12 +666,21 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Nothing typed is lost on leaving**: what was typed is stored when
   the cursor leaves a Line and when the editor saves or is left; Lines
   left empty are dropped on leaving.
-- On a Shopping List the open Lines keep the order they were typed in,
-  also the next time; a Line checked while the editor is open stays in
-  its row, and shows below the open ones the next time. A name the list
+- On a Shopping List the open Lines keep the order the user gives them,
+  as typed in or moved by ⋮ Move up and Move down (#283), also the next
+  time; a Line checked while the editor is open stays in its row, and
+  shows below the open ones the next time. A struck Line does not move;
+  it comes back where it was among the open ones. A name the list
   has already brings its Line back instead of a second.
 - ⋮ of a Line holds the rest (moving it, Delete); a long press in a
   Line's text selects, as in any field.
+- **"Removed Lines"** (#268) folds under a list's Lines in the Note
+  editor while it has deleted Lines, as a Tally's "Removed entries":
+  each deleted Line's text, the last deleted first, with Restore below
+  it where this Device may change the Line, which brings it back where
+  it was; open or folded as last left, on this Device. A Line goes
+  there by ⋮ Delete, and, without an announcement, by emptying or
+  joining it while typing, with the text it last had stored.
 - **A Shopping List's Line ends in its reappear time badge** (#195),
   before ⋮, in the editor: short text, "—" for none, "Once", "4w",
   "3m", read as "Reappear time: 4 weeks". A tap opens its dialog: None,
@@ -576,6 +705,16 @@ replace a law of Both apps where they say so. A desktop law marked
   every card in the view it sets (#189).
 - Rows show what the user needs to act, not the stored encoding: dates
   in the device format, values translated, storage keys never.
+- **The Areas stand in the person's own order** (#280): on the phone's
+  Areas list, the desktop's sidebar and every list of Areas (File
+  into…, Area Locks, Link to…, Notes for the feedback), the same on all
+  of the person's Devices, a setting of the person (ADR 0040), so the
+  others of a Shared Area keep their own. Until the first move they
+  stand by the name the app shows, in lower case, a starter Area by its
+  translated name, and a new Area sorts in among them; after it a new
+  Area goes to the end. Every list passes the core the name it shows,
+  so a move counts its place in the order on screen. Topics stay by
+  name.
 
 ### Wording
 
@@ -624,11 +763,19 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Alarms and notifications
 
-- An Occurrence's notification offers **Done** and **Snooze** (10 min,
-  30 min, 1 h) without opening the app. Done is also at the top of its
-  Note's editor and on its card (#215); Snooze stays in the
-  notification. Done moves a Plain Note with its only Reminder to the
-  trash where the person chose so (#211, "Agenda").
+- An Occurrence's notification offers **Done**, **Snooze** (10 min,
+  30 min, 1 h) and **Not today** (Skip, and Tomorrow) without opening
+  the app (#269). Done is also at the top of its Note's editor and on
+  its card (#215); Snooze and Not today sit in the notification, the
+  Agenda row's ⋮ and the Note editor's Due line. **Skip** marks the
+  Occurrence neither Done nor Missed: its alarm and Re-nag stop, it
+  never shows in the Missed Summary, and it leaves the Adherence, which
+  counts it beside it ("92 % this month · 3 skipped"). **Tomorrow**
+  skips it and adds a one-time Occurrence of the same Routine the day
+  after at the same time; it is offered only for an Occurrence of today
+  or later. Neither changes the schedule. Done moves a Plain Note with
+  its only Reminder to the trash where the person chose so (#211,
+  "Agenda").
 
 ## Phone
 
@@ -647,6 +794,34 @@ replace a law of Both apps where they say so. A desktop law marked
   Capture). **The folder**, first in the Agenda's top bar, opens the
   Areas list (#221); search by text and by #tag stays inside the
   browser.
+- **The tag tree** (#267, Q623, Q639): a row "Tags" below the Areas in
+  the Areas list opens every tag of the Notes by its levels, the top
+  level as written (`#life`), a level below by its own part (`health`),
+  indented, each with how many Notes carry it or a tag below it; the
+  levels below a tag unfold by its arrow, the top level alone at first.
+  A tap on a tag goes back to the Areas list searching for it, as a tap
+  on a tag in a text does. Typing `#` in the Areas list's search shows
+  the tags starting with what is typed as chips under the field, at most
+  twelve, the one typed exactly left out; a tap fills it in. The tree
+  and the chips leave out the Notes of a locked Area while it is closed,
+  as every list does.
+- **Ask** (#267, ADR 0051) is a `BarAction` in the Agenda's bar after
+  the folder, shown once a Device of the user's own that hosts is
+  paired, and opens the Ask page, which asks the user's computer as the
+  desktop's Ask panel does (see Desktop, "Menu bar and keys"). Before
+  the first question to a provider, protocol, host and model alike, the
+  page shows in place of the question field the computer, the provider,
+  its model and host and what is sent, with Allow and Not now; nothing
+  is sent before Allow, and a provider not allowed is asked about again
+  before the next question, which stays in the field. While no computer
+  of the user's answers, or its provider is not set up, the page says
+  why and what to do in the error colour, with Try again; a question not
+  answered goes back into the field and is announced at the top. The
+  answers stand under the field, the newest first, each with "From
+  these Notes" and Keep as Note; Start over in the bar drops them, and
+  so does leaving the page. **An address by hand** sits under each such
+  paired Device on the Sync page, a field with its line of what it is
+  for and its error under it once it is left or submitted.
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and
@@ -682,7 +857,8 @@ replace a law of Both apps where they say so. A desktop law marked
   picks the Note. A tap on a link in its text, a formatted text's or a
   bare `http://` or `https://` address (#222), opens that link instead; a
   long press on it is still the card's. A tap on a row or card never
-  opens a menu.
+  opens a menu, nor selects it: a list selects with its boxes (see
+  Cards, #273).
 - **An app link opens its place without asking** (#261, ADR 0046): a
   Note, an Area or Topic, the Agenda, Unsorted or one of the app's
   pages, as its own menu opens it. A target this Device cannot see is an
@@ -692,7 +868,15 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Long-press is the secondary action**: a menu, or the editor when
   there is only one thing to do. A long-press on a Note card opens its
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A
-  long-press never changes data by itself.
+  long-press on "+" of the Agenda or the lock screen opens text capture
+  (#282; see Capture). A long-press never changes data by itself.
+- **An Area moves by its handle** (#280): each row of the phone's Areas
+  list carries a drag handle before ⋮, and a drag up or down on it,
+  taken at once, moves the Area in the list; a swipe sideways that
+  starts on it still moves between the pages, and a long press on the
+  row moves nothing. A screen reader moves it with the row's actions, Move
+  up, Move down, Move to the start and Move to the end. The search's
+  hits carry no handles.
 - **A horizontal swipe only navigates** (see Navigation); it never
   changes data or swipes a row or card away. The exceptions are the
   full-screen table, where a one-finger drag on its cells moves it
@@ -706,10 +890,28 @@ replace a law of Both apps where they say so. A desktop law marked
   such as one asking to keep changes, takes no edge swipe. A long-press
   on a Note card gives the iPhone's haptic where Android vibrates.
 
+### Announcements
+
+- **An offer to undo** (#268): what was just deleted on the phone and
+  can be restored says so at the top at once ("Moved to the Trash",
+  "Line deleted", "Entry deleted", "Frog moved to the Trash", "“From”
+  label removed", "Transcript removed"), and so does a Skip or Tomorrow
+  made in the app ("Skipped", "The day after instead", #269), whose undo
+  takes the skip back; one made on a notification offers none. A
+  selection moved to the Trash is one offer for all of its Notes (#273).
+  It ends
+  with "Undo"; its
+  tap undoes it, and a screen reader hears "Undo" as the tap's hint. It
+  shows before what waits, a newer one takes the place of the one
+  before, and left alone it goes by itself after 10 seconds, undoing
+  nothing. What it deleted stays where it always went: the Trash,
+  "Removed entries", "Removed Lines", or "again" under its file; a
+  "From …" label has no such place and stays gone.
+
 ### Capture
 
-- **The Agenda's "+" fans out Text, Voice, Photo, Gallery and Paste**,
-  and so does the lock screen's, each an icon with
+- **The Agenda's "+" fans out Text, Voice, Photo, Gallery, Paste and
+  File** (File: #267), and so does the lock screen's, each an icon with
   its words, upward from the button; it is not a bottom sheet. While
   the fan is open, "+" reads as close; a second tap on it, a tap
   outside or Back closes the fan. Text opens text capture, Voice starts
@@ -717,16 +919,43 @@ replace a law of Both apps where they say so. A desktop law marked
   picture picker and continues as a photo Note, Paste opens text capture
   filled from the clipboard: its text in the field, its picture as the
   Note's photo, both when it holds both, and a line on the screen, no
-  announcement, when it holds neither. The clipboard is read only on
-  that tap, never on opening or in the background. The text capture
-  screen keeps its Photo, Voice, Gallery and Paste buttons. Every other
+  announcement, when it holds neither. File opens the system's file
+  picker, several files of any kind at once, and continues as text
+  capture with them attached as the Note's Attachments; a file larger
+  than 256 MB, or one that cannot be read, is not attached and is
+  announced, the others are. The clipboard is read only on
+  that tap, never on opening or in the background. **A long press on
+  "+" opens text capture at once** (#282), the Agenda's and the lock
+  screen's alike, as Text in the fan does, with no fan; a tap still fans
+  out. A screen reader announces the long press with the button ("write
+  a Note at once"), and on the iPhone, whose VoiceOver has no long press,
+  it is among the button's actions. The text capture
+  screen keeps its Photo, Voice, Gallery, Paste and File buttons. Every other
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
+- **A Tally's shortcut opens its entry page directly** (#284): "Add to
+  home screen" in a Tally's card's ⋮, offered where this Device may add
+  entries to it, pins a shortcut named as the Tally (Android's own
+  prompt places it; "Private Tally" for one in a locked Area set to
+  Masked, the home screen being as public as the lock screen). On the
+  iPhone, where no app may place an icon, the entry reads "Add to the
+  app icon" and puts the Tally among the actions of the app icon's long
+  press, the newest four, said at the top. A tap opens the Tally's
+  entry page with no screen in between, over whatever the app showed;
+  as the Agenda widget's pick, it opens its locked Area first and,
+  behind the App Lock, after the unlock, since the page shows the
+  Tally's targets and latest values. Once the page closes, saved or
+  not, Android goes back to the home screen with the app kept as it
+  was, unless the user left the app between the tap and the page, or
+  while it was open; the iPhone, which lets no app leave itself, stays in the app
+  where it was. A Tally deleted, in the trash or no longer this
+  Device's to add to opens only the app, with "This Tally is no longer
+  there." at the top.
 - **On the iPhone a share waits for the app** (#241): iOS lets no Share
   extension open its app, so "Old Brain Fix" in the share sheet keeps
-  the text, links, pictures or the app's own files and says so on a small
-  card with OK. The next time the app opens or comes back, each share
+  the text, links, pictures, the app's own files or any other file and
+  says so on a small card with OK. The next time the app opens or comes back, each share
   opens Capture as on Android, and a Pack, Profile card, Sent Item or
   bundle opens as "Open with" opens it. A share carries no source app on
   the iPhone.
@@ -735,8 +964,22 @@ replace a law of Both apps where they say so. A desktop law marked
   show iOS's own "Allow Paste" prompt each time it reads the clipboard.
   Both are iOS's, not the app's, and are allowed beside "Capture never
   asks anything"; the app itself still asks nothing there.
+- **A file shared in becomes an Attachment** (#267): any file another
+  app shares, other than a picture or a sound file, opens Capture with it
+  attached, one Note with the text and pictures shared with it, written
+  at once; a file of the app's own types (a bundle, Sent Item, Profile
+  card or Pack) shared to the app opens as "Open with" opens it.
+- **A page printed to the app comes in as a shared PDF does** (#293):
+  on Android, Old Brain Fix is a print service with one printer, "Old
+  Brain Fix"; a print job opens Capture with its PDF attached, named
+  after the job's document, without a source app, as Android names
+  none. Where Android keeps the app from coming up by itself, the print
+  waits and opens Capture the next time the app opens or comes back.
+  Settings ▸ Capture ▸ "Print to Old Brain Fix", in Simple and Advanced,
+  says whether Android has the service on and opens Android's print
+  settings, where only the user turns it on; the iPhone has no row.
 - **The quick note is uncluttered** (#142): by default it shows the
-  text field, Photo, Voice, Gallery and Paste, the Nudge buttons,
+  text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
   **To full editor** and the alarm clock beside it (#223), whose menu
   offers Routine and Reminder as the Note editor's "+" does, in Simple
   too; nothing else that sorts and no chips. The Routine or Reminder
@@ -758,7 +1001,9 @@ replace a law of Both apps where they say so. A desktop law marked
   and Session in the alarm clock's menu, and ⋮ with the Importance, Make
   it a Tally (with the Frog, Session or Tally switch) and Add to a
   Shopping List. Each opens its usual
-  page and comes back to the capture screen with the choice shown at the
+  page (Add to a Shopping List none while there is one list to add to:
+  its entry names it, "Add to Weekly", and picks it at once, #276) and
+  comes back to the capture screen with the choice shown at the
   top ("→ Household"), not saved yet; the user can keep typing or add
   more. All of it is optional. With the format bar on, it rides on the
   keyboard; where the room is small the buttons under the text scroll
@@ -814,7 +1059,8 @@ replace a law of Both apps where they say so. A desktop law marked
   holds. It is one list that scrolls when it is taller than the
   widget. **Its groups are the Agenda's** (#209): a Shopping List's and
   a Checklist's name as the heading, without a box, its words where a
-  boxed heading's begin, with their open Lines under it; a Checklist
+  boxed heading's begin, with their open Lines under it and those
+  checked today struck, box checked (#276); a Checklist
   Routine's Occurrence with its Lines; a Session's Occurrence with its
   picks; each entry with its box, indented alike in every group so its
   box stands where the heading's words begin, a Line under another
@@ -854,11 +1100,71 @@ replace a law of Both apps where they say so. A desktop law marked
   it, Save is announced as failed with Share as the fix), and only while
   its file is on the phone. Saved and copied say nothing, nor does
   a share sheet left without an app; a failure is announced.
-- The editor opens only through a long press on the card or Edit in its
-  ⋮.
+- **An Attachment shows on its card** (#267, ADR 0047): each file a row
+  with the icon of its kind (a PDF, a text document, a table, plain text
+  or Markdown, any other file), its name, its size and its pages when
+  they were counted. A tap opens it, on the card and in the Note
+  editor, asking nothing, as the file is the Note's own (unlike a file
+  link, #261): **a PDF full screen like a photo** (#286), drawn by the
+  system's own renderer (Android's `PdfRenderer`, the iPhone's PDFKit),
+  its pages swiped sideways and zoomed with two fingers, a zoomed page
+  panning instead of turning, "Page 2 of 12" at the top when it has
+  more than one, its Attachment Text one tap away on the bar's
+  Attachment Text button and back, and its ⋮ opening it in another app;
+  back closes it. Only the page shown and the one on either side are
+  drawn, as large as they show, the page shown anew when zoomed. A PDF
+  the system cannot draw (one locked with a password), an Office file
+  and any other file open with the system's app for its type, except
+  an Android app (`.apk`, `.apks`, `.apkm`, `.xapk` or
+  the media type of one), which asks once first: "… could install an
+  app. Open it anyway?", with the person who added it when another
+  person did; a file whose bytes have not synced yet, or one no app
+  opens, is announced. Its Attachment Text shows under it as a Photo Text does:
+  dimmed, labelled "Attachment Text" in the detailed view and whole
+  there, its first three lines in the compact view. While a computer is
+  to read it (a PDF of more than ten pages or not counted, a larger
+  file), "The text follows from the computer." stands there instead. A
+  Note of one file alone is that file as its card, its name as the
+  title, and goes by the file's name wherever only its words fit, rows
+  and alarms included. In the Note editor each file has Replace and
+  Append for its text, Remove for the text (with the undo at the top,
+  #268), Read the text again (not for a file left to a computer), and
+  "Remove Attachment, keep text", asked once, where this Device may;
+  the card's ⋮ offers the last too. "Attach a file" on the editor's bar
+  picks more files.
+- **Hidden from AI** (#267, ADR 0049): a card's ⋮ and an Area's menu in
+  the Areas list have the switch "Hidden from AI", the Note editor its
+  badge, offered on a Note or Area in no Shared Area and, once marked,
+  always to take the mark off; it is read as the menu opens. A shield
+  beside the Important marker on a card and on an Area's row shows what
+  is hidden, a Note by its own mark or its Area's; the editor's badge
+  says "Off, hidden by its Area" when only the Area hides it.
+- The editor opens only through a long press on the card, Edit in its
+  ⋮ or the pencil of a detailed card's action row (#281).
 - In the Note editor a text that is only read, the Note's or a
   Section's, selects with a long press, with Copy in the system's menu
   (#183).
+- **Several Notes are selected with "Select"** (#273, Q655): every Note
+  list, Unsorted and its Nudge page, an Area, a Topic, All Notes, the
+  search's hits and the Trash, has Select in its bar while it shows a
+  card this Device may change, as a long press opens the editor and a
+  tap switches the view.
+  It puts a box at the top left of every card this Device may change
+  (ADR 0013); only the box ticks, a tap and a long press on the card
+  still do what they do. While it selects the bar's title says how many
+  are ticked ("3 selected") and its buttons are, in this order, Stop
+  selecting, File into…, Merge into…, Importance and Move to trash, in
+  the Trash Stop selecting and Restore, each greyed while none is
+  ticked. File into… opens the picker of #272, marking the place when
+  all of them sit in one; Merge into… opens the Note picker with every
+  Note, the ticked ones included, and a ticked Note picked takes the
+  others in, all in one go; Importance opens its three at the button.
+  An action ends the selection; Move to trash asks nothing and offers
+  one undo for all of them at the top (#268). Back and swipe right drop
+  the selection and stay on the page, as do Stop selecting and a search
+  emptied; on the Areas list beside the Agenda back leaves for the
+  Agenda, and leaving drops it too. The cards a reload no longer shows
+  leave the selection.
 
 ### Dialogs and pages
 
@@ -873,6 +1179,18 @@ replace a law of Both apps where they say so. A desktop law marked
 - An editor with several fields is a full-screen page with Save in the
   top bar; secondary state changes are rows at the bottom of the page.
   The Note editor's settings are its badges (see Cards).
+- **Something Hidden from AI is not given away** (#267, ADR 0049):
+  filing it into a Shared Area (a card, the selection, File into…),
+  merging it with a Note of a Shared Area either way (a card, the
+  selection, Merge into…; the selection stays when nothing merged),
+  sharing an Area that is hidden or holds a hidden Note, Send to a
+  person and Export as Pack ask once, naming what is hidden: "… hidden
+  from AI. What is hidden from AI is not given to other people. Show it
+  to the AI first." with Cancel and "Show to the AI", which takes the
+  marks of what is given off and goes on. A Note hidden by its Area's
+  mark is only named with the Area, and the question says the mark
+  comes off in the Area's menu; one tap never shows the other Notes of
+  that Area to the AI. Send and sharing an Area ask before whom.
 
 ### Text editor
 
@@ -931,16 +1249,39 @@ replace a law of Both apps where they say so. A desktop law marked
   gives such an action as a `BarAction`; the bar counts a button 48
   wide, 1.3 times with Fat fingers (#224).
 - A destructive action has no special place: last in the order, on the
-  bar when there is room; its confirm dialog is the guard.
+  bar when there is room; the offer to undo at the top is the guard, or
+  for what goes for good its confirm dialog.
 - An action in ⋮ shows its icon and its words, as it does on the bar.
 - Labelled buttons (Save) and buttons that open a menu of their own
   never overflow.
+
+### Settings
+
+- **A search field sits at the top of Settings** (#282), under the bar,
+  staying there while the page scrolls; nothing focuses it on opening.
+  It filters to the settings whose label or detail line holds every
+  word typed, in any case, in the app's language, a setting without a
+  label of its own by the names of its options, each under its
+  section's heading; a heading that matches shows its section whole.
+  The intro line goes while a search runs, and a search that finds
+  nothing says so in the page ("No setting matches “…”."), not at the
+  top. ✕ in the field, or emptying it, shows everything again.
 
 ### Alarms and notifications
 
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".
+- **A tap on an Occurrence's notification opens the editor of its
+  Note** (#270), with Done, Snooze and Not today in its Due line, over
+  whatever the app showed; a locked Area asks to open first, and behind
+  the App Lock it opens after the unlock. A Routine or Note gone or in
+  the trash opens only the app.
+- **On Android an Occurrence's notification has three buttons** (#269,
+  Q650): Done · Snooze · Not today, as Android shows no more. Snooze
+  replaces them in place with 10 min, 30 min and 1 h, and Not today with
+  Skip and Tomorrow, under "Skip it, or tomorrow at the same time?";
+  Tomorrow only for an Occurrence of today or later.
 - An Occurrence from a locked Area whose Area is set to Masked never
   shows its title in a notification or on the Agenda, and stays
   checkable.
@@ -950,10 +1291,12 @@ replace a law of Both apps where they say so. A desktop law marked
     own alarm screen replaces the page: its Stop answers Done, and its
     one Snooze waits 10 min, as there is room for one only. Without the
     Alarms permission it comes as a time-sensitive notification.
-  - An Occurrence's notification is time-sensitive and offers Done and
-    the three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h")
-    at once, not Snooze and then its choices; each Re-nag is a
-    notification of its own in the Occurrence's group.
+  - An Occurrence's notification is time-sensitive and offers Done, the
+    three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h"),
+    Skip and Tomorrow at once, not Snooze and Not today and then their
+    choices (#269); a Re-nag after midnight of an earlier day's
+    Occurrence offers no Tomorrow. Each Re-nag is a notification of its
+    own in the Occurrence's group.
   - The setup asks for Notifications and Alarms only; exact and
     full-screen alarms do not exist there.
   - iOS rings only what was handed to it beforehand, at most 64 rings
@@ -966,15 +1309,59 @@ replace a law of Both apps where they say so. A desktop law marked
 ### The window
 
 - The desktop window is a classic desktop window (#145): **the menu
-  bar** on top (File, Edit, View, Note, Sync, Help); **the sidebar** on
-  the left with the Agenda, Unsorted, All Notes, Frogs, the Areas with
-  their Topics and the Trash, marking the place shown; **the list** in
+  bar** on top (File, Edit, View, Area, Note, AI, Sync, Help); **the
+  sidebar** on the left with the Agenda, Unsorted, All Notes, Frogs, the
+  Areas with their Topics, Tags (#267) and the Trash, marking the place shown; **the list** in
   the middle. **A Note opens as a dialog over the window** (#146), one at
   a time, over the list and the sidebar but not the menu bar, which
   stays at hand for it; closing it keeps what was typed: its cross, Esc,
   Alt+Left, the mouse's back button and a click beside it. The Routine
   editor, a Tally's pages and the New Tally page open as dialogs over
-  the dialog or the list they were opened from.
+  the dialog or the list they were opened from. **A click beside one of
+  these dialogs saves as leaving does** (#275): it, Esc, Alt+Left and
+  the mouse's back button save the Routine editor, a Tally entry, the
+  New Tally page and the Session pages once something changed, and ask
+  "Discard changes?" only about a change that can't be saved; Cancel
+  leaves without saving.
+- **A Note can open in a window of its own** (#287): "Open in its own
+  window" beside the Note dialog's cross and in a card's ⋮ and
+  right-click menu opens it beside the main window, which stays usable,
+  for reading and editing as the dialog does. Several can be open, one
+  window per Note: opening it again brings its window forward, and the
+  Note dialog does not open a Note that has one. What is typed there is
+  kept as in the dialog; its cross saves as closing the dialog does, and
+  the Undo slot is the main window's. A Note going to the trash, deleted
+  or merged, here or on another Device, closes its window. The Note
+  windows close, saved, as the main window closes or hides into the
+  tray. **Each has "Keep on top" above the Note**, off as it opens and
+  kept while it is open: the window stays above all others. On Wayland,
+  which lets no app ask for that, it is greyed with the reason under
+  it. The last Note window closed gives the next one its size, a setting
+  of the Device (ADR 0008).
+- **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
+  7", #279), as the one list that asks to be emptied; no other place
+  shows a count, and an empty Unsorted shows none. **An Area with Topics
+  folds and unfolds them with the chevron at the end of its row**
+  (#279), a click on it selecting nothing; this Device keeps each fold
+  (ADR 0008), as lists keep theirs, Areas starting unfolded. A folded
+  Area still shows the Topic shown under it, marked.
+- **Tags below the Areas opens the tag tree in the list** (#267): every
+  tag by its levels as on the phone (see Phone ▸ Navigation, "The tag
+  tree"), each level's arrow unfolding the levels below, kept while the
+  app runs; a click on a tag shows All Notes searching for it. Typing
+  `#` into a list's search (not the Trash's) shows the tags starting
+  with what is typed as buttons under the field, at most twelve, the one
+  typed exactly left out; a click fills it in. The desktop has no Area
+  Locks, so nothing is left out. **An Area Hidden from AI has a shield
+  at the end of its row**, before the chevron, and so has each card
+  hidden in its top row, beside the view button; both name it to a screen reader
+  and in a tooltip.
+- **The window keeps its geometry on each computer** (#278): its size
+  and position, whether it is maximized, the sidebar's width and the
+  Note dialog's size are settings of the Device (ADR 0008) and come
+  back at the next start; a position on no monitor any more opens the
+  window centred. The Note dialog is resized by its edges and corners,
+  staying centred.
 - **On the desktop nothing floats over a list** (#158); every list ends
   with the same room after its last card, so that card scrolls fully
   into view.
@@ -988,7 +1375,9 @@ replace a law of Both apps where they say so. A desktop law marked
   browser does: the arrows at the top of the list, Alt+Left and
   Alt+Right, and the mouse's back and forward buttons; the keys rest
   while text is being typed. Showing a new place forgets what lay
-  ahead. Over a dialog, back leads to the dialog it was opened from, or
+  ahead. **Back and forward show each place as it was left** (#278):
+  its search, its person filter and how far its list was scrolled; a
+  place shown anew starts with none and at the top. Over a dialog, back leads to the dialog it was opened from, or
   closes it; over a photo or table full screen, it closes that. They
   take the place of the phone's swipes.
 - **The path beside the arrows leads up the levels**, such as "Areas ›
@@ -1003,17 +1392,108 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Every menu entry acts on what it names and closes its menu**, also
   when picked by keyboard or screen reader; the Note menu acts on the
   Note in the Note dialog and is greyed while none is open, each entry
-  as far as the dialog offers it, but File into… acts on the cards
-  selected in the list while no Note is open (#148). Its keys (Ctrl+N,
-  Ctrl+F, Ctrl+M, Ctrl+,; Cmd on macOS) stand beside the entries and
-  work while typing, over the Note dialog too, not while another dialog
-  is open. On the desktop the menu bar leads to Settings, Backups and
+  as far as the dialog offers it, but File into…, Merge into…,
+  Importance and Delete, in the Trash Restore in Delete's place, act on
+  the cards selected in the list while no Note is open (#148, #273). Its keys (Ctrl+N,
+  Ctrl+F, Ctrl+M, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on macOS)
+  stand beside the entries and work while typing, over the Note dialog
+  too, not while another dialog is open; Delete and 1 to 3 stand beside
+  Delete and Importance's entries while those act on the cards selected
+  (#274). Ctrl+F searches the list shown where it has a search field
+  (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
+  finds its Routines, Reminders and Frogs by their Note), else All
+  Notes'; over the Settings dialog it searches the Settings (#282). On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
-- **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
+- **File ▸ Attach a file…** (#267) picks files of any kind and does
+  with them what a drop does (see Capture): onto the Note in the Note
+  dialog, else into the quick note for a new Note.
+- **The Area menu acts on the Area or Topic the list shows** (#279):
+  Rename (F2), Colour and icon, Share…, People, Export as Pack…, the
+  switch Hidden from AI (#267) and
+  Delete, the sidebar right-click's entries, each greyed where that
+  menu would leave it out (a Topic has no Colour and icon, Share…,
+  People or Hidden from AI, nor has an Area in a Shared Area that is not
+  marked), and all of them while no Area or Topic shows or a dialog
+  lies over the list, the Note dialog included, so that none acts on a
+  place behind it. F2 rests in a text field and while a menu is open.
+  The sidebar's right-click stays, and keeps New Topic. Move up
+  (Alt+Up) and Move down (Alt+Down) move the Area shown one place in
+  the person's own order (#280), for whoever is in it, greyed for a
+  Topic and at the ends, where the right-click leaves them out; they
+  rest while a text field has the keyboard, so in a Checklist's Line
+  they move the Line instead (#283).
+- **The sidebar's Areas are dragged by their rows** (#280, Q676): a
+  line shows the gap the Area goes into; let go where it stands or
+  away from the Areas, it stays and nothing is written. A card dropped
+  on an Area's row files there instead.
+- **The AI menu leads to the AI port** (#279): Ask… (Ctrl+K, #267)
+  shows the Ask panel, AI port… opens the Settings at the AI port's
+  card, and Review the AI Task shows the review of the AI Task that
+  waits, greyed while none waits or the port is open.
+- **The Ask panel is a place in the list** (#267, ADR 0051), reached
+  by Ask… and Ctrl+K, which also work while typing and over the Note
+  dialog and put the cursor into its question field. Under its heading
+  a line names the provider and the model and says that only what the
+  model finds and reads is sent, never what is Hidden from AI; while
+  the provider cannot be asked, the line says what is missing in the
+  error colour with "Settings…", which opens the Settings at the
+  provider's card. Enter or Ask (Ctrl+Enter) asks; while it waits,
+  Stop puts the question back into the field. The answers stand under
+  the field, the newest first, each with its question, its text as a
+  formatted text whose links open their Notes, "From these Notes" with
+  each Note's title as a link, and Keep as Note, then "Kept as a Note"
+  opening it. A question not answered goes back into the field and is
+  announced at the top, its tap the cause, the fix and the provider's
+  message. A Note
+  opens in the Note dialog over the panel, which stays. A follow-up is
+  asked after the earlier answers; Start over drops them, and so does
+  showing another place. While an AI Task waits, a line says that its
+  changes wait for review with sync, beside Review. The provider's
+  card in the Settings sits after the AI port's: the protocol as
+  radio buttons, the base URL only for an OpenAI-compatible provider
+  with its error under it, the model, the API key hidden as typed, and
+  that the key stays on this computer.
+- **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
+  Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the
+  desktop's offer to undo, with no announcement: Edit ▸ Undo is first in its menu and greyed while
+  nothing waits; Ctrl+Z works over the list and the Note dialog but not
+  in a text field, where it undoes the typing. Only the last one waits;
+  cards selected and moved to the trash or merged together come back
+  with one (#273).
+- **The keys work the card lists** (#274, Q657): over a Note list's
+  cards, with no dialog, menu or Note dialog on top and no field or
+  other widget holding the keyboard, Up and Down select the next card
+  alone (with nothing selected Down the first, Up the last), Shift+Up
+  and Shift+Down run the selection on from where it started, Ctrl+A
+  selects every card, Enter opens the Note of the card reached last,
+  Delete moves the cards selected to the Trash asking nothing (Ctrl+Z
+  undoes it), and 1, 2 and 3 make them Important, Normal or
+  Unimportant; in the Trash Delete and the digits do nothing. Down in
+  the search field goes to the first card found. The card reached
+  scrolls into view; after an action, which ends the selection, Up and
+  Down go on from it while it still shows, else from the top. Sorting Unsorted is Down, Ctrl+M, type, Enter for
+  each Note.
+- **Keys finish what is typed** (draft, #196, #277): Ctrl+Enter (Cmd on
   macOS) saves the quick note's Note and the text being edited in the
-  Note dialog, while Enter alone starts a new line; Enter in a one-line
-  field of a dialog takes it; Ctrl+B and Ctrl+I make bold and italic
-  while the Note's text is edited.
+  Note dialog, while Enter alone starts a new line; in the capture popup
+  Enter saves and Shift+Enter starts a new line (Q664). Ctrl+Enter runs
+  the main action of the dialog on top, the button on the accent (Save,
+  Create, Send, the Routine editor's, a Session's and a Tally's pages
+  included), and only while it may be pressed; Merge into… merges into
+  the first Note found once something is typed, File into… takes its
+  first row as Enter does; a question whose answer deletes or discards,
+  or opens a file that could run a program (#267), keeps Ctrl+Enter
+  from it (Q665). The first field of a dialog takes the
+  keyboard as it opens, where it has one (the Routine editor's text, else
+  its When line, a Tally's pages, Send feedback, a person's name for me);
+  the Page dialogs of sections (Settings, Profile, People, Backups, Sync,
+  Pair) open without it. Alt+Left rests in that field as in any; Esc and
+  the mouse's back button leave. In the quick note and the
+  popup Ctrl+1, Ctrl+2 and Ctrl+3 save with the Nudge buttons' 10 min,
+  30 min and 1 h while those show, named in the hint under them; the
+  list's 1 to 3 take no Ctrl and rest while a dialog is open. Enter in
+  a one-line field of a dialog takes it; Ctrl+B and Ctrl+I make bold
+  and italic while the Note's text is edited.
 - **Esc closes what lies on top** (draft, #196): a menu, a photo or
   table full screen, the top dialog, the quick note keeping what was
   typed, and over the list without a dialog the cards selected.
@@ -1062,6 +1542,15 @@ replace a law of Both apps where they say so. A desktop law marked
   Both apps (#226); the Sync dialog's "Bundle for",
   a dropdown beside its words (`sync_view.rs`), does not follow that
   yet.
+- **The question Hidden from AI is a dialog** (#267), asked as on the
+  phone (Phone ▸ Dialogs and pages, "Something Hidden from AI is not
+  given away"): before the Send dialog
+  and the Share dialog open, and when File into…, a drag onto an Area,
+  Merge into… or Export as Pack… is refused, with Cancel and "Show to
+  the AI" on the accent, which takes the marks off and does again what
+  was asked; a Note hidden by another Area's mark only names that Area,
+  with Close, and its mark comes off in the Area's menu. A Merge refused
+  keeps the cards selected, and nothing waits for Ctrl+Z.
 - **A Pack's tree is a dialog on the desktop** (#165): "Tick all" and
   "Untick all" stand over the tree under its size, in place of the
   phone's bar; every box, "Add my Profile" and "Claim as mine" too,
@@ -1079,8 +1568,27 @@ replace a law of Both apps where they say so. A desktop law marked
   it away, Shift-click selects the run from the card clicked last in the
   list's order (#148). The selected cards carry a check mark and a
   thicker outline, and say so to a screen reader; Esc and showing
-  another place drop the selection. A double-click or Edit opens the
-  Note dialog.
+  another place drop the selection. Up, Down, Shift and Ctrl+A select
+  from the keyboard (#274, see Menu bar and keys). A double-click, Edit
+  or Enter opens the Note dialog.
+- **A selection is acted on from a card's right-click** (#273, Q656):
+  its menu offers, after File into…, Merge into… and Importance ▸
+  Important, Normal or Unimportant, and Move to trash last, each only on
+  a card this Device may change; a card in the Trash has no ⋮, and its
+  right-click offers Restore alone. Between File into… and Merge into…
+  stand Routine… and Reminder…, in Advanced Frog while the Note has no
+  open Frog and Session… on a plain Note, as in the phone's compact ⋮
+  (#281), only for who may set them up (ADR 0013) and for that card
+  alone, selected or not; the ⋮ and the right-click are one menu in
+  both views. On a selected card each acts on all
+  the cards selected, on another on that card alone, as File into…
+  does, and the Note menu offers the same while no Note is open (see
+  Menu bar and keys). Merge into… opens the Note picker with every Note,
+  the selected ones included, and a selected Note picked takes the
+  others in, all in one go, the list staying shown; Move to trash asks
+  nothing. A Note this Device may not change stays as it is, without an
+  announcement. An action ends the selection; Ctrl+Z takes back the
+  trash or the Merge of all of them at once.
 - **In the Note dialog a text that is only read selects with the
   mouse** and copies with Ctrl+C (Cmd on macOS): another person's text,
   the Note's in the trash, a Section's (#183), a Transcript, a Photo
@@ -1100,6 +1608,36 @@ replace a law of Both apps where they say so. A desktop law marked
   along; one outside it goes alone. A card this Device may not move
   stays where it is; the announcement says so without numbers, its
   details how many moved and how many stayed.
+- **An Attachment shows on its card and in the Note dialog** (#267,
+  ADR 0047), as on the phone (Phone ▸ Cards): a row with the icon of its
+  kind, its name, its size and its pages; a click on it opens a copy
+  with the system's program for its type and selects no card. The copy
+  is named by the file's hash and its ending alone, and the program is
+  started without a shell (`ShellExecuteW`, `open`, `xdg-open`), as for
+  a file link. Documents, pictures, sound, video and `.zip` open without
+  asking; any other ending, or none, could run a program and asks once
+  first, also for the user's own file: "… could run a program. Open it
+  anyway?", with the person who added it when another person did, and
+  only a click on Open anyway answers it. One
+  whose bytes are not here yet, or that no program opens, is announced.
+  Its Attachment Text shows dimmed under it, "Attachment Text" over it
+  on a full card and in the Note dialog, where it selects
+  to be copied, its first three lines on a compact card. The computer
+  reads the text of every file waiting, those left to it by a phone
+  too, on a thread of its own, a PDF page by page with its scanned pages
+  read as photos are; a file that does not read as its kind gets an
+  empty text, so it is not read again, and one whose bytes are not here
+  waits for them. In the Note dialog each file has Replace Note text,
+  Append to Note text, Remove generated text (Ctrl+Z brings it back),
+  Read the text again for a file of a kind with text, and "Remove
+  Attachment, keep text", asked once; "Attach a file…" under the files
+  picks more. The card's menu has none of these, as it has none for a
+  photo.
+- **Hidden from AI on the desktop** (#267, ADR 0049): a card's ⋮ and
+  right-click, an Area's right-click in the sidebar and the Area menu
+  have the checkbox "Hidden from AI", the Note dialog its badge, offered
+  as on the phone (Phone ▸ Cards) and read as the menu opens; the badge
+  says "Off, hidden by its Area" while only another mark hides it.
 - **A photo gets out of the Note** (#149): on the desktop a right-click
   on a photo in the Note editor or full screen offers "Save image as…",
   "Copy image" and "Open in another program". Saved and copied say
@@ -1119,9 +1657,19 @@ replace a law of Both apps where they say so. A desktop law marked
   the alarm clock, whose menu offers Routine and Reminder (#223), its
   editor a dialog over the quick note dialog or a page of the popup;
   switched on, File into…, Frog and Session in the clock's menu, and
-  More with the Importance, Make it a Tally and Add to a Shopping List,
+  More with the Importance, Make it a Tally and Add to a Shopping List
+  (its lists as radio buttons, the one used last at the top; with one
+  list a single entry naming it, "Add to Weekly", #276),
   and the format bar over the field, without ☐, link and table. Files
-  dropped onto the window open the dialog and wait in it. Leaving the
+  dropped onto the window open the dialog and wait in it (#267): a
+  picture as a photo, a sound file as a voice recording, any other file
+  as an Attachment, each named on its own line; From file… picks files
+  of any kind the same way. **A file dropped onto the Note dialog goes
+  onto its Note** while nothing lies over the dialog, a picture as its
+  photo, a sound file as its recording, any other as its Attachment;
+  onto a Note's own window the same. A file larger than 256 MB, or one
+  that cannot be read, is told by its size before it is read, not
+  attached and announced; the others are. Leaving the
   dialog by its cross, Esc, Alt+Left, the mouse's back button or a click
   beside it keeps what is typed, nudged in 1 h. To full editor in the
   window opens the Note in the Note dialog in its place; in the popup it
@@ -1139,6 +1687,19 @@ replace a law of Both apps where they say so. A desktop law marked
 - On the desktop **Tab and Shift+Tab** put a Line under the Line above
   or back at the top, in place of the in and out buttons, and Up and
   Down move the cursor to the Line above and below.
+- **Alt+Up and Alt+Down move a Checklist's Line** the cursor is in
+  (#283, Q678), as ⋮ Move up and Move down do, which name the keys: a
+  Line of a group within its group, a Line at the top past the next one
+  with its group, the cursor staying in the Line; at an end nothing
+  moves. **A Line is dragged by its handle**, beside its ⋮ wherever ⋮
+  is, by the same rule: a line shows the gap within its group or the
+  top level it goes into; let go where it stands or away from its
+  level, it stays and nothing is written. Into a group and out stays
+  with Tab and Shift+Tab. **A Shopping List's open Lines move the same
+  way** (#283, Q678 (b)): Alt+Up and Alt+Down, ⋮ Move up and Move down
+  and the handle move one among the open Lines as they show; a struck
+  Line has no handle nor Move up and Move down, the keys do nothing in
+  it, and no open Line goes among the struck ones.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,
@@ -1158,10 +1719,34 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Settings
 
+- **The hotkey is recorded by pressing it** (#283, Q679): Record keys
+  beside the Hotkey field reads "Press the keys…" and takes the next
+  chord pressed, Ctrl, Alt or both (Cmd on macOS) with a letter, a
+  digit, F1 to F12 or Space, as the hotkey, which goes into the field.
+  While it records every key is its alone, so none of the app's own
+  keys works and the hotkey held lets go of its key; another key waits
+  for a chord, and Esc, a click elsewhere or leaving the Settings stops
+  it, keeping the hotkey. The field stays for typing a chord, also one
+  with Super, which the window does not hear off macOS.
 - **The Settings dialog is a column of cards** (draft, #196): each card
   embossed as a Note's, its heading strong on top (This computer,
   Alarms, Nudges, Units, Agenda, History, Features, …), its settings
   under it, each with its small weak detail line.
+- **A search field sits at the top of the Settings dialog** (#282),
+  under its heading and above the intro line, staying there while the
+  cards scroll; nothing focuses it on opening, so Alt+Left and Esc keep
+  leaving, and Ctrl+F while the Settings show puts the cursor into it.
+  It filters as on the phone (Phone ▸ Settings): every word typed in a
+  setting's label, detail line or, without a label of its own, its
+  options' names, in any case, in the app's language; each under its
+  card's heading, a card left out when none of its settings match, a
+  heading that matches showing its card whole. A card drawn as one
+  piece (the AI port, Quick capture, the speech model, Units, Features)
+  is one setting. The intro line goes while a search runs, and a search
+  that finds nothing says so in the dialog ("No setting matches “…”."),
+  not at the top. ✕ in the field, or emptying it, shows everything
+  again; the search stays into About or Send feedback and back, and the
+  Settings open anew with everything.
 
 ### Buttons and look
 
@@ -1189,9 +1774,18 @@ replace a law of Both apps where they say so. A desktop law marked
 
 - **The desktop's notifications are the system's** (draft, #196), for
   as long as the app runs, in the tray too: on Linux and Windows an
-  alarm offers Done, 10 min, 30 min, 1 h and "Open Old Brain Fix", on
-  macOS no buttons; there is no full-screen alarm. A click on the Nudge
+  alarm offers Done, Snooze, Not today and "Open Old Brain Fix" (#269),
+  as Windows toasts and some Linux desktops show only a few buttons;
+  Snooze shows it again in place with 10 min, 30 min and 1 h, and Not
+  today with Skip and Tomorrow, under "Skip it, or tomorrow at the same
+  time?", Tomorrow only for an Occurrence of today or later. On macOS it
+  has no buttons; there is no full-screen alarm. A click on the Nudge
   opens the window on Unsorted, in place of the phone's Nudge screen.
+- **A click on an Occurrence's notification opens its Note dialog**
+  (#270), the body or "Open Old Brain Fix" alike: the window comes up
+  with the Note dialog of its Note and its Due line, over whatever it
+  showed; a Routine editor or Tally form open stays over it with its
+  draft. A Routine or Note gone or in the trash opens only the window.
 
 ### What the desktop does not have
 

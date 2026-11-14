@@ -12,6 +12,7 @@ import 'app_lock.dart' show LockScope;
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'frogs_screen.dart' show FrogIcon;
+import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
 import 'look.dart' show ControlBelow;
 import 'note_editor_screen.dart' show kindIcon;
@@ -71,19 +72,24 @@ void countPackTicksWorkedOut() => packTicksWorkedOut++;
 
 /// Opens the tree of the Pack exported from the Area, Topic or Note
 /// [from]. A Tally of a locked Area that is closed now never goes along
-/// with a Session.
-Future<void> exportPack(BuildContext context, Store store, String from) {
+/// with a Session. Something Hidden from AI in it goes into no Pack
+/// until the user shows it to the AI (#267).
+Future<void> exportPack(BuildContext context, Store store, String from) async {
   final lock = LockScope.of(context);
   final closed = {
     for (final area in Places(store).areas())
       if (lock?.isAreaClosed(area.id) ?? false) area.id,
   };
-  return Navigator.of(context).push(
+  final pack = await unlessHiddenFromAi(
+    context,
+    store,
+    () => store.packOf(from, closed: closed),
+    area: from,
+  );
+  if (pack == null || !context.mounted) return;
+  await Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => PackExportScreen(
-        store: store,
-        pack: store.packOf(from, closed: closed),
-      ),
+      builder: (_) => PackExportScreen(store: store, pack: pack),
     ),
   );
 }
@@ -504,17 +510,22 @@ class _PackImportScreenState extends State<PackImportScreen> {
 /// Area and a Topic as headings, a Note by its kind's icon and its name,
 /// under it its files with their sizes, their texts, its Routines,
 /// Reminders and Frog, and under a Session the Tallies it brought from
-/// outside. An item under a Note that is not ticked cannot be ticked.
+/// outside. An item under a Note that is not ticked cannot be ticked;
+/// a Note in [trashed] says so under its name.
 class PackTreeView extends StatelessWidget {
   final Pack pack;
   final Set<String> ticks;
   final void Function(String key, bool on) onTick;
+
+  /// The Notes said to lie in the Trash: of a Backup opened (#285).
+  final Set<int> trashed;
 
   const PackTreeView({
     super.key,
     required this.pack,
     required this.ticks,
     required this.onTick,
+    this.trashed = const {},
   });
 
   @override
@@ -564,6 +575,11 @@ class PackTreeView extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                subtitle:
+                    item.kind == PackItemKind.note &&
+                        trashed.contains(item.note)
+                    ? Text(t.backupNoteTrashed)
+                    : null,
               ),
             ),
           );
@@ -600,7 +616,10 @@ class PackTreeView extends StatelessWidget {
     },
     PackItemKind.photo => const Icon(Icons.photo_outlined),
     PackItemKind.photoText ||
-    PackItemKind.transcript => const Icon(Icons.notes),
+    PackItemKind.transcript ||
+    PackItemKind.fileText => const Icon(Icons.notes),
+    // Until attached files get their own look (#267).
+    PackItemKind.file => const Icon(Icons.attach_file),
     PackItemKind.recording => const Icon(Icons.mic_none),
     PackItemKind.routine => const Icon(Icons.repeat),
     PackItemKind.reminder => const Icon(Icons.notifications_outlined),
@@ -637,6 +656,12 @@ class PackTreeView extends StatelessWidget {
         scheduleText(t, locale, note.routines[i]),
       ),
       (PackItemKind.frog, _) => t.packFrog,
+      // The file's name and size, its text's start, until attached files
+      // get words of their own (#267).
+      (PackItemKind.file, final i?) =>
+        '${note.attachments[i].name} '
+            '(${packSizeText(locale, note.attachments[i].size)})',
+      (PackItemKind.fileText, final i?) => start(note.attachments[i].text),
       _ => '',
     };
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announcements.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
@@ -340,7 +341,9 @@ class ChecklistSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
-  /// Whether the cursor starts in the empty Line of a new list (#161).
+  /// Whether the cursor starts in a new empty Line after the open ones:
+  /// the one of a new list (#161), or one opened from its group on the
+  /// Agenda (#276).
   final bool startLine;
 
   const ChecklistSection({
@@ -366,6 +369,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
   var _checks = false;
   var _adds = false;
   Set<String> _editable = const {};
+  List<DeletedLine> _removed = const [];
 
   @override
   Store get log => widget.notes.store;
@@ -384,9 +388,24 @@ class _ChecklistSectionState extends State<ChecklistSection>
     widget.typed?.listen(keepTyped);
     if (widget.startLine) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) focusEmptyRow();
+        if (mounted) startRowAt(_afterOpen());
       });
     }
+  }
+
+  /// The row after the last open Line and its group, at the top level;
+  /// the end of a list without an open Line.
+  int _afterOpen() {
+    bool open(TypedLine row) => switch (row.id) {
+      final id? => !(_list?.line(id)?.checked ?? true),
+      null => false,
+    };
+    var at = rows.lastIndexWhere(open);
+    if (at < 0) return rows.length;
+    while (at + 1 < rows.length && rows[at + 1].inGroup) {
+      at++;
+    }
+    return at + 1;
   }
 
   @override
@@ -417,6 +436,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
       for (final line in list?.lines ?? const <Line>[])
         if (_lists.mayEdit(line.id)) line.id,
     };
+    _removed = _lists.deletedLines(widget.noteId);
     rows = rowsInOrder(switch (list) {
       final list? => [
         for (final line in list.lines)
@@ -624,11 +644,24 @@ class _ChecklistSectionState extends State<ChecklistSection>
       case _LineStep.outdent:
         _lists.indent(id, under: false);
       case _LineStep.delete:
-        if (!await confirmLineDelete(context)) return;
-        if (!mounted) return;
-        if (!linesWritable || !showsLine(id)) return;
         _lists.delete(id);
+        offerLineUndo(
+          context,
+          _lists.deletedLines,
+          _lists.mayEdit,
+          _lists.restore,
+          widget.noteId,
+          id,
+        );
     }
+    setState(_load);
+  }
+
+  /// Brings the deleted Line [id] back from "Removed Lines".
+  void _restore(String id) {
+    if (!linesWritable || !_lists.mayEdit(id)) return;
+    if (!_lists.deletedLines(widget.noteId).any((l) => l.id == id)) return;
+    _lists.restore(id);
     setState(_load);
   }
 
@@ -709,6 +742,14 @@ class _ChecklistSectionState extends State<ChecklistSection>
                 ),
               ),
             ],
+            if (_removed.isNotEmpty)
+              RemovedLines(
+                store: widget.notes.store,
+                lines: _removed,
+                onRestore: linesWritable
+                    ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
+                    : (_) => null,
+              ),
           ],
         ),
       ),
@@ -716,33 +757,88 @@ class _ChecklistSectionState extends State<ChecklistSection>
   }
 }
 
-/// Asks once whether a Line goes, with Delete on the button in the
-/// error colour.
-Future<bool> confirmLineDelete(BuildContext context) async {
-  final sure = await showDialog<bool>(
-    context: context,
-    builder: (context) {
-      final t = context.t;
-      return AlertDialog(
-        content: Text(t.checklistDeleteQuestion),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            key: const ValueKey('checklist-delete-confirm'),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
+/// Offers at the top to undo the deletion of the Line [lineId] of the
+/// list of [noteId] (#268): the undo [restore]s it while [deleted] still
+/// lists it and this Device [mayEdit] it, as "Removed Lines" would.
+void offerLineUndo(
+  BuildContext context,
+  List<DeletedLine> Function(String noteId) deleted,
+  bool Function(String lineId) mayEdit,
+  void Function(String lineId) restore,
+  String noteId,
+  String lineId,
+) => AnnouncementsScope.of(context)?.offerUndo(context.t.undoLineDeleted, () {
+  if (!deleted(noteId).any((l) => l.id == lineId) || !mayEdit(lineId)) return;
+  restore(lineId);
+});
+
+/// The folded "Removed Lines" under a list's Lines in the Note editor
+/// (#268): the deleted Lines, the last deleted first, each with Restore
+/// below it where [onRestore] gives one; open or folded as last left on
+/// this Device, as a Tally's "Removed entries".
+class RemovedLines extends StatefulWidget {
+  final Store store;
+  final List<DeletedLine> lines;
+
+  /// What Restore runs for the Line of an id, or null where it may not.
+  final VoidCallback? Function(String id) onRestore;
+
+  const RemovedLines({
+    super.key,
+    required this.store,
+    required this.lines,
+    required this.onRestore,
+  });
+
+  @override
+  State<RemovedLines> createState() => _RemovedLinesState();
+}
+
+class _RemovedLinesState extends State<RemovedLines> {
+  /// The local setting that keeps "Removed Lines" open.
+  static const _openKey = 'linesRemovedOpen';
+
+  late final _open = widget.store.localSetting(_openKey) == 'true';
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final weak = Theme.of(context).colorScheme.onSurfaceVariant;
+    return ExpansionTile(
+      key: const ValueKey('lines-removed'),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: EdgeInsets.zero,
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      leading: const Icon(Icons.delete_outline),
+      title: Text(t.linesRemoved),
+      initiallyExpanded: _open,
+      onExpansionChanged: (open) =>
+          widget.store.setLocalSetting(_openKey, '$open'),
+      children: [
+        for (final line in widget.lines)
+          Padding(
+            key: ValueKey('line-removed-${line.id}'),
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(line.text, style: TextStyle(color: weak)),
+                // The control goes below its text.
+                if (widget.onRestore(line.id) case final restore?)
+                  TextButton.icon(
+                    key: ValueKey('line-restore-${line.id}'),
+                    onPressed: restore,
+                    icon: const Icon(Icons.restore),
+                    label: Text(t.restore),
+                  ),
+              ],
             ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.delete),
           ),
-        ],
-      );
-    },
-  );
-  return sure ?? false;
+      ],
+    );
+  }
 }
 
 /// Makes the Note [noteId] a Checklist where this Device may; whether it

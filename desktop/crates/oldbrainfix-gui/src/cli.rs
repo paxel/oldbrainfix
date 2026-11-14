@@ -7,7 +7,8 @@
 //! - `oldbrainfix capture -` captures what comes in on stdin,
 //! - `oldbrainfix import FILE` imports the sync bundle FILE,
 //! - `oldbrainfix open FILE` shows the Sent Item FILE in the window, to
-//!   accept or decline.
+//!   accept or decline,
+//! - `oldbrainfix --version` prints the version.
 //!
 //! A capture without a window prints nothing when it worked; an import
 //! prints what came in. The exit codes are [`OK`], [`FAILED`] and
@@ -52,6 +53,8 @@ pub enum Launch {
     Open(String),
     /// Prints the usage.
     Help,
+    /// Prints the version.
+    Version,
 }
 
 /// Arguments that make no sense.
@@ -66,6 +69,7 @@ pub fn parse(args: &[String]) -> Result<Launch, Usage> {
     match first.as_str() {
         TRAY_ARG if rest.is_empty() => Ok(Launch::Tray),
         "-h" | "--help" | "help" if rest.is_empty() => Ok(Launch::Help),
+        "-V" | "--version" if rest.is_empty() => Ok(Launch::Version),
         CAPTURE => match rest {
             [] => Ok(Launch::Popup),
             [one] if one == "-" => Ok(Launch::Stdin),
@@ -92,6 +96,12 @@ fn words(text: &[String]) -> Result<Launch, Usage> {
     Ok(Launch::Text(text.join(" ")))
 }
 
+/// What `--version` prints: the name and the version this program was
+/// built as.
+pub fn version_line() -> String {
+    format!("Old Brain Fix {}", env!("CARGO_PKG_VERSION"))
+}
+
 /// The text to capture as it is kept: without the blanks around it;
 /// `None` when nothing is left.
 pub fn note_text(text: &str) -> Option<&str> {
@@ -99,75 +109,4 @@ pub fn note_text(text: &str) -> Option<&str> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn parse_of(args: &[&str]) -> Result<Launch, Usage> {
-        let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
-        parse(&args)
-    }
-
-    #[test]
-    fn a_plain_start_opens_the_window_and_a_login_start_the_tray() {
-        assert_eq!(parse_of(&[]), Ok(Launch::Window));
-        assert_eq!(parse_of(&["--tray"]), Ok(Launch::Tray));
-        assert_eq!(parse_of(&["--help"]), Ok(Launch::Help));
-        assert_eq!(parse_of(&["--tray", "x"]), Err(Usage));
-        assert_eq!(parse_of(&["captur"]), Err(Usage));
-    }
-
-    #[test]
-    fn capture_opens_the_popup_or_takes_the_text_given() {
-        assert_eq!(parse_of(&["capture"]), Ok(Launch::Popup));
-        assert_eq!(
-            parse_of(&["capture", "buy", "milk"]),
-            Ok(Launch::Text("buy milk".into()))
-        );
-        assert_eq!(
-            parse_of(&["capture", "call Anna, 3 pm"]),
-            Ok(Launch::Text("call Anna, 3 pm".into()))
-        );
-        assert_eq!(parse_of(&["capture", "-"]), Ok(Launch::Stdin));
-        assert_eq!(parse_of(&["capture", "--help"]), Ok(Launch::Help));
-        // `--` lets a text start with a dash.
-        assert_eq!(
-            parse_of(&["capture", "--", "-", "5 kg"]),
-            Ok(Launch::Text("- 5 kg".into()))
-        );
-        assert_eq!(parse_of(&["capture", "--"]), Err(Usage));
-        assert_eq!(parse_of(&["capture", "-x", "milk"]), Err(Usage));
-        assert_eq!(parse_of(&["capture", "-", "milk"]), Err(Usage));
-    }
-
-    #[test]
-    fn import_takes_one_file() {
-        assert_eq!(
-            parse_of(&["import", "a.obfsync"]),
-            Ok(Launch::Import("a.obfsync".into()))
-        );
-        assert_eq!(parse_of(&["import", "--help"]), Ok(Launch::Help));
-        assert_eq!(parse_of(&["import"]), Err(Usage));
-        assert_eq!(parse_of(&["import", "a", "b"]), Err(Usage));
-    }
-
-    #[test]
-    fn open_takes_one_file() {
-        assert_eq!(
-            parse_of(&["open", "a.oldbrain"]),
-            Ok(Launch::Open("a.oldbrain".into()))
-        );
-        assert_eq!(parse_of(&["open", "--help"]), Ok(Launch::Help));
-        assert_eq!(parse_of(&["open"]), Err(Usage));
-        assert_eq!(parse_of(&["open", "a", "b"]), Err(Usage));
-    }
-
-    #[test]
-    fn blank_text_is_nothing_to_capture() {
-        assert_eq!(note_text("  buy milk\n"), Some("buy milk"));
-        assert_eq!(
-            note_text("line one\nline two\n"),
-            Some("line one\nline two")
-        );
-        assert_eq!(note_text(" \n\t"), None);
-    }
-}
+mod tests;

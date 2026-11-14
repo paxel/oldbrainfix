@@ -1,0 +1,505 @@
+{
+  "now": "2026-01-02T10:00:51.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [
+    {
+      "id": "area:00000000000000000000000000000001",
+      "name": "Papers",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    }
+  ],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "Lease",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:03.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "file",
+      "attachments": [
+        {
+          "hash": "eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e",
+          "name": "Lease.pdf",
+          "type": "application/pdf",
+          "size": 18,
+          "pages": 2,
+          "computer": false,
+          "kind": "pdf"
+        },
+        {
+          "hash": "00d5228c923a31c458518926ae2f123193a2925bf0fe66ec0dcd719302c05060",
+          "name": "Scan.pdf",
+          "type": "application/pdf",
+          "size": 15,
+          "pages": 40,
+          "computer": true,
+          "kind": "pdf"
+        },
+        {
+          "hash": "e745bc10bab62e45b77074b22a7d6cc19dcfd44c4fb1fe55c3529ce5227597b1",
+          "name": "notes.md",
+          "type": "text/markdown",
+          "size": 20,
+          "pages": null,
+          "computer": false,
+          "kind": "text"
+        },
+        {
+          "hash": "20ee1e5148eb1ee683c98b7d94b32a41743bb02c10d1fc1ca63c595b62ccc125",
+          "name": "plan.dwg",
+          "type": "application/octet-stream",
+          "size": 11,
+          "pages": null,
+          "computer": false,
+          "kind": "other"
+        },
+        {
+          "hash": "ee7f1c080e5eedd116a33f4c5dbe53806fe40dac2f7890845f48dfffa9e272f6",
+          "name": "Empty.docx",
+          "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size": 140,
+          "pages": null,
+          "computer": false,
+          "kind": "docx"
+        },
+        {
+          "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "name": "invfdp.exe",
+          "type": "application/x-thing",
+          "size": 0,
+          "pages": null,
+          "computer": false,
+          "kind": "other"
+        }
+      ],
+      "attachmentTexts": {
+        "eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e": "Rent due\n\n on the first",
+        "e745bc10bab62e45b77074b22a7d6cc19dcfd44c4fb1fe55c3529ce5227597b1": "# Notes\nKeys: 2",
+        "ee7f1c080e5eedd116a33f4c5dbe53806fe40dac2f7890845f48dfffa9e272f6": ""
+      },
+      "removedAttachments": [],
+      "removedAttachmentTexts": [],
+      "aloneFile": null,
+      "wordlessName": "Lease.pdf"
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:16.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "file",
+      "attachments": [
+        {
+          "hash": "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
+          "name": "Brief.odt",
+          "type": "application/vnd.oasis.opendocument.text",
+          "size": 331,
+          "pages": null,
+          "computer": false,
+          "kind": "odt"
+        }
+      ],
+      "attachmentTexts": {
+        "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95": "Grüße aus Bern  😀 ﬁ"
+      },
+      "removedAttachments": [],
+      "removedAttachmentTexts": [],
+      "aloneFile": "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
+      "wordlessName": "Brief.odt"
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "Bills",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:22.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "file",
+      "attachments": [
+        {
+          "hash": "53e24f787827167c43df3b374f94c2e089a78e3d271450a23a12ed5fa44a9b7a",
+          "name": "Costs.xlsx",
+          "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size": 1229,
+          "pages": null,
+          "computer": false,
+          "kind": "xlsx"
+        }
+      ],
+      "attachmentTexts": {
+        "253c25f1b8e1a244413c926b3485b5cf3bcec32f2a6ae3ba58d56740784318cb": "Power bill March"
+      },
+      "removedAttachments": [
+        {
+          "hash": "253c25f1b8e1a244413c926b3485b5cf3bcec32f2a6ae3ba58d56740784318cb",
+          "name": "power.txt",
+          "type": "text/plain",
+          "size": 16,
+          "pages": null,
+          "computer": false,
+          "kind": "text"
+        }
+      ],
+      "removedAttachmentTexts": [
+        "53e24f787827167c43df3b374f94c2e089a78e3d271450a23a12ed5fa44a9b7a"
+      ],
+      "aloneFile": null,
+      "wordlessName": "Costs.xlsx"
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "text": "Moving",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:33.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "file",
+      "attachments": [
+        {
+          "hash": "f5bf2db642f8f7bb0c39837e6fa8f70f7fb55f034e4e9c825847007d13fb35a4",
+          "name": "boxes.csv",
+          "type": "text/csv",
+          "size": 8,
+          "pages": null,
+          "computer": false,
+          "kind": "text"
+        }
+      ],
+      "attachmentTexts": {},
+      "removedAttachments": [],
+      "removedAttachmentTexts": [],
+      "aloneFile": null,
+      "wordlessName": "boxes.csv"
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:37.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000005",
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "file",
+      "attachments": [
+        {
+          "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
+          "name": "Plan.ods",
+          "type": "application/vnd.oasis.opendocument.spreadsheet",
+          "size": 126,
+          "pages": null,
+          "computer": false,
+          "kind": "ods"
+        }
+      ],
+      "attachmentTexts": {},
+      "removedAttachments": [],
+      "removedAttachmentTexts": [],
+      "aloneFile": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
+      "wordlessName": "Plan.ods"
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "text": "Old",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:44.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:49.000Z",
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "file",
+      "attachments": [
+        {
+          "hash": "cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4",
+          "name": "old.txt",
+          "type": "text/plain",
+          "size": 3,
+          "pages": null,
+          "computer": false,
+          "kind": "text"
+        }
+      ],
+      "attachmentTexts": {},
+      "removedAttachments": [],
+      "removedAttachmentTexts": [],
+      "aloneFile": null,
+      "wordlessName": "old.txt"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000005",
+    "note:00000000000000000000000000000004",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000002"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000005"
+  ],
+  "trashed": [
+    "note:00000000000000000000000000000007"
+  ],
+  "inside": {
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000002"
+    ]
+  },
+  "sections": {
+    "note:00000000000000000000000000000005": [
+      {
+        "id": "note:00000000000000000000000000000006",
+        "noteId": "note:00000000000000000000000000000005",
+        "text": "",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:37.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "attachments": [
+          {
+            "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
+            "name": "Plan.ods",
+            "type": "application/vnd.oasis.opendocument.spreadsheet",
+            "size": 126,
+            "pages": null,
+            "computer": false,
+            "kind": "ods"
+          }
+        ],
+        "attachmentTexts": {},
+        "removedAttachments": [],
+        "removedAttachmentTexts": [],
+        "modified": null,
+        "editedBy": null
+      }
+    ],
+    "note:00000000000000000000000000000004": [],
+    "note:00000000000000000000000000000003": [],
+    "note:00000000000000000000000000000002": [],
+    "note:00000000000000000000000000000007": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {
+    "note:00000000000000000000000000000002": [
+      "file/eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e",
+      "file/e745bc10bab62e45b77074b22a7d6cc19dcfd44c4fb1fe55c3529ce5227597b1",
+      "fileText/eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e",
+      "fileText/e745bc10bab62e45b77074b22a7d6cc19dcfd44c4fb1fe55c3529ce5227597b1"
+    ],
+    "note:00000000000000000000000000000003": [
+      "file/e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
+      "fileText/e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95"
+    ]
+  },
+  "shares": {
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Moving"
+    },
+    "note:00000000000000000000000000000004": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Bills"
+    },
+    "note:00000000000000000000000000000003": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": ""
+    },
+    "note:00000000000000000000000000000002": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Lease"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Old"
+    }
+  },
+  "search": {
+    "": [
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000002"
+    ]
+  },
+  "conflicts": []
+}

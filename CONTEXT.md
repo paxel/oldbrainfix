@@ -27,7 +27,7 @@ The rest of the text of a Note of any Kind but a Plain Note, after its Name: sho
 _Avoid_: body, notes, details
 
 **Compact view**:
-How a Note's card shows it in a list for a glance, as its Kind defines it: a Plain Note its first line and the two lines after it, a Checklist its Name and how many of its Lines are open ("3 of 7 open"), a Shopping List its Name and how many are open ("4 open"), a Tally its Name and each field's total of the current bar against its target, today's for a Tally of days ("Steps 7000 / 10000 steps"), in a Shared Area of the user's own entries, a Session its Name, the next run of any of its Routines and this week's runs of all of them done and skipped. It has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right and offers File into… and Merge into…. The list's switch shows every card compact or detailed; a tap on a card (on the desktop its view button) switches that card, and this Device keeps it so until the list's switch changes again. German: Kompaktansicht.
+How a Note's card shows it in a list for a glance, as its Kind defines it: a Plain Note its first line and the two lines after it, a Checklist its Name and how many of its Lines are open ("3 of 7 open"), a Shopping List its Name and how many are open ("4 open"), a Tally its Name and each field's total of the current bar against its target, today's for a Tally of days ("Steps 7000 / 10000 steps"), in a Shared Area of the user's own entries, a Session its Name, the next run of any of its Routines and this week's runs of all of them done and skipped. It has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right and offers File into…, Routine…, Reminder…, in Advanced Frog and Session…, and Merge into…. The list's switch shows every card compact or detailed; a tap on a card (on the desktop its view button) switches that card, and this Device keeps it so until the list's switch changes again. German: Kompaktansicht.
 _Avoid_: folded card, short view, summary
 
 **Detailed view**:
@@ -39,7 +39,7 @@ The act of creating a Note through one of the quick entry points (the "+" button
 _Avoid_: quick add, record
 
 **Quick note**:
-The text capture screen, and on the desktop the quick note dialog of the window (File ▸ New Note, Ctrl+N, "+") and the capture popup: the text, Photo, Voice, Gallery and Paste (on the desktop Record voice, Paste and From file…), the Nudge buttons, "To full editor", which saves the Note Unsorted and opens it in the Note editor, on the desktop the Note dialog, and the alarm clock, whose menu sets up a Routine or Reminder saved with the Note (#223). What else sorts the Note (File into…, Frog, Session or Tally, Add to a Shopping List, the Importance) and the format bar show only where the Device's settings switch them on; the Nudge buttons can be switched off for a single Save. German: Schnellnotiz.
+The text capture screen, and on the desktop the quick note dialog of the window (File ▸ New Note, Ctrl+N, "+") and the capture popup: the text, Photo, Voice, Gallery, Paste and File (on the desktop Record voice, Paste and From file…), the Nudge buttons, "To full editor", which saves the Note Unsorted and opens it in the Note editor, on the desktop the Note dialog, and the alarm clock, whose menu sets up a Routine or Reminder saved with the Note (#223). What else sorts the Note (File into…, Frog, Session or Tally, Add to a Shopping List, the Importance) and the format bar show only where the Device's settings switch them on; the Nudge buttons can be switched off for a single Save. German: Schnellnotiz.
 _Avoid_: quick add
 
 **Capture Context**:
@@ -56,6 +56,14 @@ Text recognised from a Note's voice recording, kept next to the recording. Only 
 **Photo Text**:
 Text recognised in a Note's photo or screenshot, kept next to the photo. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the photo stays, and read the text again. The photo can be removed and the Photo Text stays.
 _Avoid_: OCR (in the UI), caption
+
+**Attachment**:
+A file of any kind attached to a Note, such as a letter as a PDF, a Word document, a spreadsheet or a `.zip`, kept with its name, type and size and synced to every Device of the user and of the people in its Shared Area (ADR 0047). A Note can hold several next to its text, photos and recordings; a merged Note's travel with it. A Note made from a file alone shows the file as its card. There is no Kind for documents. The file can be removed while its Attachment Text stays, as a photo can. German: Anhang.
+_Avoid_: document (any file can be one), upload, file (in the UI where a Note's file is meant)
+
+**Attachment Text**:
+The text read out of an Attachment where its format allows: a PDF's own text and the text of its scanned pages, the text of `.docx`, `.odt`, `.xlsx` and `.ods` files, plain text and Markdown; other files have none. Only the machine writes it and it stays plain; search finds it as it finds a Photo Text, and the user can remove it while the file stays and read the file again. The Device that attaches a file reads it, unless it is a phone and the file a PDF of more than ten pages or larger than 10 MiB: then a computer reads it once it has the file, and until then the phone shows that the text follows from the computer. German: Anhangtext.
+_Avoid_: OCR, extracted text, preview
 
 **Section**:
 A dated part of a Note, added by Amend or Merge, carrying its own Capture Context. Its text is fixed in place as the Note's is, by the same people; it keeps its date and its place, and shows when it was last modified and who edited it.
@@ -81,6 +89,10 @@ _Avoid_: import, clipboard capture
 Making Notes from files another app or a folder holds: on the phone under Settings, on the desktop in the File menu, the files picked with the system's picker. Each Markdown or text file of a folder becomes one Note, formatted from Markdown, with the file's name as its first line unless its text begins with it, captured when the file was last changed; they all land in a new Area named after the source, beside an Area of that name rather than in it, and none of them is Unsorted or Nudged. Other files are skipped and counted. A Google Takeout export of Google Keep, zipped or unpacked, is imported the same way into its own new Area: each note becomes a Note captured when it was made in Keep, its title as its first line, its labels as #tags on a last line, a list as a Checklist with its Lines checked as in Keep, off the Agenda until switched on, its pictures as its photos; notes in Keep's trash are skipped and counted, archived ones imported. German: Import.
 _Avoid_: Pack (a Pack brings copies of Old Brain Fix Notes), Paste, bundle (a bundle is a sync transport), upload
 
+**Vault**:
+A folder of Markdown files the desktop writes by hand with File ▸ "Export as vault…", for the day the user moves to another tool such as Obsidian, and the way back from it (ADR 0050). A folder per Area, a subfolder per Topic; each Note a file named by its first line and capture date, its text as written, its Sections as dated parts, its Lines, entries or pool drawn as Markdown, its photos, recordings and attached files in an `attachments` folder beside it, and what the Markdown does not show (capture time, Area, Topic, Importance, Routines and Reminders with their schedules and check-offs, author, files) as properties at its top. Everything this Device reads goes in, other people's Notes in Shared Areas and Notes Hidden from AI included, but no Capture Context; it is not encrypted. It is written anew into a new folder each time and is no place to work in: edits there never come back on their own. "Rebuild from a vault…" on the first start takes it into an empty Old Brain Fix only, as a Backup restores: each Note with its properties, every Note, Area and Topic new and signed by this Device, a file made in the other tool as a new Note with its text, its tags and its file's date, filed by its folders. The Backup remains the way to keep everything. German: Markdown-Ordner.
+_Avoid_: Backup (a Backup is encrypted and keeps everything), sync folder (a shared folder syncs both ways), Pack, export (in the UI the action is "Export as vault…"), safe
+
 ### Text
 
 **Formatted text**:
@@ -104,7 +116,7 @@ A ☐ (open), ✅ (done) or ❌ (failed) anywhere in a Note's or Section's text,
 _Avoid_: status mark (its earlier name), checkbox (a Line of a Checklist has the checkbox)
 
 **Tag**:
-A word with "#" in front in a text, such as "#Garten": letters, digits, "_" and "-", at least one of them a letter. It is drawn highlighted, and a tap or click on it opens the search for it. Nothing is stored for a Tag and there is no list of Tags; it is no Topic and no part of the Capture Context. German: #Wort.
+A word with "#" in front in a text, such as "#Garten": letters, digits, "_" and "-", at least one of them a letter. A "/" inside nests it, such as "#life/health/back", and the search for "#life" finds it. It is drawn highlighted, and a tap or click on it opens the search for it. Nothing is stored for a Tag; the tag tree lists the Tags of the Notes by their levels, read from their texts. It is no Topic and no part of the Capture Context. German: #Wort.
 _Avoid_: label, keyword, hashtag
 
 **App link**:
@@ -126,7 +138,7 @@ Where the user finds and opens filed Notes. On the phone the page that "Search a
 _Avoid_: search screen, library
 
 **Unsorted**:
-The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, a Checklist or a Shopping List, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
+The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, a Checklist or a Shopping List, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted, or when the filing that took it out of Unsorted is undone. German: Unsortiert.
 _Avoid_: uncategorized, inbox
 
 **Nudge**:
@@ -169,16 +181,24 @@ _Avoid_: instance, slot
 An Occurrence or Frog the user checked off. Checking off early or late never moves the schedule.
 _Avoid_: completed, ticked (in the UI)
 
+**Not today**:
+The choice for an Occurrence the user won't do today, beside Snooze: Skip, or Tomorrow, which skips it and adds a one-time Occurrence of the same Routine the day after at the same time. Neither changes the schedule. German: Nicht heute.
+_Avoid_: postpone, reschedule (that changes the schedule), defer
+
+**Skip**:
+Marking an Occurrence as not to be done, a decision rather than a lapse: it is neither Done nor Missed, its alarm and Re-nag stop, it never shows in the Missed Summary, and it leaves the Adherence, which counts the skips beside it. It can be taken back. German: Auslassen.
+_Avoid_: dismiss, cancel, Missed
+
 **Re-nag**:
-Firing an ignored Occurrence again at a fixed interval until it is Done, snoozed, or the next Occurrence starts.
+Firing an ignored Occurrence again at a fixed interval until it is Done, snoozed, skipped, or the next Occurrence starts.
 _Avoid_: repeat, reminder
 
 **Escalation**:
 An opt-in step where an Occurrence ignored for several Re-nags turns into a full-screen alarm with sound. The full-screen alarm is phone-only; on the desktop Escalation makes the notification urgent, with the system's alarm sound.
 
 **Missed**:
-An Occurrence that was never Done: a Routine's when its next Occurrence starts, a Reminder's at midnight.
-_Avoid_: overdue, skipped
+An Occurrence that was never Done nor skipped: a Routine's when its next Occurrence starts, a Reminder's at midnight.
+_Avoid_: overdue, skipped (that is a Skip, the user's decision)
 
 **Missed Summary**:
 The card on the Agenda listing what was Missed and how often since the user last confirmed it.
@@ -187,10 +207,10 @@ The card on the Agenda listing what was Missed and how often since the user last
 The single notification after the device was off or dead, saying how much was Missed while it was down.
 
 **Streak**:
-The run of consecutive Occurrences of a Routine that were Done.
+The run of consecutive Occurrences of a Routine that were Done; a skipped one neither breaks it nor counts in it.
 
 **Adherence**:
-The share of a Routine's Occurrences that were Done over a period, e.g. "92 % this month".
+The share of a Routine's Occurrences that were Done over a period, those skipped left out and counted beside it, e.g. "92 % this month · 3 skipped".
 
 **Agenda**:
 The home screen: today's Occurrences, then two Frogs to eat one of, then the rest of the week dimmed (tomorrow and the five days after), with the Missed Summary and the Unsorted count on top.
@@ -224,11 +244,11 @@ _Avoid_: workout, training, playlist, Set (that is an Entry's)
 ### Checklists and Shopping Lists
 
 **Checklist**:
-A Note whose Lines are checked off, such as a packing list: its text is its Name and Description above the Lines, every Line has its checkbox, and a Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks its parent, checking the parent checks its whole group, and unchecking one Line of the group unchecks the parent. A Note is at most one of a Tally, a Checklist and a Shopping List; it turns back into a Plain Note with every Line a line of its text, or into a Shopping List of its Lines, the checked ones struck. A Routine or Reminder spawned from a Checklist starts each Occurrence with every Line unchecked, on all of the user's own Devices and for everyone in a Shared Area alike; the Occurrence is Done once every Line is checked for it, by anyone, or when checked off. Today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as its name with every open Line under it, or as one row with the count, such as "Before the trip: 3 of 7 open", or not at all, as the user chose under "Show on the Agenda" for it: a choice of their own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda. German: Checkliste.
+A Note whose Lines are checked off, such as a packing list: its text is its Name and Description above the Lines, every Line has its checkbox, and a Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks its parent, checking the parent checks its whole group, and unchecking one Line of the group unchecks the parent. A Note is at most one of a Tally, a Checklist and a Shopping List; it turns back into a Plain Note with every Line a line of its text, or into a Shopping List of its Lines, the checked ones struck. A Routine or Reminder spawned from a Checklist starts each Occurrence with every Line unchecked, on all of the user's own Devices and for everyone in a Shared Area alike; the Occurrence is Done once every Line is checked for it, by anyone, or when checked off. Today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as its name with every open Line under it, and the Lines checked today struck for the day, or as one row with the count, such as "Before the trip: 3 of 7 open", or not at all, as the user chose under "Show on the Agenda" for it: a choice of their own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda. German: Checkliste.
 _Avoid_: to-do list, task list, todo
 
 **Shopping List**:
-A Note whose Lines come back a while after they are checked, such as the weekly shopping: its text is its Name and Description above the Lines, and its Lines have no groups. The open Lines keep the order they were typed in, a new Line added at the end. Each Line has its reappear time, shown on a badge at its end ("—", "4w", "3m"): none, Once, or a number of days, weeks, months or years; a new Line has none. Checking a Line strikes it through and moves it to the end, showing the day it comes back; at the start of that day, by the Device's wall clock, it is open again, in its place: as many days or weeks on, or the same day of the month as many months or years on, the month's last day when it is shorter. A Line without a reappear time stays struck until one is set, which then counts from its check. A Line Once is gone when checked. Adding a name the list already has, in any case and with spaces around it, adds nothing: a struck or gone Line of that name comes back at once, in its place, and an open one stays. It is made from a Note and turns back into a Plain Note as a Checklist does, the struck Lines marked "✓ ", or into a Checklist of its Lines, the struck ones checked. A Routine or Reminder spawned from it is Done only when checked off. Today's Agenda shows each Shopping List with open Lines the way the user chose with "Show on the Agenda" for it: one row with the number of its open Lines, such as "Groceries: 4 open", the default; each open Line on its own row, checkable there; or not at all. A list without open Lines never shows. The choice is the user's own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda; a list nobody chose for starts as the Device's earlier setting for all Shopping Lists showed them. A Capture can go into a Shopping List instead of becoming a Note: each of its lines, typed or in a recording's Transcript, becomes a Line of the list, and no Note is kept. German: Einkaufsliste.
+A Note whose Lines come back a while after they are checked, such as the weekly shopping: its text is its Name and Description above the Lines, and its Lines have no groups. The open Lines keep the order they were typed in or moved to by hand among the open ones, a new Line added at the end; a struck Line does not move. Each Line has its reappear time, shown on a badge at its end ("—", "4w", "3m"): none, Once, or a number of days, weeks, months or years; a new Line has none. Checking a Line strikes it through and moves it to the end, showing the day it comes back; at the start of that day, by the Device's wall clock, it is open again, in its place: as many days or weeks on, or the same day of the month as many months or years on, the month's last day when it is shorter. A Line without a reappear time stays struck until one is set, which then counts from its check. A Line Once is gone when checked. Adding a name the list already has, in any case and with spaces around it, adds nothing: a struck or gone Line of that name comes back at once, in its place, and an open one stays. It is made from a Note and turns back into a Plain Note as a Checklist does, the struck Lines marked "✓ ", or into a Checklist of its Lines, the struck ones checked. A Routine or Reminder spawned from it is Done only when checked off. Today's Agenda shows each Shopping List with open Lines the way the user chose with "Show on the Agenda" for it: one row with the number of its open Lines, such as "Groceries: 4 open", the default; each open Line on its own row, checkable there, a Line checked today staying struck for the day; or not at all. A list without open Lines shows only with the Lines checked today, on its own rows. The choice is the user's own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda; a list nobody chose for starts as the Device's earlier setting for all Shopping Lists showed them. A Capture can go into a Shopping List instead of becoming a Note: each of its lines, typed or in a recording's Transcript, becomes a Line of the list, and no Note is kept. German: Einkaufsliste.
 _Avoid_: grocery list, perpetual list, to-buy list
 
 **Line**:
@@ -242,6 +262,10 @@ One installation of the app, on a phone or a desktop. Most settings belong to a 
 
 **Pairing**:
 Introducing two Devices, or a person, to each other in person or by code, which hands over the keys they need.
+
+**Address by hand**:
+An address the user types for a paired Device of their own, such as its Tailscale name, where sync and the phone's questions reach it through a VPN when the local network does not find it. A local setting of the Device that keeps it, never synced; the pinned certificate still decides whether the Device answering there is the one paired (ADR 0003). German: Adresse von Hand.
+_Avoid_: remote access, relay, server address
 
 **Shared Area**:
 An Area that other people sync with. Everything outside it stays private. It is shared in person by Pairing, or from afar with a person in People through an offer file the person accepts or declines; changes then travel by a shared folder or by bundles.
@@ -298,8 +322,12 @@ Changes the user sees as if they were kept, which are kept only once the user ac
 _Avoid_: draft, staging, preview (a preview shows without keeping anything)
 
 **AI Task**:
-One job the user hands to an AI model of their choice through the desktop's AI port, such as fixing typos or removing everything about a topic. Everything it changes is a Pending Change, reviewed together when the user says it is done and accepted or rejected as a whole. One at a time; sync waits meanwhile.
+One job the user hands to an AI model of their choice through the desktop's AI port, such as fixing typos or removing everything about a topic, or what a model changes when asked to in the Ask panel, such as filing what is new. Everything it changes is a Pending Change, reviewed together when the user says it is done and accepted or rejected as a whole. One at a time; sync waits meanwhile.
 _Avoid_: agent, assistant, chat, AI mode
+
+**Ask panel**:
+Where the user asks the desktop about their Notes (AI ▸ Ask…): the question goes to a provider the user entered with their own API key, Anthropic or an OpenAI-compatible one such as a local Ollama, whose model searches and reads the Notes through the AI port's tools and answers with links to the Notes it came from. Only what the model finds and reads is sent, never what is Hidden from AI. Asking pauses no sync; a change the model makes, such as filing what is new, waits as an AI Task for review. An answer is gone once the panel is left, unless kept as a Note (ADR 0051). The phone's Ask page asks through it: the question goes over the paired connection to the user's own desktop, which answers as the panel does; the phone holds no provider and no key, and names the provider and what is sent and asks the user's permission before the first question to it. German: Fragen-Ansicht.
+_Avoid_: chat, assistant, copilot, AI search
 
 ### Privacy
 
@@ -311,6 +339,10 @@ An optional lock on a single Area that stays closed even while the app is open.
 
 **Masked**:
 How an Occurrence from a locked Area appears in alarms and on the Agenda when its Area chooses so: "Private Routine, 08:00", still checkable.
+
+**Hidden from AI**:
+A mark the user sets on an Area or a single Note, on the phone or the desktop, for their own Devices only: for the AI (an AI Task, the Ask panel) the Note, every Note in the Area, and their Amends, Routines, Reminders, Frogs, Lines and tags do not exist, not even as a count. Hidden and shared exclude each other: the mark is not offered in a Shared Area, and a hidden Note or Area is not filed into a Shared Area, merged with a Note of one either way, shared, sent or put into a Pack until the user takes the mark off. The user sees and exports it as ever (ADR 0049). German: Vor KI verborgen.
+_Avoid_: private, secret, excluded, locked (an Area Lock is another thing)
 
 **Backup**:
 An encrypted file holding everything on a Device, opened with a passphrase.

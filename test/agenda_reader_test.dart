@@ -549,7 +549,7 @@ void main() {
           if (line != null && line.isNotEmpty) return line;
           return alarm.text == null
               ? t.noteGone
-              : wordlessTitle(t, alarm.wordless);
+              : wordlessTitle(t, alarm.wordless, alarm.wordlessName);
         }
 
         final before = [

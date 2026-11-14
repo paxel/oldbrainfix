@@ -253,9 +253,11 @@ AlarmPlanRead planAlarms(
         masked.putIfAbsent(routine.id, () => locks.masks(routine))) {
       return maskedText(t, locale, routine, alarm.occurrence);
     }
-    // A photo or voice Note without words is still there.
+    // A photo, voice or file Note without words is still there.
     return _title(alarm.text) ??
-        (alarm.text == null ? t.noteGone : wordlessTitle(t, alarm.wordless));
+        (alarm.text == null
+            ? t.noteGone
+            : wordlessTitle(t, alarm.wordless, alarm.wordlessName));
   }
 
   final planned = alarms.nudge(wallClock);

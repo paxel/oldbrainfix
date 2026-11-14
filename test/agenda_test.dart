@@ -47,6 +47,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tap(tester, find.byKey(const ValueKey('row-schedule')));
+  }
+
   /// A phone-tall page at the test's width: the title's own line under
   /// the bar's buttons leaves the default 600 too short for an editor.
   void tall(WidgetTester tester) {
@@ -725,21 +733,14 @@ void main() {
       );
     });
 
-    testWidgets('a Routine is trashed after a confirm; its Note stays', (
+    testWidgets('a Routine is trashed without asking; its Note stays', (
       tester,
     ) async {
       final routine = routines.create('pills', daily([at(8)]));
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Delete'));
-      expect(
-        find.text(
-          'Delete this Routine? It stays in the trash for 30 days. '
-          'Its Note stays.',
-        ),
-        findsOneWidget,
-      );
-      await tap(tester, find.text('Delete').last);
+      expect(find.byType(AlertDialog), findsNothing);
       expect(routines.byId(routine.id)?.isTrashed, isTrue);
       expect(notes.all().single.isUnsorted, isFalse);
       expect(find.byType(Checkbox), findsNothing);

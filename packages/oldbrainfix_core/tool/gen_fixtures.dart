@@ -19,7 +19,9 @@
 /// Agenda (`checklists.json`); the
 /// Shopping List scenario its Lines at moments around the days they come
 /// back (`shopping.json`); the History scenario each Routine's history at
-/// held moments with this Device's settings (`history.json`).
+/// held moments with this Device's settings (`history.json`); the Not
+/// today scenario what is skipped and moved, the Agenda, the alarms, the
+/// Missed Summary and the histories at held moments (`not_today.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -32,6 +34,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:image/image.dart' as img;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -476,6 +479,215 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'area-order',
+    about:
+        'The person\'s own order of the Areas (#280): by name with no order; '
+        'one moved to the front, and there again, which writes nothing; a '
+        'new Area going to the end, then two more, "～" and "😀", missing '
+        'from the order by name; one moved past the end; an order naming '
+        'only some, with an id that is no Area; a stored order with an id '
+        'that is no Area, a Topic, a number, null and a repeat; values no '
+        'app writes; an order dated back that loses; one moved on the '
+        'Areas by name; an Area deleted, its Note back to Unsorted; a '
+        'starter Area moved to the front and shared under a new id, keeping '
+        'its place. '
+        '`area_order.json` holds the Areas in order after each length of '
+        'the log.',
+    build: (store) {
+      final places = Places(store);
+      void read() => _areaOrderReads.add({
+        'entries': store.allEntries().length,
+        'areas': [for (final area in store.areasInOrder()) area.id],
+      });
+      void order(String value, {DateTime? date}) => store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.areaOrder,
+        value,
+        date: date,
+      );
+      final work = places.addArea('Work').id;
+      final home = places.addArea('Home').id;
+      final car = places.addArea('Car').id;
+      Notes(store).capture('Timesheet', place: work);
+      read();
+      store.moveArea(work, 0);
+      read();
+      store.moveArea(work, 0);
+      read();
+      places.addArea('Garden');
+      read();
+      final wave = places.addArea('～').id;
+      final smile = places.addArea('😀').id;
+      read();
+      store.moveArea(car, 99);
+      read();
+      store.setAreaOrder([smile, 'area:gone', home]);
+      read();
+      final topic = places.addTopic(home, 'Kitchen').id;
+      order(jsonEncode([wave, 'area:gone', topic, 7, null, wave, car]));
+      read();
+      for (final value in ['not json', '{"a":1}', '"$work"', '']) {
+        order(value);
+        read();
+      }
+      order(jsonEncode([car, work]), date: DateTime.utc(2025, 1, 1));
+      read();
+      store.moveArea(home, 1);
+      read();
+      places.deleteArea(work, NotesGo.unsorted);
+      read();
+      places.plantStarterSet({'household'});
+      final household = Places.starterId(PlaceKeys.typeArea, 'household');
+      store.moveArea(household, 0);
+      read();
+      store.share(household);
+      read();
+    },
+  ),
+  (
+    name: 'area-order-shown',
+    about:
+        'The person\'s own order of the Areas by the name the app shows '
+        '(#280), German names for the starter Areas here: the whole Starter '
+        'Set and "bike", "Bike", "İnbox", "Zoo", "ΣΑΣ", "σας", "～" and "😀" '
+        'with no order, by the name shown in lower case, "Bike" after '
+        '"bike" by id; the first Area shown moved to the front and an order '
+        'naming it, which write nothing; a starter Area moved to the second '
+        'place as shown; "Banana" and "apple" missing from the order by '
+        'name in lower case; a starter Area shared under a new id, keeping '
+        'its place, and "avocado" after it still among those missing by '
+        'name. `area_order.json` holds the Areas in order after each length '
+        'of the log, by stored name and by the name shown.',
+    build: (store) {
+      const german = {
+        'household': 'Haushalt',
+        'work': 'Arbeit',
+        'car': 'Auto',
+        'health': 'Gesundheit',
+      };
+      String de(Area area) => german[area.starter] ?? area.name;
+      final places = Places(store);
+      void read() => _areaOrderShownReads.add({
+        'entries': store.allEntries().length,
+        'stored': [for (final area in store.areasInOrder()) area.id],
+        'shown': [for (final area in store.areasInOrder(shown: de)) area.id],
+      });
+      String starter(String slug) => Places.starterId(PlaceKeys.typeArea, slug);
+      places.plantStarterSet(german.keys.toSet());
+      for (final name in ['bike', 'Bike', 'İnbox', 'Zoo', 'ΣΑΣ', 'σας']) {
+        places.addArea(name);
+      }
+      places.addArea('～');
+      places.addArea('😀');
+      Notes(store).capture('Oil change', place: starter('car'));
+      read();
+      store.moveArea(starter('work'), 0, shown: de);
+      store.setAreaOrder([starter('work')], shown: de);
+      read();
+      store.moveArea(starter('household'), 1, shown: de);
+      read();
+      places.addArea('Banana');
+      places.addArea('apple');
+      read();
+      store.share(starter('car'));
+      read();
+      places.addArea('avocado');
+      read();
+    },
+  ),
+  (
+    name: 'hidden-from-ai',
+    about:
+        'Hidden from AI (#267): a Note in a Topic of an Area and its Amend, '
+        'a Note of the Area itself, a Note filed nowhere with another '
+        'merged into it, and a Note of a second Area; the first Area '
+        'marked, then the Note filed nowhere, the same again, which writes '
+        'nothing; a value no app writes on the Note of the second Area; '
+        'the mark taken off the Note filed nowhere and set again; an Area '
+        'shared; refused: the first Area shared, the second shared once its '
+        'Note is marked, the marked Note and the Note of the first Area filed '
+        'into the Shared Area, the Note of the first Area sent, Packs of the '
+        'second Area and of the marked Note; the Note of the first Area filed out of it, and the '
+        'mark taken off the first Area. `hidden_from_ai.json` holds after '
+        'each length of the log the marks, the marks hiding each entity and '
+        'where the mark may be set, and each refusal with the marks named.',
+    build: (store) {
+      final places = Places(store);
+      final notes = Notes(store);
+      final health = places.addArea('Health').id;
+      final back = places.addTopic(health, 'Back').id;
+      final home = places.addArea('Home').id;
+      final physio = notes.capture('Physio #health/back', place: back).id;
+      final exercises = notes.amend(physio, 'Exercises').id;
+      final doctor = notes.capture('Doctor', place: health).id;
+      final diary = notes.capture('Diary').id;
+      final later = notes.capture('Diary, later').id;
+      notes.merge(later, diary);
+      final recipe = notes.capture('Recipe', place: home).id;
+      final watched = [
+        health,
+        back,
+        home,
+        physio,
+        exercises,
+        doctor,
+        diary,
+        later,
+        recipe,
+      ];
+      final offered = [health, back, home, physio, diary, 'note:gone'];
+      void read() => _hiddenFromAiReads.add({
+        'entries': store.allEntries().length,
+        'marks': store.hiddenFromAiMarks().toList()..sort(),
+        'hidden': {for (final id in watched) id: store.hiddenFromAiBy(id)},
+        'mayHide': {for (final id in offered) id: store.mayHideFromAi(id)},
+      });
+      void refused(String action, List<String> ids, void Function() act) {
+        try {
+          act();
+        } on HiddenFromAiRefused catch (e) {
+          _hiddenFromAiRefusals.add({
+            'entries': store.allEntries().length,
+            'action': action,
+            'ids': ids,
+            'marks': e.marks,
+          });
+          return;
+        }
+        throw StateError('$action was not refused');
+      }
+
+      read();
+      store.setHiddenFromAi(health, true);
+      read();
+      store.setHiddenFromAi(diary, true);
+      read();
+      store.setHiddenFromAi(diary, true);
+      read();
+      store.append(HiddenFromAiKeys.of(recipe), HiddenFromAiKeys.hidden, 'yes');
+      read();
+      store.setHiddenFromAi(diary, false);
+      read();
+      store.setHiddenFromAi(diary, true);
+      read();
+      final family = store.share(places.addArea('Family').id);
+      read();
+      refused('share', [health], () => store.share(health));
+      store.setHiddenFromAi(recipe, true);
+      read();
+      refused('share', [home], () => store.share(home));
+      refused('file', [diary, family], () => notes.file(diary, family));
+      refused('file', [doctor, family], () => notes.file(doctor, family));
+      refused('send', [doctor], () => sentItemOf(store, doctor));
+      refused('pack', [home], () => store.packOf(home));
+      refused('pack', [diary], () => store.packOf(diary));
+      notes.file(doctor, home);
+      read();
+      store.setHiddenFromAi(health, false);
+      read();
+    },
+  ),
+  (
     name: 'help',
     about:
         'The help Notes (#180, ADR 0042): a fresh install makes Quick start, '
@@ -520,7 +732,9 @@ final _scenarios = <Scenario>[
         'deleted with their Notes sent back to Unsorted (one that spawned a '
         'Routine included), into the Area and into the trash, and an empty '
         'one; Areas deleted with their Topics, their Notes sent into the '
-        'trash and back to Unsorted.',
+        'trash and back to Unsorted; a Note with an Amend merged into '
+        'another and its Merge undone; a Note filed from Unsorted and sent '
+        'back to Unsorted (#268).',
     build: (store) {
       final notes = Notes(store);
       final places = Places(store);
@@ -576,6 +790,105 @@ final _scenarios = <Scenario>[
       places.deleteTopic(empty.id, NotesGo.unsorted);
       places.deleteArea(errands.id, NotesGo.trash);
       places.deleteArea(garage.id, NotesGo.unsorted);
+      final keys = notes.capture(
+        'Spare keys at the neighbours',
+        place: home.id,
+      );
+      notes.amend(keys.id, 'Back by Friday');
+      final holiday = notes.capture('Neighbours on holiday');
+      notes.merge(keys.id, holiday.id);
+      notes.undoMerge(keys.id);
+      final glasses = notes.capture('Reading glasses at the office');
+      notes.file(glasses.id, home.id);
+      notes.unfile(glasses.id);
+    },
+  ),
+  (
+    name: 'not-today',
+    about:
+        'Occurrences answered without being Done (#269): a daily Routine '
+        'Done, skipped ahead, skipped as tapped on a notification and '
+        'Missed; a weekly one moved to tomorrow and on again; a Reminder '
+        'moved to tomorrow; an all-day Routine moved onto a day that has '
+        'its own, and one skipped and unskipped; a Skip on one Occurrence '
+        'turned into a Tomorrow; a Routine every other day skipped, moved to '
+        'tomorrow and Done after all, then rescheduled to another time, '
+        'which drops what Tomorrow added; and skips under keys and with '
+        'values no '
+        'app writes, a later word after the moment, and a Tomorrow on what '
+        'is no Occurrence.',
+    build: (store) {
+      final routines = Routines(store);
+      void jump(Duration by) => _tick = _tick.add(by);
+      Occurrence on(int day, [ClockTime? time]) =>
+          Occurrence(Day(2026, 1, day), time);
+      Schedule daily(List<ClockTime> times, [String rule = 'FREQ=DAILY']) =>
+          Schedule(
+            start: Day(2026, 1, 1),
+            times: times,
+            rule: Recurrence.parse(rule),
+          );
+      final stretch = routines.create('Stretch', daily([_at(7)]));
+      final bins = routines.create(
+        'Take out the bins',
+        Schedule(
+          start: Day(2026, 1, 2),
+          times: [_at(8)],
+          rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=FR'),
+        ),
+      );
+      final call = routines.create(
+        'Call the bank',
+        Schedule(start: Day(2026, 1, 3), times: [_at(10)]),
+      );
+      final walk = routines.create('Walk', daily([]));
+      final plants = routines.create(
+        'Water the plants',
+        daily([_at(18)], 'FREQ=DAILY;INTERVAL=2'),
+      );
+      routines.markDone(stretch.id, on(2, _at(7)));
+      routines.skip(stretch.id, on(3, _at(7)));
+      routines.tomorrow(walk.id, on(2));
+      routines.skip(walk.id, on(5));
+      routines.unskip(walk.id, on(5));
+      // 09:00 on the 2nd: the bins wait a day, and then another.
+      jump(const Duration(hours: 22));
+      routines.tomorrow(bins.id, on(2, _at(8)));
+      routines.skip(call.id, on(3, _at(10)));
+      jump(const Duration(days: 1));
+      routines.tomorrow(bins.id, on(3, _at(8)));
+      routines.tomorrow(call.id, on(3, _at(10)));
+      Alarms(store).applySkip(
+        stretch.id,
+        on(6, _at(7)).key,
+        DateTime.utc(2026, 1, 3, 9, 30),
+      );
+      routines.skip(plants.id, on(1, _at(18)));
+      routines.tomorrow(plants.id, on(3, _at(18)));
+      routines.markDone(plants.id, on(3, _at(18)));
+      routines.reschedule(plants.id, daily([_at(19)], 'FREQ=DAILY;INTERVAL=2'));
+      // As no app writes them.
+      store.append(
+        stretch.id,
+        '${RoutineKeys.skipPrefix}Rude',
+        '2026-01-03T09:00:00.000Z tomorrow',
+      );
+      store.append(stretch.id, RoutineKeys.skip(on(7, _at(7))), 'Rude');
+      store.append(
+        stretch.id,
+        RoutineKeys.skip(on(8, _at(7))),
+        '2026-02-30T09:00:00.000Z tomorrow',
+      );
+      store.append(
+        stretch.id,
+        RoutineKeys.skip(on(9, _at(7))),
+        '2026-01-03T09:00:00.000123Z later',
+      );
+      store.append(
+        bins.id,
+        '${RoutineKeys.skipPrefix}2026-01-06T03:00',
+        '2026-01-03T09:00:00.000Z tomorrow',
+      );
     },
   ),
   (
@@ -1255,7 +1568,12 @@ final _scenarios = <Scenario>[
         'with a choice no app writes; reappear times (#195) of days, weeks, '
         'a month from the 31st of January to the last of February and a '
         'year, none, which stays struck, and none given a day after its '
-        'check; an Unsorted Note beside them.',
+        'check; an Unsorted Note beside them; then a Line checked Once that '
+        'day, struck for the day on the Agenda, a gone one brought back by '
+        'its box and one checked again last (#276); last, open Lines moved '
+        'by hand before another, past the keys of two struck ones that come '
+        'back a week on, and after the open ones, a move before itself and '
+        'one to where it is writing nothing (#283).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1394,6 +1712,44 @@ final _scenarios = <Scenario>[
         '2026-01-09T09:00:00.000Z',
       );
       notes.capture('Unsorted thought');
+      // Struck for the day (#276): a Line checked Once, gone, and Eggs,
+      // gone since the 1st, brought back by its box.
+      final rope = lists.add(pantry, 'Rope', wall);
+      lists
+        ..setReappear(rope, Reappear.once)
+        ..check(rope, wall);
+      final eggs = lists
+          .byNote(week, wall)!
+          .gone
+          .firstWhere((l) => l.text == 'Eggs')
+          .id;
+      lists.uncheck(eggs, wall);
+      // Checked again last, it follows the others, though made first.
+      final yeast = line(pantry, 'Yeast');
+      lists
+        ..uncheck(yeast, wall)
+        ..check(yeast, wall);
+      // Moved by hand (#283): Soap before Eggs, so before the keys of the
+      // struck Lines between Milk and Eggs, Tea to the top and Milk after
+      // the open ones; before itself and where it is already, nothing.
+      final errands = notes
+          .capture('Errands\nMilk\nBread\nHam\nEggs\nTea\nSoap')
+          .id;
+      lists.make(errands);
+      for (final text in ['Bread', 'Ham']) {
+        lists
+          ..setReappear(
+            line(errands, text),
+            Reappear.after(1, ReappearUnit.week),
+          )
+          ..check(line(errands, text), wall);
+      }
+      lists
+        ..move(line(errands, 'Soap'), wall, before: line(errands, 'Eggs'))
+        ..move(line(errands, 'Tea'), wall, before: line(errands, 'Milk'))
+        ..move(line(errands, 'Milk'), wall)
+        ..move(line(errands, 'Eggs'), wall, before: line(errands, 'Eggs'))
+        ..move(line(errands, 'Milk'), wall);
     },
   ),
   (
@@ -1875,7 +2231,434 @@ final _scenarios = <Scenario>[
       routines.unmarkDone(bank.id, on(3, _at(10)));
     },
   ),
+  (
+    name: 'attachments',
+    about:
+        'Attached files (ADR 0047): a Note with a PDF of two pages and one '
+        'of forty, which only a computer reads, a Markdown file read as it '
+        'reads, a file without text and a Word document whose text a '
+        'Device found empty; a Note made from an OpenDocument text alone, '
+        'its text read; a Note with a workbook whose text was removed while '
+        'it stays, and a text file removed while its text stays; a Note '
+        'with a spreadsheet merged into another; a file attached later with '
+        'its media type said by its name; a trashed Note whose file waits '
+        'for nothing; and a file another Device attached with a name of '
+        'folders, marks that turn the text and a type of another shape. Its '
+        '`attachments.json`: the files waiting to be read on a phone and on '
+        'a computer, what each Note may remove, searches for file names and '
+        'Attachment Texts, the tree of the Pack of the Area, and that Pack '
+        'with every item ticked (`pack.obfpack`); the zipped files attached '
+        '(`inputs/`).',
+    build: (store) {
+      final notes = Notes(store);
+      final papers = Places(store).addArea('Papers').id;
+      final lease = notes.capture(
+        'Lease',
+        place: papers,
+        files: [
+          NewFile(
+            name: 'Lease.pdf',
+            mediaType: 'application/pdf',
+            bytes: _bytesOf('%PDF-1.4 the lease'),
+            pages: 2,
+          ),
+          NewFile(
+            name: 'Scan.pdf',
+            bytes: _bytesOf('%PDF-1.4 a scan'),
+            pages: 40,
+          ),
+          NewFile(
+            name: 'notes.md',
+            bytes: _bytesOf('# Notes\r\nKeys: 2  \r\n'),
+          ),
+          NewFile(name: 'plan.dwg', bytes: _bytesOf('AC1032 plan')),
+          NewFile(name: 'Empty.docx', bytes: _attachmentInputs['Empty.docx']!),
+        ],
+      );
+      final [pdf, _, md, _, docx] = [for (final a in lease.attachments) a.hash];
+      notes.setAttachmentText(
+        lease.id,
+        pdf,
+        '  Rent due \r\n\r\n\r\n on the first ',
+      );
+      final mdBytes = store.file(md)!;
+      if (FileTexts.read(FileKind.text, mdBytes) case TextRead(:final text)) {
+        notes.setAttachmentText(lease.id, md, text);
+      }
+      notes.setAttachmentText(lease.id, docx, '');
+      final letter = notes.capture(
+        '',
+        files: [
+          NewFile(
+            name: 'Brief.odt',
+            mediaType: 'application/vnd.oasis.opendocument.text',
+            bytes: _attachmentInputs['Brief.odt']!,
+          ),
+        ],
+      );
+      final odt = letter.attachments.single;
+      if (FileTexts.read(odt.kind, store.file(odt.hash)!) case TextRead(
+        :final text,
+      )) {
+        notes.setAttachmentText(letter.id, odt.hash, text);
+      }
+      final bills = notes.capture(
+        'Bills',
+        place: papers,
+        files: [
+          NewFile(name: 'Costs.xlsx', bytes: _attachmentInputs['Costs.xlsx']!),
+          NewFile(name: 'power.txt', bytes: _bytesOf('Power bill March')),
+        ],
+      );
+      final [xlsx, txt] = [for (final a in bills.attachments) a.hash];
+      notes.setAttachmentText(bills.id, xlsx, 'Costs\nRent\t950.5');
+      notes.setAttachmentText(bills.id, txt, 'Power bill March');
+      notes.removeAttachmentText(bills.id, xlsx);
+      notes.removeAttachment(bills.id, txt);
+      final target = notes.capture('Moving');
+      final plan = notes.capture(
+        '',
+        files: [
+          NewFile(name: 'Plan.ods', bytes: _attachmentInputs['Plan.ods']!),
+        ],
+      );
+      notes.merge(plan.id, target.id);
+      notes.attachFile(
+        target.id,
+        NewFile(
+          name: 'boxes.csv',
+          mediaType: 'application/octet-stream',
+          bytes: _bytesOf('box;room'),
+        ),
+      );
+      final gone = notes.capture(
+        'Old',
+        files: [NewFile(name: 'old.txt', bytes: _bytesOf('old'))],
+      );
+      notes.trash(gone.id);
+      // As another Device's app would write it, which this one reads as
+      // data: a name of folders and marks that turn the text, a size
+      // that is no whole number, a type of another shape and pages below
+      // zero.
+      store.append(
+        lease.id,
+        NoteKeys.file('c' * 64),
+        r'{"name":"C:\\x\\inv\u202Efdp.exe","pages":-1,"size":3.0,'
+        r'"type":"Application/X-Thing; a=b"}',
+      );
+    },
+  ),
 ];
+
+/// [text] as bytes.
+Uint8List _bytesOf(String text) => Uint8List.fromList(utf8.encode(text));
+
+/// The zipped files the `attachments` scenario attaches, by name: the
+/// desktop core attaches the same bytes, written out under `inputs/`.
+final _attachmentInputs = {
+  'Empty.docx': _zipOf({'word/document.xml': '<w:p/>'}),
+  'Brief.odt': _zipOf({
+    'mimetype': 'application/vnd.oasis.opendocument.text',
+    'content.xml':
+        '<office:body><office:text><text:p>Grüße aus Bern'
+        '<text:s text:c="2"/>😀 ﬁ</text:p></office:text></office:body>',
+  }),
+  'Costs.xlsx': _zipOf(_workbook),
+  'Plan.ods': _zipOf({'content.xml': '<a/>'}),
+};
+
+/// The texts of attached files, the kinds of names and the values of
+/// attached files as both cores read them (ADR 0047).
+Map<String, Object?> _fileTexts() {
+  Uint8List stored(Map<String, String> parts) {
+    final archive = Archive();
+    for (final MapEntry(:key, :value) in parts.entries) {
+      archive.add(
+        ArchiveFile.bytes(key, utf8.encode(value))
+          ..compression = CompressionType.none,
+      );
+    }
+    return ZipEncoder().encodeBytes(archive, modified: DateTime.utc(2026));
+  }
+
+  Uint8List bytes(List<int> list) => Uint8List.fromList(list);
+  final latin1Part = Archive()
+    ..add(
+      ArchiveFile.bytes('word/document.xml', [
+        ...utf8.encode('<w:p><w:t>Gr'),
+        0xfc,
+        ...utf8.encode('</w:t></w:p>'),
+      ])..compression = CompressionType.deflate,
+    );
+  final files = <(String, String, Uint8List)>[
+    (
+      'Letter.docx',
+      '',
+      _zipOf({
+        'word/document.xml':
+            '<?xml version="1.0"?><w:document xmlns:w="x"><w:body>'
+            '<w:p><w:r><w:t>Dear Ms Weber,</w:t></w:r></w:p>'
+            '<w:p><w:r><w:t xml:space="preserve">Total: </w:t><w:tab/>'
+            '<w:t>12 &amp; 50 &#8364; &#x1F600; &#0; &nbsp;</w:t></w:r>'
+            '<w:del><w:r><w:delText>gone</w:delText></w:r></w:del>'
+            '<w:r><w:br/><w:t>next</w:t><w:cr/><w:t/></w:r></w:p>'
+            '<w:p/><!-- a <w:t>comment</w:t> --><w:p><w:r>'
+            '<w:instrText>PAGE</w:instrText>'
+            "<w:t a='>'><![CDATA[a<b]]></w:t></w:r></w:p>"
+            '</w:body></w:document>',
+        'word/header1.xml': '<w:p><w:t>Not read</w:t></w:p>',
+      }),
+    ),
+    (
+      'stored.docx',
+      '',
+      stored({
+        'word/document.xml': '<w:p><w:t>Stored, not deflated</w:t></w:p>',
+      }),
+    ),
+    (
+      'latin.docx',
+      '',
+      ZipEncoder().encodeBytes(latin1Part, modified: DateTime.utc(2026)),
+    ),
+    ('Broken.docx', '', _bytesOf('PK\u0003\u0004 broken')),
+    ('no-part.docx', '', _zipOf({'other.xml': '<w:t>x</w:t>'})),
+    ('Costs.xlsx', '', _zipOf(_workbook)),
+    (
+      'Brief',
+      'application/vnd.oasis.opendocument.text',
+      _zipOf({
+        'content.xml':
+            '<office:document-content><office:automatic-styles><style:style/>'
+            '</office:automatic-styles><office:body><office:text>'
+            '<text:tracked-changes><text:changed-region><text:deletion>'
+            '<text:p>old</text:p></text:deletion></text:changed-region>'
+            '</text:tracked-changes>'
+            '<text:h text:outline-level="1">Lease</text:h>'
+            '<text:p>A<text:s text:c="3"/>B<text:tab/>C<text:line-break/>D '
+            '<text:span>E</text:span><text:s text:c="0x2"/>F'
+            '<text:s text:c="500"/>|</text:p>'
+            '<text:p/><text:p>Grüße 😀<text:s/>ﬁ</text:p></office:text>'
+            '</office:body></office:document-content>',
+      }),
+    ),
+    (
+      'Plan.ods',
+      '',
+      _zipOf({
+        'content.xml':
+            '<office:body><office:spreadsheet><table:table table:name="Plan">'
+            '<table:table-row><table:table-cell><text:p>Mon</text:p>'
+            '</table:table-cell><table:table-cell '
+            'table:number-columns-repeated="2"><text:p>x\ty</text:p>'
+            '</table:table-cell><table:table-cell '
+            'table:number-columns-repeated="1000"/></table:table-row>'
+            '<table:table-row table:number-rows-repeated="1048000">'
+            '<table:table-cell table:number-columns-repeated="1024"/>'
+            '</table:table-row><table:table-row '
+            'table:number-rows-repeated="2"><table:table-cell/>'
+            '<table:table-cell><text:p>a</text:p><text:p>b<text:s '
+            'text:c="2"/>c</text:p></table:table-cell>'
+            '<table:covered-table-cell/></table:table-row>'
+            '</table:table><table:table table:name="None"/>'
+            '<table:table table:name="Two"><table:table-row '
+            'table:number-rows-repeated="0"><table:table-cell>'
+            '<text:p>z</text:p></table:table-cell></table:table-row>'
+            '</table:table></office:spreadsheet></office:body>',
+      }),
+    ),
+    (
+      'notes.md',
+      '',
+      bytes([
+        0xef, 0xbb, 0xbf, ...utf8.encode('# Title\r\n\r\n\r\n\r\nline  \r'), //
+        0x07, ...utf8.encode('end\n'),
+      ]),
+    ),
+    (
+      'old.TXT',
+      '',
+      bytes([...utf8.encode('Gr'), 0xfc, 0xdf, 0x65, 0x20, 0x80]),
+    ),
+    ('zero.txt', '', bytes([0x61, 0, 0x62])),
+    ('list', 'text/csv', _bytesOf('a;b\n\n\n\nc;d\t\t ')),
+    ('Scan.pdf', '', _bytesOf('%PDF-1.4 scan')),
+    ('archive.zip', 'application/zip', _zipOf({'a.txt': 'a'})),
+  ];
+  const values = [
+    '{"name":"Lease.pdf","pages":2,"size":14,"type":"application/pdf"}',
+    '{"computer":true,"name":"Scan.pdf","pages":40,"size":9,"type":"application/pdf"}',
+    r'{"name":"../../.bashrc","size":5,"type":"Text/Plain; charset=utf-8"}',
+    r'{"computer":"yes","name":"inv\u202Efdp.exe\u0007","pages":1.0,"size":-3,"type":"<script>"}',
+    '{"name":"..","pages":9007199254740993,"size":9007199254740992}',
+    '{"name":" ","size":18446744073709551615}',
+    '{"name":"a","size":1e3,"type":"a/b/c"}',
+    '{"computer":false,"name":"x","type":"text/"}',
+    '{"name":"z","pages":-0.0,"size":-0.0}',
+    '{"name":"y","name":"twice","pages":3,"pages":"4"}',
+    '',
+    'null',
+    '[1]',
+    '"name"',
+    '{"name":3}',
+    '{',
+    'added',
+  ];
+  const names = [
+    'Brief.pdf',
+    r'C:\Users\ann\ Brief.pdf ',
+    '/home/ann/.hidden',
+    '.',
+    '..',
+    'a\u200Fb\u2066c\u200Ed\u0085e',
+    ' \u00a0Grüße.odt\u00a0',
+    '',
+  ];
+  const types = [
+    'application/pdf',
+    'Application/PDF; q=1',
+    'application/vnd.oasis.opendocument.text',
+    'text',
+    'text/',
+    '/plain',
+    'tëxt/plain',
+    'a b/c',
+    'x/y+z.1-2_3',
+    '',
+  ];
+  const kinds = [
+    ('Brief.PDF', ''),
+    ('a.docx', 'application/zip'),
+    ('a.XLSX', ''),
+    ('a.odt', ''),
+    ('a.Ods', ''),
+    ('notes.markdown', ''),
+    ('a.text', ''),
+    ('t.tsv', ''),
+    ('scan', 'application/pdf'),
+    ('plan.dwg', 'application/pdf'),
+    ('plan.dwg', ''),
+    ('README', 'text/markdown'),
+    ('noending.', 'text/plain'),
+    ('a.pdf.zip', ''),
+  ];
+  return {
+    'files': [
+      for (final (name, type, data) in files)
+        {
+          'name': name,
+          'type': type,
+          'bytes': base64.encode(data),
+          'kind': FileTexts.kindOf(name, type).name,
+          'read': switch (FileTexts.read(FileTexts.kindOf(name, type), data)) {
+            TextRead(:final text) => {'text': text},
+            PdfToRead() => 'pdf',
+            NoTextRead() => 'nothing',
+          },
+        },
+    ],
+    'kinds': [
+      for (final (name, type) in kinds)
+        {
+          'name': name,
+          'type': type,
+          'kind': FileTexts.kindOf(name, type).name,
+          'mediaType': FileTexts.mediaTypeOf(name),
+        },
+    ],
+    'values': [
+      for (final value in values)
+        {'value': value, 'read': _attachment(Attachment.read('a' * 64, value))},
+    ],
+    'names': [
+      for (final name in names) {'name': name, 'kept': cleanName(name)},
+    ],
+    'types': [
+      for (final type in types) {'type': type, 'kept': cleanType(type)},
+    ],
+    'computer': [
+      for (final (kind, size, pages) in [
+        (FileKind.pdf, 1 << 30, 10),
+        (FileKind.pdf, 100, 11),
+        (FileKind.pdf, 100, null),
+        (FileKind.docx, FileTexts.phoneBytes, null),
+        (FileKind.ods, FileTexts.phoneBytes + 1, 1),
+        (FileKind.text, FileTexts.phoneBytes + 1, null),
+        (FileKind.other, 1 << 30, null),
+      ])
+        {
+          'kind': kind.name,
+          'size': size,
+          'pages': pages,
+          'reads': FileTexts.computerReads(kind, size, pages),
+        },
+    ],
+    'tidy': [
+      for (final text in [
+        '  a \t\n\n\n\n b\u0085\u001bc \n',
+        '\r\n\r\nTitle\r\rbody\u000b\u007f\u009f\u00a0 ',
+        '\t\tindented\n\n\n',
+        '',
+        ' \n \n\t',
+        'Grüße 😀\u2028next',
+      ])
+        {'text': text, 'kept': FileTexts.tidy(text)},
+    ],
+    'pages': [
+      for (final pages in [
+        ['Page 1 ', ' \n', '\nPage 3'],
+        <String>[],
+        ['', ' '],
+        ['a\n\n\n\nb', 'c'],
+      ])
+        {'pages': pages, 'joined': FileTexts.joinPages(pages)},
+    ],
+  };
+}
+
+/// A zip of [parts], each deflated as office programs write them, dated
+/// alike every time.
+Uint8List _zipOf(Map<String, String> parts) {
+  final archive = Archive();
+  for (final MapEntry(:key, :value) in parts.entries) {
+    archive.add(
+      ArchiveFile.bytes(key, utf8.encode(value))
+        ..compression = CompressionType.deflate,
+    );
+  }
+  return ZipEncoder().encodeBytes(archive, modified: DateTime.utc(2026));
+}
+
+/// The parts of a workbook of two sheets in another order than their
+/// files, with shared strings, a phonetic guide, a truth value and an
+/// inline string.
+const _workbook = {
+  'xl/workbook.xml':
+      '<workbook xmlns:r="r"><sheets>'
+      '<sheet name="Costs" sheetId="2" r:id="rId2"/>'
+      '<sheet name="Empty" r:id="rId3"/>'
+      '<sheet name="Notes" sheetId="1" r:id="rId1"/></sheets></workbook>',
+  'xl/_rels/workbook.xml.rels':
+      '<Relationships>'
+      '<Relationship Id="rId1" Target="worksheets/sheet1.xml"/>'
+      '<Relationship Id="rId2" Target="/xl/worksheets/sheet2.xml"/>'
+      '<Relationship Id="rId3" Target="./worksheets/sheet3.xml"/>'
+      '</Relationships>',
+  'xl/sharedStrings.xml':
+      '<sst><si><t>Rent</t></si><si><r><t>Pow</t></r><r><t>er</t></r>'
+      '<rPh><t>ignored</t></rPh></si><si/></sst>',
+  'xl/worksheets/sheet1.xml':
+      '<worksheet><sheetData><row><c t="str"><v>x</v></c></row>'
+      '</sheetData></worksheet>',
+  'xl/worksheets/sheet2.xml':
+      '<worksheet><sheetData>'
+      '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1"><v>950.5</v></c>'
+      '</row><row r="2"><c t="s"><v> 1 </v></c><c/><c t="b"><v>1</v></c>'
+      '<c/></row><row r="3"><c t="inlineStr"><is><t>a\nb</t></is></c>'
+      '<c t="s"><v>0x1</v></c><c t="s"><v>+1</v></c></row><row r="4"/>'
+      '</sheetData></worksheet>',
+  'xl/worksheets/sheet3.xml': '<worksheet><sheetData/></worksheet>',
+};
 
 /// Grant values as a Device of a later version may write them, for the
 /// `markers` scenario's `markers.json`.
@@ -2428,6 +3211,11 @@ Map<String, Object?> _checklists(Store store) {
     ],
     'onAgenda': {for (final id in ids) id: lists.onAgenda(id).code},
     'mayShowOnAgenda': {for (final id in ids) id: lists.mayShowOnAgenda(id)},
+    // On the day of the last write and the day after (#276).
+    'checkedToday': [
+      for (final moment in [_tick, _tick.add(const Duration(days: 1))])
+        _checklistsCheckedToday(store, moment),
+    ],
     'plain': {
       for (final id in ids)
         if (lists.byNote(id) case final list?)
@@ -2494,6 +3282,33 @@ Map<String, Object?> _checklists(Store store) {
   };
 }
 
+/// The Checklists' Agenda rows of [store] with the Lines checked today, at
+/// [moment] on the European wall clock: each list, how it shows and the
+/// ids of its Lines checked that day (#276). Leaves the clock held as it
+/// was.
+Map<String, Object?> _checklistsCheckedToday(Store store, DateTime moment) {
+  final held = _held;
+  _held = moment;
+  final wall = _frogDay(0);
+  final today = Day.today(moment, wall);
+  final rows = [
+    for (final (:list, :shows) in Checklists(
+      store,
+    ).agendaRows(checkedToday: wall))
+      {
+        'note': list.noteId,
+        'open': list.openCount,
+        'shows': shows.code,
+        'checkedToday': [
+          for (final l in list.lines)
+            if (l.checkedOn(today, wall)) l.id,
+        ],
+      },
+  ];
+  _held = held;
+  return {'now': moment.toIso8601String(), 'rows': rows};
+}
+
 /// Today's Shopping List rows of [store] on UTC: each list, how it shows
 /// and its open Lines.
 List<Map<String, Object?>> _shoppingRows(Store store) => [
@@ -2553,6 +3368,7 @@ final _shoppingMoments = [
   DateTime.utc(2026, 1, 14, 23),
   DateTime.utc(2026, 1, 21, 23),
   DateTime.utc(2026, 1, 28, 23),
+  DateTime.utc(2026, 1, 31, 22, 59, 59),
   DateTime.utc(2026, 1, 31, 23),
   DateTime.utc(2026, 2, 2, 23),
   DateTime.utc(2026, 2, 27, 23),
@@ -2605,6 +3421,18 @@ Map<String, Object?> _shoppingLists(Store store) {
                   },
               ],
           },
+          // The Lines checked today after the open ones (#276).
+          'checkedToday': [
+            for (final (:list, :shows, :lines) in lists.agendaRows(
+              _frogDay(0),
+              checkedToday: true,
+            ))
+              {
+                'note': list.noteId,
+                'shows': shows.code,
+                'lines': [for (final l in lines) l.id],
+              },
+          ],
         };
       }(),
   ];
@@ -3015,6 +3843,43 @@ Map<String, Object?> _note(Note note) => {
   'removedTranscripts': note.removedTranscripts,
   'removedPhotoTexts': note.removedPhotoTexts,
   'wordless': note.wordless.name,
+  ..._files(
+    note.attachments,
+    note.attachmentTexts,
+    note.removedAttachments,
+    note.removedAttachmentTexts,
+  ),
+  if (note.attachments.isNotEmpty) 'aloneFile': note.aloneFile?.hash,
+  if (note.wordless == Wordless.file) 'wordlessName': note.wordlessName,
+};
+
+/// The attached files of a Note or Section, only when it has any, so a
+/// log without them reads as before (ADR 0047).
+Map<String, Object?> _files(
+  List<Attachment> files,
+  Map<String, String> texts,
+  List<Attachment> removed,
+  List<String> removedTexts,
+) => {
+  if (files.isNotEmpty ||
+      texts.isNotEmpty ||
+      removed.isNotEmpty ||
+      removedTexts.isNotEmpty) ...{
+    'attachments': [for (final a in files) _attachment(a)],
+    'attachmentTexts': texts,
+    'removedAttachments': [for (final a in removed) _attachment(a)],
+    'removedAttachmentTexts': removedTexts,
+  },
+};
+
+Map<String, Object?> _attachment(Attachment a) => {
+  'hash': a.hash,
+  'name': a.name,
+  'type': a.mediaType,
+  'size': a.size,
+  'pages': a.pages,
+  'computer': a.computer,
+  'kind': a.kind.name,
 };
 
 /// [context] beyond its capture time, which [_note] and [_section]
@@ -3063,6 +3928,12 @@ Map<String, Object?> _section(Section section) => {
   'removedRecordings': section.removedRecordings,
   'removedTranscripts': section.removedTranscripts,
   'removedPhotoTexts': section.removedPhotoTexts,
+  ..._files(
+    section.attachments,
+    section.attachmentTexts,
+    section.removedAttachments,
+    section.removedAttachmentTexts,
+  ),
   'modified': section.modified?.toUtc().toIso8601String(),
   'editedBy': switch (section.editedBy) {
     final by? => {'id': by.id, 'name': by.name},
@@ -3083,6 +3954,10 @@ List<String> _removable(Notes notes, Note note) => [
     if (notes.mayRemovePhotoText(note.id, hash)) 'ocr/$hash',
   for (final hash in note.recordings)
     if (notes.mayRemoveTranscript(note.id, hash)) 'transcript/$hash',
+  for (final a in note.attachments)
+    if (notes.mayRemoveAttachment(note.id, a.hash)) 'file/${a.hash}',
+  for (final a in note.attachments)
+    if (notes.mayRemoveAttachmentText(note.id, a.hash)) 'fileText/${a.hash}',
 ];
 
 List<Map<String, String>> _blobs(List<({String noteId, String hash})> list) => [
@@ -3168,6 +4043,49 @@ Map<String, Object?> _expected(Store store) {
   };
 }
 
+/// What the `attachments` scenario reads beyond [_expected]: the files
+/// waiting to be read on a phone and on a computer, what each Note may
+/// remove, searches for file names and Attachment Texts, and the tree of
+/// [pack] with its keys, kinds and sizes.
+Map<String, Object?> _attachmentsOf(Store store, Pack pack) {
+  final notes = Notes(store);
+  return {
+    'unreadPhone': _blobs(notes.unreadAttachments(computer: false)),
+    'unreadComputer': _blobs(notes.unreadAttachments(computer: true)),
+    'search': {
+      for (final query in const [
+        'rent due',
+        'LEASE.PDF',
+        'grüße',
+        'keys: 2',
+        'boxes.csv',
+        'plan.ods',
+        'power bill',
+        'costs',
+        'invfdp',
+        'old.txt',
+      ])
+        query: [for (final n in Search(store).notes(query)) n.id],
+    },
+    'missing': store.missingBlobs(),
+    'tree': _packItems(pack.tree()),
+    'all': pack.allKeys().toList()..sort(),
+    'start': pack.exportTicks().toList()..sort(),
+    'size': pack.size(pack.allKeys()),
+  };
+}
+
+/// [items] of a Pack's tree with their keys, kinds and sizes.
+List<Map<String, Object?>> _packItems(List<PackItem> items) => [
+  for (final i in items)
+    {
+      'key': i.key,
+      'kind': i.kind.name,
+      'size': i.size,
+      'children': _packItems(i.children),
+    },
+];
+
 /// What a Note hands to another app (#129), as the fixtures hold it.
 Map<String, Object?> _share(NoteShare share) => {
   'html': share.html,
@@ -3206,6 +4124,7 @@ void _writeBlobs(Store store, Directory out) {
     for (final (dir, hashes, bytes) in [
       ('photos', note.photos, store.photo),
       ('audio', note.recordings, store.audio),
+      ('files', [for (final a in note.attachments) a.hash], store.file),
     ]) {
       for (final hash in hashes) {
         final held = bytes(hash);
@@ -3235,6 +4154,147 @@ Map<String, Object?> _routine(Routine routine) => {
   'trashedWith': routine.trashedWith,
   'reminder': routine.isReminder,
 };
+
+/// What the Routines of the `not-today` scenario come to: each with what
+/// is skipped and moved, and at held moments the Agenda, the alarm plan,
+/// the Missed Summary, what each Note asks to check off, what the
+/// notifications may close and each Routine's history, on [_europe].
+/// Leaves the clock held as it was.
+Map<String, Object?> _notToday(Store store) {
+  final routines = Routines(store);
+  final ids = store.entitiesOfType(RoutineKeys.typeRoutine)..sort();
+  String? iso(DateTime? at) => at?.toUtc().toIso8601String();
+  Map<String, Object?> adherence(Adherence a) => {
+    'done': a.done,
+    'missed': a.missed,
+    'skipped': a.skipped,
+    'share': a.share,
+  };
+  List<Object?> rows(List<AgendaRow> rows) => [
+    for (final row in rows)
+      [
+        row.routine.id,
+        row.occurrence.key,
+        iso(row.done),
+        iso(row.skipped),
+        row.moved,
+      ],
+  ];
+  final held = _held;
+  final checks = [
+    // Saturday 08:30: the bins moved twice ring, Stretch is skipped.
+    DateTime.utc(2026, 1, 3, 7, 30),
+    // Monday noon: what Sunday Missed, never a skip.
+    DateTime.utc(2026, 1, 5, 11),
+    // A week on, the bins moved to Sunday Missed at last.
+    DateTime.utc(2026, 1, 10, 11),
+  ];
+  final result = {
+    'routines': [
+      for (final id in ids)
+        if (routines.byId(id) case final r?)
+          {
+            'id': r.id,
+            'skipped': {
+              for (final key in r.skipped.keys.toList()..sort())
+                key: iso(r.skipped[key]),
+            },
+            'tomorrow': r.tomorrow.toList()..sort(),
+            'moved': [for (final o in r.moved) o.key],
+            'between': [
+              for (final o in r.between(Day(2026, 1, 1), Day(2026, 1, 10)))
+                o.key,
+            ],
+            'firstFrom': r.firstFrom(Day(2026, 1, 4))?.key,
+          },
+    ],
+    'checks': [
+      for (final now in checks)
+        () {
+          _held = now;
+          final alarms = Alarms(store);
+          final agenda = routines.agenda(_europe);
+          final plan = alarms.plan(_europe);
+          final missed = alarms.missed(_europe);
+          return {
+            'now': now.toIso8601String(),
+            'agenda': {
+              'today': rows(agenda.todayRows),
+              'tomorrow': rows(agenda.tomorrowRows),
+            },
+            'alarms': [
+              for (final a in plan)
+                [a.id, iso(a.at), iso(a.endsAt), a.firesAfter(now) != null],
+            ],
+            'missed': {
+              'count': missed.count,
+              'nextChange': iso(missed.nextChange),
+              'routines': [
+                for (final m in missed.routines)
+                  [
+                    m.routine.id,
+                    for (final o in m.missed)
+                      [o.occurrence.key, iso(o.missedAt)],
+                  ],
+              ],
+            },
+            'openOf': {
+              for (final note in Notes(store).all())
+                note.id: [
+                  for (final o in alarms.openOf(note.id, _europe))
+                    [o.routine.id, o.occurrence.key, o.missed],
+                ],
+            },
+            'recentlyDone': [
+              for (final (id, o) in alarms.recentlyDone(_europe)) [id, o.key],
+            ],
+            'todayByNote': {
+              for (final MapEntry(:key, :value)
+                  in routines.todayByNote(_europe).entries)
+                key: rows(value),
+            },
+            'histories': [
+              for (final r in routines.all())
+                () {
+                  final h = routines.history(r, _europe);
+                  return {
+                    'routine': r.id,
+                    'currentStreak': h.currentStreak,
+                    'longestStreak': h.longestStreak,
+                    'lastSevenDays': [
+                      for (final d in h.lastSevenDays)
+                        [
+                          '${d.day}',
+                          d.done,
+                          d.missed,
+                          d.open,
+                          d.skipped,
+                          d.empty,
+                        ],
+                    ],
+                    'thisWeek': adherence(h.thisWeek),
+                    'thisMonth': adherence(h.thisMonth),
+                    'entries': [
+                      for (final e in h.entries)
+                        [
+                          e.occurrence.key,
+                          e.status.name,
+                          iso(e.missedAt),
+                          iso(e.doneAt),
+                          iso(e.skippedAt),
+                          e.moved,
+                        ],
+                    ],
+                  };
+                }(),
+            ],
+          };
+        }(),
+    ],
+  };
+  _held = held;
+  return result;
+}
 
 /// How many alarms of each plan the fixture spells out, the soonest
 /// first; the count covers them all.
@@ -3982,6 +5042,19 @@ var _imported = <ImportSummary>[];
 
 /// What the `features` scenario read after each of its steps.
 final _featureReads = <Map<String, Object>>[];
+
+/// What the `area-order` scenario read after each of its steps.
+final _areaOrderReads = <Map<String, Object>>[];
+
+/// What the `hidden-from-ai` scenario read after each of its steps.
+final _hiddenFromAiReads = <Map<String, Object>>[];
+
+/// What the `hidden-from-ai` scenario had refused, at which length of
+/// its log.
+final _hiddenFromAiRefusals = <Map<String, Object>>[];
+
+/// What the `area-order-shown` scenario read after each of its steps.
+final _areaOrderShownReads = <Map<String, Object>>[];
 
 /// The ids each step of the `help` scenario made.
 final _helpMade = <List<String>>[];
@@ -6370,6 +7443,195 @@ Map<String, Object?> _crypto() {
 }
 
 /// Pair codes the desktop must write and read the same.
+/// The phone's question through the desktop (#267): each body as the
+/// Dart core writes it, with what it holds, for the desktop core to write
+/// the same bytes and read the same back.
+Map<String, Object?> _ask() {
+  Map<String, Object?> reply(AskReply reply) => {
+    'body': jsonEncode(reply.toJson()),
+    if (reply.answer case final answer?)
+      'answer': {
+        'text': answer.text,
+        'notes': answer.notes,
+        'cut': answer.cut,
+        'unchecked': answer.unchecked,
+      }
+    else ...{
+      'failure': reply.failure?.name,
+      'message': reply.message,
+      'status': reply.status,
+      'unready': reply.unready?.name,
+    },
+    'review': reply.review,
+  };
+  const passport = 'note:0a1b2c3d4e5f60718293a4b5c6d7e8f9';
+  return {
+    'questions': [
+      for (final (question, earlier) in [
+        ('Where is my passport?', <AskExchange>[]),
+        (
+          'Und jetzt? „Pass“ im Ordner 📁',
+          [
+            const AskExchange(
+              'Do I have a passport?',
+              'Yes: [Passport](oldbrainfix://note/$passport).\n'
+                  'It says "valid until 2031".',
+            ),
+            const AskExchange('Where?', 'In the blue folder.'),
+          ],
+        ),
+      ])
+        {
+          'question': question,
+          'earlier': [
+            for (final e in earlier) [e.question, e.answer],
+          ],
+          'body': jsonEncode(askBody(question, earlier)),
+        },
+    ],
+    'providers': [
+      for (final provider in const [
+        DesktopProvider(
+          protocol: AskProtocol.anthropic,
+          model: 'claude-opus-5-5',
+          host: 'api.anthropic.com',
+        ),
+        DesktopProvider(
+          protocol: AskProtocol.openai,
+          model: 'qwen3:32b',
+          host: 'llm.example.org:8443',
+        ),
+        DesktopProvider(
+          protocol: AskProtocol.openai,
+          model: '',
+          host: 'localhost:11434',
+          unready: AskUnready.noModel,
+        ),
+        DesktopProvider(
+          protocol: AskProtocol.anthropic,
+          model: 'claude-opus-5-5',
+          host: 'api.anthropic.com',
+          unready: AskUnready.noKey,
+        ),
+      ])
+        {
+          'protocol': provider.protocol.name,
+          'model': provider.model,
+          'host': provider.host,
+          'unready': provider.unready?.name,
+          'body': jsonEncode(provider.toJson()),
+        },
+    ],
+    'replies': [
+      for (final r in const [
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'In the [blue folder](oldbrainfix://note/$passport).',
+            notes: [passport],
+          ),
+        ),
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'Filed into Health; it waits for your review. Ärzte: …',
+            notes: [passport, 'note:ffff'],
+            cut: true,
+          ),
+          review: true,
+        ),
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'In the [blue folder](oldbrainfix://note/$passport), a scan.',
+            notes: [passport],
+            unchecked: true,
+          ),
+        ),
+        AskReply.failed(AskFailure.unready, unready: AskUnready.noKey),
+        AskReply.failed(AskFailure.unready, unready: AskUnready.badUrl),
+        AskReply.failed(AskFailure.unready),
+        AskReply.failed(AskFailure.key, message: 'invalid x-api-key: …'),
+        AskReply.failed(
+          AskFailure.provider,
+          status: 529,
+          message: 'Overloaded "now"',
+          review: true,
+        ),
+        AskReply.failed(AskFailure.network, message: 'timed out'),
+        AskReply.failed(AskFailure.unreadable, message: 'no content'),
+        AskReply.failed(AskFailure.rounds),
+        AskReply.failed(AskFailure.refused),
+        AskReply.failed(AskFailure.stopped),
+        AskReply.failed(AskFailure.busy, review: true),
+        AskReply.failed(AskFailure.unknown),
+      ])
+        reply(r),
+    ],
+    // What a later desktop may say, as this build reads it.
+    'later': [
+      for (final body in [
+        {'failure': 'quota', 'message': 'later', 'review': true},
+        {'failure': 'unready', 'review': false, 'unready': 'noLicence'},
+        {'failure': 'provider', 'message': 'm', 'review': false, 'status': -1},
+        {
+          'answer': {
+            'cut': 'yes',
+            'notes': ['note:1', 2],
+            'text': 'T',
+          },
+          'review': 1,
+          'later': true,
+        },
+        {
+          'answer': {'notes': <String>[], 'text': 'T', 'unchecked': 'yes'},
+          'review': false,
+        },
+      ])
+        {...reply(AskReply.fromJson(body)!), 'body': jsonEncode(body)},
+    ],
+    'notReplies': [
+      for (final body in [
+        <String, Object?>{},
+        {'answer': 'text'},
+        {
+          'answer': <String, Object?>{'notes': <String>[]},
+        },
+        {'failure': 4},
+      ])
+        jsonEncode(body),
+    ],
+    'addresses': [
+      for (final typed in [
+        'Desk.Tail1234.ts.net',
+        ' 100.101.102.103:4711 ',
+        '[FD7A:115C::1]:80',
+        'fd7a::1',
+        'https://desk.local:4711/x?y',
+        'HTTP://192.168.1.5',
+        'desk.',
+        '',
+        'desk:0',
+        'desk:+80',
+        'desk:0x50',
+        'desk:65536',
+        'desk:080',
+        'a b',
+        'ftp://desk',
+        '[desk]:1',
+        '[fd7a::1]x',
+        'me@desk',
+        'desk:',
+        'des\u212A',
+        'dësk',
+      ])
+        {
+          'typed': typed,
+          'host': HandAddress.parse(typed)?.host,
+          'port': HandAddress.parse(typed)?.port,
+          'text': HandAddress.parse(typed)?.text,
+        },
+    ],
+  };
+}
+
 Map<String, Object?> _pairCodes() {
   final fp = [for (var i = 0; i < 32; i++) (i * 7 + 3) & 0xff];
   final codes = [
@@ -6925,6 +8187,218 @@ void _packFixture(Directory root) {
     _held = null;
     ada.close();
     ben.close();
+  }
+}
+
+/// Taking Notes back from a Backup (#285): Ada's Device with her Work
+/// before her Health, a Routine and a Reminder, a Checklist, a Tally a
+/// Session picks, a photo and a recording longer than a chunk with their
+/// texts, an open Frog, a Note in the trash and one filed nowhere, backed
+/// up with counted random bytes; a day later she has removed the photo
+/// and the recording, opens the Backup and adds some of its Notes back.
+/// Nothing of the Backup's identity is drawn: the fixtures after this one
+/// keep their ids.
+Future<void> _backupNotesFixture(Directory root) async {
+  final out = Directory('${root.path}/backup-notes')
+    ..createSync(recursive: true);
+  final keep = secretBytes;
+  secretBytes = _counted(700);
+  final ada = _store();
+  final work = Directory.systemTemp.createTempSync('oldbrainfix_notes_');
+  DateTime wall(DateTime utc) => utc;
+  try {
+    final places = Places(ada);
+    final notes = Notes(ada);
+    final health = places.addArea('Health');
+    final running = places.addTopic(health.id, 'Running');
+    final office = places.addArea('Work');
+    final water = notes.capture('Water', place: health.id);
+    Routines(ada).spawn(
+      water.id,
+      Schedule(
+        start: Day(2025, 12, 1),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    Routines(ada).spawn(
+      water.id,
+      Schedule(start: Day(2026, 2, 1), times: [ClockTime(9, 30)]),
+    );
+    final bag = notes.capture('Bag\nShoes\nBottle', place: running.id);
+    Checklists(ada).make(bag.id);
+    final laps = notes.capture('Laps', place: running.id);
+    Tallies(ada).addField(laps.id, name: 'Laps', target: 10);
+    final training = notes.capture('Training', place: running.id);
+    Sessions(ada).spawn(
+      training.id,
+      Schedule(
+        start: Day(2025, 12, 1),
+        times: [ClockTime(7, 0)],
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO'),
+      ),
+      pool: [laps.id],
+      count: 1,
+      rule: SessionRule.least,
+    );
+    final route = notes.capture(
+      'Route',
+      place: running.id,
+      photos: [_photo(51)],
+      recordings: [
+        Uint8List.fromList(List.generate(100000, (i) => (i * 11 + 5) & 0xff)),
+      ],
+    );
+    final media = notes.byId(route.id)!;
+    final photo = media.photos.single;
+    final recording = media.recordings.single;
+    notes.setPhotoText(route.id, photo, 'Park map');
+    notes.setTranscript(route.id, recording, 'Turn left');
+    final bike = notes.capture('Fix the bike', place: health.id);
+    Frogs(ada).spawn(bike.id);
+    final old = notes.capture('Old list', place: office.id);
+    notes.trash(old.id);
+    notes.capture('Call the vet');
+    ada
+      ..setAreaOrder([office.id, health.id])
+      ..applyProfileDefaults(name: 'Ada');
+    const passphrase = 'Notizen zurück, bitte';
+    final code = await setUpBackups(
+      ada,
+      passphrase,
+      kdf: const BackupKdf(memory: 64, iterations: 1),
+    );
+    final made = DateTime.utc(2026, 1, 10, 12);
+    _held = made;
+    secretBytes = _counted(7000);
+    final file = '${out.path}/backup.$backupExtension';
+    await writeBackup(ada, file);
+    final there = ada.packOfEverything();
+
+    // A day later the photo and the recording are gone here.
+    final opened = DateTime.utc(2026, 1, 11, 18);
+    _held = opened;
+    notes
+      ..removePhoto(route.id, photo)
+      ..removeRecording(route.id, recording);
+    _writeDevice(ada, out, 'device');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'device': _keySettings(ada)})}\n',
+    );
+
+    final header = readBackupHeader(file);
+    if (header == null) throw StateError('the notes fixture has no header');
+    final key = await unlockBackup(header, passphrase: passphrase);
+    final byCode = await unlockBackup(header, recoveryCode: code);
+    if (key == null || byCode == null || hex(key) != hex(byCode)) {
+      throw StateError('the notes fixture does not open');
+    }
+    final backup = await openBackupNotes(ada, file, key);
+    Object? item(PackItem i) => {
+      'key': i.key,
+      'kind': i.kind.name,
+      'note': i.note,
+      'index': i.index,
+      'size': i.size,
+      'children': [for (final c in i.children) item(c)],
+    };
+    final tree = [for (final i in backup.pack.tree()) item(i)];
+    if (jsonEncode(tree) !=
+            jsonEncode([for (final i in there.pack.tree()) item(i)]) ||
+        jsonEncode(backup.trashed.toList()) !=
+            jsonEncode(there.trashed.toList())) {
+      throw StateError('the notes fixture reads otherwise than its Device');
+    }
+    // Her Health a locked Area closed on this Device: none of it shows.
+    final shut = await openBackupNotes(ada, file, key, closed: {health.id});
+    final closed = {
+      'areas': [health.id],
+      'tree': [for (final i in shut.pack.tree()) item(i)],
+      'trashed': shut.trashed.toList()..sort(),
+      'leftOut': shut.leftOut.toList()..sort(),
+      'texts': [for (final n in shut.pack.notes) n.text],
+    };
+    List<String> sorted(Iterable<String> keys) => keys.toList()..sort();
+    final texts = [for (final n in backup.pack.notes) n.text];
+    final picked = [
+      for (final text in ['Training', 'Route', 'Old list', 'Call the vet'])
+        texts.indexOf(text),
+    ];
+    var ticks = backup.pack.backupTicks();
+    for (final i in picked) {
+      ticks = backup.pack.tick(ticks, PackItemKeys.note(i), true);
+    }
+    var ids = 0x1300;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    final mark = ada.currentSeq();
+    final added = await addBackupNotes(
+      ada,
+      backup,
+      ticks,
+      wallClock: wall,
+      suffix: 'Backup',
+      noArea: 'From a Backup',
+    );
+    _writeAfter(ada, mark, File('${out.path}/added.jsonl'));
+
+    // Refused as restoring refuses, each file made from the Backup.
+    final bytes = File(file).readAsBytesSync();
+    final line = utf8.decode(header.line);
+    final variants = {
+      'later': [
+        ...utf8.encode('{"format":2,${line.substring(1)}'),
+        ...bytes.sublist(header.line.length),
+      ],
+      'flipped': Uint8List.fromList(bytes)..[bytes.length - 1] ^= 1,
+      'cut': bytes.sublist(0, bytes.length - 3),
+      'none': utf8.encode('no Backup\n'),
+    };
+    Future<String> refusal(String path, Uint8List key) async {
+      try {
+        await openBackupNotes(ada, path, key);
+        return 'opened';
+      } on BackupException catch (e) {
+        return e.problem.name;
+      }
+    }
+
+    final refused = <String, String>{
+      'wrongKey': await refusal(file, Uint8List(32)),
+    };
+    for (final MapEntry(key: what, value: changed) in variants.entries) {
+      final path = '${work.path}/$what.$backupExtension';
+      File(path).writeAsBytesSync(changed);
+      refused[what] = await refusal(path, key);
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'passphrase': passphrase,
+        'recoveryCode': code,
+        'backupKey': hex(key),
+        'created': backup.created.toIso8601String(),
+        'opened': opened.toIso8601String(),
+        'tree': tree,
+        'trashed': backup.trashed.toList()..sort(),
+        'closed': closed,
+        'areas': [for (final a in backup.pack.areas) a.name],
+        'texts': texts,
+        'start': sorted(backup.pack.backupTicks()),
+        'picked': picked,
+        'ticks': sorted(ticks),
+        'size': backup.pack.size(ticks),
+        'added': {'areas': added.areas, 'notes': added.notes},
+        'areaNames': {for (final a in Places(ada).areas()) a.id: a.name},
+        'blobs': heldBlobs(ada),
+        'refused': refused,
+      })}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    _held = null;
+    work.deleteSync(recursive: true);
+    ada.close();
   }
 }
 
@@ -7728,6 +9202,11 @@ Map<String, Object?> _textTags() {
     '#Müll #Straße #ÄRGER #日記 #дача #𝔸x #İzmir #ΟΔΟΣ #ǅx',
     '#garten. #garten, (#garten) "#garten"! #garten🌱 „#h“ *#i* 🌱#j',
     '#a#b #c/d #e\'s',
+    // Nested tags (#267): a / inside, each part starting as a tag does.
+    '#life/health/back #Life/Work #a/ #a-/ #a/- #a/-b #a//b #a/b#c '
+        '(#a/b). #a-/b #İzmir/ΟΔΟΣ/𝔸x',
+    '#/a #1/2 #2024/05 #q1/2026 #2026/q1 x/#a https://example.org/#top/a '
+        'page.html#a/b #a/#b #a/b/',
     '#to-do #Garten- und Balkonpflanzen #a-- #-a #- #--',
     '#1 issue #126 #2024 #_ #1_2 #² #v2 #2024plan #3d #Ⅻ',
     '# Heading\n## Part\n#\n##double ###three # ',
@@ -7757,10 +9236,115 @@ Map<String, Object?> _textTags() {
   };
 }
 
+/// The tag tree (#267): the Areas made, the Notes captured, each with its
+/// format, the Area it is filed into by its index, its Amends, the one it
+/// is merged into and whether it is trashed, then the tree read from them
+/// and the suggestions for what is typed, with nothing closed and with
+/// the Areas of `closed` closed.
+Map<String, Object?> _tagTree() {
+  const areas = ['Locked', 'Open'];
+  const shut = ['Locked'];
+  const captured = [
+    {'text': '#Life/Health/back pain\n#life/work and #life/work'},
+    {
+      'text': 'Physio #life/health/Back #garten',
+      'amends': ['then #Life/health', '#life/health/knee'],
+    },
+    {
+      'text': '**#Life/Health** `#code/x` [#label](https://x.org/#dest)',
+      'format': TextFormats.markdown,
+    },
+    {'text': '#code/a #script', 'format': TextFormats.code},
+    {'text': 'gone #trash/x', 'trashed': true},
+    {'text': 'merged #merged/in #garten', 'into': 1},
+    {'text': '#Garten #GARTEN/beet #İzmir/ΟΔΟΣ #𝔸x/y'},
+    {'text': 'https://example.org/#top #a//b #a/-c C# #b/'},
+    {'text': '#GARTEN/geheim #secret #LIFE', 'area': 0},
+    // Merged into a Note of a closed Area, closed with it, and the other
+    // way round, open with its Note.
+    {'text': 'Physio #LIFE/health', 'area': 1, 'into': 8},
+    {'text': '#LIFE/home #garten/beet', 'area': 1},
+    {'text': 'open #Life/health/back', 'area': 0, 'into': 10},
+  ];
+  const typed = [
+    '#',
+    '#l',
+    '#LIFE/',
+    '#life/health/b',
+    '#g',
+    'garten',
+    '#i',
+    '#izmir/οδοσ',
+    '#x',
+  ];
+  var at = DateTime.utc(2026, 11, 12, 8);
+  final store = Store.inMemory(
+    clock: () => at,
+    newKey: () => SigningKey.fromSeed(_seed),
+  );
+  try {
+    final notes = Notes(store);
+    final places = Places(store);
+    final areaIds = [for (final name in areas) places.addArea(name).id];
+    final ids = <String>[];
+    for (final note in captured) {
+      at = at.add(const Duration(minutes: 1));
+      final format = note['format'] as String? ?? TextFormats.plain;
+      final place = switch (note['area']) {
+        final int i => areaIds[i],
+        _ => null,
+      };
+      final id = notes
+          .capture(note['text'] as String, format: format, place: place)
+          .id;
+      ids.add(id);
+      for (final amend in note['amends'] as List<String>? ?? const <String>[]) {
+        at = at.add(const Duration(minutes: 1));
+        notes.amend(id, amend);
+      }
+    }
+    for (final (i, note) in captured.indexed) {
+      if (note['into'] case final int into) notes.merge(ids[i], ids[into]);
+      if (note['trashed'] == true) notes.trash(ids[i]);
+    }
+    Object? node(TagNode n) => {
+      'children': [for (final c in n.children) node(c)],
+      'name': n.name,
+      'notes': n.notes,
+      'tag': n.tag,
+    };
+    final tree = TagTree(store);
+    final closed = {
+      for (final (i, name) in areas.indexed)
+        if (shut.contains(name)) areaIds[i],
+    };
+    return {
+      'areas': areas,
+      'closed': {
+        'areas': shut,
+        'suggestions': {
+          for (final t in typed)
+            t: [for (final n in tree.suggestions(t, closed: closed)) n.tag],
+        },
+        'tree': [for (final n in tree.tree(closed: closed)) node(n)],
+      },
+      'notes': captured,
+      'suggestions': {
+        for (final t in typed) t: [for (final n in tree.suggestions(t)) n.tag],
+      },
+      'tree': [for (final n in tree.tree()) node(n)],
+    };
+  } finally {
+    store.close();
+  }
+}
+
 /// Schedules as sentences (ADR 0044), on a held day: each schedule of
 /// the simple editor written in English and German and read back, more
 /// texts read as typed with the parts not understood, and the words
-/// suggested at a cursor. Offsets are counted in code points.
+/// suggested at a cursor; then at held moments the relative words of a
+/// Reminder read and the quick Reminder chips (#271). Offsets are
+/// counted in code points.
 Map<String, Object?> _scheduleSentences() {
   final today = Day(2026, 11, 3);
   ClockTime at(int hour, [int minute = 0]) => ClockTime(hour, minute);
@@ -7850,6 +9434,12 @@ Map<String, Object?> _scheduleSentences() {
       'Every day 🧠 at 08:00',
       'Every day at 08:00 Mon',
       'Jeden Tag',
+      'Every day at 7 pm',
+      'Every day at 7:30PM, 12 am and 12 pm.',
+      'Every day at 13 pm, 0 am, 7:5 pm',
+      'Every month on day 15 am',
+      'tomorrow',
+      'Every day at 19 Uhr',
     ],
     'de': [
       'Einmal',
@@ -7870,6 +9460,12 @@ Map<String, Object?> _scheduleSentences() {
       'Jede Woche um 08:00, bis',
       'Täglich um 08:00',
       'Every day',
+      'Jeden Tag um 19 Uhr',
+      'Jeden Tag um 8:30 UHR.',
+      'Jeden Tag um 24 Uhr',
+      'Jeden Monat am 15 Uhr',
+      'Jeden Tag um 7 pm',
+      'morgen',
     ],
   };
   const cursors = {
@@ -7897,6 +9493,19 @@ Map<String, Object?> _scheduleSentences() {
       'every d',
       'Every day at 08:00 and ',
       'zzz ',
+      'T',
+      'Tomorrow ',
+      'Tonight ',
+      'Today e',
+      'In ',
+      'In 2 ',
+      'in a ',
+      'in 1 h',
+      'Tomorrow 7 pm ',
+      'in 3 days ',
+      'Tomorrow 7 ',
+      'Once on 1/1, 3 ',
+      'Once t',
     ],
     'de': [
       '',
@@ -7911,6 +9520,89 @@ Map<String, Object?> _scheduleSentences() {
       'Jeden Tag um 08:00, 13:3',
       'Einmal ',
       'Jeden Tag ',
+      'H',
+      'Heute ',
+      'Heute Abend ',
+      'Morgen ',
+      'In 3 T',
+      'in einer ',
+      'in 2 St',
+    ],
+  };
+  const relative = {
+    'en': [
+      'today',
+      'Today at 17:00',
+      'tonight',
+      'tonight 8 pm',
+      'TOMORROW',
+      'Tomorrow 7 pm',
+      'tomorrow at 7:30pm',
+      'tomorrow evening',
+      'tomorrow night',
+      'today evening, at 9 pm',
+      'in 30 minutes',
+      'in 2 hours',
+      'in an hour',
+      'In 1 h',
+      'in 90 min',
+      'in 3 days',
+      'in a week',
+      'in 2 weeks 9 am',
+      'in 1 week at 10:00',
+      'in 2 hours at 08:00',
+      'in 2 hours 08:00, 09:00',
+      'tomorrow 7 pm 8 pm',
+      'tomorrow, 3 times',
+      'tomorrow until 12/1',
+      'tomorrow from 12/1',
+      'today 13 pm',
+      'today 0 am',
+      'today 12 am',
+      'today 12 pm',
+      'in 0 minutes',
+      'in',
+      'in 3',
+      'in 3 months',
+      'in 123456 days',
+      'in 99999 weeks',
+      'in 99999 minutes',
+      'Once tomorrow',
+      'Once on tomorrow at 15:00',
+      'Once on today evening',
+      'Once on tonight 8 pm',
+      'Once in 3 days',
+      'Every day tomorrow',
+      'heute',
+      'Every day at 7 pm',
+      'tomorrow 🧠 7 pm',
+    ],
+    'de': [
+      'heute',
+      'heute Abend',
+      'heute Abend um 20:30',
+      'Morgen',
+      'morgen 19 Uhr',
+      'Morgen um 8 Uhr',
+      'morgen Abend',
+      'morgen 19:30 Uhr.',
+      'in 2 Stunden',
+      'in einer Minute',
+      'in 3 Tagen',
+      'in 3 Tage',
+      'in einer Woche',
+      'in 2 Std.',
+      'in 1 h',
+      'heute 25 Uhr',
+      'heute 25\u00a0Uhr',
+      'morgen 19\u202fUhr, einmal',
+      'Einmal am morgen um 15:00',
+      'Einmal morgen',
+      'in 0 Minuten',
+      'morgen 7 pm',
+      'Einmal am 5.11.',
+      'tonight',
+      'Jeden Tag um 19 Uhr',
     ],
   };
   int points(String text, int at) => text.substring(0, at).runes.length;
@@ -7931,8 +9623,10 @@ Map<String, Object?> _scheduleSentences() {
           'start': s.start.toString(),
           'times': [for (final t in s.times) t.toString()],
         };
-  Object? readJson(String locale, String text) {
-    final read = readSchedule(text, locale, today);
+  Object? readJson(String locale, String text, [SentenceNow? now]) {
+    final read = now == null
+        ? readSchedule(text, locale, today)
+        : readScheduleAt(text, locale, now);
     return {
       'locale': locale,
       'schedule': scheduleJson(read.schedule),
@@ -7975,6 +9669,33 @@ Map<String, Object?> _scheduleSentences() {
         ],
         'text': 'Every 2 we at 08:00',
       },
+    ],
+    'relative': [
+      for (final now in [
+        SentenceNow(today, at(14, 20), at(7, 30)),
+        SentenceNow(today, at(19), at(8)),
+        SentenceNow(Day(2026, 12, 31), at(23, 30), at(9)),
+        SentenceNow(today, at(0), at(6, 15)),
+      ])
+        {
+          'now': {
+            'dayStart': now.dayStart.toString(),
+            'time': now.time.toString(),
+            'today': now.today.toString(),
+          },
+          'quick': [
+            for (final q in quickReminders(now))
+              {
+                'chip': q.chip.name,
+                'day': q.day.toString(),
+                'time': q.time.toString(),
+              },
+          ],
+          'read': [
+            for (final MapEntry(key: locale, value: texts) in relative.entries)
+              for (final text in texts) readJson(locale, text, now),
+          ],
+        },
     ],
     'today': today.toString(),
     'written': [
@@ -9084,6 +10805,12 @@ Future<void> main(List<String> args) async {
     'Nudge of the `routines` log at held moments with this Device\'s '
     'settings, and of each Note the Occurrence due or Missed of each of '
     'its Routines and what its card ticks today, on the same clock.\n'
+    '- `not-today/not_today.json`: what the Routines of the `not-today` '
+    'log come to (#269): each with what is skipped, by Tomorrow too, and '
+    'the Occurrences Tomorrow added, and at held moments the Agenda, the '
+    'alarm plan, the Missed Summary, what each Note asks to check off, '
+    'what the notifications may close and each Routine\'s history, its '
+    'Streaks and its Adherence with the skips beside it.\n'
     '- `markers/markers.json`: what the values of a later version in the '
     '`markers` log come to (ADR 0034): the Routines read and those whose '
     'schedule needs a newer version, by Note too, the people of the '
@@ -9120,6 +10847,18 @@ Future<void> main(List<String> args) async {
     'choice (#219) and whether the choice applies to it.\n'
     '- `features/features.json`: whether the first entries of the '
     '`features` log, as many as each read gives, read as Advanced.\n'
+    '- `area-order/area_order.json`: the ids of the Areas in the person\'s '
+    'own order after the first entries of the `area-order` log, as many as '
+    'each read gives.\n'
+    '- `area-order-shown/area_order.json`: the ids of the Areas in the '
+    'person\'s own order after the first entries of the `area-order-shown` '
+    'log, as many as each read gives, by stored name (`stored`) and by the '
+    'name the app shows (`shown`).\n'
+    '- `hidden-from-ai/hidden_from_ai.json`: after the first entries of the '
+    '`hidden-from-ai` log, as many as each read gives, the Notes and Areas '
+    'marked Hidden from AI, the marks hiding each entity and whether the '
+    'mark may be set on each id; and each refusal, the action with its ids '
+    'and the marks it named, at the length of the log it was tried on.\n'
     '- `help/help.json`: the ids of the help Notes each step of the `help` '
     'scenario made, in the order it made them.\n'
     '- `list-switch/kinds.json`: the kind of each Note of the '
@@ -9185,6 +10924,12 @@ Future<void> main(List<String> args) async {
     'and what was skipped, by reason.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, what is no code and codes of a later version (ADR 0034).\n'
+    '- `ask.json`: the phone\'s question through the desktop (#267, ADR '
+    '0051): question bodies with their earlier exchanges, the provider as '
+    'the phone learns it, answers (one whose unread Note links were '
+    'removed, #294) and every kind of failure as bodies with what they '
+    'hold, replies of a later desktop, and addresses typed by '
+    'hand for a paired Device as read or refused.\n'
     '- `later_formats.json`: what files and values of a later version '
     '(ADR 0034) come to: Sent Items, Backup header lines, the opened keys '
     'and Profiles files of the shared folder and local settings, with '
@@ -9241,7 +10986,26 @@ Future<void> main(List<String> args) async {
     'many scripts, after spaces of any kind, punctuation, emoji and status '
     'marks, with a `-` inside and at the end, and those that are none: '
     'numbers alone, headings, `##`, a `#` after a letter, a digit, `/`, '
-    '`\\` or `&`, as in "C#" and web addresses.\n'
+    '`\\` or `&`, as in "C#" and web addresses; nested tags with a `/` '
+    'inside, at the end, doubled and before a `-` (#267).\n'
+    '- `tag_tree.json`: the tag tree (#267): Notes captured in a fresh '
+    'store, plain, formatted and as code, some filed into two Areas, with '
+    'Amends, Merges and one trashed, and the tree read from them by its '
+    'levels, each tag as written most often with its count of Notes, and '
+    'the suggestions for what is typed; both again with one Area closed '
+    '(`closed`), its Notes and those merged into them left out.\n'
+    '- `file_texts.json`: the texts of attached files (ADR 0047): for each '
+    'file its name, media type and bytes, the kind it is and what reading '
+    'it gives: Word documents, workbooks, OpenDocument texts and '
+    'spreadsheets, deflated and stored, with tabs, breaks, spaces, deleted '
+    'text, field codes, phonetic guides, repeated cells and rows, '
+    'references and CDATA, damaged ones, parts that are no UTF-8, text '
+    'files in UTF-8 with and without a byte order mark, in Windows-1252 '
+    'and holding a zero, a PDF and a file without text; the kinds and '
+    'media types of names and types; the values of attached files as '
+    'another Device may write them, crafted ones among them, read as data; '
+    'names and types as kept; who reads a file by its kind, size and '
+    'pages (Q645); texts tidied and page texts joined.\n'
     '- `schedule_sentences.json`: schedules as sentences (ADR 0044) on a '
     'held day: each schedule of the simple editor written in English and '
     'German and read back, texts read as typed with the parts not '
@@ -9353,6 +11117,22 @@ Future<void> main(List<String> args) async {
     'Profile with the new Device\'s key bound to it by the old one\'s '
     'and her playback speed among them, and what it reads '
     '(`expected.json`).\n'
+    '- `backup-notes/`: taking Notes back from a Backup (#285): Ada\'s '
+    'Device with her Work before her Health, a Routine and a Reminder, a '
+    'Checklist, a Tally a Session picks, a photo and a recording longer '
+    'than a chunk with their texts, an open Frog, a Note in the trash and '
+    'one filed nowhere; her Backup (`backup.$backupExtension`, a low '
+    'Argon2id cost, random bytes counted from 7001 on, at a held clock); '
+    'a day later, the photo and the recording removed, her log '
+    '(`device.jsonl`) and keys (`settings.json`); the Backup opened with '
+    'the passphrase and the recovery key, its tree with keys, kinds and '
+    'sizes, the Notes that lay in the trash, the same with her Health a '
+    'locked Area closed on the Device (`closed`), the keys ticked at the '
+    'start, then Training, Route, the Note in the trash and the one filed nowhere '
+    'ticked and added back (`added.jsonl`, ids counted from 0x1301), with '
+    'the Areas made, the blobs she holds then, and the refusals of a wrong '
+    'key, a later header, a flipped byte, a cut-off file and a file that '
+    'is no Backup (`expected.json`).\n'
     '- `profiles/`: Profile names as typed and as kept, initials, '
     'placeholder colours, short codes from an id and a first key, records '
     'as they are written and records refused, the own Profile\'s local '
@@ -9469,6 +11249,7 @@ Future<void> main(List<String> args) async {
     File('${root.path}/pair_codes.json'),
     '${_json.convert(_pairCodes())}\n',
   );
+  _write(File('${root.path}/ask.json'), '${_json.convert(_ask())}\n');
   _write(File('${root.path}/keys.json'), '${_json.convert(_keys())}\n');
   _write(File('${root.path}/crypto.json'), '${_json.convert(_crypto())}\n');
   _write(
@@ -9482,6 +11263,11 @@ Future<void> main(List<String> args) async {
   _write(
     File('${root.path}/text_tags.json'),
     '${_json.convert(_textTags())}\n',
+  );
+  _write(File('${root.path}/tag_tree.json'), '${_json.convert(_tagTree())}\n');
+  _write(
+    File('${root.path}/file_texts.json'),
+    '${_json.convert(_fileTexts())}\n',
   );
   _write(File('${root.path}/markdown.json'), '${_json.convert(_markdown())}\n');
   _write(
@@ -9516,6 +11302,7 @@ Future<void> main(List<String> args) async {
   _pendingFixture(root);
   await _offerFixture(root);
   _packFixture(root);
+  await _backupNotesFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {
@@ -9537,6 +11324,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/alarms.json'),
           '${_json.convert(_alarms(store))}\n',
+        );
+      }
+      if (scenario.name == 'not-today') {
+        _write(
+          File('${out.path}/not_today.json'),
+          '${_json.convert(_notToday(store))}\n',
         );
       }
       if (store.entitiesOfType(FrogKeys.typeFrog).isNotEmpty) {
@@ -9590,6 +11383,24 @@ Future<void> main(List<String> args) async {
           '${_json.convert({'reads': _featureReads})}\n',
         );
       }
+      if (scenario.name == 'area-order') {
+        _write(
+          File('${out.path}/area_order.json'),
+          '${_json.convert({'reads': _areaOrderReads})}\n',
+        );
+      }
+      if (scenario.name == 'area-order-shown') {
+        _write(
+          File('${out.path}/area_order.json'),
+          '${_json.convert({'reads': _areaOrderShownReads})}\n',
+        );
+      }
+      if (scenario.name == 'hidden-from-ai') {
+        _write(
+          File('${out.path}/hidden_from_ai.json'),
+          '${_json.convert({'reads': _hiddenFromAiReads, 'refusals': _hiddenFromAiRefusals})}\n',
+        );
+      }
       if (scenario.name == 'help') {
         _write(
           File('${out.path}/help.json'),
@@ -9606,6 +11417,21 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/markers.json'),
           '${_json.convert(_markers(store))}\n',
+        );
+      }
+      if (scenario.name == 'attachments') {
+        for (final MapEntry(:key, :value) in _attachmentInputs.entries) {
+          File('${out.path}/inputs/$key')
+            ..parent.createSync(recursive: true)
+            ..writeAsBytesSync(value);
+        }
+        final area = Places(store).areas().single.id;
+        final pack = store.packOf(area);
+        File('${out.path}/pack.$packExtension')
+            .writeAsBytesSync(store.writePack(pack, pack.allKeys()));
+        _write(
+          File('${out.path}/attachments.json'),
+          '${_json.convert(_attachmentsOf(store, pack))}\n',
         );
       }
       if (ShoppingLists(store).ofNotes(noteIds, _frogDay(0)).isNotEmpty) {

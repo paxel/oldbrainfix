@@ -89,8 +89,9 @@ pub enum FrogAction {
     Another(String),
     /// Opens the Note with this id.
     OpenNote(String),
-    /// Asks whether the Frog goes to the trash.
-    AskDelete(String),
+    /// Moves the Frog to the trash, without asking; Ctrl+Z brings it
+    /// back (#268).
+    Delete(String),
     /// Opens the Frog view.
     OpenView,
     /// Keeps whether the Frog view's "Done" section is open.
@@ -180,7 +181,7 @@ pub fn frog_row(
             if shown.manages {
                 open.context_menu(|ui| {
                     if ui.button(RichText::new(t.delete()).color(text)).clicked() {
-                        actions.push(FrogAction::AskDelete(frog.id.clone()));
+                        actions.push(FrogAction::Delete(frog.id.clone()));
                         // Also a pick by keyboard or screen reader.
                         ui.close();
                     }

@@ -30,14 +30,15 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::{Frame, Margin, RichText, Stroke, Ui};
+use egui::{Frame, Key, Margin, Modifiers, RichText, Stroke, Ui};
 use oldbrainfix_core::{
-    Area, DeviceSettings, Error, Frogs, Importance, Note, Notes, PersonSettings, QuickNoteControl,
-    Routines, Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, Topic,
-    WallClock, markdown, text_format,
+    Area, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes, PersonSettings,
+    QuickNoteControl, Routines, Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies,
+    TallyRule, Topic, WallClock, markdown, text_format,
 };
 
 use crate::app::{Wall, icon_button};
+use crate::attachment_view::HeldFile;
 use crate::enrich::{Enricher, Said};
 use crate::icons;
 use crate::l10n::L10n;
@@ -166,6 +167,9 @@ pub enum Chip {
 /// What was asked of the capture's buttons or its choices.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ask {
+    /// "File into…": opens its picker (#272).
+    PickPlace,
+    /// The Area or Topic picked there.
     FileInto(String),
     Spawn(Spawn),
     Importance(Importance),
@@ -179,8 +183,13 @@ pub enum Ask {
 /// The page a button opens, which hands back its choice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Opens {
-    Schedule { reminder: bool, session: bool },
+    Schedule {
+        reminder: bool,
+        session: bool,
+    },
     Tally,
+    /// File into… (#272).
+    FileInto,
 }
 
 impl CaptureChoices {
@@ -251,7 +260,10 @@ impl CaptureChoices {
     /// Takes what was asked; the page to open for it, if any.
     pub fn take(&mut self, asked: Ask, store: &Store) -> oldbrainfix_core::Result<Option<Opens>> {
         match asked {
+            Ask::PickPlace => return Ok(Some(Opens::FileInto)),
             Ask::FileInto(picked) => {
+                // Picked, it is filed into last, saved or not (#272).
+                DeviceSettings::new(store).filed_into(&picked)?;
                 self.keep_what_fits(store, Some(&picked))?;
                 self.place = Some(picked);
             }
@@ -292,10 +304,9 @@ pub fn may_spawn(store: &Store, place: Option<&str>) -> oldbrainfix_core::Result
 /// A Shopping List a capture can go into: its Note's id and its title.
 pub type ListTitle = (String, String);
 
-/// What the capture's buttons offer: the Areas with their Topics to
-/// file into, whether the Note may spawn where it goes, and the Shopping
-/// Lists it can go into.
-pub type Offer<'a> = (&'a [(Area, Vec<Topic>)], bool, &'a [ListTitle]);
+/// What the capture's buttons offer: whether the Note may spawn where it
+/// goes, and the Shopping Lists it can go into.
+pub type Offer<'a> = (bool, &'a [ListTitle]);
 
 /// What a capture came to.
 #[derive(Debug, Clone, PartialEq)]
@@ -328,32 +339,46 @@ pub fn capture(
     text: &str,
     place: Option<&str>,
     nudge_in: Duration,
-    (photos, recordings): (&[Vec<u8>], &[Vec<u8>]),
+    (photos, recordings, files): (&[Vec<u8>], &[Vec<u8>], &[HeldFile]),
     (choices, wall): (&CaptureChoices, &WallClock),
 ) -> oldbrainfix_core::Result<Captured> {
     let text = text.trim();
-    if text.is_empty() && photos.is_empty() && recordings.is_empty() {
+    if text.is_empty() && photos.is_empty() && recordings.is_empty() && files.is_empty() {
         return Ok(Captured::Nothing);
     }
+    let attached: Vec<NewFile> = files.iter().map(HeldFile::new_file).collect();
     let note = |choices: &CaptureChoices| {
         let mut choices = choices.clone();
         choices.shopping = None;
         // A sorted Note needs no Nudge (#113).
         let nudge = (!choices.sorted(place)).then_some(nudge_in);
         store.batch(|| {
-            let note = Notes::new(store).capture_with(text, place, nudge, photos, recordings)?;
+            let note = Notes::new(store)
+                .capture_with_files(text, place, nudge, photos, recordings, &attached)?;
             formatted(store, &note)?;
             choices.write(store, &note.id)?;
             Ok(note)
         })
     };
-    // No Line holds a photo: the capture stays a Note, to keep it.
-    let Some(list) = choices.shopping.as_deref().filter(|_| photos.is_empty()) else {
+    // No Line holds a photo or a file: the capture stays a Note, to keep
+    // it.
+    let Some(list) = choices
+        .shopping
+        .as_deref()
+        .filter(|_| photos.is_empty() && files.is_empty())
+    else {
         return note(choices).map(Captured::Note);
     };
+    // The list used last goes to the top of the pick (#276).
+    let used = || DeviceSettings::new(store).set_last_shopping_list(Some(list));
     if recordings.is_empty() {
         return match ShoppingLists::new(store).add_lines(list, text, wall) {
-            Ok(_) => Ok(Captured::Poured),
+            Ok(added) => {
+                if !added.is_empty() {
+                    used()?;
+                }
+                Ok(Captured::Poured)
+            }
             // The list went meanwhile: a Note with all that was set up.
             Err(Error::Invalid(_)) => note(choices).map(Captured::Kept),
             Err(e) => Err(e),
@@ -362,6 +387,7 @@ pub fn capture(
     // Until the Transcripts are there, the Note holds all of it.
     let note = Notes::new(store).capture_with(text, None, None, &[], recordings)?;
     formatted(store, &note)?;
+    used()?;
     Ok(Captured::Waiting(note))
 }
 
@@ -377,12 +403,14 @@ fn untranscribed_details(list: &str) -> String {
     format!("shopping list {list}: no speech model to transcribe with")
 }
 
-/// What is held with the text being captured: the photos and the
-/// recordings, and whether a recording gets its Transcript here.
+/// What is held with the text being captured: the photos, the
+/// recordings and the files, and whether a recording gets its Transcript here.
 #[derive(Debug, Clone, Copy)]
 pub struct Held<'a> {
     pub photos: &'a [Vec<u8>],
     pub recordings: &'a [Vec<u8>],
+    /// The files to attach (#267).
+    pub files: &'a [HeldFile],
     pub transcribes: bool,
 }
 
@@ -406,6 +434,7 @@ pub fn save(
     // once it is saved; a photo keeps it a Note anyway.
     let untranscribed = picked.is_some()
         && held.photos.is_empty()
+        && held.files.is_empty()
         && !held.recordings.is_empty()
         && !held.transcribes;
     let mut writing = choices.clone();
@@ -417,7 +446,7 @@ pub fn save(
         text,
         place,
         nudge_in,
-        (held.photos, held.recordings),
+        (held.photos, held.recordings, held.files),
         (&writing, &**wall),
     )?;
     let list = picked.unwrap_or("");
@@ -555,13 +584,21 @@ pub fn shopping_title(t: &L10n, note: &Note) -> String {
 
 /// The Shopping Lists a capture can go into, by their Note's id with
 /// their title: each one this Device may add Lines to, oldest capture
-/// first.
+/// first, but the one a capture on this Device went into last at the top
+/// (#276).
 pub fn shopping_lists(store: &Store, t: &L10n) -> oldbrainfix_core::Result<Vec<ListTitle>> {
-    Ok(ShoppingLists::new(store)
+    let mut lists: Vec<ListTitle> = ShoppingLists::new(store)
         .addable()?
         .iter()
         .map(|note| (note.id.clone(), shopping_title(t, note)))
-        .collect())
+        .collect();
+    if let Some(last) = DeviceSettings::new(store).last_shopping_list()?
+        && let Some(at) = lists.iter().position(|(id, _)| *id == last)
+    {
+        let used = lists.remove(at);
+        lists.insert(0, used);
+    }
+    Ok(lists)
 }
 
 /// The title of the Shopping List `id` among `lists`; "Shopping List"
@@ -587,40 +624,10 @@ pub fn place_name(t: &L10n, areas: &[(Area, Vec<Topic>)], id: &str) -> Option<St
     None
 }
 
-/// "File into…" as a menu of the Areas with their Topics indented; the
-/// one picked.
-pub fn file_into_menu(ui: &mut Ui, t: &L10n, areas: &[(Area, Vec<Topic>)]) -> Option<String> {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    let mut picked = None;
-    ui.menu_button(RichText::new(t.file_into()).color(text), |ui| {
-        for (area, topics) in areas {
-            let mut file = |ui: &mut Ui, id: &str, label: String, indent| {
-                ui.horizontal(|ui| {
-                    ui.add_space(indent);
-                    if ui.button(RichText::new(label).color(text)).clicked() {
-                        picked = Some(id.to_string());
-                        // A pick closes the menu, also one by keyboard or
-                        // screen reader, which no pointer click closes.
-                        ui.close();
-                    }
-                });
-            };
-            file(ui, &area.id, area_name(t, area), 0.0);
-            for topic in topics {
-                file(ui, &topic.id, topic_name(t, topic), 16.0);
-            }
-        }
-        if areas.is_empty() {
-            ui.label(RichText::new(t.no_areas_yet()).color(weak));
-        }
-    });
-    picked
-}
-
 /// "Add to a Shopping List" in a menu: its heading over `lists`, by
 /// their Note's id with their title, as radio buttons, the one picked
-/// before on; the one picked.
+/// before on; with one list a single entry naming it, "Add to Weekly"
+/// (#276). The one picked.
 fn shopping_picker(
     ui: &mut Ui,
     t: &L10n,
@@ -628,6 +635,20 @@ fn shopping_picker(
     lists: &[ListTitle],
 ) -> Option<String> {
     let text = ui.visuals().text_color();
+    if let [(id, title)] = lists {
+        let on = current == Some(id.as_str());
+        let words = t.add_to_named_shopping_list(title);
+        let entry = if on {
+            ui.radio(true, RichText::new(words).color(text))
+        } else {
+            ui.button(RichText::new(words).color(text))
+        };
+        if entry.clicked() {
+            ui.close();
+            return (!on).then(|| id.clone());
+        }
+        return None;
+    }
     ui.label(RichText::new(t.add_to_shopping_list()).strong().color(text));
     let mut picked = None;
     for (id, title) in lists {
@@ -697,6 +718,37 @@ impl QuickNote {
     }
 }
 
+/// The Nudge times of the capture's buttons, 10 min, 30 min and 1 h.
+pub fn nudge_times() -> [Duration; 3] {
+    [
+        Duration::minutes(10),
+        Duration::minutes(30),
+        Notes::default_nudge(),
+    ]
+}
+
+/// The Nudge a key in the capture asks to save with, taken (#277): Ctrl+1,
+/// Ctrl+2 and Ctrl+3 (Cmd on macOS) the Nudge buttons' times while
+/// `nudges` they show, Ctrl+Enter the 1 h. Only in the dialog on top,
+/// so a dialog over the capture keeps its keys.
+pub fn nudge_key(ui: &Ui, nudges: bool) -> Option<Duration> {
+    if !crate::theme::on_top(ui) {
+        return None;
+    }
+    ui.input_mut(|i| {
+        if nudges {
+            let keys = [Key::Num1, Key::Num2, Key::Num3];
+            for (key, nudge_in) in keys.into_iter().zip(nudge_times()) {
+                if i.consume_key(Modifiers::COMMAND, key) {
+                    return Some(nudge_in);
+                }
+            }
+        }
+        i.consume_key(Modifiers::COMMAND, Key::Enter)
+            .then(Notes::default_nudge)
+    })
+}
+
 /// What was asked of the capture's action row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RowAsk {
@@ -707,7 +759,7 @@ pub enum RowAsk {
 }
 
 /// The capture's action row: "To full editor", waiting until `ready`,
-/// "File into…" over `areas` once `quick` switched it on, the alarm
+/// "File into…", opening its picker, once `quick` switched it on, the alarm
 /// clock while `spawns`, else why not, its menu a Routine or Reminder
 /// (#223) and, switched on, a Frog and Session, and "More" with what
 /// `quick` switched on: the Importance, "Make it a Tally", which goes
@@ -719,7 +771,7 @@ pub fn action_row(
     ui: &mut Ui,
     t: &L10n,
     choices: &CaptureChoices,
-    (areas, spawns, lists): Offer<'_>,
+    (spawns, lists): Offer<'_>,
     (quick, ready): (&QuickNote, bool),
 ) -> Option<RowAsk> {
     let text = ui.visuals().text_color();
@@ -743,10 +795,13 @@ pub fn action_row(
         if ui.add_enabled(ready, editor).clicked() {
             asked = Some(RowAsk::ToEditor);
         }
+        // Its picker opens over the capture, with a filter (#272).
         if quick.file_into
-            && let Some(place) = file_into_menu(ui, t, areas)
+            && ui
+                .button(RichText::new(t.file_into()).color(text))
+                .clicked()
         {
-            asked = Some(RowAsk::Choice(Ask::FileInto(place)));
+            asked = Some(RowAsk::Choice(Ask::PickPlace));
         }
         // The alarm clock is always there for a Routine or Reminder
         // (#223), its menu as the Note's "+"; the switch adds Frog and

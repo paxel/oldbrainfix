@@ -1,11 +1,16 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+
+import 'file_platform.dart';
 import 'l10n.dart';
 import 'photo_platform.dart';
 import 'voice_platform.dart';
 
 /// A way the Agenda's "+" fans out to capture a Note.
-enum CaptureWay { text, voice, photo, gallery, paste }
+enum CaptureWay { text, voice, photo, gallery, paste, file }
 
 /// One entry of a fan: its key, its icon and its words.
 typedef FanEntry = ({Key key, Widget icon, String label});
@@ -121,6 +126,62 @@ Rect? fanAnchor(BuildContext context, BuildContext? button) {
   return box.localToGlobal(Offset.zero, ancestor: over) & box.size;
 }
 
+/// The "+" of the Agenda and the lock screen (UI laws, "Capture"): a
+/// tap runs [onPressed], which fans out the ways to capture; a long press
+/// runs [onLongPress], which opens text Capture at once (#282), with the
+/// platform's touch as a card's long press gives it. A screen reader
+/// hears the long press with the button, and on the iPhone, whose
+/// VoiceOver has no long press, finds it among the button's actions.
+/// [plusKey] and [heroTag] are the button's, where the fan opens from.
+class CapturePlus extends StatelessWidget {
+  final Key plusKey;
+  final Object heroTag;
+  final VoidCallback onPressed;
+  final VoidCallback onLongPress;
+
+  const CapturePlus({
+    super.key,
+    required this.plusKey,
+    required this.heroTag,
+    required this.onPressed,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return MergeSemantics(
+      child: Semantics(
+        onLongPressHint: t.captureLongPressHint,
+        customSemanticsActions: defaultTargetPlatform == TargetPlatform.iOS
+            ? {
+                CustomSemanticsAction(label: t.captureLongPressAction):
+                    onLongPress,
+              }
+            : null,
+        // Its own label and hover, without the tooltip's long press,
+        // which is the capture's.
+        child: Tooltip(
+          message: t.captureTooltip,
+          triggerMode: TooltipTriggerMode.manual,
+          child: GestureDetector(
+            onLongPress: () {
+              unawaited(Feedback.forLongPress(context));
+              onLongPress();
+            },
+            child: FloatingActionButton(
+              key: plusKey,
+              heroTag: heroTag,
+              onPressed: onPressed,
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The Agenda's "+" opened: the capture [ways] fanned out, Text nearest
 /// the button.
 class CaptureFanRoute extends FanRoute<CaptureWay> {
@@ -142,6 +203,7 @@ class CaptureFanRoute extends FanRoute<CaptureWay> {
       CaptureWay.photo => (Icons.photo_camera_outlined, t.photo),
       CaptureWay.gallery => (Icons.photo_library_outlined, t.gallery),
       CaptureWay.paste => (Icons.content_paste, t.paste),
+      CaptureWay.file => (Icons.attach_file, t.file),
     };
     return (
       key: ValueKey('captureFan-${way.name}'),
@@ -165,6 +227,7 @@ CaptureFanRoute? captureFanFor(BuildContext context, GlobalKey plus) {
       if (photos.available) CaptureWay.photo,
       if (photos.pickable) CaptureWay.gallery,
       if (photos.pasteable) CaptureWay.paste,
+      if (FileScope.of(context).pickable) CaptureWay.file,
     ],
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
   );

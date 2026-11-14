@@ -9,13 +9,17 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
+import 'attachment_views.dart';
 import 'box_ids.dart';
 import 'calendar_platform.dart';
 import 'checklist_view.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
+import 'file_platform.dart';
 import 'frogs_screen.dart';
+import 'hidden_from_ai_view.dart';
+import 'home_shortcuts.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
 import 'location.dart';
@@ -23,6 +27,7 @@ import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_history_screen.dart';
+import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
@@ -48,7 +53,8 @@ import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
 /// Opens the editor of [note]; returns once the user left it. With
-/// [typeLines] the cursor starts in the Lines of a new list (#161).
+/// [typeLines] the cursor starts in a new Line of a list after its open
+/// ones (#161, #276).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
@@ -145,24 +151,34 @@ Future<bool> amendNote(
   return true;
 }
 
-/// Asks once whether the Note [noteId] goes to the trash, with the verb
-/// on the button in the error colour, and moves it there; whether it
-/// did. Its Routines and Reminders always go with it, and the question
-/// names them (#262).
-Future<bool> deleteNote(
-  BuildContext context,
-  Notes notes,
-  String noteId,
-) async {
+/// Moves the Note [noteId] to the trash without asking and offers to
+/// undo it at the top (#268); whether it went. Its Routines and Reminders
+/// always go with it (#262), and the undo brings them back with it.
+bool deleteNote(BuildContext context, Notes notes, String noteId) {
+  final note = notes.byId(noteId);
+  if (note == null || note.isTrashed || !notes.store.mayChange(noteId)) {
+    return false;
+  }
   final book = Routines(notes.store);
-  final linked = book.ofNote(noteId);
-  final delete = await showDialog<bool>(
-    context: context,
-    builder: (context) => _DeleteNoteDialog(linked: linked),
-  );
-  if (delete != true) return false;
   book.trashNote(noteId);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoNoteTrashed, () {
+    // The Trash, a purge or a sync may have got there first.
+    if (notes.byId(noteId)?.isTrashed != true) return;
+    if (!notes.store.mayChange(noteId)) return;
+    book.restoreNote(noteId);
+  });
   return true;
+}
+
+/// Removes the "From …" badge of the Note [noteId] (#164) without asking
+/// and offers to undo it at the top (#268), which brings it back.
+void removePackFrom(BuildContext context, Store store, String noteId) {
+  if (store.packFrom(noteId) == null || !store.mayChange(noteId)) return;
+  store.removePackFrom(noteId);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoPackFromRemoved, () {
+    if (store.packFrom(noteId) != null || !store.mayChange(noteId)) return;
+    store.restorePackFrom(noteId);
+  });
 }
 
 /// Asks once whether the photo ([photo]) or voice recording [hash] of
@@ -197,36 +213,100 @@ Future<bool> removeMedia(
   return true;
 }
 
-/// Asks once whether the Photo Text ([photo]) or Transcript of the photo
-/// or voice recording [hash] of the Note or Section [noteId] goes while
-/// the file stays, with the verb on the button in the error colour, and
-/// removes it; whether it did (ADR 0025).
-Future<bool> removeGeneratedText(
+/// Asks once whether the Attachment [hash] of the Note or Section
+/// [noteId] goes while its Attachment Text stays (ADR 0020, #267), and
+/// removes it; whether it did.
+Future<bool> removeAttachment(
+  BuildContext context,
+  Notes notes,
+  String noteId,
+  String hash,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => _RemoveDialog(
+      title: context.t.removeFileQuestion,
+      detail: context.t.removeMediaDetail,
+    ),
+  );
+  // A sync while the dialog was open may have taken it already.
+  if (confirmed != true || !notes.mayRemoveAttachment(noteId, hash)) {
+    return false;
+  }
+  notes.removeAttachment(noteId, hash);
+  return true;
+}
+
+/// Removes the Attachment Text of the file [hash] of the Note or Section
+/// [noteId] while the file stays, without asking, and offers to undo it
+/// at the top (#268); whether it did (ADR 0025). The undo writes the text
+/// back.
+bool removeAttachmentText(
+  BuildContext context,
+  Notes notes,
+  String noteId,
+  String hash,
+) {
+  final text = notes.byId(noteId)?.attachmentTexts[hash];
+  if (!notes.mayRemoveAttachmentText(noteId, hash) || text == null) {
+    return false;
+  }
+  notes.removeAttachmentText(noteId, hash);
+  AnnouncementsScope.of(context)
+      ?.offerUndo(context.t.undoAttachmentTextRemoved, () {
+        // Read again meanwhile, or the file gone: nothing to bring back.
+        final now = notes.byId(noteId);
+        final removed =
+            now != null &&
+            now.attachments.any((a) => a.hash == hash) &&
+            now.removedAttachmentTexts.contains(hash);
+        if (!removed || !notes.store.mayChange(noteId)) return;
+        notes.setAttachmentText(noteId, hash, text);
+      });
+  return true;
+}
+
+/// Removes the Photo Text ([photo]) or Transcript of the photo or voice
+/// recording [hash] of the Note or Section [noteId] while the file stays,
+/// without asking, and offers to undo it at the top (#268); whether it
+/// did (ADR 0025). The undo writes the text back.
+bool removeGeneratedText(
   BuildContext context,
   Notes notes,
   String noteId,
   String hash, {
   required bool photo,
-}) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => _RemoveDialog(
-      title: photo
-          ? context.t.removePhotoTextQuestion
-          : context.t.removeTranscriptQuestion,
-      detail: context.t.removeGeneratedTextDetail,
-    ),
-  );
-  // A sync while the dialog was open may have taken it already.
+}) {
   final allowed = photo
       ? notes.mayRemovePhotoText(noteId, hash)
       : notes.mayRemoveTranscript(noteId, hash);
-  if (confirmed != true || !allowed) return false;
+  final note = notes.byId(noteId);
+  final text = photo ? note?.photoTexts[hash] : note?.transcripts[hash];
+  if (!allowed || text == null) return false;
   if (photo) {
     notes.removePhotoText(noteId, hash);
   } else {
     notes.removeTranscript(noteId, hash);
   }
+  final t = context.t;
+  AnnouncementsScope.of(context)
+      ?.offerUndo(photo ? t.undoPhotoTextRemoved : t.undoTranscriptRemoved, () {
+        // Made again meanwhile, or the file gone: nothing to bring back.
+        final now = notes.byId(noteId);
+        final removed = photo
+            ? now != null &&
+                  now.photos.contains(hash) &&
+                  now.removedPhotoTexts.contains(hash)
+            : now != null &&
+                  now.recordings.contains(hash) &&
+                  now.removedTranscripts.contains(hash);
+        if (!removed || !notes.store.mayChange(noteId)) return;
+        if (photo) {
+          notes.setPhotoText(noteId, hash, text);
+        } else {
+          notes.setTranscript(noteId, hash, text);
+        }
+      });
   return true;
 }
 
@@ -242,7 +322,7 @@ List<MediaRemoval> mediaRemovals(
   final note = notes.byId(noteId);
   if (note == null) return const [];
   MediaRemoval removal(String hash, String? text, {required bool photo}) => (
-    photo: photo,
+    kind: photo ? RemovedMedia.photo : RemovedMedia.recording,
     hash: hash,
     text: text ?? '',
     run: () => then(removeMedia(context, notes, noteId, hash, photo: photo)),
@@ -254,6 +334,15 @@ List<MediaRemoval> mediaRemovals(
     for (final hash in note.recordings)
       if (notes.mayRemoveRecording(noteId, hash))
         removal(hash, note.transcripts[hash], photo: false),
+    // Its files too (#267), named by the file, not its text.
+    for (final file in note.attachments)
+      if (notes.mayRemoveAttachment(noteId, file.hash))
+        (
+          kind: RemovedMedia.file,
+          hash: file.hash,
+          text: file.name,
+          run: () => then(removeAttachment(context, notes, noteId, file.hash)),
+        ),
   ];
 }
 
@@ -297,7 +386,7 @@ NoteActions noteActions(
     onRemovePackFrom: from == null || !placed.changes
         ? null
         : () {
-            notes.store.removePackFrom(id);
+            removePackFrom(context, notes.store, id);
             changed();
           },
     // Copied says nothing: the text is on the screen (UI laws).
@@ -334,6 +423,14 @@ NoteActions noteActions(
     onAddEntry: placed.amends
         ? () => then(addTallyEntry(context, notes, id))
         : null,
+    // Where the phone can have one, for a Tally entries may be added to
+    // (#284).
+    onAddToHome:
+        placed.amends &&
+            !placed.note.isTrashed &&
+            HomeShortcutsScope.of(context).available
+        ? () => unawaited(addTallyToHome(context, notes, id))
+        : null,
     checklist: () {
       final lists = Checklists(notes.store);
       final shopping = ShoppingLists(notes.store);
@@ -367,8 +464,11 @@ NoteActions noteActions(
       );
     },
     showTicks: () => showTicksEntry(notes, id, changed),
+    hideFromAi: () => hiddenFromAiEntry(notes.store, id, changed),
     onDelete: placed.changes
-        ? () => then(deleteNote(context, notes, id))
+        ? () {
+            if (deleteNote(context, notes, id)) changed();
+          }
         : null,
   );
 }
@@ -537,9 +637,10 @@ class NoteEditorScreen extends StatefulWidget {
   final Drafts drafts;
   final String noteId;
 
-  /// Whether the cursor starts in the Lines of a Checklist or Shopping
-  /// List just made from the browser's "+" (#161): a new empty Line of a
-  /// Checklist, the field at the top of a Shopping List.
+  /// Whether the cursor starts in a new empty Line of a Checklist or
+  /// Shopping List after its open Lines: one just made from the
+  /// browser's "+" (#161), or one opened from its group on the Agenda
+  /// (#276).
   final bool typeLines;
 
   const NoteEditorScreen({
@@ -601,6 +702,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// that this Device may remove while their texts stay.
   Set<(String, String)> _removable = const {};
 
+  /// The files of the Note and of its Sections, as for [_removable], this
+  /// Device may remove while their texts stay, and whose texts it may
+  /// remove or read again (#267).
+  Set<(String, String)> _fileRemovable = const {};
+  Set<(String, String)> _fileTextRemovable = const {};
+  Set<(String, String)> _fileReadable = const {};
+
   /// The photos and recordings, as for [_removable], whose texts this
   /// Device may remove while they stay.
   Set<(String, String)> _textRemovable = const {};
@@ -632,6 +740,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// Whether the Note shows its ticks on this Device (ADR 0035).
   bool _showsTicks = false;
+
+  /// The Note's own mark Hidden from AI, and switching it, while it is
+  /// marked or may be (#267); and whether something else hides it, such
+  /// as its Area.
+  ({bool on, VoidCallback toggle})? _hiddenFromAi;
+  bool _hiddenByOther = false;
   late final _routineBook = Routines(widget.notes.store);
   late final _frogs = Frogs(widget.notes.store);
 
@@ -676,8 +790,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     unawaited(_restoreDraft());
   }
 
+  /// The app's announcements, whose undos this editor follows (#268).
+  Announcements? _announcements;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final announcements = AnnouncementsScope.of(context);
+    if (announcements == _announcements) return;
+    _announcements?.undone.removeListener(_undone);
+    _announcements = announcements?..undone.addListener(_undone);
+  }
+
+  /// An undo at the top may have brought back what this editor shows: a
+  /// Routine's or the Frog's badge, a Transcript, the "From …" badge.
+  void _undone() {
+    if (!mounted) return;
+    _saveText();
+    _reload();
+  }
+
   @override
   void dispose() {
+    _announcements?.undone.removeListener(_undone);
     _draftTimer?.cancel();
     _lifecycle.dispose();
     _text.dispose();
@@ -906,6 +1041,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             if (notes.recordingBytes(hash) != null) (id, hash),
         ],
     };
+    final attached = [
+      if (note != null) (note.id, note.attachments),
+      for (final section in _sections) (section.id, section.attachments),
+    ];
+    _fileRemovable = {
+      for (final (id, files) in attached)
+        for (final file in files)
+          if (notes.mayRemoveAttachment(id, file.hash)) (id, file.hash),
+    };
+    _fileTextRemovable = {
+      for (final (id, files) in attached)
+        for (final file in files)
+          if (notes.mayRemoveAttachmentText(id, file.hash)) (id, file.hash),
+    };
+    _fileReadable = {
+      for (final (id, files) in attached)
+        if (store.mayChange(id))
+          for (final file in files)
+            // Not one left to a computer (Q645).
+            if (file.kind.hasText && !file.computer) (id, file.hash),
+    };
     _capturedRemovable = {
       for (final id in [?note?.id, for (final section in _sections) section.id])
         for (final detail in CapturedDetail.values)
@@ -920,6 +1076,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // Ticks wherever this Device holds a role, unless in the trash.
     final ticks = note != null && !note.isTrashed;
     final shows = _showsTicks = showsTicks(store, widget.noteId);
+    _hiddenFromAi = hiddenFromAiEntry(store, widget.noteId, _reload);
+    _hiddenByOther = store
+        .hiddenFromAiBy(widget.noteId)
+        .any((mark) => mark != widget.noteId);
     BoxTicking ticking(String id, List<ShownBox> boxes) => BoxTicking(
       notes: notes,
       entity: id,
@@ -1580,28 +1740,35 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
-  /// Asks to remove the Note's "From …" badge (#164), and removes it.
-  Future<void> _removePackFrom(String name) async {
-    final t = context.t;
-    final remove = await showDialog<bool>(
+  /// The "From …" badge's menu at the finger [at]: Remove “From [name]”,
+  /// which removes it (#164) without asking; the announcement at the top
+  /// undoes it (#268).
+  Future<void> _removePackFrom(String name, Offset at) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final remove = await showMenu<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        content: Text(t.removePackFrom(name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            key: const ValueKey('remove-pack-from'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.remove),
-          ),
-        ],
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
       ),
+      items: [
+        PopupMenuItem(
+          key: const ValueKey('remove-pack-from'),
+          value: true,
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline),
+              const SizedBox(width: 12),
+              Flexible(child: Text(context.t.removePackFrom(name))),
+            ],
+          ),
+        ),
+      ],
     );
     if (remove != true || !mounted) return;
-    widget.notes.store.removePackFrom(widget.noteId);
+    removePackFrom(context, widget.notes.store, widget.noteId);
     setState(() {});
   }
 
@@ -1661,7 +1828,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             icon: Icons.inventory_2_outlined,
             value: t.packFrom(profileDisplayName(t, from.name)),
             onTap: changes
-                ? (_) => _removePackFrom(profileDisplayName(t, from.name))
+                ? (at) => _removePackFrom(profileDisplayName(t, from.name), at)
                 : null,
           ),
         for (final routine in _routines)
@@ -1739,6 +1906,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               _toggleTicks,
             ),
           ),
+        // Off in a Shared Area, where it is not offered (#267).
+        if (_hiddenFromAi case (:final on, :final toggle))
+          SettingBadge(
+            key: const ValueKey('badge-hidden-from-ai'),
+            setting: t.hiddenFromAi,
+            icon: hiddenFromAiIcon,
+            value: on
+                ? t.settingOn
+                : _hiddenByOther
+                ? t.hiddenFromAiByArea
+                : t.settingOff,
+            valueIcon: switchIcon(on),
+            onTap: (_) =>
+                _editSwitch(t.hiddenFromAi, hiddenFromAiIcon, on, toggle),
+          ),
         // In a Shared Area only a Manager sets them up (ADR 0013).
         if (schedules)
           SettingBadge(
@@ -1778,7 +1960,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The Frog badge's menu at the finger [at]: Eat now while it is open
   /// and this Device may check it off, Remove the Frog for who may
-  /// manage it (ADR 0013), which asks once, as the Frog view does.
+  /// manage it (ADR 0013), which the announcement at the top undoes, as
+  /// in the Frog view (#268).
   Future<void> _frogMenu(
     Frog frog,
     Offset at, {
@@ -1826,7 +2009,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveText();
     if (picked) {
       _frogs.markDone(frog.id);
-    } else if (!await trashFrog(context, _frogs, frog) || !mounted) {
+    } else if (!trashFrog(context, _frogs, frog)) {
       return;
     }
     _reload();
@@ -1960,18 +2143,154 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Removes the Photo Text ([photo]) or Transcript of [hash] of the Note
-  /// or Section [id] after asking once; the file stays.
-  Future<void> _removeGenerated(String id, String hash, bool photo) async {
+  /// or Section [id] without asking; the file stays, and the announcement
+  /// at the top undoes it (#268).
+  void _removeGenerated(String id, String hash, bool photo) {
     _saveText();
-    final removed = await removeGeneratedText(
-      context,
-      widget.notes,
-      id,
-      hash,
-      photo: photo,
+    if (removeGeneratedText(context, widget.notes, id, hash, photo: photo)) {
+      _reload();
+    }
+  }
+
+  /// The files of the Note or Section [id] (#267): each with its
+  /// Attachment Text, Replace and Append for a text that says something,
+  /// Remove for the text and for the file where this Device may, and
+  /// Read the text again; then the texts of the files removed while their
+  /// texts stay, under their names.
+  List<Widget> _fileParts(
+    String id,
+    List<Attachment> files,
+    Map<String, String> texts,
+    List<Attachment> removed,
+  ) {
+    final t = context.t;
+    Widget button(
+      String key,
+      String hash,
+      IconData icon,
+      String label,
+      VoidCallback? run,
+    ) => Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: ValueKey('$key:$hash'),
+        onPressed: run,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
     );
-    if (!mounted || !removed) return;
-    _reload();
+    List<Widget> takeOver(String hash, String? text) => [
+      if (text != null &&
+          text.trim().isNotEmpty &&
+          _textChangeable.contains(id)) ...[
+        button(
+          'replace-text',
+          hash,
+          Icons.swap_horiz,
+          t.replaceNoteText,
+          () => _takeOver(id, text, append: false),
+        ),
+        button(
+          'append-text',
+          hash,
+          Icons.playlist_add,
+          t.appendToNoteText,
+          () => _takeOver(id, text, append: true),
+        ),
+      ],
+    ];
+    return [
+      for (final file in files) ...[
+        const SizedBox(height: 16),
+        AttachmentRow(
+          key: ValueKey('file:${file.hash}'),
+          file: file,
+          noteId: id,
+          text: texts[file.hash],
+        ),
+        AttachmentText(file: file, text: texts[file.hash]),
+        ...takeOver(file.hash, texts[file.hash]),
+        if (_fileTextRemovable.contains((id, file.hash)))
+          button(
+            'remove-text',
+            file.hash,
+            Icons.backspace_outlined,
+            t.removeGeneratedText,
+            () {
+              _saveText();
+              if (removeAttachmentText(context, widget.notes, id, file.hash)) {
+                _reload();
+              }
+            },
+          ),
+        if (_fileReadable.contains((id, file.hash)))
+          button(
+            'again',
+            file.hash,
+            Icons.refresh,
+            t.readTextAgain,
+            _remaking.contains((id, file.hash))
+                ? null
+                : () => _readFileAgain(id, file.hash),
+          ),
+        if (_fileRemovable.contains((id, file.hash)))
+          button(
+            'remove',
+            file.hash,
+            Icons.link_off,
+            t.removeFileKeepText,
+            () async {
+              _saveText();
+              final gone = await removeAttachment(
+                context,
+                widget.notes,
+                id,
+                file.hash,
+              );
+              if (mounted && gone) _reload();
+            },
+          ),
+      ],
+      // Removed, the file shows no more; its text stays.
+      for (final file in removed) ...[
+        const SizedBox(height: 16),
+        GeneratedTextLabel(
+          key: ValueKey('removed-file:${file.hash}'),
+          label: file.name.isEmpty ? t.attachmentTextLabel : file.name,
+          child: AttachmentText(file: file, text: texts[file.hash]),
+        ),
+        ...takeOver(file.hash, texts[file.hash]),
+      ],
+    ];
+  }
+
+  /// Reads the file [hash] of the Note or Section [id] again (#267).
+  Future<void> _readFileAgain(String id, String hash) async {
+    _saveText();
+    setState(() => _remaking.add((id, hash)));
+    await readAttachmentAgain(context, id, hash);
+    if (!mounted) return;
+    setState(() {
+      _remaking.remove((id, hash));
+      _load();
+    });
+  }
+
+  /// Picks files with the system's file picker and attaches them to the
+  /// Note (#267); one that cannot be is said at the top.
+  Future<void> _attachFile() async {
+    _saveText();
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final files = FileScope.of(context);
+    final picked = await files.pickFiles();
+    if (picked.isEmpty) return;
+    final read = await readPickedFiles(files, picked, widget.notes.store);
+    announceNotAttached(t, announcements, navigator, read);
+    // Written also when the editor was left meanwhile: nothing is lost.
+    attachFiles(widget.notes, widget.noteId, read.files);
+    if (mounted) _reload();
   }
 
   /// Reads the photo ([photo]) or transcribes the recording [hash] of the
@@ -2206,11 +2525,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// Asks once whether the Note goes to the trash, with the same dialog
-  /// as the card's Delete, and closes the editor when it went.
-  Future<void> _trash() async {
-    if (!await deleteNote(context, widget.notes, widget.noteId)) return;
-    if (!mounted) return;
+  /// Moves the Note to the trash as the card's Delete does, without
+  /// asking, and closes the editor; the announcement at the top undoes it
+  /// (#268).
+  void _trash() {
+    if (!deleteNote(context, widget.notes, widget.noteId)) return;
     Navigator.of(context).pop();
   }
 
@@ -2228,9 +2547,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     Navigator.of(context).pop();
   }
 
+  /// Answers [open] from the line at the top with a snooze, Skip or
+  /// Tomorrow (#269); the latter two take it off the line.
+  void _answer(OpenOccurrence open, OccurrenceAnswer answer) {
+    answerOccurrence(
+      context,
+      _routineBook,
+      AlarmSyncScope.of(context),
+      open.routine.id,
+      open.occurrence,
+      answer,
+    );
+    _reload();
+  }
+
   /// The lines at the top of the editor, above the name (#215): of each
   /// Occurrence the Note asks to check off "Due 15:00" or "Missed" with
-  /// its day, and Done; for a one-time Reminder, the Note's only one, also
+  /// its day, and Done, Snooze while it is not Missed and Not today
+  /// (#269); for a one-time Reminder, the Note's only one, also
   /// "Done and move to trash" where this Device may move the Note.
   List<Widget> _openLines(AppLocalizations t, bool changes) {
     final locale = Localizations.localeOf(context).toString();
@@ -2262,6 +2596,33 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 key: const ValueKey('open-done'),
                 onPressed: () => _checkOff(open),
                 child: Text(t.markDone),
+              ),
+              // Snooze rings from now on: not for one Missed (#269).
+              if (!open.missed)
+                AnswerButton(
+                  key: const ValueKey('open-snooze'),
+                  label: t.snooze,
+                  items: () => occurrenceAnswerItems(
+                    t,
+                    (answer) => answer,
+                    snooze: true,
+                    notToday: false,
+                    tomorrow: false,
+                  ),
+                  onAnswer: (answer) => _answer(open, answer),
+                ),
+              AnswerButton(
+                key: const ValueKey('open-not-today'),
+                label: t.notToday,
+                items: () => occurrenceAnswerItems(
+                  t,
+                  (answer) => answer,
+                  snooze: false,
+                  notToday: true,
+                  // Tomorrow only for one of today or later.
+                  tomorrow: !(open.occurrence.day < today),
+                ),
+                onAnswer: (answer) => _answer(open, answer),
               ),
               if (changes && open.routine.isReminder && _routines.length == 1)
                 OutlinedButton(
@@ -2350,6 +2711,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               icon: Icons.history,
             ),
             if (changes) ...[
+              if (FileScope.of(context).pickable)
+                BarAction(
+                  key: const ValueKey('attach-file'),
+                  label: t.attachFile,
+                  onPressed: () => unawaited(_attachFile()),
+                  icon: Icons.attach_file,
+                ),
               BarAction(
                 label: t.mergeInto,
                 onPressed: _merge,
@@ -2518,6 +2886,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 photo: false,
               ),
             ],
+            ..._fileParts(
+              note.id,
+              note.attachments,
+              note.attachmentTexts,
+              note.removedAttachments,
+            ),
             const SizedBox(height: 16),
             for (final (i, section) in _sections.indexed)
               EditorPanel(
@@ -2634,6 +3008,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         photo: false,
                       ),
                     ],
+                    // A merged Note's files travel with it (ADR 0047).
+                    ..._fileParts(
+                      section.id,
+                      section.attachments,
+                      section.attachmentTexts,
+                      section.removedAttachments,
+                    ),
                     const SizedBox(height: 4),
                     // Its details, each removable on its own, in the
                     // same dialog as the Note's Captured badge (#170).
@@ -2771,42 +3152,6 @@ class EditorPanel extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// Asks once whether a Note goes to the trash with its [linked]
-/// Routines and Reminders: true to delete, null to cancel.
-class _DeleteNoteDialog extends StatelessWidget {
-  final List<Routine> linked;
-
-  const _DeleteNoteDialog({required this.linked});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    return AlertDialog(
-      title: Text(switch (linked) {
-        [] => t.deleteNoteQuestion,
-        [final one] when one.isReminder => t.deleteNoteReminderQuestion,
-        _ => t.deleteNoteLinkedQuestion(linked.length),
-      }),
-      content: Text(
-        linked.isEmpty ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(t.cancel),
-        ),
-        TextButton(
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(t.delete),
-        ),
-      ],
-    );
-  }
 }
 
 /// Asks once whether a photo or voice recording goes while its text

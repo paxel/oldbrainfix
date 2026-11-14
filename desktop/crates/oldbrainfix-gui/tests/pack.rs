@@ -374,16 +374,18 @@ fn unclaimed_notes_say_from_ada_on_the_card_and_in_the_dialog_until_removed() ->
     assert_eq!(harness.state().store().pack_from(&shoes)?, None);
     assert!(harness.state().store().pack_from(&bike)?.is_some());
 
-    // The badge in the Note dialog asks first.
+    // Ctrl+Z brings it back (#268).
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert!(harness.state().store().pack_from(&shoes)?.is_some());
+
+    // The badge in the Note dialog offers it in its menu, which asks
+    // nothing either.
     harness.state_mut().select_note(&bike);
     harness.run();
     click(&mut harness, "Pack: From Ada");
-    assert!(shows(&harness, "Remove “From Ada”"));
     assert!(harness.state().store().pack_from(&bike)?.is_some());
-    harness
-        .get_by_role_and_label(Role::Button, "Remove")
-        .click_accesskit();
-    harness.run();
+    click(&mut harness, "Remove “From Ada”");
     assert_eq!(harness.state().store().pack_from(&bike)?, None);
     assert!(!shows(&harness, "Pack: From Ada"));
     Ok(())

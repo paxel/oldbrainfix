@@ -6,8 +6,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Done and snoozes tapped on notifications, and the boxes checked in the
- * Agenda widget, kept until the app has
+ * Done, snoozes and Not today tapped on notifications, and the boxes
+ * checked in the Agenda widget, kept until the app has
  * applied them to the log (adapted from Chaos Alert). Survives the
  * process dying; the app reads, applies, then acknowledges, so a crash in
  * between loses nothing.
@@ -37,8 +37,17 @@ object EventQueue {
     /** A Line of a Checklist without a Routine checked in the Agenda widget (#209). */
     const val KIND_CHECKLIST = "checklist"
 
+    /** Not today ▸ Skip tapped on a notification (#269). */
+    const val KIND_SKIP = "skip"
+
+    /** Not today ▸ Tomorrow tapped on a notification (#269). */
+    const val KIND_TOMORROW = "tomorrow"
+
     /** The kinds of action this version applies. */
-    private val KINDS = setOf("done", "snooze", NudgePlan.KIND_SNOOZE, KIND_LINE, KIND_FROG, KIND_SHOPPING, KIND_CHECKLIST)
+    private val KINDS = setOf(
+        "done", "snooze", KIND_SKIP, KIND_TOMORROW, NudgePlan.KIND_SNOOZE,
+        KIND_LINE, KIND_FROG, KIND_SHOPPING, KIND_CHECKLIST,
+    )
 
     @Synchronized
     fun add(context: Context, kind: String, alarm: Alarm, until: Long = 0, line: String = "") =

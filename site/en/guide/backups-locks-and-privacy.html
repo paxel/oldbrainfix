@@ -1,4 +1,4 @@
-<!-- page: title="Backups, locks and privacy" track="guide" order=9 summary="Backups and the Recovery Sheet, the passphrase and the recovery key, restoring, Google backup, the App Lock and Area Locks, blocking a person, what the app keeps where, and sending feedback." -->
+<!-- page: title="Backups, locks and privacy" track="guide" order=9 summary="Backups and the Recovery Sheet, the passphrase and the recovery key, restoring, taking Notes back from a Backup, Google backup, the App Lock and Area Locks, blocking a person, what the app keeps where, and sending feedback." -->
 <p class="lede">
   Backups are encrypted files of everything on a Device, opened with your passphrase or with the
   recovery key on the Recovery Sheet. The App Lock and the Area Locks keep others from browsing your
@@ -13,14 +13,14 @@
 <guide-box name="set-up">
 <h2>Set up Backups</h2>
 <p>Make encrypted Backups possible, with a passphrase and a Recovery Sheet.</p>
-<box-tab device="phone" alt="Backups on the phone, not set up yet: the fields Passphrase and Passphrase again with Set up Backups">
+<box-tab device="phone" alt="Backups on the phone, not set up yet: the fields Passphrase and Passphrase again with Set up Backups, below them Take Notes back with Open a Backup…">
 <li>Tap your Profile picture on the Agenda.</li>
 <li>Tap <strong>Back up this Device</strong>.</li>
 <li>Type a passphrase into both fields.</li>
 <li>Tap <strong>Set up Backups</strong>.</li>
 <li>Tap <strong>Print or save</strong> and keep the sheet somewhere safe.</li>
 </box-tab>
-<box-tab device="desktop" alt="The Backups dialog in the desktop app, not set up yet: the fields Passphrase and Passphrase again with Set up Backups">
+<box-tab device="desktop" alt="The Backups dialog in the desktop app, not set up yet: the fields Passphrase and Passphrase again with Set up Backups, below them Take Notes back with Open a Backup…">
 <li>Click <strong>Sync ▸ Backups…</strong>.</li>
 <li>Type a passphrase into both fields.</li>
 <li>Click <strong>Set up Backups</strong>.</li>
@@ -65,6 +65,21 @@
   folder again and pair your other Devices again. Simple or Advanced and the Trash setting come back
   with the Backup.
 </p>
+<p>
+  <strong>Open a Backup…</strong> under Take Notes back on the Backups page brings Notes back from
+  a Backup without restoring it, such as a Note deleted for good or an earlier version of a list;
+  on the desktop it is also in the File menu. On an Android phone and on the desktop the file
+  picker starts in the Backups folder; then type the passphrase, or the recovery key, which the
+  phone can also scan. The page shows the Backup's Notes as the tree of a Pack, under the date the
+  Backup was made, and a Note that lay in its Trash says "In the Trash". On the phone, the Notes of
+  a locked Area that is closed are left out; <strong>Unlock and show them</strong> asks for the PIN
+  and adds them to the tree. No Note is ticked at first; a Note ticked comes back with its photos,
+  recordings and Routines. <strong>Add</strong>
+  takes the ticked Notes in as copies in new Areas named after the Backup's, such as "Doctor
+  (Backup)" when a Doctor Area is here already, and the Notes of no Area in "From a Backup". As
+  with a Pack, a copy comes without its Tally entries, ticks, check-offs and history; nothing else
+  on the Device changes.
+</p>
 </box-more>
 </guide-box>
 
@@ -77,7 +92,7 @@
 <li>Tap <strong>Choose folder</strong> and pick a folder.</li>
 <li>Leave <strong>Back up every week</strong> switched on.</li>
 </box-tab>
-<box-tab device="desktop" alt="The Backups dialog set up: the Recovery Sheet with Save the Recovery Sheet, and the folder with Back up every week, the last Backup and Back up now">
+<box-tab device="desktop" alt="The Backups dialog set up: the Recovery Sheet with Save the Recovery Sheet, and the folder with Back up every week, the last Backup and Back up now, below them Take Notes back with Open a Backup…">
 <li>Click <strong>Sync ▸ Backups…</strong>.</li>
 <li>Click <strong>Choose folder</strong> and pick a folder.</li>
 <li>Leave <strong>Back up every week</strong> ticked.</li>
@@ -195,6 +210,42 @@
 </box-more>
 </guide-box>
 
+<guide-box name="hidden-from-ai">
+<h2>Hide a Note from the AI</h2>
+<p>Keep a diary, health papers or a lawyer's letter away from any AI you let read your Notes.</p>
+<box-tab device="phone" alt="The menu of the Household in the Areas list, its switch Hidden from AI">
+<li>Tap <strong>⋮</strong> on the Note's card.</li>
+<li>Tap <strong>Hidden from AI</strong>.</li>
+<li>Tap <strong>⋮</strong> beside an Area in the Areas list for all of it.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Household marked Hidden from AI in the desktop window: shields on its row and its cards, its right-click menu with Hidden from AI ticked">
+<li>Right-click the Note's card.</li>
+<li>Click <strong>Hidden from AI</strong>.</li>
+<li>Right-click an Area in the sidebar for all of it.</li>
+</box-tab>
+<box-more>
+<p>
+  A Note or an Area marked <strong>Hidden from AI</strong> does not exist for the AI: neither the
+  computer's AI port nor any AI Task reads it, searches it, counts it or sees its Routines and
+  Reminders. A Note in a hidden Area is hidden with it. The mark goes to your own Devices only, never
+  to other people, and you see and back up everything as before. A shield beside the Note's card or
+  the Area's name shows it; in the Note editor the badge <strong>Hidden from AI</strong> switches it,
+  and says "Off, hidden by its Area" when only its Area hides it. Tapped again, the switch takes the
+  mark off.
+</p>
+<p>
+  Hidden and shared exclude each other: the switch is not offered in a Shared Area. Filing a hidden
+  Note into a Shared Area, merging a hidden Note with a Note of a Shared Area either way, sharing an
+  Area that is hidden or holds a hidden Note, sending a hidden Note to a person and exporting it as a
+  Pack ask first: "… hidden from AI. What is hidden from AI is
+  not given to other people. Show it to the AI first." <strong>Show to the AI</strong> takes the mark
+  off and goes on; Cancel changes nothing. A Note hidden by its Area is not shown to the AI from
+  there: the question names the Area, whose mark comes off in its own menu, so its other Notes stay
+  hidden.
+</p>
+</box-more>
+</guide-box>
+
 <guide-box name="block">
 <h2>Block a person</h2>
 <p>Keep everything a person writes off your Devices.</p>
@@ -230,14 +281,14 @@
 <guide-box name="privacy">
 <h2>See what the app keeps where</h2>
 <p>Know which Devices hold your Notes and settings, and what leaves them.</p>
-<box-tab device="phone" alt="Settings on the phone: at the top, which settings sync to your own Devices">
+<box-tab device="phone" alt="Settings on the phone: under the search field, which settings sync to your own Devices">
 <li>Tap your Profile picture, then <strong>Settings</strong>.</li>
-<li>Read the line at the top on what syncs.</li>
+<li>Read the line under the search field on what syncs.</li>
 <li>Tap <strong>About Old Brain Fix</strong> at the end.</li>
 <li>Tap <strong>Privacy policy</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The Settings dialog in the desktop app: at the top, which settings sync to your own Devices">
-<li>Click <strong>Edit ▸ Settings…</strong> and read the line at the top.</li>
+<box-tab device="desktop" alt="The Settings dialog in the desktop app: under the search field, which settings sync to your own Devices">
+<li>Click <strong>Edit ▸ Settings…</strong> and read the line under the search field.</li>
 <li>Click <strong>Help ▸ About Old Brain Fix</strong>.</li>
 <li>Click <strong>Privacy policy</strong>.</li>
 </box-tab>
@@ -251,7 +302,9 @@
 <p>
   Most settings stay on the Device they were set on. "Simple or Advanced and the Trash setting sync to
   your own Devices; the other settings belong to this phone." These two are settings of you as a
-  person: they go to your own Devices and into your Backups, never to anyone else.
+  person: they go to your own Devices and into your Backups, never to anyone else. On the phone and
+  the desktop, the search field above that line finds a setting by its name or detail line; a search
+  that finds nothing says so. On the desktop Ctrl+F puts the cursor into it.
 </p>
 <p>
   The app sends nothing on its own. When the phone app stopped unexpectedly, the next start says so

@@ -45,6 +45,7 @@
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "io.github.paxel.oldbrainfix.item"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "io.github.paxel.oldbrainfix.card"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "io.github.paxel.oldbrainfix.pack"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.data"
     ).@count &gt; 0
 ).@count &gt; 0</string>
 		</dict>

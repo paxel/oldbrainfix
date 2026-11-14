@@ -9,6 +9,7 @@ import 'announcements.dart';
 import 'bundle_platform.dart';
 import 'checklist_view.dart';
 import 'failure_dialog.dart';
+import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
 import 'pack_screen.dart';
@@ -24,7 +25,8 @@ import 'text_marks_view.dart';
 /// Sends the Note [noteId] as a Sent Item (ADR 0009, 0015): asks who
 /// gets it, writes the file, encrypted to that person or signed only,
 /// and offers it to the app the user picks. A Note sent before goes as
-/// an update, or as its cancellation. Announces a failure when no file
+/// an update, or as its cancellation, and starts at the person this
+/// Device last sent it to (#288). Announces a failure when no file
 /// could be written or no app takes it, why behind the tap.
 Future<void> sendNoteFile(
   BuildContext context,
@@ -44,11 +46,17 @@ Future<void> sendNoteFile(
     fix: fix,
     details: details,
   );
+  // A Note Hidden from AI goes to nobody (#267): asked before whom.
+  if (!await showToAiFirst(context, store, store.hiddenFromAiBy(noteId)) ||
+      !context.mounted) {
+    return;
+  }
   final picked = await showDialog<_Pick>(
     context: context,
     builder: (_) => SendNoteDialog(
       recipients: sentItemRecipients(store),
       update: wasSent(store, noteId),
+      sentTo: lastSentTo(store, noteId),
     ),
   );
   if (picked == null) return;
@@ -61,9 +69,15 @@ Future<void> sendNoteFile(
     );
     return;
   }
-  File(path).writeAsBytesSync(
-    sendNote(store, noteId, to: picked.to, cancel: picked.cancel),
+  if (!context.mounted) return;
+  // Marked meanwhile, as by a sync: asked again.
+  final bytes = await unlessHiddenFromAi(
+    context,
+    store,
+    () => sendNote(store, noteId, to: picked.to, cancel: picked.cancel),
   );
+  if (bytes == null) return;
+  File(path).writeAsBytesSync(bytes);
   if (await files.share(path, type: sentItemMimeType) == ShareOutcome.noApp) {
     notSent(t.sendNoApp, t.sendNoAppFix, 'sent item: no app took the file');
   }
@@ -76,15 +90,21 @@ typedef _Pick = ({Recipient? to, bool cancel});
 /// Asks who gets a Note: anyone, signed only, with a hint that whoever
 /// holds the file can read it, or one of the people whose keys are
 /// known here, encrypted to them. For a Note sent before ([update]) it
-/// sends an update, or a cancellation instead.
+/// sends an update, or a cancellation instead. Nobody is picked at
+/// first, so a private Note never goes to whoever is listed first
+/// (#288): an update starts at the person it went to before
+/// ([sentTo], a [Recipient.id]) while they are listed, and with nobody
+/// listed only anyone is left. Send waits for a pick.
 class SendNoteDialog extends StatefulWidget {
   final List<Recipient> recipients;
   final bool update;
+  final String? sentTo;
 
   const SendNoteDialog({
     super.key,
     required this.recipients,
     this.update = false,
+    this.sentTo,
   });
 
   @override
@@ -92,8 +112,13 @@ class SendNoteDialog extends StatefulWidget {
 }
 
 class _SendNoteDialogState extends State<SendNoteDialog> {
-  /// The index of the person picked; -1 for anyone.
-  late var _picked = widget.recipients.isEmpty ? -1 : 0;
+  /// The index of the person picked; -1 for anyone, null for nobody yet.
+  late int? _picked = widget.recipients.isEmpty
+      ? -1
+      : switch (widget.recipients.indexWhere((r) => r.id == widget.sentTo)) {
+          -1 => null,
+          final i => i,
+        };
   var _cancel = false;
 
   @override
@@ -105,7 +130,7 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
       content: SingleChildScrollView(
         child: RadioGroup<int>(
           groupValue: _picked,
-          onChanged: (i) => setState(() => _picked = i ?? -1),
+          onChanged: (i) => setState(() => _picked = i),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,7 +151,7 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
                 title: Text(t.sendAnyone),
                 secondary: const Icon(Icons.lock_open),
               ),
-              if (_picked < 0) Text(t.sendPlainHint),
+              if (_picked == -1) Text(t.sendPlainHint),
               if (widget.update)
                 CheckboxListTile(
                   key: const ValueKey('send-cancel'),
@@ -149,10 +174,13 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
         ),
         TextButton(
           key: const ValueKey('send-note'),
-          onPressed: () => Navigator.of(context).pop<_Pick>((
-            to: _picked < 0 ? null : recipients[_picked],
-            cancel: _cancel,
-          )),
+          onPressed: switch (_picked) {
+            null => null,
+            final picked => () => Navigator.of(context).pop<_Pick>((
+              to: picked < 0 ? null : recipients[picked],
+              cancel: _cancel,
+            )),
+          },
           child: Text(t.sendAction),
         ),
       ],

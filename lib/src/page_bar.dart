@@ -19,12 +19,12 @@ const _iconRoom = 44.0;
 
 /// An action of a page's bar that goes into ⋮ when the bar is full (UI
 /// laws, "The bar"): on the bar its icon with [label] as its tooltip, in
-/// ⋮ its icon and [label]. Any other widget among a bar's actions stays
-/// on the bar.
+/// ⋮ its icon and [label], greyed in both while [onPressed] is null. Any
+/// other widget among a bar's actions stays on the bar.
 class BarAction extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const BarAction({
     super.key,
@@ -79,6 +79,7 @@ class _BarMore extends StatelessWidget {
         PopupMenuItem(
           key: action.key,
           value: action.onPressed,
+          enabled: action.onPressed != null,
           child: Row(
             children: [
               Icon(action.icon),

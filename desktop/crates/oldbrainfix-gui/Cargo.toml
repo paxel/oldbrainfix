@@ -17,9 +17,9 @@ name = "oldbrainfix"
 path = "src/bin/oldbrainfix.rs"
 
 [dependencies]
-oldbrainfix-core = { path = "../oldbrainfix-core", version = "0.5.1" }
-oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.5.1" }
-oldbrainfix-whisper = { path = "../oldbrainfix-whisper", version = "0.5.1" }
+oldbrainfix-core = { path = "../oldbrainfix-core", version = "0.6.0" }
+oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.6.0" }
+oldbrainfix-whisper = { path = "../oldbrainfix-whisper", version = "0.6.0" }
 eframe = "0.35"
 egui = "0.35"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
@@ -59,6 +59,8 @@ rfd = "0.17"
 # the core's zip, which also reads Deflate here, through the flate2 the
 # PNG decoder brings already.
 zip = { version = "=9.1.2", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+# Whether the app running already is older than this start (#290).
+semver = "1"
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -79,16 +81,17 @@ tray-icon = { version = "0.26", default-features = false }
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
-# The login's display name for the own Profile (`GetUserNameExW`).
+# The login's display name for the own Profile (`GetUserNameExW`), and
+# a file opened with its program without a shell (`ShellExecuteW`).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Identity"] }
+windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Identity", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 # Closing a notification once its Occurrence is Done.
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
 zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
 
 [build-dependencies]
-oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.5.1" }
+oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.6.0" }
 
 [dev-dependencies]
 # wgpu draws the desktop screenshots (tests/screenshots.rs).

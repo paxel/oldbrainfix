@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'l10n.dart';
+import 'leave_saves.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
@@ -46,6 +47,15 @@ class _FieldDraft {
         : TallyUnits.parseShown(text, unit(system), system);
   }
 
+  /// Whether anything was set in it (#275).
+  bool get touched =>
+      name.text.trim().isNotEmpty ||
+      unitText.trim().isNotEmpty ||
+      picked != null ||
+      rulePicked ||
+      targetText.trim().isNotEmpty ||
+      check;
+
   void dispose() {
     name.dispose();
     focus.dispose();
@@ -61,8 +71,10 @@ class _FieldDraft {
 /// typed with the known units it may mean as suggestions (#159), and the
 /// rule follows its kind until it is picked. Save files the Tally into
 /// [place], Unsorted for none, with every row that has a name; rows left
-/// without one are dropped. It pops the new Tally's Note id; leaving
-/// without Save makes nothing.
+/// without one are dropped. It pops the new Tally's Note id. Leaving by
+/// Back saves as Save does (#275); without a name or a named field, or
+/// with a target that is no number, it asks once whether to discard what
+/// was typed. Left as it opened, it makes nothing.
 class TallyFormScreen extends StatefulWidget {
   final Notes notes;
 
@@ -114,6 +126,24 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) field.focus.requestFocus();
     });
+  }
+
+  /// Whether anything differs from the page as it opened (#275).
+  bool _changed() =>
+      _name.text.trim() != widget.text.trim() ||
+      _fields.length > 1 ||
+      _fields.any((field) => field.touched);
+
+  /// Whether Save would make the Tally.
+  bool _valid() {
+    final kept = _fields.where((field) => field.name.text.trim().isNotEmpty);
+    return _name.text.trim().isNotEmpty &&
+        kept.isNotEmpty &&
+        !kept.any(
+          (field) =>
+              field.targetText.trim().isNotEmpty &&
+              field.target(_system) == null,
+        );
   }
 
   void _save() {
@@ -356,49 +386,56 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    return Scaffold(
-      appBar: pageBar(
-        context,
-        title: t.newTally,
-        actions: [
-          TextButton(
-            key: const ValueKey('tally-form-save'),
-            onPressed: _save,
-            child: Text(t.save),
-          ),
-        ],
-      ),
-      // A short page, built whole, so a field to fix can come into view.
-      body: SingleChildScrollView(
-        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            EditorPanel(
-              child: TextField(
-                key: const ValueKey('tally-form-name'),
-                controller: _name,
-                focusNode: _nameFocus,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: t.kindName,
-                  errorText: _nameMissing ? t.kindNameMissing : null,
-                ),
-              ),
-            ),
-            for (final (index, field) in _fields.indexed)
-              _fieldRow(t, index, field),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.tonalIcon(
-                key: const ValueKey('tally-form-add-field'),
-                onPressed: _addField,
-                icon: const Icon(Icons.add),
-                label: Text(t.tallyAddField),
-              ),
+    return LeaveSaves(
+      changed: _changed,
+      valid: _valid,
+      save: _save,
+      // Save shows what to fix without saving.
+      onKeep: _save,
+      child: Scaffold(
+        appBar: pageBar(
+          context,
+          title: t.newTally,
+          actions: [
+            TextButton(
+              key: const ValueKey('tally-form-save'),
+              onPressed: _save,
+              child: Text(t.save),
             ),
           ],
+        ),
+        // A short page, built whole, so a field to fix can come into view.
+        body: SingleChildScrollView(
+          padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              EditorPanel(
+                child: TextField(
+                  key: const ValueKey('tally-form-name'),
+                  controller: _name,
+                  focusNode: _nameFocus,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: t.kindName,
+                    errorText: _nameMissing ? t.kindNameMissing : null,
+                  ),
+                ),
+              ),
+              for (final (index, field) in _fields.indexed)
+                _fieldRow(t, index, field),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  key: const ValueKey('tally-form-add-field'),
+                  onPressed: _addField,
+                  icon: const Icon(Icons.add),
+                  label: Text(t.tallyAddField),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

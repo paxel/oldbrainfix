@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/app_lock.dart';
+import 'package:oldbrainfix/src/backup_notes_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
@@ -169,6 +171,7 @@ void main() {
     FolderPlatform folders = const NoFolders(),
     PhotoPlatform? photos,
     PairingPlatform? pairing,
+    AppLock? lock,
   }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
@@ -189,7 +192,12 @@ void main() {
                 folders: folders,
                 child: BundleScope(
                   bundles: bundles,
-                  child: child ?? const SizedBox.shrink(),
+                  child: lock == null
+                      ? child ?? const SizedBox.shrink()
+                      : LockScope(
+                          lock: lock,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                 ),
               ),
             ),
@@ -634,6 +642,301 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Welcome to Old Brain Fix'), findsOneWidget);
       expect(find.byKey(const ValueKey('restore-offer')), findsNothing);
+    });
+  });
+
+  group('taking Notes back', () {
+    /// A Backup of a Device with a Note and its photo in an Area, a Note
+    /// in its Trash and one filed nowhere, and its recovery key.
+    Future<(String, String)> withNotes() async {
+      final old = Store.inMemory(clock: () => now)
+        ..applyProfileDefaults(name: 'Pixel');
+      addTearDown(old.close);
+      final notes = Notes(old);
+      final area = Places(old).addArea('Doctor');
+      notes.capture(
+        'Pills at eight',
+        place: area.id,
+        photos: [
+          Uint8List.fromList(List.generate(9000, (i) => (i * 7 + 3) & 0xff)),
+        ],
+      );
+      notes.trash(notes.capture('Old list', place: area.id).id);
+      notes.capture('Call the vet');
+      final code = await setUpBackups(old, 'correct horse', derive: quickKey);
+      final path = '${dir.path}/notes.$backupExtension';
+      await writeBackup(old, path);
+      return (path, code);
+    }
+
+    /// This Device, with an Area of the Backup's name and a Note of its
+    /// own, its Backups going into a folder.
+    Store device() {
+      final store = Store.inMemory(clock: () => now)
+        ..applyProfileDefaults(name: 'Phone');
+      addTearDown(store.close);
+      final area = Places(store).addArea('Doctor');
+      Notes(store).capture('Already here', place: area.id);
+      store.backupFolder = 'content://folders/tree/primary%3ABackups';
+      return store;
+    }
+
+    Future<void> openPicked(WidgetTester tester, String picked) async {
+      bundles.picks = picked;
+      await tester.tap(find.byKey(const ValueKey('backup-open')));
+      await tester.pumpAndSettle();
+    }
+
+    FilledButton add(WidgetTester tester) => tester.widget<FilledButton>(
+      find.byKey(const ValueKey('backup-notes-add')),
+    );
+
+    testWidgets('opens a Backup from the Backups folder and takes the Notes '
+        'ticked back as copies in new Areas', (tester) async {
+      final (path, _) = await withNotes();
+      final store = device();
+      final seq = store.currentSeq();
+      await page(tester, BackupScreen(store: store, derive: quickKey));
+
+      final picked = copy(path);
+      await openPicked(tester, picked);
+      expect(bundles.pickedFrom, [store.backupFolder]);
+      expect(find.byType(BackupNotesScreen), findsOneWidget);
+      expect(find.textContaining('Backup of October 24, 2026'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('restore-passphrase')),
+        'wrong horse',
+      );
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not opened.',
+        title: 'Backup not opened',
+        cause: 'This passphrase or recovery key does not open the Backup.',
+        fix:
+            'Type the passphrase again, or use the recovery key on the '
+            'Recovery Sheet.',
+      );
+      announcements.dismiss();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('restore-passphrase')),
+        'correct horse',
+      );
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      // The tree under the Backup's date, the Note from its Trash said
+      // to be there, nothing ticked yet.
+      expect(find.byKey(const ValueKey('backup-notes-when')), findsOneWidget);
+      expect(find.text('Old list'), findsOneWidget);
+      expect(find.text('In the Trash'), findsOneWidget);
+      expect(find.text('Call the vet'), findsOneWidget);
+      expect(add(tester).onPressed, isNull);
+      expect(store.currentSeq(), seq);
+      // "Untick all" goes back to that start: a Note ticked after it
+      // still comes back with its photo.
+      await tester.tap(find.byKey(const ValueKey('pack-tick-all')));
+      await tester.pumpAndSettle();
+      expect(add(tester).onPressed, isNotNull);
+      await tester.tap(find.byKey(const ValueKey('pack-untick-all')));
+      await tester.pumpAndSettle();
+      expect(add(tester).onPressed, isNull);
+
+      await tester.tap(find.text('Pills at eight'));
+      await tester.tap(find.text('Old list'));
+      await tester.tap(find.text('Call the vet'));
+      await tester.pumpAndSettle();
+      expect(add(tester).onPressed, isNotNull);
+      await tester.tap(find.byKey(const ValueKey('backup-notes-add')));
+      await tester.pumpAndSettle();
+
+      expect(announcements.visible, '3 Notes added');
+      expect(find.byType(BackupNotesScreen), findsNothing);
+      expect(find.byType(BackupScreen), findsOneWidget);
+      final places = Places(store);
+      expect(
+        places.areas().map((a) => a.name),
+        containsAll(['Doctor', 'Doctor (Backup)', 'From a Backup']),
+      );
+      final copied = places.areas().firstWhere(
+        (a) => a.name == 'Doctor (Backup)',
+      );
+      final texts = {for (final n in Notes(store).all()) n.text: n};
+      expect(texts.keys, containsAll(['Already here', 'Pills at eight']));
+      // Out of the Trash, filed where it was.
+      expect(texts['Old list']?.place, copied.id);
+      expect(texts['Old list']?.trashed, isNull);
+      expect(texts['Pills at eight']?.place, copied.id);
+      expect(texts['Pills at eight']?.photos, hasLength(1));
+      expect(store.photo(texts['Pills at eight']!.photos.single), isNotNull);
+      expect(File(picked).existsSync(), isFalse);
+    });
+
+    testWidgets('refuses what is no Backup, a later one, a mistyped recovery '
+        'key and a damaged one, as restoring does', (tester) async {
+      final (path, code) = await withNotes();
+      final store = device();
+      final seq = store.currentSeq();
+      await page(tester, BackupScreen(store: store, derive: quickKey));
+
+      final notOne = copy('${Directory.current.path}/pubspec.yaml');
+      await openPicked(tester, notOne);
+      expect(find.byType(BackupNotesScreen), findsNothing);
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not opened.',
+        title: 'Backup not opened',
+        cause: 'This file is not a Backup of Old Brain Fix.',
+        fix: 'Pick the Backup file again.',
+      );
+      expect(File(notOne).existsSync(), isFalse);
+
+      final later = '${dir.path}/later.$backupExtension';
+      File(later).writeAsStringSync('{"format":2,"type":"$backupType"}\n');
+      await openPicked(tester, copy(later));
+      expect(find.byType(BackupNotesScreen), findsNothing);
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not opened.',
+        cause: 'This Backup was made by a newer Old Brain Fix.',
+        fix: 'Update Old Brain Fix on this Device, then open it again.',
+      );
+
+      // Cut off: it opens with the key, then reads as damaged.
+      final bytes = File(path).readAsBytesSync();
+      final cut = '${dir.path}/cut.$backupExtension';
+      File(cut).writeAsBytesSync(bytes.sublist(0, bytes.length - 3));
+      final picked = copy(cut);
+      await openPicked(tester, picked);
+      await tester.enterText(
+        find.byKey(const ValueKey('restore-code')),
+        'not a key',
+      );
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'That is not a recovery key. Check it against the Recovery Sheet.',
+        ),
+        findsOneWidget,
+      );
+      await tester.enterText(find.byKey(const ValueKey('restore-code')), code);
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not opened.',
+        cause: 'The Backup is damaged or incomplete.',
+        fix: 'Nothing was changed; try an older Backup.',
+      );
+      expect(find.byKey(const ValueKey('backup-notes-when')), findsNothing);
+      expect(store.currentSeq(), seq);
+
+      // Leaving takes the copy away.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(BackupScreen), findsOneWidget);
+      expect(File(picked).existsSync(), isFalse);
+    });
+
+    testWidgets('leaves out the Notes of a locked Area closed now and shows '
+        'them once it is unlocked', (tester) async {
+      // A Backup of this very Device, its Diary locked since.
+      final store = device();
+      final diary = Places(store).addArea('Diary');
+      Notes(store).capture('Dear diary', place: diary.id);
+      await setUpBackups(store, 'correct horse', derive: quickKey);
+      final path = '${dir.path}/own.$backupExtension';
+      await writeBackup(store, path);
+      store
+        ..setPin('1357', iterations: 10)
+        ..setAreaLocked(diary.id, true);
+      final lock = AppLock(store: store);
+      addTearDown(lock.dispose);
+      await page(
+        tester,
+        BackupScreen(store: store, derive: quickKey),
+        lock: lock,
+      );
+      await openPicked(tester, copy(path));
+      await tester.enterText(
+        find.byKey(const ValueKey('restore-passphrase')),
+        'correct horse',
+      );
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      expect(find.text('Already here'), findsOneWidget);
+      expect(find.text('Dear diary'), findsNothing);
+      expect(find.text('Diary'), findsNothing);
+      expect(
+        find.text(
+          'The Notes of a locked Area are left out until you unlock '
+          'it.',
+        ),
+        findsOneWidget,
+      );
+
+      // A wrong PIN shows nothing more.
+      final unlock = find.byKey(const ValueKey('backup-notes-unlock'));
+      await tester.tap(unlock);
+      await tester.pumpAndSettle();
+      expect(find.text('Show the Notes of locked Areas'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('pinField')), '0000');
+      await tester.tap(find.widgetWithText(TextButton, 'Unlock'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dear diary'), findsNothing);
+      expect(lock.isAreaClosed(diary.id), isTrue);
+
+      await tester.tap(unlock);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('pinField')), '1357');
+      await tester.tap(find.widgetWithText(TextButton, 'Unlock'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dear diary'), findsOneWidget);
+      expect(find.text('Already here'), findsOneWidget);
+      expect(unlock, findsNothing);
+      // Open on this page only: everywhere else it stays closed.
+      expect(lock.isAreaClosed(diary.id), isTrue);
+    });
+
+    testWidgets('a file changed after it was opened adds nothing and says '
+        'so', (tester) async {
+      final (path, code) = await withNotes();
+      final store = device();
+      final seq = store.currentSeq();
+      await page(tester, BackupScreen(store: store, derive: quickKey));
+      final picked = copy(path);
+      await openPicked(tester, picked);
+      await tester.enterText(find.byKey(const ValueKey('restore-code')), code);
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pills at eight'));
+      await tester.pumpAndSettle();
+
+      final bytes = File(picked).readAsBytesSync();
+      File(picked).writeAsBytesSync(bytes.sublist(0, bytes.length - 3));
+      await tester.tap(find.byKey(const ValueKey('backup-notes-add')));
+      await tester.pumpAndSettle();
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Notes were not added.',
+        title: 'Notes not added',
+        cause:
+            'The Backup file changed or could not be read again since it '
+            'was opened.',
+        fix: 'Nothing was added; open the Backup again.',
+      );
+      expect(store.currentSeq(), seq);
+      expect(find.byType(BackupNotesScreen), findsOneWidget);
     });
   });
 }

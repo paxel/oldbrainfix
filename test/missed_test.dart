@@ -56,6 +56,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-schedule')));
+    await tester.pumpAndSettle();
+  }
+
   final card = find.byType(MissedSummaryCard);
   Finder inCard(Finder finder) => find.descendant(of: card, matching: finder);
 
@@ -148,6 +159,33 @@ void main() {
       await tester.pumpAndSettle();
       expect(inCard(find.text('pills · once')), findsOneWidget);
     });
+
+    testWidgets('fits a 320 dp phone in German; the day and time wrap '
+        'instead of running off', (tester) async {
+      tester.view.physicalSize = const Size(960, 1920);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      madeAt(DateTime(2026, 10, 21, 6), 'pills', daily([at(8)]));
+      madeAt(
+        DateTime(2026, 10, 21, 6),
+        'dentist',
+        Schedule(start: Day(2026, 10, 22)),
+      );
+      await start(tester);
+
+      expect(inCard(find.text('Verpasst')), findsOneWidget);
+      expect(inCard(find.text('Do., 22.10.2026  Ganztägig')), findsOneWidget);
+      expect(inCard(find.text('Fr., 23.10.2026  08:00')), findsOneWidget);
+      final right = tester.getTopRight(card).dx;
+      for (final row in inCard(find.textContaining('.2026')).evaluate()) {
+        expect(
+          tester.getTopRight(find.byWidget(row.widget)).dx,
+          lessThanOrEqualTo(right),
+        );
+      }
+    });
   });
 
   group('Re-nag', () {
@@ -177,7 +215,7 @@ void main() {
         'the Device\'s default only in Settings', (tester) async {
       final pills = routines.create('pills', daily([at(8)]));
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
 
       final section = find.text('Re-nag');
@@ -221,7 +259,7 @@ void main() {
       final pills = routines.create('pills', daily([at(8)]));
       routines.setRenag(pills.id, const Duration(minutes: 20));
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       final section = find.text('Re-nag');
       await tester.scrollUntilVisible(
         section,
@@ -292,8 +330,8 @@ void main() {
     ) async {
       madeAt(DateTime(2026, 10, 22, 6), 'pills', daily([at(8)]));
       await start(tester);
-      // Tomorrow's row; [tap] scrolls it to the top of the week.
-      await tap(tester, find.text('pills').at(1));
+      // Tomorrow's row, scrolled to the top of the week.
+      await editSchedule(tester, find.text('pills').at(1));
       await tap(tester, find.text('Save'));
       // The Agenda's own list, not the PageView around it (#258).
       await tester.scrollUntilVisible(

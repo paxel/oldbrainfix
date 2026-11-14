@@ -598,6 +598,29 @@ void main() {
       expect(sessions.setupOf(made.noteId)?.pool, [pushUps, mop]);
     });
 
+    testWidgets('a tag picked filters for the Tallies tagged below it too, '
+        'and no more (#267)', (tester) async {
+      final run = tally('Run #sport/run');
+      final swim = tally('Swim #Sport/Swim');
+      final chess = tally('Chess #sportive');
+      final plain = tally('Plank #sport');
+      final made = session([plain], count: 1);
+      await start(tester);
+      await edit(tester, made.noteId);
+
+      await tap(tester, key('session-tag-#sport'));
+      expect(key('session-pool-$plain'), findsOneWidget);
+      expect(key('session-pool-$run'), findsOneWidget);
+      expect(key('session-pool-$swim'), findsOneWidget);
+      expect(key('session-pool-$chess'), findsNothing);
+
+      await tap(tester, key('session-tag-#sport'));
+      await tap(tester, key('session-tag-#sport/run'));
+      expect(key('session-pool-$run'), findsOneWidget);
+      expect(key('session-pool-$swim'), findsNothing);
+      expect(key('session-pool-$plain'), findsNothing);
+    });
+
     testWidgets('the New Session page filters its pool by tag, and New Tally '
         'there carries the tags (#220)', (tester) async {
       final pushUps = tally('Push-ups #sport');
@@ -748,12 +771,18 @@ void main() {
       await tap(tester, key('session-pick-$pushUps'));
       expect(find.text('Entry'), findsOneWidget);
       await tap(tester, key('tally-entry-trash'));
-      await tap(tester, find.text('Delete').last);
+      // Deleted without asking; the announcement at the top undoes it
+      // (#268).
+      expect(find.byType(AlertDialog), findsNothing);
 
       expect(tallies.entryById(entry.id)?.isTrashed, isTrue);
       final box = tester.widget<Checkbox>(find.byType(Checkbox).first);
       expect(box.value, isFalse);
       expect(box.onChanged, isNull, reason: 'it only shows Done (#208)');
+
+      await tap(tester, find.text('Entry deleted'));
+      expect(tallies.entryById(entry.id)?.isTrashed, isFalse);
+      expect(tester.widget<Checkbox>(find.byType(Checkbox).first).value, true);
     });
 
     testWidgets('the heading\'s box only shows Done and a tap on it does '

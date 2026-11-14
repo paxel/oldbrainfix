@@ -199,6 +199,21 @@ class FakeAlarms implements AlarmPlatform {
     return tapped;
   }
 
+  OpenedOccurrence? _occurrenceTapped;
+
+  /// An Occurrence's notification is tapped while the app runs (#270).
+  void tapOccurrence(OpenedOccurrence opened) {
+    _occurrenceTapped = opened;
+    _actions.add(null);
+  }
+
+  @override
+  Future<OpenedOccurrence?> occurrenceOpened() async {
+    final tapped = _occurrenceTapped;
+    _occurrenceTapped = null;
+    return tapped;
+  }
+
   @override
   Future<Map<AlarmPermission, bool>> permissions() async => {
     for (final p in steps) p: granted[p] ?? false,

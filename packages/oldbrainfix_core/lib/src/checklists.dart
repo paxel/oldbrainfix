@@ -180,6 +180,57 @@ class Line {
 
   /// Whether it shows under a parent, in its group.
   bool get inGroup => parent != null;
+
+  /// Whether it shows checked by a check made on [day] by [wallClock].
+  bool checkedOn(Day day, WallClock wallClock) => switch (checkedAt) {
+    final at? when checked => Day.of(wallClock(at)) == day,
+    _ => false,
+  };
+}
+
+/// A deleted Line of a Checklist or Shopping List (#268), for its folded
+/// "Removed Lines": it can be restored.
+class DeletedLine {
+  /// Entity id, `line:<id>`.
+  final String id;
+  final String text;
+
+  /// When it was deleted.
+  final DateTime deleted;
+
+  const DeletedLine({
+    required this.id,
+    required this.text,
+    required this.deleted,
+  });
+}
+
+/// The deleted Lines of the Note [noteId] of the list [making], those a
+/// restore brings back, the last deleted first; none without a list.
+List<DeletedLine> deletedLinesOf(Store store, String noteId, String? making) {
+  if (making == null) return const [];
+  final found = <DeletedLine>[];
+  for (final id in store.entitiesOfType(ChecklistKeys.typeLine)) {
+    final fields = store.currentFields(id);
+    if (fields[ChecklistKeys.note] != noteId ||
+        fields[ChecklistKeys.made] != making) {
+      continue;
+    }
+    final deleted = DateTime.tryParse(fields[ChecklistKeys.trashed] ?? '');
+    if (deleted == null) continue;
+    found.add(
+      DeletedLine(
+        id: id,
+        text: StoredText.read(fields[ChecklistKeys.text]).text,
+        deleted: deleted.toUtc(),
+      ),
+    );
+  }
+  found.sort((a, b) {
+    final byDeleted = b.deleted.compareTo(a.deleted);
+    return byDeleted != 0 ? byDeleted : a.id.compareTo(b.id);
+  });
+  return found;
 }
 
 /// An Occurrence of the Routine [routineId]: one a Checklist is checked
@@ -359,17 +410,20 @@ class Checklists {
   static RoutineOccurrence? _now(List<Routine> routines, Day today) {
     Day? latest;
     for (final routine in routines) {
-      final day = _lastDay(routine.schedule, today);
+      var day = _lastDay(routine.schedule, today);
+      // A one-time Occurrence Tomorrow added counts as any other.
+      for (final moved in routine.moved) {
+        if (moved.day > today) break;
+        if (day == null || moved.day > day) day = moved.day;
+      }
       if (day != null && (latest == null || day > latest)) latest = day;
     }
     final found = <(Routine, Occurrence)>[
       for (final routine in routines)
         if (latest != null)
-          for (final occurrence in routine.schedule.on(latest))
-            (routine, occurrence)
-        else
-          for (final occurrence in routine.schedule.next(today, 1))
-            (routine, occurrence),
+          for (final occurrence in routine.on(latest)) (routine, occurrence)
+        else if (routine.firstFrom(today) case final occurrence?)
+          (routine, occurrence),
     ];
     if (found.isEmpty) return null;
     found.sort((a, b) {
@@ -379,7 +433,7 @@ class Checklists {
     var (routine, occurrence) = found.first;
     if (latest != null) {
       (routine, occurrence) = found.firstWhere(
-        (f) => f.$1.doneAt(f.$2) == null,
+        (f) => f.$1.doneAt(f.$2) == null && f.$1.skippedAt(f.$2) == null,
         orElse: () => found.last,
       );
     }
@@ -409,8 +463,10 @@ class Checklists {
   /// Lines are open of how many ([Checklist.openCount],
   /// [Checklist.count]); the apps show one of a locked Area set to
   /// Masked as a row that tells nothing of it, as a Shopping List's.
-  /// Reading writes nothing.
-  List<ChecklistAgendaRow> agendaRows() {
+  /// With [checkedToday], the wall clock today is read on, a list whose
+  /// open Lines were all checked today shows too, its Lines struck for
+  /// the day (#276). Reading writes nothing.
+  List<ChecklistAgendaRow> agendaRows({WallClock? checkedToday}) {
     final notes = Notes(store);
     final routines = Routines(store);
     final spawned = {for (final r in routines.all()) ?routines.note(r)?.id};
@@ -430,9 +486,22 @@ class Checklists {
       return byCapture != 0 ? byCapture : a.$1.id.compareTo(b.$1.id);
     });
     final lists = ofNotes([for (final (n, _) in shown) n.id]);
+    // The clock is read only when asked for.
+    final today = switch (checkedToday) {
+      final wall? => (day: Day.today(store.clock(), wall), wall: wall),
+      null => null,
+    };
+    bool listed(Checklist list) =>
+        list.openCount > 0 ||
+        switch (today) {
+          (:final day, :final wall) => list.lines.any(
+            (l) => l.checkedOn(day, wall),
+          ),
+          null => false,
+        };
     return [
       for (final (note, shows) in shown)
-        if (lists[note.id] case final list? when list.openCount > 0)
+        if (lists[note.id] case final list? when listed(list))
           (list: list, shows: shows),
     ];
   }
@@ -658,6 +727,11 @@ class Checklists {
     store.append(lineId, ChecklistKeys.trashed, null);
   }
 
+  /// The deleted Lines of the Checklist of [noteId] that [restore]
+  /// brings back, the last deleted first; none when it is no Checklist.
+  List<DeletedLine> deletedLines(String noteId) =>
+      deletedLinesOf(store, noteId, _making(noteId));
+
   /// Moves the Line [lineId], with its group, to just before the Line
   /// [before], or to the end. A single Line moved before a Line of a
   /// group joins that group; one placed before a Line at the top comes
@@ -798,7 +872,7 @@ class Checklists {
         (routine.noteId != noteId && routines.note(routine)?.id != noteId)) {
       throw ArgumentError.value(on.routineId, 'on', 'no Routine of $noteId');
     }
-    if (!routine.schedule.has(on.occurrence)) {
+    if (!routine.has(on.occurrence)) {
       throw ArgumentError.value(on.occurrence, 'on', 'not due then');
     }
     if (!store.mayCheckOff(on.routineId)) {

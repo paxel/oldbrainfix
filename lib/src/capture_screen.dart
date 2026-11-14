@@ -7,11 +7,13 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
 import 'announcements.dart';
+import 'attachment_views.dart';
 import 'capture_choices.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'file_into_screen.dart';
+import 'file_platform.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'note_card.dart';
@@ -64,11 +66,13 @@ Future<void> captureNote(
   bool photo = false,
   bool gallery = false,
   bool paste = false,
+  bool file = false,
   required VoidCallback onChanged,
   ValueChanged<String>? onCaptured,
 }) async {
   final location = LocationScope.of(context);
   final photos = PhotoScope.of(context);
+  final files = FileScope.of(context);
   final microphone = VoiceScope.of(context);
   final contextSource = ContextScope.of(context);
   if (shared != null) announceUntranscribable(context, shared.recordings);
@@ -82,12 +86,14 @@ Future<void> captureNote(
         photos: photos,
         voice: microphone,
         contextSource: contextSource,
+        files: files,
         place: place,
         shared: shared,
         startVoice: voice,
         startPhoto: photo,
         startGallery: gallery,
         startPaste: paste,
+        startFile: file,
       ),
     ),
   );
@@ -296,6 +302,13 @@ class CaptureScreen extends StatefulWidget {
   /// does.
   final bool startPaste;
 
+  /// The system's file picker, for the File button (#267).
+  final FilePlatform files;
+
+  /// Opens the system's file picker at once; back from it, the screen is
+  /// text Capture with the files attached.
+  final bool startFile;
+
   const CaptureScreen({
     super.key,
     required this.notes,
@@ -303,12 +316,14 @@ class CaptureScreen extends StatefulWidget {
     this.photos = const NoPhotos(),
     this.voice = const NoVoice(),
     this.contextSource = const NoContext(),
+    this.files = const NoFiles(),
     this.place,
     this.shared,
     this.startVoice = false,
     this.startPhoto = false,
     this.startGallery = false,
     this.startPaste = false,
+    this.startFile = false,
   });
 
   @override
@@ -357,6 +372,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   /// The hashes of the Note's voice recordings, as written.
   List<String> _recordings = const [];
+
+  /// The Note's files, as written (#267).
+  List<Attachment> _files = const [];
+
+  /// Set when the Note, Hidden from AI, was kept out of the Shared Area
+  /// picked (#267), to say so at the top once.
+  var _notFiledHidden = false;
+
+  /// The files being picked or shared in and written; null while none
+  /// are.
+  Future<void>? _filing;
 
   /// Whether the screen shows voice instead of the text field.
   var _voiceMode = false;
@@ -436,7 +462,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     _extras = currentExtras(widget.notes.store, widget.contextSource);
     // A share is meant to be kept: it is written at once, as one Note.
     final shared = widget.shared;
-    if (shared != null && !shared.isEmpty) {
+    if (shared != null && !shared.holdsNoNote) {
       _text.text = shared.text;
       _create(
         shared.text.trim(),
@@ -444,6 +470,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
         recordings: [
           for (final recording in shared.recordings) recording.bytes,
         ],
+      );
+    }
+    // Its files are read in first, into the same Note (#267).
+    if (shared != null && shared.files.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _attachFiles(Future.value(shared.files)),
       );
     }
     // The app may be killed in the background: the text is kept.
@@ -467,6 +499,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _pickPhotos());
     } else if (widget.startPaste && widget.photos.pasteable) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _paste());
+    } else if (widget.startFile && widget.files.pickable) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _pickFiles());
     }
   }
 
@@ -554,6 +588,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
     });
     if (created != null) _adopt(created);
     if (choices case (:final filed)) _choicesWritten(filed);
+    if (_notFiledHidden && mounted) {
+      _notFiledHidden = false;
+      final t = context.t;
+      announceFailure(
+        context,
+        t.captureNotFiledHidden,
+        title: t.captureNotFiledHiddenTitle,
+        cause: t.captureNotFiledHiddenCause,
+        fix: t.captureNotFiledHiddenFix,
+        details: 'capture: hidden from AI, not filed into $_place',
+      );
+    }
   }
 
   /// Writes what was set up here into the Note [noteId], one after the
@@ -567,7 +613,21 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final note = notes.byId(noteId);
     if (note == null) return null;
     final place = _place;
-    if (place != null && note.place != place) notes.file(noteId, place);
+    var filed = place ?? note.place;
+    if (place != null && note.place != place) {
+      // A Note Hidden from AI, as by the Area it was captured in, goes
+      // into no Shared Area (#267): it stays, said at the top, as
+      // Capture asks nothing.
+      final area = store.areaOf(place);
+      if (area != null &&
+          store.isShared(area) &&
+          store.hiddenFromAiBy(noteId).isNotEmpty) {
+        _notFiledHidden = true;
+        filed = note.place;
+      } else {
+        notes.file(noteId, place);
+      }
+    }
     if (note.importance != _importance) {
       notes.setImportance(noteId, _importance);
     }
@@ -585,7 +645,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       choice.spawnFrom(store, noteId);
     }
     if (_frog && !_frogWritten) Frogs(store).spawn(noteId);
-    return (filed: place ?? note.place);
+    return (filed: filed);
   }
 
   /// Marks what [_writeChoices] wrote as written, the Note in [filed].
@@ -664,9 +724,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// capture holds no photo, which no Line can hold, nothing written
   /// that hangs on the Note, and a recording only where a speech model
   /// can give its Transcript; never behind the App Lock, which keeps the
-  /// lists out of reach, nor without a list to add to.
-  VoidCallback? _shoppingOffer() {
-    if ((_lock?.locked ?? false) || _photos.isNotEmpty) return null;
+  /// lists out of reach, nor without a list to add to. With one list to
+  /// add to it names it, "Add to Weekly", and picks it without the page
+  /// (#276).
+  ({String label, VoidCallback run})? _shoppingOffer() {
+    if ((_lock?.locked ?? false) || _photos.isNotEmpty || _files.isNotEmpty) {
+      return null;
+    }
     if (_writtenSchedules.isNotEmpty || _frogWritten || _tallyWritten) {
       return null;
     }
@@ -674,8 +738,23 @@ class _CaptureScreenState extends State<CaptureScreen> {
         SpeechScope.of(context)?.model.current == null) {
       return null;
     }
-    final lists = shoppingListsToAddTo(widget.notes.store, _lock);
-    return lists.isEmpty ? null : _pickShopping;
+    final t = context.t;
+    return switch (shoppingListsToAddTo(widget.notes.store, _lock)) {
+      [] => null,
+      [final only] => (
+        label: t.addToNamedShoppingList(shoppingTitle(t, only)),
+        run: () => _intoList(only),
+      ),
+      _ => (label: t.addToShoppingList, run: _pickShopping),
+    };
+  }
+
+  /// The lines go into the Shopping List [note]; it shows at the top.
+  void _intoList(Note note) {
+    if (_photos.isNotEmpty || _files.isNotEmpty) return;
+    setState(
+      () => _shopping = (id: note.id, title: shoppingTitle(context.t, note)),
+    );
   }
 
   /// Picks the Shopping List the lines go into; it shows at the top.
@@ -687,12 +766,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
             ShoppingPickScreen(store: store, current: _shopping?.id),
       ),
     );
-    if (!mounted || picked == null || _photos.isNotEmpty) return;
-    final note = widget.notes.byId(picked);
-    if (note == null) return;
-    setState(
-      () => _shopping = (id: picked, title: shoppingTitle(context.t, note)),
-    );
+    if (!mounted || picked == null) return;
+    if (widget.notes.byId(picked) case final note?) _intoList(note);
   }
 
   /// Sets up the first field of the Tally the Note becomes.
@@ -702,20 +777,25 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() => _tally = field);
   }
 
-  /// Captures the new Note with [text], [photos] and [recordings].
+  /// Captures the new Note with [text], [photos], [recordings] and
+  /// [files].
   void _create(
     String text, {
     List<Uint8List> photos = const [],
     List<Uint8List> recordings = const [],
-  }) => _adopt(_captureNote(text, photos: photos, recordings: recordings));
+    List<NewFile> files = const [],
+  }) => _adopt(
+    _captureNote(text, photos: photos, recordings: recordings, files: files),
+  );
 
-  /// Writes the new Note with [text], [photos] and [recordings], nudged
-  /// [nudgeIn] from now, 1 h when null, unless it is sorted.
+  /// Writes the new Note with [text], [photos], [recordings] and [files],
+  /// nudged [nudgeIn] from now, 1 h when null, unless it is sorted.
   Note _captureNote(
     String text, {
     Duration? nudgeIn,
     List<Uint8List> photos = const [],
     List<Uint8List> recordings = const [],
+    List<NewFile> files = const [],
   }) => widget.notes.capture(
     text,
     format: _formatOf(text) ?? TextFormats.plain,
@@ -724,6 +804,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     nudgeIn: _sorted ? null : nudgeIn ?? Notes.defaultNudge,
     photos: photos,
     recordings: recordings,
+    files: files,
     sourceApp: widget.shared?.sourceApp,
   );
 
@@ -752,6 +833,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     _filed = note.place;
     _photos = note.photos;
     _recordings = note.recordings;
+    _files = note.attachments;
   }
 
   /// Writes [photos] into the Note, capturing it with the text so far
@@ -769,6 +851,58 @@ class _CaptureScreenState extends State<CaptureScreen> {
       widget.notes.addPhoto(captured.noteId, bytes);
     }
     _photos = widget.notes.byId(captured.noteId)?.photos ?? _photos;
+  }
+
+  /// Writes [files] into the Note, capturing it with the text so far
+  /// when there is none yet.
+  void _addFiles(List<NewFile> files) {
+    if (files.isEmpty) return;
+    // No Line holds a file: the capture stays a Note, to keep it.
+    _shopping = null;
+    final captured = _captured;
+    if (captured == null) {
+      _create(_text.text.trim(), files: files);
+      return;
+    }
+    attachFiles(widget.notes, captured.noteId, files);
+    _files = widget.notes.byId(captured.noteId)?.attachments ?? _files;
+  }
+
+  /// Picks files with the system's file picker into the Note (#267); no
+  /// second picker while files are being attached.
+  Future<void> _pickFiles() =>
+      _filing ?? _attachFiles(widget.files.pickFiles());
+
+  /// Waits for the files [coming], reads them in and writes them into
+  /// the Note, after those already coming, also when leaving began
+  /// meanwhile, so none is lost; one that cannot be attached is said at
+  /// the top.
+  Future<void> _attachFiles(Future<List<DeviceFile>> coming) {
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final before = _filing;
+    late final Future<void> run;
+    run =
+        () async {
+          if (before != null) await before;
+          final picked = await coming;
+          if (picked.isEmpty) return;
+          final read = await readPickedFiles(
+            widget.files,
+            picked,
+            widget.notes.store,
+          );
+          announceNotAttached(t, announcements, navigator, read);
+          if (mounted && !_leaving) {
+            setState(() => _addFiles(read.files));
+          } else {
+            _addFiles(read.files);
+          }
+        }().whenComplete(() {
+          if (identical(_filing, run)) _filing = null;
+        });
+    return _filing = run;
   }
 
   /// Takes a photo with the camera into the Note.
@@ -1005,10 +1139,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
           ? 'capture into a Shopping List: a recording got no Transcript'
           : 'capture into a Shopping List: the list can no longer be added to',
     );
+    // The list used last goes to the top of the pick (#276).
+    void used() => notes.store.lastShoppingList = listId;
     if (_captured == null) {
       try {
-        ShoppingLists(notes.store)
+        final added = ShoppingLists(notes.store)
             .addLines(listId, _text.text.trim(), deviceWallClock);
+        if (added.isNotEmpty) used();
         return null;
       } on StateError {
         // The list went meanwhile: a Note with all that was set up.
@@ -1034,11 +1171,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
     ];
     if (waiting.isEmpty) {
       if (pourIntoShopping(notes, captured.noteId, listId) == true) {
+        used();
         return null;
       }
       announce(untranscribed: false);
       return captured;
     }
+    used();
     return (
       noteId: captured.noteId,
       editing: null,
@@ -1166,9 +1305,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
   Widget _field(BuildContext context) {
     final t = context.t;
     final autofocus =
-        !widget.startVoice && !widget.startPhoto && !widget.startGallery;
+        !widget.startVoice &&
+        !widget.startPhoto &&
+        !widget.startGallery &&
+        !widget.startFile;
     final decoration = InputDecoration(
-      hintText: _photos.isEmpty && _recordings.isEmpty
+      hintText: _photos.isEmpty && _recordings.isEmpty && _files.isEmpty
           ? t.captureHint
           : t.capturePhotoHint,
     );
@@ -1402,11 +1544,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
       ),
       const SizedBox(height: 8),
     ],
+    for (final file in _files)
+      AttachmentRow(key: ValueKey('capture-file-${file.hash}'), file: file),
+    if (_files.isNotEmpty) const SizedBox(height: 8),
   ];
 
-  /// The Photo, Voice, Gallery and Paste buttons above the Nudge choices,
-  /// side by side, each with its icon above its one-word label so four
-  /// fit the row; none while recording, where the big stop button comes
+  /// The Photo, Voice, Gallery, Paste and File buttons above the Nudge
+  /// choices, side by side, each with its icon above its one-word label
+  /// so five fit the row; none while recording, where the big stop button comes
   /// first. Below the text field, they rise with the keyboard.
   Widget _captureButtons(BuildContext context) {
     final t = context.t;
@@ -1438,6 +1583,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
           onPressed: _paste,
           icon: Icons.content_paste,
           label: t.paste,
+        ),
+      if (widget.files.pickable)
+        _captureButton(
+          key: const ValueKey('captureFile'),
+          onPressed: _pickFiles,
+          icon: Icons.attach_file,
+          label: t.file,
         ),
     ];
     if (buttons.isEmpty) return const SizedBox.shrink();
@@ -1471,7 +1623,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       children: [
         Icon(icon, size: 28),
         const SizedBox(height: 4),
-        // Four in a row: a long word shrinks rather than being cut.
+        // Five in a row: a long word shrinks rather than being cut.
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(label, maxLines: 1, softWrap: false),

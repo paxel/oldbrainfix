@@ -96,8 +96,11 @@
             android:excludeFromRecents="true"
             android:theme="@style/CrashTheme"/>
         <!-- The share target: images, sound files such as voice messages,
-             text and links from other apps. It only hands the share over
-             to MainActivity. -->
+             text and links from other apps, and any other file, which
+             becomes an Attachment (#267). It only hands the share over
+             to MainActivity. A file of one of the app's own types, or
+             one a messenger names only "some file" or a zip, is offered
+             to BundleActivity too: the user picks which. -->
         <activity
             android:name=".ShareActivity"
             android:exported="true"
@@ -107,29 +110,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="application/ogg" />
+                <data android:mimeType="*/*" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="application/ogg" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
         <!-- Sync bundles (ADR 0003), Sent Items (ADR 0009), Profile card
@@ -188,6 +174,16 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@android:style/Theme.NoDisplay" />
+        <!-- A Tally's shortcut on the home screen (#284): hands the Tally
+             over to MainActivity, which opens its entry page. Not
+             exported: the launcher starts a pinned shortcut as the app
+             itself, and no other app may open an entry page. -->
+        <activity
+            android:name=".TallyEntryActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
         <!-- Quick Settings tiles for voice, text and photo Capture. On the
              lock screen Android asks to unlock first. -->
         <service
@@ -219,6 +215,25 @@
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+        </service>
+        <!-- Print to Old Brain Fix (#293): Android's print service with one
+             printer, "Old Brain Fix". Only the system binds it, and only
+             once the user turned it on in Android's print settings. A
+             print job's PDF is kept in the app's files and opens Capture
+             as a PDF shared in does. In the app's own process, where the
+             shares wait. -->
+        <service
+            android:name=".PrintInService"
+            android:label="@string/print_printer"
+            android:icon="@mipmap/ic_launcher"
+            android:exported="true"
+            android:permission="android.permission.BIND_PRINT_SERVICE">
+            <intent-filter>
+                <action android:name="android.printservice.PrintService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.printservice"
+                android:resource="@xml/print_service" />
         </service>
         <!-- Home-screen widgets: one capture button each, and all three
              side by side. -->

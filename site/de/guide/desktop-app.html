@@ -1,4 +1,4 @@
-<!-- page: title="Die Desktop-App" track="guide" order=10 summary="Old Brain Fix unter Linux, Windows und macOS: die Installation, das Fenster und seine Karten, der Notiz-Dialog, die Menüleiste, Dialoge und Tasten, der Infobereich und der Start beim Anmelden, das Erfassen-Fenster, das Tastenkürzel und oldbrainfix capture, Ziehen und Ablegen, Benachrichtigungen, Transkripte, der Abgleich mit dem Handy, der KI-Port, das Design und die Größe, und was nur das Handy hat." -->
+<!-- page: title="Die Desktop-App" track="guide" order=10 summary="Old Brain Fix unter Linux, Windows und macOS: die Installation, das Fenster und seine Karten, der Notiz-Dialog, die Menüleiste, Dialoge und Tasten, der Infobereich und der Start beim Anmelden, das Erfassen-Fenster, das Tastenkürzel und oldbrainfix capture, Ziehen und Ablegen, Benachrichtigungen, Transkripte, der Abgleich mit dem Handy, der KI-Port, das Fragen zu den Notizen, das Design und die Größe, und was nur das Handy hat." -->
 <p class="lede">
   Die Desktop-App läuft unter Linux, Windows und macOS und hat dieselben Notizen, Bereiche und
   Routinen wie das Handy, sobald beide gekoppelt sind. Sie ist ein Fenster mit einer Menüleiste, den
@@ -20,10 +20,10 @@
 <li>Öffne es.</li>
 <li>Wähle beim ersten Start eine der drei Möglichkeiten.</li>
 </box-tab>
-<box-tab device="desktop" alt="Der erste Start in der Desktop-App: Neu bei Old Brain Fix, Ein Gerät von mir hinzufügen und Aus einer Sicherung wiederherstellen">
+<box-tab device="desktop" alt="Der erste Start in der Desktop-App: Neu bei Old Brain Fix, Ein Gerät von mir hinzufügen, Aus einer Sicherung wiederherstellen und Aus einem Markdown-Ordner neu aufbauen">
 <li>Installiere die App, wie die Seite <a href="../reference/install.html">Installieren</a> sagt.</li>
 <li>Starte Old Brain Fix.</li>
-<li>Wähle beim ersten Start eine der drei Möglichkeiten.</li>
+<li>Wähle beim ersten Start eine der Möglichkeiten.</li>
 </box-tab>
 <box-more>
 <p>
@@ -33,10 +33,19 @@
   Anwendungsmenü und ihr Symbol.
 </p>
 <p>
+  Ein Update ersetzt die laufende App beim nächsten Start: Läuft im Infobereich noch eine ältere
+  Version, beendet die neue sie und läuft an ihrer Stelle, mit dem Fenster, dem Erfassen-Fenster, dem
+  Erfassen oder dem Import, für den sie gestartet wurde. Endet die ältere nicht innerhalb weniger
+  Sekunden, sagt die neue das und startet nichts; wähle <strong>Beenden</strong> im Menü des
+  Infobereichs und starte die App erneut.
+</p>
+<p>
   Der erste Start bietet dieselben drei Wahlmöglichkeiten wie das Handy: <strong>Neu bei Old Brain
   Fix</strong> mit der Startauswahl, in der Einfach oder Erweitert gewählt wird, <strong>Ein Gerät von
   mir hinzufügen</strong> und <strong>Aus einer Sicherung wiederherstellen</strong> (siehe
-  <a href="getting-started.html#auf-dem-desktop">Erste Schritte</a>). Das Profil übernimmt Namen und
+  <a href="getting-started.html#auf-dem-desktop">Erste Schritte</a>), und eine vierte,
+  <strong>Aus einem Markdown-Ordner neu aufbauen</strong> (siehe
+  <a href="#deine-notizen-in-eine-andere-app-mitnehmen">Deine Notizen in eine andere App mitnehmen</a>). Das Profil übernimmt Namen und
   Bild deiner Anmeldung am Computer, sonst den Namen des Computers. Der Desktop fragt weder nach dem
   Sprachmodell noch nach dem Zugriff für Alarme.
 </p>
@@ -62,11 +71,13 @@
 <box-more>
 <p>
   Das Fenster hat oben die Menüleiste und darunter zwei Spalten; die Grenze zwischen ihnen lässt
-  sich ziehen.
+  sich ziehen. Das Fenster öffnet sich so groß und dort, wie es geschlossen wurde, maximiert, wenn
+  es das war, mit der Seitenleiste so breit, wie sie verlassen wurde. Das bleibt nur auf diesem
+  Computer gespeichert. Ein Fenster, dessen Bildschirm fehlt, öffnet sich mittig.
 </p>
 <ul>
-  <li><strong>Links</strong>, die Seitenleiste: Agenda, Unsortiert, Alle Notizen und Frösche, dann „Bereiche“ mit einem „+“ für einen neuen Bereich, jeder Bereich mit seinen Themen darunter, und der Papierkorb. Der Ort, den die Liste zeigt, ist markiert. Ein Rechtsklick auf einen Bereich öffnet Als Paket exportieren…, Menschen, wenn er geteilt ist, und, soweit du den Bereich verwaltest, Neues Thema, in Erweitert, Umbenennen, Farbe und Symbol, Teilen … und Löschen; ein Rechtsklick auf ein Thema öffnet Als Paket exportieren… und, soweit du seinen Bereich verwaltest, Umbenennen und Löschen. Diese Menüs schließen sich, sobald ein Eintrag gewählt ist, mit der Maus, der Tastatur oder einem Bildschirmleser.</li>
-  <li><strong>Mitte</strong>, die Liste: oben die Pfeile zurück und vorwärts und der Pfad zum gezeigten Ort, etwa „Bereiche › Haushalt › Reparaturen“, wo ein Klick auf eine Ebene sie zeigt; „Bereiche“ führt zu Alle Notizen. Darunter, was links ausgewählt ist. Alle Notizen, ein Bereich und ein Thema haben ein Suchfeld; jede Liste von Notizen außer dem Papierkorb hat einen Schalter zwischen der Kompakt- und der Detailansicht ihrer Karten und einen Filter nach Person. Die Überschrift endet mit einem „+“.</li>
+  <li><strong>Links</strong>, die Seitenleiste: Agenda, Unsortiert, Alle Notizen und Frösche, dann „Bereiche“ mit einem „+“ für einen neuen Bereich, jeder Bereich mit seinen Themen darunter, #Wörter, das jedes #Wort nach seinen Ebenen zeigt (siehe <a href="formatted-text-transcripts-photo-texts.html#deine-woerter-durchstoebern">Deine #Wörter durchstöbern</a>), und der Papierkorb. Ein Schild am Ende der Zeile eines Bereichs zeigt, dass er vor KI verborgen ist. Der Ort, den die Liste zeigt, ist markiert. Unsortiert sagt, wie viele Notizen es hält, etwa „Unsortiert 7“; kein anderer Ort zeigt eine Zahl. Der Pfeil am Ende der Zeile eines Bereichs klappt seine Themen ein und wieder auf; dieser Computer behält jedes Einklappen, und ein eingeklappter Bereich zeigt weiter das Thema, das die Liste zeigt. Die Bereiche stehen in deiner eigenen Reihenfolge, gleich auf allen deinen Geräten: Zieh einen Bereich an seiner Zeile nach oben oder unten, und eine Linie zeigt, wohin er kommt, wenn du loslässt; dort fallen gelassen, wo er steht, oder abseits der Bereiche, bleibt er. Eine Karte, die auf die Zeile eines Bereichs fällt, wird stattdessen dort abgelegt. Ein Rechtsklick auf einen Bereich öffnet Nach oben verschieben und Nach unten verschieben, aber nicht über den ersten oder letzten Platz hinaus, Als Paket exportieren…, Menschen, wenn er geteilt ist, Vor KI verborgen, wenn er nicht geteilt oder markiert ist, und, soweit du den Bereich verwaltest, Neues Thema, in Erweitert, Umbenennen, Farbe und Symbol, Teilen … und Löschen; ein Rechtsklick auf ein Thema öffnet Als Paket exportieren… und, soweit du seinen Bereich verwaltest, Umbenennen und Löschen. Diese Menüs schließen sich, sobald ein Eintrag gewählt ist, mit der Maus, der Tastatur oder einem Bildschirmleser.</li>
+  <li><strong>Mitte</strong>, die Liste: oben die Pfeile zurück und vorwärts und der Pfad zum gezeigten Ort, etwa „Bereiche › Haushalt › Reparaturen“, wo ein Klick auf eine Ebene sie zeigt; „Bereiche“ führt zu Alle Notizen. Darunter, was links ausgewählt ist. Alle Notizen, Unsortiert, ein Bereich, ein Thema und der Papierkorb haben ein Suchfeld; jede Liste von Notizen außer dem Papierkorb hat einen Schalter zwischen der Kompakt- und der Detailansicht ihrer Karten und einen Filter nach Person. Die Überschrift endet mit einem „+“.</li>
 </ul>
 <p>
   Das „+“ von Alle Notizen, einem Bereich und einem Thema öffnet ein Menü: <strong>Notiz</strong>
@@ -130,13 +141,27 @@
   die Karte aus.
 </p>
 <p>
-  Ein Rechtsklick auf eine Karte oder ihr ⋮ öffnet <strong>Bearbeiten</strong>, <strong>Ablegen in
-  …</strong>, die Einträge für Checkliste und Einkaufsliste mit <strong>Auf der Agenda zeigen</strong>
+  Ein Rechtsklick auf eine Karte oder ihr ⋮ öffnet <strong>Bearbeiten</strong>, außerhalb des
+  Papierkorbs <strong>In eigenem Fenster öffnen</strong>, <strong>Ablegen in
+  …</strong>, wo du sie einrichten darfst, <strong>Routine …</strong> und <strong>Erinnerung
+  …</strong>, in Erweitert <strong>Frosch</strong> und <strong>Einheit …</strong>, bei einer Notiz,
+  die du ändern darfst, <strong>Zusammenführen mit …</strong> und <strong>Wichtigkeit</strong>, dann
+  die Einträge für Checkliste und Einkaufsliste mit <strong>Auf der Agenda zeigen</strong>
   und seinen drei Möglichkeiten (siehe <a href="lists-tallies-sessions-frogs.html#auf-dem-desktop">Listen,
   Strichlisten, Einheiten und Frösche</a>), <strong>An eine Person senden</strong>, <strong>Als Text
   kopieren</strong>, <strong>Als Markdown speichern …</strong>, <strong>Als Paket
   exportieren…</strong>, <strong>„Von …“ entfernen</strong> bei einer Notiz aus einem Paket, das
-  nicht als deins übernommen wurde, und, wo die Notiz Kästchen hat, <strong>Ticks zeigen</strong>. Eine Karte, die auf einen Bereich oder ein Thema in der Seitenleiste
+  nicht als deins übernommen wurde, wo die Notiz Kästchen hat, <strong>Ticks zeigen</strong>,
+  außerhalb eines geteilten Bereichs <strong>Vor KI verborgen</strong> (siehe
+  <a href="backups-locks-and-privacy.html#eine-notiz-vor-der-ki-verbergen">Eine Notiz vor der KI
+  verbergen</a>) und, bei einer Notiz, die du ändern darfst, <strong>In den Papierkorb</strong>
+  zuletzt. Eine Datei auf einer Karte öffnet sich mit einem Klick (siehe
+  <a href="formatted-text-transcripts-photo-texts.html#eine-datei-an-eine-notiz-haengen">Eine Datei an
+  eine Notiz hängen</a>). Routine …,
+  Erinnerung …, Frosch und Einheit … gelten nur für diese Karte, auch wenn mehr Karten ausgewählt
+  sind. Im
+  Papierkorb hat eine Karte kein ⋮; ihr Rechtsklick bietet nur <strong>Wiederherstellen</strong>.
+  Eine Karte, die auf einen Bereich oder ein Thema in der Seitenleiste
   gezogen wird, wird dort abgelegt, eine unsortierte verlässt dabei Unsortiert; Notizen im
   Papierkorb lassen sich nicht ziehen.
 </p>
@@ -152,6 +177,16 @@
   sind, und eine Zeile oben sagt, dass nicht jede Notiz abgelegt wurde; ihr Klick zeigt, wie viele
   verschoben wurden und wie viele geblieben sind.
 </p>
+<p>
+  Zusammenführen mit …, Wichtigkeit, In den Papierkorb und Wiederherstellen im Rechtsklick-Menü einer
+  ausgewählten Karte wirken ebenso auf alle ausgewählten Karten, wie auch <strong>Notiz ▸
+  Zusammenführen mit …</strong>, <strong>Wichtigkeit</strong>, <strong>Löschen</strong> und im
+  Papierkorb <strong>Wiederherstellen</strong>, solange keine Notiz offen ist. Zusammenführen mit …
+  bietet jede Notiz an, die ausgewählten eingeschlossen: Eine gewählte ausgewählte Notiz nimmt die
+  anderen auf, und die Liste bleibt. In den Papierkorb fragt nichts; Strg+Z holt alle auf einmal
+  zurück und nimmt ebenso ein Zusammenführen aller zurück. Eine Notiz, die du nicht ändern darfst,
+  bleibt, wie sie ist. Jedes davon beendet die Auswahl.
+</p>
 </box-more>
 </guide-box>
 
@@ -164,7 +199,7 @@
 <li>Tippe eine Plakette, um diese Einstellung zu ändern.</li>
 <li>Tippe den Pfeil zurück, um sie zu schließen.</li>
 </box-tab>
-<box-tab device="desktop" alt="Das Desktop-Fenster mit der Notiz zum Küchenhahn aus Reparaturen im Notiz-Dialog über den Notizen des Haushalts: ihr Text, die Plaketten Wichtig, Haushalt / Reparaturen, ihre Erfassungszeit, die Art, das Textformat und +, ein Abschnitt und Zur Notiz hinzufügen">
+<box-tab device="desktop" alt="Das Desktop-Fenster mit der Notiz zum Küchenhahn aus Reparaturen im Notiz-Dialog über den Notizen des Haushalts: ihr Text, die Plaketten Wichtig, Haushalt / Reparaturen, ihre Erfassungszeit, die Art, das Textformat, Vor KI verborgen und +, Datei anhängen …, ein Abschnitt und Zur Notiz hinzufügen">
 <li>Doppelklicke eine Karte, oder klicke ihren Stift.</li>
 <li>Tippe in den Text.</li>
 <li>Klicke eine Plakette, um diese Einstellung zu ändern.</li>
@@ -174,10 +209,12 @@
 <p>
   Eine Notiz öffnet sich als Dialog über der Liste und der Seitenleiste, eine zur Zeit; die
   Menüleiste bleibt darüber erreichbar. Er enthält den Text mit der Formatleiste, in Erweitert,
-  darunter die Einstellungen der Notiz als Plaketten, dann ihre Zeilen, Fotos und Aufnahmen, die
+  darunter die Einstellungen der Notiz als Plaketten, dann ihre Zeilen, Fotos, Aufnahmen und Dateien mit <strong>Datei anhängen …</strong>, die
   Einrichtung ihrer Strichliste und ihre Abschnitte, Zur Notiz hinzufügen und den Rest dessen, was
   sich mit ihr tun lässt. Sein Kreuz, Esc, Alt+Links, die Zurück-Taste der Maus und ein Klick daneben
   schließen ihn, und was getippt wurde, bleibt erhalten, auch ein Abschnitt in Zur Notiz hinzufügen.
+  Seine Ränder und Ecken lassen sich ziehen, um ihn größer oder kleiner zu machen; er bleibt mittig
+  und öffnet sich von da an in dieser Größe, auf diesem Computer.
 </p>
 <p>
   Jede Plakette zeigt das Symbol einer Einstellung und ihren Wert, als Symbol oder als kurzen Text, wie auf dem Handy (siehe
@@ -187,7 +224,7 @@
   Einheiten und Frösche</a>), das Textformat einer einfachen Notiz (Unformatierter Text, Formatierter
   Text oder Code; siehe <a href="formatted-text-transcripts-photo-texts.html#auf-dem-desktop">Formatierter
   Text</a>), Auf der Agenda zeigen bei einer Checkliste ohne Routine und bei einer Einkaufsliste,
-  Ticks zeigen, solange es ein Kästchen gibt, und „+“ mit Routine, Erinnerung, Frosch und Einheit für
+  Ticks zeigen, solange es ein Kästchen gibt, Vor KI verborgen außerhalb eines geteilten Bereichs, und „+“ mit Routine, Erinnerung, Frosch und Einheit für
   den, der sie einrichten darf, Frosch und Einheit nur in Erweitert. Ein Klick öffnet ihren kleinen
   Editor als Dialog über der Notiz; Bereich und Thema öffnet Ablegen in …, eine Routine oder
   Erinnerung ihren Editor. Der Routinen-Editor, die Seiten einer Strichliste, die Seite Neue
@@ -231,6 +268,40 @@
 </box-more>
 </guide-box>
 
+<guide-box name="note-window">
+<h2>Eine Notiz neben der Liste offen halten</h2>
+<p>Öffne eine Notiz in einem eigenen Fenster, etwa ein Rezept neben einer Einkaufsliste.</p>
+<box-tab device="phone" alt="Die Notiz zur Therme im Notiz-Editor auf dem Handy, das eine Notiz zur Zeit zeigt">
+<li>Nutze die Desktop-App; das Handy zeigt eine Notiz zur Zeit.</li>
+</box-tab>
+<box-tab device="desktop" alt="Die Notiz zum Küchenhahn in einem eigenen Fenster: Im Vordergrund halten über ihrem Text, ihre Plaketten, ein Abschnitt und Zur Notiz hinzufügen">
+<li>Klicke mit rechts auf eine Karte.</li>
+<li>Klicke <strong>In eigenem Fenster öffnen</strong>.</li>
+<li>Hake <strong>Im Vordergrund halten</strong> an, wenn du willst.</li>
+<li>Schließe das Fenster, wenn du fertig bist.</li>
+</box-tab>
+<box-more>
+<p>
+  Derselbe Knopf steht neben dem Kreuz des Notiz-Dialogs. Die Notiz öffnet sich in einem eigenen
+  Fenster neben dem Hauptfenster, das weiter nutzbar bleibt; sie lässt sich dort lesen und
+  bearbeiten wie im Notiz-Dialog. Mehrere Notizen können zugleich offen sein, jede in einem Fenster:
+  Eine Notiz noch einmal zu öffnen holt ihr Fenster nach vorn, und die Karte einer Notiz, die in
+  einem Fenster offen ist, holt dieses Fenster nach vorn statt des Dialogs. Was getippt wurde, bleibt
+  erhalten wie im Notiz-Dialog, auch wenn sich das Fenster schließt, und Strg+Z wirkt wie im
+  Hauptfenster. Eine Notiz, die in den Papierkorb kommt, gelöscht oder zusammengeführt wird, hier
+  oder auf einem anderen Gerät, schließt ihr Fenster. Die Notiz-Fenster schließen sich, mit dem
+  Getippten, wenn sich das Hauptfenster schließt oder in den Infobereich geht.
+</p>
+<p>
+  <strong>Im Vordergrund halten</strong> hält das Fenster über allen anderen Fenstern, etwa eine
+  Checkliste über einem Spiel; beim Öffnen eines Fensters ist es aus. Wayland kennt keinen
+  einheitlichen Weg, auf dem eine App ihr Fenster im Vordergrund halten kann, deshalb ist es dort mit
+  dem Grund ausgegraut; KDEs eigenes „Im Vordergrund halten“ im Fenstermenü funktioniert weiterhin.
+  Ein neues Notiz-Fenster öffnet sich so groß wie das zuletzt geschlossene, auf diesem Computer.
+</p>
+</box-more>
+</guide-box>
+
 <guide-box name="menu-bar">
 <h2>Die Menüleiste benutzen</h2>
 <p>Erreiche Einstellungen, Abgleich, Sicherungen und alles, was eine Notiz kann.</p>
@@ -238,18 +309,21 @@
 <li>Tippe auf der Agenda auf dein Profilbild.</li>
 <li>Tippe <strong>Dieses Gerät sichern</strong>, <strong>Mit einem anderen Gerät synchronisieren</strong> oder <strong>Einstellungen</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="Das Menü Notiz offen über dem Fenster: Ablegen in … mit Strg+M, Routine …, Erinnerung …, Frosch, Einheit, Zur Checkliste machen, Zur Einkaufsliste machen, Zur Strichliste machen, An eine Person senden, Als Text kopieren, Als Paket exportieren…, Verlauf und Löschen">
+<box-tab device="desktop" alt="Das Menü Notiz offen über dem Fenster: Ablegen in … mit Strg+M, Zusammenführen mit … mit Strg+Umschalt+M, Wichtigkeit, Routine …, Erinnerung …, Frosch, Einheit, Zur Checkliste machen, Zur Einkaufsliste machen, Zur Strichliste machen, An eine Person senden, Als Text kopieren, Als Paket exportieren…, Verlauf und Löschen">
 <li>Klicke <strong>Bearbeiten ▸ Einstellungen …</strong> für die Einstellungen.</li>
 <li>Klicke <strong>Synchronisieren</strong> für Abgleich, Koppeln, Menschen, Profil und Sicherungen.</li>
+<li>Klicke <strong>Bereich</strong> für den gezeigten Bereich oder das gezeigte Thema.</li>
 <li>Klicke <strong>Notiz</strong> für die Notiz im Notiz-Dialog.</li>
 <li>Klicke <strong>Hilfe ▸ Anleitung</strong> für diese Anleitung.</li>
 </box-tab>
 <box-more>
 <ul>
-  <li><strong>Datei</strong>: <strong>Neue Notiz</strong> (Strg+N) öffnet die Schnellnotiz als Dialog über dem Fenster, der Cursor in ihrem Feld, abgelegt in den Bereich oder das Thema, das die Liste zeigt (siehe <a href="capture-and-sort.html#auf-dem-desktop">Erfassen und sortieren</a>). <strong>Schnellnotiz</strong> öffnet das Erfassen-Fenster, wie das Tastenkürzel. <strong>Importieren …</strong> öffnet den Dialog „Import“ mit <strong>Ein Ordner …</strong>, das Notizen aus einem Ordner mit Markdown- oder Textdateien macht, und <strong>Google Keep …</strong>, das sie aus einem Export von Keep aus Google Takeout macht (siehe <a href="getting-started.html#notizen-aus-einer-anderen-app-importieren">Notizen aus einer anderen App importieren</a>). <strong>Paket öffnen …</strong> öffnet ein Paket, das dir jemand geschickt hat (siehe <a href="sharing-and-sync.html">Teilen und abgleichen</a>). <strong>Als Markdown speichern …</strong> speichert die Notiz im Notiz-Dialog. <strong>Beenden</strong> beendet die App, auch wo das Schließen des Fensters sie im Infobereich lässt.</li>
-  <li><strong>Bearbeiten</strong>: <strong>Ausschneiden</strong>, <strong>Kopieren</strong> und <strong>Einfügen</strong> für das Textfeld, in dem der Cursor war. <strong>Suchen</strong> (Strg+F) setzt den Cursor ins Suchfeld, in das von Alle Notizen, wo die Liste keines hat. <strong>Einstellungen …</strong> (Strg+,) öffnet die Einstellungen.</li>
+  <li><strong>Datei</strong>: <strong>Neue Notiz</strong> (Strg+N) öffnet die Schnellnotiz als Dialog über dem Fenster, der Cursor in ihrem Feld, abgelegt in den Bereich oder das Thema, das die Liste zeigt (siehe <a href="capture-and-sort.html#auf-dem-desktop">Erfassen und sortieren</a>). <strong>Datei anhängen …</strong> wählt Dateien jeder Art: bei offenem Notiz-Dialog kommen sie an seine Notiz, sonst warten sie in der Schnellnotiz auf eine neue Notiz, wie auf das Fenster gezogene Dateien. <strong>Schnellnotiz</strong> öffnet das Erfassen-Fenster, wie das Tastenkürzel. <strong>Importieren …</strong> öffnet den Dialog „Import“ mit <strong>Ein Ordner …</strong>, das Notizen aus einem Ordner mit Markdown- oder Textdateien macht, und <strong>Google Keep …</strong>, das sie aus einem Export von Keep aus Google Takeout macht (siehe <a href="getting-started.html#notizen-aus-einer-anderen-app-importieren">Notizen aus einer anderen App importieren</a>). <strong>Paket öffnen …</strong> öffnet ein Paket, das dir jemand geschickt hat (siehe <a href="sharing-and-sync.html">Teilen und abgleichen</a>). <strong>Sicherung öffnen …</strong> öffnet eine Sicherung, um Notizen daraus zurückzuholen, wie im Dialog Sicherungen (siehe <a href="backups-locks-and-privacy.html">Sicherungen, Sperren und Privatsphäre</a>). <strong>Als Markdown speichern …</strong> speichert die Notiz im Notiz-Dialog. <strong>Als Markdown-Ordner exportieren …</strong> schreibt jede Notiz als Markdown-Datei für eine andere App (siehe <a href="#deine-notizen-in-eine-andere-app-mitnehmen">Deine Notizen in eine andere App mitnehmen</a>). <strong>Beenden</strong> beendet die App, auch wo das Schließen des Fensters sie im Infobereich lässt.</li>
+  <li><strong>Bearbeiten</strong>: <strong>Rückgängig</strong> (Strg+Z) nimmt das letzte Löschen, Abhaken, Ablegen oder Zusammenführen zurück, das aller ausgewählten Karten auf einmal, wo sie zusammen gingen; es ist ausgegraut, solange es nichts zurückzunehmen gibt. <strong>Ausschneiden</strong>, <strong>Kopieren</strong> und <strong>Einfügen</strong> für das Textfeld, in dem der Cursor war. <strong>Suchen</strong> (Strg+F) setzt den Cursor ins Suchfeld der gezeigten Liste, in das von Alle Notizen, wo die Liste keines hat, etwa in der Agenda, und über den Einstellungen in deren eigenes. <strong>Einstellungen …</strong> (Strg+,) öffnet die Einstellungen, deren Suchfeld oben nur die Einstellungen zeigt, die die eingetippten Wörter enthalten.</li>
   <li><strong>Ansicht</strong>: Agenda, Unsortiert, Alle Notizen, Frösche und Alle Routinen und Erinnerungen; <strong>Detailansichten</strong> und <strong>Kompaktansichten</strong> für die Karten der gezeigten Liste; <strong>Design</strong> (siehe <a href="#design-und-groesse-aendern">Design und Größe ändern</a>).</li>
-  <li><strong>Notiz</strong>, für die Notiz im Notiz-Dialog: <strong>Ablegen in …</strong> (Strg+M), das nach dem Bereich oder Thema fragt und, solange keine Notiz offen ist, die in der Liste ausgewählten Karten ablegt, <strong>Routine …</strong>, <strong>Erinnerung …</strong>, <strong>Frosch</strong> und <strong>Einheit</strong>, <strong>Zur Checkliste machen</strong>, <strong>Zur Einkaufsliste machen</strong>, <strong>Zur Strichliste machen</strong>, <strong>An eine Person senden</strong>, <strong>Als Text kopieren</strong>, <strong>Als Paket exportieren…</strong>, <strong>Verlauf</strong> und <strong>Löschen</strong>. Frosch, Einheit und Zur Strichliste machen stehen nur in Erweitert. Sie sind ausgegraut, solange keine Notiz offen ist, bis auf Ablegen in …, solange Karten ausgewählt sind, und jeder einzelne dort, wo auch der Notiz-Dialog ihn nicht anbietet.</li>
+  <li><strong>Bereich</strong>, für den Bereich oder das Thema, das die Liste zeigt: <strong>Umbenennen</strong> (F2), <strong>Farbe und Symbol</strong>, <strong>Teilen …</strong>, <strong>Menschen</strong>, <strong>Als Paket exportieren…</strong>, <strong>Vor KI verborgen</strong>, <strong>Nach oben verschieben</strong> (Alt+Pfeil hoch), <strong>Nach unten verschieben</strong> (Alt+Pfeil runter) und <strong>Löschen</strong>, wie sie sein Rechtsklick in der Seitenleiste anbietet. Jeder ist ausgegraut, wo dieses Menü ihn weglässt, etwa Farbe und Symbol, Teilen …, Menschen, Vor KI verborgen, Nach oben verschieben und Nach unten verschieben für ein Thema, Vor KI verborgen für einen geteilten Bereich, Nach oben verschieben für den ersten Bereich und Nach unten verschieben für den letzten, und alle, solange kein Bereich und kein Thema gezeigt wird oder ein Dialog, auch der Notiz-Dialog, über der Liste liegt.</li>
+  <li><strong>Notiz</strong>, für die Notiz im Notiz-Dialog: <strong>Ablegen in …</strong> (Strg+M), das nach dem Bereich oder Thema fragt und, solange keine Notiz offen ist, die in der Liste ausgewählten Karten ablegt, <strong>Zusammenführen mit …</strong> (Strg+Umschalt+M), <strong>Wichtigkeit</strong>, <strong>Routine …</strong>, <strong>Erinnerung …</strong>, <strong>Frosch</strong> und <strong>Einheit</strong>, <strong>Zur Checkliste machen</strong>, <strong>Zur Einkaufsliste machen</strong>, <strong>Zur Strichliste machen</strong>, <strong>An eine Person senden</strong>, <strong>Als Text kopieren</strong>, <strong>Als Paket exportieren…</strong>, <strong>Verlauf</strong> und <strong>Löschen</strong>, im Papierkorb an dessen Stelle <strong>Wiederherstellen</strong>, solange keine Notiz offen ist. Frosch, Einheit und Zur Strichliste machen stehen nur in Erweitert. Sie sind ausgegraut, solange keine Notiz offen ist, bis auf Ablegen in …, Zusammenführen mit …, Wichtigkeit, Löschen und Wiederherstellen, solange Karten ausgewählt sind, auf die sie dann wirken, und jeder einzelne dort, wo auch der Notiz-Dialog ihn nicht anbietet.</li>
+  <li><strong>KI</strong>: <strong>Fragen …</strong> (Strg+K) zeigt die Fragen-Ansicht in der Liste (siehe <a href="#zu-deinen-notizen-fragen">Zu deinen Notizen fragen</a>), <strong>KI-Port …</strong> öffnet die Einstellungen bei der Karte des KI-Ports, und <strong>KI-Aufgabe prüfen</strong> zeigt die Prüfung der KI-Aufgabe, die wartet, ausgegraut, solange keine wartet oder der Port offen ist (siehe <a href="#den-ki-port-oeffnen">Den KI-Port öffnen</a>).</li>
   <li><strong>Synchronisieren</strong>: <strong>Jetzt synchronisieren</strong>, <strong>Gerät koppeln</strong>, <strong>Menschen</strong>, <strong>Profil</strong> und <strong>Sicherungen …</strong>, jeweils ein Dialog (siehe <a href="#einen-dialog-schliessen-oder-darin-zurueckgehen">Einen Dialog schließen oder darin zurückgehen</a>).</li>
   <li><strong>Hilfe</strong>: <strong>Anleitung</strong> öffnet diese Seite im Browser; <strong>Über Old Brain Fix</strong> zeigt die Version, die Dokumentation und die Datenschutzerklärung, den Quellcode und jede Fremdkomponente mit ihrer Lizenz.</li>
 </ul>
@@ -314,15 +388,21 @@
   wirken immer.
 </p>
 <ul>
-  <li><strong>Alt+Links, die Zurück-Taste der Maus oder der Pfeil zurück über der Liste</strong>: der Ort, den die Liste davor zeigte, so wie ein Browser zurückgeht. In einem Dialog, der aus einem anderen geöffnet wurde, führt es zu diesem zurück, sonst schließt es den Dialog, wobei der Notiz-Dialog und die Schnellnotiz behalten, was getippt wurde; ein Foto oder eine Tabelle im Vollbild schließt.</li>
-  <li><strong>Alt+Rechts, die Vorwärts-Taste der Maus oder der Pfeil vorwärts</strong>: der Ort, von dem zurück kam. Wird ein anderer Ort gezeigt, ist vergessen, was voraus lag.</li>
-  <li><strong>Strg+N, Strg+F, Strg+M und Strg+,</strong> (Cmd unter macOS): Neue Notiz, Suchen, Ablegen in … und Einstellungen …, wie in der Menüleiste; auch während der Cursor in einem Textfeld steht und über dem Notiz-Dialog, nicht während ein anderer Dialog offen ist.</li>
-  <li><strong>Strg+Enter</strong> (Cmd+Enter unter macOS): speichert die Notiz der Schnellnotiz und speichert den Text, der im Notiz-Dialog bearbeitet wird. Enter allein beginnt eine neue Zeile.</li>
-  <li><strong>In einer Zeile einer Checkliste</strong> teilt Enter die Zeile am Cursor, die Rücktaste an ihrem Anfang hängt sie an die Zeile darüber an, Tab und Umschalt+Tab nehmen sie unter die Zeile darüber und zurück auf die oberste Ebene, und Pfeil hoch und Pfeil runter gehen zur Zeile darüber und darunter. Im Feld einer Einkaufsliste fügt Enter die Zeile hinzu, und in einer ihrer Zeilen beendet es das Umbenennen (siehe <a href="lists-tallies-sessions-frogs.html#auf-dem-desktop">Listen, Strichlisten, Einheiten und Frösche</a>).</li>
+  <li><strong>Alt+Links, die Zurück-Taste der Maus oder der Pfeil zurück über der Liste</strong>: der Ort, den die Liste davor zeigte, so wie ein Browser zurückgeht, mit der Suche, dem Filter nach Person und der Scroll-Position, mit denen er verlassen wurde. In einem Dialog, der aus einem anderen geöffnet wurde, führt es zu diesem zurück, sonst schließt es den Dialog, wobei der Notiz-Dialog und die Schnellnotiz behalten, was getippt wurde, und der Routinen-Editor, ein Eintrag einer Strichliste und die Seiten Neue Strichliste und Neue Einheit eine Änderung speichern wie bei Esc; ein Foto oder eine Tabelle im Vollbild schließt.</li>
+  <li><strong>Alt+Rechts, die Vorwärts-Taste der Maus oder der Pfeil vorwärts</strong>: der Ort, von dem zurück kam, so wie er verlassen wurde. Wird ein anderer Ort gezeigt, ist vergessen, was voraus lag; ein aus der Seitenleiste oder dem Pfad neu gezeigter Ort beginnt mit leerer Suche, oben.</li>
+  <li><strong>Strg+Z</strong> (Cmd+Z unter macOS): wie <strong>Bearbeiten ▸ Rückgängig</strong> kommt das letzte Löschen, Abhaken, Ablegen oder Zusammenführen zurück. Was sich wiederherstellen lässt, löscht sich ohne Nachfrage, und Strg+Z ist der sofortige Weg zurück: Es holt eine Notiz mit ihren Routinen und Erinnerungen aus dem Papierkorb, eine Routine, eine Erinnerung, einen Frosch, einen Eintrag einer Strichliste, eine Zeile, das „Von …“, ein Transkript oder einen Fototext zurück, nimmt das Abhaken einer Fälligkeit oder eines Froschs zurück, legt Notizen wieder dort ab, wo sie waren, die aus Unsortiert wieder in Unsortiert, und macht ein Zusammenführen rückgängig. In einem Textfeld macht Strg+Z stattdessen das Getippte rückgängig.</li>
+  <li><strong>Strg+N, Strg+F, Strg+M, Strg+Umschalt+M, Strg+K und Strg+,</strong> (Cmd unter macOS): Neue Notiz, Suchen, Ablegen in …, Zusammenführen mit …, Fragen … und Einstellungen …, wie in der Menüleiste; auch während der Cursor in einem Textfeld steht und über dem Notiz-Dialog, nicht während ein anderer Dialog offen ist, außer Strg+F über den Einstellungen, das den Cursor in deren Suchfeld setzt.</li>
+  <li><strong>F2</strong>: benennt den Bereich oder das Thema um, das die Liste zeigt, wie <strong>Bereich ▸ Umbenennen</strong>; nicht, während der Cursor in einem Textfeld steht oder ein Dialog offen ist.</li>
+  <li><strong>Alt+Pfeil hoch und Alt+Pfeil runter</strong>: verschieben den Bereich, den die Liste zeigt, in deiner eigenen Reihenfolge der Bereiche um einen Platz nach oben oder unten, wie <strong>Bereich ▸ Nach oben verschieben</strong> und <strong>Nach unten verschieben</strong>, auch einen geteilten Bereich, dessen andere ihre eigene Reihenfolge behalten; nicht, während der Cursor in einem Textfeld steht oder ein Dialog offen ist. In einer Zeile einer Checkliste verschieben sie stattdessen die Zeile.</li>
+  <li><strong>Über den Karten einer Notizliste</strong>, solange kein Dialog offen ist und der Cursor in keinem Feld steht: Pfeil hoch und Pfeil runter wählen die nächste Karte aus, Umschalt+Pfeil hoch und Umschalt+Pfeil runter erweitern die Auswahl, Strg+A (Cmd+A unter macOS) wählt alle Karten aus, Enter öffnet die Notiz der zuletzt erreichten Karte, Entf legt die ausgewählten Karten ohne Nachfrage in den Papierkorb, aus dem Strg+Z sie zurückholt, und 1, 2 und 3 machen sie Wichtig, Normal oder Unwichtig. Pfeil runter im Suchfeld geht zur ersten gefundenen Karte. Die ausgewählte Karte rollt ins Bild, und nach einer Aktion machen Pfeil hoch und runter bei ihr weiter, solange sie noch zu sehen ist, so wird Unsortiert mit Pfeil runter, Strg+M, ein paar Buchstaben des Orts und Enter für jede Notiz sortiert. Im Papierkorb tun Entf und die Ziffern nichts. Das Menü Notiz zeigt Entf und die Ziffern neben seinen Einträgen, solange sie auf die ausgewählten Karten wirken.</li>
+  <li><strong>Strg+Enter</strong> (Cmd+Enter unter macOS): speichert die Notiz der Schnellnotiz und speichert den Text, der im Notiz-Dialog bearbeitet wird. Enter allein beginnt eine neue Zeile. In jedem anderen Dialog löst es den Knopf in der Akzentfarbe aus, etwa Speichern, Anlegen oder Senden, auch im Routinen-Editor, in einem Eintrag einer Strichliste und auf den Seiten Neue Strichliste und Neue Einheit; in Zusammenführen mit … führt es mit der ersten gefundenen Notiz zusammen, sobald etwas getippt ist, und in Ablegen in … nimmt es die erste Zeile, wie Enter. Eine Frage, deren Antwort löscht oder verwirft, beantwortet es nicht. Das erste Feld eines Dialogs hat den Cursor, sobald er sich öffnet, auch im Routinen-Editor, auf den Seiten einer Strichliste, in Feedback senden und im Profil einer Person; die Seiten Einstellungen, Profil, Menschen, Sicherungen und Wiederherstellung, Synchronisieren und Gerät koppeln öffnen sich ohne. Solange der Cursor in einem Feld steht, ruht Alt+Links wie in jedem Feld; Esc und die Zurück-Taste der Maus führen weiterhin hinaus.</li>
+  <li><strong>Strg+1, Strg+2 und Strg+3</strong> (Cmd unter macOS) in der Schnellnotiz und im Erfassen-Fenster: speichern die Notiz mit einem Stupser in 10 Min., 30 Min. oder 1 Std., wie die Stupser-Knöpfe; die Zeile darunter nennt die Tasten. Die 1, 2 und 3 der Liste haben kein Strg und tun nichts, solange ein Dialog offen ist.</li>
+  <li><strong>Enter</strong> im Erfassen-Fenster speichert die Notiz; <strong>Umschalt+Enter</strong> beginnt eine neue Zeile.</li>
+  <li><strong>In einer Zeile einer Checkliste</strong> teilt Enter die Zeile am Cursor, die Rücktaste an ihrem Anfang hängt sie an die Zeile darüber an, Tab und Umschalt+Tab nehmen sie unter die Zeile darüber und zurück auf die oberste Ebene, Alt+Pfeil hoch und Alt+Pfeil runter verschieben sie um einen Platz innerhalb ihrer Gruppe oder der obersten Ebene, wie Nach oben und Nach unten der Zeile, und Pfeil hoch und Pfeil runter gehen zur Zeile darüber und darunter. In einer Zeile einer Einkaufsliste verschieben Alt+Pfeil hoch und Alt+Pfeil runter eine offene Zeile um einen Platz innerhalb der offenen Zeilen. Im Feld einer Einkaufsliste fügt Enter die Zeile hinzu, und in einer ihrer Zeilen beendet es das Umbenennen (siehe <a href="lists-tallies-sessions-frogs.html#auf-dem-desktop">Listen, Strichlisten, Einheiten und Frösche</a>).</li>
   <li><strong>Strg+B und Strg+I</strong> (Cmd unter macOS): fett und kursiv, während der Text der Notiz bearbeitet wird.</li>
   <li><strong>Strg+V</strong> (Cmd+V unter macOS) im leeren Feld der Schnellnotiz: nimmt den Text der Zwischenablage ins Feld und ihr Bild als Foto in die Notiz.</li>
   <li><strong>Enter</strong> in einem einzeiligen Feld eines Dialogs, etwa einem Namen oder der Adresse eines Links, übernimmt es.</li>
-  <li><strong>Esc</strong> schließt ein Menü, einen Dialog, ebenso ein Klick daneben, und ein Foto oder eine Tabelle im Vollbild; über der Liste ohne Dialog hebt es die Auswahl der Karten auf. In einer Tabellenzelle gehen Tab und Umschalt+Tab zur nächsten und zur vorigen Zelle (siehe <a href="formatted-text-transcripts-photo-texts.html#auf-dem-desktop">Formatierter Text</a>). Der Notiz-Dialog und die Schnellnotiz behalten beim Schließen, was getippt wurde.</li>
+  <li><strong>Esc</strong> schließt ein Menü, einen Dialog, ebenso ein Klick daneben, und ein Foto oder eine Tabelle im Vollbild; über der Liste ohne Dialog hebt es die Auswahl der Karten auf. In einer Tabellenzelle gehen Tab und Umschalt+Tab zur nächsten und zur vorigen Zelle (siehe <a href="formatted-text-transcripts-photo-texts.html#auf-dem-desktop">Formatierter Text</a>). Der Notiz-Dialog und die Schnellnotiz behalten beim Schließen, was getippt wurde. Der Routinen-Editor, ein Eintrag einer Strichliste und die Seiten Neue Strichliste und Neue Einheit speichern eine Änderung wie ihr Speichern und fragen nur bei einer, die sich nicht speichern lässt, „Änderungen verwerfen?“.</li>
 </ul>
 </box-more>
 </guide-box>
@@ -333,7 +413,7 @@
 <box-tab device="phone" alt="Die Agenda auf dem Handy, das keinen Infobereich hat">
 <li>Nimm dafür die Desktop-App; das Handy hat keinen Infobereich.</li>
 </box-tab>
-<box-tab device="desktop" alt="Die Einstellungen am Desktop als Dialog über der Agenda: unter Dieser Computer Benachrichtigungen auf diesem Computer, Beim Anmelden starten und Größere Schrift und Symbole, dann der KI-Port mit Wer sich verbinden darf, Über Old Brain Fix und Schnell erfassen mit dem Tastenkürzel Ctrl+Alt+N">
+<box-tab device="desktop" alt="Die Einstellungen am Desktop als Dialog über der Agenda: unter Dieser Computer Benachrichtigungen auf diesem Computer, Beim Anmelden starten und Größere Schrift und Symbole, dann der KI-Port mit Wer sich verbinden darf und die Fragen-Ansicht mit Anthropic (Claude) und OpenAI-kompatibel">
 <li>Schließ das Fenster.</li>
 <li>Klicke das Symbol im Infobereich, um es wieder zu öffnen.</li>
 <li>Klicke mit rechts auf das Symbol für sein Menü.</li>
@@ -382,7 +462,7 @@
 <li>Drücke irgendwo Strg+Alt+N.</li>
 <li>Schreibe, was dir durch den Kopf geht.</li>
 <li>Drücke Enter.</li>
-<li>Ändere die Taste in den Einstellungen unter „Schnell erfassen“.</li>
+<li>Ändere die Taste mit <strong>Tasten aufnehmen</strong> in den Einstellungen.</li>
 </box-tab>
 <box-more>
 <p>
@@ -390,16 +470,17 @@
   allen anderen Fenstern, auch während die App ohne ihr Fenster im Infobereich läuft.
   <strong>Notiz erfassen</strong> im Infobereich, <strong>Datei ▸ Schnellnotiz</strong> und der Befehl
   <code>oldbrainfix capture</code> öffnen es ebenfalls. Es nimmt Text, eine Sprachaufnahme und die
-  Zwischenablage: Es enthält ein einzeiliges Feld, <strong>Sprache aufnehmen</strong>,
+  Zwischenablage: Es enthält ein Feld, <strong>Sprache aufnehmen</strong>,
   <strong>Einfügen</strong>, <strong>Zum vollen Editor</strong>, den Wecker, dessen Menü Routine und
   Erinnerung anbietet, was die Einstellungen unter „Schnellnotiz“ eingeschaltet haben, wie die
   Schnellnotiz im Fenster, und die Stupser-Knöpfe. Es fragt nie etwas: Enter speichert die Notiz mit
-  einem Stupser in 1 Std., oder ohne, sobald die Notiz einsortiert ist, und Esc behält Getipptes
-  genauso (siehe <a href="capture-and-sort.html#das-tastenkuerzel-und-das-erfassen-fenster">Erfassen
+  einem Stupser in 1 Std., oder ohne, sobald die Notiz einsortiert ist, Umschalt+Enter beginnt eine
+  neue Zeile, Strg+1, Strg+2 und Strg+3 speichern mit einem Stupser in 10 Min., 30 Min. oder 1 Std.,
+  und Esc behält Getipptes genauso (siehe <a href="capture-and-sort.html#das-tastenkuerzel-und-das-erfassen-fenster">Erfassen
   und sortieren</a>).
 </p>
 <ul>
-  <li>Das Tastenkürzel stellst du in den Einstellungen unter „Schnell erfassen“ im Feld „Tastenkürzel“ ein: Strg, Alt oder Super, wahlweise Umschalt, und ein Buchstabe, eine Ziffer, F1 bis F12 oder die Leertaste, etwa Super+Shift+F5.</li>
+  <li>Das Tastenkürzel stellst du in den Einstellungen unter „Schnell erfassen“ ein: <strong>Tasten aufnehmen</strong> zeigt „Tasten drücken …“ und nimmt die nächsten zusammen gedrückten Tasten, Strg, Alt oder beide (Cmd unter macOS), wahlweise Umschalt, mit einem Buchstaben, einer Ziffer, F1 bis F12 oder der Leertaste. Solange es wartet, tun die eigenen Tasten der App nichts; Esc oder ein Klick daneben beendet es und behält das Tastenkürzel. Das Feld „Tastenkürzel“ daneben nimmt die Tasten ausgeschrieben, etwa Super+Shift+F5; eine Taste mit Super wird dort unter Linux und Windows getippt, wo das Fenster sie nicht hört.</li>
   <li>Unter X11, Windows und macOS belegt die App die Taste selbst; unter Wayland verwaltet die Arbeitsumgebung sie, fragt einmal nach und lässt sie dich in ihren eigenen Tastatureinstellungen ändern. Die Zeile unter dem Feld sagt, wenn die Taste belegt oder kein Tastenkürzel möglich ist.</li>
   <li>Die Taste wirkt, solange die App läuft, auch aus dem Infobereich.</li>
   <li>Unter Wayland entscheidet die Arbeitsumgebung, ob das Erfassen-Fenster über anderen Fenstern bleibt und wohin die Tastatur geht, wenn es schließt.</li>
@@ -426,6 +507,7 @@
   <li><code>oldbrainfix capture -</code> behält, was über die Standardeingabe kommt.</li>
   <li><code>oldbrainfix import DATEI</code> importiert ein Bündel und gibt aus, was hereinkam.</li>
   <li><code>oldbrainfix open DATEI</code> zeigt eine gesendete Notiz im Fenster, zum Annehmen oder Ablehnen; eine Profilkartendatei fügt die Person hinzu und öffnet ihr Profil.</li>
+  <li><code>oldbrainfix --version</code> oder <code>-V</code> gibt die Version aus, etwa „Old Brain Fix 0.6.0“, ohne die App zu starten.</li>
   <li><code>oldbrainfix --help</code> gibt die Bedienung aus.</li>
 </ul>
 <p>
@@ -441,21 +523,24 @@
 
 <guide-box name="drop">
 <h2>Dateien auf das Fenster ziehen</h2>
-<p>Mach eine Notiz aus einem Bild oder einer Tondatei, oder öffne eine Datei der App.</p>
-<box-tab device="phone" alt="Die Agenda auf dem Handy mit offenem Fächer ihres +: Text, Sprache, Foto, Galerie und Einfügen">
+<p>Mach eine Notiz aus jeder Datei, häng sie an eine Notiz, oder öffne eine Datei der App.</p>
+<box-tab device="phone" alt="Die Agenda auf dem Handy mit offenem Fächer ihres +: Text, Sprache, Foto, Galerie, Einfügen und Datei">
 <li>Teile ein Bild oder eine Tondatei mit Old Brain Fix.</li>
 <li>Tippe stattdessen auf der Agenda <strong>+</strong> ▸ <strong>Galerie</strong>.</li>
 <li>Schreibe, was dazugehört.</li>
 <li>Tippe <strong>10 Min.</strong>, <strong>30 Min.</strong> oder <strong>1 Std.</strong></li>
 </box-tab>
 <box-tab device="desktop" alt="Die Schnellnotiz mit einem abgelegten Foto, das darin als Zeile Foto wartet, der Text des Belegs darüber getippt">
-<li>Zieh ein Bild oder eine Tondatei auf das Fenster.</li>
+<li>Zieh eine oder mehrere Dateien auf das Fenster.</li>
 <li>Schreibe, was dazugehört.</li>
 <li>Drücke Strg+Enter.</li>
+<li>Zieh eine Datei auf den Notiz-Dialog, um sie dort anzuhängen.</li>
 </box-tab>
 <box-more>
 <ul>
-  <li>Bilder und Tondateien, die auf das Fenster gezogen werden, öffnen die Schnellnotiz und warten darin, ein Bild als Zeile „Foto“ und eine Tondatei als Zeile „Sprachaufnahme“, und werden mit dem Getippten als eine Notiz gespeichert. Bilder sind JPEG, PNG und WebP; Tondateien sind Ogg, Opus, M4A, MP3, WAV und AAC. Eine Aufnahme, die sich nicht transkribieren lässt, bleibt trotzdem erhalten, und eine Zeile oben im Fenster sagt es, sobald die Notiz gespeichert ist. Andere Dateien bleiben unbeachtet.</li>
+  <li>Dateien, die auf das Fenster gezogen werden, öffnen die Schnellnotiz und warten darin, ein Bild als Zeile „Foto“, eine Tondatei als Zeile „Sprachaufnahme“ und jede andere Datei als Zeile mit ihrem Namen, und werden mit dem Getippten als eine Notiz gespeichert, die anderen Dateien als ihre Anhänge (siehe <a href="formatted-text-transcripts-photo-texts.html#eine-datei-an-eine-notiz-haengen">Eine Datei an eine Notiz hängen</a>). Bilder sind JPEG, PNG und WebP; Tondateien sind Ogg, Opus, M4A, MP3, WAV und AAC. Eine Aufnahme, die sich nicht transkribieren lässt, bleibt trotzdem erhalten, und eine Zeile oben im Fenster sagt es, sobald die Notiz gespeichert ist.</li>
+  <li>Dateien, die auf den Notiz-Dialog oder das eigene Fenster einer Notiz gezogen werden, kommen sofort an diese Notiz, ein Bild als ihr Foto, eine Tondatei als ihre Sprachaufnahme, jede andere Datei als ihr Anhang. Solange ein anderer Dialog über dem Notiz-Dialog liegt, warten sie stattdessen in der Schnellnotiz auf eine neue Notiz.</li>
+  <li>Eine Datei über 256 MB, oder eine, die sich nicht lesen lässt, wird nicht angehängt, und eine Zeile oben sagt es; die anderen Dateien schon. <strong>Datei</strong> ▸ <strong>Datei anhängen …</strong> tut dasselbe wie das Hineinziehen, mit Dateien, die im Dialog des Systems gewählt werden.</li>
   <li>Ein Bündel (<code>.obfsync</code>), das auf das Fenster gezogen wird, wird importiert; eine gesendete Notiz (<code>.oldbrain</code>) wird zum Annehmen oder Ablehnen gezeigt; eine Profilkartendatei (<code>.obfcard</code>) fügt die Person hinzu und öffnet ihr Profil; ein Paket (<code>.obfpack</code>) zeigt, was es zum Hinzufügen enthält.</li>
   <li>Die Karte einer Notiz, die auf einen Bereich oder ein Thema in der Seitenleiste gezogen wird, wird dort abgelegt, mit den anderen ausgewählten Karten, wenn sie eine von ihnen ist.</li>
 </ul>
@@ -479,12 +564,14 @@
   Die Alarme der Routinen und Erinnerungen, der Stupser, der Änderungs-Stupser und „Verpasst,
   während Old Brain Fix nicht lief“ kommen als Benachrichtigungen des Systems, solange die App
   läuft. Der Schalter „Benachrichtigungen auf diesem Computer“ in den Einstellungen schaltet sie ab.
-  Ein Klick auf eine Benachrichtigung öffnet das Fenster: beim Stupser bei „Unsortiert“; beim
+  Ein Klick auf eine Benachrichtigung öffnet das Fenster: beim Alarm einer Routine oder Erinnerung
+  mit dem Notiz-Dialog ihrer Notiz, nur das Fenster, wenn es die Notiz nicht mehr gibt oder sie im Papierkorb ist; beim
+  Stupser bei „Unsortiert“; beim
   Änderungs-Stupser einen Speichern-Dialog für jeden wartenden Menschen.
 </p>
 <ul>
-  <li><strong>Linux</strong>: Ein Alarm bietet Erledigt, 10 Min., 30 Min., 1 Std. und „Old Brain Fix öffnen“; der Stupser bietet 10 Min., 30 Min., 1 Std. und „Old Brain Fix öffnen“; „Verpasst, während Old Brain Fix nicht lief“ bietet „Old Brain Fix öffnen“; der Änderungs-Stupser bietet Senden. Eine erneut gezeigte Benachrichtigung ersetzt die vorige, und die Benachrichtigung eines Alarms schließt, sobald seine Fälligkeit erledigt ist, auch auf einem anderen Gerät.</li>
-  <li><strong>Windows</strong>: dieselben Knöpfe. Jede Benachrichtigung wird neu gezeigt, und die App schließt sie nicht, wenn ihre Fälligkeit erledigt ist.</li>
+  <li><strong>Linux</strong>: Ein Alarm bietet Erledigt, Später, Nicht heute und „Old Brain Fix öffnen“; Später zeigt dieselbe Benachrichtigung erneut mit 10 Min., 30 Min. und 1 Std., Nicht heute mit Auslassen und Morgen. Der Stupser bietet 10 Min., 30 Min., 1 Std. und „Old Brain Fix öffnen“; „Verpasst, während Old Brain Fix nicht lief“ bietet „Old Brain Fix öffnen“; der Änderungs-Stupser bietet Senden. Eine erneut gezeigte Benachrichtigung ersetzt die vorige, und die Benachrichtigung eines Alarms schließt, sobald seine Fälligkeit erledigt oder ausgelassen ist, auch auf einem anderen Gerät.</li>
+  <li><strong>Windows</strong>: dieselben Knöpfe. Jede Benachrichtigung wird neu gezeigt, und die App schließt sie nicht, wenn ihre Fälligkeit erledigt oder ausgelassen ist; Später und Nicht heute zeigen ihre Wahl in einer neuen.</li>
   <li><strong>macOS</strong>: keine Knöpfe; ein Klick auf die Benachrichtigung öffnet das Fenster.</li>
 </ul>
 <p>
@@ -559,7 +646,7 @@
 <li>Gleiche das Handy ab, sobald die Prüfung fertig ist.</li>
 </box-tab>
 <box-tab device="desktop" alt="KI-Aufgabe prüfen: ein Tippfehler behoben, mit Vorher und Nachher, Alle annehmen und Alle ablehnen, und die Zeile, dass die KI-Aufgabe auf die Prüfung wartet und der Abgleich pausiert">
-<li>Klicke in den Einstellungen <strong>KI-Port öffnen</strong>.</li>
+<li>Klicke <strong>KI ▸ KI-Port …</strong>, dann <strong>KI-Port öffnen</strong>.</li>
 <li>Klicke <strong>Client-Konfiguration kopieren</strong> und füge sie im KI-Client ein.</li>
 <li>Gib der KI ihre Aufgabe.</li>
 <li>Klicke <strong>Fertig, prüfen</strong>.</li>
@@ -567,7 +654,9 @@
 </box-tab>
 <box-more>
 <p>
-  Nur der Desktop hat den KI-Port. Einstellungen, <strong>KI-Port öffnen</strong> lässt ein
+  Nur der Desktop hat den KI-Port. <strong>KI ▸ KI-Port …</strong> öffnet die Einstellungen bei
+  seiner Karte, und <strong>KI ▸ KI-Aufgabe prüfen</strong> zeigt die Prüfung einer KI-Aufgabe, die
+  noch wartet. <strong>KI-Port öffnen</strong> lässt ein
   KI-Modell deiner Wahl für eine Aufgabe an deinen Notizen arbeiten, erreichbar nur mit seinem Token,
   von diesem Computer oder, wie unter <strong>Wer sich verbinden darf</strong> gewählt, von
   Docker-Containern darauf. Der Abgleich wartet, solange der Port offen ist und bis zur Prüfung.
@@ -582,6 +671,157 @@
   einer Notiz, richtet Strichlisten, Einheiten, Checklisten, Einkaufslisten und Frösche ein und macht
   eine Checkliste zur Einkaufsliste und zurück, jeweils als Änderung, die auf die Prüfung wartet. Was
   du festgehalten hast, liest sie nur.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="ask">
+<h2>Zu deinen Notizen fragen</h2>
+<p>Frag ein KI-Modell deiner Wahl zu deinen Notizen und bekomm Antworten mit Links zu ihnen.</p>
+<box-tab device="phone" alt="Fragen auf dem Handy: die Zeile mit Computer, Anbieter und Modell, die Frage Wo ist der Ersatzschlüssel?, die Antwort mit einem Link zur Notiz, Aus diesen Notizen mit dem Titel der Notiz, und Als Notiz behalten">
+<li>Markiere private Notizen und Bereiche als <strong>Vor KI verborgen</strong>.</li>
+<li>Tippe in der Leiste der Agenda auf <strong>Fragen</strong>.</li>
+<li>Lies, was gesendet wird, und tippe auf <strong>Erlauben</strong>.</li>
+<li>Tipp deine Frage ein und tippe auf <strong>Fragen</strong>.</li>
+<li>Tippe eine Notiz unter <strong>Aus diesen Notizen</strong>, um sie zu öffnen.</li>
+</box-tab>
+<box-tab device="desktop" alt="Die Fragen-Ansicht: die Frage Wo sind die Winterreifen?, die Antwort mit einem Link zur Notiz, Aus diesen Notizen mit dem Titel der Notiz, und Als Notiz behalten">
+<li>Trag unter <strong>Fragen-Ansicht</strong> in den Einstellungen Anbieter, Modell und API-Schlüssel ein.</li>
+<li>Drück Strg+K oder klicke <strong>KI ▸ Fragen …</strong>.</li>
+<li>Tipp deine Frage ein und drück die Eingabetaste.</li>
+<li>Klicke eine Notiz unter <strong>Aus diesen Notizen</strong>, um sie zu öffnen.</li>
+<li>Klicke <strong>Als Notiz behalten</strong>, um die Antwort zu behalten.</li>
+</box-tab>
+<box-more>
+<p>
+  Nur der Desktop spricht mit dem Anbieter. Old Brain Fix stellt kein Modell und kein Konto: Unter
+  <strong>Fragen-Ansicht</strong> in den Einstellungen wählst du <strong>Anthropic (Claude)</strong>
+  oder einen OpenAI-kompatiblen Anbieter wie DeepSeek, OpenRouter, Ollama oder LM Studio, mit seiner
+  Basis-URL (leer fragt Ollama auf diesem Computer), das Modell und deinen eigenen API-Schlüssel, den
+  ein Modell auf diesem Computer nicht braucht. Der Schlüssel bleibt auf diesem Computer: Er wird nicht
+  synchronisiert und steht in keiner Sicherung. Eine <code>http://</code>-Adresse ist nur auf diesem
+  Computer oder im Heimnetz erlaubt.
+</p>
+<p>
+  Die Zeile unter der Überschrift nennt den Anbieter und das Modell. Das Modell durchsucht deine
+  Notizen mehrmals mit eigenen Wörtern, liest die Notizen, die es nutzt, und verlinkt sie in seiner
+  Antwort; ein Klick auf einen Link oder auf einen Titel unter <strong>Aus diesen Notizen</strong>
+  öffnet die Notiz über der Ansicht. Das Modell antwortet nur aus den Notizen, die es für diese Frage gelesen
+  hat, nie aus allgemeinem Wissen, und sagt „Das steht nicht in deinen Notizen“, wenn sie nichts dazu
+  enthalten. Ein Link zu einer Notiz, die es nicht gelesen hat, wird entfernt, seine Wörter bleiben,
+  und die Antwort sagt dann <strong>Eine Quelle konnte nicht geprüft werden</strong>. Nur was das Modell findet und liest, geht an den Anbieter: die Namen deiner Bereiche, Themen und #Wörter, deine Routinen und Erinnerungen mit ihren Erledigt-Haken, wenn es sie auflistet, die Titel und kurzen Auszüge der Notizen, die seine Suchen finden, und die Notizen, die es ganz liest, mit ihren Abschnitten, Transkripten, Fototexten, Anhangtexten und ihrem Erfassungskontext (wann und wo eine Notiz erfasst wurde, der Kalendertermin und das Bluetooth-Gerät). Notizen und Bereiche, die vor KI verborgen sind, werden nie gesendet, nicht einmal als
+  Anzahl. Das Fragen hält den Abgleich nicht an.
+</p>
+<p>
+  Eine Frage nach einer Antwort wird nach ihr gestellt, so kannst du weiterfragen.
+  <strong>Neu beginnen</strong> verwirft die gestellten Fragen, und <strong>Anhalten</strong> legt eine
+  Frage zurück ins Feld, ebenso eine Frage ohne Antwort, und oben steht dann, warum. Die Antworten sind weg, sobald die Liste einen anderen Ort zeigt;
+  <strong>Als Notiz behalten</strong> speichert die Frage und ihre Antwort mit ihren Links als neue
+  Notiz in Unsortiert. Bittest du das Modell, etwas zu ändern, etwa „sortier das Neue“ in Bereiche und
+  Themen, warten seine Änderungen als KI-Aufgabe: Die Ansicht sagt es, und <strong>Prüfen</strong>
+  zeigt sie, um sie als Ganzes anzunehmen oder abzulehnen (siehe
+  <a href="#den-ki-port-oeffnen">Den KI-Port öffnen</a>). Der Abgleich wartet, bis du entscheidest.
+</p>
+<p>
+  Auf dem Handy steht <strong>Fragen</strong> in der Leiste der Agenda, sobald ein Computer von dir
+  gekoppelt ist. Das Handy führt kein Modell aus und spricht mit keinem Anbieter: Es schickt die Frage
+  über die gekoppelte Verbindung an deinen Computer, der seinen Anbieter mit seinem eigenen Schlüssel
+  fragt, wie die Ansicht es tut, und die Antwort mit ihren Links zurückschickt, die die Notizen auf dem
+  Handy öffnen. Der Computer muss laufen, zu Hause oder über dein VPN (siehe
+  <a href="#von-unterwegs-fragen">Von unterwegs fragen</a>). Vor der ersten Frage, und wieder, sobald
+  der Computer einen anderen Anbieter oder ein anderes Modell fragt, nennt das Handy den Computer, den
+  Anbieter, das Modell und seine Adresse und was gesendet wird, dasselbe wie oben, und fragt nach deiner
+  Erlaubnis; nichts wird gesendet, bevor du auf <strong>Erlauben</strong> tippst, und
+  <strong>Jetzt nicht</strong> sendet nichts. Eine Folgefrage wird nach den früheren Antworten gestellt,
+  <strong>Neu beginnen</strong> verwirft sie, ebenso das Verlassen der Seite, und
+  <strong>Als Notiz behalten</strong> speichert die Frage und ihre Antwort als neue Notiz in Unsortiert.
+  Ändert das Modell etwas, sagt das Handy, dass die Änderungen auf dem Computer auf deine Prüfung warten.
+  Antwortet kein Computer von dir, oder ist sein Anbieter nicht eingerichtet, sagt die Seite warum und
+  was zu tun ist; eine Frage ohne Antwort kommt zurück ins Feld, und oben steht, warum.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="ask-away">
+<h2>Von unterwegs fragen</h2>
+<p>Erreich deinen Computer vom Handy über ein VPN, um zu fragen und abzugleichen.</p>
+<box-tab device="phone" alt="Synchronisieren auf dem Handy: der gekoppelte Computer Desk mit Automatisch synchronisieren und Adresse von Hand desk.tail1234.ts.net">
+<li>Installiere Tailscale auf dem Handy und melde dich an.</li>
+<li>Tippe auf das Profilbild, dann <strong>Mit einem anderen Gerät synchronisieren</strong>.</li>
+<li>Tipp den Tailscale-Namen des Computers unter <strong>Adresse von Hand</strong> ein.</li>
+<li>Tippe in der Leiste der Agenda auf <strong>Fragen</strong>.</li>
+</box-tab>
+<box-tab device="desktop" alt="Die Einstellungen am Desktop als Dialog über der Agenda: unter Dieser Computer Benachrichtigungen auf diesem Computer, Beim Anmelden starten und Größere Schrift und Symbole, dann der KI-Port mit Wer sich verbinden darf und die Fragen-Ansicht mit Anthropic (Claude) und OpenAI-kompatibel">
+<li>Installiere Tailscale auf dem Computer und melde dich an.</li>
+<li>Lass <strong>Beim Anmelden starten</strong> in den Einstellungen angehakt.</li>
+<li>Lass den Computer an.</li>
+</box-tab>
+<box-more>
+<p>
+  Old Brain Fix baut keinen eigenen Fernzugang; ein VPN, das du außerhalb der App betreibst, trägt die
+  gekoppelte Verbindung. Ein VPN, das dein Heimnetz zum Handy leitet, etwa WireGuard am Router, braucht
+  nichts weiter: Das Handy erreicht den Computer an der Adresse, an der es ihn zu Hause gefunden hat.
+  Tailscale gibt dem Computer eine andere Adresse und trägt die Suche im Netz nicht, also gib dem Handy
+  den Tailscale-Namen des Computers, etwa <code>desk.tail1234.ts.net</code>, oder seine
+  Tailscale-Adresse unter <strong>Adresse von Hand</strong> unter dem Computer bei
+  <strong>Gekoppelte Geräte</strong>. Ein Port nach einem Doppelpunkt ist nur nötig, wenn der Computer
+  an einem anderen Port anbietet als dem, an dem er zuletzt gefunden wurde.
+</p>
+<p>
+  Das Handy sucht den Computer zuerst dort, wo dieses Netz ihn findet, dann an seiner Adresse von Hand,
+  dann dort, wo er zuletzt war. Es vertraut an jeder Adresse nur dem Zertifikat, mit dem es gekoppelt
+  hat, sodass ein Gerät, das dort an seiner Stelle antwortet, nichts bekommt. Der automatische Abgleich
+  nimmt denselben Weg, also gleicht das Handy auch von unterwegs ab. Die Adresse bleibt auf diesem
+  Handy: Sie wird nicht synchronisiert und mit dem Computer vergessen. Eine Adresse, die
+  keine ist, oder ein Port außerhalb von 1 bis 65535 steht unter dem Feld und wird nicht behalten.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="vault">
+<h2>Deine Notizen in eine andere App mitnehmen</h2>
+<p>Schreib jede Notiz als Markdown-Datei für eine andere App, und hol sie später zurück.</p>
+<box-tab device="phone" alt="Synchronisieren auf dem Handy: Code scannen, das Feld Kopplungscode mit Jetzt synchronisieren und Code dieses Geräts zeigen">
+<li>Gleiche das Handy mit dem Computer ab.</li>
+<li>Exportiere den Markdown-Ordner in der Desktop-App.</li>
+</box-tab>
+<box-tab device="desktop" alt="Das Menü Datei offen, mit Als Markdown-Ordner exportieren … unter Als Markdown speichern …">
+<li>Klicke <strong>Datei ▸ Als Markdown-Ordner exportieren …</strong>.</li>
+<li>Wähle den Ordner, in den er kommt.</li>
+<li>Warte, bis oben <strong>Markdown-Ordner geschrieben</strong> steht.</li>
+</box-tab>
+<box-more>
+<p>
+  Nur der Desktop schreibt einen Markdown-Ordner. Er kommt in einen neuen Ordner in dem, den du wählst,
+  benannt <code>oldbrainfix-vault-</code> und das Datum, sodass sich in diesem Ordner nichts ändert. Jeder
+  Bereich ist ein Ordner, jedes Thema ein Ordner darin und jede Notiz eine Markdown-Datei, benannt nach
+  ihrer ersten Zeile und dem Tag ihrer Erfassung, mit ihren Abschnitten als datierten Teilen, ihren
+  Zeilen als Aufgabenliste, den Einträgen einer Strichliste als Tabelle, den Strichlisten einer Einheit
+  als Links und ihren Fotos, Aufnahmen und Dateien in einem Ordner <code>attachments</code> daneben. Ihr
+  Text wird geschrieben, wie er ist, und ein Link zu einer anderen Notiz wird ein Link zu deren Datei,
+  dem Obsidian und Git-Hoster folgen. Was das Markdown nicht zeigt, etwa die Erfassungszeit, den Bereich,
+  die Wichtigkeit und die Routinen und Erinnerungen mit ihren Erledigt-Haken, steht als Eigenschaften
+  oben in der Datei.
+</p>
+<p>
+  Alles, was dieser Computer hält, kommt hinein, Notizen anderer Menschen in geteilten Bereichen mit
+  ihrem Namen und Notizen, die vor KI verborgen sind, auch, aber nicht, wo und womit eine Notiz erfasst
+  wurde. Der Ordner ist nicht verschlüsselt: Bewahre ihn dort auf, wo nur du ihn lesen kannst. Das
+  Schreiben kann dauern; der Dialog lässt sich schließen, und oben steht, wann er geschrieben ist, ein
+  Tippen darauf nennt den Ordner. Was du im Markdown-Ordner änderst, kommt nicht von selbst zurück, und
+  er wird nicht aktuell gehalten: Exportiere noch einmal für einen neuen. Eine Sicherung bleibt der Weg,
+  alles zu behalten (siehe <a href="backups-locks-and-privacy.html">Sicherungen, Sperren und Privatsphäre</a>).
+</p>
+<p>
+  Um zurückzukommen, klicke beim ersten Start eines leeren Old Brain Fix neben <strong>Aus einer
+  Sicherung wiederherstellen</strong> auf <strong>Aus einem Markdown-Ordner neu aufbauen</strong> und
+  wähle seinen Ordner. Jede Notiz kommt mit ihren Eigenschaften zurück, jede Notiz, jeder Bereich und
+  jedes Thema neu und deins, geteilte Bereiche als deine eigenen privaten. Eine Markdown- oder Textdatei,
+  die du in der anderen App geschrieben hast, wird eine neue Notiz mit ihrem Text, ihren #Wörtern und
+  dem Datum ihrer Datei, im Bereich ihres ersten Ordners und im Thema ihres zweiten. Deine anderen
+  Geräte gleichen sich mit den neu aufgebauten Notizen nicht ab: Leere sie und kopple sie noch einmal.
+  Ein Ordner ohne Markdown- oder Textdatei, ein Old Brain Fix, das schon Notizen hält, oder ein
+  Markdown-Ordner einer neueren Version baut nichts neu auf, und oben steht, warum.
 </p>
 </box-more>
 </guide-box>
@@ -632,7 +872,7 @@
 <li>Zeig die Termine deines Kalenders auf der Agenda.</li>
 <li>Mach Fotos mit der Kamera.</li>
 </box-tab>
-<box-tab device="desktop" alt="Die Schnellnotiz in der Desktop-App: keine Kamera, Aus Datei… für Bilder und Tondateien">
+<box-tab device="desktop" alt="Die Schnellnotiz in der Desktop-App: keine Kamera, Aus Datei… für Dateien jeder Art">
 <li>Füge Fotos aus einer Datei, der Zwischenablage oder durch Ablegen hinzu.</li>
 <li>Nimm das Handy für Sperren, den Kalender und die Kamera.</li>
 </box-tab>

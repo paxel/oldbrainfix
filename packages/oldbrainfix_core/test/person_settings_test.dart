@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -98,6 +100,209 @@ void main() {
     });
   });
 
+  group("the person's own order of the Areas", () {
+    late Places places;
+    List<String> names(Store store) => [
+      for (final area in store.areasInOrder()) area.name,
+    ];
+    String id(String name) =>
+        places.areas().firstWhere((a) => a.name == name).id;
+    void order(Store store, Object? value, {DateTime? date}) => store.append(
+      PersonSettingKeys.entity,
+      PersonSettingKeys.areaOrder,
+      value is String ? value : jsonEncode(value),
+      date: date,
+    );
+
+    setUp(() {
+      places = Places(ann);
+      for (final name in ['Work', 'Home', 'Car']) {
+        places.addArea(name);
+      }
+    });
+
+    test('by name until moved; the same place again writes nothing', () {
+      expect(names(ann), ['Car', 'Home', 'Work']);
+      ann.moveArea(id('Work'), 0);
+      expect(names(ann), ['Work', 'Car', 'Home']);
+      expect(
+        jsonDecode(
+          ann.current(PersonSettingKeys.entity, PersonSettingKeys.areaOrder) ??
+              'null',
+        ),
+        [id('Work'), id('Car'), id('Home')],
+      );
+      final written = ann.allEntries().length;
+      ann.moveArea(id('Work'), 0);
+      ann.setAreaOrder([id('Work'), id('Car')]);
+      expect(ann.allEntries().length, written);
+      ann.moveArea(id('Car'), 99);
+      expect(names(ann), ['Work', 'Home', 'Car']);
+      ann.moveArea(id('Car'), -1);
+      expect(names(ann), ['Car', 'Work', 'Home']);
+      expect(places.areas().map((a) => a.name), ['Car', 'Home', 'Work']);
+    });
+
+    test('nothing is stored while the order stays by name', () {
+      ann.moveArea(id('Car'), 0);
+      ann.setAreaOrder([id('Car'), id('Home')]);
+      expect(ann.loggedHistory(PersonSettingKeys.entity), isEmpty);
+    });
+
+    test('new Areas go to the end, those missing from the order by name', () {
+      ann.moveArea(id('Work'), 0);
+      places.addArea('Garden');
+      expect(names(ann), ['Work', 'Car', 'Home', 'Garden']);
+      places.addArea('Attic');
+      expect(names(ann), ['Work', 'Car', 'Home', 'Attic', 'Garden']);
+      ann.moveArea(id('Attic'), 1);
+      places.deleteArea(id('Car'), NotesGo.unsorted);
+      expect(names(ann), ['Work', 'Attic', 'Home', 'Garden']);
+    });
+
+    test('the Areas left out of a new order keep the order they had', () {
+      ann.moveArea(id('Work'), 0);
+      ann.setAreaOrder([id('Home'), 'area:gone', id('Home')]);
+      expect(names(ann), ['Home', 'Work', 'Car']);
+    });
+
+    test('moving what is no Area is refused', () {
+      expect(() => ann.moveArea('area:gone', 0), throwsArgumentError);
+      final topic = places.addTopic(id('Home'), 'Garden');
+      expect(() => ann.moveArea(topic.id, 0), throwsArgumentError);
+      expect(ann.loggedHistory(PersonSettingKeys.entity), isEmpty);
+    });
+
+    test('ids that are no Area, repeats and other values are skipped', () {
+      final topic = places.addTopic(id('Home'), 'Garden').id;
+      order(ann, [id('Work'), 'area:gone', topic, 7, null, id('Work')]);
+      expect(names(ann), ['Work', 'Car', 'Home']);
+      for (final value in ['not json', '{"a":1}', '"area:x"', '', 'null']) {
+        order(ann, value);
+        expect(names(ann), ['Car', 'Home', 'Work'], reason: value);
+      }
+    });
+
+    test('an order dated back loses to the newer one', () {
+      ann.moveArea(id('Work'), 0);
+      order(ann, [id('Home')], date: DateTime.utc(2020));
+      expect(names(ann), ['Work', 'Car', 'Home']);
+    });
+
+    test("it travels between one's own Devices", () {
+      final desk = device(clock, 'Ann at the desk');
+      exchange(desk, ann);
+      ann.moveArea(id('Work'), 0);
+      exchange(desk, ann);
+      expect(names(desk), ['Work', 'Car', 'Home']);
+      desk.moveArea(id('Home'), 0);
+      exchange(desk, ann);
+      expect(names(ann), ['Home', 'Work', 'Car']);
+    });
+
+    test('a starter Area keeps its place when it is shared', () {
+      places.plantStarterSet({'household'});
+      final car = places.areas().firstWhere((a) => a.starter == 'household');
+      ann.moveArea(car.id, 0);
+      final before = names(ann);
+      final shared = ann.share(car.id);
+      expect(shared, isNot(car.id));
+      expect(names(ann), before);
+      expect(ann.areasInOrder().first.id, shared);
+    });
+  });
+
+  group('the order of the Areas by the name the app shows', () {
+    // The starter Areas as a German phone shows them.
+    const german = {
+      'household': 'Haushalt',
+      'work': 'Arbeit',
+      'car': 'Auto',
+      'health': 'Gesundheit',
+    };
+    String de(Area area) => german[area.starter] ?? area.name;
+    late Places places;
+    List<String> shown(Store store) => [
+      for (final area in store.areasInOrder(shown: de)) de(area),
+    ];
+    String id(String slug) => Places.starterId(PlaceKeys.typeArea, slug);
+
+    setUp(() {
+      places = Places(ann)..plantStarterSet(german.keys.toSet());
+    });
+
+    test('until moved, by the name shown, in lower case', () {
+      expect(shown(ann), ['Arbeit', 'Auto', 'Gesundheit', 'Haushalt']);
+      expect(
+        [for (final a in ann.areasInOrder()) a.name],
+        ['Car', 'Health', 'Household', 'Work'],
+      );
+      places.addArea('bike');
+      places.addArea('Zoo');
+      expect(shown(ann), [
+        'Arbeit',
+        'Auto',
+        'bike',
+        'Gesundheit',
+        'Haushalt',
+        'Zoo',
+      ]);
+      expect(
+        [for (final a in ann.areasInOrder()) a.name],
+        ['bike', 'Car', 'Health', 'Household', 'Work', 'Zoo'],
+      );
+    });
+
+    test('a move counts its place in the order shown', () {
+      final written = ann.allEntries().length;
+      ann.moveArea(id('work'), 0, shown: de);
+      ann.setAreaOrder([id('work'), id('car')], shown: de);
+      expect(ann.allEntries().length, written);
+      ann.moveArea(id('household'), 1, shown: de);
+      expect(shown(ann), ['Arbeit', 'Haushalt', 'Auto', 'Gesundheit']);
+      expect(
+        jsonDecode(
+          ann.current(PersonSettingKeys.entity, PersonSettingKeys.areaOrder) ??
+              'null',
+        ),
+        [id('work'), id('household'), id('car'), id('health')],
+      );
+    });
+
+    test('the Areas left out of a new order keep the order shown', () {
+      ann.setAreaOrder([id('health')], shown: de);
+      expect(shown(ann), ['Gesundheit', 'Arbeit', 'Auto', 'Haushalt']);
+    });
+
+    test('those missing from the order by the name shown', () {
+      ann.moveArea(id('health'), 0, shown: de);
+      places.addArea('Zoo');
+      places.addArea('Bike');
+      places.addArea('apple');
+      expect(shown(ann).skip(4), ['apple', 'Bike', 'Zoo']);
+    });
+
+    test('sharing a starter Area leaves those missing from the order '
+        'by name', () {
+      ann.moveArea(id('health'), 0, shown: de);
+      places.addArea('Banana');
+      places.addArea('apple');
+      final shared = ann.share(id('car'));
+      expect(shared, isNot(id('car')));
+      expect(ann.areasInOrder(shown: de)[2].id, shared);
+      places.addArea('avocado');
+      expect(shown(ann), [
+        'Gesundheit',
+        'Arbeit',
+        'Auto',
+        'Haushalt',
+        'apple',
+        'avocado',
+        'Banana',
+      ]);
+    });
+  });
+
   group('in a Shared Area', () {
     late Store ben;
     late String area;
@@ -146,6 +351,32 @@ void main() {
       ann.applyEntries([forged], verifiedDevice: ben.deviceId);
       expect(ann.allEntries().map((e) => e.id), contains(forged.id));
       expect(ann.trashesDoneReminder, isFalse);
+    });
+
+    test("the order of the Areas never reaches another person", () {
+      final attic = Places(ann).addArea('Attic').id;
+      ann.moveArea(attic, 99);
+      exchange(ben, ann);
+      expect(ben.loggedHistory(PersonSettingKeys.entity), isEmpty);
+      final bens = Places(ben).addArea('Bike').id;
+      expect([for (final a in ben.areasInOrder()) a.id], [bens, area]);
+      ben.moveArea(bens, 99);
+      exchange(ben, ann);
+      expect([for (final a in ben.areasInOrder()) a.id], [area, bens]);
+      expect([for (final a in ann.areasInOrder()) a.id], [area, attic]);
+    });
+
+    test("an order another person's Device wrote counts for nothing", () {
+      final attic = Places(ann).addArea('Attic').id;
+      exchange(ben, ann);
+      final forged = ben.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.areaOrder,
+        jsonEncode([area, attic]),
+      );
+      ann.applyEntries([forged], verifiedDevice: ben.deviceId);
+      expect(ann.allEntries().map((e) => e.id), contains(forged.id));
+      expect([for (final a in ann.areasInOrder()) a.id], [attic, area]);
     });
 
     test("a Member's Done moves nothing of another person's Note", () {

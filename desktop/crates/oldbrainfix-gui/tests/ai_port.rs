@@ -30,7 +30,7 @@ use std::time::{Duration as StdDuration, Instant};
 
 use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::ai_port::{Reach, docker_bridge};
 use oldbrainfix_core::schedule::{ClockTime, Day, Schedule};
 use oldbrainfix_core::tallies::Tallies;
@@ -182,6 +182,68 @@ fn a_tool_call_is_answered_while_the_window_idles_and_kept_on_accept() -> TestRe
     assert!(store.ai_task()?.is_none());
     assert!(!store.sync_paused()?);
     assert_eq!(harness.state().notice(), Some(t.ai_accepted()));
+    Ok(())
+}
+
+#[test]
+fn with_a_wake_the_open_port_is_not_polled_and_a_call_wakes_the_window() -> TestResult {
+    use std::sync::atomic::AtomicUsize;
+    let store = device()?;
+    let t = L10n::new("en");
+    let woken = Arc::new(AtomicUsize::new(0));
+    let mut app = App::new(store.clone(), "en");
+    {
+        let woken = woken.clone();
+        app.set_redraw(Arc::new(move || {
+            woken.fetch_add(1, Ordering::SeqCst);
+        }));
+    }
+    app.open(Page::Settings);
+    let mut harness = window(app);
+    click(&mut harness, t.ai_port_open());
+    // Idle with the port open: no frame asks for the next within a second.
+    harness.run_steps(3);
+    let delay = harness.output().viewport_output[&egui::ViewportId::ROOT].repaint_delay;
+    assert!(
+        delay > StdDuration::from_secs(1),
+        "the open port is polled: next frame in {delay:?}"
+    );
+    let (url, token) = {
+        let port = harness.state().ai_port().ok_or("the port is open")?;
+        (port.url(), port.token().to_string())
+    };
+    let call = json!({
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {"name": "add_area", "arguments": {"name": "Garden"}},
+    });
+    let client = std::thread::spawn(move || -> Result<u16, String> {
+        let config = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .build();
+        let res = ureq::Agent::new_with_config(config)
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {token}"))
+            .send(call.to_string())
+            .map_err(|e| e.to_string())?;
+        Ok(res.status().as_u16())
+    });
+    // The window draws only once woken, as the event loop would.
+    let deadline = Instant::now() + StdDuration::from_secs(20);
+    let mut seen = 0;
+    while !client.is_finished() {
+        assert!(Instant::now() < deadline, "the call was not answered");
+        let now = woken.load(Ordering::SeqCst);
+        if now != seen {
+            seen = now;
+            harness.step();
+        }
+        std::thread::sleep(StdDuration::from_millis(5));
+    }
+    assert_eq!(client.join().map_err(|_| "client")??, 200);
+    assert_eq!(seen, 1, "one wake for one call");
     Ok(())
 }
 
@@ -405,6 +467,7 @@ fn the_docker_choice_without_a_bridge_says_so_and_does_not_open() {
                 oldbrainfix_gui::theme::install(ui.ctx());
                 let tones = oldbrainfix_gui::theme::tones(ui.visuals());
                 let shown = PortShown {
+                    at: false,
                     url: None,
                     waiting: false,
                     copied: None,
@@ -430,4 +493,102 @@ fn the_docker_choice_without_a_bridge_says_so_and_does_not_open() {
 
 fn shows_in<S>(harness: &Harness<'_, S>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
+}
+
+/// The menu bar's `menu`, ahead of the window's widgets of the same name
+/// (#279).
+fn bar<'a>(harness: &'a Harness<'_, App>, menu: &'a str) -> egui_kittest::Node<'a> {
+    match harness.get_all_by_label(menu).next() {
+        Some(node) => node,
+        None => panic!("no menu {menu}"),
+    }
+}
+
+/// Whether `entry` of the menu bar's AI menu can be picked; the menu
+/// stays open.
+fn ai_entry_enabled(harness: &mut Harness<'_, App>, entry: &str) -> bool {
+    bar(harness, "AI").click();
+    harness.run_steps(4);
+    match harness.get_all_by_label(entry).last() {
+        Some(node) => !node.accesskit_node().is_disabled(),
+        None => panic!("no {entry}"),
+    }
+}
+
+#[test]
+fn the_ai_menu_opens_the_settings_at_the_port_card() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    // Low enough that the card lies under the Settings' first one.
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 420.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            App::new(store.clone(), "en"),
+        );
+    harness.run();
+    let card_top =
+        |harness: &Harness<'_, App>| match harness.get_all_by_label(t.ai_port_title()).last() {
+            Some(node) => node.rect().top(),
+            None => panic!("no {}", t.ai_port_title()),
+        };
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    // Low in the dialog, at its bottom edge.
+    let low = card_top(&harness);
+    harness.state_mut().close_page();
+    harness.run();
+
+    assert!(ai_entry_enabled(&mut harness, "AI port…"));
+    click(&mut harness, "AI port…");
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    let top = card_top(&harness);
+    assert!(
+        top + 100.0 < low,
+        "scrolled up to the top: {top}, from {low}"
+    );
+    assert!(shows(&harness, t.ai_port_open()));
+    Ok(())
+}
+
+#[test]
+fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let milk = Notes::new(&store).capture("Milk", None, None)?;
+    let mut harness = window(App::new(store.clone(), "en"));
+    assert!(!ai_entry_enabled(&mut harness, t.ai_review_title()));
+    bar(&harness, "AI").click();
+    harness.run_steps(4);
+
+    // The menu bar is under the Settings dialog: they close for it.
+    harness.state_mut().open(Page::Settings);
+    harness.run_steps(4);
+    click(&mut harness, t.ai_port_open());
+    harness.state_mut().close_page();
+    harness.run_steps(4);
+    // Open, the task does not wait yet.
+    assert!(!ai_entry_enabled(&mut harness, t.ai_review_title()));
+    bar(&harness, "AI").click();
+    harness.run_steps(4);
+    let task = task(&harness)?;
+    store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
+    harness.state_mut().open(Page::Settings);
+    harness.run_steps(4);
+    click(&mut harness, t.ai_port_done());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+
+    harness.state_mut().select(Selection::Agenda);
+    harness.run_steps(4);
+    assert!(ai_entry_enabled(&mut harness, t.ai_review_title()));
+    click(&mut harness, t.ai_review_title());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(shows(&harness, &t.ai_after("Milk and eggs")));
+    // The menu closed with the pick.
+    assert!(!shows(&harness, "AI port…"));
+    Ok(())
 }

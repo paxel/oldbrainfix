@@ -106,12 +106,15 @@ void main() {
   final nudge10 = find.byKey(const ValueKey('nudge10'));
   final chip = find.byKey(const ValueKey('choice-shopping'));
 
-  /// Picks the Shopping List [id] with "Add to a Shopping List" in ⋮.
+  /// Picks the Shopping List [id] with "Add to a Shopping List" in ⋮, on
+  /// its page where there are several, at once where it is the only one
+  /// (#276).
   Future<void> pick(WidgetTester tester, String id) async {
     await tap(tester, more);
     await tap(tester, addToShopping);
-    expect(find.byType(ShoppingPickScreen), findsOneWidget);
-    await tap(tester, find.byKey(ValueKey('shopping-pick-$id')));
+    if (find.byType(ShoppingPickScreen).evaluate().isNotEmpty) {
+      await tap(tester, find.byKey(ValueKey('shopping-pick-$id')));
+    }
     expect(find.byType(CaptureScreen), findsOneWidget);
   }
 
@@ -161,6 +164,56 @@ void main() {
     expect(store.entitiesOfType(ChecklistKeys.typeLine), hasLength(5));
     expect(notes.all().map((n) => n.id).toSet(), {groceries, hardware});
     expect(notes.trashed(), isEmpty);
+  });
+
+  testWidgets('with one list to add to, ⋮ names it and picks it without '
+      'the page; with several, the list used last is at the top (#276)', (
+    tester,
+  ) async {
+    final groceries = shopping('Groceries');
+    await start(tester);
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Coffee');
+    await tap(tester, more);
+    expect(
+      find.descendant(
+        of: addToShopping,
+        matching: find.text('Add to Groceries'),
+      ),
+      findsOneWidget,
+    );
+    await tap(tester, addToShopping);
+    expect(find.byType(ShoppingPickScreen), findsNothing);
+    expect(find.text('Shopping List: Groceries'), findsOneWidget);
+    await tap(tester, save);
+    expect(shown(groceries), ['Coffee']);
+    expect(store.lastShoppingList, groceries);
+
+    final hardware = shopping('Hardware');
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Nails');
+    await tap(tester, more);
+    expect(
+      find.descendant(
+        of: addToShopping,
+        matching: find.text('Add to a Shopping List'),
+      ),
+      findsOneWidget,
+    );
+    await tap(tester, addToShopping);
+    double top(String id) =>
+        tester.getTopLeft(find.byKey(ValueKey('shopping-pick-$id'))).dy;
+    // Groceries, captured first, is first anyway; Hardware once used.
+    expect(top(groceries), lessThan(top(hardware)));
+    await tap(tester, find.byKey(ValueKey('shopping-pick-$hardware')));
+    await tap(tester, save);
+    expect(shown(hardware), ['Nails']);
+    expect(store.lastShoppingList, hardware);
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Glue');
+    await tap(tester, more);
+    await tap(tester, addToShopping);
+    expect(top(hardware), lessThan(top(groceries)));
   });
 
   testWidgets('the other choices wait while a list is picked, and come '

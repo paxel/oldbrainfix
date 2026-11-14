@@ -171,13 +171,18 @@ impl SessionDraft {
     }
 
     /// Whether the Tally `id` shows under `filter`: with no tag in it
-    /// always, else when it carries any of them.
+    /// always, else when it carries any of them or a tag nested under one
+    /// (#267: `#sport` shows `#sport/run`, not `#sportive`).
     fn shows(&self, id: &str, filter: &[String]) -> bool {
-        filter.is_empty()
-            || self
-                .tags
-                .get(id)
-                .is_some_and(|tags| filter.iter().any(|tag| tags.contains(tag)))
+        let under = |tag: &String| {
+            filter.iter().any(|f| {
+                tag == f
+                    || tag
+                        .strip_prefix(f.as_str())
+                        .is_some_and(|rest| rest.starts_with('/'))
+            })
+        };
+        filter.is_empty() || self.tags.get(id).is_some_and(|tags| tags.iter().any(under))
     }
 
     /// How many Tallies ticked the filter hides.
@@ -539,21 +544,4 @@ fn tags_of(text: Option<&str>) -> BTreeSet<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use oldbrainfix_core::SigningKey;
-
-    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
-
-    #[test]
-    fn a_weekday_past_sunday_has_no_own_count() -> TestResult {
-        let store = Store::in_memory(Box::new(chrono::Utc::now), || {
-            Ok(SigningKey::from_seed([3; 32]))
-        })?;
-        let mut draft = SessionDraft::of(&store, &L10n::new("en"), "note:a", None)?;
-        draft.set_own(0, true);
-        draft.set_own(7, true);
-        assert_eq!(draft.counts, [Some(1), None, None, None, None, None, None]);
-        Ok(())
-    }
-}
+mod tests;

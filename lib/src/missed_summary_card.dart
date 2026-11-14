@@ -79,9 +79,12 @@ class MissedSummaryCard extends StatelessWidget {
                         semanticLabel: t.markDone,
                         onChanged: (_) => onCheck(missed.routine, occurrence),
                       ),
-                      Text(
-                        '${dayText(locale, occurrence.day)}  '
-                        '${occurrenceTime(t, locale, occurrence)}',
+                      // Wraps on a narrow phone rather than running off.
+                      Expanded(
+                        child: Text(
+                          '${dayText(locale, occurrence.day)}  '
+                          '${occurrenceTime(t, locale, occurrence)}',
+                        ),
                       ),
                     ],
                   ),

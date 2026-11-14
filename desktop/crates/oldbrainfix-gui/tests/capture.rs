@@ -1,13 +1,14 @@
-//! The capture popup and the Settings' hotkey, driven headless by
-//! egui_kittest over an empty store with its clock held still.
+//! The capture popup and the Settings' hotkey, typed or recorded from the
+//! keys pressed (#283), driven headless by egui_kittest over an empty
+//! store with its clock held still.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::Key;
 use egui::accesskit::Role;
+use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{DeviceSettings, Note, Notes, SigningKey, Store, dart_iso, parse_time};
@@ -211,10 +212,11 @@ fn the_popup_speaks_the_apps_language() -> TestResult {
     Ok(())
 }
 
-/// A hotkey that records where it is moved.
+/// A hotkey that records where it is moved and when it lets its key go.
 struct FakeHotkey {
     status: Status,
     moved: Vec<Chord>,
+    paused: Vec<bool>,
 }
 
 impl Control for FakeHotkey {
@@ -226,6 +228,10 @@ impl Control for FakeHotkey {
         self.moved.push(*chord);
         self.status = Status::Taken;
     }
+
+    fn pause(&mut self, paused: bool) {
+        self.paused.push(paused);
+    }
 }
 
 /// The Settings with a fake hotkey, and that hotkey.
@@ -235,6 +241,7 @@ fn settings(status: Status) -> Result<Settings, Box<dyn std::error::Error>> {
     let fake = Rc::new(RefCell::new(FakeHotkey {
         status,
         moved: Vec::new(),
+        paused: Vec::new(),
     }));
     let mut app = App::new(store()?, "en");
     let control: Rc<RefCell<dyn Control>> = fake.clone();
@@ -327,5 +334,98 @@ fn on_wayland_the_settings_say_the_desktop_holds_the_key() -> TestResult {
             .query_by_label_contains("No hotkey on this desktop.")
             .is_some()
     );
+    Ok(())
+}
+
+/// Clicks the Settings' Record keys, or its "Press the keys…" while it
+/// records.
+fn record(harness: &mut Harness<'_, App>, label: &str) {
+    harness
+        .get_by_role_and_label(Role::Button, label)
+        .click_accesskit();
+    harness.run();
+}
+
+fn stored(harness: &Harness<'_, App>) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(DeviceSettings::new(harness.state().store()).capture_hotkey()?)
+}
+
+#[test]
+fn record_keys_takes_the_chord_pressed_and_no_key_of_the_app_meanwhile() -> TestResult {
+    let (mut harness, fake) = settings(Status::Active)?;
+    record(&mut harness, "Record keys");
+    assert!(harness.query_by_label("Press the keys…").is_some());
+    assert!(harness.query_by_label_contains("Esc cancels.").is_some());
+    // The key held lets go, so that it reaches the window.
+    assert_eq!(fake.borrow().paused, [true]);
+    // Alt+Left would leave the Settings; it is no chord and waits.
+    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    assert!(harness.query_by_label("Press the keys…").is_some());
+    // Ctrl+F would search the Settings; recorded, it is the hotkey.
+    harness.key_press_modifiers(
+        Modifiers::CTRL | Modifiers::COMMAND | Modifiers::ALT,
+        Key::F,
+    );
+    harness.run();
+    let searching = harness.query_by(|n| n.is_focused() && n.role() == Role::TextInput);
+    assert!(searching.is_none());
+    assert_eq!(stored(&harness)?, "Ctrl+Alt+F");
+    assert_eq!(
+        fake.borrow()
+            .moved
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>(),
+        ["Ctrl+Alt+F"]
+    );
+    assert_eq!(fake.borrow().paused, [true, false]);
+    // The field shows it, and Record keys is back.
+    assert_eq!(
+        holding(&harness, "Ctrl+Alt+F").value().as_deref(),
+        Some("Ctrl+Alt+F")
+    );
+    assert!(harness.query_by_label("Record keys").is_some());
+    assert!(harness.query_by_label("Press the keys…").is_none());
+    Ok(())
+}
+
+#[test]
+fn esc_and_leaving_the_settings_stop_recording_and_keep_the_hotkey() -> TestResult {
+    let (mut harness, fake) = settings(Status::Active)?;
+    let before = stored(&harness)?;
+    record(&mut harness, "Record keys");
+    // A key without Ctrl or Alt waits for a chord.
+    harness.key_press(Key::N);
+    harness.run();
+    assert!(harness.query_by_label("Press the keys…").is_some());
+    // Esc stops it, and leaves the Settings open.
+    harness.key_press(Key::Escape);
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    assert!(harness.query_by_label("Record keys").is_some());
+    assert_eq!(stored(&harness)?, before);
+    assert!(fake.borrow().moved.is_empty());
+    assert_eq!(fake.borrow().paused, [true, false]);
+    // A second click on it stops it too.
+    record(&mut harness, "Record keys");
+    record(&mut harness, "Press the keys…");
+    assert!(harness.query_by_label("Record keys").is_some());
+    assert_eq!(fake.borrow().paused, [true, false, true, false]);
+    // Leaving the Settings stops it, so the window hears its keys again.
+    record(&mut harness, "Record keys");
+    harness.state_mut().open(Page::About);
+    harness.run();
+    assert_eq!(
+        fake.borrow().paused,
+        [true, false, true, false, true, false]
+    );
+    harness.key_press_modifiers(
+        Modifiers::CTRL | Modifiers::COMMAND | Modifiers::ALT,
+        Key::K,
+    );
+    harness.run();
+    assert_eq!(stored(&harness)?, before);
     Ok(())
 }

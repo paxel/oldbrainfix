@@ -132,6 +132,15 @@ fn the_agenda_offers_two_frogs_and_checking_one_hides_the_other() -> TestResult 
     harness.run();
     assert_eq!(shown(&harness), two);
     assert!(Frogs::new(&store).done()?.is_empty());
+
+    // Ctrl+Z unchecks the one checked off last (#268).
+    harness.get_by_label(&format!("Done: {}", two[1])).click();
+    harness.run();
+    assert_eq!(Frogs::new(&store).done()?.len(), 1);
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert!(Frogs::new(&store).done()?.is_empty());
+    assert_eq!(shown(&harness), two);
     Ok(())
 }
 
@@ -268,7 +277,7 @@ fn the_frogs_row_on_the_left_opens_the_frog_view_from_anywhere() -> TestResult {
 }
 
 #[test]
-fn a_right_click_deletes_a_frog_after_one_question_and_the_trash_restores_it() -> TestResult {
+fn a_right_click_deletes_a_frog_without_asking_and_the_trash_restores_it() -> TestResult {
     let store = device()?;
     let t = L10n::new("en");
     let mut harness = window(&store, "en");
@@ -283,10 +292,8 @@ fn a_right_click_deletes_a_frog_after_one_question_and_the_trash_restores_it() -
     // click closes: the menu closes all the same.
     harness.get_by_label(t.delete()).click_accesskit();
     harness.run();
-    assert!(shows(harness, t.delete_frog_question()));
-    assert_eq!(harness.query_all_by_label(t.delete()).count(), 1);
-    click(harness, t.delete())?;
     assert!(!shows(harness, t.delete_frog_question()));
+    assert_eq!(harness.query_all_by_label(t.delete()).count(), 0);
     let frogs = Frogs::new(&store);
     assert_eq!(frogs.open()?.len(), 2);
     assert!(!shown(harness).contains(&JOBS[0]));
@@ -423,7 +430,7 @@ fn the_frog_badge_shows_open_eats_it_and_shows_it_eaten_for_two_days() -> TestRe
 }
 
 #[test]
-fn remove_the_frog_asks_once_and_moves_it_to_the_trash() -> TestResult {
+fn remove_the_frog_asks_nothing_and_ctrl_z_brings_it_back() -> TestResult {
     let store = device()?;
     let t = L10n::new("en");
     let frog = Frogs::new(&store).open()?.remove(0);
@@ -435,9 +442,22 @@ fn remove_the_frog_asks_once_and_moves_it_to_the_trash() -> TestResult {
     harness.get_by_label(&open).click();
     harness.run();
     click(harness, t.frog_remove())?;
-    assert!(shows(harness, t.delete_frog_question()));
-    click(harness, t.delete())?;
     assert!(!shows(harness, t.delete_frog_question()));
+    assert!(
+        Frogs::new(&store)
+            .by_id(&frog.id)?
+            .is_some_and(|f| f.is_trashed())
+    );
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert!(
+        Frogs::new(&store)
+            .by_id(&frog.id)?
+            .is_some_and(|f| !f.is_trashed())
+    );
+    harness.get_by_label(&open).click();
+    harness.run();
+    click(harness, t.frog_remove())?;
     assert!(
         Frogs::new(&store)
             .by_id(&frog.id)?

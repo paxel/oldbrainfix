@@ -14,7 +14,7 @@
 <p>Write, say or photograph a thought before it is gone.</p>
 <box-tab device="phone" alt="The Agenda with the fan of the plus button open">
 <li>Tap <strong>+</strong> on the Agenda.</li>
-<li>Tap <strong>Text</strong>, <strong>Voice</strong>, <strong>Photo</strong>, <strong>Gallery</strong> or <strong>Paste</strong>.</li>
+<li>Tap <strong>Text</strong>, <strong>Voice</strong>, <strong>Photo</strong>, <strong>Gallery</strong>, <strong>Paste</strong> or <strong>File</strong>.</li>
 <li>Type, speak or take the photo.</li>
 <li>After speaking, tap <strong>Stop</strong>.</li>
 <li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
@@ -31,14 +31,18 @@
   word: <strong>Text</strong> opens the capture screen with the keyboard up, <strong>Voice</strong>
   starts recording at once, <strong>Photo</strong> opens the camera, <strong>Gallery</strong> opens
   the system's picture picker, where several pictures can be picked at once, and
-  <strong>Paste</strong> opens the capture screen filled from the clipboard. Voice, Photo, Gallery
-  and Paste show only where the Device has them. While the fan is open, "+" reads as Close; tapping
-  it again, tapping outside or Back closes the fan.
+  <strong>Paste</strong> opens the capture screen filled from the clipboard, and <strong>File</strong>
+  opens the system's file picker and attaches the files picked (see
+  <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>).
+  Voice, Photo, Gallery, Paste and File show only where the Device has them. While the fan is open, "+" reads as Close; tapping
+  it again, tapping outside or Back closes the fan. A long press on "+" opens the capture screen
+  with the keyboard up at once, as Text does, without the fan; a screen reader names it with the
+  button, and on the iPhone VoiceOver lists it among the button's actions.
 </p>
 <p>
   The capture screen, the quick note, holds the text field ("What's on your mind?"), the buttons
-  <strong>Photo</strong>, <strong>Voice</strong>, <strong>Gallery</strong> and
-  <strong>Paste</strong>, <strong>To full editor</strong>, and at the bottom "Remind me to sort it in"
+  <strong>Photo</strong>, <strong>Voice</strong>, <strong>Gallery</strong>, <strong>Paste</strong>
+  and <strong>File</strong>, <strong>To full editor</strong>, and at the bottom "Remind me to sort it in"
   with <strong>10 min</strong>, <strong>30 min</strong> and <strong>1 h</strong>. Each of the three
   saves the Note and sets its Nudge to that time. The alarm clock beside To full editor sets up a
   Routine or Reminder; nothing else on the screen sorts the Note unless it is switched on in
@@ -64,7 +68,7 @@
   "Add here"; its <strong>Note</strong> opens the quick note. The dialog's cross, Esc, Alt+Left and a
   click beside it close it and keep what is typed with a Nudge in 1 h. Enter starts a new line;
   Ctrl+Enter (Cmd+Enter on macOS) saves the Note with a Nudge in 1 h, or without one once the Note
-  is sorted. Once something is typed or recorded, <strong>To full editor</strong>, the alarm clock
+  is sorted, and Ctrl+1, Ctrl+2 and Ctrl+3 save it with a Nudge in 10 min, 30 min or 1 h. Once something is typed or recorded, <strong>To full editor</strong>, the alarm clock
   and "Remind me to sort it in" with <strong>10 min</strong>, <strong>30 min</strong> and
   <strong>1 h</strong> appear. Like the phone's quick note, it shows nothing else that sorts the
   Note unless it is switched on in Settings under "Quick note".
@@ -74,7 +78,7 @@
   <li>With an Area or Topic shown in the list, the Note is filed there and needs no Nudge: one <strong>Save</strong> takes the place of the three Nudge buttons, and To full editor files it there too.</li>
   <li><strong>Record voice</strong> starts recording at once; <strong>Stop</strong> ends it, the recording waits under the field as a "Voice recording" line and is saved with the Note.</li>
   <li><strong>Paste</strong>, or Ctrl+V in the empty field, puts the clipboard's text into the field. A pasted picture waits under the field as a "Photo" line and is saved with what is typed as the Note's photo.</li>
-  <li><strong>From file…</strong> picks pictures and sound files; files dropped onto the window open the quick note. They wait under the field, a picture as a "Photo" line and a sound file as a "Voice recording" line, and are saved with what is typed as one Note.</li>
+  <li><strong>From file…</strong> picks files of any kind; files dropped onto the window open the quick note. They wait under the field, a picture as a "Photo" line, a sound file as a "Voice recording" line and any other file as a line with its name, and are saved with what is typed as one Note, the other files as its Attachments (see <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>).</li>
 </ul>
 <p>
   Text still typed, and pictures and files still waiting, when the window closes are kept as a
@@ -91,14 +95,14 @@
 <guide-box name="sort-while-capturing">
 <h2>Sort while capturing</h2>
 <p>File the Note, or set it up, before it is saved.</p>
-<box-tab device="phone" alt="File into… opened from the quick note, with the Areas and their Topics">
+<box-tab device="phone" alt="File into… opened from the quick note, with the filter, Work and Kitchen filed into recently, then the Areas with their Topics and New Topic…">
 <li>Tap your Profile picture, then <strong>Settings</strong>.</li>
 <li>Switch on <strong>File into…</strong> under "Quick note".</li>
 <li>Tap <strong>+</strong> ▸ <strong>Text</strong> and type.</li>
 <li>Tap the folder, <strong>File into…</strong>, and pick an Area.</li>
 <li>Tap <strong>Save</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The quick note with a typed text and To full editor, File into…, the alarm clock and More">
+<box-tab device="desktop" alt="File into… over the quick note, with the filter, Work and Repairs filed into recently, then the Areas with their Topics, New Topic… and New Area…">
 <li>Click <strong>Edit ▸ Settings…</strong>.</li>
 <li>Tick <strong>File into…</strong> under "Quick note".</li>
 <li>Press Ctrl+N and type.</li>
@@ -110,12 +114,13 @@
   The quick note is meant for getting a thought out of the head; sorting happens later on the card
   or in the editor. Only the alarm clock beside To full editor is always there: it offers
   <strong>Routine</strong> and <strong>Reminder</strong>, as the "+" of the Note editor does, in
-  Simple too. Each opens its editor over the quick note; its <strong>Save</strong> comes back with
-  the choice at the top, and the Routine or Reminder is saved together with the Note. Settings,
+  Simple too. Each opens its editor over the quick note; its <strong>Save</strong>, and leaving
+  it once something changed, by Back on the phone, by Esc on the desktop, comes back with the choice at the top, and the Routine or Reminder is saved together with the Note. Settings,
   under "Quick note", has one switch each for what the quick note shows besides, all off unless
   switched on; they belong to this phone. On the phone, Settings is the row
   under "Settings of this Device" on the Profile page, behind the Profile picture in the Agenda's
-  top corner.
+  top corner. The search field at the top of Settings shows only the settings whose name or detail
+  line holds the words typed, such as "quick note", each under its section's heading.
 </p>
 <p>
   Frog, Session, Make it a Tally and the format bar are there in Advanced only; in Simple their
@@ -144,7 +149,9 @@
 </p>
 <p>
   <strong>Add to a Shopping List</strong> makes each line of the capture a Line of the Shopping
-  List you pick, and keeps no Note. While a list is picked, the other choices and To full editor
+  List you pick, and keeps no Note. With one list to add to, the entry names it, such as
+  <strong>Add to Weekly</strong>, and picks it at once; with several, the list a capture went into
+  last is at the top of the page. While a list is picked, the other choices and To full editor
   wait unshown, and one <strong>Save</strong> takes the place of the Nudge buttons. It is offered
   only while there is a list to add to and the capture holds no photo; a photo taken or pasted
   afterwards drops it, and it is not offered behind the App Lock. A recording gives the lines of its
@@ -161,7 +168,7 @@
 <ul>
   <li><strong>File into…</strong> picks the Area or Topic.</li>
   <li><strong>Frog, Session or Tally</strong> adds <strong>Frog</strong> and <strong>Session</strong> to the alarm clock and <strong>Make it a Tally</strong> to <strong>More</strong>; in Simple the switch does not show.</li>
-  <li><strong>Add to a Shopping List</strong>, in <strong>More</strong>. With a list picked, the lines go into that list and no Note is made; only More stays in the row, To full editor goes, and one <strong>Save</strong> takes the place of the Nudge buttons.</li>
+  <li><strong>Add to a Shopping List</strong>, in <strong>More</strong>: the lists to pick, the one used last at the top, or with one list one entry naming it, such as <strong>Add to Weekly</strong>. With a list picked, the lines go into that list and no Note is made; only More stays in the row, To full editor goes, and one <strong>Save</strong> takes the place of the Nudge buttons.</li>
   <li><strong>Importance</strong>, in <strong>More</strong>.</li>
   <li><strong>Format bar</strong>: the format bar over the field, without ☐, link and table, which the Note editor adds. In Simple the switch does not show and the bar stays off.</li>
   <li><strong>Nudge buttons</strong>, on unless switched off: off, a single <strong>Save</strong> takes the place of the three buttons and saves with a Nudge in 1 h.</li>
@@ -204,24 +211,26 @@
   <li><strong>Sharing</strong>: text, pictures and sound files shared from another app open the capture screen filled in, sound files as voice recordings. The app they came from is recorded with the Note.</li>
 </ul>
 <p>
-  While the App Lock is on, its lock screen has its own "+" with the same fan, and every quick entry
-  point opens Capture without unlocking.
+  While the App Lock is on, its lock screen has its own "+" with the same fan and the same long
+  press, and every quick entry point opens Capture without unlocking.
 </p>
 <p>
   On the desktop, the hotkey, Ctrl+Alt+N unless changed, opens the popup "Capture a Note" over all
   other windows; <strong>File ▸ Quick note</strong> opens it too. It works while Old Brain Fix runs;
   where there is a tray, the app keeps running there after its window is closed. The popup holds a
-  one-line field, <strong>Record voice</strong>, <strong>Paste</strong>, <strong>To full
+  field, <strong>Record voice</strong>, <strong>Paste</strong>, <strong>To full
   editor</strong>, the alarm clock, what Settings under "Quick note" switched on, and the Nudge
   buttons. Enter saves
-  the Note with a Nudge in 1 h, or without one once the Note is sorted; Esc and the close button
+  the Note with a Nudge in 1 h, or without one once the Note is sorted, and Shift+Enter starts a
+  new line; Ctrl+1, Ctrl+2 and Ctrl+3 (Cmd on macOS) save it with a Nudge in 10 min, 30 min or 1 h,
+  as the Nudge buttons do. Esc and the close button
   keep what is typed the same way, and an empty popup just closes. To full editor saves the Note the
   same way, closes the popup and opens the Note in the window's Note editor, bringing the window back
   from the tray; it and the Nudge buttons wait until something is typed or recorded.
 </p>
 <p>
-  The key is set in Settings under "Quick capture", in the field "Hotkey"; it needs Ctrl, Alt or
-  Super. On X11, Windows and macOS the app takes the key itself. On Wayland the desktop manages it:
+  The key is set in Settings under "Quick capture": <strong>Record keys</strong> takes the keys
+  pressed next, and the field "Hotkey" takes them typed out; it needs Ctrl, Alt or Super. On X11, Windows and macOS the app takes the key itself. On Wayland the desktop manages it:
   it asks once and lets you change the key in its own keyboard settings. Where the key is taken or no
   hotkey is possible, the line under the field says so. The tray's menu also has
   <strong>Capture a Note</strong>.
@@ -250,14 +259,16 @@
 <guide-box name="sort-later">
 <h2>Sort what is Unsorted</h2>
 <p>File the Notes you captured without sorting them.</p>
-<box-tab device="phone" alt="Unsorted with three Notes, each card with File into…">
+<box-tab device="phone" alt="Unsorted while it selects, two of three Notes ticked, with File into… in the bar">
 <li>Tap the Nudge, or <strong>x Unsorted</strong> on the Agenda.</li>
-<li>Tap the folder, <strong>File into…</strong>, on a Note's card.</li>
+<li>Tap <strong>Select</strong> and tick the Notes.</li>
+<li>Tap the folder, <strong>File into…</strong>, in the bar.</li>
 <li>Pick the Area or Topic.</li>
 </box-tab>
-<box-tab device="desktop" alt="Unsorted in the desktop app with two Notes">
+<box-tab device="desktop" alt="Unsorted in the desktop app, both of its cards selected, with File into… in a card's right-click menu">
 <li>Click the Nudge, or <strong>Unsorted</strong> in the sidebar.</li>
-<li>Click <strong>⋮ ▸ File into…</strong> on a Note's card.</li>
+<li>Ctrl-click the cards of the Notes.</li>
+<li>Right-click one of them ▸ <strong>File into…</strong>.</li>
 <li>Pick the Area or Topic.</li>
 </box-tab>
 <box-more>
@@ -284,7 +295,42 @@
   On the desktop, File into… is also in a card's right-click menu and under <strong>Note ▸ File
   into…</strong> (Ctrl+M), and the badge "Area and Topic" in the Note dialog opens it. A card can be
   dragged onto an Area or Topic in the sidebar. Ctrl-click and Shift-click select several cards;
-  File into… then files all of them.
+  File into… then files all of them. A selected card's right-click also offers <strong>Merge
+  into…</strong>, <strong>Importance</strong> and <strong>Move to trash</strong> for all of them, and
+  in the Trash <strong>Restore</strong>; Ctrl+Z takes back the trash or the Merge of all of them at
+  once.
+</p>
+<p>
+  Without the mouse, Down selects the next card in Unsorted, Ctrl+M opens File into…, a few letters
+  of the Area or Topic and Enter file it, and Down goes on to the next Note. Unsorted has a search
+  field of its own, and Down there goes to the first card found (see
+  <a href="desktop-app.html">The desktop app</a> for all keys).
+</p>
+<p>
+  On the phone, every list of Notes has <strong>Select</strong> in its bar: Unsorted, an Area, a
+  Topic, All Notes, the search's hits and the Trash. It puts a box on each card you may change; only
+  the box ticks, a tap on the card still switches its view and a long press opens the editor. The
+  bar then says how many are ticked and offers <strong>File into…</strong>, <strong>Merge
+  into…</strong>, which merges all of them into the Note picked, a ticked one included,
+  <strong>Importance</strong> and <strong>Move to trash</strong>, which asks nothing: the
+  announcement "Moved to the Trash" at the top brings all of them back with one tap. In the Trash it
+  offers <strong>Restore</strong>. The card's own File into… still files that Note alone. Back or
+  <strong>Stop selecting</strong> ends the selection without changing anything.
+</p>
+<p>
+  File into… starts with a filter: typing shows the Areas and Topics whose names hold the text.
+  Above the Areas, "Filed into recently" lists the last three Areas or Topics this Device filed
+  into. The Areas stand in your own order, as on the Areas list. <strong>New Topic…</strong> under
+  an Area and <strong>New Area…</strong> at the end ask for a name, New Area… with the typed text filled in, then make the Topic or Area and file the Note
+  into it. Made from the quick note, the Topic or Area stays even when the Note is not saved. New
+  Topic… is there in Advanced only, and in a Shared Area only for a Manager. On the phone, a locked
+  Area that is not open shows no Topics, and New Topic… is not offered there.
+</p>
+<p>
+  On the desktop the filter takes the keyboard as File into… opens. Enter files into the first Area
+  or Topic whose name matches, or, while nothing is typed, the one filed into last; when nothing
+  matches, it asks the name of a New Area. Esc closes File into… and files nothing. A card dragged
+  onto the sidebar counts as filed into, too.
 </p>
 </box-more>
 </guide-box>
@@ -292,7 +338,7 @@
 <guide-box name="edit">
 <h2 id="the-note-editor">Change a Note</h2>
 <p>Change a Note's text and its settings.</p>
-<box-tab device="phone" alt="The Note editor with the text, the badges Important, Household, the capture time, the kind and the text format, the + badge and two dated Sections">
+<box-tab device="phone" alt="The Note editor with the text, the badges Important, Household, the capture time, the kind, the text format and Hidden from AI, the + badge and two dated Sections">
 <li>Long-press the Note's card.</li>
 <li>Change the text.</li>
 <li>Tap a badge to change its setting.</li>
@@ -306,7 +352,8 @@
 </box-tab>
 <box-more>
 <p>
-  A long press on a Note's card, or Edit in its ⋮, opens the Note editor. The text, the Lines of a
+  A long press on a Note's card, the pencil at the bottom of its detailed view, or Edit in its ⋮,
+  opens the Note editor. The text, the Lines of a
   list, the photos and recordings and the Sections fill the page. A Checklist, a Shopping List, a
   Tally or a Session starts with its name and its description, then its Lines, its Tally or its
   Session (see "A Note's kind" in Lists, Tallies, Sessions and Frogs). The text is saved on leaving.
@@ -322,7 +369,7 @@
   Show ticks, and as short text otherwise, such as "Household" or "Every day · 08:00":
 </p>
 <ul>
-  <li><strong>Importance</strong>: Unimportant, Normal or Important. It is changed here, not in the card's ⋮.</li>
+  <li><strong>Importance</strong>: Unimportant, Normal or Important. It is changed here, not in the card's ⋮; on the desktop a card's right-click offers it too.</li>
   <li><strong>Area and Topic</strong>: where the Note is filed, or Unsorted, or "Not filed" for a Note with a Routine or the like and no Area. A tap opens File into….</li>
   <li><strong>Captured</strong>: when the Note was captured; its editor also shows the place, the calendar event, the Bluetooth device and the app it was shared from, as far as they were recorded. Each of these but the time has <strong>Remove</strong> beside it, which asks once and then takes the detail off the Note on every Device; the time it was captured stays. Under its text, each Section shows its own in one small grey line, such as "12:40 · Home · Dentist", its time alone when it was captured the same day as the part before it; a tap on the line opens the same details, with the same Remove. In a Shared Area, the Note's author and the Area's Managers may remove them.</li>
   <li>Each <strong>Routine</strong> and <strong>Reminder</strong> of the Note with its schedule, such as "Every day · 08:00". A tap opens its editor.</li>
@@ -331,6 +378,7 @@
   <li><strong>Text format</strong>, for a Plain Note: <strong>Plain text</strong>, <strong>Formatted text</strong> or <strong>Code</strong>, as choice chips; a formatted text does not become plain again (see <a href="formatted-text-transcripts-photo-texts.html">Formatted text</a>).</li>
   <li><strong>Show on the Agenda</strong> of a Checklist without a Routine or Reminder, and of a Shopping List: Off, One row with the number of open Lines, or Each open Line on its own row, with radio buttons in its editor.</li>
   <li><strong>Show ticks</strong>, while the Note has a box: On or Off, with a switch in its editor.</li>
+  <li><strong>Hidden from AI</strong>, outside a Shared Area: On or Off, with a switch in its editor, or "Off, hidden by its Area" while only its Area is marked (see <a href="backups-locks-and-privacy.html#hide-a-note-from-the-ai">Hide a Note from the AI</a>).</li>
 </ul>
 <p>
   A tap on a badge opens its small editor, which names the setting beside the same icon, shows its
@@ -351,7 +399,7 @@
   Ann". The text before every edit stays in the log.
 </p>
 <p>
-  <strong>Copy text</strong> in the ⋮ of a Note's card puts the text of the Note and of each of its
+  <strong>Copy text</strong>, under <strong>Share…</strong> in the ⋮ of a Note's card, puts the text of the Note and of each of its
   Sections on the clipboard, as they show, oldest first, with a blank line between them. In the
   editor, a text that is only read, such as another person's Section, is selected with a long press;
   the menu beside it offers <strong>Copy</strong> and <strong>Select all</strong>.

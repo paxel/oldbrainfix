@@ -1,0 +1,16 @@
+{
+  "device": [
+    [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000014\",\"name\":\"Ada\",\"version\":1}"
+    ],
+    [
+      "profile:first",
+      "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"UrZdx5SB8FbHx04wdHI6NpZxEi4KuWjUXGgqS+VGxuhF0dC2HqUhF4JDHxutVHA1MevOg8RLi6ZOEAt0y8DuCA==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
+    ]
+  ]
+}

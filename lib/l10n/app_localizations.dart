@@ -170,6 +170,18 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get captureFanClose;
 
+  /// Screen reader hint of the long press on the Agenda's and the lock screen's + (#282): it opens text capture at once, without the fan. Lowercase, as Android reads it after "Double-tap and hold to".
+  ///
+  /// In en, this message translates to:
+  /// **'write a Note at once'**
+  String get captureLongPressHint;
+
+  /// Screen reader action of the Agenda's and the lock screen's + on the iPhone (#282), the long press's: opens text capture at once, without the fan.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a Note at once'**
+  String get captureLongPressAction;
+
   /// No description provided for @photoMissing.
   ///
   /// In en, this message translates to:
@@ -343,6 +355,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'File into…'**
   String get fileInto;
+
+  /// The filter field at the top of File into…
+  ///
+  /// In en, this message translates to:
+  /// **'Filter Areas and Topics'**
+  String get fileIntoFilterHint;
+
+  /// Heading over the last three places this Device filed into, at the top of File into…
+  ///
+  /// In en, this message translates to:
+  /// **'Filed into recently'**
+  String get fileIntoRecent;
+
+  /// The row at the end of File into… that makes an Area and files into it
+  ///
+  /// In en, this message translates to:
+  /// **'New Area…'**
+  String get fileIntoNewArea;
+
+  /// The row under an Area in File into… that makes a Topic there and files into it
+  ///
+  /// In en, this message translates to:
+  /// **'New Topic…'**
+  String get fileIntoNewTopic;
+
+  /// File into… when nothing matches the filter
+  ///
+  /// In en, this message translates to:
+  /// **'No Area or Topic matches.'**
+  String get fileIntoNoMatch;
 
   /// No description provided for @firstStartTitle.
   ///
@@ -854,6 +896,24 @@ abstract class AppLocalizations {
   /// **'Reminder'**
   String get reminder;
 
+  /// Entry in a compact Note card's ⋮ menu that opens the editor of a new Routine for the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine…'**
+  String get spawnRoutine;
+
+  /// Entry in a compact Note card's ⋮ menu that opens the editor of a new Reminder for the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder…'**
+  String get spawnReminder;
+
+  /// Entry in a compact Note card's ⋮ menu, in Advanced, that opens the editor of a new Session run from the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Session…'**
+  String get spawnSession;
+
   /// No description provided for @newRoutine.
   ///
   /// In en, this message translates to:
@@ -907,6 +967,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Switch to Simple to type.'**
   String get scheduleSentenceAdvanced;
+
+  /// The chip that sets a new Reminder to an hour from now, with its time (#271).
+  ///
+  /// In en, this message translates to:
+  /// **'In 1 h, {time}'**
+  String quickInAnHour(String time);
+
+  /// The chip that sets a new Reminder to 19:00 today, with its time.
+  ///
+  /// In en, this message translates to:
+  /// **'Tonight {time}'**
+  String quickTonight(String time);
+
+  /// The chip that sets a new Reminder to tomorrow when this Device's Quiet Hours end, with its time.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow {time}'**
+  String quickTomorrow(String time);
+
+  /// The chip that sets a new Reminder to a week from today when the Quiet Hours end, with its time.
+  ///
+  /// In en, this message translates to:
+  /// **'In a week, {time}'**
+  String quickInAWeek(String time);
 
   /// No description provided for @scheduleSimple.
   ///
@@ -1273,6 +1357,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'1 h'**
   String get snooze60;
+
+  /// Beside Snooze on an Occurrence's notification, in the Agenda row's menu and in the Note editor's Due line (#269): opens Skip and Tomorrow. CONTEXT.md, Not today.
+  ///
+  /// In en, this message translates to:
+  /// **'Not today'**
+  String get notToday;
+
+  /// In the menu of an Occurrence's row on the Agenda (#270): opens the Routine or Reminder editor, as a tap on the row opens its Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit schedule'**
+  String get editSchedule;
+
+  /// The text of an Occurrence's notification once Not today was tapped, above Skip and Tomorrow (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skip it, or tomorrow at the same time?'**
+  String get notTodayQuestion;
+
+  /// A Not today choice (#269): the Occurrence is neither Done nor Missed, and rings no more. CONTEXT.md, Skip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get skip;
+
+  /// A Not today choice (#269): skips the Occurrence and adds a one-time one of the same Routine the day after, at the same time.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get notTodayTomorrow;
+
+  /// Under a skipped Occurrence on the Agenda, struck through for the day (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get occurrenceSkipped;
+
+  /// Under an Occurrence on the Agenda that Not today ▸ Tomorrow skipped (#269); its one-time Occurrence shows the day after.
+  ///
+  /// In en, this message translates to:
+  /// **'The day after instead'**
+  String get occurrenceTomorrowInstead;
+
+  /// Under the one-time Occurrence that Not today ▸ Tomorrow added, on the Agenda and in the Routine's history log (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'From the day before'**
+  String get occurrenceFromDayBefore;
 
   /// No description provided for @alarmsBanner.
   ///
@@ -2144,6 +2276,30 @@ abstract class AppLocalizations {
   /// **'Due, not Done yet'**
   String get logOpen;
 
+  /// A day of the last seven days in a Routine's history whose Occurrences were all skipped (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'{day}: skipped'**
+  String daySkipped(String day);
+
+  /// Beside a period's Adherence in a Routine's history, when Occurrences were skipped in it (#269): "92 % · 3 skipped". Skipped ones are not part of the share.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} skipped'**
+  String adherenceSkipped(int count);
+
+  /// An Occurrence in a Routine's history log that was skipped (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get logSkipped;
+
+  /// An Occurrence in a Routine's history log that Not today ▸ Tomorrow skipped (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped, the day after instead'**
+  String get logSkippedTomorrow;
+
   /// No description provided for @logComing.
   ///
   /// In en, this message translates to:
@@ -2390,6 +2546,18 @@ abstract class AppLocalizations {
   /// **'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.'**
   String get settingsIntro;
 
+  /// Hint of the search field at the top of Settings (#282), which filters to the matching settings with their headings.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Settings'**
+  String get settingsSearchHint;
+
+  /// Shown in Settings when its search finds no setting (#282).
+  ///
+  /// In en, this message translates to:
+  /// **'No setting matches “{query}”.'**
+  String settingsSearchNothing(String query);
+
   /// No description provided for @settingsLook.
   ///
   /// In en, this message translates to:
@@ -2503,6 +2671,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'For Transcripts of voice Notes.'**
   String get settingsSpeechModelDetail;
+
+  /// Settings ▸ Capture, Android only (#293): the row of the app's print service, with which printing in any app to the printer Old Brain Fix opens Capture with the printed pages as a PDF.
+  ///
+  /// In en, this message translates to:
+  /// **'Print to Old Brain Fix'**
+  String get printService;
+
+  /// The print service row's line while Android lists the service as on (#293).
+  ///
+  /// In en, this message translates to:
+  /// **'On. Print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.'**
+  String get printServiceOn;
+
+  /// The print service row's line while Android lists the service as turned off (#293).
+  ///
+  /// In en, this message translates to:
+  /// **'Off. Turn on Old Brain Fix in Android\'s print settings to print pages into a Note.'**
+  String get printServiceOff;
+
+  /// The print service row's line where Android does not tell whether the service is on (#293).
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on Old Brain Fix in Android\'s print settings. Then print in any app and pick Old Brain Fix as the printer to capture the pages as a PDF.'**
+  String get printServiceUnknown;
+
+  /// The print service row's button (#293): opens Android's print settings, where the service is turned on or off.
+  ///
+  /// In en, this message translates to:
+  /// **'Open print settings'**
+  String get printServiceOpen;
 
   /// No description provided for @settingsCalendar.
   ///
@@ -5426,6 +5624,36 @@ abstract class AppLocalizations {
   /// **'Add entry'**
   String get addTallyEntry;
 
+  /// In a Tally card's menu on Android: puts a shortcut to the Tally's entry page on the home screen (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'Add to home screen'**
+  String get addToHomeScreen;
+
+  /// In a Tally card's menu on the iPhone: puts the Tally's entry page among the actions of the app icon's long press (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'Add to the app icon'**
+  String get addToHomeScreenIphone;
+
+  /// Announced when the phone's home screen cannot take a Tally's shortcut (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'This home screen takes no shortcuts.'**
+  String get tallyShortcutNotTaken;
+
+  /// Announced on the iPhone after Add to the app icon (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is in the app icon\'s menu: touch and hold the icon on the Home Screen.'**
+  String tallyShortcutOnIcon(String name);
+
+  /// Announced when a Tally's home-screen shortcut is tapped after the Tally was deleted or trashed (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'This Tally is no longer there.'**
+  String get tallyShortcutGone;
+
   /// Makes a Note a Checklist: its first line stays its text, every other line becomes a Line (CONTEXT.md: Checklist, Line).
   ///
   /// In en, this message translates to:
@@ -5480,7 +5708,7 @@ abstract class AppLocalizations {
   /// **'Next: {when}'**
   String sessionCardNext(String when);
 
-  /// The compact view of the card of a Note that runs a Session (#189): how many of its runs were Done and how many Missed since the week began.
+  /// The compact view of the card of a Note that runs a Session (#189): how many of its runs were Done and how many skipped (#269) since the week began.
   ///
   /// In en, this message translates to:
   /// **'done {done} / skipped {skipped} this week'**
@@ -5492,7 +5720,7 @@ abstract class AppLocalizations {
   /// **'Last 4 weeks'**
   String get sessionHistory;
 
-  /// One week of a Session Note's history on its detailed card (#191): the day the week starts, and how many runs of all its Routines were Done and how many Missed in it.
+  /// One week of a Session Note's history on its detailed card (#191): the day the week starts, and how many runs of all its Routines were Done and how many skipped (#269) in it.
   ///
   /// In en, this message translates to:
   /// **'Week of {day}: done {done} / skipped {skipped}'**
@@ -6422,6 +6650,12 @@ abstract class AppLocalizations {
   /// **'Add to a Shopping List'**
   String get addToShoppingList;
 
+  /// In the ⋮ of a capture screen while there is one Shopping List to add to, by its title: makes each line of the Note being captured a Line of it at once, with no page to pick from (CONTEXT.md: Shopping List, Line).
+  ///
+  /// In en, this message translates to:
+  /// **'Add to {list}'**
+  String addToNamedShoppingList(String list);
+
   /// On a capture screen: the Shopping List the lines being captured go into, by its title.
   ///
   /// In en, this message translates to:
@@ -7063,6 +7297,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Share to an app'**
   String get shareToApp;
+
+  /// Entry in a Note card's ⋮ menu that opens a small menu with Send to a person, Share to an app, Copy text and Export as Pack…
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get shareNote;
 
   /// Announced when a Note could not be handed to another app; the tap shows why and what to do.
   ///
@@ -7883,7 +8123,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
+  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -9271,6 +9511,941 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Feedback not shared'**
   String get feedbackNotSentTitle;
+
+  /// At the end of an announcement whose tap undoes what was just done (#268), and the screen reader's hint for that tap.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// Announced after a Note was moved to the Trash without asking; its tap brings it back with its Routines and Reminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to the Trash'**
+  String get undoNoteTrashed;
+
+  /// Announced after a Line of a Checklist or Shopping List was deleted without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line deleted'**
+  String get undoLineDeleted;
+
+  /// Announced after a Tally entry was deleted without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry deleted'**
+  String get undoEntryDeleted;
+
+  /// Announced after a Frog was moved to the Trash without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Frog moved to the Trash'**
+  String get undoFrogTrashed;
+
+  /// Announced after a Routine was moved to the Trash without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine moved to the Trash'**
+  String get undoRoutineTrashed;
+
+  /// Announced after a Reminder was moved to the Trash without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder moved to the Trash'**
+  String get undoReminderTrashed;
+
+  /// Announced after a Note's “From …” label was removed without asking; its tap brings it back. No name: values never go into an announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'“From” label removed'**
+  String get undoPackFromRemoved;
+
+  /// Announced after a Transcript was removed without asking; its tap brings it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript removed'**
+  String get undoTranscriptRemoved;
+
+  /// Announced after a Photo Text was removed without asking; its tap brings it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Text removed'**
+  String get undoPhotoTextRemoved;
+
+  /// Announced after Not today ▸ Skip in the app (#269); its tap takes the skip back.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get undoSkipped;
+
+  /// Announced after Not today ▸ Tomorrow in the app (#269); its tap takes it back, and the Occurrence added tomorrow goes.
+  ///
+  /// In en, this message translates to:
+  /// **'The day after instead'**
+  String get undoTomorrow;
+
+  /// Folded heading under a Checklist's or Shopping List's Lines in the Note editor: the deleted Lines, each with Restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed Lines'**
+  String get linesRemoved;
+
+  /// Bar action of a Note list on the phone (#273): shows a box on every card this Device may change, to act on several Notes at once.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get selectNotes;
+
+  /// Screen reader label of the box on a Note card while its list selects (#273).
+  ///
+  /// In en, this message translates to:
+  /// **'Select this Note'**
+  String get selectNote;
+
+  /// First bar button while a Note list selects (#273): drops the selection and hides the boxes.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop selecting'**
+  String get stopSelecting;
+
+  /// Title of a Note list while it selects (#273): how many Notes are selected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String notesSelected(int count);
+
+  /// Title of the dialog asked when an edit page that cannot be saved as it is is left by Back.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get leaveDiscardTitle;
+
+  /// No description provided for @leaveDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It can\'t be saved as it is, so leaving drops it.'**
+  String get leaveDiscardBody;
+
+  /// Button of the leave dialog that closes the page without saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get leaveDiscard;
+
+  /// Button of the leave dialog that stays on the page.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get leaveKeepEditing;
+
+  /// Title of the card on the Backups page that opens a Backup to take Notes back from it (#285).
+  ///
+  /// In en, this message translates to:
+  /// **'Take Notes back'**
+  String get backupOpenTitle;
+
+  /// Text of the card 'backupOpenTitle' on the Backups page.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a Backup to bring Notes back from it, such as a Note deleted for good or an earlier version of a list. They come back as copies in new Areas; nothing else changes.'**
+  String get backupOpenIntro;
+
+  /// Button on the Backups page that picks a Backup file to take Notes back from it.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a Backup…'**
+  String get backupOpen;
+
+  /// Title of the page that asks for the passphrase or recovery key of a Backup opened to take Notes back.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a Backup'**
+  String get backupOpenPageTitle;
+
+  /// Text over the passphrase and recovery key fields when a Backup is opened to take Notes back.
+  ///
+  /// In en, this message translates to:
+  /// **'Open it with your passphrase or with the recovery key from the Recovery Sheet. Nothing is restored: you pick the Notes to take back.'**
+  String get backupOpenUnlockIntro;
+
+  /// Button that opens the Backup with the passphrase or recovery key typed.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get backupOpenStart;
+
+  /// Shown beside a spinner while a Backup is opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening… this takes a moment.'**
+  String get backupOpenWorking;
+
+  /// Announced when a Backup could not be opened to take Notes back; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup was not opened.'**
+  String get backupNotOpened;
+
+  /// Title of the dialog behind 'backupNotOpened'.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup not opened'**
+  String get backupNotOpenedTitle;
+
+  /// The fix when a Backup opened to take Notes back is damaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was changed; try an older Backup.'**
+  String get backupOpenDamagedFix;
+
+  /// Text over the tree of a Backup's Notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick the Notes to take back. Each comes back as a copy in a new Area, with its files; the Notes on this Device stay as they are.'**
+  String get backupNotesHint;
+
+  /// Over the tree of a Backup's Notes when the Notes of locked Areas that are closed now are not shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The Notes of a locked Area are left out until you unlock it.} other{The Notes of {count} locked Areas are left out until you unlock them.}}'**
+  String backupNotesLocked(int count);
+
+  /// Button under 'backupNotesLocked': asks for the PIN, opens those locked Areas and shows their Notes in the tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock and show them'**
+  String get backupNotesUnlock;
+
+  /// Title of the PIN or biometrics request behind 'backupNotesUnlock'.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the Notes of locked Areas'**
+  String get backupNotesUnlockTitle;
+
+  /// Under a Note of a Backup's tree that lay in the Trash when the Backup was made.
+  ///
+  /// In en, this message translates to:
+  /// **'In the Trash'**
+  String get backupNoteTrashed;
+
+  /// Put after the name of a new Area from a Backup when an Area has that name: 'Health (Backup)'.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backupSuffix;
+
+  /// The name of the new Area for the Notes of a Backup that were in no Area.
+  ///
+  /// In en, this message translates to:
+  /// **'From a Backup'**
+  String get backupNoArea;
+
+  /// Announced when Add on a Backup's Notes failed; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes were not added.'**
+  String get backupNotesNotAdded;
+
+  /// Title of the dialog behind 'backupNotesNotAdded'.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes not added'**
+  String get backupNotesNotAddedTitle;
+
+  /// Why the Notes of a Backup were not added.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup file changed or could not be read again since it was opened.'**
+  String get backupAddDamagedCause;
+
+  /// The fix when the Notes of a Backup were not added.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was added; open the Backup again.'**
+  String get backupAddDamagedFix;
+
+  /// Row below the Areas in the Areas list, and the title of the page it opens: every tag (#word) of the Notes by its levels (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get tagsTitle;
+
+  /// The tag tree page while no Note has a tag.
+  ///
+  /// In en, this message translates to:
+  /// **'No tags yet. A word with # in front in a Note, such as #garden or #life/health, shows here.'**
+  String get tagsNone;
+
+  /// How many Notes carry a tag of the tag tree, or a tag below it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note} other{{count} Notes}}'**
+  String tagNotes(int count);
+
+  /// Button beside a tag in the tag tree: shows the tags nested below it, such as #life/health below #life.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the tags below'**
+  String get tagUnfold;
+
+  /// Button beside a tag in the tag tree whose tags below show: hides them.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide the tags below'**
+  String get tagFold;
+
+  /// The mark of a Note or an Area that hides it and everything on it from the AI on the user's computer (#267, ADR 0049): a switch in the card's and the Area's menu and a badge in the Note editor; also read by a screen reader for the shield beside a hidden Note or Area.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden from AI'**
+  String get hiddenFromAi;
+
+  /// Value of the Note editor's badge Hidden from AI while the Note has no mark of its own but its Area, or the Note it is merged into, is hidden from AI.
+  ///
+  /// In en, this message translates to:
+  /// **'Off, hidden by its Area'**
+  String get hiddenFromAiByArea;
+
+  /// Title of the question shown when something hidden from AI is about to be given to other people: filed into a Shared Area, shared, sent or put into a Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden from AI'**
+  String get hiddenFromAiRefusedTitle;
+
+  /// Text of that question; names are the Notes (their first line) and Areas whose mark is in the way.
+  ///
+  /// In en, this message translates to:
+  /// **'{names}: hidden from AI. What is hidden from AI is not given to other people. Show it to the AI first.'**
+  String hiddenFromAiRefusedBody(String names);
+
+  /// Button of that question: takes the marks Hidden from AI off and goes on with filing, sharing, sending or the Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'Show to the AI'**
+  String get hiddenFromAiShow;
+
+  /// Capture button and entry of the Agenda's "+" fan: picks files of any kind with the system's file picker and attaches them to the Note (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get file;
+
+  /// Action in the Note editor's bar: picks files with the system's file picker and attaches them to the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach a file'**
+  String get attachFile;
+
+  /// Label over the text read out of an attached file, shown dimmed so it does not read as typed text (like Photo Text).
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment Text'**
+  String get attachmentTextLabel;
+
+  /// Under an attached file whose text the phone leaves to the user's computer (a PDF of more than 10 pages, or a large file): the computer reads it once it has the file, and the text syncs back.
+  ///
+  /// In en, this message translates to:
+  /// **'The text follows from the computer.'**
+  String get attachmentTextFromComputer;
+
+  /// How many pages an attached PDF has, beside its size.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 page} other{{count} pages}}'**
+  String attachmentPages(int count);
+
+  /// Screen reader label of an attached file's row: a tap opens it with the system's app.
+  ///
+  /// In en, this message translates to:
+  /// **'Open {name}'**
+  String openFile(String name);
+
+  /// Title of the one question before an Attachment of a kind that could run a program opens (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'Open this file?'**
+  String get fileRiskTitle;
+
+  /// The question before an Attachment of a kind that could run a program, such as an .exe or a script, opens on the computer (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'\"{file}\" could run a program. Open it anyway?'**
+  String fileRiskQuestion(String file);
+
+  /// The question before an Attachment that is an Android app (.apk) opens on the phone (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'\"{file}\" could install an app. Open it anyway?'**
+  String fileRiskAppQuestion(String file);
+
+  /// Under that question: the person who added the file, when another person did (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'{person} added it.'**
+  String fileRiskAddedBy(String person);
+
+  /// Button of that question that opens the file (#267).
+  ///
+  /// In en, this message translates to:
+  /// **'Open anyway'**
+  String get fileRiskOpen;
+
+  /// Announcement at the top when an attached file could not be opened; its tap gives the reason.
+  ///
+  /// In en, this message translates to:
+  /// **'An Attachment was not opened.'**
+  String get fileNotOpened;
+
+  /// Title of the details of that announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment not opened'**
+  String get fileNotOpenedTitle;
+
+  /// Why an attached file was not opened: its bytes have not synced to this Device yet.
+  ///
+  /// In en, this message translates to:
+  /// **'The Attachment is not on this Device yet.'**
+  String get fileNotHereCause;
+
+  /// The fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'It comes with the next sync; nothing is lost.'**
+  String get fileNotHereFix;
+
+  /// Why an attached file was not opened: no app took it.
+  ///
+  /// In en, this message translates to:
+  /// **'No app on this Device opens files of this kind.'**
+  String get fileNoAppCause;
+
+  /// The fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Install an app for it, or open the Attachment on the computer.'**
+  String get fileNoAppFix;
+
+  /// Announcement at the top when a picked or shared file could not be attached; its tap gives the reason.
+  ///
+  /// In en, this message translates to:
+  /// **'A file was not attached.'**
+  String get fileNotAttached;
+
+  /// Title of the details of that announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'File not attached'**
+  String get fileNotAttachedTitle;
+
+  /// Why a file was not attached: too large.
+  ///
+  /// In en, this message translates to:
+  /// **'It is larger than 256 MB, the most a file can be.'**
+  String get fileTooLargeCause;
+
+  /// Why a file was not attached: its copy could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'It could not be read on this Device.'**
+  String get fileUnreadableCause;
+
+  /// The fix for a file not attached.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was written; the file is still where it was.'**
+  String get fileNotAttachedFix;
+
+  /// Button under an attached file with an Attachment Text, and entry of the card's menu: removes the file while its text stays (ADR 0020).
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Attachment, keep text'**
+  String get removeFileKeepText;
+
+  /// The question before removing an attached file while its text stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this Attachment and keep its Attachment Text?'**
+  String get removeFileQuestion;
+
+  /// Offer at the top to undo removing an Attachment Text (#268).
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment Text removed'**
+  String get undoAttachmentTextRemoved;
+
+  /// Announcement when reading an attached file's text again failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The text of an Attachment could not be read.'**
+  String get fileReadAgainFailed;
+
+  /// Title of its details.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment not read'**
+  String get fileReadAgainFailedTitle;
+
+  /// Why the text of a file was not read again.
+  ///
+  /// In en, this message translates to:
+  /// **'This Attachment could not be read on this Device.'**
+  String get fileReadAgainCause;
+
+  /// What a Note made from a file alone is called where only its words fit, as in a row or an alarm, when the file has no name.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment'**
+  String get attachment;
+
+  /// When a Note to be filed into a Shared Area, sent or put into a Pack lies in an Area hidden from AI: names the Area and says where its mark comes off; nothing is taken off from here.
+  ///
+  /// In en, this message translates to:
+  /// **'{names}: hidden from AI. A Note in an Area hidden from AI is not given to other people. Take the mark off in the Area\'s menu in the Areas list first.'**
+  String hiddenFromAiAreaFirst(String names);
+
+  /// Announcement at the top when a Note captured in an Area hidden from AI was to be filed into a Shared Area: it stays where it was; its tap gives the reason.
+  ///
+  /// In en, this message translates to:
+  /// **'A Note was not filed.'**
+  String get captureNotFiledHidden;
+
+  /// Title of the details of that announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'Note not filed'**
+  String get captureNotFiledHiddenTitle;
+
+  /// Why the Note was not filed.
+  ///
+  /// In en, this message translates to:
+  /// **'It is hidden from AI, and what is hidden from AI does not go into a Shared Area.'**
+  String get captureNotFiledHiddenCause;
+
+  /// The fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'It stays where it was; take the mark off, then file it.'**
+  String get captureNotFiledHiddenFix;
+
+  /// Title of the phone's Ask page and its button in the Agenda's bar (#267): asks the user's own computer about the Notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get phoneAskTitle;
+
+  /// Shown on the Ask page while the phone looks for the user's own computer and the provider it asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for your computer…'**
+  String get phoneAskLooking;
+
+  /// Button on the Ask page that looks for the computer again.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get phoneAskTryAgain;
+
+  /// Hint in the Ask page's question field.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about your Notes'**
+  String get phoneAskHint;
+
+  /// Button that sends the question to the computer.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get phoneAskButton;
+
+  /// Bar action of the Ask page that drops the questions asked, for a new one.
+  ///
+  /// In en, this message translates to:
+  /// **'Start over'**
+  String get phoneAskStartOver;
+
+  /// Shown under the question while the computer asks its provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the answer from {provider}…'**
+  String phoneAskAsking(String provider);
+
+  /// Line at the top of the Ask page naming the computer, its provider and model.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions go through {computer} to {provider}, model {model}. Only what the model finds and reads in your Notes is sent there, never what is Hidden from AI.'**
+  String phoneAskSends(String computer, String provider, String model);
+
+  /// Line on the Ask page when the answer says an AI Task waits for review on the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes the AI made wait for your review on the computer. Sync with it waits until you decide there.'**
+  String get phoneAskTaskWaits;
+
+  /// Heading over the Notes an answer links, each opening its Note.
+  ///
+  /// In en, this message translates to:
+  /// **'From these Notes'**
+  String get phoneAskFromNotes;
+
+  /// Button that saves the question and its answer as a Note in Unsorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as Note'**
+  String get phoneAskKeep;
+
+  /// Shown once the answer was kept; a tap opens the Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept as a Note'**
+  String get phoneAskKept;
+
+  /// Line under an answer the provider cut off.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer was cut off at its length limit.'**
+  String get phoneAskCut;
+
+  /// Line under an answer that linked a Note the computer's model did not read in this question: the computer removed the link and kept its words (#294).
+  ///
+  /// In en, this message translates to:
+  /// **'A source could not be checked.'**
+  String get phoneAskUnchecked;
+
+  /// Why the computer cannot ask its provider yet.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} is not set up on the computer yet.'**
+  String phoneAskUnreadyCause(String provider);
+
+  /// Fix when the computer's provider is not set up, for a reason this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up the provider under Ask panel in the computer\'s Settings.'**
+  String get phoneAskUnreadyFix;
+
+  /// Fix: the computer's provider has no model.
+  ///
+  /// In en, this message translates to:
+  /// **'Name a model under Ask panel in the computer\'s Settings.'**
+  String get phoneAskUnreadyModel;
+
+  /// Fix: the computer's Anthropic provider has no key.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the API key under Ask panel in the computer\'s Settings.'**
+  String get phoneAskUnreadyKey;
+
+  /// Fix: the computer's provider address may not be asked.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.'**
+  String get phoneAskUnreadyUrl;
+
+  /// Heading of the permission asked on the Ask page before the first question to a provider (App Store guideline 5.1.2(i)).
+  ///
+  /// In en, this message translates to:
+  /// **'Before your first question'**
+  String get phoneAskConsentTitle;
+
+  /// Names the computer and the third-party AI provider it sends the questions to.
+  ///
+  /// In en, this message translates to:
+  /// **'Your questions go from this phone to your computer {computer}, which sends them to {provider}, model {model}, at {host}.'**
+  String phoneAskConsentIntro(
+    String computer,
+    String provider,
+    String model,
+    String host,
+  );
+
+  /// Heading over the list of what is sent to the provider.
+  ///
+  /// In en, this message translates to:
+  /// **'What {provider} receives:'**
+  String phoneAskConsentWhat(String provider);
+
+  /// What is sent: the question.
+  ///
+  /// In en, this message translates to:
+  /// **'Your question, and the questions and answers before it when you ask on.'**
+  String get phoneAskConsentQuestion;
+
+  /// What is sent: names.
+  ///
+  /// In en, this message translates to:
+  /// **'The names of your Areas, Topics and tags.'**
+  String get phoneAskConsentNames;
+
+  /// What is sent: Routines and Reminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Routines and Reminders with their check-offs, when the model lists them.'**
+  String get phoneAskConsentRoutines;
+
+  /// What is sent: search hits.
+  ///
+  /// In en, this message translates to:
+  /// **'The titles and short excerpts of the Notes its searches find.'**
+  String get phoneAskConsentFound;
+
+  /// What is sent: Notes read in full.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes it reads in full, with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context (when and where a Note was captured, the calendar event and the Bluetooth device).'**
+  String get phoneAskConsentRead;
+
+  /// What is never sent, and who receives nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing Hidden from AI is sent, not even as a count. {provider} handles what it receives under its own terms; Old Brain Fix and its developer receive nothing.'**
+  String phoneAskConsentNever(String provider);
+
+  /// Says that nothing goes without the permission, and when it is asked again.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is sent until you allow it. When the computer asks another provider or model, this phone asks you again.'**
+  String get phoneAskConsentAgain;
+
+  /// Button that allows questions to the provider named.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get phoneAskAllow;
+
+  /// Announcement at the top when a question got no answer; its tap gives cause and fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The question was not answered.'**
+  String get phoneAskFailed;
+
+  /// Title of its details.
+  ///
+  /// In en, this message translates to:
+  /// **'Not answered'**
+  String get phoneAskFailedTitle;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} refused the computer\'s API key.'**
+  String phoneAskKeyRefused(String provider);
+
+  /// Fix for a refused key.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the API key under Ask panel in the computer\'s Settings.'**
+  String get phoneAskKeyFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} answered the computer with an error.'**
+  String phoneAskProviderFailed(String provider);
+
+  /// Fix for an error of the provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the model\'s name in the computer\'s Settings, or ask again later.'**
+  String get phoneAskProviderFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer came from {provider} to the computer.'**
+  String phoneAskNoReply(String provider);
+
+  /// Fix for no reply from the provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the computer\'s network and the provider\'s address in its Settings, then ask again.'**
+  String get phoneAskNoReplyFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer from {provider} could not be read on the computer.'**
+  String phoneAskUnreadable(String provider);
+
+  /// Fix for an unreadable reply.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.'**
+  String get phoneAskUnreadableFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The model searched too long without answering.'**
+  String get phoneAskTooManyRounds;
+
+  /// Fix for a search too long.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a narrower question.'**
+  String get phoneAskNarrowerFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The model declined to answer this question.'**
+  String get phoneAskRefused;
+
+  /// Fix for a declined question.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask it in other words.'**
+  String get phoneAskOtherWordsFix;
+
+  /// Why a question was not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer stopped waiting for the answer.'**
+  String get phoneAskStopped;
+
+  /// Fix: ask again.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask again.'**
+  String get phoneAskAgainFix;
+
+  /// Why a question was not answered: one at a time on the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer is answering another question.'**
+  String get phoneAskBusy;
+
+  /// Fix for a busy computer.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask again in a moment.'**
+  String get phoneAskBusyFix;
+
+  /// Why a question was not answered: a failure of a later desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer answered in a way this version cannot read.'**
+  String get phoneAskUnknown;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the latest Old Brain Fix on this phone.'**
+  String get phoneAskUpdatePhoneFix;
+
+  /// Why the phone cannot ask: no own paired Device that hosts.
+  ///
+  /// In en, this message translates to:
+  /// **'No computer of yours is paired with this phone.'**
+  String get phoneAskNoComputer;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair your computer under Profile ▸ Sync with another Device, then ask.'**
+  String get phoneAskNoComputerFix;
+
+  /// Why the phone cannot ask: no address of the computer answered.
+  ///
+  /// In en, this message translates to:
+  /// **'No computer of yours answered.'**
+  String get phoneAskUnreachable;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Old Brain Fix on the computer and join its network or your VPN; through Tailscale, give it an address by hand under Profile ▸ Sync with another Device.'**
+  String get phoneAskUnreachableFix;
+
+  /// Why the phone cannot ask: the pinned certificate did not match.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device answered at your computer\'s address.'**
+  String get phoneAskWrongHost;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the address by hand under Profile ▸ Sync with another Device, or pair the computer again.'**
+  String get phoneAskWrongHostFix;
+
+  /// Why the phone cannot ask: the computer declined it.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer does not let this phone ask.'**
+  String get phoneAskDeclined;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'On the computer, switch on Sync automatically for this phone under Sync.'**
+  String get phoneAskDeclinedFix;
+
+  /// Why the phone cannot ask: only phones or older desktops answered.
+  ///
+  /// In en, this message translates to:
+  /// **'None of your paired Devices answers questions.'**
+  String get phoneAskNotOffered;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the latest Old Brain Fix on your computer; a phone answers no questions.'**
+  String get phoneAskNotOfferedFix;
+
+  /// Why the phone cannot ask: a timeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer did not answer in time.'**
+  String get phoneAskTimedOut;
+
+  /// Fix for that.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the computer is on and awake, then ask again.'**
+  String get phoneAskTimedOutFix;
+
+  /// Why the phone cannot ask: anything else on the way.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection to your computer broke off.'**
+  String get phoneAskBrokeOff;
+
+  /// Field under an own paired Device on the Sync page (#267): an address such as a Tailscale name, tried when the local network does not find it.
+  ///
+  /// In en, this message translates to:
+  /// **'Address by hand'**
+  String get handAddressLabel;
+
+  /// Helper line under that field.
+  ///
+  /// In en, this message translates to:
+  /// **'For a VPN such as Tailscale: its name or address there, such as desk.tail1234.ts.net, with :port if needed. Tried when this network does not find it.'**
+  String get handAddressHelp;
+
+  /// Error under the field for text that is no address.
+  ///
+  /// In en, this message translates to:
+  /// **'Not an address. Type a name or an IP address, with :port if needed.'**
+  String get handAddressInvalid;
+
+  /// Error under the field for a port that is none.
+  ///
+  /// In en, this message translates to:
+  /// **'The port must be a number from 1 to 65535.'**
+  String get handAddressBadPort;
+
+  /// At the top of an attached PDF shown full screen (#286): the page shown and how many there are.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pages}'**
+  String pdfPageOf(int page, int pages);
+
+  /// The entry in the ⋮ of an attached PDF shown full screen (#286) that opens it with the system's app for PDFs.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in another app'**
+  String get openInOtherApp;
 }
 
 class _AppLocalizationsDelegate

@@ -51,8 +51,13 @@
   <li><strong>Tally</strong> and <strong>Session</strong> open their own page (see "Count what you do with a Tally" and "Let a Session pick Tallies" below).</li>
 </ul>
 <p>
-  Leaving a name dialog with <strong>Cancel</strong>, or the Tally or Session page without
-  <strong>Save</strong>, makes nothing; a Tally made with New Tally stays.
+  Leaving a name dialog with <strong>Cancel</strong> makes nothing. Leaving the Tally or Session
+  page saves as <strong>Save</strong> does once something was typed or picked: on the phone by Back,
+  on the desktop by Esc, a click beside the dialog, Alt+Left or the mouse's back button. When it
+  can't be saved yet, without a Name, a field with a name or, on the Session page, a ticked Tally,
+  leaving asks "Discard changes?" first: <strong>Discard</strong> leaves without saving,
+  <strong>Keep editing</strong> shows what is missing. A page left as it opened makes nothing; a
+  Tally made with New Tally stays. On the desktop <strong>Cancel</strong> leaves without saving.
 </p>
 <p>
   On the desktop the "+" at the top of All Notes, an Area or a Topic opens a menu with the same
@@ -84,8 +89,9 @@
   and each field's total of the current bar, today's for a Tally of days, against its target, such as "Pages 30 / 50 pages", in a Shared
   Area of your own entries, and a Session its name, the next run of any of its Routines and
   "done 4 / skipped 1 this week" over all of them. The compact view has no Capture Context and none
-  of the buttons at the bottom of the card; its ⋮ sits top right and offers <strong>File
-  into…</strong> and <strong>Merge into…</strong> after Edit.
+  of the buttons at the bottom of the card; its ⋮ sits top right and offers, after Edit,
+  <strong>File into…</strong>, <strong>Routine…</strong>, <strong>Reminder…</strong>, in Advanced
+  <strong>Frog</strong> and <strong>Session…</strong>, and <strong>Merge into…</strong>.
 </p>
 <p>
   The button on the list's bar shows every card compact or detailed. A tap on a card switches only
@@ -97,8 +103,8 @@
   between its compact and its detailed view, as a tap does on the phone; a click on the card only
   selects it. <strong>Compact views</strong> and <strong>Detailed views</strong> in the View menu,
   and the button after the list's heading, do what the button on the phone's bar does. A card's ⋮ is
-  the same in both views; <strong>Merge into…</strong> is a button at the bottom of the Note
-  dialog.
+  the same in both views and offers among its entries those of the phone's compact ⋮, Merge into…
+  included.
 </p>
 </box-more>
 </guide-box>
@@ -172,7 +178,7 @@
   <li>In the detailed view every Line has its checkbox; a checked Line is struck through in place. The compact view shows "3 of 5 open".</li>
   <li>A Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks the Line above it, checking that Line checks its whole group, and unchecking one Line of the group unchecks it again. A group shows in a frame with the Line it is under.</li>
   <li>In the editor the Lines are edited as one block of text, every Line starting with its box; a new list starts with one empty Line. Return adds a new Line with an empty box under the cursor's Line; in the middle of a Line it moves the rest of the Line into the new one. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; the joined Line's checks stay in the log. An empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard move the Line with the cursor into a group and out.</li>
-  <li>Everything typed is kept on leaving the editor; Lines left empty are dropped. ⋮ on a Line offers <strong>Move up</strong>, <strong>Move down</strong>, <strong>Put under the Line above</strong> or <strong>Back to the top level</strong>, and <strong>Delete</strong>, which asks "Delete this Line?" first.</li>
+  <li>Everything typed is kept on leaving the editor; Lines left empty are dropped. ⋮ on a Line offers <strong>Move up</strong>, <strong>Move down</strong>, <strong>Put under the Line above</strong> or <strong>Back to the top level</strong>, and <strong>Delete</strong>. On the phone Delete asks nothing: the announcement at the top, "Line deleted", brings the Line back with a tap, and the folded "Removed Lines" under the Lines restores each deleted Line with <strong>Restore</strong>. The desktop asks nothing either: Ctrl+Z or Edit ▸ Undo brings the Line back, and the Note dialog has the same "Removed Lines".</li>
   <li><strong>Uncheck all</strong> shows while a Line is checked, to use the list again. <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Checklist" turn it back: every Line becomes a line of the Note's text, a checked one marked "✓ ".</li>
   <li>In a Shared Area anyone with a role adds and checks Lines; renaming, moving and deleting a Line stay with the author of the Note or of the Line and the Managers.</li>
 </ul>
@@ -190,7 +196,12 @@
   On the desktop the Lines are typed in place as on the phone, as one block of text: Enter adds a
   Line below or moves the rest of a Line into it, Backspace at its start joins it with the Line
   above, Tab and Shift+Tab move it into a group and out, in place of the buttons above the keyboard,
-  and Up and Down move to the Line above and below. A Line's menu opens with its ⋮.
+  and Up and Down move to the Line above and below. Alt+Up and Alt+Down move the Line with the
+  cursor one place up or down, as Move up and Move down do: a Line of a group within its group, a
+  Line at the top with its group. The handle beside a Line's ⋮ drags it up or down by the same rule;
+  a line shows where it goes, and let go where it stands it stays. A Shopping List's open Lines
+  move the same way among the open ones; a struck Line has no handle and stays where it is. A
+  Line's menu opens with its ⋮.
 </p>
 </box-more>
 </guide-box>
@@ -215,15 +226,18 @@
 <ul>
   <li><strong>Off</strong>: not at all.</li>
   <li><strong>One row with the number of open Lines</strong>, such as "Weekly shopping: 4 open" or "Before the trip: 3 of 7 open". This is how every Shopping List starts.</li>
-  <li><strong>Each open Line on its own row</strong>: the list's name as a heading and its open Lines indented under it, each with its box, which checks it there. This is how every Checklist starts, but for one imported from Google Keep, which starts Off.</li>
+  <li><strong>Each open Line on its own row</strong>: the list's name as a heading and its open Lines indented under it, each with its box, which checks it there; a Line checked today stays struck through for the day, and its box unchecks it. This is how every Checklist starts, but for one imported from Google Keep, which starts Off.</li>
 </ul>
 <p>
   A list without open Lines does not show, whatever the choice, until a Line comes back, is
-  unchecked or is added. The rows come after today's all-day Occurrences, the Shopping Lists before
-  the Checklists; a tap on the heading or a Line's words opens the list. A Checklist with a Routine
-  shows as its Occurrence and has no choice. A Routine or Reminder spawned from a Shopping List is
-  Done only when checked off. A checked Line of a list leaves the Agenda, whether or not "Hide what's
-  checked on the Agenda" is on.
+  unchecked or is added; only on the day its last Lines were checked it shows them, struck through,
+  as each open Line on its own row. The rows come after today's all-day Occurrences, the Shopping
+  Lists before the Checklists. A tap on the heading opens the list with the cursor in a new empty
+  Line after the open ones, the keyboard up; left unused, that Line is dropped. A tap on a Line's
+  words opens the list as it is. A Checklist with a Routine shows as its Occurrence and has no
+  choice. A Routine or Reminder spawned from a Shopping List is Done only when checked off. A Line
+  checked there stays on the Agenda for the day, struck through, a Shopping List's under the open
+  Lines, also one checked Once; where "Hide what's checked on the Agenda" is on, it leaves at once.
 </p>
 <p>
   The choice is yours alone: it goes to your own Devices, and in a Shared Area each person decides
@@ -233,8 +247,9 @@
   Shopping List" or "Private Checklist" with its counts.
 </p>
 <p>
-  On the desktop a list shows on today's Agenda as on the phone, and a click on its row opens it in
-  the Note dialog. <strong>Show on the Agenda</strong> is three radio buttons in the card's menu,
+  On the desktop a list shows on today's Agenda as on the phone, its Lines checked today struck
+  through, and a click on a Line's words opens it in the Note dialog; a click on its heading opens it
+  there with the keyboard in a new empty Line after the open ones. <strong>Show on the Agenda</strong> is three radio buttons in the card's menu,
   before <strong>Uncheck all</strong> on a Checklist and before <strong>Back to a plain Note</strong>
   on a Shopping List, and a badge in the Note dialog whose dialog offers the same three; a click on
   one closes it.
@@ -267,18 +282,20 @@
 <ul>
   <li>Checking a Line strikes it through and moves it to the end, showing the day it comes back, such as "back Sat, Oct 31". At the start of that day it is open again, in its place.</li>
   <li>Each Line has its <strong>Reappear time</strong> on a badge at its end: "—" for none, "Once", or a number with a unit, such as "4w" or "3m". The badge is on the Lines in the Note editor, not on the card. A tap on it opens it: <strong>None</strong>, <strong>Once</strong> or <strong>After</strong>, with a number from 1 to 99 and day, week, month or year, 1 week at first; each choice is kept at once. A new Line has none: once checked it stays struck until a time is set, which then counts from its check. A Line comes back as many days or weeks on, or on the same day of the month as many months or years on (on the last day of a shorter month), by the Device's clock. A Line Once is gone when checked.</li>
-  <li>In the editor the Lines are edited as on a Checklist: one block of text, every Line starting with its box, Return for a new Line, Backspace at the start to join a Line with the one above. The Lines stay in the order they were typed in, also the next time. While the editor is open a Line checked there stays in its row; the next time it shows below the open ones.</li>
+  <li>In the editor the Lines are edited as on a Checklist: one block of text, every Line starting with its box, Return for a new Line, Backspace at the start to join a Line with the one above. The Lines stay in the order they were typed in or moved to, also the next time: <strong>Move up</strong> and <strong>Move down</strong> in the ⋮ of an open Line move it one place among the open ones. While the editor is open a Line checked there stays in its row; the next time it shows below the open ones, and once open again it is back in its place.</li>
   <li>A name the list already has adds nothing, whatever its case and spaces around it: a struck or gone Line of that name comes back at once, and an open one stays.</li>
-  <li>A Line left empty is dropped on leaving. ⋮ on a Line offers <strong>Delete</strong>, which asks once.</li>
+  <li>A Line left empty is dropped on leaving. ⋮ on a Line offers <strong>Delete</strong>; on the phone it asks nothing and is undone as on a Checklist, with "Removed Lines" under the Lines; on the desktop Ctrl+Z or Edit ▸ Undo brings it back.</li>
   <li>In the detailed view the open Lines show with their checkboxes; the struck ones are folded under them as "2 struck through", which a tap shows and hides again; the phone keeps them shown until they are folded again. The compact view shows "3 open". <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Shopping List" write the Lines into the text, the struck ones marked "✓ ".</li>
 </ul>
 <p>
   <strong>Capturing into a Shopping List</strong>: <strong>Add to a Shopping List</strong> in the ⋮
   of the capture screen makes each line of the capture a Line of the list picked, and keeps no Note.
-  A recording gives the lines of its Transcript. When it is offered is described in
+  With one list to add to, it reads <strong>Add to Weekly</strong> and picks that list at once; with
+  several, the list used last is at the top. A recording gives the lines of its Transcript. When it is offered is described in
   <a href="capture-and-sort.html">Capture and sort</a>. On the desktop it is in the
-  <strong>More</strong> menu of the quick note's action row, with the lists to pick, once Settings
-  under "Quick note" switch on "Add to a Shopping List" and while a Shopping List exists.
+  <strong>More</strong> menu of the quick note's action row, with the lists to pick, the one used
+  last at the top, or with one list the entry naming it, once Settings under "Quick note" switch on
+  "Add to a Shopping List" and while a Shopping List exists.
 </p>
 <p>
   On the desktop the Reappear time's dialog stays open after a choice; <strong>Close</strong>, Esc
@@ -390,12 +407,23 @@
   which a tap shows and hides again, kept per Tally on this Device. On the phone
   <strong>Add entry</strong> is also in the ⋮ of the Tally's card.
 </p>
+<p>
+  For a Tally you fill in every day, such as your weight or water, <strong>Add to home
+  screen</strong> in the ⋮ of its card puts a shortcut named as the Tally on the phone's home
+  screen; Android asks where it goes. A tap on it opens the Tally's entry page directly, behind the
+  App Lock after the unlock, and once the entry is saved or left the phone is back on the home
+  screen. A Tally in a locked Area set to Masked is named "Private Tally" there. On the iPhone the
+  entry reads <strong>Add to the app icon</strong>: the Tally is then in the menu a long press on
+  the app icon shows, the newest four, and after saving the app stays open where it was. A
+  shortcut to a Tally that was deleted opens the app and says "This Tally is no longer there."
+  The desktop has no such shortcut.
+</p>
 <ul>
-  <li>An entry holds a box per Check field, ticked once per entry above the sets; a value per number field, prefilled with the targets, so saving the targets is one tap; the <strong>Date</strong> it counts for, today for a new one; and one <strong>Line of text</strong>. A value left empty is none. Numbers are typed like 12, 2.5 or 1:30.</li>
+  <li>An entry holds a box per Check field, ticked once per entry above the sets; a value per number field, prefilled with the targets, so saving the targets is one tap, and a field without a target with its value in your latest entry that has one, selected when the field takes the cursor, so typing replaces it; the <strong>Date</strong> it counts for, today for a new one; and one <strong>Line of text</strong>. A value left empty is none. Numbers are typed like 12, 2.5 or 1:30. Leaving the entry, by Back on the phone, by Esc or a click beside it on the desktop, saves it as <strong>Save</strong> does once something changed; with a value that is no number, or a new entry left empty, it asks "Discard changes?" first. An entry left as it opened, targets and all, is not saved; on the desktop <strong>Cancel</strong> saves nothing either.</li>
   <li>In a Tally that counts in sets the values come as "Set 1", "Set 2" and so on, a row across the number fields each. <strong>Add set</strong> adds a set that starts with the values of the set before; a set after the first can be removed. The entry shows each set on a line of its own, such as "1. Weight 60 kg · Reps 10".</li>
   <li>Each chart shows slim bars of a fixed width with gaps, the newest on the right and as many as fit the width, the target as a thin line, the days the bars cover and the highest bar's value. A single bar stays slim. Older values are in the entries; the chart does not scroll sideways.</li>
   <li>The compact card shows each field's total of the current bar against its target, today's for a Tally of days.</li>
-  <li>A tap on an entry opens it to change; a long press offers <strong>Edit</strong> and <strong>Delete</strong>. Delete asks once; the entry can be restored under the folded "Removed entries".</li>
+  <li>A tap on an entry opens it to change; a long press offers <strong>Edit</strong> and <strong>Delete</strong>. On the phone Delete asks nothing: the announcement at the top, "Entry deleted", brings it back with a tap; on the desktop Ctrl+Z or Edit ▸ Undo does. Either way the entry can be restored under the folded "Removed entries".</li>
   <li>In a Shared Area, "Show entries" chooses <strong>Mine</strong>, <strong>Everyone's</strong> or one person's; your own show at first.</li>
 </ul>
 <p>
@@ -470,7 +498,7 @@
   <strong>On the Agenda</strong>: today's row of each Routine of a Session lists its picks indented
   under its title, in the order picked, each with its box and each Tally's name with its targets,
   such as "Push-ups 20 times"; the box is checked and the name struck through once it has an entry.
-  A tap on a pick or its box opens its entry form, prefilled with the targets; saving records it for
+  A tap on a pick or its box opens its entry form, prefilled as any new entry; saving records it for
   this Occurrence. A tap on a pick that has its entry opens that entry to change. Each pick without an entry offers <strong>Another one</strong> while the pool
   holds a Tally not picked. The Occurrence is Done once every pick has an entry, by anyone; removing
   an entry undoes that. The box of the Session's title only shows this: it checks itself, and a tap
@@ -489,7 +517,7 @@
   all day, at first, with <strong>Cancel</strong> and <strong>Save</strong> at the bottom. The "+"
   badge of the Note dialog holds Routine, Reminder, and in Advanced Frog and Session; on a Session it
   adds a Routine or Reminder that runs it. The <strong>Note</strong> menu of the menu bar offers the
-  same. A Session's pool is ordered for
+  same, and so do a card's ⋮ and right-click. A Session's pool is ordered for
   Rolling with arrow buttons instead of handles, and a weekday gets its own count with a checkbox
   instead of a switch.
 </p>
@@ -530,24 +558,24 @@
 <p>
   The Frog view lists the open Frogs, oldest first, each with its box, and below them the folded
   "Done" section with those checked off, the latest first, each with its date ("Done on …"); its
-  box unchecks it. A long press offers <strong>Delete</strong>, which asks once; the Frog goes to
-  the Trash and its Note stays. In a Shared Area a Manager makes and deletes Frogs, and anyone with
+  box unchecks it. A long press offers <strong>Delete</strong>; the Frog goes to the Trash and its
+  Note stays. On the phone it asks nothing, and the announcement at the top, "Frog moved to the
+  Trash", brings it back with a tap; on the desktop Ctrl+Z or Edit ▸ Undo does. In a Shared Area a Manager makes and deletes Frogs, and anyone with
   a role checks them off; a Frog one person eats is eaten for everyone.
 </p>
 <p>
   The Note editor shows a Note's Frog as a <strong>Frog</strong> badge with the frog: Open while it
   is not eaten, then Eaten today or Eaten yesterday, after which the badge goes; it shows in Simple
   too. A tap offers <strong>Eat now</strong>, which checks it off, while it is open, and
-  <strong>Remove the Frog</strong>, which asks once as Delete does and moves it to the Trash; its Note
-  stays. In a Shared Area anyone with a role may eat it and a Manager may remove it. On the desktop
+  <strong>Remove the Frog</strong>, which moves it to the Trash as Delete does; its Note stays. In a Shared Area anyone with a role may eat it and a Manager may remove it. On the desktop
   the badge sits in the Note dialog and a click opens the same menu.
 </p>
 <p>
   On the desktop <strong>Frogs</strong> on the left, below All Notes, and <strong>View ▸
   Frogs</strong> open the Frog view as well; a right-click on a Frog there offers
   <strong>Delete</strong>. The cards have no alarm clock: a Frog is made in the Note dialog with the
-  "+" at the end of its badges, which offers Frog while the Note has no open Frog, or with
-  <strong>Note ▸ Frog</strong>.
+  "+" at the end of its badges, which offers Frog while the Note has no open Frog, with
+  <strong>Note ▸ Frog</strong> or with Frog in a card's ⋮ or right-click.
 </p>
 </box-more>
 </guide-box>

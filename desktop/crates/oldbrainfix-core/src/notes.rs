@@ -2,15 +2,17 @@
 //! them: the text, the capture time, the Importance, where a Note is
 //! filed, whether it is in the trash, what was merged into it, and its
 //! photos and voice recordings with their Photo Texts and Transcripts,
+//! the files attached to it with their Attachment Texts (ADR 0047),
 //! and the Capture Context of Notes and Sections. Every write appends the same entries, in the same order and read from the
 //! clock as often, as the Dart core's, so both logs come out alike.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
 
 use crate::boxes::{self, Boxes};
 use crate::entry::{Entry, dart_iso, parse_time};
+use crate::file_text::{self, FileKind};
 use crate::named_places::{Coordinates, NamedPlace, NamedPlaces};
 use crate::places::Places;
 use crate::profile::Profile;
@@ -32,7 +34,8 @@ pub mod keys {
     pub const IMPORTANCE: &str = "importance";
     /// When the Note was moved to the trash; absent while it is not there.
     pub const TRASHED: &str = "trashed";
-    /// The Note this one was merged into; absent while it stands alone.
+    /// The Note this one was merged into; absent while it stands alone,
+    /// null once its Merge was undone.
     pub const MERGED: &str = "merged";
     /// When the Note first spawned a Routine or Reminder.
     pub const SPAWNED: &str = "spawned";
@@ -60,6 +63,17 @@ pub mod keys {
     /// text was found; absent means not read (yet); null means removed
     /// while the photo stays (ADR 0025).
     pub const OCR_PREFIX: &str = "ocr:";
+    /// One field per attached file (ADR 0047), `file:<hash>` = its name,
+    /// media type and size as JSON ([`super::Attachment`]), so files
+    /// attached on two Devices at once are both kept. The bytes are in
+    /// the store's files, under the hash. Null once the file was removed
+    /// and its Attachment Text kept, as for photos (ADR 0020).
+    pub const FILE_PREFIX: &str = "file:";
+    /// The Attachment Text of an attached file, `fileText:<hash>` = the
+    /// text read out of it, on the Note holding `file:<hash>`. An empty
+    /// text means no text was found; absent means not read (yet); null
+    /// means removed while the file stays (ADR 0025).
+    pub const FILE_TEXT_PREFIX: &str = "fileText:";
     /// Where a Note or Section was captured, `<latitude>,<longitude>`;
     /// absent while unknown.
     pub const LOCATION: &str = "location";
@@ -89,6 +103,14 @@ pub mod keys {
 
     pub fn ocr(hash: &str) -> String {
         format!("{OCR_PREFIX}{hash}")
+    }
+
+    pub fn file(hash: &str) -> String {
+        format!("{FILE_PREFIX}{hash}")
+    }
+
+    pub fn file_text(hash: &str) -> String {
+        format!("{FILE_TEXT_PREFIX}{hash}")
     }
 
     /// Field keys of a Section.
@@ -127,12 +149,14 @@ impl Importance {
 }
 
 /// What a Note without words is titled as where only its words fit, as
-/// in a row or an alarm.
+/// in a row or an alarm: a photo, a voice recording, or a file, which
+/// goes by its name ([`Note::wordless_name`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Wordless {
     #[default]
     Photo,
     VoiceRecording,
+    File,
 }
 
 impl Wordless {
@@ -141,6 +165,7 @@ impl Wordless {
         match self {
             Wordless::Photo => "photo",
             Wordless::VoiceRecording => "voiceRecording",
+            Wordless::File => "file",
         }
     }
 }
@@ -312,6 +337,19 @@ pub struct Note {
     /// The hashes of its photos whose Photo Text was removed while the
     /// photo stays, as for `removed_transcripts`.
     pub removed_photo_texts: Vec<String>,
+    /// The files attached to it (ADR 0047), in the order they were
+    /// attached.
+    pub attachments: Vec<Attachment>,
+    /// The Attachment Texts of its files, by file hash; a file not read
+    /// yet, or of a kind without text, has none.
+    pub attachment_texts: BTreeMap<String, String>,
+    /// Its files that were removed while their Attachment Text stays, in
+    /// the order they were attached, as they were before; the text is in
+    /// `attachment_texts`.
+    pub removed_attachments: Vec<Attachment>,
+    /// The hashes of its files whose Attachment Text was removed while
+    /// the file stays, as for `removed_photo_texts`.
+    pub removed_attachment_texts: Vec<String>,
     /// The boxes of `text` as they show now, in the order they come (ADR
     /// 0035); none in a text this version may not change.
     pub boxes: Vec<ShownBox>,
@@ -352,18 +390,51 @@ impl Note {
         self.nudge.unwrap_or(self.captured + Notes::default_nudge())
     }
 
-    /// What the Note is titled as while its text is blank: a voice
-    /// recording when it has one and no photo, removed ones whose texts
-    /// stay included; a photo otherwise.
-    pub fn wordless(&self) -> Wordless {
-        if self.photos.is_empty()
+    /// The file a Note made from a file alone shows as its card (ADR
+    /// 0047): its one attached file, while its text is blank and it has
+    /// no photo, recording or other file, removed ones included.
+    pub fn alone_file(&self) -> Option<&Attachment> {
+        let [file] = self.attachments.as_slice() else {
+            return None;
+        };
+        let alone = dart_trim(&self.shown_text()).is_empty()
+            && self.photos.is_empty()
             && self.removed_photos.is_empty()
-            && !(self.recordings.is_empty() && self.removed_recordings.is_empty())
-        {
+            && self.recordings.is_empty()
+            && self.removed_recordings.is_empty()
+            && self.removed_attachments.is_empty();
+        alone.then_some(file)
+    }
+
+    /// What the Note is titled as while its text is blank, removed
+    /// photos, recordings and files whose texts stay included: a photo
+    /// when it has one; else a voice recording when it has one; else a
+    /// file when it has one, by [`Note::wordless_name`]; a photo
+    /// otherwise.
+    pub fn wordless(&self) -> Wordless {
+        if !(self.photos.is_empty() && self.removed_photos.is_empty()) {
+            Wordless::Photo
+        } else if !(self.recordings.is_empty() && self.removed_recordings.is_empty()) {
             Wordless::VoiceRecording
+        } else if !(self.attachments.is_empty() && self.removed_attachments.is_empty()) {
+            Wordless::File
         } else {
             Wordless::Photo
         }
+    }
+
+    /// The name a Note titled [`Wordless::File`] goes by (#267): its
+    /// first attached file's, else its first removed one's; empty when
+    /// that file has no name, or for any other Note.
+    pub fn wordless_name(&self) -> String {
+        if self.wordless() != Wordless::File {
+            return String::new();
+        }
+        self.attachments
+            .first()
+            .or_else(|| self.removed_attachments.first())
+            .map(|a| a.name.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -401,6 +472,13 @@ pub struct Section {
     /// [`Note::removed_photo_texts`].
     pub removed_transcripts: Vec<String>,
     pub removed_photo_texts: Vec<String>,
+    /// A merged Note's attached files with their Attachment Texts, those
+    /// removed and those whose texts were removed, as for
+    /// [`Note::attachments`]; an Amend has none.
+    pub attachments: Vec<Attachment>,
+    pub attachment_texts: BTreeMap<String, String>,
+    pub removed_attachments: Vec<Attachment>,
+    pub removed_attachment_texts: Vec<String>,
     /// The boxes of `text` as they show now, as for [`Note::boxes`].
     pub boxes: Vec<ShownBox>,
     /// When `text` was last edited, as the Dart core's `modified` (#183):
@@ -413,6 +491,17 @@ pub struct Section {
     /// of their Devices; `None` while it was never edited (`modified` is
     /// `None`) and for a writer not known.
     pub edited_by: Option<Profile>,
+}
+
+/// An error unless `file` is small enough to attach.
+fn require_size(file: &NewFile) -> Result<()> {
+    if file.bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err(Error::Invalid(format!(
+            "{} is larger than {MAX_FILE_BYTES} bytes",
+            file.name
+        )));
+    }
+    Ok(())
 }
 
 /// An error unless `format` is a format this version writes.
@@ -473,6 +562,145 @@ pub struct Blob {
     pub hash: String,
 }
 
+/// The largest file that can be attached: the most a bundle, a Backup
+/// and the local network carry of one (ADR 0003, 0047).
+pub const MAX_FILE_BYTES: u64 = 256 << 20;
+
+/// The largest whole number a size or a page count is read as: what a
+/// double holds exactly, so both cores read the same.
+const MAX_COUNT: u64 = 1 << 53;
+
+/// The most characters of a file's name kept.
+const MAX_NAME_CHARS: usize = 255;
+
+/// The media type of a file no app named one for.
+pub const UNKNOWN_TYPE: &str = "application/octet-stream";
+
+/// A file attached to a Note (ADR 0047): its bytes are a blob, kept by
+/// its hash; the rest is what the attaching Device wrote down. Another
+/// person's Device may have written it, so it is read as data only: a
+/// name without folders or control characters, a media type of the
+/// usual shape, numbers that are whole.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attachment {
+    pub hash: String,
+    /// Its file name, without any folder; empty when none was given.
+    pub name: String,
+    /// Its media type in lower case, such as `application/pdf`;
+    /// [`UNKNOWN_TYPE`] when none was given.
+    pub media_type: String,
+    /// Its size in bytes.
+    pub size: u64,
+    /// How many pages it has, when the attaching Device counted them.
+    pub pages: Option<u64>,
+    /// Whether only a computer reads its text (Q645,
+    /// [`file_text::computer_reads`]); until one has, a phone shows that
+    /// the text follows from the computer.
+    pub computer: bool,
+}
+
+impl Attachment {
+    /// What the file is, as far as its text goes.
+    pub fn kind(&self) -> FileKind {
+        file_text::kind_of(&self.name, &self.media_type)
+    }
+
+    /// The attachment `hash` from the value of its field: whatever does
+    /// not read is left empty, never an error.
+    pub fn read(hash: &str, value: &str) -> Attachment {
+        let json = serde_json::from_str::<serde_json::Value>(value).ok();
+        let object = json.as_ref().and_then(serde_json::Value::as_object);
+        let field = |key: &str| object.and_then(|o| o.get(key));
+        let count = |key: &str| {
+            field(key)
+                .and_then(serde_json::Value::as_u64)
+                .filter(|n| *n <= MAX_COUNT)
+        };
+        Attachment {
+            hash: hash.to_string(),
+            name: clean_name(field("name").and_then(|v| v.as_str()).unwrap_or("")),
+            media_type: clean_type(field("type").and_then(|v| v.as_str()).unwrap_or("")),
+            size: count("size").unwrap_or(0),
+            pages: count("pages"),
+            computer: field("computer") == Some(&serde_json::Value::Bool(true)),
+        }
+    }
+
+    /// The value of its field: JSON, keys sorted, `computer` only when
+    /// true and `pages` only when counted.
+    pub fn value(&self) -> String {
+        let mut out = serde_json::Map::new();
+        if self.computer {
+            out.insert("computer".into(), true.into());
+        }
+        out.insert("name".into(), self.name.clone().into());
+        if let Some(pages) = self.pages {
+            out.insert("pages".into(), pages.into());
+        }
+        out.insert("size".into(), self.size.into());
+        out.insert("type".into(), self.media_type.clone().into());
+        serde_json::Value::Object(out).to_string()
+    }
+}
+
+/// A file to attach: its name, the media type the app was told (empty,
+/// or `application/octet-stream`, for the one its name's ending says,
+/// [`file_text::media_type_of`]), its bytes and, for a PDF, how many
+/// pages it has when the app counted them ([`crate::pdf::page_count`] on
+/// the desktop).
+#[derive(Debug, Clone, Copy)]
+pub struct NewFile<'b> {
+    pub name: &'b str,
+    pub media_type: &'b str,
+    pub bytes: &'b [u8],
+    pub pages: Option<u64>,
+}
+
+/// `name` as a file's name is kept: the part after its last `/` or `\`,
+/// without control characters and the marks that turn the direction of
+/// text (which could make `exe.pdf` of `fdp.exe`), its blanks at the
+/// ends trimmed, at most [`MAX_NAME_CHARS`] characters; `.` and `..` are
+/// no name.
+pub fn clean_name(name: &str) -> String {
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    let kept: String = base
+        .chars()
+        .filter(|&c| {
+            !(c < ' '
+                || ('\u{7f}'..='\u{9f}').contains(&c)
+                || ('\u{202a}'..='\u{202e}').contains(&c)
+                || ('\u{2066}'..='\u{2069}').contains(&c)
+                || c == '\u{200e}'
+                || c == '\u{200f}')
+        })
+        .collect();
+    let trimmed: String = dart_trim(&kept).chars().take(MAX_NAME_CHARS).collect();
+    let trimmed = dart_trim(&trimmed);
+    if trimmed == "." || trimmed == ".." {
+        String::new()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// `media_type` as a file's media type is kept: in lower case, without
+/// its parameters, when it has the shape `type/subtype` of letters,
+/// digits and `!#$&^_.+-`, at most 127 characters; [`UNKNOWN_TYPE`]
+/// otherwise.
+pub fn clean_type(media_type: &str) -> String {
+    let bare = media_type.split(';').next().unwrap_or("");
+    let lower = dart_trim(bare).to_ascii_lowercase();
+    let part = |p: &str| {
+        !p.is_empty()
+            && p.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"!#$&^_.+-".contains(&b))
+    };
+    match lower.split_once('/') {
+        Some((top, sub)) if lower.len() <= 127 && part(top) && part(sub) => lower,
+        _ => UNKNOWN_TYPE.to_string(),
+    }
+}
+
 /// Reading Notes.
 pub struct Notes<'a> {
     store: &'a Store,
@@ -503,7 +731,7 @@ impl<'a> Notes<'a> {
         place: Option<&str>,
         nudge_in: Option<Duration>,
     ) -> Result<Note> {
-        self.capture_full(text, text_format::PLAIN, place, nudge_in, &[], &[])
+        self.capture_full(text, text_format::PLAIN, place, nudge_in, &[], &[], &[])
     }
 
     /// Captures a new Note as [`Notes::capture`] does, its text in
@@ -515,7 +743,7 @@ impl<'a> Notes<'a> {
         place: Option<&str>,
         nudge_in: Option<Duration>,
     ) -> Result<Note> {
-        self.capture_full(text, format, place, nudge_in, &[], &[])
+        self.capture_full(text, format, place, nudge_in, &[], &[], &[])
     }
 
     /// Captures a new Note as [`Notes::capture`] does, with `photos` and
@@ -536,9 +764,36 @@ impl<'a> Notes<'a> {
             nudge_in,
             photos,
             recordings,
+            &[],
         )
     }
 
+    /// Captures a new Note as [`Notes::capture_with`] does, with `files`
+    /// attached (ADR 0047): the text may be empty for a Note made from a
+    /// file alone, which shows the file as its card
+    /// ([`Note::alone_file`]). The files are kept as they are; one larger
+    /// than [`MAX_FILE_BYTES`] is refused and nothing is written.
+    pub fn capture_with_files(
+        &self,
+        text: &str,
+        place: Option<&str>,
+        nudge_in: Option<Duration>,
+        photos: &[Vec<u8>],
+        recordings: &[Vec<u8>],
+        files: &[NewFile],
+    ) -> Result<Note> {
+        self.capture_full(
+            text,
+            text_format::PLAIN,
+            place,
+            nudge_in,
+            photos,
+            recordings,
+            files,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn capture_full(
         &self,
         text: &str,
@@ -547,8 +802,12 @@ impl<'a> Notes<'a> {
         nudge_in: Option<Duration>,
         photos: &[Vec<u8>],
         recordings: &[Vec<u8>],
+        files: &[NewFile],
     ) -> Result<Note> {
         require_format(format)?;
+        for file in files {
+            require_size(file)?;
+        }
         if let Some(place) = place
             && !Places::new(self.store).is_place(place)?
         {
@@ -573,6 +832,10 @@ impl<'a> Notes<'a> {
             .iter()
             .map(|r| self.store.put_audio(r))
             .collect::<Result<Vec<_>>>()?;
+        let files = files
+            .iter()
+            .map(|f| self.keep_file(f))
+            .collect::<Result<Vec<_>>>()?;
         self.store.batch(|| {
             let s = self.store;
             s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), at)?;
@@ -591,6 +854,9 @@ impl<'a> Notes<'a> {
             }
             for hash in &audio {
                 s.append(&id, &keys::audio(hash), Some(keys::ADDED), at)?;
+            }
+            for file in &files {
+                s.append(&id, &keys::file(&file.hash), Some(&file.value()), at)?;
             }
             Ok(())
         })?;
@@ -639,6 +905,179 @@ impl<'a> Notes<'a> {
     /// reading it.
     pub fn has_recording(&self, hash: &str) -> bool {
         self.store.has_blob("audio", hash)
+    }
+
+    /// Attaches the file `file` to the Note `note_id` (ADR 0047), its
+    /// bytes kept as they are; returns the hash they are kept under. A
+    /// file larger than [`MAX_FILE_BYTES`] is refused. The same file
+    /// attached again keeps one field, written anew.
+    pub fn attach_file(&self, note_id: &str, file: &NewFile) -> Result<String> {
+        self.require_note(note_id)?;
+        require_size(file)?;
+        let attachment = self.keep_file(file)?;
+        self.store.append(
+            note_id,
+            &keys::file(&attachment.hash),
+            Some(&attachment.value()),
+            None,
+        )?;
+        Ok(attachment.hash)
+    }
+
+    /// Keeps the bytes of `file` and gives what its field holds.
+    fn keep_file(&self, file: &NewFile) -> Result<Attachment> {
+        let hash = self.store.put_file(file.bytes)?;
+        let name = clean_name(file.name);
+        // A type not named is the one its name's ending says.
+        let media_type = match clean_type(file.media_type) {
+            t if t == UNKNOWN_TYPE => file_text::media_type_of(&name).to_string(),
+            t => t,
+        };
+        let size = file.bytes.len() as u64;
+        let pages = file.pages.filter(|p| *p <= MAX_COUNT);
+        let kind = file_text::kind_of(&name, &media_type);
+        Ok(Attachment {
+            hash,
+            computer: file_text::computer_reads(kind, size, pages),
+            name,
+            media_type,
+            size,
+            pages,
+        })
+    }
+
+    /// The bytes of the attached file `hash`, or `None` when they are not
+    /// on this Device (yet).
+    pub fn file_bytes(&self, hash: &str) -> Option<Vec<u8>> {
+        self.store.file(hash)
+    }
+
+    /// Whether the attached file `hash` is on this Device, without
+    /// reading it.
+    pub fn has_file(&self, hash: &str) -> bool {
+        self.store.has_blob("file", hash)
+    }
+
+    /// Keeps `text`, tidied ([`file_text::tidy`]), as the Attachment Text
+    /// of the file `hash` of the Note `note_id`, a merged one included,
+    /// next to the file. An empty text records that no text was found,
+    /// so the file is not read again. Given again, as when reading the
+    /// file again, it replaces the Attachment Text, a removed one
+    /// included.
+    pub fn set_attachment_text(&self, note_id: &str, hash: &str, text: &str) -> Result<()> {
+        self.require_attached(note_id, hash)?;
+        self.store
+            .append(
+                note_id,
+                &keys::file_text(hash),
+                Some(&file_text::tidy(text)),
+                None,
+            )
+            .map(drop)
+    }
+
+    /// The attached files whose text is still to be read, newest capture
+    /// first: those of a kind with text ([`FileKind::has_text`]) without
+    /// an Attachment Text, nor one that was removed, on every Note not in
+    /// the trash, merged ones included. On a phone (`computer` false)
+    /// those only a computer reads are left out (Q645).
+    pub fn unread_attachments(&self, computer: bool) -> Result<Vec<Blob>> {
+        let waits = |note: &Note, file: &Attachment| {
+            file.kind().has_text()
+                && (computer || !file.computer)
+                && !note.attachment_texts.contains_key(&file.hash)
+                && !note.removed_attachment_texts.contains(&file.hash)
+        };
+        let mut notes = Vec::new();
+        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
+            if let Some(note) = self.by_id(&id)?
+                && !note.is_trashed()
+                && note.attachments.iter().any(|a| waits(&note, a))
+            {
+                notes.push(note);
+            }
+        }
+        // By id within one capture time, so both cores list them alike.
+        notes.sort_by(|a, b| b.captured.cmp(&a.captured).then_with(|| a.id.cmp(&b.id)));
+        let mut out = Vec::new();
+        for note in &notes {
+            for file in &note.attachments {
+                if waits(note, file) {
+                    out.push(Blob {
+                        note_id: note.id.clone(),
+                        hash: file.hash.clone(),
+                    });
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Whether this Device may remove the attached file `hash` of the
+    /// Note `note_id`, a merged one included, and keep its Attachment
+    /// Text, as for [`Notes::may_remove_photo`]: the file has one that
+    /// is not empty, and the Note is this Device's to change.
+    pub fn may_remove_attachment(&self, note_id: &str, hash: &str) -> Result<bool> {
+        let Some(note) = self.by_id(note_id)? else {
+            return Ok(false);
+        };
+        if !note.attachments.iter().any(|a| a.hash == hash)
+            || !has_text(note.attachment_texts.get(hash))
+        {
+            return Ok(false);
+        }
+        self.store.may_change(note_id)
+    }
+
+    /// Removes the attached file `hash` from the Note `note_id` and keeps
+    /// its Attachment Text, which search still finds, as
+    /// [`Notes::remove_photo`] does (ADR 0020). Refused unless
+    /// [`Notes::may_remove_attachment`].
+    pub fn remove_attachment(&self, note_id: &str, hash: &str) -> Result<()> {
+        self.require_attached(note_id, hash)?;
+        if !self.may_remove_attachment(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the file {hash} of {note_id} may not be removed here"
+            )));
+        }
+        self.store.append(note_id, &keys::file(hash), None, None)?;
+        self.store.drop_removed_blobs().map(drop)
+    }
+
+    /// Whether this Device may remove the Attachment Text of the file
+    /// `hash` of the Note `note_id` and keep the file, as for
+    /// [`Notes::may_remove_photo_text`].
+    pub fn may_remove_attachment_text(&self, note_id: &str, hash: &str) -> Result<bool> {
+        self.may_remove_attachment(note_id, hash)
+    }
+
+    /// Removes the Attachment Text of the file `hash` from the Note
+    /// `note_id`; the file stays (ADR 0025). Search no longer finds the
+    /// text, and the file is not read again until
+    /// [`Notes::set_attachment_text`] is given a new one. Refused unless
+    /// [`Notes::may_remove_attachment_text`].
+    pub fn remove_attachment_text(&self, note_id: &str, hash: &str) -> Result<()> {
+        self.require_attached(note_id, hash)?;
+        if !self.may_remove_attachment_text(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the Attachment Text of {hash} may not be removed here"
+            )));
+        }
+        self.store
+            .append(note_id, &keys::file_text(hash), None, None)
+            .map(drop)
+    }
+
+    /// An error unless `hash` is a file attached to the Note `note_id`.
+    fn require_attached(&self, note_id: &str, hash: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.attachments.iter().any(|a| a.hash == hash));
+        if held {
+            Ok(())
+        } else {
+            Err(Error::Invalid(format!("not a file of {note_id}: {hash}")))
+        }
     }
 
     /// Keeps `text`, trimmed, as the Transcript of the voice recording
@@ -907,14 +1346,48 @@ impl<'a> Notes<'a> {
     }
 
     /// Files the Note `note_id` into the Area or Topic `place_id`, out of
-    /// wherever it was before.
+    /// wherever it was before. A Note Hidden from AI, by its own mark or
+    /// its Area's, does not go into a Shared Area
+    /// ([`Error::HiddenFromAi`], #267).
     pub fn file(&self, note_id: &str, place_id: &str) -> Result<()> {
         self.require_note(note_id)?;
         if !Places::new(self.store).is_place(place_id)? {
             return Err(Error::Invalid(format!("not an Area or Topic: {place_id}")));
         }
+        if let Some(area) = self.store.area_of(place_id)?
+            && self.store.is_shared(&area)?
+        {
+            Store::refuse_hidden_from_ai(self.store.hidden_from_ai_by(note_id)?)?;
+        }
         self.store
             .append(note_id, keys::PLACE, Some(place_id), None)
+            .map(drop)
+    }
+
+    /// Whether this Device may take the Note `note_id` out of its Area
+    /// or Topic (#268): it shows filed in one that exists, and it is this
+    /// Device's to change ([`Store::may_change`]), as filing it was.
+    pub fn may_unfile(&self, note_id: &str) -> Result<bool> {
+        Ok(self.by_id(note_id)?.is_some_and(|n| n.place.is_some())
+            && self.store.may_change(note_id)?)
+    }
+
+    /// Takes the Note `note_id` out of its Area or Topic, filed nowhere
+    /// again: back in Unsorted unless something else keeps it out, such
+    /// as a Routine it spawned. One entry clears the place
+    /// [`Notes::file`] wrote; latest wins, so the user's other Devices
+    /// follow. Refused unless [`Notes::may_unfile`].
+    pub fn unfile(&self, note_id: &str) -> Result<()> {
+        if !self.by_id(note_id)?.is_some_and(|n| n.place.is_some()) {
+            return Err(Error::Invalid(format!("not a filed Note: {note_id}")));
+        }
+        if !self.store.may_change(note_id)? {
+            return Err(Error::Invalid(format!(
+                "{note_id} may not be taken out of its place here"
+            )));
+        }
+        self.store
+            .append(note_id, keys::PLACE, None, None)
             .map(drop)
     }
 
@@ -1111,7 +1584,10 @@ impl<'a> Notes<'a> {
 
     /// Merges the Note `note_id` into the Note `into_id`: it becomes a
     /// dated Section of it and leaves every list and Unsorted. Nothing is
-    /// copied; the merged Note only points at its target.
+    /// copied; the merged Note only points at its target. Hidden and
+    /// shared do not meet (#267): a Note Hidden from AI does not merge
+    /// into a Note of a Shared Area, nor a Note of a Shared Area into a
+    /// hidden one ([`Error::HiddenFromAi`]).
     pub fn merge(&self, note_id: &str, into_id: &str) -> Result<()> {
         for id in [note_id, into_id] {
             let listed = self
@@ -1124,9 +1600,145 @@ impl<'a> Notes<'a> {
         if note_id == into_id {
             return Err(Error::Invalid("a Note cannot merge into itself".into()));
         }
+        self.refuse_hidden_merge(&[note_id.to_string()], into_id)?;
         self.store
             .append(note_id, keys::MERGED, Some(into_id), None)
             .map(drop)
+    }
+
+    /// [`Error::HiddenFromAi`] when merging `note_ids` into `into_id`
+    /// would put something Hidden from AI together with a Shared Area: a
+    /// hidden Note into a Note of one, by the marks that hide it, or a
+    /// Note of one into a hidden Note, by the marks that hide the target.
+    /// The marks of all of them, sorted, each once.
+    fn refuse_hidden_merge(&self, note_ids: &[String], into_id: &str) -> Result<()> {
+        let marks = self.store.hidden_from_ai_marks()?;
+        if marks.is_empty() {
+            return Ok(());
+        }
+        let shared = |id: &str| -> Result<bool> {
+            match self.store.area_of(id)? {
+                Some(area) => self.store.is_shared(&area),
+                None => Ok(false),
+            }
+        };
+        let mut found: BTreeSet<String> = BTreeSet::new();
+        let into_shared = shared(into_id)?;
+        let into_hidden = self.store.hidden_by(into_id, &marks)?;
+        for id in note_ids {
+            if into_shared {
+                found.extend(self.store.hidden_by(id, &marks)?);
+            }
+            if !into_hidden.is_empty() && shared(id)? {
+                found.extend(into_hidden.iter().cloned());
+            }
+        }
+        let mut found: Vec<String> = found.into_iter().collect();
+        found.sort_by(|a, b| crate::store::utf16_cmp(a, b));
+        Store::refuse_hidden_from_ai(found)
+    }
+
+    /// Whether this Device may undo the Merge of the Note `note_id`
+    /// (#268): it shows merged into another, and it is this Device's to
+    /// change ([`Store::may_change`]), in no Area or one it manages, or as
+    /// a Member when they made it.
+    pub fn may_undo_merge(&self, note_id: &str) -> Result<bool> {
+        Ok(
+            self.by_id(note_id)?.is_some_and(|n| n.is_merged())
+                && self.store.may_change(note_id)?,
+        )
+    }
+
+    /// Undoes the Merge of the Note `note_id`: it stands alone again, in
+    /// the lists and where it was filed, with its Sections, Routines,
+    /// Reminders and Frogs, all of which never left it. One entry clears
+    /// the pointer [`Notes::merge`] wrote; latest wins, so the user's
+    /// other Devices follow. Refused unless [`Notes::may_undo_merge`].
+    pub fn undo_merge(&self, note_id: &str) -> Result<()> {
+        if !self.by_id(note_id)?.is_some_and(|n| n.is_merged()) {
+            return Err(Error::Invalid(format!("not a merged Note: {note_id}")));
+        }
+        if !self.store.may_change(note_id)? {
+            return Err(Error::Invalid(format!(
+                "the Merge of {note_id} may not be undone here"
+            )));
+        }
+        self.store
+            .append(note_id, keys::MERGED, None, None)
+            .map(drop)
+    }
+
+    /// Merges every Note of `note_ids` into the Note `into_id` in one
+    /// batch (#273), each as [`Notes::merge`] does: all of them or, when
+    /// one is refused, none. A Note named twice merges once. Refused for
+    /// the target among `note_ids`, a Note or target not in the lists, a
+    /// Note this Device may not change ([`Store::may_change`]), and what
+    /// is Hidden from AI meeting a Shared Area as for [`Notes::merge`].
+    /// Gives the Notes merged, in the order named, for
+    /// [`Notes::undo_merge_all`].
+    pub fn merge_all<I, S>(&self, note_ids: I, into_id: &str) -> Result<Vec<String>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut ids: Vec<String> = Vec::new();
+        for id in note_ids {
+            let id = id.as_ref();
+            if !ids.iter().any(|known| known == id) {
+                ids.push(id.to_string());
+            }
+        }
+        for id in ids.iter().map(String::as_str).chain([into_id]) {
+            let listed = self
+                .by_id(id)?
+                .is_some_and(|n| !n.is_trashed() && !n.is_merged());
+            if !listed {
+                return Err(Error::Invalid(format!("not a Note in the lists: {id}")));
+            }
+        }
+        if ids.iter().any(|id| id == into_id) {
+            return Err(Error::Invalid(format!(
+                "the target is among the Notes merged: {into_id}"
+            )));
+        }
+        for id in &ids {
+            if !self.store.may_change(id)? {
+                return Err(Error::Invalid(format!("{id} may not be merged here")));
+            }
+        }
+        self.refuse_hidden_merge(&ids, into_id)?;
+        self.store.batch(|| {
+            for id in &ids {
+                self.store.append(id, keys::MERGED, Some(into_id), None)?;
+            }
+            Ok(())
+        })?;
+        Ok(ids)
+    }
+
+    /// Undoes the Merge of each Note of `note_ids` in one batch, as
+    /// [`Notes::undo_merge`] does for each one that
+    /// [`Notes::may_undo_merge`]; the others, which a sync or another step
+    /// got to first, are left as they are. Gives the Notes that stand
+    /// alone again.
+    pub fn undo_merge_all<I, S>(&self, note_ids: I) -> Result<Vec<String>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let note_ids: Vec<S> = note_ids.into_iter().collect();
+        self.store.batch(|| {
+            let mut undone: Vec<String> = Vec::new();
+            for id in &note_ids {
+                let id = id.as_ref();
+                if undone.iter().any(|known| known == id) || !self.may_undo_merge(id)? {
+                    continue;
+                }
+                self.store.append(id, keys::MERGED, None, None)?;
+                undone.push(id.to_string());
+            }
+            Ok(undone)
+        })
     }
 
     /// Sets the Importance of the Note `note_id`.
@@ -1232,6 +1844,22 @@ impl<'a> Notes<'a> {
         };
         let removed_transcripts = removed_texts(&recordings, keys::transcript);
         let removed_photo_texts = removed_texts(&photos, keys::ocr);
+        let attachment_texts = texts(&fields, keys::FILE_TEXT_PREFIX);
+        let attachments: Vec<Attachment> = fields
+            .iter()
+            .filter_map(|(key, value)| {
+                let hash = key.strip_prefix(keys::FILE_PREFIX)?;
+                Some(Attachment::read(hash, value?))
+            })
+            .collect();
+        let hashes: Vec<String> = attachments.iter().map(|a| a.hash.clone()).collect();
+        let removed_attachment_texts = removed_texts(&hashes, keys::file_text);
+        let gone = removed(keys::FILE_PREFIX, &attachment_texts);
+        let removed_attachments = if gone.is_empty() {
+            Vec::new()
+        } else {
+            self.as_attached(id, &gone)?
+        };
         let boxes = self.boxes(id, &text, &fields)?;
         Ok(Some(Note {
             id: id.to_string(),
@@ -1256,8 +1884,36 @@ impl<'a> Notes<'a> {
             photo_texts,
             removed_transcripts,
             removed_photo_texts,
+            attachments,
+            attachment_texts,
+            removed_attachments,
+            removed_attachment_texts,
             boxes,
         }))
+    }
+
+    /// The removed files `hashes` of the Note `id` as they were attached:
+    /// each by the value of its field that wins by latest wins among
+    /// those that name the file.
+    fn as_attached(&self, id: &str, hashes: &[String]) -> Result<Vec<Attachment>> {
+        let history = self.store.history(id)?;
+        Ok(hashes
+            .iter()
+            .map(|hash| {
+                let field = keys::file(hash);
+                let mut held: Option<&Entry> = None;
+                for e in &history {
+                    if e.field == field
+                        && e.value.is_some()
+                        && held
+                            .is_none_or(|h| Store::latest_wins(e, h) == std::cmp::Ordering::Greater)
+                    {
+                        held = Some(e);
+                    }
+                }
+                Attachment::read(hash, held.and_then(|e| e.value.as_deref()).unwrap_or(""))
+            })
+            .collect())
     }
 
     /// The boxes of the stored `text` of `id` with the ticks that count
@@ -1459,6 +2115,10 @@ impl<'a> Notes<'a> {
             removed_recordings: note.removed_recordings,
             removed_transcripts: note.removed_transcripts,
             removed_photo_texts: note.removed_photo_texts,
+            attachments: note.attachments,
+            attachment_texts: note.attachment_texts,
+            removed_attachments: note.removed_attachments,
+            removed_attachment_texts: note.removed_attachment_texts,
             boxes: note.boxes,
             modified,
             edited_by,
@@ -1520,6 +2180,10 @@ impl<'a> Notes<'a> {
             removed_recordings: Vec::new(),
             removed_transcripts: Vec::new(),
             removed_photo_texts: Vec::new(),
+            attachments: Vec::new(),
+            attachment_texts: BTreeMap::new(),
+            removed_attachments: Vec::new(),
+            removed_attachment_texts: Vec::new(),
             boxes,
             modified,
             edited_by,
@@ -1639,1387 +2303,4 @@ fn texts(fields: &Fields, prefix: &str) -> BTreeMap<String, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn importance_reads_its_stored_name_and_defaults_to_normal() {
-        for i in [
-            Importance::Unimportant,
-            Importance::Normal,
-            Importance::Important,
-        ] {
-            assert_eq!(Importance::from_name(Some(i.name())), i);
-        }
-        assert_eq!(Importance::from_name(None), Importance::Normal);
-        assert_eq!(Importance::from_name(Some("huge")), Importance::Normal);
-    }
-
-    #[test]
-    fn a_note_without_words_is_titled_by_what_it_holds() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let wordless =
-            |id: &str| -> Result<Option<Wordless>> { Ok(notes.by_id(id)?.map(|n| n.wordless())) };
-        let untranscribed = notes.capture_with("", None, None, &[], &[voice(1)])?;
-        let silent = notes.capture_with("", None, None, &[], &[voice(2)])?;
-        notes.set_transcript(&silent.id, &silent.recordings[0], "")?;
-        let receipt = notes.capture_with("", None, None, &[photo(1)], &[])?;
-        let both = notes.capture_with("", None, None, &[photo(2)], &[voice(3)])?;
-        assert_eq!(wordless(&untranscribed.id)?, Some(Wordless::VoiceRecording));
-        assert_eq!(wordless(&silent.id)?, Some(Wordless::VoiceRecording));
-        assert_eq!(wordless(&receipt.id)?, Some(Wordless::Photo));
-        assert_eq!(wordless(&both.id)?, Some(Wordless::Photo));
-        // A file gone while its text stays still counts.
-        let memo = notes.capture_with("", None, None, &[], &[voice(4)])?;
-        notes.set_transcript(&memo.id, &memo.recordings[0], "call the bank")?;
-        notes.remove_recording(&memo.id, &memo.recordings[0])?;
-        notes.set_photo_text(&both.id, &both.photos[0], "RECEIPT")?;
-        notes.remove_photo(&both.id, &both.photos[0])?;
-        assert_eq!(notes.by_id(&memo.id)?.map(|n| n.recordings.len()), Some(0));
-        assert_eq!(wordless(&memo.id)?, Some(Wordless::VoiceRecording));
-        assert_eq!(notes.by_id(&both.id)?.map(|n| n.photos.len()), Some(0));
-        assert_eq!(wordless(&both.id)?, Some(Wordless::Photo));
-        Ok(())
-    }
-
-    #[test]
-    fn writes_check_what_they_write_to() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        assert!(notes.capture("x", Some("area:none"), None).is_err());
-        let a = notes.capture("  kept as typed ", None, None)?;
-        assert_eq!(a.text, "  kept as typed ");
-        assert!(notes.edit(&a.id, "   ").is_err());
-        assert!(notes.edit("note:none", "x").is_err());
-        assert!(notes.amend(&a.id, "").is_err());
-        assert!(notes.file(&a.id, "topic:none").is_err());
-        assert!(notes.merge(&a.id, &a.id).is_err());
-        assert!(notes.merge(&a.id, "note:none").is_err());
-        notes.edit(&a.id, " fixed ")?;
-        assert_eq!(notes.by_id(&a.id)?.map(|n| n.text), Some("fixed".into()));
-        let b = notes.capture("other", None, Some(Duration::minutes(10)))?;
-        notes.trash(&b.id)?;
-        assert!(notes.merge(&a.id, &b.id).is_err());
-        notes.restore(&b.id)?;
-        notes.merge(&a.id, &b.id)?;
-        assert_eq!(notes.sections(&b.id)?.len(), 1);
-        assert_eq!(
-            store.current(&b.id, keys::NUDGE)?.as_deref(),
-            Some("2026-01-01T10:10:06.000Z")
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn the_sections_of_many_notes_read_at_once_are_those_of_each() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let plain = notes.capture("plain", None, None)?;
-        let amended = notes.capture("amended", None, None)?;
-        notes.amend(&amended.id, "amend")?;
-        // A chain a → b → c, with Amends on a and b, read for all three.
-        let a = notes.capture("a", None, None)?;
-        notes.amend(&a.id, "a amend")?;
-        let b = notes.capture("b", None, None)?;
-        notes.amend(&b.id, "b amend")?;
-        let c = notes.capture("c", None, None)?;
-        notes.merge(&a.id, &b.id)?;
-        notes.merge(&b.id, &c.id)?;
-        // Two Notes merged into each other, and a Merge into a Note gone.
-        let x = notes.capture("x", None, None)?;
-        let y = notes.capture("y", None, None)?;
-        notes.amend(&y.id, "y amend")?;
-        store.append(&x.id, keys::MERGED, Some(&y.id), None)?;
-        store.append(&y.id, keys::MERGED, Some(&x.id), None)?;
-        let lost = notes.capture("lost", None, None)?;
-        store.append(&lost.id, keys::MERGED, Some("note:never-synced"), None)?;
-        notes.amend(&lost.id, "lost amend")?;
-        // A Section whose Note never arrived.
-        let orphan = "section:orphan";
-        store.append(orphan, keys::TYPE, Some(keys::TYPE_SECTION), None)?;
-        store.append(orphan, keys::NOTE, Some("note:never-synced"), None)?;
-        store.append(orphan, keys::TEXT, Some("orphan"), None)?;
-        let at = dart_iso(store.now());
-        store.append(orphan, keys::CAPTURED, Some(&at), None)?;
-
-        let mut ids: Vec<String> = [&plain, &amended, &a, &b, &c, &x, &y, &lost]
-            .iter()
-            .map(|n| n.id.clone())
-            .collect();
-        ids.push("note:never-synced".into());
-        ids.push("note:unknown".into());
-        let read = notes.sections_of(&ids)?;
-        assert_eq!(read.len(), ids.len());
-        for id in &ids {
-            assert_eq!(read.get(id), Some(&notes.sections(id)?), "{id}");
-            let alone = notes.sections_of(std::slice::from_ref(id))?;
-            assert_eq!(alone.get(id), read.get(id), "{id}");
-        }
-        let texts = |id: &str| -> Vec<String> {
-            read.get(id)
-                .map(|list| list.iter().map(|s| s.text.clone()).collect())
-                .unwrap_or_default()
-        };
-        assert_eq!(texts(&b.id), ["b amend"]);
-        assert_eq!(texts(&c.id), ["a", "a amend", "b", "b amend"]);
-        assert!(
-            read.get(&c.id)
-                .into_iter()
-                .flatten()
-                .all(|s| s.note_id == c.id)
-        );
-        assert_eq!(texts("note:never-synced"), ["orphan"]);
-        assert_eq!(read.get("note:unknown"), Some(&Vec::new()));
-        assert!(notes.sections_of(&[])?.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn a_plain_text_becomes_formatted_at_its_first_format_and_stays_so() -> Result<()> {
-        use crate::text_format::{MARKDOWN, PLAIN};
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let shop = notes.capture_as("# Shop", MARKDOWN, None, None)?;
-        assert_eq!(
-            store.current(&shop.id, keys::TEXT)?.as_deref(),
-            Some(r##"{"format":"markdown","text":"# Shop"}"##)
-        );
-        let section = notes.amend_as(&shop.id, "~~old~~ new", MARKDOWN)?;
-        assert_eq!(section.visible_text(), "old new");
-        assert!(notes.capture_as("x", "x-future", None, None).is_err());
-        let note = notes.capture("Call mum", None, None)?;
-        notes.edit(&note.id, "Call mum later")?;
-        let format =
-            |id: &str| -> Result<Option<String>> { Ok(notes.by_id(id)?.map(|n| n.text_format)) };
-        assert_eq!(format(&note.id)?.as_deref(), Some(PLAIN));
-        notes.edit_as(&note.id, "Call **mum**", MARKDOWN)?;
-        // An edit without a format, or asking for plain, keeps it formatted.
-        notes.edit(&note.id, "Call **mum** now")?;
-        notes.edit_as(&note.id, "Call mum", PLAIN)?;
-        assert_eq!(
-            store.current(&note.id, keys::TEXT)?.as_deref(),
-            Some(r#"{"format":"markdown","text":"Call mum"}"#)
-        );
-        assert!(notes.edit_as(&note.id, "x", "x-future").is_err());
-        // set_format makes a plain text formatted, never back.
-        let list = notes.capture("- milk", None, None)?;
-        notes.set_format(&list.id, MARKDOWN)?;
-        assert_eq!(format(&list.id)?.as_deref(), Some(MARKDOWN));
-        let entries = store.history(&list.id)?.len();
-        notes.set_format(&list.id, PLAIN)?;
-        notes.set_format(&list.id, MARKDOWN)?;
-        assert_eq!(store.history(&list.id)?.len(), entries);
-        Ok(())
-    }
-
-    #[test]
-    fn a_code_text_keeps_its_glyphs_its_format_and_has_no_boxes()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
-        use crate::text_format::{CODE, MARKDOWN, PLAIN};
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let stored = |id: &str| store.current(id, keys::TEXT);
-        let note = notes.capture_as("☐ echo", CODE, None, None)?;
-        assert_eq!(
-            stored(&note.id)?.as_deref(),
-            Some(r#"{"format":"code","text":"☐ echo"}"#)
-        );
-        let read = notes.by_id(&note.id)?.ok_or("the Note")?;
-        assert!(read.boxes.is_empty());
-        assert_eq!(read.visible_text(), "☐ echo");
-        // An edit keeps it code, whatever format it asks.
-        notes.edit(&note.id, "ls -l")?;
-        notes.edit_as(&note.id, "**ls**", MARKDOWN)?;
-        notes.edit_as(&note.id, "ls -la", PLAIN)?;
-        assert_eq!(
-            stored(&note.id)?.as_deref(),
-            Some(r#"{"format":"code","text":"ls -la"}"#)
-        );
-        // A box with its id that came in a code text is no box.
-        let boxed = format!("☐{} x", text_boxes::encode_id("ab12"));
-        let came = notes.capture("x", None, None)?;
-        let value = StoredText::of(CODE, &boxed, text_format::VERSION).encode();
-        store.append(&came.id, keys::TEXT, Some(&value), None)?;
-        let came = notes.by_id(&came.id)?.ok_or("the Note")?;
-        assert!(came.boxes.is_empty());
-        assert_eq!(came.visible_text(), "☐ x");
-        // Its words are found.
-        let grep = notes.capture_as("grep -r **needle** .", CODE, None, None)?;
-        let found = crate::search::Search::new(&store).notes("**needle**", None)?;
-        assert_eq!(found.iter().map(|n| &n.id).collect::<Vec<_>>(), [&grep.id]);
-        Ok(())
-    }
-
-    #[test]
-    fn set_format_puts_a_plain_or_formatted_text_into_code_and_back()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
-        use crate::text_format::{CODE, MARKDOWN, PLAIN};
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let stored = |id: &str| store.current(id, keys::TEXT);
-        let format =
-            |id: &str| -> Result<Option<String>> { Ok(notes.by_id(id)?.map(|n| n.text_format)) };
-        let note = notes.capture("# comment\necho hi", None, None)?;
-        notes.set_format(&note.id, MARKDOWN)?;
-        notes.set_format(&note.id, CODE)?;
-        assert_eq!(
-            stored(&note.id)?.as_deref(),
-            Some(r##"{"format":"code","text":"# comment\necho hi"}"##)
-        );
-        let entries = store.history(&note.id)?.len();
-        notes.set_format(&note.id, CODE)?;
-        assert_eq!(store.history(&note.id)?.len(), entries);
-        notes.set_format(&note.id, PLAIN)?;
-        assert_eq!(
-            stored(&note.id)?.as_deref(),
-            Some(r##"{"format":"plain","text":"# comment\necho hi"}"##)
-        );
-        notes.set_format(&note.id, CODE)?;
-        notes.set_format(&note.id, MARKDOWN)?;
-        assert_eq!(format(&note.id)?.as_deref(), Some(MARKDOWN));
-        // A formatted text still never goes back to plain.
-        notes.set_format(&note.id, PLAIN)?;
-        assert_eq!(format(&note.id)?.as_deref(), Some(MARKDOWN));
-        // Into code a text goes as it shows; back, its glyphs are boxes.
-        let list = notes.capture("☐ milk ☐ eggs", None, None)?;
-        Boxes::new(&store).tick(
-            &list.id,
-            &list.boxes[0].id,
-            crate::text_boxes::BoxState::Done,
-        )?;
-        notes.set_format(&list.id, CODE)?;
-        assert_eq!(
-            stored(&list.id)?.as_deref(),
-            Some(r#"{"format":"code","text":"✅ milk ☐ eggs"}"#)
-        );
-        notes.set_format(&list.id, PLAIN)?;
-        let back = notes.by_id(&list.id)?.ok_or("the Note")?;
-        assert_eq!(back.boxes.len(), 2);
-        assert_eq!(back.visible_text(), "✅ milk ☐ eggs");
-        // A code Note becomes no Checklist or Shopping List.
-        let script = notes.capture_as("Script\nls\npwd", CODE, None, None)?;
-        let lists = crate::checklists::Checklists::new(&store);
-        let shopping = crate::shopping_lists::ShoppingLists::new(&store);
-        assert!(!lists.may_make(&script.id)?);
-        assert!(!shopping.may_make(&script.id)?);
-        notes.set_format(&script.id, PLAIN)?;
-        assert!(lists.may_make(&script.id)?);
-        assert!(shopping.may_make(&script.id)?);
-        Ok(())
-    }
-
-    #[test]
-    fn a_transcript_taken_over_into_a_formatted_text_reads_as_itself() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let note = notes.capture_as("**Todo**", crate::text_format::MARKDOWN, None, None)?;
-        let written = notes.take_over(&note.id, "2*3*4 and #tag_x\n- not a list ", true)?;
-        assert_eq!(written, "**Todo**\n2\\*3\\*4 and #tag_x\n\\- not a list");
-        let got = notes
-            .by_id(&note.id)?
-            .ok_or(Error::Invalid("gone".into()))?;
-        assert_eq!(got.text, written);
-        assert_eq!(got.visible_text(), "Todo\n2*3*4 and #tag_x\n- not a list");
-        assert_eq!(notes.take_over(&note.id, "*x*", false)?, "\\*x\\*");
-        // Into a plain text it goes as it is.
-        let plain = notes.capture("Plain", None, None)?;
-        assert_eq!(notes.take_over(&plain.id, "*x*", true)?, "Plain\n*x*");
-        Ok(())
-    }
-
-    #[test]
-    fn a_checklist_or_shopping_list_keeps_the_text_formatted() -> Result<()> {
-        use crate::text_format::MARKDOWN;
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let format =
-            |id: &str| -> Result<Option<String>> { Ok(notes.by_id(id)?.map(|n| n.text_format)) };
-        let packing = notes.capture_as("**Packing**\n- socks", MARKDOWN, None, None)?;
-        let checklists = crate::Checklists::new(&store);
-        checklists.make(&packing.id)?;
-        assert_eq!(
-            store.current(&packing.id, keys::TEXT)?.as_deref(),
-            Some(r#"{"format":"markdown","text":"**Packing**"}"#)
-        );
-        checklists.to_plain(&packing.id)?;
-        assert_eq!(format(&packing.id)?.as_deref(), Some(MARKDOWN));
-        let weekly = notes.capture_as("# Weekly\nmilk", MARKDOWN, None, None)?;
-        let shopping = crate::ShoppingLists::new(&store);
-        shopping.make(&weekly.id)?;
-        assert_eq!(format(&weekly.id)?.as_deref(), Some(MARKDOWN));
-        shopping.to_plain(&weekly.id, &|utc| utc.naive_utc())?;
-        assert_eq!(format(&weekly.id)?.as_deref(), Some(MARKDOWN));
-        Ok(())
-    }
-
-    #[test]
-    fn a_text_in_an_unknown_format_is_never_overwritten_here() -> Result<()> {
-        const FUTURE: &str = r##"{"format":"x-future","text":"# Heading"}"##;
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let a = notes.capture("x", None, None)?;
-        assert_eq!(
-            store.current(&a.id, keys::TEXT)?.as_deref(),
-            Some(r#"{"format":"plain","text":"x"}"#)
-        );
-        store.append(&a.id, keys::TEXT, Some("Old milk"), None)?;
-        let old = notes.by_id(&a.id)?.ok_or(Error::Invalid("note".into()))?;
-        assert_eq!((old.text.as_str(), old.text_editable), ("Old milk", true));
-        store.append(&a.id, keys::TEXT, Some(FUTURE), None)?;
-        let other = notes.capture("Other", None, None)?;
-        let note = notes.by_id(&a.id)?.ok_or(Error::Invalid("note".into()))?;
-        assert_eq!(note.text, "# Heading");
-        assert_eq!(note.text_format, "x-future");
-        assert!(!note.text_editable);
-        assert!(notes.edit(&a.id, "Plain now").is_err());
-        // Amend adds a Section; Merge points at the other Note.
-        let section = notes.amend(&a.id, "Amended")?;
-        assert!(section.text_editable);
-        notes.merge(&a.id, &other.id)?;
-        assert_eq!(store.current(&a.id, keys::TEXT)?.as_deref(), Some(FUTURE));
-        store.append(&section.id, keys::TEXT, Some(FUTURE), None)?;
-        let shown = notes.sections(&other.id)?;
-        assert_eq!(shown.len(), 2);
-        assert!(
-            shown
-                .iter()
-                .all(|s| !s.text_editable && s.text == "# Heading")
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_text_in_a_later_structure_is_never_overwritten_here() -> Result<()> {
-        const LATER: &str = r#"{"format":"plain","more":1,"text":"Later milk","v":2}"#;
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let a = notes.capture("x", None, None)?;
-        store.append(&a.id, keys::TEXT, Some(LATER), None)?;
-        let note = notes.by_id(&a.id)?.ok_or(Error::Invalid("note".into()))?;
-        assert_eq!(note.text, "Later milk");
-        assert_eq!(note.text_version, 2);
-        assert!(!note.text_editable);
-        assert!(notes.edit(&a.id, "Plain now").is_err());
-        let section = notes.amend(&a.id, "Amended")?;
-        store.append(&section.id, keys::TEXT, Some(LATER), None)?;
-        let shown = notes.sections(&a.id)?;
-        assert_eq!(shown.len(), 1);
-        assert_eq!(shown[0].text_version, 2);
-        assert!(!shown[0].text_editable);
-        assert_eq!(store.current(&a.id, keys::TEXT)?.as_deref(), Some(LATER));
-        Ok(())
-    }
-
-    // ------------------------------------------ removing media (ADR 0020)
-
-    use crate::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
-    use crate::shared::{AreaRole, Invite};
-    use crate::signing::SigningKey;
-    use crate::store::Clock;
-    use crate::sync::split_blob_ref;
-    use crate::{PairedDevice, Search};
-    use chrono::TimeZone;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicI64, Ordering};
-
-    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
-
-    /// Devices sharing one clock, a second per read, so they write in a
-    /// known order; each with a Profile of its own.
-    struct Devices(Arc<AtomicI64>);
-
-    impl Devices {
-        fn new() -> Devices {
-            Devices(Arc::new(AtomicI64::new(0)))
-        }
-
-        fn device(&self, seed: u8, name: &str) -> Result<Store> {
-            let ticks = Arc::clone(&self.0);
-            let clock: Clock = Box::new(move || {
-                let n = ticks.fetch_add(1, Ordering::SeqCst) + 1;
-                let start = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).single();
-                start.unwrap_or_default() + Duration::seconds(n)
-            });
-            let store = Store::in_memory(clock, move || Ok(SigningKey::from_seed([seed; 32])))?;
-            crate::profile::OwnProfile::new(&store).apply_defaults(name, None)?;
-            Ok(store)
-        }
-    }
-
-    #[test]
-    fn a_discarded_note_is_gone_at_once_without_the_trash() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let note = notes.capture_with("milk", None, None, &[], &[voice(1)])?;
-        let kept = notes.capture("kept", None, None)?;
-        notes.discard(&note.id)?;
-        assert!(notes.by_id(&note.id)?.is_none());
-        let ids: Vec<String> = notes.all()?.into_iter().map(|n| n.id).collect();
-        assert_eq!(ids, [kept.id]);
-        assert!(notes.trashed()?.is_empty());
-        assert!(notes.untranscribed()?.is_empty());
-        assert!(notes.discard(&note.id).is_err());
-        let frog = notes.capture("frog", None, None)?;
-        crate::Frogs::new(&store).spawn(&frog.id)?;
-        assert!(notes.discard(&frog.id).is_err(), "it spawned a Frog");
-        assert!(notes.by_id(&frog.id)?.is_some());
-        Ok(())
-    }
-
-    /// Stand-ins: a JPEG start, so the store keeps the photo as it is.
-    fn photo(n: u8) -> Vec<u8> {
-        vec![0xFF, 0xD8, 0xFF, 0xD9, n]
-    }
-
-    fn voice(n: u8) -> Vec<u8> {
-        vec![0x52, 0x49, 0x46, 0x46, n]
-    }
-
-    /// A Note with a photo and a recording, both with their text.
-    fn with_texts(store: &Store, place: Option<&str>, n: u8) -> Result<(String, String, String)> {
-        let notes = Notes::new(store);
-        let note = notes.capture_with("Dentist", place, None, &[photo(n)], &[voice(n)])?;
-        let (p, r) = (note.photos[0].clone(), note.recordings[0].clone());
-        notes.set_photo_text(&note.id, &p, "Dr. Weber, Mon 9-12")?;
-        notes.set_transcript(&note.id, &r, "Bring the old X-ray")?;
-        Ok((note.id, p, r))
-    }
-
-    /// The blobs `to` lacks, carried over from `from`.
-    fn carry(from: &Store, to: &Store) -> Result<()> {
-        for reference in to.missing_blobs()? {
-            let (kind, hash) = split_blob_ref(&reference);
-            if let Some(bytes) = from.blob(kind, hash) {
-                to.put_blob(kind, hash, &bytes)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// One LAN session without the network, the blobs after it both
-    /// ways: `joiner` joins `host`, which invites it when `inviting`.
-    /// Both remember each other, as the apps do.
-    fn exchange(joiner: &Store, host: &Store, inviting: Option<&Invite>) -> TestResult {
-        let host_id = host.device_id()?;
-        let joiner_id = joiner.device_id()?;
-        let shared = inviting.is_some() || joiner.is_shared_peer(&host_id)?;
-        let joining = match inviting {
-            Some(_) => Joining::Invited,
-            None => Joining::Plain,
-        };
-        let vector = host.version_vector()?;
-        let request = sync_request_as(joiner, &vector, "Phone", &host_id, "", joining)?;
-        let (answer, _) =
-            answer_sync_inviting(host, &request, "Desk", inviting)?.ok_or("an answer")?;
-        apply_answer_as(joiner, &answer, shared, None)?;
-        for (store, id) in [(host, &joiner_id), (joiner, &host_id)] {
-            store.remember_device(&PairedDevice {
-                id: id.clone(),
-                name: "Other".into(),
-                fingerprint: String::new(),
-                host: None,
-                port: None,
-                last_sync: store.now(),
-                shared,
-            })?;
-        }
-        carry(host, joiner)?;
-        carry(joiner, host)?;
-        Ok(())
-    }
-
-    fn found(store: &Store, query: &str) -> Result<Vec<String>> {
-        Ok(Search::new(store)
-            .notes(query, None)?
-            .into_iter()
-            .map(|n| n.id)
-            .collect())
-    }
-
-    fn note(store: &Store, id: &str) -> Result<Note> {
-        Notes::new(store)
-            .by_id(id)?
-            .ok_or_else(|| Error::Invalid(format!("no Note {id}")))
-    }
-
-    /// Ann's Household shared with Ben as a Member, and her private
-    /// Health beside it: (area, private).
-    fn household(
-        ann: &Store,
-        ben: &Store,
-    ) -> std::result::Result<(String, String), Box<dyn std::error::Error>> {
-        let places = Places::new(ann);
-        let area = ann.share(&places.add_area("Household")?.id)?;
-        let private = places.add_area("Health")?.id;
-        let invite = Invite {
-            area: area.clone(),
-            role: AreaRole::Member,
-        };
-        exchange(ben, ann, Some(&invite))?;
-        Ok((area, private))
-    }
-
-    #[test]
-    fn a_removed_file_goes_and_its_text_stays_and_is_found() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let (id, p, r) = with_texts(&ann, None, 1)?;
-        assert!(notes.may_remove_photo(&id, &p)?);
-        assert!(notes.may_remove_recording(&id, &r)?);
-        notes.remove_photo(&id, &p)?;
-        notes.remove_recording(&id, &r)?;
-        let read = note(&ann, &id)?;
-        assert!(read.photos.is_empty() && read.recordings.is_empty());
-        assert_eq!(read.removed_photos, vec![p.clone()]);
-        assert_eq!(read.removed_recordings, vec![r.clone()]);
-        assert_eq!(
-            read.photo_texts.get(&p).map(String::as_str),
-            Some("Dr. Weber, Mon 9-12")
-        );
-        assert_eq!(
-            read.transcripts.get(&r).map(String::as_str),
-            Some("Bring the old X-ray")
-        );
-        assert_eq!(ann.photo(&p), None);
-        assert_eq!(ann.audio(&r), None);
-        assert!(ann.missing_blobs()?.is_empty(), "not wanted back");
-        assert!(!ann.knows_blob(&format!("photo/{p}"))?);
-        assert_eq!(found(&ann, "weber")?, vec![id.clone()]);
-        assert_eq!(found(&ann, "x-ray")?, vec![id.clone()]);
-        assert!(!notes.may_remove_photo(&id, &p)?);
-        assert_eq!(ann.current(&id, &keys::photo(&p))?, None);
-        Ok(())
-    }
-
-    #[test]
-    fn a_file_without_a_text_or_with_an_empty_one_is_not_removed() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let n = notes.capture_with("", None, None, &[photo(1), photo(2)], &[voice(1)])?;
-        let (p1, p2, r) = (&n.photos[0], &n.photos[1], &n.recordings[0]);
-        notes.set_photo_text(&n.id, p2, "   ")?;
-        for hash in [p1, p2] {
-            assert!(!notes.may_remove_photo(&n.id, hash)?);
-            assert!(notes.remove_photo(&n.id, hash).is_err());
-        }
-        assert!(!notes.may_remove_recording(&n.id, r)?);
-        assert!(notes.remove_recording(&n.id, r).is_err());
-        assert!(
-            notes.remove_photo(&n.id, r).is_err(),
-            "a recording is no photo"
-        );
-        assert!(!notes.may_remove_photo("note:none", p1)?);
-        assert_eq!(note(&ann, &n.id)?.photos, n.photos);
-        assert!(ann.photo(p1).is_some());
-        Ok(())
-    }
-
-    #[test]
-    fn the_bytes_stay_while_another_note_shows_the_same_photo() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let (id, p, _) = with_texts(&ann, None, 1)?;
-        let other = notes.capture_with("Same card", None, None, &[photo(1)], &[])?;
-        assert_eq!(other.photos, vec![p.clone()]);
-        notes.remove_photo(&id, &p)?;
-        assert_eq!(ann.photo(&p), Some(photo(1)));
-        assert!(ann.removed_blobs()?.is_empty());
-        let target = notes.capture("Health", None, None)?;
-        notes.merge(&other.id, &target.id)?;
-        notes.set_photo_text(&other.id, &p, "Same card")?;
-        notes.remove_photo(&other.id, &p)?;
-        let section = notes.sections(&target.id)?;
-        assert_eq!(section[0].removed_photos, vec![p.clone()]);
-        assert_eq!(ann.photo(&p), None, "gone with the last Note showing it");
-        Ok(())
-    }
-
-    #[test]
-    fn the_removal_reaches_another_own_device() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let desk = devices.device(3, "Ann")?;
-        let (id, p, r) = with_texts(&ann, None, 1)?;
-        exchange(&desk, &ann, None)?;
-        assert!(desk.photo(&p).is_some() && desk.audio(&r).is_some());
-        Notes::new(&ann).remove_photo(&id, &p)?;
-        Notes::new(&desk).remove_recording(&id, &r)?;
-        exchange(&desk, &ann, None)?;
-        for store in [&ann, &desk] {
-            let read = note(store, &id)?;
-            assert!(read.photos.is_empty() && read.recordings.is_empty());
-            assert_eq!(read.photo_texts.len() + read.transcripts.len(), 2);
-            assert_eq!(store.photo(&p), None);
-            assert_eq!(store.audio(&r), None);
-            assert!(store.missing_blobs()?.is_empty());
-            assert_eq!(found(store, "weber")?, vec![id.clone()]);
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn a_removal_in_a_shared_area_reaches_the_member_and_the_manager() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, _) = household(&ann, &ben)?;
-        let (id, p, _) = with_texts(&ann, Some(&area), 1)?;
-        let (own, own_p, own_r) = with_texts(&ben, Some(&area), 2)?;
-        exchange(&ben, &ann, None)?;
-        assert!(ben.photo(&p).is_some() && ann.photo(&own_p).is_some());
-        assert!(!Notes::new(&ben).may_remove_photo(&id, &p)?);
-        Notes::new(&ann).remove_photo(&id, &p)?;
-        // A Member removes from their own Note, a Manager from anyone's.
-        Notes::new(&ben).remove_photo(&own, &own_p)?;
-        Notes::new(&ann).remove_recording(&own, &own_r)?;
-        exchange(&ben, &ann, None)?;
-        for store in [&ann, &ben] {
-            assert_eq!(note(store, &id)?.removed_photos, vec![p.clone()]);
-            assert_eq!(note(store, &own)?.removed_photos, vec![own_p.clone()]);
-            assert_eq!(note(store, &own)?.removed_recordings, vec![own_r.clone()]);
-            assert_eq!(store.photo(&p), None);
-            assert_eq!(store.photo(&own_p), None);
-            assert_eq!(store.audio(&own_r), None);
-            assert_eq!(found(store, "weber")?.len(), 2);
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn a_members_removal_on_anothers_note_is_refused_and_ignored() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, _) = household(&ann, &ben)?;
-        let (id, p, _) = with_texts(&ann, Some(&area), 1)?;
-        exchange(&ben, &ann, None)?;
-        assert!(Notes::new(&ben).remove_photo(&id, &p).is_err());
-        // As a modified app would write it.
-        ben.append(&id, &keys::photo(&p), None, None)?;
-        ben.drop_removed_blobs()?;
-        exchange(&ben, &ann, None)?;
-        for store in [&ann, &ben] {
-            assert_eq!(note(store, &id)?.photos, vec![p.clone()]);
-            assert!(store.photo(&p).is_some());
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn another_persons_removal_outside_a_shared_area_keeps_the_bytes() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, private) = household(&ann, &ben)?;
-        let (id, p, _) = with_texts(&ann, Some(&area), 1)?;
-        exchange(&ben, &ann, None)?;
-        // Ann takes the Note out of the Shared Area; Ben has not seen it
-        // and writes a removal as a modified app would.
-        Notes::new(&ann).file(&id, &private)?;
-        ben.append(&id, &keys::photo(&p), None, None)?;
-        exchange(&ben, &ann, None)?;
-        assert_eq!(ann.current(&id, &keys::photo(&p))?, None);
-        assert!(ann.removed_blobs()?.is_empty());
-        assert_eq!(ann.photo(&p), Some(photo(1)));
-        Ok(())
-    }
-
-    #[test]
-    fn a_removed_text_goes_its_file_stays_and_it_is_not_read_again() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let (id, p, r) = with_texts(&ann, None, 1)?;
-        assert!(notes.may_remove_photo_text(&id, &p)?);
-        assert!(notes.may_remove_transcript(&id, &r)?);
-        notes.remove_photo_text(&id, &p)?;
-        notes.remove_transcript(&id, &r)?;
-        let read = note(&ann, &id)?;
-        assert_eq!(read.photos, vec![p.clone()]);
-        assert_eq!(read.recordings, vec![r.clone()]);
-        assert!(read.photo_texts.is_empty() && read.transcripts.is_empty());
-        assert_eq!(read.removed_photo_texts, vec![p.clone()]);
-        assert_eq!(read.removed_transcripts, vec![r.clone()]);
-        assert!(read.removed_photos.is_empty() && read.removed_recordings.is_empty());
-        assert!(ann.photo(&p).is_some() && ann.audio(&r).is_some());
-        assert!(found(&ann, "weber")?.is_empty());
-        assert!(found(&ann, "x-ray")?.is_empty());
-        assert!(notes.unread_photos()?.is_empty());
-        assert!(notes.untranscribed()?.is_empty());
-        // Without a text the file may not go either.
-        assert!(!notes.may_remove_photo(&id, &p)?);
-        assert!(!notes.may_remove_photo_text(&id, &p)?);
-        assert_eq!(ann.current(&id, &keys::transcript(&r))?, None);
-        // Transcribing or reading again brings a text back.
-        notes.set_photo_text(&id, &p, "Dr. Weber, Tue 9-12")?;
-        notes.set_transcript(&id, &r, "Bring the new X-ray")?;
-        let read = note(&ann, &id)?;
-        assert!(read.removed_photo_texts.is_empty() && read.removed_transcripts.is_empty());
-        assert_eq!(found(&ann, "tue")?, vec![id.clone()]);
-        assert_eq!(found(&ann, "new x-ray")?, vec![id.clone()]);
-        Ok(())
-    }
-
-    #[test]
-    fn a_missing_or_empty_text_or_one_without_its_file_is_not_removed() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let n = notes.capture_with("", None, None, &[photo(1), photo(2)], &[voice(1)])?;
-        let (p1, p2, r) = (&n.photos[0], &n.photos[1], &n.recordings[0]);
-        notes.set_photo_text(&n.id, p2, "")?;
-        for hash in [p1, p2] {
-            assert!(!notes.may_remove_photo_text(&n.id, hash)?);
-            assert!(notes.remove_photo_text(&n.id, hash).is_err());
-        }
-        assert!(!notes.may_remove_transcript(&n.id, r)?);
-        assert!(notes.remove_transcript(&n.id, r).is_err());
-        assert!(
-            notes.remove_photo_text(&n.id, r).is_err(),
-            "a recording is no photo"
-        );
-        assert!(!notes.may_remove_transcript("note:none", r)?);
-        let (id, p, _) = with_texts(&ann, None, 3)?;
-        notes.remove_photo(&id, &p)?;
-        assert!(!notes.may_remove_photo_text(&id, &p)?);
-        assert!(notes.remove_photo_text(&id, &p).is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn a_removed_text_shows_in_the_section_and_reaches_another_own_device() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let desk = devices.device(3, "Ann")?;
-        let notes = Notes::new(&ann);
-        let (id, p, r) = with_texts(&ann, None, 1)?;
-        let target = notes.capture("Health", None, None)?;
-        notes.merge(&id, &target.id)?;
-        exchange(&desk, &ann, None)?;
-        notes.remove_transcript(&id, &r)?;
-        Notes::new(&desk).remove_photo_text(&id, &p)?;
-        exchange(&desk, &ann, None)?;
-        for store in [&ann, &desk] {
-            let section = Notes::new(store).sections(&target.id)?;
-            assert_eq!(section[0].removed_transcripts, vec![r.clone()]);
-            assert_eq!(section[0].removed_photo_texts, vec![p.clone()]);
-            assert!(store.photo(&p).is_some() && store.audio(&r).is_some());
-            assert!(Notes::new(store).untranscribed()?.is_empty());
-            assert!(Notes::new(store).unread_photos()?.is_empty());
-            assert!(found(store, "weber")?.is_empty());
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn a_members_text_removal_on_anothers_note_is_refused_and_ignored() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, _) = household(&ann, &ben)?;
-        let (id, p, r) = with_texts(&ann, Some(&area), 1)?;
-        let (own, own_p, own_r) = with_texts(&ben, Some(&area), 2)?;
-        exchange(&ben, &ann, None)?;
-        assert!(!Notes::new(&ben).may_remove_transcript(&id, &r)?);
-        assert!(Notes::new(&ben).remove_transcript(&id, &r).is_err());
-        // As a modified app would write them.
-        ben.append(&id, &keys::transcript(&r), None, None)?;
-        ben.append(&id, &keys::ocr(&p), None, None)?;
-        // A Member removes from their own Note, a Manager from anyone's.
-        Notes::new(&ben).remove_photo_text(&own, &own_p)?;
-        Notes::new(&ann).remove_transcript(&own, &own_r)?;
-        exchange(&ben, &ann, None)?;
-        for store in [&ann, &ben] {
-            let read = note(store, &id)?;
-            assert_eq!(
-                read.transcripts.get(&r).map(String::as_str),
-                Some("Bring the old X-ray")
-            );
-            assert_eq!(
-                read.photo_texts.get(&p).map(String::as_str),
-                Some("Dr. Weber, Mon 9-12")
-            );
-            assert!(read.removed_transcripts.is_empty());
-            let own = note(store, &own)?;
-            assert_eq!(own.removed_photo_texts, vec![own_p.clone()]);
-            assert_eq!(own.removed_transcripts, vec![own_r.clone()]);
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn a_members_machine_still_gives_anothers_note_its_texts() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, _) = household(&ann, &ben)?;
-        let shed =
-            Notes::new(&ann).capture_with("Shed", Some(&area), None, &[photo(4)], &[voice(4)])?;
-        exchange(&ben, &ann, None)?;
-        Notes::new(&ben).set_photo_text(&shed.id, &shed.photos[0], "Spare key")?;
-        Notes::new(&ben).set_transcript(&shed.id, &shed.recordings[0], "Oil the door")?;
-        exchange(&ben, &ann, None)?;
-        let read = note(&ann, &shed.id)?;
-        assert_eq!(
-            read.photo_texts.get(&shed.photos[0]).map(String::as_str),
-            Some("Spare key")
-        );
-        assert_eq!(
-            read.transcripts
-                .get(&shed.recordings[0])
-                .map(String::as_str),
-            Some("Oil the door")
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_removed_photo_leaves_the_shared_folder() -> TestResult {
-        use crate::folder::{MemoryFolder, folder_sync, random_nonce};
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let desk = devices.device(3, "Ann")?;
-        exchange(&desk, &ann, None)?;
-        let (id, p, r) = with_texts(&ann, None, 1)?;
-        let mut folder = MemoryFolder::default();
-        let blobs = |folder: &MemoryFolder| folder.dirs.get("blobs").map_or(0, |b| b.len());
-        folder_sync(&ann, &mut folder, &mut random_nonce)?;
-        assert_eq!(blobs(&folder), 2);
-        folder_sync(&desk, &mut folder, &mut random_nonce)?;
-        assert!(desk.photo(&p).is_some());
-        Notes::new(&ann).remove_photo(&id, &p)?;
-        folder_sync(&ann, &mut folder, &mut random_nonce)?;
-        assert_eq!(blobs(&folder), 1);
-        folder_sync(&desk, &mut folder, &mut random_nonce)?;
-        assert_eq!(desk.photo(&p), None);
-        assert!(desk.audio(&r).is_some());
-        assert_eq!(note(&desk, &id)?.removed_photos, vec![p]);
-        Ok(())
-    }
-
-    #[test]
-    fn a_note_without_a_capture_time_is_no_note() -> Result<()> {
-        let store = crate::store::tests::store();
-        store.append("note:a", keys::TYPE, Some(keys::TYPE_NOTE), None)?;
-        assert_eq!(Notes::new(&store).by_id("note:a")?, None);
-        store.append(
-            "note:a",
-            keys::CAPTURED,
-            Some("2026-01-01T10:00:00.000Z"),
-            None,
-        )?;
-        let note = Notes::new(&store).by_id("note:a")?;
-        assert!(note.is_some_and(|n| n.is_unsorted() && n.text.is_empty()));
-        Ok(())
-    }
-
-    #[test]
-    fn names_read_only_the_strings_of_a_json_list() {
-        let read = |json: Option<&str>| names(json);
-        assert_eq!(read(None), Vec::<String>::new());
-        assert_eq!(read(Some(r#"["Standup","Lunch"]"#)), ["Standup", "Lunch"]);
-        // As the Dart core's `whereType<String>`: in their order, empty
-        // and repeated ones kept.
-        assert_eq!(
-            read(Some(r#" ["Dentist",3,null,"",["x"],{"a":"b"},"Dentist"] "#)),
-            ["Dentist", "", "Dentist"]
-        );
-        for garbled in [
-            "",
-            "not json",
-            r#""Car kit""#,
-            r#"{"name":"Car kit"}"#,
-            "[]",
-            r#"["a",]"#,
-            "[\"a\"] x",
-        ] {
-            assert_eq!(read(Some(garbled)), Vec::<String>::new(), "{garbled:?}");
-        }
-    }
-
-    #[test]
-    fn a_source_app_is_named_by_its_label_else_its_package() {
-        let app = |label: Option<&str>| SourceApp {
-            package: "com.whatsapp".into(),
-            label: label.map(str::to_string),
-        };
-        assert_eq!(app(Some("WhatsApp")).name(), "WhatsApp");
-        assert_eq!(app(Some(" WhatsApp\u{a0}")).name(), "WhatsApp");
-        for blank in [None, Some(""), Some("  "), Some("\u{feff}\n")] {
-            assert_eq!(app(blank).name(), "com.whatsapp", "{blank:?}");
-        }
-    }
-
-    /// Writes `values` on `id`, as another version or Device might have.
-    fn put(store: &Store, id: &str, values: &[(&str, Option<&str>)]) -> Result<()> {
-        for (field, value) in values {
-            store.append(id, field, *value, None)?;
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn notes_and_sections_read_their_capture_context() -> Result<()> {
-        use crate::named_places::keys as place_keys;
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        for (id, name, centre, radius) in [
-            ("namedplace:home", "Home", "52.52,13.405", "300.0"),
-            ("namedplace:kitchen", "Kitchen", "52.521,13.405", "30.0"),
-        ] {
-            put(
-                &store,
-                id,
-                &[
-                    (place_keys::TYPE, Some(place_keys::TYPE_NAMED_PLACE)),
-                    (place_keys::NAME, Some(name)),
-                    (place_keys::CENTRE, Some(centre)),
-                    (place_keys::RADIUS, Some(radius)),
-                ],
-            )?;
-        }
-        let shared = notes.capture("Shared in", None, None)?;
-        assert_eq!(shared.context, CaptureContext::default());
-        assert!(!shared.context.has_more());
-        put(
-            &store,
-            &shared.id,
-            &[
-                (keys::LOCATION, Some("52.521,13.405")),
-                (keys::SOURCE_PACKAGE, Some("com.whatsapp")),
-                (keys::CALENDAR, Some(r#"["Standup"]"#)),
-                (keys::BLUETOOTH, Some(r#"["Car kit"]"#)),
-            ],
-        )?;
-        let context = note(&store, &shared.id)?.context;
-        assert_eq!(context.location, Coordinates::new(52.521, 13.405));
-        // The smaller of the two holding it.
-        assert_eq!(
-            context.named_place.map(|p| p.id).as_deref(),
-            Some("namedplace:kitchen")
-        );
-        let app = context.source_app.ok_or(Error::Invalid("no app".into()))?;
-        assert_eq!((app.package.as_str(), app.label), ("com.whatsapp", None));
-        assert_eq!(context.calendar_events, ["Standup"]);
-        assert_eq!(context.bluetooth_devices, ["Car kit"]);
-        // An Amend keeps its own, under the same keys; garbled values
-        // read as nothing, and an empty package as no app.
-        let host = notes.capture("Host", None, None)?;
-        let amend = notes.amend(&host.id, "Later")?;
-        put(
-            &store,
-            &amend.id,
-            &[
-                (keys::LOCATION, Some(" 52.52 , 13.405 ")),
-                (keys::SOURCE_PACKAGE, Some("")),
-                (keys::SOURCE_LABEL, Some("Ghost")),
-                (keys::CALENDAR, Some("not json")),
-                (keys::BLUETOOTH, Some(r#"["Ear buds"]"#)),
-            ],
-        )?;
-        put(&store, &host.id, &[(keys::LOCATION, Some("91,0"))])?;
-        notes.merge(&shared.id, &host.id)?;
-        let host_context = note(&store, &host.id)?.context;
-        assert_eq!(host_context.location, None);
-        assert_eq!(host_context.named_place, None);
-        let sections = notes.sections(&host.id)?;
-        let at_once = notes.sections_of(std::slice::from_ref(&host.id))?;
-        assert_eq!(at_once.get(&host.id), Some(&sections));
-        let by_id = |id: &str| sections.iter().find(|s| s.id == id).map(|s| &s.context);
-        // The merged Note brings its own.
-        assert_eq!(by_id(&shared.id), Some(&note(&store, &shared.id)?.context));
-        let amended = by_id(&amend.id).cloned().unwrap_or_default();
-        assert_eq!(
-            amended.named_place.as_ref().map(|p| p.name.as_str()),
-            Some("Home")
-        );
-        assert_eq!(amended.source_app, None);
-        assert!(amended.calendar_events.is_empty());
-        assert_eq!(amended.bluetooth_devices, ["Ear buds"]);
-        assert!(amended.has_more());
-        // A Named Place renamed or deleted shows on what was captured
-        // before.
-        put(&store, "namedplace:kitchen", &[(place_keys::TYPE, None)])?;
-        let moved = note(&store, &shared.id)?.context.named_place;
-        assert_eq!(moved.map(|p| p.name).as_deref(), Some("Home"));
-        put(
-            &store,
-            "namedplace:home",
-            &[(place_keys::NAME, Some("Flat"))],
-        )?;
-        let renamed = note(&store, &shared.id)?.context.named_place;
-        assert_eq!(renamed.map(|p| p.name).as_deref(), Some("Flat"));
-        // A cleared field reads as unknown again.
-        put(
-            &store,
-            &shared.id,
-            &[(keys::CALENDAR, None), (keys::LOCATION, None)],
-        )?;
-        let cleared = note(&store, &shared.id)?.context;
-        assert!(cleared.calendar_events.is_empty() && cleared.location.is_none());
-        Ok(())
-    }
-
-    // ------------------------------- removing a captured detail (ADR 0037)
-
-    /// What the phone records on `id` when capturing at Work, shared in
-    /// from a chat, during a meeting and with a headset connected.
-    fn with_context(store: &Store, id: &str) -> Result<()> {
-        put(
-            store,
-            id,
-            &[
-                (keys::SOURCE_PACKAGE, Some("org.example.chat")),
-                (keys::SOURCE_LABEL, Some("Chat")),
-                (keys::LOCATION, Some("52.52,13.405")),
-                (keys::CALENDAR, Some(r#"["Katzenklo"]"#)),
-                (keys::BLUETOOTH, Some(r#"["Headset"]"#)),
-            ],
-        )
-    }
-
-    #[test]
-    fn each_captured_detail_goes_on_its_own_and_the_time_stays() -> TestResult {
-        use crate::named_places::keys as place_keys;
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        put(
-            &store,
-            "namedplace:work",
-            &[
-                (place_keys::TYPE, Some(place_keys::TYPE_NAMED_PLACE)),
-                (place_keys::NAME, Some("Work")),
-                (place_keys::CENTRE, Some("52.52,13.405")),
-                (place_keys::RADIUS, Some("100.0")),
-            ],
-        )?;
-        let id = notes.capture("Order toner", None, None)?.id;
-        with_context(&store, &id)?;
-        let at = note(&store, &id)?.captured;
-        for detail in CapturedDetail::ALL {
-            assert!(notes.may_remove_captured(&id, detail)?, "{detail:?}");
-            assert_eq!(CapturedDetail::parse(detail.name()), Some(detail));
-        }
-        assert_eq!(CapturedDetail::parse("time"), None);
-
-        notes.remove_captured(&id, CapturedDetail::Event)?;
-        let context = note(&store, &id)?.context;
-        assert!(context.calendar_events.is_empty());
-        assert_eq!(context.bluetooth_devices, ["Headset"]);
-        assert_eq!(context.named_place.map(|p| p.name).as_deref(), Some("Work"));
-        notes.remove_captured(&id, CapturedDetail::Place)?;
-        let context = note(&store, &id)?.context;
-        assert!(context.location.is_none() && context.named_place.is_none());
-        assert_eq!(NamedPlaces::new(&store).all()?.len(), 1);
-        notes.remove_captured(&id, CapturedDetail::Device)?;
-        notes.remove_captured(&id, CapturedDetail::App)?;
-        let read = note(&store, &id)?;
-        assert_eq!(read.context, CaptureContext::default());
-        assert_eq!(read.captured, at);
-        let last: Vec<(String, Option<String>)> = store
-            .history(&id)?
-            .into_iter()
-            .rev()
-            .take(5)
-            .map(|e| (e.field, e.value))
-            .collect();
-        let nulls: Vec<(String, Option<String>)> = [
-            keys::SOURCE_LABEL,
-            keys::SOURCE_PACKAGE,
-            keys::BLUETOOTH,
-            keys::LOCATION,
-            keys::CALENDAR,
-        ]
-        .iter()
-        .map(|f| (f.to_string(), None))
-        .collect();
-        assert_eq!(last, nulls);
-
-        // What does not show is not removed: gone once, garbled, typed.
-        let typed = notes.capture("Typed", None, None)?.id;
-        put(
-            &store,
-            &typed,
-            &[
-                (keys::LOCATION, Some("somewhere")),
-                (keys::CALENDAR, Some("[]")),
-            ],
-        )?;
-        let mark = store.current_seq()?;
-        for (on, detail) in CapturedDetail::ALL
-            .iter()
-            .flat_map(|d| [(&id, *d), (&typed, *d)])
-        {
-            assert!(!notes.may_remove_captured(on, detail)?);
-            assert!(notes.remove_captured(on, detail).is_err());
-        }
-        assert_eq!(store.current_seq()?, mark);
-        assert!(
-            notes
-                .remove_captured("note:none", CapturedDetail::Place)
-                .is_err()
-        );
-        let area = Places::new(&store).add_area("Work")?.id;
-        assert!(!notes.may_remove_captured(&area, CapturedDetail::Place)?);
-        Ok(())
-    }
-
-    #[test]
-    fn an_amend_and_a_merged_note_lose_theirs_as_sections() -> TestResult {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let host = notes.capture("Toner", None, None)?;
-        let amend = notes.amend(&host.id, "Ordered")?;
-        with_context(&store, &amend.id)?;
-        let merged = notes.capture("Order toner", None, None)?.id;
-        with_context(&store, &merged)?;
-        notes.merge(&merged, &host.id)?;
-        assert!(notes.may_remove_captured(&amend.id, CapturedDetail::Event)?);
-        notes.remove_captured(&amend.id, CapturedDetail::Event)?;
-        notes.remove_captured(&merged, CapturedDetail::Device)?;
-        let sections = notes.sections(&host.id)?;
-        let of = |id: &str| {
-            sections
-                .iter()
-                .find(|s| s.id == id)
-                .map(|s| s.context.clone())
-                .unwrap_or_default()
-        };
-        assert!(of(&amend.id).calendar_events.is_empty());
-        assert!(of(&amend.id).location.is_some());
-        assert!(of(&merged).bluetooth_devices.is_empty());
-        assert_eq!(of(&merged).calendar_events, ["Katzenklo"]);
-        Ok(())
-    }
-
-    #[test]
-    fn a_members_removal_of_a_captured_detail_is_refused_and_ignored() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, _) = household(&ann, &ben)?;
-        let id = Notes::new(&ann)
-            .capture("Order toner", Some(&area), None)?
-            .id;
-        with_context(&ann, &id)?;
-        let own = Notes::new(&ben)
-            .capture("Ben's toner", Some(&area), None)?
-            .id;
-        with_context(&ben, &own)?;
-        exchange(&ben, &ann, None)?;
-        let mark = ben.current_seq()?;
-        for detail in CapturedDetail::ALL {
-            assert!(!Notes::new(&ben).may_remove_captured(&id, detail)?);
-            assert!(Notes::new(&ben).remove_captured(&id, detail).is_err());
-        }
-        assert_eq!(ben.current_seq()?, mark);
-        // As a modified app would write them.
-        put(
-            &ben,
-            &id,
-            &[
-                (keys::LOCATION, None),
-                (keys::CALENDAR, None),
-                (keys::BLUETOOTH, None),
-                (keys::SOURCE_PACKAGE, None),
-            ],
-        )?;
-        // A Member removes from their own Note, a Manager from anyone's.
-        Notes::new(&ben).remove_captured(&own, CapturedDetail::Place)?;
-        Notes::new(&ann).remove_captured(&own, CapturedDetail::Event)?;
-        exchange(&ben, &ann, None)?;
-        for store in [&ann, &ben] {
-            let context = note(store, &id)?.context;
-            assert!(context.location.is_some());
-            assert_eq!(context.calendar_events, ["Katzenklo"]);
-            assert_eq!(context.bluetooth_devices, ["Headset"]);
-            assert_eq!(
-                context.source_app.map(|a| a.package).as_deref(),
-                Some("org.example.chat")
-            );
-            let theirs = note(store, &own)?.context;
-            assert!(theirs.location.is_none() && theirs.calendar_events.is_empty());
-            assert_eq!(theirs.bluetooth_devices, ["Headset"]);
-        }
-        Ok(())
-    }
-
-    // ------------------------------------------ editing a Section (#183)
-
-    fn section_of(store: &Store, id: &str) -> Result<Section> {
-        Notes::new(store)
-            .section_by_id(id)?
-            .ok_or_else(|| Error::Invalid(format!("no Section {id}")))
-    }
-
-    #[test]
-    fn an_amend_is_fixed_in_place_and_shows_when_and_by_whom() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let note = notes.capture("Dentist on Tuesday", None, None)?;
-        let amend = notes.amend(&note.id, "Moved to Wednesday")?;
-        let later = notes.amend(&note.id, "Called, all set")?;
-        assert!(amend.modified.is_none() && amend.edited_by.is_none());
-        assert!(notes.may_edit_section(&amend.id)?);
-        notes.edit_section(&amend.id, "  Moved to Thursday  ")?;
-        let edited = section_of(&ann, &amend.id)?;
-        assert_eq!(edited.text, "Moved to Thursday");
-        assert_eq!(edited.created(), amend.created());
-        assert!(edited.modified.is_some_and(|at| at > edited.created()));
-        assert_eq!(edited.edited_by.map(|p| p.name).as_deref(), Some("Ann"));
-        let order: Vec<String> = notes
-            .sections(&note.id)?
-            .into_iter()
-            .map(|s| s.id)
-            .collect();
-        assert_eq!(order, [amend.id.clone(), later.id.clone()]);
-        assert!(section_of(&ann, &later.id)?.modified.is_none());
-        let texts: Vec<String> = ann
-            .history(&amend.id)?
-            .into_iter()
-            .filter(|e| e.field == keys::TEXT)
-            .map(|e| StoredText::read(e.value.as_deref()).text)
-            .collect();
-        assert_eq!(texts, ["Moved to Wednesday", "Moved to Thursday"]);
-        Ok(())
-    }
-
-    #[test]
-    fn an_unchanged_section_text_writes_nothing_and_a_blank_one_is_refused() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let note = notes.capture("Dentist", None, None)?;
-        let amend = notes.amend(&note.id, "Bring ☐ the X-ray")?;
-        let mark = ann.current_seq()?;
-        let stored = section_of(&ann, &amend.id)?.text;
-        notes.edit_section(&amend.id, &stored)?;
-        notes.edit_section(&amend.id, &format!(" {stored}\n"))?;
-        assert_eq!(ann.current_seq()?, mark);
-        assert!(section_of(&ann, &amend.id)?.modified.is_none());
-        assert!(notes.edit_section(&amend.id, "  ").is_err());
-        assert!(notes.edit_section("section:none", "Text").is_err());
-        assert!(notes.edit_section(&note.id, "Text").is_err());
-        assert!(notes.edit_section_as(&amend.id, "Text", "x-later").is_err());
-        assert_eq!(ann.current_seq()?, mark);
-        Ok(())
-    }
-
-    #[test]
-    fn a_section_edit_keeps_the_format_and_the_boxes_as_a_note_edit_does() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let note = notes.capture("Trip", None, None)?;
-        let amend = notes.amend(&note.id, "Tent")?;
-        notes.edit_section_as(&amend.id, "**Tent** ☐", text_format::MARKDOWN)?;
-        let section = section_of(&ann, &amend.id)?;
-        assert_eq!(section.text_format, text_format::MARKDOWN);
-        assert_eq!(section.boxes.len(), 1);
-        assert_eq!(section.shown_text(), "**Tent** ☐");
-        let id = section.boxes[0].id.clone();
-        notes.edit_section_as(
-            &amend.id,
-            &format!("{} torch", section.text),
-            text_format::PLAIN,
-        )?;
-        let section = section_of(&ann, &amend.id)?;
-        assert_eq!(section.text_format, text_format::MARKDOWN);
-        assert_eq!(section.boxes[0].id, id);
-        assert_eq!(section.shown_text(), "**Tent** ☐ torch");
-        // A text in a format not known here is never overwritten.
-        ann.append(
-            &amend.id,
-            keys::TEXT,
-            Some(r##"{"format":"x-future","text":"# Tent"}"##),
-            None,
-        )?;
-        assert!(!notes.may_edit_section(&amend.id)?);
-        let mark = ann.current_seq()?;
-        assert!(notes.edit_section(&amend.id, "Tent").is_err());
-        assert_eq!(ann.current_seq()?, mark);
-        Ok(())
-    }
-
-    #[test]
-    fn a_merged_note_is_edited_as_a_section_of_its_target() -> TestResult {
-        let ann = Devices::new().device(1, "Ann")?;
-        let notes = Notes::new(&ann);
-        let host = notes.capture("Dentist number", None, None)?;
-        let merged = notes.capture("Ask about the crown", None, None)?;
-        notes.merge(&merged.id, &host.id)?;
-        assert!(notes.may_edit_section(&merged.id)?);
-        notes.edit_section(&merged.id, "Ask about the bridge")?;
-        let sections = notes.sections(&host.id)?;
-        assert_eq!(sections.len(), 1);
-        assert_eq!(sections[0].id, merged.id);
-        assert_eq!(sections[0].text, "Ask about the bridge");
-        assert!(sections[0].modified.is_some());
-        assert_eq!(
-            sections[0].edited_by.as_ref().map(|p| p.name.as_str()),
-            Some("Ann")
-        );
-        assert_eq!(note(&ann, &merged.id)?.text, "Ask about the bridge");
-        Ok(())
-    }
-
-    #[test]
-    fn a_member_edits_their_own_amend_and_a_manager_anyones() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, _) = household(&ann, &ben)?;
-        let note = Notes::new(&ann).capture("Buy milk", Some(&area), None)?;
-        exchange(&ben, &ann, None)?;
-        let own = Notes::new(&ben).amend(&note.id, "Oat milk please")?;
-        assert!(Notes::new(&ben).may_edit_section(&own.id)?);
-        Notes::new(&ben).edit_section(&own.id, "Oat milk, two litres")?;
-        exchange(&ben, &ann, None)?;
-        for store in [&ann, &ben] {
-            let section = section_of(store, &own.id)?;
-            assert_eq!(section.text, "Oat milk, two litres");
-            assert_eq!(section.edited_by.map(|p| p.name).as_deref(), Some("Ben"));
-        }
-        assert!(Notes::new(&ann).may_edit_section(&own.id)?);
-        Notes::new(&ann).edit_section(&own.id, "Oat milk, three litres")?;
-        exchange(&ben, &ann, None)?;
-        for store in [&ann, &ben] {
-            let section = section_of(store, &own.id)?;
-            assert_eq!(section.text, "Oat milk, three litres");
-            assert_eq!(section.created(), own.created());
-            assert_eq!(section.edited_by.map(|p| p.name).as_deref(), Some("Ann"));
-        }
-        assert_eq!(
-            section_of(&ann, &own.id)?.modified,
-            section_of(&ben, &own.id)?.modified
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_members_edit_of_anothers_amend_is_refused_and_ignored() -> TestResult {
-        let devices = Devices::new();
-        let ann = devices.device(1, "Ann")?;
-        let ben = devices.device(2, "Ben")?;
-        let (area, _) = household(&ann, &ben)?;
-        let note = Notes::new(&ann).capture("Buy milk", Some(&area), None)?;
-        let theirs = Notes::new(&ann).amend(&note.id, "Two litres")?;
-        exchange(&ben, &ann, None)?;
-        let mark = ben.current_seq()?;
-        assert!(!Notes::new(&ben).may_edit_section(&theirs.id)?);
-        assert!(
-            Notes::new(&ben)
-                .edit_section(&theirs.id, "Ten litres")
-                .is_err()
-        );
-        assert_eq!(ben.current_seq()?, mark);
-        // As a modified app would write it.
-        let forged =
-            StoredText::of(text_format::PLAIN, "Ten litres", text_format::VERSION).encode();
-        ben.append(&theirs.id, keys::TEXT, Some(&forged), None)?;
-        exchange(&ben, &ann, None)?;
-        for store in [&ann, &ben] {
-            let section = section_of(store, &theirs.id)?;
-            assert_eq!(section.text, "Two litres");
-            assert!(section.modified.is_none() && section.edited_by.is_none());
-        }
-        Ok(())
-    }
-}
+mod tests;

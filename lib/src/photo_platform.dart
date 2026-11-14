@@ -4,23 +4,32 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'file_platform.dart';
+
 /// Something another app shared into Old Brain Fix: its text, links
-/// included, its photos, its sound files as voice recordings, and the app
-/// it came from when Android said.
+/// included, its photos, its sound files as voice recordings, its other
+/// files as Attachments (#267), and the app it came from when Android
+/// said.
 class SharedItem {
   final String text;
   final List<Uint8List> photos;
   final List<SharedRecording> recordings;
+  final List<DeviceFile> files;
   final SourceApp? sourceApp;
 
   const SharedItem({
     this.text = '',
     this.photos = const [],
     this.recordings = const [],
+    this.files = const [],
     this.sourceApp,
   });
 
-  bool get isEmpty =>
+  bool get isEmpty => holdsNoNote && files.isEmpty;
+
+  /// Whether it holds nothing a Note is written from at once: no text,
+  /// photo or recording. Its files are read in first.
+  bool get holdsNoNote =>
       text.trim().isEmpty && photos.isEmpty && recordings.isEmpty;
 }
 
@@ -249,6 +258,7 @@ class AndroidPhotos implements PhotoPlatform {
               format: recording['format'] as String?,
             ),
       ],
+      files: deviceFiles(raw['files'] as List<Object?>?),
       sourceApp: package is String && package.isNotEmpty
           ? SourceApp(package, label: raw['sourceLabel'] as String?)
           : null,

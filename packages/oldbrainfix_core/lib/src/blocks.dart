@@ -30,7 +30,8 @@ final _blockedInstant = RegExp(
 
 /// Whether [e], written by a blocked person's Device, is kept (ADR 0021):
 /// only what carries no text, picture or sound and keeps the Shared Areas
-/// whole. That is a check-off or its undoing (`done@…` on a Routine,
+/// whole. That is a check-off or its undoing (`done@…` on a Routine, a
+/// skip `skip@…` on it,
 /// `done` on a Frog, `checked` on a Checklist's Line, `check@…` on a
 /// Routine for one of its Lines, a tick `box@…` of a box in the text of
 /// a Note or a Section), a grant (`role:…` on an Area), and a
@@ -54,6 +55,15 @@ bool keptFromBlocked(Entry e) {
     final key = e.field.substring(RoutineKeys.donePrefix.length);
     return Occurrence.tryParse(key)?.key == key &&
         (value == null || _blockedInstant.hasMatch(value));
+  }
+  if (kind == 'routine' && e.field.startsWith(RoutineKeys.skipPrefix)) {
+    final key = e.field.substring(RoutineKeys.skipPrefix.length);
+    const tomorrow = ' ${RoutineKeys.tomorrowMark}';
+    final at = value != null && value.endsWith(tomorrow)
+        ? value.substring(0, value.length - tomorrow.length)
+        : value;
+    return Occurrence.tryParse(key)?.key == key &&
+        (at == null || _blockedInstant.hasMatch(at));
   }
   if (kind == 'routine' && e.field.startsWith(ChecklistKeys.checkPrefix)) {
     final rest = e.field.substring(ChecklistKeys.checkPrefix.length);

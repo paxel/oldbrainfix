@@ -189,7 +189,7 @@ extension Sync on Store {
   );
 
   /// The blobs the log refers to whose bytes are not here, as
-  /// `photo/<hash>` and `audio/<hash>`, sorted.
+  /// `photo/<hash>`, `audio/<hash>` and `file/<hash>`, sorted.
   List<String> missingBlobs() {
     final missing = <String>{};
     for (final (kind, prefix) in blobKinds) {
@@ -272,6 +272,7 @@ extension Sync on Store {
   static const blobKinds = [
     ('photo', NoteKeys.photoPrefix),
     ('audio', NoteKeys.audioPrefix),
+    ('file', NoteKeys.filePrefix),
   ];
 }
 

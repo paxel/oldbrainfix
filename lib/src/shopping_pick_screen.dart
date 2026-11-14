@@ -25,7 +25,8 @@ String shoppingTitle(AppLocalizations t, Note note) =>
       final title => title,
     };
 
-/// Picks the Shopping List the lines of a capture go into; pops with
+/// Picks the Shopping List the lines of a capture go into, the one a
+/// capture on this Device went into last at the top (#276); pops with
 /// its Note's id.
 class ShoppingPickScreen extends StatefulWidget {
   final Store store;
@@ -47,7 +48,12 @@ class _ShoppingPickScreenState extends State<ShoppingPickScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_loaded) return;
-    _lists = shoppingListsToAddTo(widget.store, LockScope.of(context));
+    final lists = shoppingListsToAddTo(widget.store, LockScope.of(context));
+    final last = widget.store.lastShoppingList;
+    _lists = [
+      ...lists.where((note) => note.id == last),
+      ...lists.where((note) => note.id != last),
+    ];
     _loaded = true;
   }
 

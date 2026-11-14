@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:01:49.000Z",
+  "now": "2026-01-02T10:02:11.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [
     {
@@ -281,9 +281,102 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000013",
+      "text": "Spare keys at the neighbours",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:50.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000015",
+      "text": "Neighbours on holiday",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000016",
+      "text": "Reading glasses at the office",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:06.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
     }
   ],
   "all": [
+    "note:00000000000000000000000000000016",
+    "note:00000000000000000000000000000015",
+    "note:00000000000000000000000000000013",
     "note:00000000000000000000000000000012",
     "note:00000000000000000000000000000011",
     "note:0000000000000000000000000000000d",
@@ -295,7 +388,9 @@
     "note:0000000000000000000000000000000b",
     "note:0000000000000000000000000000000c",
     "note:00000000000000000000000000000011",
-    "note:00000000000000000000000000000012"
+    "note:00000000000000000000000000000012",
+    "note:00000000000000000000000000000015",
+    "note:00000000000000000000000000000016"
   ],
   "trashed": [
     "note:0000000000000000000000000000000f",
@@ -304,11 +399,43 @@
   ],
   "inside": {
     "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000013",
       "note:0000000000000000000000000000000d",
       "note:0000000000000000000000000000000a"
     ]
   },
   "sections": {
+    "note:00000000000000000000000000000016": [],
+    "note:00000000000000000000000000000015": [],
+    "note:00000000000000000000000000000013": [
+      {
+        "id": "section:00000000000000000000000000000014",
+        "noteId": "note:00000000000000000000000000000013",
+        "text": "Back by Friday",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:01:55.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
+      }
+    ],
     "note:00000000000000000000000000000012": [],
     "note:00000000000000000000000000000011": [],
     "note:0000000000000000000000000000000d": [],
@@ -323,6 +450,24 @@
   "unreadPhotos": [],
   "removable": {},
   "shares": {
+    "note:00000000000000000000000000000016": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Reading glasses at the office"
+    },
+    "note:00000000000000000000000000000015": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Neighbours on holiday"
+    },
+    "note:00000000000000000000000000000013": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Spare keys at the neighbours\n\n2026-01-01T10:01:55.000Z\nBack by Friday"
+    },
     "note:00000000000000000000000000000012": {
       "html": null,
       "photos": [],
@@ -380,6 +525,9 @@
   },
   "search": {
     "": [
+      "note:00000000000000000000000000000016",
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000013",
       "note:00000000000000000000000000000012",
       "note:00000000000000000000000000000011",
       "note:0000000000000000000000000000000d",
@@ -396,6 +544,9 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:00000000000000000000000000000016",
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000013",
       "note:00000000000000000000000000000012",
       "note:00000000000000000000000000000011",
       "note:0000000000000000000000000000000d",
@@ -411,6 +562,7 @@
   },
   "searchWithin": {
     "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000013",
       "note:0000000000000000000000000000000d",
       "note:0000000000000000000000000000000a"
     ]

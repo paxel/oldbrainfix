@@ -1,5 +1,5 @@
 {
-  "now": "2026-02-01T11:36:25.000Z",
+  "now": "2026-02-01T11:37:59.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -242,9 +242,40 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000002c",
+      "text": "Errands",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-31T11:36:47.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
     }
   ],
   "all": [
+    "note:0000000000000000000000000000002c",
     "note:0000000000000000000000000000002a",
     "note:00000000000000000000000000000021",
     "note:00000000000000000000000000000020",
@@ -261,6 +292,7 @@
   "trashed": [],
   "inside": {},
   "sections": {
+    "note:0000000000000000000000000000002c": [],
     "note:0000000000000000000000000000002a": [],
     "note:00000000000000000000000000000021": [],
     "note:00000000000000000000000000000020": [],
@@ -274,6 +306,12 @@
   "unreadPhotos": [],
   "removable": {},
   "shares": {
+    "note:0000000000000000000000000000002c": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Errands"
+    },
     "note:0000000000000000000000000000002a": {
       "html": null,
       "photos": [],
@@ -325,6 +363,7 @@
   },
   "search": {
     "": [
+      "note:0000000000000000000000000000002c",
       "note:0000000000000000000000000000002a",
       "note:00000000000000000000000000000021",
       "note:00000000000000000000000000000020",
@@ -336,6 +375,7 @@
     ],
     "sauce": [],
     "MILK": [
+      "note:0000000000000000000000000000002c",
       "note:00000000000000000000000000000001"
     ],
     "receipt": [],
@@ -345,6 +385,7 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:0000000000000000000000000000002c",
       "note:0000000000000000000000000000002a",
       "note:00000000000000000000000000000021",
       "note:00000000000000000000000000000020",

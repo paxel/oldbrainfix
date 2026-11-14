@@ -2,9 +2,12 @@
 //! today shows each Checklist without a Routine or Reminder that has open
 //! Lines as a heading with its name, its open Lines indented under it,
 //! each with its box, after the Shopping Lists and before the timed
-//! Occurrences, oldest capture first; a click on the heading or a Line's
-//! words opens it, a box checks its Line; once every Line is checked it
-//! is gone; "Show on the Agenda" in the card's ⋮ and in the editor offers
+//! Occurrences, oldest capture first; a click on a Line's words opens
+//! it, on the heading with the keyboard in a new empty Line after the
+//! open ones, which is dropped left unused (#276); a box checks its Line,
+//! which stays struck for the day, its box unchecking it, unless this
+//! Device hides what is checked (#276); once every Line is checked it is
+//! gone the next day; "Show on the Agenda" in the card's ⋮ and in the editor offers
 //! the three ways of a Shopping List for this person: off, its heading
 //! with the count, or every open Line; a Checklist with a Routine has
 //! neither the row nor the choice.
@@ -17,8 +20,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    Checklists, ClockTime, Day, ListOnAgenda, Notes, OwnProfile, Routines, Schedule, SigningKey,
-    Store,
+    Checklists, ClockTime, Day, DeviceSettings, ListOnAgenda, Notes, OwnProfile, Routines,
+    Schedule, SigningKey, Store,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -40,19 +43,30 @@ const LINES: &str = "Each open Line on its own row";
 /// The Agenda's message for a day with nothing due.
 const NOTHING_TODAY: &str = "Nothing due today. Click + to capture a thought.";
 
+/// The seconds the clock of [`packing_on`] has moved from [`NOW`]; it
+/// moves a second per read and can be set.
+type Ticks = Arc<AtomicI64>;
+
 /// A store on a clock that moves a second per read from [`NOW`], with
 /// its own Profile, and the Checklist [`PACKING`]: the store and the
 /// Note's id.
 fn packing() -> Result<(Arc<Store>, String), Box<dyn std::error::Error>> {
+    let (store, note, _) = packing_on()?;
+    Ok((store, note))
+}
+
+/// As [`packing`], with the clock.
+fn packing_on() -> Result<(Arc<Store>, String, Ticks), Box<dyn std::error::Error>> {
     let start = DateTime::parse_from_rfc3339(NOW)?.with_timezone(&Utc);
     let ticks = Arc::new(AtomicI64::new(0));
-    let clock = Box::new(move || start + Duration::seconds(ticks.fetch_add(1, Ordering::SeqCst)));
+    let read = ticks.clone();
+    let clock = Box::new(move || start + Duration::seconds(read.fetch_add(1, Ordering::SeqCst)));
     let store = Store::in_memory(clock, move || Ok(SigningKey::from_seed([6; 32])))?;
     store.set_local_setting("author", "Desk")?;
     OwnProfile::new(&store).apply_defaults("Desk", None)?;
     let note = Notes::new(&store).capture(PACKING, None, None)?;
     Checklists::new(&store).make(&note.id)?;
-    Ok((Arc::new(store), note.id))
+    Ok((Arc::new(store), note.id, ticks))
 }
 
 /// The window over `store` in English, its days on UTC, showing
@@ -154,6 +168,60 @@ fn line_box<'a>(harness: &'a Harness<'_, App>, text: &'a str) -> Option<egui_kit
         .next()
 }
 
+/// Whether the box of the Line `text` shows checked, or `None` while it
+/// does not show.
+fn ticked(harness: &Harness<'_, App>, text: &str) -> Option<bool> {
+    line_box(harness, text).map(|n| n.accesskit_node().toggled() == Some(Toggled::True))
+}
+
+/// Clicks the box of the Line `text` and reads the Agenda again.
+fn tick(harness: &mut Harness<'_, App>, text: &str) -> TestResult {
+    line_box(harness, text)
+        .ok_or(format!("{text:?}"))?
+        .click_accesskit();
+    harness.run();
+    reload_agenda(harness);
+    Ok(())
+}
+
+/// The texts of the Lines of the Checklist of `note`, in their order,
+/// each "x " in front while checked and "  " while in a group.
+fn texts(store: &Store, note: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    Ok(Checklists::new(store)
+        .by_note(note)?
+        .ok_or("a Checklist")?
+        .lines
+        .iter()
+        .map(|l| {
+            let group = if l.in_group() { "  " } else { "" };
+            let checked = if l.checked { "x " } else { "" };
+            format!("{group}{checked}{}", l.text)
+        })
+        .collect())
+}
+
+/// What the field with the keyboard holds.
+fn focused(harness: &Harness<'_, App>) -> Option<String> {
+    harness
+        .query_all_by(|n| n.is_focused())
+        .next()
+        .and_then(|n| n.value())
+}
+
+/// The top of the Line field holding `value` in the Note dialog.
+fn field_top(harness: &Harness<'_, App>, value: &str) -> Result<f32, Box<dyn std::error::Error>> {
+    Ok(harness
+        .query_all_by(|n| {
+            n.role() == Role::TextInput
+                && n.placeholder().unwrap_or_default().is_empty()
+                && n.value().as_deref() == Some(value)
+        })
+        .next()
+        .ok_or(format!("a field holding {value:?}"))?
+        .rect()
+        .top())
+}
+
 /// The top of the first widget labelled `label`.
 fn top(harness: &Harness<'_, App>, label: &str) -> Result<f32, Box<dyn std::error::Error>> {
     Ok(harness
@@ -205,25 +273,15 @@ fn a_checklist_shows_today_with_its_open_lines_and_opens() -> TestResult {
     assert!(passport.left() >= heading.left() - 0.5);
     assert!(charger.left() > passport.left());
     // The box checks its Line; the parent counts as it shows: checking
-    // its group checks it.
-    line_box(&harness, "Charger")
-        .ok_or("Charger")?
-        .click_accesskit();
-    harness.run();
-    reload_agenda(&mut harness);
-    let lists = Checklists::new(&store);
-    let checked = |text: &str| -> Result<bool, Box<dyn std::error::Error>> {
-        Ok(lists
-            .by_note(&note)?
-            .ok_or("a Checklist")?
-            .lines
-            .iter()
-            .any(|l| l.text == text && l.checked))
-    };
-    assert!(checked("Charger")?);
-    assert!(line_box(&harness, "Charger").is_none());
-    assert!(line_box(&harness, "Passport").is_none());
-    assert!(line_box(&harness, "Ticket").is_some());
+    // its group checks it. Both stay, struck for the day (#276).
+    tick(&mut harness, "Charger")?;
+    assert_eq!(
+        texts(&store, &note)?,
+        ["x Passport", "  x Charger", "Ticket"]
+    );
+    assert_eq!(ticked(&harness, "Charger"), Some(true));
+    assert_eq!(ticked(&harness, "Passport"), Some(true));
+    assert_eq!(ticked(&harness, "Ticket"), Some(false));
     harness
         .get_by_role_and_label(Role::Button, "Ticket")
         .click();
@@ -240,18 +298,123 @@ fn a_checklist_shows_today_with_its_open_lines_and_opens() -> TestResult {
 }
 
 #[test]
-fn every_line_checked_takes_it_off_until_one_is_unchecked() -> TestResult {
+fn a_line_checked_today_stays_struck_and_its_box_unchecks_it() -> TestResult {
     let (store, note) = packing()?;
+    let mut harness = window(&store, Selection::Agenda, None);
+    tick(&mut harness, "Ticket")?;
+    assert_eq!(texts(&store, &note)?, ["Passport", "  Charger", "x Ticket"]);
+    assert_eq!(ticked(&harness, "Ticket"), Some(true));
+    // In its place, after the open ones above it.
+    assert!(top(&harness, "Charger")? < top(&harness, "Ticket")?);
+    // A wrong click is undone by one more.
+    tick(&mut harness, "Ticket")?;
+    assert_eq!(texts(&store, &note)?, ["Passport", "  Charger", "Ticket"]);
+    assert_eq!(ticked(&harness, "Ticket"), Some(false));
+    Ok(())
+}
+
+#[test]
+fn every_line_checked_today_shows_struck_until_the_day_ends() -> TestResult {
+    let (store, note, ticks) = packing_on()?;
     let lists = Checklists::new(&store);
     lists.check(&line_id(&store, &note, "Charger")?)?;
     lists.check(&line_id(&store, &note, "Ticket")?)?;
     let mut harness = window(&store, Selection::Agenda, None);
+    assert!(group(&harness, "Packing"));
+    for line in ["Passport", "Charger", "Ticket"] {
+        assert_eq!(ticked(&harness, line), Some(true), "{line}");
+    }
+    // Shown as its count, none open, it does not show.
+    lists.set_on_agenda(&note, ListOnAgenda::Count)?;
+    reload_agenda(&mut harness);
+    assert!(!shows(&harness, "Packing: 0 of 3 open"));
+    assert!(shows(&harness, NOTHING_TODAY));
+    lists.set_on_agenda(&note, ListOnAgenda::Lines)?;
+    // The next day it is gone until a Line is unchecked.
+    ticks.fetch_add(86_400, Ordering::SeqCst);
+    reload_agenda(&mut harness);
     assert!(!group(&harness, "Packing"));
     assert!(shows(&harness, NOTHING_TODAY));
     lists.uncheck(&line_id(&store, &note, "Ticket")?)?;
     reload_agenda(&mut harness);
     assert!(group(&harness, "Packing"));
-    assert!(line_box(&harness, "Ticket").is_some());
+    assert_eq!(ticked(&harness, "Ticket"), Some(false));
+    assert!(line_box(&harness, "Charger").is_none());
+    Ok(())
+}
+
+#[test]
+fn hiding_whats_checked_takes_a_checked_line_off_at_once() -> TestResult {
+    let (store, note) = packing()?;
+    DeviceSettings::new(&store).set_agenda_hides_checked(true)?;
+    let mut harness = window(&store, Selection::Agenda, None);
+    tick(&mut harness, "Ticket")?;
+    assert_eq!(texts(&store, &note)?, ["Passport", "  Charger", "x Ticket"]);
+    assert!(line_box(&harness, "Ticket").is_none());
+    assert_eq!(ticked(&harness, "Passport"), Some(false));
+    tick(&mut harness, "Charger")?;
+    assert!(!group(&harness, "Packing"));
+    assert!(shows(&harness, NOTHING_TODAY));
+    Ok(())
+}
+
+#[test]
+fn the_heading_opens_the_list_in_a_new_line_after_the_open_ones() -> TestResult {
+    let (store, note) = packing()?;
+    let other = Notes::new(&store).capture("Other", None, None)?.id;
+    Checklists::new(&store).check(&line_id(&store, &note, "Ticket")?)?;
+    let mut harness = window(&store, Selection::Agenda, None);
+    harness
+        .get_by_role_and_label(Role::Button, "Packing")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    // The keyboard in an empty Line after the open ones and their group,
+    // before the checked one.
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    let new = field_top(&harness, "")?;
+    assert!(field_top(&harness, "Charger")? < new);
+    assert!(new < field_top(&harness, "Ticket")?);
+    harness.get_by(|n| n.is_focused()).type_text("Socks");
+    harness.run();
+    harness.state_mut().select_note(&other);
+    harness.run();
+    assert_eq!(
+        texts(&store, &note)?,
+        ["Passport", "  Charger", "Socks", "x Ticket"]
+    );
+    // Left unused, by back too, it is dropped.
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::Button, "Packing")
+        .click();
+    harness.run();
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    // The mouse's back button; Alt+Left rests while a Line is typed in.
+    for pressed in [true, false] {
+        harness.event(egui::Event::PointerButton {
+            pos: egui::Pos2::new(640.0, 700.0),
+            button: egui::PointerButton::Extra1,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        });
+    }
+    harness.run();
+    assert_eq!(harness.state().selected_note(), None);
+    assert!(group(&harness, "Packing"));
+    assert_eq!(
+        texts(&store, &note)?,
+        ["Passport", "  Charger", "Socks", "x Ticket"]
+    );
+    // A Line's words open the list as it is.
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    harness.get_by_role_and_label(Role::Button, "Socks").click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    assert_eq!(focused(&harness), None);
+    assert!(field_top(&harness, "").is_err());
     Ok(())
 }
 

@@ -10,4 +10,4 @@
 rust-core 96
 rust-gui 88
 dart-core 96
-flutter-app 91
+flutter-app 92

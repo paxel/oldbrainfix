@@ -12,8 +12,8 @@
 //! to type in, an empty one at its end while it has none, so a new list
 //! starts with one. A Checklist's rows follow its order; a Shopping
 //! List's stay where they are while the editor is open, a Line checked
-//! there in its row, and a new one is added among the open Lines where it
-//! was typed.
+//! there in its row, a new one is added among the open Lines where it was
+//! typed, and a Line moved goes where it was moved to (#283).
 //!
 //! What is typed is stored as the cursor leaves a Line and whenever the
 //! editor saves ([`TypedLines::keep`]); as the editor is left
@@ -124,6 +124,9 @@ pub enum Typing {
     Join(u64),
     /// Tab, or with `false` Shift+Tab.
     Indent(u64, bool),
+    /// Alt+Up, or with `false` Alt+Down (#283): the list moves the Line
+    /// by its own steps, a Shopping List among its open Lines.
+    Move(u64, bool),
     /// The cursor left it.
     Store(u64),
 }
@@ -159,6 +162,15 @@ pub struct TypedLines {
 }
 
 impl TypedLines {
+    /// None yet, their rows keyed after `base`: a Note window's (#287),
+    /// whose fields are not to share an id with another window's.
+    pub fn keyed_after(base: u64) -> TypedLines {
+        TypedLines {
+            next: base,
+            ..TypedLines::default()
+        }
+    }
+
     /// A row for the Line `id` holding `text`, or a new one.
     fn row(&mut self, id: Option<String>, text: &str, in_group: bool) -> TypedLine {
         self.next += 1;
@@ -189,6 +201,11 @@ impl TypedLines {
     /// The row shown under `id`.
     pub fn shown(&self, id: &str) -> Option<&TypedLine> {
         self.rows.iter().find(|r| r.shown_id() == id)
+    }
+
+    /// The row `key`.
+    pub fn keyed(&self, key: u64) -> Option<&TypedLine> {
+        self.rows.iter().find(|r| r.key == key)
     }
 
     /// The Lines with ⋮, by the id they show under: `editable`, and the
@@ -245,15 +262,52 @@ impl TypedLines {
         }
     }
 
-    /// The cursor into the empty Line of a list without Lines, as a new
-    /// list starts (#161).
-    pub fn focus_empty_row(&mut self) {
-        if let [row] = self.rows.as_slice()
-            && row.id.is_none()
-            && row.typed().is_empty()
+    /// The cursor into a new empty row after the open Lines of `listed`,
+    /// as a list opened from its group on the Agenda starts (#276), or
+    /// into the empty new row there is already, as a new list starts with
+    /// one (#161). Nothing where this Device may not add Lines. Left
+    /// unused, the row goes as the Note is left.
+    pub fn start_row(&mut self, listed: Listed) {
+        if !self.adds {
+            return;
+        }
+        if let Some(row) = self
+            .rows
+            .iter()
+            .find(|r| r.id.is_none() && r.typed().is_empty())
         {
             self.focus = Some((row.key, 0));
+            return;
         }
+        let at = match listed {
+            // Before the struck Lines.
+            Listed::Shopping(_) => (0..self.rows.len())
+                .rev()
+                .find(|at| self.places_among(*at))
+                .map_or(0, |at| at + 1),
+            // After the last open Line and its group, at the top level;
+            // the end of a list without an open Line.
+            Listed::Checklist(list) => {
+                let open = |row: &TypedLine| {
+                    row.id
+                        .as_deref()
+                        .and_then(|id| list.line(id))
+                        .is_some_and(|line| !line.checked)
+                };
+                match self.rows.iter().rposition(open) {
+                    None => self.rows.len(),
+                    Some(mut at) => {
+                        while self.rows.get(at + 1).is_some_and(|r| r.in_group) {
+                            at += 1;
+                        }
+                        at + 1
+                    }
+                }
+            }
+        };
+        let row = self.row(None, "", false);
+        self.focus = Some((row.key, 0));
+        self.rows.insert(at.min(self.rows.len()), row);
     }
 
     /// The rows for the Lines of `list`: those there already kept with
@@ -329,6 +383,28 @@ impl TypedLines {
             rows.push(row);
         }
         self.rows = rows;
+    }
+
+    /// Moves the row of the Line `id` to just before the row of the Line
+    /// `before`, or with `None` after the last row of an open Line: where
+    /// a Shopping List's Line was moved to, as its rows stay where they
+    /// are (#283). Its key stays, so its field keeps the keyboard.
+    pub fn move_row(&mut self, id: &str, before: Option<&str>) {
+        let of =
+            |rows: &[TypedLine], id: &str| rows.iter().position(|r| r.id.as_deref() == Some(id));
+        let Some(from) = of(&self.rows, id) else {
+            return;
+        };
+        let row = self.rows.remove(from);
+        let at = match before {
+            Some(before) => of(&self.rows, before),
+            None => (0..self.rows.len())
+                .rev()
+                .find(|at| self.places_among(*at))
+                .map(|at| at + 1),
+        };
+        self.rows
+            .insert(at.unwrap_or(from).min(self.rows.len()), row);
     }
 
     /// Whether the Line of the row at `at` counts for the place a new
@@ -525,6 +601,9 @@ impl TypedLines {
             Typing::Split(key, at) => self.split(store, wall, key, at),
             Typing::Join(key) => self.join(store, wall, key),
             Typing::Indent(key, under) => self.indent(store, key, under),
+            // The list moves it as its ⋮ does (`checklist_view`,
+            // `shopping_view`).
+            Typing::Move(..) => Ok(()),
             Typing::Store(key) => match self.at(key) {
                 Some(at) => self.store_row(store, wall, at).map(|_| ()),
                 None => Ok(()),
@@ -910,7 +989,8 @@ pub fn field(
 }
 
 /// The keys a focused field takes before it: Enter, Backspace at its
-/// start, on a Checklist Tab and Shift+Tab, Up and Down.
+/// start, on a Checklist Tab and Shift+Tab, Alt+Up and Alt+Down, Up and
+/// Down.
 fn keys(
     ui: &mut Ui,
     lines: &mut TypedLines,
@@ -964,6 +1044,15 @@ fn keys(
     if kind == FieldOf::Checklist && ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Tab)) {
         asked.push(Typing::Indent(key, true));
         return;
+    }
+    // Alt+Up and Alt+Down move the Line (#283), taken before Up and Down,
+    // which take them with Alt too; where it cannot move, the cursor
+    // stays.
+    for (arrow, up) in [(Key::ArrowUp, true), (Key::ArrowDown, false)] {
+        if ui.input_mut(|i| i.consume_key(Modifiers::ALT, arrow)) {
+            asked.push(Typing::Move(key, up));
+            return;
+        }
     }
     for (arrow, next) in [(Key::ArrowUp, above), (Key::ArrowDown, below)] {
         if let Some(next) = next

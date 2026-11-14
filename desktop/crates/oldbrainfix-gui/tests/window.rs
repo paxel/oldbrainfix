@@ -117,12 +117,19 @@ fn has_card(harness: &Harness<'_, App>, text: &str) -> bool {
         .is_some()
 }
 
+/// The sidebar's Unsorted, with how many Notes it holds (#279).
+fn unsorted_row(harness: &Harness<'_, App>) -> String {
+    match Notes::new(harness.state().store()).unsorted() {
+        Ok(notes) if !notes.is_empty() => format!("Unsorted {}", notes.len()),
+        _ => "Unsorted".to_string(),
+    }
+}
+
 #[test]
 fn places_sit_left_of_the_notes_and_filter_them() -> TestResult {
     let mut harness = harness("places", "en")?;
     for label in [
         "All Notes",
-        "Unsorted",
         "Areas",
         "Household",
         "Kitchen",
@@ -131,6 +138,7 @@ fn places_sit_left_of_the_notes_and_filter_them() -> TestResult {
     ] {
         assert!(shows(&harness, label), "{label}");
     }
+    assert!(shows(&harness, &unsorted_row(&harness)));
     // A renamed starter keeps the name it was given.
     assert!(shows(&harness, "Bike"));
     let kettle = card(&harness, "Descale the kettle").rect();
@@ -160,7 +168,7 @@ fn places_sit_left_of_the_notes_and_filter_them() -> TestResult {
     assert!(!shows(&harness, "Descale the kettle"));
 
     // The Note whose Topic vanished is Unsorted again.
-    harness.get_by_label("Unsorted").click();
+    harness.get_by_label(&unsorted_row(&harness)).click();
     harness.run();
     assert!(shows(&harness, "Where did this go?"));
     assert!(!shows(&harness, "Descale the kettle"));
@@ -641,19 +649,15 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     assert_eq!(sections.len(), 1);
     assert!(shows(&harness, "Vinegar works"));
 
-    // Deleting asks once; Cancel keeps the Note.
+    // Deleting asks nothing (#268); Ctrl+Z brings the Note back.
     harness.get_by_label("Move to trash").click();
-    harness.run();
-    assert!(shows(&harness, "Delete this Note?"));
-    assert!(shows(&harness, "It stays in the trash for 30 days."));
-    assert!(!shows(&harness, "Delete only the Note"));
-    harness.get_by_label("Cancel").click();
     harness.run();
     assert!(!shows(&harness, "Delete this Note?"));
+    assert!(note(&harness, &kettle)?.is_trashed());
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
     assert!(!note(&harness, &kettle)?.is_trashed());
     harness.get_by_label("Move to trash").click();
-    harness.run();
-    harness.get_by_label("Delete").click();
     harness.run();
     assert!(note(&harness, &kettle)?.is_trashed());
     assert!(
@@ -682,6 +686,10 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     assert_eq!(harness.state().selected_note(), Some(cellar.as_str()));
     assert!(showing(&harness, "Descale the kettle").next().is_some());
     assert!(showing(&harness, "Vinegar works").next().is_some());
+    // Ctrl+Z undoes the Merge (#268): the Note stands alone again.
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert!(!note(&harness, &kettle)?.is_merged());
     Ok(())
 }
 
@@ -733,6 +741,10 @@ fn a_note_is_filed_from_its_editor_or_by_dragging_its_card() -> TestResult {
     harness.drop_at(from + egui::vec2(0.0, 40.0));
     harness.run();
     assert_eq!(harness.state().store().all_entries()?.len(), entries);
+    // Ctrl+Z files it back where it was before the last filing (#268).
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert_eq!(filed(&harness)?, Some(place(harness.state(), "Kitchen")?));
     Ok(())
 }
 
@@ -952,7 +964,7 @@ fn back_and_forward_walk_the_places_shown_and_the_path_leads_up() -> TestResult 
     assert_eq!(harness.state().selection(), &household);
 
     // While typing, Alt+arrows stay with the text.
-    harness.get_by_label("Unsorted").click();
+    harness.get_by_label(&unsorted_row(&harness)).click();
     harness.run();
     harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
     harness.run();

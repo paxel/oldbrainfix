@@ -25,7 +25,7 @@ Der Rest des Textes einer Notiz jeder Art außer der einfachen Notiz, nach ihrem
 _Avoid_: Inhalt, Notizen, Details
 
 **Kompaktansicht** [Compact view]:
-Wie die Karte einer Notiz sie in einer Liste auf einen Blick zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihre erste Zeile und die zwei Zeilen danach, eine Checkliste ihren Namen und wie viele ihrer Zeilen offen sind („3 von 7 offen“), eine Einkaufsliste ihren Namen und wie viele offen sind („4 offen“), eine Strichliste ihren Namen und je Feld die Summe des aktuellen Balkens gegen ihr Ziel, bei einer Strichliste von Tagen die von heute („Schritte 7000 / 10000 Schritte“), in einem geteilten Bereich aus den eigenen Einträgen, eine Einheit ihren Namen, den nächsten Lauf einer ihrer Routinen und die Läufe dieser Woche aller ihrer Routinen, erledigt und ausgelassen. Sie hat keinen Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und bietet Ablegen in … und Zusammenführen mit … an. Der Schalter der Liste zeigt alle Karten kompakt oder ausführlich; ein Tippen auf eine Karte (am Desktop ihr Ansichtsknopf) wechselt diese Karte, und dieses Gerät behält das, bis der Schalter der Liste wieder wechselt.
+Wie die Karte einer Notiz sie in einer Liste auf einen Blick zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihre erste Zeile und die zwei Zeilen danach, eine Checkliste ihren Namen und wie viele ihrer Zeilen offen sind („3 von 7 offen“), eine Einkaufsliste ihren Namen und wie viele offen sind („4 offen“), eine Strichliste ihren Namen und je Feld die Summe des aktuellen Balkens gegen ihr Ziel, bei einer Strichliste von Tagen die von heute („Schritte 7000 / 10000 Schritte“), in einem geteilten Bereich aus den eigenen Einträgen, eine Einheit ihren Namen, den nächsten Lauf einer ihrer Routinen und die Läufe dieser Woche aller ihrer Routinen, erledigt und ausgelassen. Sie hat keinen Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und bietet Ablegen in …, Routine …, Erinnerung …, in Erweitert Frosch und Einheit …, und Zusammenführen mit … an. Der Schalter der Liste zeigt alle Karten kompakt oder ausführlich; ein Tippen auf eine Karte (am Desktop ihr Ansichtsknopf) wechselt diese Karte, und dieses Gerät behält das, bis der Schalter der Liste wieder wechselt.
 _Avoid_: eingeklappte Karte, Kurzansicht, Zusammenfassung
 
 **Detailansicht** [Detailed view]:
@@ -37,7 +37,7 @@ Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widge
 _Avoid_: Schnell hinzufügen, Aufnehmen
 
 **Schnellnotiz** [Quick note]:
-Der Bildschirm zum Erfassen von Text, auf dem Desktop der Schnellnotiz-Dialog des Fensters (Datei ▸ Neue Notiz, Strg+N, „+“) und das Fenster „Notiz erfassen“: der Text, Foto, Sprache, Galerie und Einfügen (auf dem Desktop Sprache aufnehmen, Einfügen und Aus Datei…), die Stupser-Knöpfe, „Zum vollen Editor“, das die Notiz unsortiert speichert und im Notiz-Editor öffnet, auf dem Desktop im Notiz-Dialog, und der Wecker, dessen Menü eine Routine oder Erinnerung anlegt, die mit der Notiz gespeichert wird (#223). Was die Notiz sonst einsortiert (Ablegen in …, Frosch, Einheit oder Strichliste, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit), und die Formatleiste erscheinen nur, wo die Einstellungen des Geräts sie einschalten; die Stupser-Knöpfe lassen sich für ein einziges Speichern ausschalten.
+Der Bildschirm zum Erfassen von Text, auf dem Desktop der Schnellnotiz-Dialog des Fensters (Datei ▸ Neue Notiz, Strg+N, „+“) und das Fenster „Notiz erfassen“: der Text, Foto, Sprache, Galerie, Einfügen und Datei (auf dem Desktop Sprache aufnehmen, Einfügen und Aus Datei…), die Stupser-Knöpfe, „Zum vollen Editor“, das die Notiz unsortiert speichert und im Notiz-Editor öffnet, auf dem Desktop im Notiz-Dialog, und der Wecker, dessen Menü eine Routine oder Erinnerung anlegt, die mit der Notiz gespeichert wird (#223). Was die Notiz sonst einsortiert (Ablegen in …, Frosch, Einheit oder Strichliste, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit), und die Formatleiste erscheinen nur, wo die Einstellungen des Geräts sie einschalten; die Stupser-Knöpfe lassen sich für ein einziges Speichern ausschalten.
 _Avoid_: Schnell hinzufügen
 
 **Erfassungskontext** [Capture Context]:
@@ -54,6 +54,14 @@ Der aus der Sprachaufnahme einer Notiz erkannte Text, neben der Aufnahme aufbewa
 **Fototext** [Photo Text]:
 Der in einem Foto oder Bildschirmfoto einer Notiz erkannte Text, neben dem Foto aufbewahrt, nie an seiner Stelle.
 _Avoid_: OCR (in der App), Bildunterschrift
+
+**Anhang** [Attachment]:
+Eine Datei jeder Art an einer Notiz, etwa ein Brief als PDF, ein Word-Dokument, eine Tabelle oder ein `.zip`, mit ihrem Namen, ihrer Art und ihrer Größe aufbewahrt und auf alle Geräte synchronisiert. Eine Notiz, die nur aus einer Datei gemacht wurde, zeigt die Datei als ihre Karte.
+_Avoid_: Dokument, Upload, Datei (in der App, wo die Datei einer Notiz gemeint ist)
+
+**Anhangtext** [Attachment Text]:
+Der aus einem Anhang gelesene Text, wo sein Format es erlaubt, neben dem Anhang aufbewahrt, nie an seiner Stelle. Kommt er vom Computer, zeigt das Handy bis dahin, dass der Text vom Computer folgt.
+_Avoid_: OCR, extrahierter Text, Vorschau
 
 **Abschnitt** [Section]:
 Ein datierter Teil einer Notiz, angelegt durch Ergänzen oder Zusammenführen, mit seinem eigenen Erfassungskontext. Sein Text wird an Ort und Stelle verbessert wie der Text der Notiz, von denselben Personen; er behält sein Datum und seinen Platz und zeigt, wann er zuletzt geändert wurde und wer ihn bearbeitet hat.
@@ -79,6 +87,10 @@ _Avoid_: Importieren, Aus der Zwischenablage erfassen
 Notizen aus Dateien machen, die eine andere App oder ein Ordner hält: auf dem Handy in den Einstellungen, am Computer im Menü Datei, die Dateien mit der Dateiauswahl des Systems gewählt. Jede Markdown- oder Textdatei eines Ordners wird eine Notiz, aus Markdown formatiert, mit dem Namen der Datei als erster Zeile, wenn ihr Text nicht schon damit beginnt, erfasst zu der Zeit, zu der die Datei zuletzt geändert wurde; alle landen in einem neuen Bereich, der nach der Quelle benannt ist, neben einem Bereich dieses Namens statt darin, und keine ist unsortiert oder bekommt einen Stupser. Andere Dateien werden übersprungen und gezählt. Ein Export von Google Notizen (Google Keep) aus Google Takeout, gepackt oder entpackt, wird ebenso in einen eigenen neuen Bereich importiert: Jede Notiz wird eine Notiz, erfasst zu der Zeit, zu der sie in Keep angelegt wurde, ihr Titel als erste Zeile, ihre Labels als #Wörter in einer letzten Zeile, eine Liste als Checkliste mit ihren Zeilen, abgehakt wie in Keep, nicht auf der Agenda, bis du sie dort einschaltest, ihre Bilder als ihre Fotos; Notizen im Papierkorb von Keep werden übersprungen und gezählt, archivierte importiert.
 _Avoid_: Paket (ein Paket bringt Kopien von Old-Brain-Fix-Notizen), Einfügen, Bündel (ein Bündel ist ein Weg der Synchronisierung), Hochladen
 
+**Markdown-Ordner** [Vault]:
+Ein Ordner mit Markdown-Dateien, den die Desktop-App von Hand mit Datei ▸ „Als Markdown-Ordner exportieren…“ schreibt, für den Tag, an dem du zu einem anderen Werkzeug wie Obsidian wechselst, und der Weg von dort zurück. Ein Ordner je Bereich, ein Unterordner je Thema; jede Notiz eine Datei, benannt nach ihrer ersten Zeile und dem Tag ihrer Erfassung, ihr Text wie geschrieben, ihre Abschnitte als datierte Teile, ihre Zeilen, Einträge oder ihr Vorrat als Markdown gezeichnet, ihre Fotos, Aufnahmen und Anhänge in einem Ordner `attachments` daneben, und was das Markdown nicht zeigt (Erfassungszeit, Bereich, Thema, Wichtigkeit, Routinen und Erinnerungen mit ihren Zeitplänen und Erledigt-Haken, wer sie schrieb, Dateien) als Eigenschaften an ihrem Anfang. Alles, was dieses Gerät lesen kann, kommt hinein, Notizen anderer Menschen in geteilten Bereichen und Notizen, die vor KI verborgen sind, eingeschlossen, aber kein Erfassungskontext; er ist nicht verschlüsselt. Er wird jedes Mal neu in einen neuen Ordner geschrieben und ist kein Ort zum Arbeiten: Änderungen darin kommen nie von selbst zurück. „Aus einem Markdown-Ordner neu aufbauen…“ beim ersten Start nimmt ihn nur in ein leeres Old Brain Fix auf, so wie eine Sicherung wiederhergestellt wird: jede Notiz mit ihren Eigenschaften, jede Notiz, jeder Bereich und jedes Thema neu und von diesem Gerät signiert, eine Datei aus dem anderen Werkzeug als neue Notiz mit ihrem Text, ihren #Wörtern und dem Datum ihrer Datei, abgelegt nach ihren Ordnern. Die Sicherung bleibt der Weg, alles zu behalten.
+_Avoid_: Tresor (der Ordner ist nicht verschlossen), Vault, Sicherung (eine Sicherung ist verschlüsselt und behält alles), Synchronisierter Ordner, Paket, Exportieren (in der App heißt die Aktion „Als Markdown-Ordner exportieren…“)
+
 ## Text
 
 **Formatierter Text** [Formatted text]:
@@ -102,7 +114,7 @@ Ein ☐ (offen), ✅ (erledigt) oder ❌ (gescheitert) irgendwo im Text einer No
 _Avoid_: Statuszeichen (der frühere Name), Kästchen, Haken (eine Zeile einer Checkliste hat das Kästchen)
 
 **#Wort** [Tag]:
-Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert, und es gibt keine Liste von #Wörtern; es ist kein Thema und kein Teil des Erfassungskontexts.
+Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Ein „/“ darin verschachtelt es, etwa „#leben/gesundheit/rücken“, und die Suche nach „#leben“ findet es. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert; die Liste der #Wörter nach ihren Ebenen wird aus den Texten der Notizen gelesen. Es ist kein Thema und kein Teil des Erfassungskontexts.
 _Avoid_: Etikett, Schlagwort, Hashtag
 
 **App-Link** [App link]:
@@ -167,16 +179,24 @@ _Avoid_: Instanz, Slot
 Eine Fälligkeit, die du abgehakt hast. Früh oder spät abhaken verschiebt nie den Plan.
 _Avoid_: Abgeschlossen, Abgehakt (in der App)
 
+**Nicht heute** [Not today]:
+Die Wahl für eine Fälligkeit, die du heute nicht erledigen wirst, neben „Später“: Auslassen, oder Morgen, das sie auslässt und eine einmalige Fälligkeit derselben Routine am Tag danach zur selben Zeit hinzufügt. Keins von beiden ändert den Plan.
+_Avoid_: Aufschieben, Umplanen (das ändert den Plan), Vertagen
+
+**Auslassen** [Skip]:
+Eine Fälligkeit als nicht zu erledigen markieren, eine Entscheidung und kein Versäumnis: Sie ist weder erledigt noch verpasst, ihr Alarm und das erneute Erinnern hören auf, sie erscheint nie in der Verpasst-Übersicht, und sie fällt aus der Einhaltung heraus, die die ausgelassenen daneben zählt. Es lässt sich zurücknehmen.
+_Avoid_: Verwerfen, Abbrechen, Verpasst
+
 **Erneut erinnern** [Re-nag]:
-Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledigt ist, verschoben wird oder die nächste Fälligkeit beginnt.
+Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledigt ist, verschoben oder ausgelassen wird oder die nächste Fälligkeit beginnt.
 _Avoid_: Wiederholen, Erinnerung
 
 **Eskalation** [Escalation]:
 Ein Schritt, den du einschalten kannst: eine Fälligkeit, die mehrmals unbeachtet wieder geklingelt hat, wird zu einem Vollbild-Alarm mit Ton. Den Vollbild-Alarm gibt es nur auf dem Telefon; auf dem Desktop wird die Benachrichtigung dringend, mit dem Alarmton des Systems.
 
 **Verpasst** [Missed]:
-Eine Fälligkeit, die nie erledigt wurde: bei einer Routine, wenn ihre nächste Fälligkeit beginnt, bei einer Erinnerung um Mitternacht.
-_Avoid_: Überfällig, Übersprungen
+Eine Fälligkeit, die weder erledigt noch ausgelassen wurde: bei einer Routine, wenn ihre nächste Fälligkeit beginnt, bei einer Erinnerung um Mitternacht.
+_Avoid_: Überfällig, Übersprungen, Ausgelassen (das ist ein Auslassen, deine Entscheidung)
 
 **Verpasst-Übersicht** [Missed Summary]:
 Die Karte in der Agenda, die auflistet, was verpasst wurde und wie oft, seit du es zuletzt bestätigt hast.
@@ -185,10 +205,10 @@ Die Karte in der Agenda, die auflistet, was verpasst wurde und wie oft, seit du 
 Die eine Benachrichtigung, nachdem das Gerät aus oder leer war, die sagt, wie viel in der Zeit verpasst wurde.
 
 **Serie** [Streak]:
-Die Folge aufeinanderfolgender Fälligkeiten einer Routine, die erledigt wurden.
+Die Folge aufeinanderfolgender Fälligkeiten einer Routine, die erledigt wurden; eine ausgelassene unterbricht sie nicht und zählt nicht mit.
 
 **Einhaltung** [Adherence]:
-Der Anteil der Fälligkeiten einer Routine, die in einem Zeitraum erledigt wurden, etwa "92 % in diesem Monat".
+Der Anteil der Fälligkeiten einer Routine, die in einem Zeitraum erledigt wurden, ohne die ausgelassenen, die daneben gezählt werden, etwa "92 % in diesem Monat · 3 ausgelassen".
 
 **Agenda** [Agenda]:
 Der Startbildschirm: die Fälligkeiten von heute, dann gedimmt morgen, mit der Verpasst-Übersicht und der Zahl der unsortierten Notizen obenauf.
@@ -222,11 +242,11 @@ _Avoid_: Workout, Training, Playlist, Satz (der gehört zu einem Eintrag)
 ## Checklisten und Einkaufslisten
 
 **Checkliste** [Checklist]:
-Eine Notiz, deren Zeilen abgehakt werden, etwa eine Packliste: ihr Text ist ihr Name und ihre Beschreibung über den Zeilen, jede Zeile hat ihr Kästchen, und eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Jede Zeile einer Gruppe abzuhaken hakt die übergeordnete Zeile ab, die übergeordnete Zeile abzuhaken hakt ihre ganze Gruppe ab, und den Haken einer Zeile der Gruppe wegzunehmen nimmt auch den der übergeordneten Zeile weg. Eine Notiz ist höchstens eines von Strichliste, Checkliste und Einkaufsliste; sie wird wieder eine einfache Notiz mit jeder Zeile als Zeile ihres Textes, oder eine Einkaufsliste ihrer Zeilen, die abgehakten durchgestrichen. Eine Routine oder Erinnerung aus einer Checkliste beginnt jede Fälligkeit ohne abgehakte Zeile, auf allen deinen Geräten und für alle in einem geteilten Bereich gleich; die Fälligkeit ist erledigt, sobald jede Zeile für sie abgehakt ist, von wem auch immer, oder wenn du sie abhakst. Die Agenda zeigt heute jede Checkliste ohne Routine oder Erinnerung, die offene Zeilen hat, mit ihrem Namen und jeder offenen Zeile darunter, als eine Reihe mit der Zahl, etwa „Vor der Reise: 3 von 7 offen“, oder gar nicht, wie du es unter „Auf der Agenda zeigen“ für sie gewählt hast: eine Wahl nur für dich, auf deinen eigenen Geräten gehalten wie eine eigene Anzeige, sodass in einem geteilten Bereich jede Person für ihre eigene Agenda entscheidet.
+Eine Notiz, deren Zeilen abgehakt werden, etwa eine Packliste: ihr Text ist ihr Name und ihre Beschreibung über den Zeilen, jede Zeile hat ihr Kästchen, und eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Jede Zeile einer Gruppe abzuhaken hakt die übergeordnete Zeile ab, die übergeordnete Zeile abzuhaken hakt ihre ganze Gruppe ab, und den Haken einer Zeile der Gruppe wegzunehmen nimmt auch den der übergeordneten Zeile weg. Eine Notiz ist höchstens eines von Strichliste, Checkliste und Einkaufsliste; sie wird wieder eine einfache Notiz mit jeder Zeile als Zeile ihres Textes, oder eine Einkaufsliste ihrer Zeilen, die abgehakten durchgestrichen. Eine Routine oder Erinnerung aus einer Checkliste beginnt jede Fälligkeit ohne abgehakte Zeile, auf allen deinen Geräten und für alle in einem geteilten Bereich gleich; die Fälligkeit ist erledigt, sobald jede Zeile für sie abgehakt ist, von wem auch immer, oder wenn du sie abhakst. Die Agenda zeigt heute jede Checkliste ohne Routine oder Erinnerung, die offene Zeilen hat, mit ihrem Namen und jeder offenen Zeile darunter, dazu den heute abgehakten Zeilen, den Tag über durchgestrichen, als eine Reihe mit der Zahl, etwa „Vor der Reise: 3 von 7 offen“, oder gar nicht, wie du es unter „Auf der Agenda zeigen“ für sie gewählt hast: eine Wahl nur für dich, auf deinen eigenen Geräten gehalten wie eine eigene Anzeige, sodass in einem geteilten Bereich jede Person für ihre eigene Agenda entscheidet.
 _Avoid_: To-do-Liste, Aufgabenliste, Todo
 
 **Einkaufsliste** [Shopping List]:
-Eine Notiz, deren Zeilen eine Weile nach dem Abhaken wiederkommen, etwa für den Wocheneinkauf: ihr Text ist ihr Name und ihre Beschreibung über den Zeilen, und ihre Zeilen haben keine Gruppen. Die offenen Zeilen behalten die Reihenfolge, in der sie eingegeben wurden, eine neue Zeile kommt ans Ende. Jede Zeile hat ihre Wiederkehr, auf einem Abzeichen an ihrem Ende („—“, „4W“, „3M“): keine, Einmal oder eine Zahl von Tagen, Wochen, Monaten oder Jahren; eine neue Zeile hat keine. Eine Zeile abzuhaken streicht sie durch und schiebt sie ans Ende, mit dem Tag, an dem sie wiederkommt; mit Beginn dieses Tages nach der Uhr des Geräts ist sie wieder offen, an ihrem Platz: so viele Tage oder Wochen später, oder am selben Tag des Monats so viele Monate oder Jahre später, am letzten Tag des Monats, wenn er kürzer ist. Eine Zeile ohne Wiederkehr bleibt durchgestrichen, bis eine eingestellt ist, die dann ab ihrem Abhaken zählt. Eine Zeile mit Einmal ist nach dem Abhaken weg. Einen Namen hinzuzufügen, den die Liste schon hat, in beliebiger Schreibung und mit Leerzeichen davor oder danach, fügt nichts hinzu: eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, an ihrem Platz, und eine offene bleibt. Sie wird aus einer Notiz gemacht und wieder eine einfache Notiz wie eine Checkliste, die durchgestrichenen Zeilen mit „✓ “ davor, oder eine Checkliste ihrer Zeilen, die durchgestrichenen abgehakt. Eine Routine oder Erinnerung aus ihr ist nur erledigt, wenn du sie abhakst. Die Agenda zeigt heute jede Einkaufsliste mit offenen Zeilen so, wie du es mit „Auf der Agenda zeigen“ für sie gewählt hast: eine Reihe mit der Zahl ihrer offenen Zeilen, etwa „Wocheneinkauf: 4 offen“, so ist es voreingestellt; jede offene Zeile in einer eigenen Reihe, dort abhakbar; oder gar nicht. Eine Liste ohne offene Zeilen zeigt sie nie. Die Wahl ist nur für dich, auf deinen eigenen Geräten gehalten wie eine eigene Anzeige, sodass in einem geteilten Bereich jede Person für ihre eigene Agenda entscheidet; eine Liste, für die niemand gewählt hat, beginnt so, wie die frühere Einstellung des Geräts für alle Einkaufslisten sie zeigte. Was du erfasst, kann statt einer Notiz in eine Einkaufsliste gehen: jede seiner Zeilen, getippt oder im Transkript einer Aufnahme, wird eine Zeile der Liste, und keine Notiz bleibt.
+Eine Notiz, deren Zeilen eine Weile nach dem Abhaken wiederkommen, etwa für den Wocheneinkauf: ihr Text ist ihr Name und ihre Beschreibung über den Zeilen, und ihre Zeilen haben keine Gruppen. Die offenen Zeilen behalten die Reihenfolge, in der sie eingegeben wurden, eine neue Zeile kommt ans Ende. Jede Zeile hat ihre Wiederkehr, auf einem Abzeichen an ihrem Ende („—“, „4W“, „3M“): keine, Einmal oder eine Zahl von Tagen, Wochen, Monaten oder Jahren; eine neue Zeile hat keine. Eine Zeile abzuhaken streicht sie durch und schiebt sie ans Ende, mit dem Tag, an dem sie wiederkommt; mit Beginn dieses Tages nach der Uhr des Geräts ist sie wieder offen, an ihrem Platz: so viele Tage oder Wochen später, oder am selben Tag des Monats so viele Monate oder Jahre später, am letzten Tag des Monats, wenn er kürzer ist. Eine Zeile ohne Wiederkehr bleibt durchgestrichen, bis eine eingestellt ist, die dann ab ihrem Abhaken zählt. Eine Zeile mit Einmal ist nach dem Abhaken weg. Einen Namen hinzuzufügen, den die Liste schon hat, in beliebiger Schreibung und mit Leerzeichen davor oder danach, fügt nichts hinzu: eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, an ihrem Platz, und eine offene bleibt. Sie wird aus einer Notiz gemacht und wieder eine einfache Notiz wie eine Checkliste, die durchgestrichenen Zeilen mit „✓ “ davor, oder eine Checkliste ihrer Zeilen, die durchgestrichenen abgehakt. Eine Routine oder Erinnerung aus ihr ist nur erledigt, wenn du sie abhakst. Die Agenda zeigt heute jede Einkaufsliste mit offenen Zeilen so, wie du es mit „Auf der Agenda zeigen“ für sie gewählt hast: eine Reihe mit der Zahl ihrer offenen Zeilen, etwa „Wocheneinkauf: 4 offen“, so ist es voreingestellt; jede offene Zeile in einer eigenen Reihe, dort abhakbar, wobei eine heute abgehakte Zeile den Tag über durchgestrichen bleibt; oder gar nicht. Eine Liste ohne offene Zeilen zeigt sie nur mit den heute abgehakten Zeilen, in eigenen Reihen. Die Wahl ist nur für dich, auf deinen eigenen Geräten gehalten wie eine eigene Anzeige, sodass in einem geteilten Bereich jede Person für ihre eigene Agenda entscheidet; eine Liste, für die niemand gewählt hat, beginnt so, wie die frühere Einstellung des Geräts für alle Einkaufslisten sie zeigte. Was du erfasst, kann statt einer Notiz in eine Einkaufsliste gehen: jede seiner Zeilen, getippt oder im Transkript einer Aufnahme, wird eine Zeile der Liste, und keine Notiz bleibt.
 _Avoid_: Einkaufszettel, Dauerliste
 
 **Zeile** [Line]:
@@ -240,6 +260,10 @@ Eine Installation der App, auf einem Handy oder einem Computer. Die meisten Eins
 
 **Koppeln** [Pairing]:
 Zwei Geräte oder eine Person miteinander bekannt machen, persönlich oder per Code, wobei sie die Schlüssel bekommen, die sie brauchen.
+
+**Adresse von Hand** [Address by hand]:
+Eine Adresse, die du für ein gekoppeltes eigenes Gerät eintippst, etwa seinen Tailscale-Namen, an der der Abgleich und die Fragen des Handys es über ein VPN erreichen, wenn das lokale Netz es nicht findet. Eine Einstellung des Geräts, das sie hat, nie abgeglichen; das gemerkte Zertifikat entscheidet weiter, ob das Gerät, das dort antwortet, das gekoppelte ist.
+_Avoid_: Fernzugriff, Relay, Serveradresse
 
 **Geteilter Bereich** [Shared Area]:
 Ein Bereich, den andere Menschen mit abgleichen. Alles außerhalb bleibt privat.
@@ -296,8 +320,12 @@ _Avoid_: Zusammenstoß, Merge-Konflikt
 _Avoid_: Entwurf, Zwischenstand, Vorschau (eine Vorschau zeigt, ohne etwas zu behalten)
 
 **KI-Aufgabe** [AI Task]:
-Eine Arbeit, die du über den KI-Port des Computers einem KI-Modell deiner Wahl gibst, etwa Tippfehler zu beheben oder alles über ein Thema zu entfernen. Alles, was sie ändert, ist eine ausstehende Änderung; sie werden zusammen geprüft, wenn du sagst, dass sie fertig ist, und als Ganzes angenommen oder abgelehnt. Eine nach der anderen; der Abgleich wartet so lange.
+Eine Arbeit, die du über den KI-Port des Computers einem KI-Modell deiner Wahl gibst, etwa Tippfehler zu beheben oder alles über ein Thema zu entfernen, oder was ein Modell ändert, wenn du es in der Fragen-Ansicht darum bittest, etwa das Neue abzulegen. Alles, was sie ändert, ist eine ausstehende Änderung; sie werden zusammen geprüft, wenn du sagst, dass sie fertig ist, und als Ganzes angenommen oder abgelehnt. Eine nach der anderen; der Abgleich wartet so lange.
 _Avoid_: Agent, Assistent, Chat, KI-Modus
+
+**Fragen-Ansicht** [Ask panel]:
+Wo du den Computer zu deinen Notizen fragst (KI ▸ Fragen …): Die Frage geht an einen Anbieter, den du mit deinem eigenen API-Schlüssel eingetragen hast, Anthropic oder einen OpenAI-kompatiblen wie ein lokales Ollama, dessen Modell die Notizen über die Werkzeuge des KI-Ports sucht und liest und mit Links zu den Notizen antwortet, aus denen es die Antwort hat. Gesendet wird nur, was das Modell findet und liest, nie was vor KI verborgen ist. Das Fragen hält keinen Abgleich an; eine Änderung des Modells, etwa das Ablegen des Neuen, wartet als KI-Aufgabe auf deine Prüfung. Eine Antwort ist weg, sobald du die Ansicht verlässt, außer du behältst sie als Notiz. Die Seite Fragen auf dem Handy fragt über sie: Die Frage geht über die gekoppelte Verbindung an deinen eigenen Computer, der wie die Ansicht antwortet; das Handy hat keinen Anbieter und keinen Schlüssel und nennt vor der ersten Frage an einen Anbieter diesen und was gesendet wird und fragt nach deiner Erlaubnis.
+_Avoid_: Chat, Assistent, Copilot, KI-Suche
 
 ## Privatsphäre
 
@@ -309,6 +337,10 @@ Eine optionale Sperre auf einem einzelnen Bereich, die zu bleibt, auch während 
 
 **Maskiert** [Masked]:
 Wie eine Fälligkeit aus einem gesperrten Bereich in Alarmen und in der Agenda erscheint, wenn ihr Bereich das so will: "Private Routine, 08:00", trotzdem abhakbar.
+
+**Vor KI verborgen** [Hidden from AI]:
+Eine Markierung, die du auf einen Bereich oder eine einzelne Notiz setzt, auf dem Handy oder am Computer, nur für deine eigenen Geräte: Für die KI (eine KI-Aufgabe, das Fragen am Computer) gibt es die Notiz, jede Notiz des Bereichs und ihre Ergänzungen, Routinen, Erinnerungen, Frösche, Zeilen und #Wörter nicht, nicht einmal als Anzahl. Verborgen und geteilt schließen sich aus: In einem geteilten Bereich wird die Markierung nicht angeboten, und was verborgen ist, wird weder in einen geteilten Bereich abgelegt noch mit einer Notiz eines geteilten Bereichs zusammengeführt, geteilt, gesendet oder in ein Paket gelegt, bis du die Markierung abnimmst. Du selbst siehst und exportierst es wie immer.
+_Avoid_: privat, geheim, ausgeschlossen, gesperrt (eine Bereichssperre ist etwas anderes)
 
 **Sicherung** [Backup]:
 Eine verschlüsselte Datei mit allem, was auf einem Gerät ist, geöffnet mit einer Passphrase.

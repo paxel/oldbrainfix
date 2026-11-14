@@ -131,6 +131,16 @@
     "note:0000000000000000000000000000001a": false,
     "note:0000000000000000000000000000001c": false
   },
+  "checkedToday": [
+    {
+      "now": "2026-01-01T10:03:04.000Z",
+      "rows": []
+    },
+    {
+      "now": "2026-01-02T10:03:04.000Z",
+      "rows": []
+    }
+  ],
   "plain": {
     "note:00000000000000000000000000000001": "Gym bag\n✓ Towel\nShoes\n  Laces\n  Socks\nLock",
     "note:0000000000000000000000000000000a": "Passport\nPhoto\nForm",

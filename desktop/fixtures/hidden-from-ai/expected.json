@@ -1,0 +1,342 @@
+{
+  "now": "2026-01-02T10:00:47.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [
+    {
+      "id": "area:0000000000000000000000000000000a",
+      "name": "Family",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000001",
+      "name": "Health",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": [
+        {
+          "id": "topic:00000000000000000000000000000002",
+          "areaId": "area:00000000000000000000000000000001",
+          "name": "Back",
+          "starter": null
+        }
+      ]
+    },
+    {
+      "id": "area:00000000000000000000000000000003",
+      "name": "Home",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    }
+  ],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "Physio #health/back",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:08.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "topic:00000000000000000000000000000002",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "Doctor",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:18.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000003",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "text": "Diary",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:23.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000008",
+      "text": "Diary, later",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:27.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000007",
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000009",
+      "text": "Recipe",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:32.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000003",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000009",
+    "note:00000000000000000000000000000007",
+    "note:00000000000000000000000000000006",
+    "note:00000000000000000000000000000004"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000007"
+  ],
+  "trashed": [],
+  "inside": {
+    "area:0000000000000000000000000000000a": [],
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000004"
+    ],
+    "topic:00000000000000000000000000000002": [
+      "note:00000000000000000000000000000004"
+    ],
+    "area:00000000000000000000000000000003": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000006"
+    ]
+  },
+  "sections": {
+    "note:00000000000000000000000000000009": [],
+    "note:00000000000000000000000000000007": [
+      {
+        "id": "note:00000000000000000000000000000008",
+        "noteId": "note:00000000000000000000000000000007",
+        "text": "Diary, later",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:27.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
+      }
+    ],
+    "note:00000000000000000000000000000006": [],
+    "note:00000000000000000000000000000004": [
+      {
+        "id": "section:00000000000000000000000000000005",
+        "noteId": "note:00000000000000000000000000000004",
+        "text": "Exercises",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:13.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
+      }
+    ]
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000009": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Recipe"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Diary\n\n2026-01-01T10:00:27.000Z\nDiary, later"
+    },
+    "note:00000000000000000000000000000006": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Doctor"
+    },
+    "note:00000000000000000000000000000004": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Physio #health/back\n\n2026-01-01T10:00:13.000Z\nExercises"
+    }
+  },
+  "search": {
+    "": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000004"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000004"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {
+    "area:0000000000000000000000000000000a": [],
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000004"
+    ],
+    "topic:00000000000000000000000000000002": [
+      "note:00000000000000000000000000000004"
+    ],
+    "area:00000000000000000000000000000003": [
+      "note:00000000000000000000000000000009"
+    ]
+  },
+  "conflicts": []
+}

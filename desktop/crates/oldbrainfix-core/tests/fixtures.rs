@@ -37,20 +37,23 @@ use oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, Blob, CaptureContext, CapturedDetail, Checklist, Checklists, ClockTime,
-    Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports, ListOnAgenda, Note,
-    Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear, ReappearUnit, Recurrence,
-    RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section,
-    SessionRule, Sessions, ShoppingAgendaRow, ShoppingList, ShoppingLists, ShoppingOnAgenda,
-    SigningKey, SimpleRepeat, Store, Tallies, Tally, TallyEntry, TallyPeriod, TallyRule,
-    UnitSystem, WireEntry, dart_iso, parse_time,
+    AgendaRow, Alarms, Attachment, Blob, CaptureContext, CapturedDetail, Checklist, Checklists,
+    ClockTime, Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports,
+    ListOnAgenda, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear, ReappearUnit,
+    Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search,
+    Section, SessionRule, Sessions, ShoppingAgendaRow, ShoppingList, ShoppingLists,
+    ShoppingOnAgenda, SigningKey, SimpleRepeat, Store, Tallies, Tally, TallyEntry, TallyPeriod,
+    TallyRule, UnitSystem, WireEntry, Wordless, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 27] = [
+const SCENARIOS: [&str; 32] = [
+    "area-order",
+    "area-order-shown",
+    "attachments",
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -61,6 +64,7 @@ const SCENARIOS: [&str; 27] = [
     "formats",
     "frogs",
     "help",
+    "hidden-from-ai",
     "history",
     "import",
     "keep",
@@ -68,6 +72,7 @@ const SCENARIOS: [&str; 27] = [
     "markdown",
     "markers",
     "media",
+    "not-today",
     "notes",
     "places",
     "routines",
@@ -193,7 +198,7 @@ fn load(scenario: &str, now: &str) -> Result<Store, Box<dyn std::error::Error>> 
 }
 
 fn note_json(note: &Note) -> Value {
-    json!({
+    let mut out = json!({
         "id": note.id,
         "text": note.text,
         "textFormat": note.text_format,
@@ -215,6 +220,62 @@ fn note_json(note: &Note) -> Value {
         "removedTranscripts": note.removed_transcripts,
         "removedPhotoTexts": note.removed_photo_texts,
         "wordless": note.wordless().name(),
+    });
+    if let Some(all) = out.as_object_mut() {
+        all.extend(files_json(
+            &note.attachments,
+            &note.attachment_texts,
+            &note.removed_attachments,
+            &note.removed_attachment_texts,
+        ));
+        if !note.attachments.is_empty() {
+            all.insert(
+                "aloneFile".into(),
+                json!(note.alone_file().map(|a| a.hash.clone())),
+            );
+        }
+        if note.wordless() == Wordless::File {
+            all.insert("wordlessName".into(), json!(note.wordless_name()));
+        }
+    }
+    out
+}
+
+/// The attached files of a Note or Section in the shape of the
+/// generator's `_files`: only when it has any.
+fn files_json(
+    files: &[Attachment],
+    texts: &BTreeMap<String, String>,
+    removed: &[Attachment],
+    removed_texts: &[String],
+) -> serde_json::Map<String, Value> {
+    let mut out = serde_json::Map::new();
+    if files.is_empty() && texts.is_empty() && removed.is_empty() && removed_texts.is_empty() {
+        return out;
+    }
+    out.insert(
+        "attachments".into(),
+        json!(files.iter().map(attachment_json).collect::<Vec<_>>()),
+    );
+    out.insert("attachmentTexts".into(), json!(texts));
+    out.insert(
+        "removedAttachments".into(),
+        json!(removed.iter().map(attachment_json).collect::<Vec<_>>()),
+    );
+    out.insert("removedAttachmentTexts".into(), json!(removed_texts));
+    out
+}
+
+/// An attached file in the shape of the generator's `_attachment`.
+fn attachment_json(a: &Attachment) -> Value {
+    json!({
+        "hash": a.hash,
+        "name": a.name,
+        "type": a.media_type,
+        "size": a.size,
+        "pages": a.pages,
+        "computer": a.computer,
+        "kind": a.kind().name(),
     })
 }
 
@@ -240,7 +301,7 @@ fn context_json(context: &CaptureContext) -> Value {
 }
 
 fn section_json(section: &Section) -> Value {
-    json!({
+    let mut out = json!({
         "id": section.id,
         "noteId": section.note_id,
         "text": section.text,
@@ -259,7 +320,16 @@ fn section_json(section: &Section) -> Value {
         "removedPhotoTexts": section.removed_photo_texts,
         "modified": section.modified.map(dart_iso),
         "editedBy": section.edited_by.as_ref().map(|by| json!({"id": by.id, "name": by.name})),
-    })
+    });
+    if let Some(all) = out.as_object_mut() {
+        all.extend(files_json(
+            &section.attachments,
+            &section.attachment_texts,
+            &section.removed_attachments,
+            &section.removed_attachment_texts,
+        ));
+    }
+    out
 }
 
 fn blobs_json(list: &[Blob]) -> Value {
@@ -345,6 +415,16 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
             for hash in &note.recordings {
                 if notes.may_remove_transcript(id, hash)? {
                     refs.push(format!("transcript/{hash}"));
+                }
+            }
+            for a in &note.attachments {
+                if notes.may_remove_attachment(id, &a.hash)? {
+                    refs.push(format!("file/{}", a.hash));
+                }
+            }
+            for a in &note.attachments {
+                if notes.may_remove_attachment_text(id, &a.hash)? {
+                    refs.push(format!("fileText/{}", a.hash));
                 }
             }
             if !refs.is_empty() {
@@ -438,6 +518,135 @@ fn every_scenario_reads_as_the_dart_core_reads_it() -> TestResult {
         let store = load(scenario, now)?;
         let actual = read(&store)?;
         assert_eq!(actual, expected, "{scenario}");
+    }
+    Ok(())
+}
+
+/// The items of a Pack's tree in the shape of the generator's
+/// `_packItems`.
+fn pack_items(items: &[oldbrainfix_core::PackItem]) -> Value {
+    json!(
+        items
+            .iter()
+            .map(|i| json!({
+                "key": i.key,
+                "kind": i.kind.name(),
+                "size": i.size,
+                "children": pack_items(&i.children),
+            }))
+            .collect::<Vec<_>>()
+    )
+}
+
+#[test]
+fn attached_files_wait_are_found_and_go_in_a_pack_as_the_dart_core_has_them() -> TestResult {
+    let dir = fixtures().join("attachments");
+    let now = read_json(&dir.join("expected.json"))?["now"]
+        .as_str()
+        .ok_or("now")?
+        .to_string();
+    let store = load("attachments", &now)?;
+    for (hash, bytes) in files(&dir.join("files"))? {
+        assert!(store.put_blob("file", &hash, &bytes)?, "{hash}");
+    }
+    let notes = Notes::new(&store);
+    let expected = read_json(&dir.join("attachments.json"))?;
+    let mut search = serde_json::Map::new();
+    for query in expected["search"].as_object().ok_or("search")?.keys() {
+        let ids: Vec<String> = Search::new(&store)
+            .notes(query, None)?
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        search.insert(query.clone(), json!(ids));
+    }
+    let area = Places::new(&store).areas()?[0].id.clone();
+    let pack = store.pack_of(&area, &std::collections::HashSet::new())?;
+    let sorted = |ticks: oldbrainfix_core::PackTicks| ticks.into_iter().collect::<Vec<_>>();
+    let actual = json!({
+        "unreadPhone": blobs_json(&notes.unread_attachments(false)?),
+        "unreadComputer": blobs_json(&notes.unread_attachments(true)?),
+        "search": search,
+        "missing": store.missing_blobs()?,
+        "tree": pack_items(&pack.tree()),
+        "all": sorted(pack.all_keys()),
+        "start": sorted(pack.export_ticks()),
+        "size": pack.size(&pack.all_keys()),
+    });
+    assert_eq!(actual, expected);
+    // The same Pack, byte for byte, and the Dart core's opens alike.
+    let theirs = std::fs::read(dir.join("pack.obfpack"))?;
+    assert_eq!(store.write_pack(&pack, &pack.all_keys(), false)?, theirs);
+    let opened = store.open_pack(&theirs)?.map_err(|e| e.name())?;
+    assert_eq!(pack_items(&opened.pack.tree()), expected["tree"]);
+    Ok(())
+}
+
+#[test]
+fn attached_files_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::file_text::{self, FileKind, FileReading};
+    use oldbrainfix_core::notes::{clean_name, clean_type};
+    let expected = read_json(&fixtures().join("file_texts.json"))?;
+    let kind_of = |name: &str| -> FileKind {
+        [
+            FileKind::Pdf,
+            FileKind::Docx,
+            FileKind::Xlsx,
+            FileKind::Odt,
+            FileKind::Ods,
+            FileKind::Text,
+            FileKind::Other,
+        ]
+        .into_iter()
+        .find(|k| k.name() == name)
+        .unwrap_or(FileKind::Other)
+    };
+    for file in expected["files"].as_array().ok_or("files")? {
+        let name = file["name"].as_str().ok_or("name")?;
+        let kind = file_text::kind_of(name, file["type"].as_str().ok_or("type")?);
+        assert_eq!(kind.name(), file["kind"], "{name}");
+        let bytes = BASE64.decode(file["bytes"].as_str().ok_or("bytes")?)?;
+        let read = match file_text::read(kind, &bytes) {
+            FileReading::Text(text) => json!({"text": text}),
+            FileReading::Pdf => json!("pdf"),
+            FileReading::Nothing => json!("nothing"),
+        };
+        assert_eq!(read, file["read"], "{name}");
+    }
+    for k in expected["kinds"].as_array().ok_or("kinds")? {
+        let name = k["name"].as_str().ok_or("name")?;
+        let kind = file_text::kind_of(name, k["type"].as_str().ok_or("type")?);
+        assert_eq!(kind.name(), k["kind"], "{name}");
+        assert_eq!(file_text::media_type_of(name), k["mediaType"], "{name}");
+    }
+    for v in expected["values"].as_array().ok_or("values")? {
+        let value = v["value"].as_str().ok_or("value")?;
+        let read = Attachment::read(&"a".repeat(64), value);
+        assert_eq!(attachment_json(&read), v["read"], "{value}");
+    }
+    for n in expected["names"].as_array().ok_or("names")? {
+        assert_eq!(clean_name(n["name"].as_str().ok_or("name")?), n["kept"]);
+    }
+    for t in expected["types"].as_array().ok_or("types")? {
+        assert_eq!(clean_type(t["type"].as_str().ok_or("type")?), t["kept"]);
+    }
+    for c in expected["computer"].as_array().ok_or("computer")? {
+        let reads = file_text::computer_reads(
+            kind_of(c["kind"].as_str().ok_or("kind")?),
+            c["size"].as_u64().ok_or("size")?,
+            c["pages"].as_u64(),
+        );
+        assert_eq!(json!(reads), c["reads"], "{c}");
+    }
+    for t in expected["tidy"].as_array().ok_or("tidy")? {
+        assert_eq!(
+            file_text::tidy(t["text"].as_str().ok_or("text")?),
+            t["kept"]
+        );
+    }
+    for p in expected["pages"].as_array().ok_or("pages")? {
+        let pages: Vec<String> = serde_json::from_value(p["pages"].clone())?;
+        assert_eq!(file_text::join_pages(&pages), p["joined"]);
     }
     Ok(())
 }
@@ -1608,6 +1817,234 @@ fn simple_or_advanced_reads_as_the_dart_core_reads_it() -> TestResult {
     Ok(())
 }
 
+/// The generator's `area-order` scenario (#280).
+fn write_area_order(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    use oldbrainfix_core::person_settings::keys;
+    let places = Places::new(store);
+    let settings = PersonSettings::new(store);
+    let order = |value: &str, date: Option<DateTime<Utc>>| {
+        store.append(keys::ENTITY, keys::AREA_ORDER, Some(value), date)
+    };
+    let work = places.add_area("Work")?.id;
+    let home = places.add_area("Home")?.id;
+    let car = places.add_area("Car")?.id;
+    Notes::new(store).capture("Timesheet", Some(&work), None)?;
+    settings.move_area(&work, 0)?;
+    settings.move_area(&work, 0)?;
+    places.add_area("Garden")?;
+    let wave = places.add_area("～")?.id;
+    let smile = places.add_area("😀")?.id;
+    settings.move_area(&car, 99)?;
+    settings.set_area_order(&[smile.as_str(), "area:gone", home.as_str()])?;
+    let topic = places.add_topic(&home, "Kitchen")?.id;
+    let stored = json!([wave, "area:gone", topic, 7, null, wave, car]);
+    order(&stored.to_string(), None)?;
+    let quoted = json!(work).to_string();
+    for value in ["not json", r#"{"a":1}"#, quoted.as_str(), ""] {
+        order(value, None)?;
+    }
+    let back = Utc
+        .with_ymd_and_hms(2025, 1, 1, 0, 0, 0)
+        .single()
+        .ok_or("a date")?;
+    order(&json!([car, work]).to_string(), Some(back))?;
+    settings.move_area(&home, 1)?;
+    places.delete_area(&work, NotesGo::Unsorted)?;
+    places.plant_starter_set(&["household"])?;
+    let household = oldbrainfix_core::places::starter_id(place_keys::TYPE_AREA, "household");
+    settings.move_area(&household, 0)?;
+    store.share(&household)?;
+    Ok(())
+}
+
+#[test]
+fn the_areas_read_in_the_persons_own_order_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let expected = read_json(&fixtures().join("area-order").join("area_order.json"))?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    assert!(!reads.is_empty());
+    let entries = log("area-order")?;
+    for read in reads {
+        let length = read["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        let ids: Vec<String> = PersonSettings::new(&store)
+            .areas_in_order()?
+            .into_iter()
+            .map(|a| a.id)
+            .collect();
+        assert_eq!(json!(ids), read["areas"], "after {length} entries");
+    }
+    Ok(())
+}
+
+/// The generator's `hidden-from-ai` scenario (#267).
+fn write_hidden_from_ai(store: &Store) -> Built {
+    use oldbrainfix_core::Error;
+    use oldbrainfix_core::hidden::keys;
+    let places = Places::new(store);
+    let notes = Notes::new(store);
+    let refused = |done: Result<(), Error>| match done {
+        Err(Error::HiddenFromAi(_)) => Ok(()),
+        other => Err(format!("not refused: {other:?}")),
+    };
+    let health = places.add_area("Health")?.id;
+    let back = places.add_topic(&health, "Back")?.id;
+    let home = places.add_area("Home")?.id;
+    let physio = notes.capture("Physio #health/back", Some(&back), None)?.id;
+    notes.amend(&physio, "Exercises")?;
+    let doctor = notes.capture("Doctor", Some(&health), None)?.id;
+    let diary = notes.capture("Diary", None, None)?.id;
+    let later = notes.capture("Diary, later", None, None)?.id;
+    notes.merge(&later, &diary)?;
+    let recipe = notes.capture("Recipe", Some(&home), None)?.id;
+    store.set_hidden_from_ai(&health, true)?;
+    store.set_hidden_from_ai(&diary, true)?;
+    store.set_hidden_from_ai(&diary, true)?;
+    store.append(&keys::of(&recipe), keys::HIDDEN, Some("yes"), None)?;
+    store.set_hidden_from_ai(&diary, false)?;
+    store.set_hidden_from_ai(&diary, true)?;
+    let family = store.share(&places.add_area("Family")?.id)?;
+    refused(store.share(&health).map(drop))?;
+    store.set_hidden_from_ai(&recipe, true)?;
+    refused(store.share(&home).map(drop))?;
+    refused(notes.file(&diary, &family))?;
+    refused(notes.file(&doctor, &family))?;
+    refused(store.sent_item_of(&doctor, false).map(drop))?;
+    let none = std::collections::HashSet::new();
+    refused(store.pack_of(&home, &none).map(drop))?;
+    refused(store.pack_of(&diary, &none).map(drop))?;
+    notes.file(&doctor, &home)?;
+    store.set_hidden_from_ai(&health, false)?;
+    Ok(())
+}
+
+#[test]
+fn what_is_hidden_from_ai_reads_and_is_refused_as_the_dart_core_has_it() -> TestResult {
+    use oldbrainfix_core::Error;
+    let path = fixtures()
+        .join("hidden-from-ai")
+        .join("hidden_from_ai.json");
+    let expected = read_json(&path)?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    let refusals = expected["refusals"].as_array().ok_or("refusals")?;
+    assert!(!reads.is_empty() && !refusals.is_empty());
+    let entries = log("hidden-from-ai")?;
+    let up_to = |value: &Value| -> Result<Store, Box<dyn std::error::Error>> {
+        let length = value["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        Ok(store)
+    };
+    for read in reads {
+        let store = up_to(read)?;
+        let length = &read["entries"];
+        let marks: Vec<String> = store.hidden_from_ai_marks()?.into_iter().collect();
+        assert_eq!(json!(marks), read["marks"], "after {length} entries");
+        for (id, by) in read["hidden"].as_object().ok_or("hidden")? {
+            assert_eq!(
+                json!(store.hidden_from_ai_by(id)?),
+                *by,
+                "{id} after {length}"
+            );
+        }
+        for (id, may) in read["mayHide"].as_object().ok_or("mayHide")? {
+            assert_eq!(
+                json!(store.may_hide_from_ai(id)?),
+                *may,
+                "{id} after {length}"
+            );
+        }
+    }
+    for refusal in refusals {
+        let store = up_to(refusal)?;
+        let ids: Vec<&str> = refusal["ids"]
+            .as_array()
+            .ok_or("ids")?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        let none = std::collections::HashSet::new();
+        let done = match (refusal["action"].as_str(), ids.as_slice()) {
+            (Some("share"), [area]) => store.share(area).map(drop),
+            (Some("file"), [note, place]) => Notes::new(&store).file(note, place),
+            (Some("send"), [note]) => store.sent_item_of(note, false).map(drop),
+            (Some("pack"), [from]) => store.pack_of(from, &none).map(drop),
+            other => return Err(format!("no action {other:?}").into()),
+        };
+        let Err(Error::HiddenFromAi(marks)) = done else {
+            return Err(format!("not refused: {refusal} {done:?}").into());
+        };
+        assert_eq!(json!(marks), refusal["marks"], "{refusal}");
+    }
+    Ok(())
+}
+
+/// The starter Areas of the generator's `area-order-shown` scenario as
+/// it shows them: in German.
+fn german_area(area: &oldbrainfix_core::places::Area) -> String {
+    match area.starter.as_deref() {
+        Some("household") => "Haushalt",
+        Some("work") => "Arbeit",
+        Some("car") => "Auto",
+        Some("health") => "Gesundheit",
+        _ => area.name.as_str(),
+    }
+    .to_string()
+}
+
+/// The generator's `area-order-shown` scenario (#280).
+fn write_area_order_shown(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    let places = Places::new(store);
+    let settings = PersonSettings::new(store);
+    let starter = |slug: &str| oldbrainfix_core::places::starter_id(place_keys::TYPE_AREA, slug);
+    places.plant_starter_set(&["household", "work", "car", "health"])?;
+    for name in ["bike", "Bike", "İnbox", "Zoo", "ΣΑΣ", "σας", "～", "😀"] {
+        places.add_area(name)?;
+    }
+    Notes::new(store).capture("Oil change", Some(&starter("car")), None)?;
+    settings.move_area_by(&starter("work"), 0, german_area)?;
+    settings.set_area_order_by(&[starter("work")], german_area)?;
+    settings.move_area_by(&starter("household"), 1, german_area)?;
+    places.add_area("Banana")?;
+    places.add_area("apple")?;
+    store.share(&starter("car"))?;
+    places.add_area("avocado")?;
+    Ok(())
+}
+
+#[test]
+fn the_areas_read_by_the_name_shown_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let path = fixtures().join("area-order-shown").join("area_order.json");
+    let expected = read_json(&path)?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    assert!(!reads.is_empty());
+    let entries = log("area-order-shown")?;
+    for read in reads {
+        let length = read["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        let settings = PersonSettings::new(&store);
+        let ids = |areas: Vec<oldbrainfix_core::places::Area>| -> Vec<String> {
+            areas.into_iter().map(|a| a.id).collect()
+        };
+        let stored = ids(settings.areas_in_order()?);
+        assert_eq!(json!(stored), read["stored"], "after {length} entries");
+        let shown = ids(settings.areas_in_order_by(german_area)?);
+        assert_eq!(json!(shown), read["shown"], "after {length} entries");
+    }
+    Ok(())
+}
+
 /// The texts of the generator's `help` scenario, English or German.
 fn help_texts(german: bool) -> oldbrainfix_core::HelpTexts<'static> {
     const EN: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
@@ -1746,6 +2183,14 @@ fn write_edits(store: &Store) -> Built {
     places.delete_topic(&empty.id, NotesGo::Unsorted)?;
     places.delete_area(&errands.id, NotesGo::Trash)?;
     places.delete_area(&garage.id, NotesGo::Unsorted)?;
+    let keys = notes.capture("Spare keys at the neighbours", Some(&home.id), None)?;
+    notes.amend(&keys.id, "Back by Friday")?;
+    let holiday = notes.capture("Neighbours on holiday", None, None)?;
+    notes.merge(&keys.id, &holiday.id)?;
+    notes.undo_merge(&keys.id)?;
+    let glasses = notes.capture("Reading glasses at the office", None, None)?;
+    notes.file(&glasses.id, &home.id)?;
+    notes.unfile(&glasses.id)?;
     Ok(())
 }
 
@@ -2020,6 +2465,147 @@ fn write_media(store: &Store) -> Built {
     Ok(())
 }
 
+/// A zipped file the generator's `attachments` scenario attaches, as it
+/// wrote it out under `inputs/`.
+fn input(name: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Ok(std::fs::read(
+        fixtures().join("attachments").join("inputs").join(name),
+    )?)
+}
+
+/// The generator's `attachments` scenario.
+fn write_attachments(store: &Store) -> Built {
+    use oldbrainfix_core::NewFile;
+    use oldbrainfix_core::file_text::{self, FileKind, FileReading};
+    let file = |name, media_type, bytes, pages| NewFile {
+        name,
+        media_type,
+        bytes,
+        pages,
+    };
+    let notes = Notes::new(store);
+    let papers = Places::new(store).add_area("Papers")?.id;
+    let empty = input("Empty.docx")?;
+    let lease = notes.capture_with_files(
+        "Lease",
+        Some(&papers),
+        None,
+        &[],
+        &[],
+        &[
+            file(
+                "Lease.pdf",
+                "application/pdf",
+                b"%PDF-1.4 the lease",
+                Some(2),
+            ),
+            file("Scan.pdf", "", b"%PDF-1.4 a scan", Some(40)),
+            file("notes.md", "", b"# Notes\r\nKeys: 2  \r\n", None),
+            file("plan.dwg", "", b"AC1032 plan", None),
+            file("Empty.docx", "", &empty, None),
+        ],
+    )?;
+    let hash = |i: usize| lease.attachments[i].hash.clone();
+    let (pdf, md, docx) = (hash(0), hash(2), hash(4));
+    notes.set_attachment_text(&lease.id, &pdf, "  Rent due \r\n\r\n\r\n on the first ")?;
+    let md_bytes = store.file(&md).ok_or("the Markdown file")?;
+    if let FileReading::Text(text) = file_text::read(FileKind::Text, &md_bytes) {
+        notes.set_attachment_text(&lease.id, &md, &text)?;
+    }
+    notes.set_attachment_text(&lease.id, &docx, "")?;
+    let brief = input("Brief.odt")?;
+    let letter = notes.capture_with_files(
+        "",
+        None,
+        None,
+        &[],
+        &[],
+        &[file(
+            "Brief.odt",
+            "application/vnd.oasis.opendocument.text",
+            &brief,
+            None,
+        )],
+    )?;
+    let odt = &letter.attachments[0];
+    let odt_bytes = store.file(&odt.hash).ok_or("the text")?;
+    if let FileReading::Text(text) = file_text::read(odt.kind(), &odt_bytes) {
+        notes.set_attachment_text(&letter.id, &odt.hash, &text)?;
+    }
+    let costs = input("Costs.xlsx")?;
+    let bills = notes.capture_with_files(
+        "Bills",
+        Some(&papers),
+        None,
+        &[],
+        &[],
+        &[
+            file("Costs.xlsx", "", &costs, None),
+            file("power.txt", "", b"Power bill March", None),
+        ],
+    )?;
+    let (xlsx, txt) = (
+        bills.attachments[0].hash.clone(),
+        bills.attachments[1].hash.clone(),
+    );
+    notes.set_attachment_text(&bills.id, &xlsx, "Costs\nRent\t950.5")?;
+    notes.set_attachment_text(&bills.id, &txt, "Power bill March")?;
+    notes.remove_attachment_text(&bills.id, &xlsx)?;
+    notes.remove_attachment(&bills.id, &txt)?;
+    let target = notes.capture("Moving", None, None)?;
+    let ods = input("Plan.ods")?;
+    let plan = notes.capture_with_files(
+        "",
+        None,
+        None,
+        &[],
+        &[],
+        &[file("Plan.ods", "", &ods, None)],
+    )?;
+    notes.merge(&plan.id, &target.id)?;
+    notes.attach_file(
+        &target.id,
+        &file("boxes.csv", "application/octet-stream", b"box;room", None),
+    )?;
+    let gone = notes.capture_with_files(
+        "Old",
+        None,
+        None,
+        &[],
+        &[],
+        &[file("old.txt", "", b"old", None)],
+    )?;
+    notes.trash(&gone.id)?;
+    store.append(
+        &lease.id,
+        &note_keys::file(&"c".repeat(64)),
+        Some(concat!(
+            r#"{"name":"C:\\x\\inv\u202Efdp.exe","pages":-1,"size":3.0,"#,
+            r#""type":"Application/X-Thing; a=b"}"#
+        )),
+        None,
+    )?;
+    Ok(())
+}
+
+#[test]
+fn attached_files_are_kept_as_the_dart_core_keeps_them() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Store::open(
+        &dir.path().join("oldbrainfix.db"),
+        Box::new(Utc::now),
+        || Ok(writer_key()),
+    )?;
+    write_attachments(&store)?;
+    let ours = files(&dir.path().join("files"))?;
+    let theirs = files(&fixtures().join("attachments").join("files"))?;
+    assert!(!theirs.is_empty());
+    // The trashed Note's file stays until the trash is purged; the removed
+    // one is gone in both.
+    assert_eq!(ours, theirs);
+    Ok(())
+}
+
 /// The files under `dir` of a scenario's folder, by name.
 /// A file's name and bytes.
 type Named = (String, Vec<u8>);
@@ -2069,7 +2655,10 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 27] = [
+    let writers: [(&str, Writer); 32] = [
+        ("area-order", write_area_order),
+        ("area-order-shown", write_area_order_shown),
+        ("attachments", write_attachments),
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -2080,6 +2669,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("formats", write_formats),
         ("frogs", write_frogs),
         ("help", write_help),
+        ("hidden-from-ai", write_hidden_from_ai),
         ("history", write_history),
         ("import", write_import),
         ("keep", write_keep),
@@ -2087,6 +2677,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("markdown", write_markdown),
         ("markers", write_markers),
         ("media", write_media),
+        ("not-today", write_not_today),
         ("notes", write_notes),
         ("places", write_places),
         ("routines", write_routines),
@@ -3102,6 +3693,219 @@ fn routine_histories_come_to_what_the_dart_core_says() -> TestResult {
     Ok(())
 }
 
+// ------------------------------------------------------------ Not today
+
+/// The generator's `not-today` scenario.
+fn write_not_today(store: &Store) -> Built {
+    use oldbrainfix_core::routines::keys;
+    let routines = Routines::new(store);
+    let on = |day: i64, time: Option<ClockTime>| Occurrence::new(Day::new(2026, 1, day), time);
+    let daily = |times: &[ClockTime]| schedule(Day::new(2026, 1, 1), times, Some("FREQ=DAILY"));
+    let (seven, eight, ten) = (Some(at(7, 0)?), Some(at(8, 0)?), Some(at(10, 0)?));
+    let stretch = routines.create("Stretch", &daily(&[at(7, 0)?])?)?.id;
+    let bins = routines
+        .create(
+            "Take out the bins",
+            &schedule(
+                Day::new(2026, 1, 2),
+                &[at(8, 0)?],
+                Some("FREQ=WEEKLY;BYDAY=FR"),
+            )?,
+        )?
+        .id;
+    let call = routines
+        .create(
+            "Call the bank",
+            &schedule(Day::new(2026, 1, 3), &[at(10, 0)?], None)?,
+        )?
+        .id;
+    let walk = routines.create("Walk", &daily(&[])?)?.id;
+    let every_other =
+        |time: ClockTime| schedule(Day::new(2026, 1, 1), &[time], Some("FREQ=DAILY;INTERVAL=2"));
+    let plants = routines
+        .create("Water the plants", &every_other(at(18, 0)?)?)?
+        .id;
+    routines.mark_done(&stretch, &on(2, seven), None)?;
+    routines.skip(&stretch, &on(3, seven), None)?;
+    routines.tomorrow(&walk, &on(2, None), None)?;
+    routines.skip(&walk, &on(5, None), None)?;
+    routines.unskip(&walk, &on(5, None))?;
+    // 09:00 on the 2nd: the bins wait a day, and then another.
+    jump(Duration::hours(22));
+    routines.tomorrow(&bins, &on(2, eight), None)?;
+    routines.skip(&call, &on(3, ten), None)?;
+    jump(Duration::days(1));
+    routines.tomorrow(&bins, &on(3, eight), None)?;
+    routines.tomorrow(&call, &on(3, ten), None)?;
+    Alarms::new(store).apply_skip(&stretch, &on(6, seven).key(), utc_at(2026, 1, 3, 9, 30)?)?;
+    let six_pm = Some(at(18, 0)?);
+    routines.skip(&plants, &on(1, six_pm), None)?;
+    routines.tomorrow(&plants, &on(3, six_pm), None)?;
+    routines.mark_done(&plants, &on(3, six_pm), None)?;
+    routines.reschedule(&plants, &every_other(at(19, 0)?)?)?;
+    // As no app writes them.
+    let raw = |id: &str, field: &str, value: &str| store.append(id, field, Some(value), None);
+    raw(
+        &stretch,
+        &format!("{}Rude", keys::SKIP_PREFIX),
+        "2026-01-03T09:00:00.000Z tomorrow",
+    )?;
+    raw(&stretch, &keys::skip(&on(7, seven)), "Rude")?;
+    raw(
+        &stretch,
+        &keys::skip(&on(8, seven)),
+        "2026-02-30T09:00:00.000Z tomorrow",
+    )?;
+    raw(
+        &stretch,
+        &keys::skip(&on(9, seven)),
+        "2026-01-03T09:00:00.000123Z later",
+    )?;
+    raw(
+        &bins,
+        &format!("{}2026-01-06T03:00", keys::SKIP_PREFIX),
+        "2026-01-03T09:00:00.000Z tomorrow",
+    )?;
+    Ok(())
+}
+
+fn not_today_rows(rows: &[AgendaRow]) -> Value {
+    json!(
+        rows.iter()
+            .map(|r| json!([
+                r.routine.id,
+                r.occurrence.key(),
+                iso(r.done()),
+                iso(r.skipped()),
+                r.moved(),
+            ]))
+            .collect::<Vec<_>>()
+    )
+}
+
+fn not_today_adherence(a: &Adherence) -> Value {
+    json!({"done": a.done, "missed": a.missed, "skipped": a.skipped, "share": a.share()})
+}
+
+/// What this core makes of the `not-today` log at one held moment, in
+/// the shape of a check in the generator's `not_today.json`.
+fn not_today_check(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    let now = store.now();
+    let routines = Routines::new(store);
+    let alarms = Alarms::new(store);
+    let agenda = routines.agenda(&berlin)?;
+    let missed = alarms.missed(&berlin)?;
+    let mut open_of = serde_json::Map::new();
+    for note in Notes::new(store).all()? {
+        let open: Vec<Value> = alarms
+            .open_of(&note.id, &berlin)?
+            .iter()
+            .map(|o| json!([o.routine.id, o.occurrence.key(), o.missed]))
+            .collect();
+        open_of.insert(note.id, json!(open));
+    }
+    let mut today_by_note = serde_json::Map::new();
+    for (id, rows) in routines.today_by_note(&berlin)? {
+        today_by_note.insert(id, not_today_rows(&rows));
+    }
+    let mut histories = Vec::new();
+    for r in routines.all()? {
+        let h = routines.history(&r, &berlin, oldbrainfix_core::history::MONDAY)?;
+        histories.push(json!({
+            "routine": r.id,
+            "currentStreak": h.current_streak,
+            "longestStreak": h.longest_streak,
+            "lastSevenDays": h.last_seven_days.iter().map(|d| json!([
+                d.day.to_string(), d.done, d.missed, d.open, d.skipped, d.is_empty(),
+            ])).collect::<Vec<_>>(),
+            "thisWeek": not_today_adherence(&h.this_week),
+            "thisMonth": not_today_adherence(&h.this_month),
+            "entries": h.entries.iter().map(|e| json!([
+                e.occurrence.key(),
+                e.status.name(),
+                dart_iso(e.missed_at),
+                iso(e.done_at),
+                iso(e.skipped_at),
+                e.moved,
+            ])).collect::<Vec<_>>(),
+        }));
+    }
+    Ok(json!({
+        "now": dart_iso(now),
+        "agenda": {
+            "today": not_today_rows(&agenda.today_rows),
+            "tomorrow": not_today_rows(&agenda.tomorrow_rows),
+        },
+        "alarms": alarms.plan(&berlin)?.iter().map(|a| json!([
+            a.id(), dart_iso(a.at), dart_iso(a.ends_at), a.fires_after(now).is_some(),
+        ])).collect::<Vec<_>>(),
+        "missed": {
+            "count": missed.count(),
+            "nextChange": iso(missed.next_change),
+            "routines": missed.routines.iter().map(|m| {
+                let mut row = vec![json!(m.routine.id)];
+                row.extend(m.missed.iter().map(|o| json!([o.occurrence.key(), dart_iso(o.missed_at)])));
+                Value::Array(row)
+            }).collect::<Vec<_>>(),
+        },
+        "openOf": open_of,
+        "recentlyDone": alarms.recently_done(&berlin)?.iter()
+            .map(|(id, o)| json!([id, o.key()]))
+            .collect::<Vec<_>>(),
+        "todayByNote": today_by_note,
+        "histories": histories,
+    }))
+}
+
+#[test]
+fn skips_and_moved_occurrences_come_to_what_the_dart_core_says() -> TestResult {
+    let expected = read_json(&fixtures().join("not-today").join("not_today.json"))?;
+    let read_at = read_json(&fixtures().join("not-today").join("expected.json"))?;
+    let store = load("not-today", read_at["now"].as_str().ok_or("now")?)?;
+    let routines = Routines::new(&store);
+    let mut ids = store.entities_of_type("routine")?;
+    ids.sort();
+    let mut every = Vec::new();
+    for id in &ids {
+        let Some(r) = routines.by_id(id)? else {
+            continue;
+        };
+        let skipped: serde_json::Map<String, Value> = r
+            .skipped
+            .iter()
+            .map(|(k, v)| (k.clone(), json!(dart_iso(*v))))
+            .collect();
+        every.push(json!({
+            "id": r.id,
+            "skipped": skipped,
+            "tomorrow": r.tomorrow,
+            "moved": r.moved.iter().map(Occurrence::key).collect::<Vec<_>>(),
+            "between": r.between(Day::new(2026, 1, 1), Day::new(2026, 1, 10))
+                .iter().map(Occurrence::key).collect::<Vec<_>>(),
+            "firstFrom": r.first_from(Day::new(2026, 1, 4)).map(|o| o.key()),
+        }));
+    }
+    assert_eq!(json!(every), expected["routines"]);
+    let checks = expected["checks"].as_array().ok_or("checks")?;
+    assert_eq!(checks.len(), 3);
+    for check in checks {
+        let now = check["now"].as_str().ok_or("now")?;
+        let ours = not_today_check(&load("not-today", now)?)?;
+        for key in [
+            "agenda",
+            "alarms",
+            "missed",
+            "openOf",
+            "recentlyDone",
+            "todayByNote",
+            "histories",
+        ] {
+            assert_eq!(ours[key], check[key], "{now} {key}");
+        }
+    }
+    Ok(())
+}
+
 // -------------------------------------------------------------- Tallies
 
 fn utc_at(
@@ -3460,6 +4264,29 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         })
         .collect();
     assert_eq!(json!(agenda), expected["agenda"], "{scenario}");
+    // On the day of the last write and the day after (#276).
+    let europe = frog_day(0);
+    let europe: &oldbrainfix_core::schedule::WallClock = &europe;
+    for moment in expected["checkedToday"].as_array().ok_or("checkedToday")? {
+        let now = moment["now"].as_str().ok_or("now")?;
+        let store = load(scenario, now)?;
+        let today = Day::today(parse_time(now)?, europe);
+        let rows: Vec<Value> = Checklists::new(&store)
+            .agenda_rows_with(Some(europe))?
+            .iter()
+            .map(|r| {
+                let l = &r.list;
+                let checked: Vec<&str> = l
+                    .lines
+                    .iter()
+                    .filter(|line| line.checked_on(today, europe))
+                    .map(|line| line.id.as_str())
+                    .collect();
+                json!({"note": l.note_id, "open": l.open_count(), "shows": r.shows.code(), "checkedToday": checked})
+            })
+            .collect();
+        assert_eq!(json!(rows), moment["rows"], "{scenario} at {now}");
+    }
     let mut shows = serde_json::Map::new();
     let mut applies = serde_json::Map::new();
     for id in &ids {
@@ -3802,6 +4629,56 @@ fn write_shopping_lists(store: &Store) -> Built {
     );
     store.append(&errand.id, &check, Some("2026-01-09T09:00:00.000Z"), None)?;
     notes.capture("Unsorted thought", None, None)?;
+    // Struck for the day (#276): a Line checked Once, gone, and Eggs, gone
+    // since the 1st, brought back by its box.
+    let rope = lists.add(&pantry, "Rope", &wall)?;
+    lists.set_reappear(&rope, Reappear::Once)?;
+    lists.check(&rope, &wall)?;
+    let eggs = lists
+        .by_note(&week, &wall)?
+        .ok_or("a Shopping List")?
+        .gone()
+        .iter()
+        .find(|l| l.text == "Eggs")
+        .ok_or("the gone Eggs")?
+        .id
+        .clone();
+    lists.uncheck(&eggs, &wall)?;
+    // Checked again last, it follows the others, though made first.
+    let yeast = line(&pantry, "Yeast")?;
+    lists.uncheck(&yeast, &wall)?;
+    lists.check(&yeast, &wall)?;
+    // Moved by hand (#283): Soap before Eggs, so before the keys of the
+    // struck Lines between Milk and Eggs, Tea to the top and Milk after
+    // the open ones; before itself and where it is already, nothing.
+    let errands = notes
+        .capture("Errands\nMilk\nBread\nHam\nEggs\nTea\nSoap", None, None)?
+        .id;
+    lists.make(&errands)?;
+    for text in ["Bread", "Ham"] {
+        lists.set_reappear(
+            &line(&errands, text)?,
+            Reappear::After(1, ReappearUnit::Week),
+        )?;
+        lists.check(&line(&errands, text)?, &wall)?;
+    }
+    lists.move_line(
+        &line(&errands, "Soap")?,
+        &wall,
+        Some(&line(&errands, "Eggs")?),
+    )?;
+    lists.move_line(
+        &line(&errands, "Tea")?,
+        &wall,
+        Some(&line(&errands, "Milk")?),
+    )?;
+    lists.move_line(&line(&errands, "Milk")?, &wall, None)?;
+    lists.move_line(
+        &line(&errands, "Eggs")?,
+        &wall,
+        Some(&line(&errands, "Eggs")?),
+    )?;
+    lists.move_line(&line(&errands, "Milk")?, &wall, None)?;
     Ok(())
 }
 
@@ -3904,8 +4781,16 @@ fn shopping_lists_of_come_to_what_the_dart_core_says(scenario: &str) -> TestResu
             })?;
             agenda.insert(old.unwrap_or("none").to_string(), rows);
         }
+        // The Lines checked today after the open ones (#276).
+        let checked_today = shopping_rows_json(&lists.agenda_rows_with(&wall, true)?);
         assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
-        at.push(json!({"now": now, "lists": shown, "plain": plain, "agenda": agenda}));
+        at.push(json!({
+            "now": now,
+            "lists": shown,
+            "plain": plain,
+            "agenda": agenda,
+            "checkedToday": checked_today,
+        }));
     }
     assert_eq!(json!(at), expected["at"]);
     let read_at = read_json(&dir.join("expected.json"))?;
@@ -4553,6 +5438,9 @@ fn bare_routine(id: &str, schedule: Schedule) -> Routine {
         scheduled_at: None,
         trashed: None,
         trashed_with: None,
+        skipped: BTreeMap::new(),
+        tomorrow: Default::default(),
+        moved: Vec::new(),
     }
 }
 
@@ -4607,6 +5495,162 @@ fn pair_codes_are_written_and_read_as_the_dart_core_does() -> TestResult {
                 code[kind].as_str().ok_or("a code")?
             ));
         }
+    }
+    Ok(())
+}
+
+/// The reply `item` of `ask.json` describes with its fields.
+fn ask_reply_of(
+    item: &Value,
+) -> Result<oldbrainfix_core::lan_ask::AskReply, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::ask::Unready;
+    use oldbrainfix_core::lan_ask::{Answered, AskFailure, AskReply};
+    let review = item["review"].as_bool().ok_or("review")?;
+    if let Some(answer) = item.get("answer") {
+        let notes = answer["notes"]
+            .as_array()
+            .ok_or("notes")?
+            .iter()
+            .map(|n| n.as_str().map(str::to_string).ok_or("a note"))
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(AskReply {
+            outcome: Ok(Answered {
+                text: answer["text"].as_str().ok_or("text")?.to_string(),
+                notes,
+                cut: answer["cut"].as_bool().ok_or("cut")?,
+                unchecked: answer["unchecked"].as_bool().ok_or("unchecked")?,
+            }),
+            review,
+        });
+    }
+    let message = item["message"].as_str().ok_or("message")?.to_string();
+    let unready = match item["unready"].as_str() {
+        None => None,
+        Some("noModel") => Some(Unready::NoModel),
+        Some("noKey") => Some(Unready::NoKey),
+        Some("badUrl") => Some(Unready::BadUrl),
+        Some(other) => return Err(format!("unready {other}").into()),
+    };
+    let failure = match item["failure"].as_str().ok_or("failure")? {
+        "unready" => AskFailure::Unready(unready),
+        "key" => AskFailure::Key(message),
+        "provider" => AskFailure::Provider(
+            u16::try_from(item["status"].as_u64().ok_or("status")?)?,
+            message,
+        ),
+        "network" => AskFailure::Network(message),
+        "unreadable" => AskFailure::Unreadable(message),
+        "rounds" => AskFailure::Rounds,
+        "refused" => AskFailure::Refused,
+        "stopped" => AskFailure::Stopped,
+        "busy" => AskFailure::Busy,
+        "unknown" => AskFailure::Unknown,
+        other => return Err(format!("failure {other}").into()),
+    };
+    Ok(AskReply {
+        outcome: Err(failure),
+        review,
+    })
+}
+
+#[test]
+fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::ask::{Exchange, Protocol, Unready};
+    use oldbrainfix_core::lan_ask::{AskReply, ProviderShown, Question};
+    use oldbrainfix_core::pairing::HandAddress;
+    let fixture = read_json(&fixtures().join("ask.json"))?;
+    let text = |v: &Value, k: &str| -> Result<String, Box<dyn std::error::Error>> {
+        Ok(v[k].as_str().ok_or(format!("{k} is text"))?.to_string())
+    };
+    for item in fixture["questions"].as_array().ok_or("questions")? {
+        let earlier = item["earlier"]
+            .as_array()
+            .ok_or("earlier")?
+            .iter()
+            .map(|e| {
+                Some(Exchange {
+                    question: e[0].as_str()?.to_string(),
+                    answer: e[1].as_str()?.to_string(),
+                })
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or("an exchange")?;
+        let question = Question {
+            question: text(item, "question")?,
+            earlier,
+        };
+        let body = text(item, "body")?;
+        assert_eq!(question.to_json().to_string(), body);
+        assert_eq!(
+            Question::from_json(&serde_json::from_str(&body)?),
+            Some(question)
+        );
+    }
+    for item in fixture["providers"].as_array().ok_or("providers")? {
+        let shown = ProviderShown {
+            protocol: match text(item, "protocol")?.as_str() {
+                "openai" => Protocol::OpenAi,
+                _ => Protocol::Anthropic,
+            },
+            model: text(item, "model")?,
+            host: text(item, "host")?,
+            unready: match item["unready"].as_str() {
+                None => None,
+                Some("noModel") => Some(Unready::NoModel),
+                Some("noKey") => Some(Unready::NoKey),
+                Some(_) => Some(Unready::BadUrl),
+            },
+        };
+        let body = text(item, "body")?;
+        assert_eq!(shown.to_json().to_string(), body);
+        assert_eq!(
+            ProviderShown::from_json(&serde_json::from_str(&body)?),
+            Some(shown)
+        );
+    }
+    for item in fixture["replies"].as_array().ok_or("replies")? {
+        let reply = ask_reply_of(item)?;
+        let body = text(item, "body")?;
+        assert_eq!(reply.to_json().to_string(), body);
+        assert_eq!(
+            AskReply::from_json(&serde_json::from_str(&body)?),
+            Some(reply)
+        );
+    }
+    for item in fixture["later"].as_array().ok_or("later")? {
+        let body = text(item, "body")?;
+        assert_eq!(
+            AskReply::from_json(&serde_json::from_str(&body)?),
+            Some(ask_reply_of(item)?),
+            "{body}"
+        );
+    }
+    for body in fixture["notReplies"].as_array().ok_or("notReplies")? {
+        let body = body.as_str().ok_or("a body")?;
+        assert_eq!(
+            AskReply::from_json(&serde_json::from_str(body)?),
+            None,
+            "{body}"
+        );
+    }
+    for item in fixture["addresses"].as_array().ok_or("addresses")? {
+        let typed = text(item, "typed")?;
+        let read = HandAddress::parse(&typed);
+        assert_eq!(
+            read.as_ref().map(|a| a.host.as_str()),
+            item["host"].as_str(),
+            "{typed}"
+        );
+        assert_eq!(
+            read.as_ref().and_then(|a| a.port).map(u64::from),
+            item["port"].as_u64(),
+            "{typed}"
+        );
+        assert_eq!(
+            read.as_ref().map(HandAddress::text).as_deref(),
+            item["text"].as_str(),
+            "{typed}"
+        );
     }
     Ok(())
 }
@@ -6598,6 +7642,133 @@ fn packs_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
 }
 
 #[test]
+fn notes_are_taken_back_from_a_backup_as_the_dart_core_takes_them() -> TestResult {
+    use oldbrainfix_core::backup::{Problem, add_notes, open_notes, read_header, unlock};
+    use oldbrainfix_core::packs::item_keys;
+    use std::collections::HashSet;
+    let dir = fixtures().join("backup-notes");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let at = expected["opened"].as_str().ok_or("opened")?;
+    let mut ada = fixture_device("backup-notes", "device", writer_key, at)?;
+    let file = dir.join("backup.obfbackup");
+    let header = read_header(&file)?.ok_or("a header")?;
+    assert_eq!(
+        Some(dart_iso(header.created).as_str()),
+        expected["created"].as_str()
+    );
+    let passphrase = expected["passphrase"].as_str().ok_or("passphrase")?;
+    let code = expected["recoveryCode"].as_str().ok_or("code")?;
+    let key = unlock(&header, Some(passphrase), None)?.ok_or("the passphrase opens it")?;
+    assert_eq!(unlock(&header, None, Some(code))?, Some(key));
+    assert_eq!(
+        Some(hex::encode(key).as_str()),
+        expected["backupKey"].as_str()
+    );
+
+    // Her Notes as the Device that made it read them, nothing kept here.
+    let mark = ada.current_seq()?;
+    let opened = open_notes(&ada, &file, &key, &HashSet::new(), |a| a.name.clone())?;
+    assert_eq!(ada.current_seq()?, mark);
+    let tree: Vec<Value> = opened.pack.tree().iter().map(pack_item_json).collect();
+    assert_eq!(Value::Array(tree), expected["tree"]);
+    assert_eq!(json!(opened.trashed), expected["trashed"]);
+    let names: Vec<_> = opened.pack.areas.iter().map(|a| a.name.clone()).collect();
+    assert_eq!(json!(names), expected["areas"]);
+    let texts: Vec<_> = opened.pack.notes.iter().map(|n| n.text.clone()).collect();
+    assert_eq!(json!(texts), expected["texts"]);
+    assert_eq!(json!(dart_iso(opened.created)), expected["created"]);
+    assert_eq!(json!(opened.pack.backup_ticks()), expected["start"]);
+
+    // Her Health a locked Area closed on this Device: none of it shows.
+    let closed = &expected["closed"];
+    let areas: HashSet<String> = closed["areas"]
+        .as_array()
+        .ok_or("closed areas")?
+        .iter()
+        .filter_map(|a| a.as_str().map(str::to_string))
+        .collect();
+    let shut = open_notes(&ada, &file, &key, &areas, |a| a.name.clone())?;
+    let tree: Vec<Value> = shut.pack.tree().iter().map(pack_item_json).collect();
+    assert_eq!(Value::Array(tree), closed["tree"]);
+    assert_eq!(json!(shut.trashed), closed["trashed"]);
+    assert_eq!(json!(shut.left_out), closed["leftOut"]);
+    let texts: Vec<_> = shut.pack.notes.iter().map(|n| n.text.clone()).collect();
+    assert_eq!(json!(texts), closed["texts"]);
+
+    // Some of them added back, their photo and recording from the Backup.
+    let mut ticks = opened.pack.backup_ticks();
+    for i in expected["picked"].as_array().ok_or("picked")? {
+        let i = usize::try_from(i.as_u64().ok_or("an index")?)?;
+        ticks = opened.pack.tick(&ticks, &item_keys::note(i), true);
+    }
+    assert_eq!(json!(ticks), expected["ticks"]);
+    assert_eq!(json!(opened.pack.size(&ticks)), expected["size"]);
+    counted_ids(&mut ada, 0x1300);
+    let wall = |at: DateTime<Utc>| at.naive_utc();
+    let added = add_notes(&ada, &opened, &ticks, &wall, "Backup", "From a Backup")?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("added.jsonl"))?
+    );
+    assert_eq!(
+        json!({"areas": added.areas, "notes": added.notes}),
+        expected["added"]
+    );
+    let names: serde_json::Map<String, Value> = Places::new(&ada)
+        .areas()?
+        .into_iter()
+        .map(|a| (a.id, json!(a.name)))
+        .collect();
+    assert_eq!(Value::Object(names), expected["areaNames"]);
+    assert_eq!(
+        json!(oldbrainfix_core::backup::held_blobs(&ada)?),
+        expected["blobs"]
+    );
+
+    // Refused as restoring refuses, each file made from the Backup.
+    let name = |p: Problem| match p {
+        Problem::NotABackup => "notABackup",
+        Problem::NeedsUpdate => "needsUpdate",
+        Problem::WrongSecret => "wrongSecret",
+        Problem::Damaged => "damaged",
+        Problem::NotEmpty => "notEmpty",
+    };
+    let refusal =
+        |path: &std::path::Path, key: &[u8; 32]| -> Result<String, Box<dyn std::error::Error>> {
+            Ok(
+                match open_notes(&ada, path, key, &HashSet::new(), |a| a.name.clone()) {
+                    Ok(_) => "opened".to_string(),
+                    Err(oldbrainfix_core::Error::Backup(p)) => name(p).to_string(),
+                    Err(e) => return Err(e.into()),
+                },
+            )
+        };
+    let bytes = std::fs::read(&file)?;
+    let line = String::from_utf8(header.line.clone())?;
+    let mut later = format!("{{\"format\":2,{}", &line[1..]).into_bytes();
+    later.extend_from_slice(&bytes[header.line.len()..]);
+    let mut flipped = bytes.clone();
+    if let Some(last) = flipped.last_mut() {
+        *last ^= 1;
+    }
+    let work = tempfile::tempdir()?;
+    let mut refused = serde_json::Map::new();
+    refused.insert("wrongKey".into(), json!(refusal(&file, &[0; 32])?));
+    for (what, changed) in [
+        ("later", later),
+        ("flipped", flipped),
+        ("cut", bytes[..bytes.len() - 3].to_vec()),
+        ("none", b"no Backup\n".to_vec()),
+    ] {
+        let path = work.path().join(format!("{what}.obfbackup"));
+        std::fs::write(&path, changed)?;
+        refused.insert(what.into(), json!(refusal(&path, &key)?));
+    }
+    assert_eq!(Value::Object(refused), expected["refused"]);
+    Ok(())
+}
+
+#[test]
 fn entries_of_a_later_version_are_kept_and_passed_on_byte_for_byte() -> TestResult {
     use oldbrainfix_core::signing::{ImportReport, KeyRecord};
     let dir = fixtures().join("versions");
@@ -6770,6 +7941,97 @@ fn tags_are_found_as_the_dart_core_finds_them() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn the_tag_tree_is_read_as_the_dart_core_reads_it() -> TestResult {
+    use oldbrainfix_core::{TagNode, TagTree};
+    let fixture = read_json(&fixtures().join("tag_tree.json"))?;
+    let captured = fixture["notes"].as_array().ok_or("notes")?;
+    let at = std::sync::Arc::new(std::sync::Mutex::new(parse_time(
+        "2026-11-12T08:00:00.000Z",
+    )?));
+    let clock = at.clone();
+    let store = Store::in_memory(
+        Box::new(move || clock.lock().map(|t| *t).unwrap_or_default()),
+        || Ok(SigningKey::from_seed([9; 32])),
+    )?;
+    let tick = || {
+        if let Ok(mut t) = at.lock() {
+            *t += chrono::Duration::minutes(1);
+        }
+    };
+    let notes = Notes::new(&store);
+    let places = Places::new(&store);
+    let mut area_ids = Vec::new();
+    for name in fixture["areas"].as_array().ok_or("areas")? {
+        area_ids.push(places.add_area(name.as_str().ok_or("area")?)?.id);
+    }
+    let mut ids = Vec::new();
+    for note in captured {
+        tick();
+        let text = note["text"].as_str().ok_or("text")?;
+        let format = note["format"].as_str().unwrap_or("plain");
+        let place = match note["area"].as_u64() {
+            Some(i) => Some(area_ids.get(usize::try_from(i)?).ok_or("area")?.as_str()),
+            None => None,
+        };
+        let id = notes.capture_as(text, format, place, None)?.id;
+        for amend in note["amends"].as_array().into_iter().flatten() {
+            tick();
+            notes.amend(&id, amend.as_str().ok_or("amend")?)?;
+        }
+        ids.push(id);
+    }
+    for (i, note) in captured.iter().enumerate() {
+        if let Some(into) = note["into"].as_u64() {
+            let into = usize::try_from(into)?;
+            notes.merge(&ids[i], &ids[into])?;
+        }
+        if note["trashed"].as_bool() == Some(true) {
+            notes.trash(&ids[i])?;
+        }
+    }
+    fn node(n: &TagNode) -> Value {
+        json!({
+            "children": n.children.iter().map(node).collect::<Vec<_>>(),
+            "name": n.name,
+            "notes": n.notes,
+            "tag": n.tag,
+        })
+    }
+    let tree = TagTree::new(&store);
+    let mut closed = std::collections::HashSet::new();
+    let areas = fixture["areas"].as_array().ok_or("areas")?;
+    for shut in fixture["closed"]["areas"].as_array().ok_or("closed")? {
+        let i = areas.iter().position(|a| a == shut).ok_or("closed area")?;
+        closed.insert(area_ids.get(i).ok_or("area")?.clone());
+    }
+    assert!(!closed.is_empty());
+    for (shut, wanted) in [
+        (std::collections::HashSet::new(), &fixture),
+        (closed, &fixture["closed"]),
+    ] {
+        let mut suggestions = serde_json::Map::new();
+        for typed in wanted["suggestions"]
+            .as_object()
+            .ok_or("suggestions")?
+            .keys()
+        {
+            let tags: Vec<String> = tree
+                .suggestions(typed, &shut)?
+                .into_iter()
+                .map(|n| n.tag)
+                .collect();
+            suggestions.insert(typed.clone(), json!(tags));
+        }
+        assert_eq!(json!(suggestions), wanted["suggestions"]);
+        let ours: Vec<Value> = tree.tree(&shut)?.iter().map(node).collect();
+        assert_eq!(json!(ours), wanted["tree"]);
+        assert!(ours.len() >= 4);
+    }
+    assert_ne!(fixture["tree"], fixture["closed"]["tree"]);
+    Ok(())
+}
+
 // --------------------------------------------------- Schedule sentences
 
 /// `repeat` as the generator writes it.
@@ -6854,13 +8116,18 @@ fn sentence_repeat(value: &Value) -> Option<oldbrainfix_core::SimpleRepeat> {
 
 #[test]
 fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
-    use oldbrainfix_core::schedule_sentence::{SimpleSchedule, read, sentence, suggest};
+    use oldbrainfix_core::schedule_sentence::{
+        QuickChip, SentenceNow, SimpleSchedule, quick_reminders, read, read_at, sentence, suggest,
+    };
     let fixture = read_json(&fixtures().join("schedule_sentences.json"))?;
     let today = Day::parse(fixture["today"].as_str().ok_or("today")?).ok_or("day")?;
     // Byte offsets in `text` as the generator counts them: in code points.
     let points = |text: &str, at: usize| text.get(..at).map(|t| t.chars().count());
-    let read_json = |locale: &str, text: &str| {
-        let read = read(text, locale, today);
+    let read_json = |locale: &str, text: &str, now: Option<&SentenceNow>| {
+        let read = match now {
+            Some(now) => read_at(text, locale, now),
+            None => read(text, locale, today),
+        };
         json!({
             "locale": locale,
             "schedule": sentence_schedule_json(read.schedule.as_ref()),
@@ -6891,7 +8158,7 @@ fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
         assert_eq!(&sentence_schedule_json(Some(&schedule)), value, "{case}");
         let text = sentence(&schedule, locale, today);
         assert_eq!(text, case["sentence"], "{case}");
-        assert_eq!(read_json(locale, &text), case["read"], "{case}");
+        assert_eq!(read_json(locale, &text, None), case["read"], "{case}");
         // The round trip.
         assert_eq!(
             read(&text, locale, today).schedule,
@@ -6904,7 +8171,7 @@ fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
     for case in typed {
         let locale = case["locale"].as_str().ok_or("locale")?;
         let text = case["text"].as_str().ok_or("text")?;
-        assert_eq!(&read_json(locale, text), case, "{text:?}");
+        assert_eq!(&read_json(locale, text, None), case, "{text:?}");
     }
     let suggested = fixture["suggested"].as_array().ok_or("suggested")?;
     assert!(suggested.len() >= 30);
@@ -6927,6 +8194,46 @@ fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
             })
             .collect();
         assert_eq!(&Value::Array(ours), &case["suggestions"], "{text:?}");
+    }
+    // The relative words and the quick Reminder chips at held moments
+    // (#271).
+    let moments = fixture["relative"].as_array().ok_or("relative")?;
+    assert!(moments.len() >= 4);
+    let time = |v: &Value| v.as_str().and_then(ClockTime::parse).ok_or("time");
+    for moment in moments {
+        let held = &moment["now"];
+        let now = SentenceNow {
+            today: Day::parse(held["today"].as_str().ok_or("today")?).ok_or("day")?,
+            time: time(&held["time"])?,
+            day_start: time(&held["dayStart"])?,
+        };
+        let quick: Vec<Value> = quick_reminders(&now)
+            .into_iter()
+            .map(|q| {
+                json!({
+                    "chip": match q.chip {
+                        QuickChip::InAnHour => "inAnHour",
+                        QuickChip::Tonight => "tonight",
+                        QuickChip::Tomorrow => "tomorrow",
+                        QuickChip::InAWeek => "inAWeek",
+                    },
+                    "day": q.day.to_string(),
+                    "time": q.time.to_string(),
+                })
+            })
+            .collect();
+        assert_eq!(&Value::Array(quick), &moment["quick"], "{held}");
+        let reads = moment["read"].as_array().ok_or("read")?;
+        assert!(reads.len() >= 50);
+        for case in reads {
+            let locale = case["locale"].as_str().ok_or("locale")?;
+            let text = case["text"].as_str().ok_or("text")?;
+            assert_eq!(
+                &read_json(locale, text, Some(&now)),
+                case,
+                "{held} {text:?}"
+            );
+        }
     }
     Ok(())
 }

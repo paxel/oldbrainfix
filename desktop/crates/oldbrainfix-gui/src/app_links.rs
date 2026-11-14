@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 
 use egui::{Id, RichText, ScrollArea, TextEdit, Ui};
 use oldbrainfix_core::app_link::AppLink;
-use oldbrainfix_core::{Notes, Places, Result, Store};
+use oldbrainfix_core::{Notes, PersonSettings, Places, Result, Store};
 
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
@@ -83,7 +83,8 @@ pub fn targets(store: &Store, t: &L10n, advanced: bool) -> Result<Vec<Target>> {
     }
     out.push(page(AppLink::Guide(None, None), t.link_to_guide()));
     let places = Places::new(store);
-    for area in places.areas()? {
+    // In the person's own order, as the sidebar has them (#280).
+    for area in PersonSettings::new(store).areas_in_order_by(|a| area_name(t, a))? {
         let name = area_name(t, &area);
         let topics = places.topics(&area.id)?;
         out.push(Target {
@@ -257,22 +258,12 @@ pub fn desktop_entry_name(text: &str) -> Option<String> {
     None
 }
 
-/// Opens `file` with the app the system has for its type: `xdg-open`
-/// on Linux, `open` on macOS and the shell's `start` on Windows. Whether
-/// it could be started.
+/// Opens `file` with the app the system has for its type, without a
+/// shell ([`crate::system_open`]): `xdg-open` on Linux, `open` on macOS
+/// and `ShellExecuteW` on Windows. Whether it could be started.
 pub fn open_file(file: &Path) -> bool {
-    let mut command = if cfg!(target_os = "windows") {
-        let mut c = Command::new("cmd");
-        c.args(["/C", "start", ""]).arg(file);
-        c
-    } else if cfg!(target_os = "macos") {
-        let mut c = Command::new("open");
-        c.arg(file);
-        c
-    } else {
-        let mut c = Command::new("xdg-open");
-        c.arg(file);
-        c
+    let Some(mut command) = crate::system_open::command(file) else {
+        return crate::system_open::shell_execute(file).is_ok();
     };
     command
         .stdin(Stdio::null())
@@ -283,40 +274,4 @@ pub fn open_file(file: &Path) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_file_link_finds_only_files_inside_the_folder() -> std::result::Result<(), String> {
-        let base = std::env::temp_dir().join(format!("obf-links-{}", std::process::id()));
-        let folder = base.join("Sync");
-        std::fs::create_dir_all(folder.join("Scans")).map_err(|e| e.to_string())?;
-        std::fs::write(folder.join("Scans/tax 2026.pdf"), b"x").map_err(|e| e.to_string())?;
-        std::fs::write(base.join("secret.txt"), b"x").map_err(|e| e.to_string())?;
-        let found = file_in(&folder, "Scans/tax 2026.pdf");
-        let outside = file_in(&folder, "../secret.txt");
-        let dir = file_in(&folder, "Scans");
-        let missing = file_in(&folder, "nope.pdf");
-        #[cfg(unix)]
-        let linked = {
-            std::os::unix::fs::symlink(base.join("secret.txt"), folder.join("ln.txt"))
-                .map_err(|e| e.to_string())?;
-            file_in(&folder, "ln.txt")
-        };
-        drop(std::fs::remove_dir_all(&base));
-        assert!(found.is_some_and(|f| f.ends_with("Scans/tax 2026.pdf")));
-        assert_eq!(outside, None);
-        assert_eq!(dir, None);
-        assert_eq!(missing, None);
-        #[cfg(unix)]
-        assert_eq!(linked, None, "a symbolic link out of the folder");
-        Ok(())
-    }
-
-    #[test]
-    fn a_desktop_file_names_its_app() {
-        let text = "[Desktop Entry]\nType=Application\nName[de]=Dokumente\nName=Document Viewer\n[Desktop Action new]\nName=New";
-        assert_eq!(desktop_entry_name(text).as_deref(), Some("Document Viewer"));
-        assert_eq!(desktop_entry_name("[Other]\nName=x"), None);
-    }
-}
+mod tests;

@@ -75,6 +75,13 @@ class AlarmLabels {
   final String snooze30;
   final String snooze60;
 
+  /// Not today, its question and its choices (#269): Skip, and Tomorrow,
+  /// which moves the Occurrence to the day after at the same time.
+  final String notToday;
+  final String notTodayQuestion;
+  final String skip;
+  final String tomorrow;
+
   /// The Catch-up Notification's title, and its text for one and for
   /// several Missed; the latter holds `{count}` for the number.
   final String catchUpTitle;
@@ -97,6 +104,10 @@ class AlarmLabels {
     required this.snooze10,
     required this.snooze30,
     required this.snooze60,
+    required this.notToday,
+    required this.notTodayQuestion,
+    required this.skip,
+    required this.tomorrow,
     required this.catchUpTitle,
     required this.catchUpOne,
     required this.catchUpMany,
@@ -113,6 +124,10 @@ class AlarmLabels {
     'snooze10': snooze10,
     'snooze30': snooze30,
     'snooze60': snooze60,
+    'notToday': notToday,
+    'notTodayQuestion': notTodayQuestion,
+    'skip': skip,
+    'tomorrow': tomorrow,
     'catchUpTitle': catchUpTitle,
     'catchUpOne': catchUpOne,
     'catchUpMany': catchUpMany,
@@ -122,8 +137,8 @@ class AlarmLabels {
   };
 }
 
-/// Done or a snooze tapped on a notification, or a box checked in the
-/// Agenda widget, waiting to be applied.
+/// Done, a snooze or Not today tapped on a notification, or a box
+/// checked in the Agenda widget, waiting to be applied.
 sealed class AlarmAction {
   /// Counts up; acknowledging one acknowledges everything before it.
   final int seq;
@@ -156,6 +171,24 @@ class SnoozeTapped extends AlarmAction {
     DateTime at,
     this.until,
   ) : super(seq, at);
+}
+
+/// Not today ▸ Skip tapped on a notification (#269).
+class SkipTapped extends AlarmAction {
+  final String routineId;
+  final String occurrenceKey;
+
+  const SkipTapped(int seq, this.routineId, this.occurrenceKey, DateTime at)
+    : super(seq, at);
+}
+
+/// Not today ▸ Tomorrow tapped on a notification (#269).
+class TomorrowTapped extends AlarmAction {
+  final String routineId;
+  final String occurrenceKey;
+
+  const TomorrowTapped(int seq, this.routineId, this.occurrenceKey, DateTime at)
+    : super(seq, at);
 }
 
 /// A Line of a Checklist Routine's Occurrence checked in the Agenda
@@ -200,6 +233,10 @@ class ChecklistTapped extends AlarmAction {
 /// Tally [noteId] for the Occurrence [occurrenceKey] of the Session
 /// [sessionId], whose entry form opens.
 typedef WidgetPick = ({String sessionId, String occurrenceKey, String noteId});
+
+/// An Occurrence's notification tapped (#270): the Occurrence
+/// [occurrenceKey] of the Routine [routineId], whose Note opens.
+typedef OpenedOccurrence = ({String routineId, String occurrenceKey});
 
 /// A snooze tapped on the Nudge: the Notes Unsorted then wait until
 /// [until].
@@ -288,6 +325,10 @@ abstract interface class AlarmPlatform {
   /// asked, or null; asking clears it.
   Future<WidgetPick?> pickOpened();
 
+  /// The Occurrence whose notification was tapped since this was last
+  /// asked, or null; asking clears it.
+  Future<OpenedOccurrence?> occurrenceOpened();
+
   /// The taps not acknowledged yet, oldest first.
   Future<List<AlarmAction>> pendingActions();
 
@@ -354,6 +395,9 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Future<WidgetPick?> pickOpened() async => null;
+
+  @override
+  Future<OpenedOccurrence?> occurrenceOpened() async => null;
 
   @override
   Future<List<AlarmAction>> pendingActions() async => const [];
@@ -533,6 +577,19 @@ class AndroidAlarms implements AlarmPlatform {
   }
 
   @override
+  Future<OpenedOccurrence?> occurrenceOpened() async {
+    final raw = await _call(
+      () => _channel.invokeMapMethod<String, Object?>('occurrenceOpened'),
+    );
+    return switch ((raw?['routine'], raw?['occurrence'])) {
+      (final String routine, final String occurrence)
+          when routine.isNotEmpty && occurrence.isNotEmpty =>
+        (routineId: routine, occurrenceKey: occurrence),
+      _ => null,
+    };
+  }
+
+  @override
   Future<List<AlarmAction>> pendingActions() async {
     final raw =
         await _call(
@@ -636,6 +693,8 @@ class AndroidAlarms implements AlarmPlatform {
         DateTime.fromMillisecondsSinceEpoch(until, isUtc: true),
       ),
       ('done', _) => DoneTapped(seq, routine, occurrence, tapped),
+      ('skip', _) => SkipTapped(seq, routine, occurrence, tapped),
+      ('tomorrow', _) => TomorrowTapped(seq, routine, occurrence, tapped),
       ('line', _) => switch (m['line']) {
         final String line when line.isNotEmpty => LineTapped(
           seq,

@@ -306,6 +306,98 @@
     "note:00000000000000000000000000000029": true,
     "note:0000000000000000000000000000002c": false
   },
+  "checkedToday": [
+    {
+      "now": "2026-01-01T10:03:52.000Z",
+      "rows": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": [
+            "line:00000000000000000000000000000004",
+            "line:00000000000000000000000000000005",
+            "line:00000000000000000000000000000006"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000000a",
+          "open": 2,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:0000000000000000000000000000000e",
+          "open": 0,
+          "shows": "lines",
+          "checkedToday": [
+            "line:00000000000000000000000000000010"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000017",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:00000000000000000000000000000022",
+          "open": 2,
+          "shows": "count",
+          "checkedToday": []
+        },
+        {
+          "note": "note:00000000000000000000000000000026",
+          "open": 0,
+          "shows": "count",
+          "checkedToday": [
+            "line:00000000000000000000000000000028"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000029",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        }
+      ]
+    },
+    {
+      "now": "2026-01-02T10:03:52.000Z",
+      "rows": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:0000000000000000000000000000000a",
+          "open": 2,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:00000000000000000000000000000017",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:00000000000000000000000000000022",
+          "open": 2,
+          "shows": "count",
+          "checkedToday": []
+        },
+        {
+          "note": "note:00000000000000000000000000000029",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        }
+      ]
+    }
+  ],
   "plain": {
     "note:00000000000000000000000000000001": "Before the trip\nTent\n✓ Torch\n  ✓ Batteries\n✓ Map",
     "note:00000000000000000000000000000007": "Someday\nPaint the shed",

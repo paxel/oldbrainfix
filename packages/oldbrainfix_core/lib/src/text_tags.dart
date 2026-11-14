@@ -1,6 +1,6 @@
 /// Tags in user text (ADR 0032): a `#word` in any text is drawn
 /// highlighted, and a tap on it searches for it. Nothing is stored for a
-/// tag and there is no list of them; it is part of the text.
+/// tag; it is part of the text, and the tag tree is read from the texts.
 library;
 
 /// A tag found in a text: where it lies, from [start] to [end] in UTF-16
@@ -12,6 +12,8 @@ typedef FoundTag = ({int start, int end, String tag});
 ///
 /// A tag is a `#` followed by letters, digits, `_` and `-`, at least one
 /// letter among them, the first no `-` and any `-` at its end left out.
+/// A `/` inside parts a nested tag, such as "#life/health": each part
+/// starts as the tag does, so a `/` at the end, `//` and `/-` end it.
 /// Before the `#` comes the start of the text or a character that is no
 /// letter, digit, `_` or `-` and no `#`, `/`, `\` or `&`, so neither
 /// "C#" nor a web address's "/#top" is one. A letter is a character of
@@ -32,6 +34,11 @@ abstract final class TextTags {
       var letters = false;
       while (end < text.length) {
         final c = _at(text, end);
+        if (c == _slash) {
+          if (end == from || !_startsPart(text, end + 1)) break;
+          end++;
+          continue;
+        }
         if (!_inTag(c) || (end == from && c == _dash)) break;
         letters = letters || _letter(c);
         end += c > 0xFFFF ? 2 : 1;
@@ -117,6 +124,14 @@ abstract final class TextTags {
           c == _dash;
     }
     return _letter(c) || _number.hasMatch(String.fromCharCode(c));
+  }
+
+  /// Whether a part of a nested tag starts at the UTF-16 offset [i] of
+  /// [text]: a tag character there that is no `-`.
+  static bool _startsPart(String text, int i) {
+    if (i >= text.length) return false;
+    final c = _at(text, i);
+    return c != _dash && _inTag(c);
   }
 
   static bool _mayPrecede(int? c) =>

@@ -137,7 +137,8 @@ fn the_popup_files_the_note_and_saves_it_without_a_nudge() -> TestResult {
     assert!(shows(&harness, "Save"));
     assert!(shows(
         &harness,
-        "Enter saves it. Esc keeps what is typed the same way; empty, it just closes."
+        "Enter saves it. Shift+Enter starts a new line. Esc keeps what is typed the same way; \
+         empty, it just closes."
     ));
     // Leaving saves all of it.
     harness.key_press(Key::Escape);
@@ -186,8 +187,11 @@ fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
     assert!(!harness.state().popup.page_open());
     assert!(!harness.state().closed);
     assert!(harness.state().popup.choices().schedules.is_empty());
-    // Alt+Left goes back from the page the same way.
+    // Alt+Left goes back from the page the same way, once the cursor
+    // left the When line it starts in (#277), where Alt+Left rests.
     spawn(&mut harness, "Reminder");
+    harness.key_press(Key::Tab);
+    harness.run();
     harness.key_press_modifiers(egui::Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert!(!harness.state().popup.page_open());
@@ -393,7 +397,7 @@ fn a_write_failing_in_the_window_leaves_nothing_written() -> TestResult {
 }
 
 #[test]
-fn file_into_without_areas_says_how_the_desktop_makes_one() -> TestResult {
+fn file_into_without_areas_offers_a_new_area() -> TestResult {
     let now = parse_time("2026-10-26T09:00:00.000Z")?;
     let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([4; 32])))?;
     OwnProfile::new(&store).apply_defaults("Desk", None)?;
@@ -402,10 +406,8 @@ fn file_into_without_areas_says_how_the_desktop_makes_one() -> TestResult {
     let mut harness = window(&store);
     type_in_window(&mut harness, "Water the plants");
     click(&mut harness, "File into…");
-    assert!(shows(
-        &harness,
-        "No Areas yet. Click the + beside Areas on the left to make one."
-    ));
+    // Made there and filed into at once (#272).
+    assert!(shows(&harness, "New Area…"));
     assert!(harness.query_all_by_label_contains("Tap").next().is_none());
     Ok(())
 }
@@ -415,7 +417,7 @@ fn a_place_picked_by_keyboard_or_screen_reader_closes_file_into() -> TestResult 
     let (store, _, _) = store()?;
     let mut harness = window(&store);
     type_in_window(&mut harness, "Water the plants");
-    // "Household" in the left pane, and in the menu while it is open.
+    // "Household" in the left pane, and in File into… while it is open.
     let households = |harness: &Harness<'_, App>| {
         harness
             .query_all_by_role_and_label(Role::Button, "Household")
@@ -424,24 +426,25 @@ fn a_place_picked_by_keyboard_or_screen_reader_closes_file_into() -> TestResult 
     let shut = households(&harness);
     click(&mut harness, "File into…");
     assert_eq!(households(&harness), shut + 1);
-    // No pointer click: the pick alone closes the menu.
-    let menu = harness
+    // No pointer click: the pick alone closes it.
+    let pick = harness
         .query_all_by_role_and_label(Role::Button, "Household")
         .last()
-        .ok_or("the menu's Household")?;
-    menu.click_accesskit();
+        .ok_or("File into…'s Household")?;
+    pick.click_accesskit();
     harness.run();
     assert!(shows(&harness, "Into: Household"));
     assert_eq!(households(&harness), shut);
-    // It opens again with the next click on it, and the same pick, which
-    // changes nothing on the card, closes it too.
+    // It opens again with the next click on it, Household now also
+    // filed into recently, and the same pick, which changes nothing on
+    // the card, closes it too.
     click(&mut harness, "File into…");
-    assert_eq!(households(&harness), shut + 1);
-    let menu = harness
+    assert_eq!(households(&harness), shut + 2);
+    let pick = harness
         .query_all_by_role_and_label(Role::Button, "Household")
         .last()
-        .ok_or("the menu's Household")?;
-    menu.click_accesskit();
+        .ok_or("File into…'s Household")?;
+    pick.click_accesskit();
     harness.run();
     assert_eq!(households(&harness), shut);
     Ok(())

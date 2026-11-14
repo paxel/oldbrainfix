@@ -1,4 +1,4 @@
-<!-- page: title="Sicherungen, Sperren und Privatsphäre" track="guide" order=9 summary="Sicherungen und das Wiederherstellungsblatt, die Passphrase und der Wiederherstellungsschlüssel, das Wiederherstellen, die Google-Sicherung, die App-Sperre und die Bereichssperren, eine Person blockieren, was die App wo aufbewahrt, und Feedback senden." -->
+<!-- page: title="Sicherungen, Sperren und Privatsphäre" track="guide" order=9 summary="Sicherungen und das Wiederherstellungsblatt, die Passphrase und der Wiederherstellungsschlüssel, das Wiederherstellen, Notizen aus einer Sicherung zurückholen, die Google-Sicherung, die App-Sperre und die Bereichssperren, eine Person blockieren, was die App wo aufbewahrt, und Feedback senden." -->
 <p class="lede">
   Sicherungen sind verschlüsselte Dateien mit allem, was auf einem Gerät ist, geöffnet mit deiner
   Passphrase oder mit dem Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt. Die App-Sperre
@@ -15,14 +15,14 @@
 <guide-box name="set-up">
 <h2>Sicherungen einrichten</h2>
 <p>Mach verschlüsselte Sicherungen möglich, mit einer Passphrase und einem Wiederherstellungsblatt.</p>
-<box-tab device="phone" alt="Die Sicherungen auf dem Handy, noch nicht eingerichtet: die Felder Passphrase und Passphrase wiederholen mit Sicherungen einrichten">
+<box-tab device="phone" alt="Die Sicherungen auf dem Handy, noch nicht eingerichtet: die Felder Passphrase und Passphrase wiederholen mit Sicherungen einrichten, darunter Notizen zurückholen mit Sicherung öffnen …">
 <li>Tippe auf der Agenda auf dein Profilbild.</li>
 <li>Tippe <strong>Dieses Gerät sichern</strong>.</li>
 <li>Tippe eine Passphrase in beide Felder ein.</li>
 <li>Tippe <strong>Sicherungen einrichten</strong>.</li>
 <li>Tippe <strong>Drucken oder speichern</strong> und bewahre das Blatt sicher auf.</li>
 </box-tab>
-<box-tab device="desktop" alt="Der Dialog Sicherungen in der Desktop-App, noch nicht eingerichtet: die Felder Passphrase und Passphrase wiederholen mit Sicherungen einrichten">
+<box-tab device="desktop" alt="Der Dialog Sicherungen in der Desktop-App, noch nicht eingerichtet: die Felder Passphrase und Passphrase wiederholen mit Sicherungen einrichten, darunter Notizen zurückholen mit Sicherung öffnen …">
 <li>Klicke <strong>Synchronisieren ▸ Sicherungen …</strong>.</li>
 <li>Tippe eine Passphrase in beide Felder ein.</li>
 <li>Klicke <strong>Sicherungen einrichten</strong>.</li>
@@ -73,6 +73,23 @@
   danach neu ein, wähle den Sicherungsordner noch einmal und kopple deine anderen Geräte noch einmal.
   Einfach oder Erweitert und die Papierkorb-Einstellung kommen mit der Sicherung zurück.
 </p>
+<p>
+  <strong>Sicherung öffnen …</strong> unter Notizen zurückholen auf der Seite Sicherungen holt
+  Notizen aus einer Sicherung zurück, ohne sie wiederherzustellen, etwa eine endgültig gelöschte
+  Notiz oder eine frühere Fassung einer Liste; auf dem Desktop steht es auch im Menü Datei. Auf
+  einem Android-Handy und auf dem Desktop beginnt die Dateiauswahl im Sicherungsordner; dann tippe
+  die Passphrase ein oder den Wiederherstellungsschlüssel, den das Handy auch scannen kann. Die
+  Seite zeigt die Notizen der Sicherung als Baum eines Pakets, unter dem Datum, an dem die Sicherung
+  erstellt wurde, und eine Notiz, die in ihrem Papierkorb lag, sagt „Im Papierkorb“. Auf dem Handy
+  fehlen die Notizen eines gesperrten Bereichs, der zu ist; <strong>Entsperren und zeigen</strong>
+  fragt nach der PIN und nimmt sie in den Baum auf. Zu Beginn ist keine Notiz angehakt; eine angehakte
+  Notiz kommt mit ihren Fotos, Aufnahmen und
+  Routinen zurück. <strong>Hinzufügen</strong> übernimmt die angehakten Notizen als Kopien in neue
+  Bereiche, benannt nach denen der Sicherung, etwa „Arzt (Sicherung)“, wenn es hier schon einen
+  Bereich Arzt gibt, und die Notizen ohne Bereich in „Aus einer Sicherung“. Wie bei einem Paket
+  kommt eine Kopie ohne die Einträge ihrer Strichliste, Haken, Erledigt-Haken und ihren Verlauf;
+  sonst ändert sich auf dem Gerät nichts.
+</p>
 </box-more>
 </guide-box>
 
@@ -85,7 +102,7 @@
 <li>Tippe <strong>Ordner wählen</strong> und wähle einen Ordner.</li>
 <li>Lass <strong>Jede Woche sichern</strong> eingeschaltet.</li>
 </box-tab>
-<box-tab device="desktop" alt="Der Dialog Sicherungen, eingerichtet: das Wiederherstellungsblatt mit Wiederherstellungsblatt speichern, und der Ordner mit Jede Woche sichern, der letzten Sicherung und Jetzt sichern">
+<box-tab device="desktop" alt="Der Dialog Sicherungen, eingerichtet: das Wiederherstellungsblatt mit Wiederherstellungsblatt speichern, und der Ordner mit Jede Woche sichern, der letzten Sicherung und Jetzt sichern, darunter Notizen zurückholen mit Sicherung öffnen …">
 <li>Klicke <strong>Synchronisieren ▸ Sicherungen …</strong>.</li>
 <li>Klicke <strong>Ordner wählen</strong> und wähle einen Ordner.</li>
 <li>Lass <strong>Jede Woche sichern</strong> angehakt.</li>
@@ -209,6 +226,44 @@
 </box-more>
 </guide-box>
 
+<guide-box name="hidden-from-ai">
+<h2>Eine Notiz vor der KI verbergen</h2>
+<p>Halte ein Tagebuch, Gesundheitsunterlagen oder den Brief eines Anwalts von jeder KI fern, die deine Notizen lesen darf.</p>
+<box-tab device="phone" alt="Das Menü des Haushalts in der Liste der Bereiche, sein Schalter Vor KI verborgen">
+<li>Tippe <strong>⋮</strong> auf der Karte der Notiz.</li>
+<li>Tippe <strong>Vor KI verborgen</strong>.</li>
+<li>Tippe für einen ganzen Bereich <strong>⋮</strong> neben ihm in der Bereichsliste.</li>
+</box-tab>
+<box-tab device="desktop" alt="Der Haushalt vor KI verborgen im Desktop-Fenster: Schilde an seiner Zeile und seinen Karten, sein Rechtsklick-Menü mit Vor KI verborgen angehakt">
+<li>Klicke mit rechts auf die Karte der Notiz.</li>
+<li>Klicke <strong>Vor KI verborgen</strong>.</li>
+<li>Klicke mit rechts auf einen Bereich in der Seitenleiste für alles darin.</li>
+</box-tab>
+<box-more>
+<p>
+  Eine Notiz oder ein Bereich mit der Markierung <strong>Vor KI verborgen</strong> existiert für die
+  KI nicht: Weder der KI-Port des Computers noch eine KI-Aufgabe liest, durchsucht oder zählt sie
+  oder sieht ihre Routinen und Erinnerungen. Eine Notiz in einem verborgenen Bereich ist mit ihm
+  verborgen. Die Markierung geht nur an deine eigenen Geräte, nie an andere Menschen, und du siehst und
+  sicherst alles wie bisher. Ein Schild neben der Karte der Notiz oder dem Namen des Bereichs zeigt
+  sie; im Notiz-Editor schaltet die Plakette <strong>Vor KI verborgen</strong> sie, und sie sagt „Aus,
+  über ihren Bereich verborgen“, wenn nur ihr Bereich sie verbirgt. Ein erneutes Tippen auf den
+  Schalter nimmt die Markierung ab.
+</p>
+<p>
+  Verborgen und geteilt schließen sich aus: In einem geteilten Bereich wird der Schalter nicht
+  angeboten. Eine verborgene Notiz in einen geteilten Bereich ablegen, eine verborgene Notiz und eine
+  Notiz eines geteilten Bereichs in beide Richtungen zusammenführen, einen Bereich teilen, der
+  verborgen ist oder eine verborgene Notiz enthält, eine verborgene Notiz an eine Person senden und sie
+  als Paket exportieren fragen zuerst: „… vor KI verborgen. Was vor KI verborgen ist, geht an niemanden
+  sonst. Zeige es zuerst der KI.“ <strong>Der KI zeigen</strong> nimmt die Markierung ab und macht
+  weiter; Abbrechen ändert nichts. Eine Notiz, die ihr Bereich verbirgt, wird von dort aus nicht der
+  KI gezeigt: Die Frage nennt den Bereich, dessen Markierung in seinem eigenen Menü abgeht, sodass
+  seine anderen Notizen verborgen bleiben.
+</p>
+</box-more>
+</guide-box>
+
 <guide-box name="block">
 <h2>Eine Person blockieren</h2>
 <p>Halte alles, was ein Mensch schreibt, von deinen Geräten fern.</p>
@@ -245,14 +300,14 @@
 <guide-box name="privacy">
 <h2>Nachsehen, was die App wo aufbewahrt</h2>
 <p>Wisse, welche Geräte deine Notizen und Einstellungen haben und was sie verlässt.</p>
-<box-tab device="phone" alt="Die Einstellungen auf dem Handy: oben, welche Einstellungen mit deinen eigenen Geräten synchronisiert werden">
+<box-tab device="phone" alt="Die Einstellungen auf dem Handy: unter dem Suchfeld, welche Einstellungen mit deinen eigenen Geräten synchronisiert werden">
 <li>Tippe dein Profilbild, dann <strong>Einstellungen</strong>.</li>
-<li>Lies die Zeile oben, was synchronisiert wird.</li>
+<li>Lies die Zeile unter dem Suchfeld, was synchronisiert wird.</li>
 <li>Tippe am Ende auf <strong>Über Old Brain Fix</strong>.</li>
 <li>Tippe <strong>Datenschutzerklärung</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="Der Dialog Einstellungen in der Desktop-App: oben, welche Einstellungen mit deinen eigenen Geräten synchronisiert werden">
-<li>Klicke <strong>Bearbeiten ▸ Einstellungen …</strong> und lies die Zeile oben.</li>
+<box-tab device="desktop" alt="Der Dialog Einstellungen in der Desktop-App: unter dem Suchfeld, welche Einstellungen mit deinen eigenen Geräten synchronisiert werden">
+<li>Klicke <strong>Bearbeiten ▸ Einstellungen …</strong> und lies die Zeile unter dem Suchfeld.</li>
 <li>Klicke <strong>Hilfe ▸ Über Old Brain Fix</strong>.</li>
 <li>Klicke <strong>Datenschutzerklärung</strong>.</li>
 </box-tab>
@@ -268,7 +323,9 @@
   Die meisten Einstellungen bleiben auf dem Gerät, auf dem sie gesetzt wurden. „Einfach oder Erweitert
   und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; die anderen
   Einstellungen gelten nur für dieses Handy.“ Diese zwei sind Einstellungen von dir als Person: Sie
-  gehen an deine eigenen Geräte und in deine Sicherungen, nie an jemand anderen.
+  gehen an deine eigenen Geräte und in deine Sicherungen, nie an jemand anderen. Auf dem Handy und
+  dem Desktop findet das Suchfeld über dieser Zeile eine Einstellung nach ihrem Namen oder ihrer
+  Beschreibung; findet die Suche nichts, sagt sie es. Auf dem Desktop setzt Strg+F den Cursor hinein.
 </p>
 <p>
   Die App schickt nichts von selbst. Wurde die App auf dem Handy unerwartet beendet, sagt es der

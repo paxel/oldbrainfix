@@ -86,6 +86,31 @@ void main() {
       expect(rows(ann), ['Before the trip: 1 of 3']);
     });
 
+    test('asked for, a list whose Lines were all checked today shows for '
+        'the day (#276)', () {
+      var now = DateTime.utc(2026, 3, 5, 21);
+      final store = device(
+        () => now = now.add(const Duration(seconds: 1)),
+        'Cleo',
+      );
+      DateTime wall(DateTime utc) => utc.add(const Duration(hours: 1));
+      final trip = checklist(store, 'Trip\nTent\nTorch');
+      final lists = Checklists(store)
+        ..check(idOf(store, trip, 'Tent'))
+        ..check(idOf(store, trip, 'Torch'));
+      List<String> today() => [
+        for (final (:list, shows: _) in lists.agendaRows(checkedToday: wall))
+          for (final l in list.lines)
+            if (l.checkedOn(Day.today(store.clock(), wall), wall)) l.text,
+      ];
+      expect(rows(store), isEmpty, reason: 'unasked');
+      expect(today(), ['Tent', 'Torch']);
+      // Past midnight on the wall clock it shows no more.
+      now = DateTime.utc(2026, 3, 5, 23, 30);
+      expect(today(), isEmpty);
+      expect(lists.agendaRows(checkedToday: wall), isEmpty);
+    });
+
     test('one shown as its count never shows without an open Line', () {
       final trip = checklist(ann, 'Trip\nTent');
       final lists = Checklists(ann)..setOnAgenda(trip, ListOnAgenda.count);

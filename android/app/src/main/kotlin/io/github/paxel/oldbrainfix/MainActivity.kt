@@ -11,6 +11,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.view.WindowManager
 import androidx.core.content.FileProvider
@@ -37,12 +38,16 @@ class MainActivity : FlutterActivity() {
     /** The answer to Capture's "pick", until the gallery comes back. */
     private var galleryAnswer: MethodChannel.Result? = null
 
+    /** The answer to the file picker's "pick" (#267), until it comes back. */
+    private var filesAnswer: MethodChannel.Result? = null
+
     /** The answer to the Profile's "pick", until the picture picker comes back. */
     private var pictureAnswer: MethodChannel.Result? = null
 
     private var voiceChannel: MethodChannel? = null
 
     private var captureChannel: MethodChannel? = null
+    private var shortcutsChannel: MethodChannel? = null
 
     /** The microphone and the player for voice Notes. */
     private val voice by lazy { Voice(this) }
@@ -100,6 +105,7 @@ class MainActivity : FlutterActivity() {
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_CHANGES, false) == true) changesOpened = true
         if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
         if (savedInstanceState == null) pickOf(intent)?.let { pickOpened = it }
+        if (savedInstanceState == null) occurrenceOf(intent)?.let { occurrenceOpened = it }
         if (savedInstanceState == null) {
             CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
         }
@@ -107,9 +113,9 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * The full-screen alarm, the Nudge, the Changes Nudge, the Agenda
-     * widget's Unsorted count or a pick on it opened the running app: the
-     * app shows it.
+     * The full-screen alarm, the Nudge, the Changes Nudge, an
+     * Occurrence's notification, the Agenda widget's Unsorted count or a
+     * pick on it opened the running app: the app shows it.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -130,6 +136,10 @@ class MainActivity : FlutterActivity() {
             pickOpened = it
             actionsArrived()
         }
+        occurrenceOf(intent)?.let {
+            occurrenceOpened = it
+            actionsArrived()
+        }
         // Something was shared in while the app runs: it takes it now.
         if (intent.getBooleanExtra(EXTRA_SHARED, false)) {
             photoChannel?.invokeMethod("shared", null)
@@ -142,6 +152,11 @@ class MainActivity : FlutterActivity() {
         CaptureModes.of(intent.action, intent.flags)?.let {
             captureRequested = it
             captureChannel?.invokeMethod("requested", null)
+        }
+        // A Tally's shortcut asked for its entry page while the app runs
+        // (#284); which one, TallyEntryActivity told already.
+        if (intent.action == TallyShortcuts.ACTION && tallyRequested != null) {
+            shortcutsChannel?.invokeMethod("requested", null)
         }
         if (!intent.getBooleanExtra(EXTRA_RING, false)) return
         showOverLockScreen(true)
@@ -182,7 +197,12 @@ class MainActivity : FlutterActivity() {
                     "take" -> takePhoto(result)
                     "pick" -> pickPhotos(result)
                     "paste" -> paste(result)
-                    "shared" -> inBackground(result) { Shares.take() }
+                    "shared" -> inBackground(result) {
+                        // Pages printed to the app wait in its files,
+                        // also through a restart (#293).
+                        Shares.keepPrinted(this@MainActivity)
+                        Shares.take()
+                    }
                     "save" -> {
                         val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
                         inBackground(result) {
@@ -379,7 +399,7 @@ class MainActivity : FlutterActivity() {
                             args["subject"] as? String,
                         ),
                     )
-                    "pick" -> pickBundle(result)
+                    "pick" -> pickBundle(result, Bundles.startOf(args["from"] as? String))
                     "take" -> result.success(Bundles.take())
                     "print" -> result.success(
                         Printing.print(
@@ -392,6 +412,40 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILES_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                when (call.method) {
+                    "pick" -> pickFiles(result)
+                    "open" -> result.success(
+                        Files.open(this, args["path"] as? String ?: "", args["type"] as? String ?: ""),
+                    )
+                    "pdfPages" -> inBackground(result) { Files.pdfPages(call.arguments as? String ?: "") }
+                    "pdfPage" -> inBackground(result) {
+                        Files.pdfPage(args["path"] as? String ?: "", (args["index"] as? Number)?.toInt() ?: -1)
+                    }
+                    "pdfLayout" -> inBackground(result) { Files.pdfLayout(call.arguments as? String ?: "") }
+                    "pdfRender" -> inBackground(result) {
+                        Files.pdfRender(
+                            args["path"] as? String ?: "",
+                            (args["index"] as? Number)?.toInt() ?: -1,
+                            (args["width"] as? Number)?.toInt() ?: 0,
+                        )
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        // Print to Old Brain Fix (#293): whether the print service is on,
+        // asked again each time Settings shows, and Android's print
+        // settings, where the user turns it on.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PRINT_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "state" -> result.success(PrintIn.state(this).name.lowercase())
+                    "openSettings" -> result.success(PrintIn.openSettings(this))
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OCR_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -493,6 +547,32 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        shortcutsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHORTCUTS_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "pinTally" -> {
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        val note = args["note"] as? String
+                        if (note.isNullOrEmpty()) {
+                            result.success(false)
+                        } else {
+                            result.success(TallyShortcuts.pin(this@MainActivity, note, args["label"] as? String ?: ""))
+                        }
+                    }
+                    "take" -> {
+                        result.success(tallyRequested)
+                        tallyRequested = null
+                    }
+                    // The entry page a shortcut opened closed: back to the
+                    // home screen, the app kept as it was behind it.
+                    "leave" -> {
+                        moveTaskToBack(true)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
         alarmChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ALARM_CHANNEL).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -511,6 +591,10 @@ class MainActivity : FlutterActivity() {
                     "pickOpened" -> {
                         result.success(pickOpened)
                         pickOpened = null
+                    }
+                    "occurrenceOpened" -> {
+                        result.success(occurrenceOpened)
+                        occurrenceOpened = null
                     }
                     "request" -> {
                         Permissions.request(this@MainActivity, call.arguments as String)
@@ -651,6 +735,26 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
+     * Opens the system's file picker for Attachments (#267), several files
+     * of any kind at once, which needs no storage permission; they come
+     * back copied with their names and types in [onActivityResult].
+     */
+    private fun pickFiles(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_FILES)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(emptyList<Map<String, String?>>())
+        }
+        filesAnswer?.success(emptyList<Map<String, String?>>())
+        filesAnswer = result
+    }
+
+    /**
      * Lets the user pick a speech model file of their own with the
      * system's file picker, which needs no storage permission, and copies
      * it to the side; answers its SHA-256, or null when none was picked.
@@ -711,11 +815,18 @@ class MainActivity : FlutterActivity() {
         soundAnswer = result
     }
 
-    /** Opens the system's file picker for a bundle to import; the answer comes in [onActivityResult]. */
-    private fun pickBundle(result: MethodChannel.Result) {
+    /**
+     * Opens the system's file picker for a bundle to import, at the document
+     * [start] where there is one (Android 8 and later); the answer comes in
+     * [onActivityResult].
+     */
+    private fun pickBundle(result: MethodChannel.Result, start: String?) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
             .setType("*/*")
+        if (start != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(start))
+        }
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(intent, REQUEST_BUNDLE)
@@ -845,6 +956,29 @@ class MainActivity : FlutterActivity() {
             return inBackground(answer) {
                 uris.mapNotNull { uri -> Photos.normalize { contentResolver.openInputStream(uri) } }
             }
+        }
+        if (requestCode == REQUEST_FILES) {
+            val answer = filesAnswer
+            filesAnswer = null
+            val clips = data?.clipData
+            val uris = Photos.picked(
+                resultCode == Activity.RESULT_OK,
+                clips?.let { (0 until it.itemCount).mapNotNull { i -> it.getItemAt(i).uri } },
+                data?.data,
+            )
+            if (answer == null) {
+                // The app was gone while the picker was open: the files
+                // still reach a Note, through Capture like a share.
+                if (uris.isNotEmpty()) {
+                    Thread {
+                        Shares.keepPickedFiles(this, uris)
+                        runOnUiThread { photoChannel?.invokeMethod("shared", null) }
+                    }.start()
+                }
+                return
+            }
+            if (uris.isEmpty()) return answer.success(emptyList<Map<String, String?>>())
+            return inBackground(answer) { Files.handed(Files.copy(this, uris)) }
         }
         if (requestCode == REQUEST_MODEL) {
             val answer = modelAnswer ?: return
@@ -1030,6 +1164,11 @@ class MainActivity : FlutterActivity() {
         return mapOf("session" to session, "occurrence" to occurrence, "note" to note)
     }
 
+    /** The Occurrence whose notification was tapped (#270), as the app reads it, or null. */
+    private fun occurrenceOf(intent: Intent?): Map<String, String>? = intent?.let {
+        OccurrenceOpen.of({ key -> it.getStringExtra(key) }, it.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0)
+    }
+
     private fun opensUnsorted(intent: Intent?): Boolean =
         intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
             intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
@@ -1041,8 +1180,11 @@ class MainActivity : FlutterActivity() {
         private const val CONTEXT_CHANNEL = "io.github.paxel.oldbrainfix/context"
         private const val VOICE_CHANNEL = "io.github.paxel.oldbrainfix/voice"
         private const val CAPTURE_CHANNEL = "io.github.paxel.oldbrainfix/capture"
+        private const val SHORTCUTS_CHANNEL = "io.github.paxel.oldbrainfix/shortcuts"
         private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
+        private const val FILES_CHANNEL = "io.github.paxel.oldbrainfix/files"
+        private const val PRINT_CHANNEL = "io.github.paxel.oldbrainfix/print"
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val EXIT_CHANNEL = "io.github.paxel.oldbrainfix/exit"
@@ -1059,6 +1201,7 @@ class MainActivity : FlutterActivity() {
         private const val REQUEST_BUNDLE = 6
         private const val REQUEST_PICTURE = 7
         private const val REQUEST_GALLERY = 8
+        private const val REQUEST_FILES = 16
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12
@@ -1105,8 +1248,23 @@ class MainActivity : FlutterActivity() {
         /** The pick tapped on the Agenda widget whose entry form the app has not opened yet. */
         private var pickOpened: Map<String, String>? = null
 
+        /** The Occurrence whose notification was tapped and whose Note the app has not opened yet. */
+        private var occurrenceOpened: Map<String, String>? = null
+
         /** The capture screen an entry point asked for and the app has not opened yet. */
         private var captureRequested: String? = null
+
+        /** The Tally whose shortcut was tapped and whose entry page the app has not opened yet (#284). */
+        private var tallyRequested: String? = null
+
+        /**
+         * A Tally's shortcut asked for the entry page of the Tally of
+         * [note]: only [TallyEntryActivity] tells, in the app's own
+         * process, so no other app's intent opens one.
+         */
+        fun tallyAsked(note: String) {
+            tallyRequested = note
+        }
 
         /**
          * The full-screen alarm stopped: the app no longer shows over the

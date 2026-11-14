@@ -12,14 +12,17 @@ extension L10nContext on BuildContext {
 /// as it reads, without the marks of a formatted one, or what it holds
 /// when it has no words ([Note.wordless]).
 String noteText(AppLocalizations t, Note note) => note.text.trim().isEmpty
-    ? wordlessTitle(t, note.wordless)
+    ? wordlessTitle(t, note.wordless, note.wordlessName)
     : note.visibleText;
 
-/// "Photo" or "Voice recording" for a Note without words.
-String wordlessTitle(AppLocalizations t, Wordless wordless) =>
+/// "Photo" or "Voice recording" for a Note without words; for one of
+/// files by the [name] of its first file (#267, [Note.wordlessName]), or
+/// the word for an Attachment when it has none.
+String wordlessTitle(AppLocalizations t, Wordless wordless, String name) =>
     switch (wordless) {
       Wordless.photo => t.photo,
       Wordless.voiceRecording => t.voiceRecording,
+      Wordless.file => name.isEmpty ? t.attachment : name,
     };
 
 /// [names] as a sentence lists them: "Bob", "Bob and Carol", "Bob, Carol

@@ -1,6 +1,8 @@
 //! Sorting a capture into a Shopping List (#124), in the capture popup
 //! and the window's capture field, driven headless by egui_kittest: "Add
-//! to a Shopping List" in "More" lists the lists, the one picked shows at
+//! to a Shopping List" in "More" lists the lists, the one a capture went
+//! into last at the top, or with one list names it, "Add to Groceries",
+//! and picks it at once (#276); the one picked shows at
 //! the top alone and the other choices come back when it is dropped;
 //! saving makes each line a Line, a name the list has bringing its Line
 //! back, and keeps no Note; a recording's Transcript gives its lines once
@@ -101,13 +103,20 @@ fn click<S>(harness: &mut Harness<'_, S>, label: &str) {
     harness.run();
 }
 
-/// Picks the Shopping List `title` in "More".
+/// Picks the Shopping List `title` in "More": the entry naming it while
+/// it is the only one (#276), else its radio button under the heading.
 fn pick<S>(harness: &mut Harness<'_, S>, title: &str) {
     click(harness, "More");
-    assert!(shows(harness, t().add_to_shopping_list()));
-    harness
-        .get_by_role_and_label(Role::RadioButton, title)
-        .click_accesskit();
+    let named = t().add_to_named_shopping_list(title);
+    match harness.query_all_by_label(&named).next() {
+        Some(entry) => entry.click_accesskit(),
+        None => {
+            assert!(shows(harness, t().add_to_shopping_list()));
+            harness
+                .get_by_role_and_label(Role::RadioButton, title)
+                .click_accesskit();
+        }
+    }
     harness.run();
 }
 
@@ -463,21 +472,75 @@ fn a_list_picked_by_keyboard_or_screen_reader_closes_more() -> TestResult {
     harness.get_by(|n| n.is_focused()).type_text("Bread");
     harness.run();
     // No pointer click: the pick alone closes the menu.
+    let named = t().add_to_named_shopping_list("Groceries");
     pick(&mut harness, "Groceries");
     assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    assert!(
-        harness
-            .query_by_role_and_label(Role::RadioButton, "Groceries")
-            .is_none()
-    );
+    assert!(!shows(&harness, &named));
     // The list picked again, in the "More" that holds only it, closes it
     // too and keeps it.
-    pick(&mut harness, "Groceries");
+    click(&mut harness, "More");
+    harness
+        .get_by_role_and_label(Role::RadioButton, &named)
+        .click_accesskit();
+    harness.run();
+    assert!(!shows(&harness, &named));
+    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
+    Ok(())
+}
+
+#[test]
+fn one_list_is_named_and_picked_at_once() -> TestResult {
+    let (store, _, list) = store()?;
+    let mut harness = window(App::new(store.clone(), "en"));
+    type_rows(&mut harness, &["Eggs"]);
+    click(&mut harness, "More");
+    // No heading over one list to pick from: its entry names it.
+    assert!(!shows(&harness, t().add_to_shopping_list()));
     assert!(
         harness
             .query_by_role_and_label(Role::RadioButton, "Groceries")
             .is_none()
     );
+    click(&mut harness, &t().add_to_named_shopping_list("Groceries"));
     assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
+    click(&mut harness, "Save");
+    assert_eq!(lines(&store, &list)?, ["Eggs", "Milk"]);
+    Ok(())
+}
+
+#[test]
+fn of_several_lists_the_one_a_capture_went_into_last_is_at_the_top() -> TestResult {
+    let (store, _, groceries) = store()?;
+    let hardware = Notes::new(&store)
+        .capture("Hardware\nNails", None, None)?
+        .id;
+    ShoppingLists::new(&store).make(&hardware)?;
+    let top = |harness: &Harness<'_, App>, title: &str| {
+        harness
+            .get_by_role_and_label(Role::RadioButton, title)
+            .rect()
+            .top()
+    };
+    let mut harness = window(App::new(store.clone(), "en"));
+    type_rows(&mut harness, &["Glue"]);
+    // Oldest capture first while none was used.
+    click(&mut harness, "More");
+    assert!(shows(&harness, t().add_to_shopping_list()));
+    assert!(top(&harness, "Groceries") < top(&harness, "Hardware"));
+    harness.key_press(Key::Escape);
+    harness.run();
+    pick(&mut harness, "Hardware");
+    // Picked, but nothing added yet: nothing remembered.
+    assert_eq!(DeviceSettings::new(&store).last_shopping_list()?, None);
+    click(&mut harness, "Save");
+    assert_eq!(lines(&store, &hardware)?, ["Glue", "Nails"]);
+    assert_eq!(
+        DeviceSettings::new(&store).last_shopping_list()?.as_deref(),
+        Some(hardware.as_str())
+    );
+    type_rows(&mut harness, &["Tea"]);
+    click(&mut harness, "More");
+    assert!(top(&harness, "Hardware") < top(&harness, "Groceries"));
+    assert_eq!(lines(&store, &groceries)?, ["Milk"]);
     Ok(())
 }

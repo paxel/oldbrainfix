@@ -9,6 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'auto_sync.dart';
+import 'backup_notes_screen.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'folder_platform.dart';
@@ -56,8 +57,8 @@ Uint8List recoverySheetBytes(
 /// sync, as the backup key belongs to the Profile; then the opt-in to
 /// keep the newest one in the user's Google account where the platform
 /// has one, the folder they go into, the weekly switch, "Back up now"
-/// and how the last one went. What happened, or why not, is announced
-/// at the top.
+/// and how the last one went; and "Open a Backup…" to take Notes back
+/// from one (#285). What happened, or why not, is announced at the top.
 class BackupScreen extends StatefulWidget {
   final Store store;
 
@@ -477,6 +478,27 @@ class _BackupScreenState extends State<BackupScreen> {
           Text(t.backupsIntro),
           const SizedBox(height: 16),
           if (_store.backupsSetUp) ..._setUpDone(t, when) else ..._setUpForm(t),
+          if (BundleScope.of(context).available) ...[
+            if (!_store.backupsSetUp) const SizedBox(height: 16),
+            _Card(
+              title: t.backupOpenTitle,
+              children: [
+                Text(t.backupOpenIntro),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    key: const ValueKey('backup-open'),
+                    onPressed: () => unawaited(
+                      openBackupFile(context, _store, derive: widget.derive),
+                    ),
+                    icon: const Icon(Icons.restore_page_outlined),
+                    label: Text(t.backupOpen),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

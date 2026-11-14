@@ -499,12 +499,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "oldbrainfix-pdf"
+version = "0.6.0"
+dependencies = [
+ "crc32fast",
+ "flate2",
+]
+
+[[package]]
 name = "oldbrainfix_ocr"
 version = "0.1.0"
 dependencies = [
  "image",
  "jni",
  "ndarray",
+ "oldbrainfix-pdf",
  "rten",
  "rten-tensor",
  "rusto-rs",

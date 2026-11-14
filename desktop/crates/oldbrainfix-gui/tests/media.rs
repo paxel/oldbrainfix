@@ -380,7 +380,7 @@ fn pictures_dropped_onto_the_window_become_one_photo_note() -> TestResult {
             bytes: Some(Arc::from(png(10, 10))),
             ..Default::default()
         },
-        // Not a picture: left alone.
+        // Not a picture: an Attachment of the same Note (#267).
         egui::DroppedFile {
             bytes: Some(Arc::from(&b"plain text"[..])),
             ..Default::default()
@@ -397,6 +397,7 @@ fn pictures_dropped_onto_the_window_become_one_photo_note() -> TestResult {
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].photos.len(), 2);
+    assert_eq!(notes[0].attachments.len(), 1);
     let kept = store.photo(&notes[0].photos[0]).ok_or("the photo")?;
     let size = image::load_from_memory(&kept).map(|i| (i.width(), i.height()))?;
     assert_eq!(size, (2048, 683));
@@ -554,6 +555,8 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
     let mut harness = settings(app);
     harness.run();
     std::thread::sleep(StdDuration::from_millis(100));
+    // The speech model's card lies below the AI cards, out of the
+    // dialog's view: its buttons are clicked as a screen reader does.
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2, "no model yet");
     assert!(shows(&harness, "Speech model"));
     assert!(shows(&harness, "No speech model yet"));
@@ -565,7 +568,7 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
         &harness,
         "Better with English words in German speech, but slower, and it needs more memory."
     ));
-    harness.get_by_label("Small, 488 MB").click();
+    harness.get_by_label("Small, 488 MB").click_accesskit();
     harness.run();
     assert!(eventually(|| speech.outcome().is_some()));
     harness.run();
@@ -574,7 +577,9 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
         "That is not the expected speech model, so it was not kept."
     ));
     // A file of the user's own that is not the model is refused alike.
-    harness.get_by_label("Use a file of my own").click();
+    harness
+        .get_by_label("Use a file of my own")
+        .click_accesskit();
     harness.run();
     assert!(eventually(|| speech.status() == Status::Missing));
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2);
@@ -636,7 +641,7 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     app.open(Page::Settings);
     let mut harness = settings(app);
     harness.run();
-    harness.get_by_label("Base, 148 MB").click();
+    harness.get_by_label("Base, 148 MB").click_accesskit();
     // A download in progress repaints, so step instead of waiting for stillness.
     harness.run_steps(4);
     assert!(eventually(|| speech.current() == Some(WhisperModel::Base)));
@@ -650,7 +655,7 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
         .untranscribed()
         .is_ok_and(|w| w.is_empty())));
     // The small one downloads while the base one stays in use.
-    harness.get_by_label("Small, 488 MB").click();
+    harness.get_by_label("Small, 488 MB").click_accesskit();
     // A download repaints to show how far it came.
     harness.run_steps(3);
     assert!(matches!(
@@ -1085,6 +1090,36 @@ fn replace_and_append_take_a_photo_text_over_into_the_notes_text() -> TestResult
 }
 
 #[test]
+fn removing_a_transcript_asks_nothing_and_ctrl_z_writes_it_back() -> TestResult {
+    let store = empty_store()?;
+    let notes = Notes::new(&store);
+    let note = notes.capture("Bike", None, None)?;
+    let hash = notes.add_recording(&note.id, &heard())?;
+    notes.set_transcript(&note.id, &hash, "Lock code 1234")?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    harness.get_by_label("Remove generated text").click();
+    harness.run();
+    assert!(!shows(&harness, "Remove this Transcript?"));
+    let bike = Notes::new(&store).by_id(&note.id)?.ok_or("Bike")?;
+    assert_eq!(bike.removed_transcripts, vec![hash.clone()]);
+    assert!(!shows(&harness, "Lock code 1234"));
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    let bike = Notes::new(&store).by_id(&note.id)?.ok_or("Bike")?;
+    assert!(bike.removed_transcripts.is_empty());
+    assert_eq!(
+        bike.transcripts.get(&hash).map(String::as_str),
+        Some("Lock code 1234")
+    );
+    assert_eq!(bike.recordings, vec![hash]);
+    assert!(shows(&harness, "Lock code 1234"));
+    Ok(())
+}
+
+#[test]
 fn replace_and_append_take_a_transcript_over_into_the_notes_text() -> TestResult {
     let store = empty_store()?;
     let notes = Notes::new(&store);
@@ -1132,7 +1167,7 @@ fn replace_and_append_take_a_transcript_over_into_the_notes_text() -> TestResult
 }
 
 #[test]
-fn removing_a_photo_text_asks_once_and_keeps_the_photo() -> TestResult {
+fn removing_a_photo_text_asks_nothing_keeps_the_photo_and_ctrl_z_brings_it_back() -> TestResult {
     let store = media_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
@@ -1141,17 +1176,22 @@ fn removing_a_photo_text_asks_once_and_keeps_the_photo() -> TestResult {
     let photo = "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90";
     harness.get_by_label("Remove generated text").click();
     harness.run();
-    assert!(shows(&harness, "Remove this Photo Text?"));
-    harness.get_by_label("Cancel").click();
-    harness.run();
     assert!(!shows(&harness, "Remove this Photo Text?"));
+    assert_eq!(harness.state().error(), None);
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert_eq!(shed.removed_photo_texts, vec![photo.to_string()]);
+    // Ctrl+Z writes the text back, and Remove takes it again.
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert!(shed.removed_photo_texts.is_empty());
+    assert_eq!(
+        shed.photo_texts.get(photo).map(String::as_str),
+        Some("Spare key under the pot")
+    );
+    assert!(shows(&harness, "Spare key under the pot"));
     harness.get_by_label("Remove generated text").click();
     harness.run();
-    harness.get_by_label("Remove").click();
-    harness.run();
-    assert_eq!(harness.state().error(), None);
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert_eq!(shed.removed_photo_texts, vec![photo.to_string()]);
     assert_eq!(shed.photos.len(), 3);

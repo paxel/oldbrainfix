@@ -33,7 +33,9 @@ typedef ShownPicks = ({
 });
 
 /// A Shopping List's group on today's Agenda (#123, #186, #208): its
-/// open [lines] under its name, or none when it shows as one row with its
+/// open [lines] under its name, then those checked today, by id in
+/// [struck], which stay struck for the day unless this Device hides
+/// what is checked (#276); or none when it shows as one row with its
 /// [count] of open Lines, as chosen for it or as a Masked one does; with
 /// where its Note is filed, whether it shows Masked and whether this
 /// Device may check its Lines.
@@ -42,6 +44,7 @@ typedef ShoppingRow = ({
   Area? area,
   bool masked,
   List<ShoppingLine> lines,
+  Set<String> struck,
   int count,
   bool checks,
 });
@@ -63,12 +66,34 @@ typedef ChecklistRow = ({
 /// The Lines a Checklist shows under its heading on the Agenda (#208): a
 /// Checklist Routine's Occurrence every Line, checked ones struck
 /// through, or only its open ones where this Device [hidesChecked]
-/// (#217); a Checklist without a Routine its open ones. The one place
-/// that decides it, for the Agenda and its widget alike.
-List<Line> agendaLines(Checklist list, {required bool hidesChecked}) => [
-  for (final line in list.lines)
-    if ((list.on != null && !hidesChecked) || !line.checked) line,
-];
+/// (#217); a Checklist without a Routine its open ones, and those checked
+/// [today] struck for the day (#276), a Line with a group while a Line of
+/// it shows. The one place that decides it, for the Agenda and its widget
+/// alike.
+List<Line> agendaLines(
+  Checklist list, {
+  required bool hidesChecked,
+  ({Day day, WallClock wallClock})? today,
+}) {
+  if (list.on != null && !hidesChecked) return list.lines;
+  final shown = {
+    for (final line in list.lines)
+      if (!line.checked ||
+          (!hidesChecked &&
+              today != null &&
+              line.checkedOn(today.day, today.wallClock)))
+        line.id,
+  };
+  // A group's Line shows over the Lines of its group that show.
+  shown.addAll([
+    for (final line in list.lines)
+      if (line.parent case final parent? when shown.contains(line.id)) parent,
+  ]);
+  return [
+    for (final line in list.lines)
+      if (shown.contains(line.id)) line,
+  ];
+}
 
 /// Whether [placed] shows as Done: checked off, or Done from the entries
 /// of every pick or from every Line checked.
@@ -185,11 +210,13 @@ class AgendaDays {
   }) {
     final hidesChecked = store.agendaHidesChecked;
     final reader = _Reader(store, places, wallClock, sessions);
-    // What shows as Done leaves where this Device hides it (#217).
+    // What shows as Done leaves where this Device hides it (#217), and
+    // so does what is struck as skipped (#269).
     List<PlacedRow> placed(List<AgendaRow> rows) => [
       for (final row in rows)
         if (reader.place(row) case final placed
-            when !hidesChecked || !shownDone(placed))
+            when !hidesChecked ||
+                !(shownDone(placed) || placed.row.skipped != null))
           placed,
     ];
     final agenda = Routines(store).agenda(wallClock, days: days);
@@ -212,8 +239,8 @@ class AgendaDays {
         today: _DayPart(
           agenda.today,
           placed(agenda.todayRows),
-          shopping: reader.shoppingRows(),
-          checklists: reader.checklistRows(),
+          shopping: reader.shoppingRows(hidesChecked: hidesChecked),
+          checklists: reader.checklistRows(hidesChecked: hidesChecked),
         ),
         tomorrow: _DayPart(agenda.tomorrow, placed(agenda.tomorrowRows)),
         later: [
@@ -330,6 +357,9 @@ class _Reader {
   /// their rows read their Lines for the Occurrence.
   Set<String> listNotes = const {};
 
+  /// Today on [wallClock], read once.
+  late final Day today = Day.today(store.clock(), wallClock);
+
   _Reader(
     this.store,
     this.places,
@@ -349,23 +379,33 @@ class _Reader {
       '$id@${occurrence.key}';
 
   /// Today's groups of the Shopping Lists, as this person chose for each
-  /// list (#186): its open Lines under it, or only their number. A list
-  /// of a Masked Area tells nothing of its Lines.
-  List<ShoppingRow> shoppingRows() {
+  /// list (#186): its open Lines under it, then those checked today,
+  /// struck for the day unless this Device [hidesChecked] (#276); or only
+  /// the number of open ones, never 0. A list of a Masked Area tells
+  /// nothing of its Lines.
+  List<ShoppingRow> shoppingRows({required bool hidesChecked}) {
     final rows = <ShoppingRow>[];
-    for (final (:list, :shows, :lines) in shopping.agendaRows(wallClock)) {
+    for (final (:list, :shows, :lines) in shopping.agendaRows(
+      wallClock,
+      checkedToday: !hidesChecked,
+    )) {
       final note = notes.byId(list.noteId);
       if (note == null) continue;
       final masked = masksNote(note);
-      final area = placeNote(places, note).area;
+      final listed = shows == ListOnAgenda.lines && !masked;
+      if (!listed && list.openCount == 0) continue;
+      final open = {for (final line in list.open) line.id};
       rows.add((
         note: note,
-        area: area,
+        area: placeNote(places, note).area,
         masked: masked,
-        lines: shows == ListOnAgenda.lines && !masked
-            ? lines
-            : const <ShoppingLine>[],
-        count: lines.length,
+        lines: listed ? lines : const <ShoppingLine>[],
+        struck: {
+          if (listed)
+            for (final line in lines)
+              if (!open.contains(line.id)) line.id,
+        },
+        count: list.openCount,
         checks: shopping.mayCheck(note.id),
       ));
     }
@@ -374,17 +414,24 @@ class _Reader {
 
   /// Today's rows of the Checklists without a Routine that show on this
   /// person's Agenda, as this person chose for each list (#219): its open
-  /// Lines under it, or only their count; oldest capture first. One of a
-  /// Masked Area tells nothing of it.
-  List<ChecklistRow> checklistRows() => [
-    for (final (:list, :shows) in checklists.agendaRows())
+  /// Lines under it, then those checked today struck for the day unless
+  /// this Device [hidesChecked] (#276), or only their count, never with
+  /// none open; oldest capture first. One of a Masked Area tells nothing
+  /// of it.
+  List<ChecklistRow> checklistRows({required bool hidesChecked}) => [
+    for (final (:list, :shows) in checklists.agendaRows(
+      checkedToday: hidesChecked ? null : wallClock,
+    ))
       if (notes.byId(list.noteId) case final note?)
-        checklistRow(
-          note,
-          list,
-          masked: masksNote(note),
-          count: shows == ListOnAgenda.count,
-        ),
+        if (checklistRow(
+              note,
+              list,
+              masked: masksNote(note),
+              count: shows == ListOnAgenda.count,
+              hidesChecked: hidesChecked,
+            )
+            case final row when row.lines.isNotEmpty || list.openCount > 0)
+          row,
   ];
 
   /// The group of the Checklist [list] of [note]: every Line it shows
@@ -395,15 +442,21 @@ class _Reader {
     Checklist list, {
     required bool masked,
     bool count = false,
+    required bool hidesChecked,
   }) => (
     note: note,
     area: placeNote(places, note).area,
     masked: masked,
     list: list,
-    // Its checked Lines never show (#143).
+    // Its checked Lines show only on the day they were checked (#143,
+    // #276).
     lines: masked || count
         ? const <Line>[]
-        : agendaLines(list, hidesChecked: true),
+        : agendaLines(
+            list,
+            hidesChecked: hidesChecked,
+            today: (day: today, wallClock: wallClock),
+          ),
     checks: checklists.mayCheck(note.id),
   );
 

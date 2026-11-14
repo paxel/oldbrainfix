@@ -248,6 +248,23 @@ fn a_compact_session_shows_the_next_run_of_its_routines_and_their_week() -> Test
 }
 
 #[test]
+fn a_sessions_skipped_runs_count_as_skipped_not_its_missed_ones() -> TestResult {
+    let store = store()?;
+    let (pool, sport) = sport(&store)?;
+    let today = Day::new(2026, 10, 26);
+    let evening = daily_at(today, 18)?;
+    let run = Sessions::new(&store).spawn(&sport, &evening, &pool, 1, SessionRule::Rolling)?;
+    let at = oldbrainfix_core::ClockTime::new(18, 0).ok_or("a time")?;
+    let tonight = oldbrainfix_core::Occurrence::new(today, Some(at));
+    // Not today (#269): skipped, the run counts as skipped.
+    oldbrainfix_core::Routines::new(&store).skip(run.id(), &tonight, None)?;
+    let harness = compact(&store)?;
+    assert!(shows(&harness, "Next: Tue, 10/27/2026 18:00"));
+    assert!(shows(&harness, "done 0 / skipped 1 this week"));
+    Ok(())
+}
+
+#[test]
 fn a_detailed_session_shows_its_pool_todays_picks_of_each_routine_and_four_weeks() -> TestResult {
     let store = store()?;
     let (pool, sport) = sport(&store)?;

@@ -71,6 +71,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-schedule')));
+    await tester.pumpAndSettle();
+  }
+
   final page = find.byType(RoutineHistoryScreen);
 
   /// The dots of the days that came to [outcome].
@@ -99,7 +110,7 @@ void main() {
         'the log', (tester) async {
       pills();
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       await tap(tester, historyButton);
       expect(page, findsOneWidget);
@@ -158,7 +169,7 @@ void main() {
         at: DateTime(2026, 10, 23, 8, 30),
       );
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, historyButton);
       await tester.scrollUntilVisible(
         find.textContaining('Done late: '),
@@ -176,7 +187,7 @@ void main() {
     ) async {
       pills();
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, historyButton);
       expect(streak, findsOneWidget);
 
@@ -193,7 +204,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, historyButton);
       expect(streak, findsNothing);
       expect(find.text('Now'), findsNothing);
@@ -222,12 +233,41 @@ void main() {
         Schedule(start: Day(2026, 10, 24), times: [at(10)]),
       );
       await start(tester);
-      // No menu: the press opens the Reminder as a tap does.
+      // Its menu answers it (#269), and has no History.
       await tester.longPress(find.text('call mum'));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('answer-skip')), findsOneWidget);
       expect(find.text('History'), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      await editSchedule(tester, find.text('call mum'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(historyButton, findsNothing);
+    });
+
+    testWidgets('the Adherence fits a 320 dp phone in German; the share '
+        'wraps instead of running off', (tester) async {
+      tester.view.physicalSize = const Size(960, 1920);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      pills();
+      await start(tester);
+      await editSchedule(tester, find.text('pills').first);
+      await tap(tester, find.byTooltip('Verlauf'));
+      expect(page, findsOneWidget);
+
+      expect(find.text('Einhaltung'), findsOneWidget);
+      expect(find.text('3 von 4 erledigt'), findsNWidgets(3));
+      expect(find.text('75\u00a0%'), findsNWidgets(3));
+      final right = tester.getTopRight(page).dx;
+      for (final percent in find.text('75\u00a0%').evaluate()) {
+        expect(
+          tester.getTopRight(find.byWidget(percent.widget)).dx,
+          lessThanOrEqualTo(right),
+        );
+      }
     });
   });
 }
