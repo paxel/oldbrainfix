@@ -347,7 +347,8 @@ enum ShareTypes {
     if let match = types.first(where: { $0.type.conforms(to: .plainText) }) {
       return (.text, match.id)
     }
-    if let match = types.first(where: { $0.type.conforms(to: .data) }) {
+    // A URL is data too; a file URL alone is nothing to load.
+    if let match = types.first(where: { $0.type.conforms(to: .data) && !$0.type.conforms(to: .url) }) {
       return (.attachment, match.id)
     }
     return nil
