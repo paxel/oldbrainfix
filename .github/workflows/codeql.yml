@@ -88,9 +88,12 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+          # Test code holds fixed keys and secrets on purpose; shipped code keeps every rule.
           config: |
             paths-ignore:
               - third_party
+              - desktop/crates/*/tests
+              - desktop/crates/**/*tests.rs
 
       # Only the Kotlin compile: the native libraries (whisper.cpp, RustO)
       # are not Kotlin and are left out. No daemon, so every compilation
