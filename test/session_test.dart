@@ -705,12 +705,16 @@ void main() {
 
       await tap(tester, key('session-pick-$pushUps'));
       expect(find.byType(TallyEntryScreen), findsOneWidget);
+      // Only the entry form opens, not the Tally's editor under it (#320).
+      expect(find.byType(NoteEditorScreen, skipOffstage: false), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller?.text,
         '20',
       );
       expect(key('tally-entry-date'), findsNothing, reason: 'counts for now');
       await tap(tester, key('tally-entry-save'));
+      expect(find.byType(NoteEditorScreen, skipOffstage: false), findsNothing);
+      expect(key('row-${made.id}@${today.key}'), findsOneWidget);
 
       final first = sessions.on(made.id, today).picks.first;
       expect(first.entries.single.values.values.single, 20);
@@ -815,7 +819,10 @@ void main() {
       );
       await tap(tester, pick);
       expect(find.byType(TallyEntryScreen), findsOneWidget);
+      // Only the entry form opens, not the Tally's editor under it (#320).
+      expect(find.byType(NoteEditorScreen, skipOffstage: false), findsNothing);
       await tap(tester, key('tally-entry-save'));
+      expect(find.byType(NoteEditorScreen, skipOffstage: false), findsNothing);
       expect(sessions.on(made.id, today).picks.first.done, isTrue);
       expect(tester.widget<Checkbox>(pick).value, isTrue);
     });

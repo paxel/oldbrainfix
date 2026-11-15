@@ -8200,8 +8200,8 @@ impl App {
     }
 
     /// Does what was asked of a Session's row on the Agenda (#104): a
-    /// pick's entry form opens in its dialog over its Tally's Note,
-    /// which shows once it is saved.
+    /// pick's entry form opens in its dialog alone, over what showed
+    /// before, the Tally's Note not opened with it (#320).
     fn session_action(&mut self, asked: SessionAction) -> oldbrainfix_core::Result<()> {
         match asked {
             SessionAction::Open {
@@ -8229,7 +8229,6 @@ impl App {
                 let mine = self.own_entries(&tally, entry.is_none())?;
                 self.save_text()?;
                 self.editor = None;
-                self.selected_note = Some(note_id);
                 let form = EntryForm::new(
                     &tally,
                     (entry, &mine),
