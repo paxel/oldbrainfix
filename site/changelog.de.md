@@ -19,6 +19,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop ist das Fragen experimentell und aus, bis „KI (experimentell)“ angehakt ist; der KI-Port arbeitet so oder so. ([obf-1027](https://github.com/paxel/oldbrainfix/issues/334))
 - Auf dem Desktop öffnet KI ▸ KI-Einstellungen … eine Seite mit allen Einstellungen der KI. ([obf-1028](https://github.com/paxel/oldbrainfix/issues/335))
 - Auf dem Handy ist das Fragen experimentell und aus, bis „Fragen (experimentell)“ in den Einstellungen eingeschaltet ist. ([obf-1026](https://github.com/paxel/oldbrainfix/issues/333))
+- Unter jeder Antwort beim Fragen nennt „Auch gelesen“ die anderen gelesenen Notizen, und ein kleines lokales Modell sucht und liest jetzt vor dem Antworten. ([obf-1007](https://github.com/paxel/oldbrainfix/issues/314))
 
 ### Behoben
 

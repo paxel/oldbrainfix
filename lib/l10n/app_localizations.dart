@@ -10136,6 +10136,12 @@ abstract class AppLocalizations {
   /// **'From these Notes'**
   String get phoneAskFromNotes;
 
+  /// Heading under the Notes an answer links, over the other Notes the model read in full for this question, each opening its Note (#314).
+  ///
+  /// In en, this message translates to:
+  /// **'Also read'**
+  String get phoneAskAlsoRead;
+
   /// Button that saves the question and its answer as a Note in Unsorted.
   ///
   /// In en, this message translates to:

@@ -6302,6 +6302,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get phoneAskFromNotes => 'Aus diesen Notizen';
 
   @override
+  String get phoneAskAlsoRead => 'Auch gelesen';
+
+  @override
   String get phoneAskKeep => 'Als Notiz behalten';
 
   @override

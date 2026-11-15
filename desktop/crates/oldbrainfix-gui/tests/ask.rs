@@ -380,12 +380,71 @@ fn an_answer_shows_with_links_that_open_the_notes_it_came_from() -> TestResult {
 }
 
 #[test]
+fn the_other_notes_read_show_as_also_read_under_the_linked_ones_and_open() -> TestResult {
+    let (store, passport) = store()?;
+    let booth = Notes::new(&store).capture("Passport photo booth at the station", None, None)?;
+    let fake = Fake::new(vec![
+        tool_use("find_notes", json!({"words": ["passport"]})),
+        tool_use("read_note", json!({"id": booth.id})),
+        tool_use("read_note", json!({"id": passport})),
+        end_turn(&format!(
+            "It is in the [blue folder](oldbrainfix://note/{passport})."
+        )),
+        // A small model's answer that links nothing (#314).
+        tool_use("read_note", json!({"id": passport})),
+        end_turn("It is in the blue folder."),
+    ]);
+    let t = L10n::new("en");
+    let mut harness = harness(store, &fake);
+    ask(&mut harness, "Where is my passport?");
+    let asked = &harness.state().ask_panel().exchanges[0];
+    assert_eq!(
+        asked.sources,
+        vec![(passport.clone(), PASSPORT.to_string())]
+    );
+    assert_eq!(
+        asked.also_read,
+        vec![(booth.id.clone(), booth.text.clone())]
+    );
+    assert!(shows(&harness, t.ask_from_notes()));
+    assert!(shows(&harness, t.ask_also_read()));
+    // Linked first, then "Also read" under them.
+    let top = |label: &str| {
+        harness
+            .get_by_role_and_label(Role::Link, label)
+            .rect()
+            .min
+            .y
+    };
+    assert!(top(PASSPORT) < top(&booth.text));
+    harness
+        .get_by_role_and_label(Role::Link, &booth.text)
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(booth.id.as_str()));
+    assert_eq!(harness.state().selection(), &Selection::Ask);
+
+    harness.key_press(Key::Escape);
+    harness.run();
+    ask(&mut harness, "And now?");
+    let asked = &harness.state().ask_panel().exchanges[1];
+    assert!(asked.sources.is_empty());
+    assert_eq!(
+        asked.also_read,
+        vec![(passport.clone(), PASSPORT.to_string())]
+    );
+    Ok(())
+}
+
+#[test]
 fn keep_as_note_saves_the_question_and_its_answer_and_leaving_drops_the_rest() -> TestResult {
     let (store, passport) = store()?;
     let answer = format!("In the [blue folder](oldbrainfix://note/{passport}).");
     let fake = Fake::new(vec![
         tool_use("read_note", json!({"id": passport})),
         end_turn(&answer),
+        end_turn("Also in the drawer."),
+        // Told to search first (#314), it answers the same.
         end_turn("Also in the drawer."),
     ]);
     let t = L10n::new("en");
@@ -439,6 +498,8 @@ fn a_note_hidden_from_ai_is_in_no_request() -> TestResult {
         tool_use("list_places", json!({})),
         tool_use("list_tags", json!({})),
         end_turn("Nothing about that."),
+        // Told to read the passport list_new showed (#314).
+        end_turn("Nothing about that."),
     ]);
     let mut harness = harness(store, &fake);
     ask(&mut harness, "What about my kidney?");
@@ -456,6 +517,8 @@ fn a_change_the_model_makes_waits_for_its_review_with_sync() -> TestResult {
     let area = Places::new(&store).add_area("Papers")?;
     let fake = Fake::new(vec![
         tool_use("find_notes", json!({"words": ["passport"]})),
+        end_turn("Nothing to change."),
+        // Told to read the Note found (#314), it answers the same.
         end_turn("Nothing to change."),
         tool_use("file_note", json!({"id": passport, "place": area.id})),
         end_turn("Filed into Papers; it waits for your review."),
@@ -601,6 +664,8 @@ fn a_question_not_answered_stays_under_it_with_its_cause_and_fix_until_asked_aga
     app.set_ask_transport(Arc::new(Replies::new(vec![
         Err("Connection refused".into()),
         reply(200, &end_turn("In the blue folder.").to_string()),
+        // Told to search first (#314), it answers the same.
+        reply(200, &end_turn("In the blue folder.").to_string()),
     ])));
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
@@ -733,12 +798,15 @@ fn off_the_windows_thread_the_tools_are_answered_on_it() -> TestResult {
 fn a_link_to_a_note_not_read_goes_and_the_answer_says_a_source_could_not_be_checked() -> TestResult
 {
     let (store, passport) = store()?;
-    // The model only found the Note, and links it.
+    // The model only found the Note, and links it, also once told to
+    // read it (#314).
+    let linked = end_turn(&format!(
+        "It is in the [blue folder](oldbrainfix://note/{passport})."
+    ));
     let fake = Fake::new(vec![
         tool_use("find_notes", json!({"words": ["passport"]})),
-        end_turn(&format!(
-            "It is in the [blue folder](oldbrainfix://note/{passport})."
-        )),
+        linked.clone(),
+        linked,
     ]);
     let t = L10n::new("en");
     let mut harness = harness(store, &fake);

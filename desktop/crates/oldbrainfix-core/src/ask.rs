@@ -62,8 +62,40 @@ pub const MAX_ROUNDS: usize = 24;
 
 /// What the model is told, the same for every question so that a
 /// provider can keep it cached; the time and the question come in the
-/// user's turn.
-pub const SYSTEM: &str = "You answer questions about the user's own Notes in Old Brain Fix, a memory aid. Find what you need with the tools: search with find_notes several times, with different words, synonyms and spellings in the user's language, use list_new for what came in since a time, and read the Notes you use with read_note. Answer briefly and only from the Notes you read with read_note during this question, never from general knowledge or a guess: an excerpt find_notes or list_new gives, or a Note an earlier answer named, counts only once you read that Note with read_note in this question; the Areas, Topics, tags, Routines and check-offs the other tools list count too. Link the Note of every statement you take from a Note as a Markdown link with its title as the label and oldbrainfix://note/ followed by its id as the address, such as [Dentist](oldbrainfix://note/note:3f2a); a link to a Note you did not read in this question is removed. When the Notes you read hold nothing about it, answer only \"That's not in your Notes\", translated into the language of the question. Answer in the language of the question. Change something only when the user asks for it, such as filing what is new into Areas and Topics or adding tags to a text: every change waits for the user's review in the app, so say what you changed and that it waits for review, linking only the Notes you read. Notes the user hid from the AI do not exist for you.";
+/// user's turn. Numbered short steps with an example, which a small
+/// local model follows (#314, ADR 0051).
+pub const SYSTEM: &str = "You answer questions about the user's own Notes in Old Brain Fix, a memory aid. Do these steps for every question:
+1. Call find_notes first, always, before you answer. Give it the main words of the question one by one, such as {\"words\": [\"dentist\", \"appointment\"]}, then search again with synonyms and other spellings in the language of the question. Use list_new for what came in since a time.
+2. Call read_note with the id of every Note you want to use. What find_notes and list_new show is not enough; only read_note counts. A Note an earlier answer named counts only once you read it again in this question.
+3. Answer briefly and only from the Notes you read with read_note in this question, never from general knowledge or a guess. The Areas, Topics, tags, Routines and check-offs the other tools list count too.
+4. Link the Note of every statement as a Markdown link: its title as the label, oldbrainfix://note/ and its id as the address. A link to a Note you did not read with read_note is removed.
+5. Only when you searched and found nothing about it, answer only \"That's not in your Notes\", translated into the language of the question.
+Example: the question is \"When is the dentist?\". You call find_notes with words [\"dentist\", \"doctor\"]. It finds the Note note:3f2a titled \"Dentist\". You call read_note with id \"note:3f2a\". It says \"Dentist on Friday at 9:00\". You answer: \"On Friday at 9:00, see [Dentist](oldbrainfix://note/note:3f2a).\"
+Answer in the language of the question. Change something only when the user asks for it, such as filing what is new into Areas and Topics or adding tags to a text. Every change waits for the user's review in the app, so say what you changed and that it waits for review, linking only the Notes you read. Notes the user hid from the AI do not exist for you.";
+
+/// What the model hears, once, when it answers having called no tool at
+/// all (#314): a small model otherwise says "That's not in your Notes"
+/// without having searched.
+pub const SEARCH_FIRST: &str = "Search the Notes first: call find_notes with the main words of my question, such as {\"words\": [\"...\"]}.";
+
+/// What the model hears, once, when it answers having read none of the
+/// Notes find_notes or list_new showed it (#314), with the calls to make
+/// for the first [`READ_NAMED`] of them: a small model otherwise answers
+/// from an excerpt.
+fn read_first(shown: &[String]) -> String {
+    let calls: Vec<String> = shown
+        .iter()
+        .take(READ_NAMED)
+        .map(|id| json!({"id": id}).to_string())
+        .collect();
+    format!(
+        "Read before you answer: call read_note with {} for each Note you use. Then answer from what read_note returns.",
+        calls.join(" or ")
+    )
+}
+
+/// How many of the Notes shown [`read_first`] names.
+const READ_NAMED: usize = 3;
 
 /// The line before the question in the user's turn, the time after it.
 const NOW: &str = "Now on this computer: ";
@@ -394,10 +426,33 @@ pub struct Answer {
     pub unchecked: bool,
 }
 
+impl Answer {
+    /// The Notes shown under the answer as "Also read" (#314, Q719): those
+    /// read in this question that it does not link, in the order read.
+    /// Its links come first, as [`Answer::notes`].
+    pub fn also_read(&self) -> Vec<String> {
+        also_read(&self.notes, &self.read)
+    }
+}
+
+/// The ids of `read` not in `linked`, in the order read, each once: the
+/// Notes an answer shows as "Also read" (#314), on the panel and the
+/// phone alike.
+pub fn also_read(linked: &[String], read: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for id in read {
+        if !linked.contains(id) && !out.contains(id) {
+            out.push(id.clone());
+        }
+    }
+    out
+}
+
 /// What the model did after a request.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Step {
-    /// It paused a long turn: ask again as it stands.
+    /// It paused a long turn, or answered before it searched or read and
+    /// was told to ([`SEARCH_FIRST`], #314): ask again as it stands.
     Again,
     /// It calls these tools; their outputs go to [`Conversation::answer`].
     Tools(Vec<ToolCall>),
@@ -450,6 +505,15 @@ pub struct Conversation {
     /// Calls whose arguments could not be read, answered as errors with
     /// the next tool outputs.
     unreadable: Vec<(String, String)>,
+    /// Whether the model called any tool in this question.
+    called: bool,
+    /// The Notes `find_notes` and `list_new` showed in this question, in
+    /// the order shown.
+    shown: Vec<String>,
+    /// Whether the model was told [`SEARCH_FIRST`], or to read the Notes
+    /// shown ([`read_first`]): each once per question (#314).
+    told_search: bool,
+    told_read: bool,
 }
 
 impl Conversation {
@@ -468,6 +532,10 @@ impl Conversation {
             rounds: 0,
             read: Vec::new(),
             unreadable: Vec::new(),
+            called: false,
+            shown: Vec::new(),
+            told_search: false,
+            told_read: false,
         }
     }
 
@@ -675,7 +743,28 @@ impl Conversation {
         Ok(self.answered(text, finish == Some("length")))
     }
 
-    fn answered(&self, text: String, cut: bool) -> Step {
+    /// The model's answer `text`, or [`Step::Again`] after telling it to
+    /// search or to read first (#314): once each per question, only
+    /// while it has read no Note, and never for an answer cut off at its
+    /// length. It is told to search when it called no tool at all, since
+    /// an answer from the Areas, tags or Routines the other tools list
+    /// counts, and to read when `find_notes` or `list_new` showed Notes.
+    fn answered(&mut self, text: String, cut: bool) -> Step {
+        if !cut && self.read.is_empty() {
+            let told = if !self.called && !self.told_search {
+                self.told_search = true;
+                Some(SEARCH_FIRST.to_string())
+            } else if !self.shown.is_empty() && !self.told_read {
+                self.told_read = true;
+                Some(read_first(&self.shown))
+            } else {
+                None
+            };
+            if let Some(told) = told {
+                self.messages.push(json!({"role": "user", "content": told}));
+                return Step::Again;
+            }
+        }
         let (text, unchecked) = checked(&text, &self.read);
         Step::Answered(Answer {
             notes: linked_notes(&text),
@@ -692,11 +781,19 @@ impl Conversation {
     /// Note, such as `read_check_offs`, answers for one hidden from the AI
     /// or none at all without an error.
     pub fn answer(&mut self, done: &[(ToolCall, ToolOutput)]) {
+        if !done.is_empty() || !self.unreadable.is_empty() {
+            self.called = true;
+        }
         for (call, output) in done {
             if let Some(id) = note_read(call, output)
                 && !self.read.iter().any(|r| r == id)
             {
                 self.read.push(id.to_string());
+            }
+            for id in notes_shown(call, output) {
+                if !self.shown.contains(&id) {
+                    self.shown.push(id);
+                }
             }
         }
         let unreadable = std::mem::take(&mut self.unreadable);
@@ -849,6 +946,24 @@ pub fn note_read<'a>(call: &'a ToolCall, output: &ToolOutput) -> Option<&'a str>
         .get(key)
         .and_then(Value::as_str)
         .filter(|id| id.starts_with("note:"))
+}
+
+/// The ids of the Notes `find_notes` or `list_new` showed in `output`,
+/// in order; none for another tool or an error.
+fn notes_shown(call: &ToolCall, output: &ToolOutput) -> Vec<String> {
+    if output.is_error || !matches!(call.name.as_str(), "find_notes" | "list_new") {
+        return Vec::new();
+    }
+    let parsed: Option<Value> = serde_json::from_str(&output_text(output)).ok();
+    parsed
+        .as_ref()
+        .and_then(|v| v.get("notes"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|n| n.get("id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect()
 }
 
 /// Asks `conversation` through `transport` until the model answers, the

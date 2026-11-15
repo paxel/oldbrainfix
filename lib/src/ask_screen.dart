@@ -246,10 +246,14 @@ class _Asked {
   /// first lines.
   final List<(String, String)> sources;
 
+  /// The other Notes the desktop's model read for it that this phone
+  /// shows, in the order read: "Also read" (#314).
+  final List<(String, String)> alsoRead;
+
   /// The Note it was kept as.
   String? kept;
 
-  _Asked(this.question, this.answer, this.sources);
+  _Asked(this.question, this.answer, this.sources, this.alsoRead);
 }
 
 /// What the page shows above its answers: in [ready] the question field,
@@ -423,7 +427,15 @@ class _AskScreenState extends State<AskScreen> {
           _stopPolling();
           _asking = null;
           _askingId = null;
-          _asked.insert(0, _Asked(question, answer, _sources(answer)));
+          _asked.insert(
+            0,
+            _Asked(
+              question,
+              answer,
+              _sources(answer.notes),
+              _sources(answer.alsoRead),
+            ),
+          );
         }
       });
     } on Object catch (e) {
@@ -533,16 +545,16 @@ class _AskScreenState extends State<AskScreen> {
     return (cause, fix, said.isEmpty ? 'ask: ${failure.name}' : said);
   }
 
-  /// The Notes [answer] links that this phone shows, by their first
+  /// The Notes [ids] of an answer that this phone shows, by their first
   /// lines: not one it does not hold, nor one in the Trash, merged, or in
   /// a locked Area while it is closed, whose link in the text still asks
   /// for the PIN.
-  List<(String, String)> _sources(DesktopAnswer answer) {
+  List<(String, String)> _sources(List<String> ids) {
     final notes = Notes(widget.store);
     final places = Places(widget.store);
     final lock = LockScope.of(context);
     return [
-      for (final id in answer.notes)
+      for (final id in ids)
         if (notes.byId(id) case final note?
             when !note.isTrashed && !note.isMerged)
           if (!_closed(lock, places, note.place)) (id, _title(note)),
@@ -864,20 +876,24 @@ class _AskScreenState extends State<AskScreen> {
           style: weak,
         ),
       ],
-      if (asked.sources.isNotEmpty) ...[
-        const SizedBox(height: 8),
-        Text(t.phoneAskFromNotes, style: weak),
-        for (final (id, title) in asked.sources)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: ValueKey('ask-source-$i-$id'),
-              onPressed: () => _open(id),
-              icon: const Icon(Icons.notes),
-              label: Text(title),
+      for (final (heading, key, notes) in [
+        (t.phoneAskFromNotes, 'ask-source', asked.sources),
+        (t.phoneAskAlsoRead, 'ask-also-read', asked.alsoRead),
+      ])
+        if (notes.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(heading, key: ValueKey('$key-$i'), style: weak),
+          for (final (id, title) in notes)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: ValueKey('$key-$i-$id'),
+                onPressed: () => _open(id),
+                icon: const Icon(Icons.notes),
+                label: Text(title),
+              ),
             ),
-          ),
-      ],
+        ],
       const SizedBox(height: 8),
       Align(
         alignment: Alignment.centerLeft,

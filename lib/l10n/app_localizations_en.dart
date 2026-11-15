@@ -6229,6 +6229,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneAskFromNotes => 'From these Notes';
 
   @override
+  String get phoneAskAlsoRead => 'Also read';
+
+  @override
   String get phoneAskKeep => 'Keep as Note';
 
   @override

@@ -5407,20 +5407,27 @@ impl App {
             }
         };
         let notes = Notes::new(&self.store);
-        let mut sources = Vec::new();
-        for id in &answer.notes {
-            if let Ok(Some(note)) = notes.by_id(id)
-                && !note.is_trashed()
-            {
-                let title = row_title(&self.t, Some(&note));
-                let first = title.lines().next().unwrap_or_default().to_string();
-                sources.push((id.clone(), first));
+        // The Notes here by id with their titles: not one in the trash.
+        let titled = |ids: &[String]| -> Vec<(String, String)> {
+            let mut out = Vec::new();
+            for id in ids {
+                if let Ok(Some(note)) = notes.by_id(id)
+                    && !note.is_trashed()
+                {
+                    let title = row_title(&self.t, Some(&note));
+                    let first = title.lines().next().unwrap_or_default().to_string();
+                    out.push((id.clone(), first));
+                }
             }
-        }
+            out
+        };
+        let sources = titled(&answer.notes);
+        let also_read = titled(&answer.also_read());
         self.ask.exchanges.push(ask_view::Asked {
             question,
             answer,
             sources,
+            also_read,
             kept: None,
         });
     }

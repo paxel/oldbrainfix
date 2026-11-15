@@ -7564,6 +7564,8 @@ Map<String, Object?> _ask() {
       'answer': {
         'text': answer.text,
         'notes': answer.notes,
+        'read': answer.read,
+        'alsoRead': answer.alsoRead,
         'cut': answer.cut,
         'unchecked': answer.unchecked,
       }
@@ -7687,6 +7689,21 @@ Map<String, Object?> _ask() {
             unchecked: true,
           ),
         ),
+        // The Notes read, linked or not, in the order read (#314).
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'Your passport is in the blue folder.',
+            notes: [],
+            read: ['note:ffff', passport],
+          ),
+        ),
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'In the [blue folder](oldbrainfix://note/$passport).',
+            notes: [passport],
+            read: [passport, 'note:ffff', 'note:eeee'],
+          ),
+        ),
         AskReply.failed(AskFailure.unready, unready: AskUnready.noKey),
         AskReply.failed(AskFailure.unready, unready: AskUnready.badUrl),
         AskReply.failed(AskFailure.unready, unready: AskUnready.aiOff),
@@ -7725,6 +7742,28 @@ Map<String, Object?> _ask() {
         },
         {
           'answer': {'notes': <String>[], 'text': 'T', 'unchecked': 'yes'},
+          'review': false,
+        },
+        // A desktop before #314 names no Note read; junk in it is none.
+        {
+          'answer': {
+            'cut': false,
+            'notes': [passport],
+            'text': 'T',
+            'unchecked': false,
+          },
+          'review': false,
+        },
+        {
+          'answer': {
+            'notes': <String>[],
+            'read': ['note:1', 2, null, passport],
+            'text': 'T',
+          },
+          'review': false,
+        },
+        {
+          'answer': {'notes': <String>[], 'read': 'note:1', 'text': 'T'},
           'review': false,
         },
       ])
@@ -11074,8 +11113,10 @@ Future<void> main(List<String> args) async {
     'phone gives one (#317), how far the desktop is with a question, the '
     'provider as '
     'the phone learns it, answers (one whose unread Note links were '
-    'removed, #294) and every kind of failure as bodies with what they '
-    'hold, replies of a later desktop, and addresses typed by '
+    'removed, #294, and ones with the Notes read in the order read and '
+    'those of them shown as "Also read", #314) and every kind of failure '
+    'as bodies with what they hold, replies of a later desktop and of one '
+    'before #314, which names no Note read, and addresses typed by '
     'hand for a paired Device as read or refused.\n'
     '- `later_formats.json`: what files and values of a later version '
     '(ADR 0034) come to: Sent Items, Backup header lines, the opened keys '

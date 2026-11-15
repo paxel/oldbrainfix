@@ -401,6 +401,7 @@
   "askOpenSettings": "KI-Einstellungen …",
   "askTaskWaits": "Änderungen der KI warten auf deine Prüfung. Die Synchronisierung wartet, bis du entscheidest.",
   "askFromNotes": "Aus diesen Notizen",
+  "askAlsoRead": "Auch gelesen",
   "askKeep": "Als Notiz behalten",
   "askKept": "Als Notiz behalten",
   "askCut": "Die Antwort wurde an ihrer Längengrenze abgeschnitten.",

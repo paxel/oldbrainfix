@@ -1681,6 +1681,7 @@
   "phoneAskSends": "Fragen gehen über {computer} an {provider}, Modell {model}. Nur was das Modell in deinen Notizen findet und liest, wird dorthin gesendet, nie was vor KI verborgen ist.",
   "phoneAskTaskWaits": "Änderungen der KI warten auf dem Computer auf deine Prüfung. Die Synchronisierung mit ihm wartet, bis du dort entscheidest.",
   "phoneAskFromNotes": "Aus diesen Notizen",
+  "phoneAskAlsoRead": "Auch gelesen",
   "phoneAskKeep": "Als Notiz behalten",
   "phoneAskKept": "Als Notiz gespeichert",
   "phoneAskCut": "Die Antwort wurde an ihrer Längengrenze abgeschnitten.",

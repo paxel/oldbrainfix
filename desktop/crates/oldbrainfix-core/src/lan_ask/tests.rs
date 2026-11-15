@@ -288,10 +288,12 @@ fn the_phones_question_is_answered_with_its_notes_and_hidden_ones_stay_out() -> 
     let notes = Notes::new(&desk);
     let passport = notes.capture("Passport in the blue folder", None, None)?;
     let hidden = notes.capture("Passport scan in the diary", None, None)?;
+    let booth = notes.capture("Passport photo booth at the station", None, None)?;
     desk.set_hidden_from_ai(&hidden.id, true)?;
     let fake = Fake::new(vec![
         tool_use("find_notes", json!({"words": ["passport"]})),
         tool_use("read_note", json!({"id": hidden.id})),
+        tool_use("read_note", json!({"id": booth.id})),
         tool_use("read_note", json!({"id": passport.id})),
         end_turn(&format!(
             "In the [blue folder](oldbrainfix://note/{}), a [scan](oldbrainfix://note/{}).",
@@ -320,12 +322,20 @@ fn the_phones_question_is_answered_with_its_notes_and_hidden_ones_stay_out() -> 
                     passport.id
                 ),
                 notes: vec![passport.id.clone()],
+                // Every Note read in full, in the order read (#314): not
+                // the hidden one, whose read failed.
+                read: vec![booth.id.clone(), passport.id.clone()],
                 cut: false,
                 unchecked: true,
             }),
             review: false,
         }
     );
+    // The phone shows the one read and not linked as "Also read".
+    let Ok(answered) = &reply.outcome else {
+        return Err("no answer".into());
+    };
+    assert_eq!(answered.also_read(), vec![booth.id.clone()]);
     let sent = fake.sent();
     assert!(sent.contains("blue folder"));
     assert!(sent.contains("Do I have a passport?"), "asked after it");
@@ -347,6 +357,8 @@ fn a_change_waits_for_the_review_and_the_phone_hears_so_while_sync_waits() -> Te
     let fake = Fake::new(vec![
         tool_use("file_note", json!({"id": note.id, "place": area.id})),
         end_turn("Filed into Health; it waits for your review."),
+        end_turn("Still waiting."),
+        // Told to search first (#314), it answers the same.
         end_turn("Still waiting."),
     ]);
     let (request, _) = asked(&desk, &phone, "POST", ASK_PATH, &question("Sort"), true)?;
@@ -431,7 +443,8 @@ fn the_failure_kinds_go_both_ways() {
 fn a_question_runs_off_the_hosts_thread_one_at_a_time() -> TestResult {
     let (desk, phone) = paired(false)?;
     let desk = Arc::new(desk);
-    let (fake, open) = Fake::gated(vec![end_turn("Here.")]);
+    // Told to search first (#314), it answers the same again.
+    let (fake, open) = Fake::gated(vec![end_turn("Here."), end_turn("Here.")]);
     let (told, heard) = channel();
     let wall: SharedWall = Arc::new(|t: DateTime<Utc>| t.naive_utc());
     let ask_desk = AskDesk::new(desk.clone(), Arc::new(fake), wall, move || {
@@ -452,6 +465,7 @@ fn a_question_runs_off_the_hosts_thread_one_at_a_time() -> TestResult {
         shown_answer.recv_timeout(Duration::from_secs(10))?.status,
         200
     );
+    open.send(())?;
     open.send(())?;
     let answer = first_answer.recv_timeout(Duration::from_secs(10))?;
     assert_eq!(

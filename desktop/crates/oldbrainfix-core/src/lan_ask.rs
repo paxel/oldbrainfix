@@ -2,7 +2,7 @@
 //! a paired phone of the user asks over the paired LAN connection, and
 //! the desktop runs the question as its Ask panel does, with its own
 //! provider and key ([`Store::ask`]), and sends back the answer with the
-//! Notes it links, or why there is none. The phone holds no provider and
+//! Notes it links and those its model read (#314), or why there is none. The phone holds no provider and
 //! no key; neither ever crosses the wire.
 //!
 //! Requests on the paired host, each with the paired Device's proof
@@ -228,15 +228,27 @@ impl AskProgress {
 }
 
 /// The answer as the phone gets it: its Markdown text, the Notes it
-/// links in the order first linked, whether it was cut off, and whether
-/// a link to a Note not read was removed from it ([`crate::ask::checked`]);
-/// a reply without the last is one with none removed.
+/// links in the order first linked, the Notes its model read in full in
+/// the order read (#314, which the phone shows as "Also read" where the
+/// answer does not link them), whether it was cut off, and whether a link
+/// to a Note not read was removed from it ([`crate::ask::checked`]); a
+/// reply without `read`, from a desktop before #314, read none, and one
+/// without `unchecked` removed none.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Answered {
     pub text: String,
     pub notes: Vec<String>,
+    pub read: Vec<String>,
     pub cut: bool,
     pub unchecked: bool,
+}
+
+impl Answered {
+    /// The Notes read that the answer does not link, in the order read
+    /// ([`ask::also_read`]).
+    pub fn also_read(&self) -> Vec<String> {
+        ask::also_read(&self.notes, &self.read)
+    }
 }
 
 /// Why the phone's question got no answer.
@@ -340,6 +352,7 @@ impl AskReply {
                     json!({
                         "cut": answer.cut,
                         "notes": answer.notes,
+                        "read": answer.read,
                         "text": answer.text,
                         "unchecked": answer.unchecked,
                     }),
@@ -376,18 +389,21 @@ impl AskReply {
     pub fn from_json(json: &Value) -> Option<AskReply> {
         let review = json.get("review").and_then(Value::as_bool) == Some(true);
         if let Some(answer) = json.get("answer").filter(|a| !a.is_null()) {
-            let notes = answer
-                .get("notes")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .map(str::to_string)
-                .collect();
+            let ids = |key: &str| -> Vec<String> {
+                answer
+                    .get(key)
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            };
             return Some(AskReply {
                 outcome: Ok(Answered {
                     text: answer.get("text")?.as_str()?.to_string(),
-                    notes,
+                    notes: ids("notes"),
+                    read: ids("read"),
                     cut: answer.get("cut").and_then(Value::as_bool) == Some(true),
                     unchecked: answer.get("unchecked").and_then(Value::as_bool) == Some(true),
                 }),
@@ -526,6 +542,7 @@ impl Store {
                     .map(|asked| Answered {
                         text: asked.answer.text,
                         notes: asked.answer.notes,
+                        read: asked.answer.read,
                         cut: asked.answer.cut,
                         unchecked: asked.answer.unchecked,
                     })

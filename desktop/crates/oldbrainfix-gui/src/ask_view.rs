@@ -5,7 +5,8 @@
 //! it runs, a status line under it says whom it asks and how many Notes
 //! the model has read, and a question not answered stays under its
 //! question with its cause and fix until the next is asked (#317). Each
-//! answer shows with links to the Notes it came from, which open them,
+//! answer shows with links to the Notes it came from, then to the other
+//! Notes the model read for it under "Also read" (#314), which open them,
 //! and "Keep as Note". What the model changed waits as an AI Task for its
 //! review. The answers are gone once the list shows another place.
 //!
@@ -81,6 +82,9 @@ pub struct Asked {
     pub answer: Answer,
     /// The Notes its answer links that are here, by id with their titles.
     pub sources: Vec<(String, String)>,
+    /// The other Notes the model read in full for it that are here, in
+    /// the order read, by id with their titles: "Also read" (#314).
+    pub also_read: Vec<(String, String)>,
     /// The Note it was kept as.
     pub kept: Option<String>,
 }
@@ -293,8 +297,8 @@ pub fn page(
 
 /// An answer as Markdown, its links opening the Notes they name, whether
 /// it was cut off, whether a link to a Note not read was removed from it
-/// (#294), the Notes it came from, and "Keep as Note", or that it was
-/// kept.
+/// (#294), the Notes it came from, then those the model also read
+/// (#314), and "Keep as Note", or that it was kept.
 fn answer_rows(
     ui: &mut Ui,
     t: &L10n,
@@ -318,9 +322,15 @@ fn answer_rows(
     if answer.unchecked {
         ui.label(RichText::new(t.ask_unchecked()).small().color(weak));
     }
-    if !exchange.sources.is_empty() {
-        ui.label(RichText::new(t.ask_from_notes()).small().color(weak));
-        for (id, title) in &exchange.sources {
+    for (heading, notes) in [
+        (t.ask_from_notes(), &exchange.sources),
+        (t.ask_also_read(), &exchange.also_read),
+    ] {
+        if notes.is_empty() {
+            continue;
+        }
+        ui.label(RichText::new(heading).small().color(weak));
+        for (id, title) in notes {
             let link = ui
                 .link(RichText::new(title).color(ui.visuals().hyperlink_color))
                 .on_hover_cursor(egui::CursorIcon::PointingHand);

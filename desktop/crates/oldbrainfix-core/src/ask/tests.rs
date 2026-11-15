@@ -203,11 +203,12 @@ fn the_tools_are_answered_until_the_model_answers_with_links_to_its_notes() -> T
 #[test]
 fn asking_opens_no_ai_task_and_leaves_sync_running() -> TestResult {
     let store = store();
-    Notes::new(&store).capture("Bike lock code 4711", None, None)?;
+    let bike = Notes::new(&store).capture("Bike lock code 4711", None, None)?;
     let fake = Fake::new(vec![
         tool_use("find_notes", json!({"words": ["bike"]})),
         tool_use("list_new", json!({"since": "2026-01-01"})),
         tool_use("list_places", json!({})),
+        tool_use("read_note", json!({"id": bike.id})),
         end_turn("4711."),
     ]);
     ask(&store, &fake, anthropic(), "Bike lock?")?;
@@ -273,6 +274,8 @@ fn a_note_hidden_from_ai_is_in_no_request() -> TestResult {
         tool_use("read_note", json!({"id": in_area.id})),
         tool_use("list_places", json!({})),
         end_turn("Only beans."),
+        // Told to read the Notes shown, it answers again.
+        end_turn("Only beans."),
     ]);
     ask(&store, &fake, anthropic(), "What about my kidney?")?;
     let sent: String = fake.sent.lock().iter().map(|r| r.body.clone()).collect();
@@ -300,6 +303,7 @@ fn the_stop_reasons_end_the_question_as_they_say() -> TestResult {
 
     let paused = Fake::new(vec![
         json!({"content": [{"text": "Still", "type": "text"}], "stop_reason": "pause_turn"}),
+        tool_use("list_tags", json!({})),
         end_turn("Done."),
     ]);
     assert_eq!(ask(&store, &paused, anthropic(), "Q")?.answer.text, "Done.");
@@ -530,14 +534,21 @@ fn the_web_posts_the_request_and_reads_an_error_reply_with_its_body() -> TestRes
 #[test]
 fn the_system_prompt_answers_only_from_the_notes_read_with_a_link_for_each() {
     for rule in [
-        "only from the Notes you read with read_note during this question",
+        "Call find_notes first, always, before you answer",
+        "Call read_note with the id of every Note you want to use",
+        "only read_note counts",
+        "A Note an earlier answer named counts only once you read it again in this question",
+        "only from the Notes you read with read_note in this question",
         "never from general knowledge",
         "Link the Note of every statement",
-        "the Areas, Topics, tags, Routines and check-offs the other tools list count too",
+        "The Areas, Topics, tags, Routines and check-offs the other tools list count too",
         "oldbrainfix://note/",
-        "a link to a Note you did not read in this question is removed",
+        "A link to a Note you did not read with read_note is removed",
+        "Only when you searched and found nothing about it",
         "\"That's not in your Notes\"",
         "translated into the language of the question",
+        "linking only the Notes you read",
+        "Example:",
     ] {
         assert!(SYSTEM.contains(rule), "{rule}");
     }
@@ -581,7 +592,11 @@ fn a_note_read_in_an_earlier_question_is_not_read_in_this_one() -> TestResult {
         question: "Where is my passport?".into(),
         answer: format!("In the {link}."),
     }];
-    let fake = Fake::new(vec![end_turn(&format!("Still in the {link}."))]);
+    // Told to search first, it answers the same again.
+    let fake = Fake::new(vec![
+        end_turn(&format!("Still in the {link}.")),
+        end_turn(&format!("Still in the {link}.")),
+    ]);
     let mut conversation =
         Conversation::new(anthropic(), &earlier, "Still there?", "2026-01-01 10:00");
     let answer = store
@@ -705,4 +720,104 @@ fn every_note_link_is_checked_wherever_it_stands() {
 fn the_links_of_an_answer_name_its_notes_once_in_order() {
     let text = "See [a](oldbrainfix://note/note:a), **[b](oldbrainfix://note/note:b)** and [a again](oldbrainfix://note/note:a), not [web](https://example.com).";
     assert_eq!(linked_notes(text), ["note:a", "note:b"]);
+}
+
+#[test]
+fn a_model_that_answers_before_any_tool_is_told_once_to_search_first() -> TestResult {
+    let store = store();
+    let note = Notes::new(&store).capture("Wifi password: kiwi-42", None, None)?;
+    let fake = Fake::new(vec![
+        end_turn("That's not in your Notes"),
+        tool_use("find_notes", json!({"words": ["wifi"]})),
+        tool_use("read_note", json!({"id": note.id})),
+        end_turn("kiwi-42."),
+    ]);
+    let asked = ask(&store, &fake, anthropic(), "Wifi?")?;
+    assert_eq!(asked.answer.text, "kiwi-42.");
+    assert_eq!(asked.answer.read, std::slice::from_ref(&note.id));
+    let bodies = fake.bodies();
+    assert_eq!(bodies.len(), 4);
+    // The first answer stays in the conversation, the word after it.
+    let second = bodies[1]["messages"].as_array().ok_or("messages")?;
+    assert_eq!(second.len(), 3);
+    assert_eq!(second[2], json!({"role": "user", "content": SEARCH_FIRST}));
+
+    // Told once only: the next answer stands, however it reads.
+    let stubborn = Fake::new(vec![
+        end_turn("That's not in your Notes"),
+        end_turn("Still not."),
+    ]);
+    let asked = ask(&store, &stubborn, anthropic(), "Wifi?")?;
+    assert_eq!(asked.answer.text, "Still not.");
+    assert_eq!(stubborn.bodies().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_model_that_answers_from_an_excerpt_is_told_once_to_read_the_notes_shown() -> TestResult {
+    let store = store();
+    let note = Notes::new(&store).capture("Passport in the blue folder", None, None)?;
+    let say = |text: &str| {
+        json!({"choices": [{"finish_reason": "stop", "message": {
+            "content": text, "role": "assistant",
+        }}]})
+    };
+    let call = |id: &str, name: &str, args: Value| {
+        json!({"choices": [{"finish_reason": "tool_calls", "message": {
+            "content": null,
+            "role": "assistant",
+            "tool_calls": [{"function": {"arguments": args.to_string(), "name": name}, "id": id, "type": "function"}],
+        }}]})
+    };
+    let fake = Fake::new(vec![
+        call("c1", "find_notes", json!({"words": ["passport"]})),
+        say("In the blue folder."),
+        call("c2", "read_note", json!({"id": note.id})),
+        say("In the blue folder."),
+    ]);
+    let asked = ask(&store, &fake, openai(""), "Where is my passport?")?;
+    // Read, not linked: it shows as "Also read".
+    assert_eq!(asked.answer.read, std::slice::from_ref(&note.id));
+    assert!(asked.answer.notes.is_empty());
+    assert_eq!(asked.answer.also_read(), std::slice::from_ref(&note.id));
+    let bodies = fake.bodies();
+    assert_eq!(bodies.len(), 4);
+    let told = &bodies[2]["messages"].as_array().ok_or("messages")?;
+    let last = told.last().ok_or("a message")?;
+    assert_eq!(last["role"], "user");
+    let words = last["content"].as_str().ok_or("words")?;
+    // The call to make, as the tool takes it.
+    assert!(
+        words.contains(&json!({"id": note.id}).to_string()),
+        "{words}"
+    );
+    assert_eq!(words, read_first(std::slice::from_ref(&note.id)));
+
+    // An answer after a search that showed nothing stands at once.
+    let none = Fake::new(vec![
+        call("c1", "find_notes", json!({"words": ["tax"]})),
+        say("That's not in your Notes."),
+    ]);
+    let asked = ask(&store, &none, openai(""), "Tax?")?;
+    assert_eq!(asked.answer.text, "That's not in your Notes.");
+    assert_eq!(none.bodies().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn also_read_are_the_notes_read_the_answer_does_not_link_in_the_order_read() {
+    let ids = |all: &[&str]| all.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    let answer = Answer {
+        text: "See [B](oldbrainfix://note/note:b).".into(),
+        notes: ids(&["note:b"]),
+        read: ids(&["note:c", "note:b", "note:a"]),
+        cut: false,
+        unchecked: false,
+    };
+    assert_eq!(answer.also_read(), ids(&["note:c", "note:a"]));
+    assert_eq!(also_read(&ids(&["note:a"]), &ids(&["note:a"])), ids(&[]));
+    assert_eq!(
+        also_read(&[], &ids(&["note:a", "note:a"])),
+        ids(&["note:a"])
+    );
 }

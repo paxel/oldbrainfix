@@ -13,8 +13,8 @@ import 'store.dart';
 /// the phone runs no model and talks to no provider, so it asks the
 /// user's own desktop over the paired LAN connection, and the desktop
 /// runs the question as its Ask panel does, with its own provider and
-/// key, and sends back the answer with the Notes it links, or why there
-/// is none. Any change the model makes waits as an AI Task for the review
+/// key, and sends back the answer with the Notes it links and those its
+/// model read (#314), or why there is none. Any change the model makes waits as an AI Task for the review
 /// on the desktop; the answer says when one does.
 ///
 /// Requests on the desktop's paired host, each with this Device's
@@ -188,21 +188,36 @@ class AskProgress {
 
 /// The answer as the phone gets it: its Markdown text, the ids of the
 /// Notes it links as app links in the order first linked (ADR 0046),
-/// which open on the phone, whether it was cut off at its length, and
-/// whether the desktop removed a link to a Note its model did not read in
-/// this question ([unchecked], #294); a reply without it removed none.
+/// which open on the phone, the ids of the Notes its model read in full
+/// in the order read ([read], #314; a reply of a desktop before it read
+/// none), whether it was cut off at its length, and whether the desktop
+/// removed a link to a Note its model did not read in this question
+/// ([unchecked], #294); a reply without it removed none.
 class DesktopAnswer {
   final String text;
   final List<String> notes;
+  final List<String> read;
   final bool cut;
   final bool unchecked;
 
   const DesktopAnswer({
     required this.text,
     required this.notes,
+    this.read = const [],
     this.cut = false,
     this.unchecked = false,
   });
+
+  /// The Notes shown under the answer as "Also read" (#314, Q719): those
+  /// read that it does not link, in the order read, each once; its links
+  /// come first, as [notes].
+  List<String> get alsoRead {
+    final out = <String>[];
+    for (final id in read) {
+      if (!notes.contains(id) && !out.contains(id)) out.add(id);
+    }
+    return out;
+  }
 }
 
 /// Why the desktop gave no answer to the question.
@@ -282,6 +297,7 @@ class AskReply {
         'answer': {
           'cut': answer.cut,
           'notes': answer.notes,
+          'read': answer.read,
           'text': answer.text,
           'unchecked': answer.unchecked,
         },
@@ -317,15 +333,16 @@ class AskReply {
       if (answered is! Map) return null;
       final text = answered['text'];
       if (text is! String) return null;
-      final notes = answered['notes'];
+      List<String> ids(Object? list) => [
+        if (list is List)
+          for (final id in list)
+            if (id is String) id,
+      ];
       return AskReply.answered(
         DesktopAnswer(
           text: text,
-          notes: [
-            if (notes is List)
-              for (final id in notes)
-                if (id is String) id,
-          ],
+          notes: ids(answered['notes']),
+          read: ids(answered['read']),
           cut: answered['cut'] == true,
           unchecked: answered['unchecked'] == true,
         ),

@@ -755,6 +755,8 @@
   "@askTaskWaits": {"description": "In the Ask panel while an AI Task waits for its review."},
   "askFromNotes": "From these Notes",
   "@askFromNotes": {"description": "Above the links to the Notes an answer came from."},
+  "askAlsoRead": "Also read",
+  "@askAlsoRead": {"description": "Under the Notes an answer links: above the links to the other Notes the model read in full for this question, each opening its Note (#314)."},
   "askKeep": "Keep as Note",
   "@askKeep": {"description": "Button under an answer: saves the question and the answer, with its links, as a Note."},
   "askKept": "Kept as a Note",

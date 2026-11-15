@@ -324,6 +324,62 @@ void main() {
       expect(desk.asked.last.$2, isEmpty, reason: 'started over');
     });
 
+    testWidgets('show the other Notes read as "Also read" under the linked '
+        'ones, which open; one in the Trash or not here stays out', (
+      tester,
+    ) async {
+      store.allowAsking(fakeClaude);
+      final passport = Notes(store).capture('Passport\nIn the blue folder');
+      final booth = Notes(store).capture('Photo booth at the station');
+      final gone = Notes(store).capture('Old passport');
+      Notes(store).trash(gone.id);
+      var linked = true;
+      final desk = FakeAsking(
+        answer: (_) => AskReply.answered(
+          DesktopAnswer(
+            text: linked
+                ? 'In the [blue folder](oldbrainfix://note/${passport.id}).'
+                : 'In the blue folder.',
+            notes: [if (linked) passport.id],
+            read: [booth.id, gone.id, passport.id, 'note:not-here'],
+          ),
+        ),
+      );
+      await pumpAsk(tester, desk);
+      await ask(tester, 'Where is my passport?');
+      expect(find.text('Also read'), findsOneWidget);
+      expect(key('ask-source-0-${passport.id}'), findsOneWidget);
+      expect(key('ask-also-read-0-${booth.id}'), findsOneWidget);
+      expect(
+        key('ask-also-read-0-${passport.id}'),
+        findsNothing,
+        reason: 'linked, so above',
+      );
+      expect(find.text('Old passport'), findsNothing, reason: 'in the Trash');
+      // Linked first, then "Also read" under them.
+      expect(
+        tester.getTopLeft(key('ask-source-0-${passport.id}')).dy,
+        lessThan(tester.getTopLeft(key('ask-also-read-0')).dy),
+      );
+      expect(
+        tester.getTopLeft(key('ask-also-read-0')).dy,
+        lessThan(tester.getTopLeft(key('ask-also-read-0-${booth.id}')).dy),
+      );
+      await tester.tap(key('ask-also-read-0-${booth.id}'));
+      await tester.pumpAndSettle();
+      expect(opened, [AppLink(AppLinkKind.note, booth.id)]);
+
+      // An answer that links nothing still shows what was read, in the
+      // order read.
+      linked = false;
+      await ask(tester, 'And now?');
+      expect(key('ask-source-0'), findsNothing);
+      expect(
+        tester.getTopLeft(key('ask-also-read-0-${booth.id}')).dy,
+        lessThan(tester.getTopLeft(key('ask-also-read-0-${passport.id}')).dy),
+      );
+    });
+
     testWidgets('say when a source could not be checked, and only '
         'then', (tester) async {
       store.allowAsking(fakeClaude);

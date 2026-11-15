@@ -20,6 +20,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, asking is experimental and off until "AI (experimental)" is ticked; the AI port works either way. ([obf-1027](https://github.com/paxel/oldbrainfix/issues/334))
 - On the desktop, AI ▸ AI settings… opens one page with every AI setting. ([obf-1028](https://github.com/paxel/oldbrainfix/issues/335))
 - On the phone, asking is experimental and off until "Ask (experimental)" is switched on in the Settings. ([obf-1026](https://github.com/paxel/oldbrainfix/issues/333))
+- Under each Ask answer, "Also read" lists the other Notes the model read, and a small local model now searches and reads before answering. ([obf-1007](https://github.com/paxel/oldbrainfix/issues/314))
 
 ### Fixed
 

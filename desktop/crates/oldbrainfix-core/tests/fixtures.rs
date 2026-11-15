@@ -5605,19 +5605,25 @@ fn ask_reply_of(
     use oldbrainfix_core::lan_ask::{Answered, AskFailure, AskReply};
     let review = item["review"].as_bool().ok_or("review")?;
     if let Some(answer) = item.get("answer") {
-        let notes = answer["notes"]
-            .as_array()
-            .ok_or("notes")?
-            .iter()
-            .map(|n| n.as_str().map(str::to_string).ok_or("a note"))
-            .collect::<Result<Vec<_>, _>>()?;
+        let ids = |key: &str| -> Result<Vec<String>, Box<dyn std::error::Error>> {
+            Ok(answer[key]
+                .as_array()
+                .ok_or(format!("{key} is a list"))?
+                .iter()
+                .map(|n| n.as_str().map(str::to_string).ok_or("a note"))
+                .collect::<Result<Vec<_>, _>>()?)
+        };
+        let answered = Answered {
+            text: answer["text"].as_str().ok_or("text")?.to_string(),
+            notes: ids("notes")?,
+            read: ids("read")?,
+            cut: answer["cut"].as_bool().ok_or("cut")?,
+            unchecked: answer["unchecked"].as_bool().ok_or("unchecked")?,
+        };
+        // "Also read" as the Dart core shows it (#314).
+        assert_eq!(answered.also_read(), ids("alsoRead")?, "{item}");
         return Ok(AskReply {
-            outcome: Ok(Answered {
-                text: answer["text"].as_str().ok_or("text")?.to_string(),
-                notes,
-                cut: answer["cut"].as_bool().ok_or("cut")?,
-                unchecked: answer["unchecked"].as_bool().ok_or("unchecked")?,
-            }),
+            outcome: Ok(answered),
             review,
         });
     }

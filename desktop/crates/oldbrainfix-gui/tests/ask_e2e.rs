@@ -752,6 +752,19 @@ fn the_phone_hears_where_the_passport_is_from_its_note() -> TestResult {
             .map(|id| titled(&ids, id))
             .collect::<Vec<_>>()
     );
+    println!(
+        "  read, as the phone hears it: {:?}, also read {:?}",
+        answer
+            .read
+            .iter()
+            .map(|id| titled(&ids, id))
+            .collect::<Vec<_>>(),
+        answer
+            .also_read()
+            .iter()
+            .map(|id| titled(&ids, id))
+            .collect::<Vec<_>>()
+    );
     assert!(!answer.text.trim().is_empty(), "an empty answer");
     assert!(
         transport.read_asked().contains(&ids[PASSPORT]),
@@ -860,6 +873,10 @@ fn shoot_panel(url: &str, model: &str, question: &str, name: &str) -> TestResult
             println!(
                 "  sources shown: {:?}",
                 asked.sources.iter().map(|(_, t)| t).collect::<Vec<_>>()
+            );
+            println!(
+                "  also read shown: {:?}",
+                asked.also_read.iter().map(|(_, t)| t).collect::<Vec<_>>()
             );
             println!(
                 "  read: {:?}",

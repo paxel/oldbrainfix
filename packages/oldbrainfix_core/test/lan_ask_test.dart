@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -331,6 +332,42 @@ void main() {
       ]) {
         final reply = AskReply.fromJson({'answer': later, 'review': false});
         expect(reply?.answer?.unchecked, isFalse, reason: '$later');
+      }
+    });
+
+    test('the Notes read go both ways in the order read, "Also read" are '
+        'those the answer does not link, and a desktop before #314 read '
+        'none', () {
+      final reply = AskReply.answered(
+        const DesktopAnswer(
+          text: 'In the [blue folder](oldbrainfix://note/note:2).',
+          notes: ['note:2'],
+          read: ['note:3', 'note:2', 'note:1'],
+        ),
+      );
+      final json = reply.toJson();
+      expect((json['answer'] as Map?)?.keys, [
+        'cut',
+        'notes',
+        'read',
+        'text',
+        'unchecked',
+      ]);
+      final back = AskReply.fromJson(jsonDecode(jsonEncode(json)))?.answer;
+      expect(back?.read, ['note:3', 'note:2', 'note:1']);
+      expect(back?.alsoRead, ['note:3', 'note:1']);
+      for (final later in [
+        {'notes': <String>[], 'text': 'T'},
+        {
+          'notes': <String>[],
+          'read': ['note:1', 2, null],
+          'text': 'T',
+        },
+        {'notes': <String>[], 'read': 'note:1', 'text': 'T'},
+      ]) {
+        final answer = AskReply.fromJson({'answer': later, 'review': false})
+            ?.answer;
+        expect(answer?.read, later['read'] is List ? ['note:1'] : isEmpty);
       }
     });
 
