@@ -15,7 +15,7 @@
 use std::sync::{Arc, Mutex};
 
 use egui::accesskit::Toggled;
-use egui::{Key, Modifiers, ViewportCommand, ViewportId};
+use egui::{Key, Modifiers};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::{Notes, Places, SigningKey, Store};
@@ -98,6 +98,20 @@ fn enabled(harness: &mut Harness<'_, App>, menu: &str, entry: &str) -> bool {
     on
 }
 
+/// What the frame just drawn put on the clipboard.
+fn copied(harness: &Harness<'_, App>) -> Vec<String> {
+    harness
+        .output()
+        .platform_output
+        .commands
+        .iter()
+        .filter_map(|c| match c {
+            egui::OutputCommand::CopyText(text) => Some(text.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The label of the widget with the keyboard.
 fn focused(harness: &Harness<'_, App>) -> Option<String> {
     let node = harness.query_by(|n| n.is_focused())?.accesskit_node();
@@ -162,12 +176,22 @@ fn the_edit_menu_finds_opens_the_settings_and_hands_the_clipboard_to_the_field()
     harness.run();
     harness.get_by(|n| n.is_focused()).type_text(" now");
     harness.run();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    harness.run();
+    // The field copies what is selected in the next frame, as Ctrl+C
+    // would have it (#319).
     pick(&mut harness, "Edit", "Copy");
-    let asked = &harness.output().viewport_output[&ViewportId::ROOT].commands;
-    assert!(asked.contains(&ViewportCommand::RequestCopy), "{asked:?}");
+    harness.step();
+    assert_eq!(copied(&harness), ["Fix the tap now"]);
     harness.run();
     // The cursor is back in the field.
     assert_eq!(focused(&harness).as_deref(), Some("Note text"));
+    pick(&mut harness, "Edit", "Cut");
+    harness.step();
+    assert_eq!(copied(&harness), ["Fix the tap now"]);
+    harness.run();
+    let value = harness.query_by(|n| n.is_focused()).and_then(|n| n.value());
+    assert_eq!(value.as_deref(), Some(""));
 
     // Find: All Notes' search on the Agenda, which has none.
     pick(&mut harness, "Edit", "Find Ctrl+F");

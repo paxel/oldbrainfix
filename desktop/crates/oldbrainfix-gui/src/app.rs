@@ -187,7 +187,7 @@ use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
 };
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
-use crate::text_menu::{self, Pick as MenuPick};
+use crate::text_menu::{self, Clip, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::undo::Undo;
 use crate::vault_view::{self, VaultDone, VaultJob};
@@ -287,14 +287,6 @@ enum Pick {
     One,
     Toggle,
     Run,
-}
-
-/// Which of Edit's Cut, Copy and Paste the field the cursor was in gets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Clip {
-    Cut,
-    Copy,
-    Paste,
 }
 
 /// What a card carries while it is dragged: the ids of the Notes that
@@ -10671,17 +10663,12 @@ impl App {
         if let Some(text) = self.copy.take() {
             ui.ctx().copy_text(text);
         }
-        // Edit's Cut, Copy and Paste: the cursor back into its field, and
-        // the system's clipboard asked as the keys ask it.
+        // Edit's Cut, Copy and Paste: the cursor back into its field,
+        // which takes them in the next frame as it takes the keys (#319).
         if let Some(clip) = self.clip.take()
             && let Some(field) = self.last_field
         {
-            ui.ctx().memory_mut(|m| m.request_focus(field));
-            ui.ctx().send_viewport_cmd(match clip {
-                Clip::Cut => egui::ViewportCommand::RequestCut,
-                Clip::Copy => egui::ViewportCommand::RequestCopy,
-                Clip::Paste => egui::ViewportCommand::RequestPaste,
-            });
+            text_menu::clip_into(ui.ctx(), field, clip);
         }
         if let Some(url) = self.open_url.take() {
             match &self.url_opener {

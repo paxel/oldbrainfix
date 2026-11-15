@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.6.1]
 
+### Behoben
+
+- Auf dem Desktop erreichen Ausschneiden, Kopieren und Einfügen im Rechtsklick-Menü eines Textfelds und im Menü Bearbeiten die Zwischenablage des Systems, auch im eigenen Fenster einer Notiz, wie Strg+X, Strg+C und Strg+V. ([obf-1012](https://github.com/paxel/oldbrainfix/issues/319))
+
 ## [0.6.0] - 2026-11-14
 
 ### Neu
