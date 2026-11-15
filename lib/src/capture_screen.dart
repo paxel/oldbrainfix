@@ -28,7 +28,6 @@ import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'shopping_list_view.dart';
 import 'shopping_pick_screen.dart';
-import 'speech_platform.dart';
 import 'sync_line.dart';
 import 'tally_field_screen.dart';
 import 'text_marks_view.dart';
@@ -131,25 +130,23 @@ Future<void> captureNote(
   }
 }
 
-/// Makes each line of the text of the Note [noteId] and of its
-/// recordings' Transcripts a Line of the Shopping List [listId], a name
-/// the list has bringing its Line back, and discards the Note, all in one
-/// batch (#124). True when it did; false when the list can no longer be
-/// added to, and null when the Note may no longer go: deleted, merged or
-/// with something spawned from it meanwhile. Either way the Note stays.
+/// Makes each line of the text of the Note [noteId] a Line of the
+/// Shopping List [listId], a name the list has bringing its Line back,
+/// and discards the Note, all in one batch (#124): a capture without a
+/// recording, which [ShoppingLists.addVoiceCapture] keeps on the list.
+/// True when it did; false when the list can no longer be added to, and
+/// null when the Note may no longer go: deleted, merged or with something
+/// spawned from it meanwhile. Either way the Note stays.
 bool? pourIntoShopping(Notes notes, String noteId, String listId) {
   final note = notes.byId(noteId);
   if (note == null || note.isTrashed || note.isMerged || note.spawned) {
     return null;
   }
-  final text = [
-    // Its boxes as they show, without their ids (ADR 0035).
-    note.shownText,
-    for (final hash in note.recordings) ?note.transcripts[hash],
-  ].join('\n');
   try {
     notes.store.batch(() {
-      ShoppingLists(notes.store).addLines(listId, text, deviceWallClock);
+      // Its boxes as they show, without their ids (ADR 0035).
+      ShoppingLists(notes.store)
+          .addLines(listId, note.shownText, deviceWallClock);
       notes.discard(noteId);
     });
     return true;
@@ -158,33 +155,6 @@ bool? pourIntoShopping(Notes notes, String noteId, String listId) {
   } on ArgumentError {
     return false;
   }
-}
-
-/// Waits for the Transcripts of the recordings [hashes] of the Note
-/// [noteId], then pours it into the Shopping List [listId] as
-/// [pourIntoShopping] does; whether it did. Until then the Note holds
-/// all of it, so nothing is lost when the app ends meanwhile. Without a
-/// Transcript, or when the list can no longer be added to, the Note
-/// stays and [announce] tells why at the top.
-Future<bool> intoShoppingLater(
-  Notes notes,
-  Transcriber? transcriber,
-  String noteId,
-  String listId,
-  List<String> hashes, {
-  required void Function({required bool untranscribed}) announce,
-}) async {
-  for (final hash in hashes) {
-    if (transcriber == null || !await transcriber.transcribed(noteId, hash)) {
-      if (notes.byId(noteId) case final note? when !note.isTrashed) {
-        announce(untranscribed: true);
-      }
-      return false;
-    }
-  }
-  final poured = pourIntoShopping(notes, noteId, listId);
-  if (poured == false) announce(untranscribed: false);
-  return poured ?? false;
 }
 
 /// Announces at the top that some of the shared [recordings] cannot be
@@ -273,10 +243,13 @@ void announceUntranscribable(
 /// a Plain Note, nudged; the Kind is made only on leaving, so typing on
 /// meanwhile is not lost into the list's Name.
 ///
-/// "Add to a Shopping List" (#124) makes each line typed, and of
-/// each recording's Transcript, a Line of the list picked, and keeps no
-/// Note; the other choices wait unshown meanwhile. It is not offered
-/// with a photo, which no Line holds, nor behind the App Lock.
+/// "Add to a Shopping List" (#124) makes each line typed a Line of the
+/// list picked, and keeps no Note; the other choices wait unshown
+/// meanwhile. It is not offered with a photo, which no Line holds, nor
+/// behind the App Lock. A voice capture (#311) stays on the list as a
+/// Section, its recording to be listened to, and the items said in its
+/// Transcript become Lines, at once or once it is transcribed, the
+/// speech model downloaded later too ([ShoppingLists.addVoiceCapture]).
 ///
 /// The Photo button takes a photo into the Note, and the Gallery button
 /// picks pictures from the Device into it, several at once; the text is
@@ -783,10 +756,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// "Add to a Shopping List" in ⋮, read as it opens: offered while the
-  /// capture holds no photo, which no Line can hold, nothing written
-  /// that hangs on the Note, and a recording only where a speech model
-  /// can give its Transcript; never behind the App Lock, which keeps the
-  /// lists out of reach, nor without a list to add to. With one list to
+  /// capture holds no photo, which no Line can hold, and nothing written
+  /// that hangs on the Note; a recording, with a speech model or without
+  /// (#311); never behind the App Lock, which keeps the lists out of
+  /// reach, nor without a list to add to. With one list to
   /// add to it names it, "Add to Weekly", and picks it without the page
   /// (#276).
   ({String label, VoidCallback run})? _shoppingOffer() {
@@ -794,10 +767,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
       return null;
     }
     if (_writtenSchedules.isNotEmpty || _frogWritten || _tallyWritten) {
-      return null;
-    }
-    if (_recordings.isNotEmpty &&
-        SpeechScope.of(context)?.model.current == null) {
       return null;
     }
     final t = context.t;
@@ -1265,29 +1234,27 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// Makes each line of the text a Line of the Shopping List [listId],
-  /// and the Note written meanwhile goes, with the lines of its
-  /// recordings' Transcripts (#124). While a recording has no Transcript
-  /// yet, the Note stays with all of it and goes once it has one
-  /// ([intoShoppingLater]). What cannot go stays a Note, announced at the
-  /// top. Returns the Note left to show; null when none is.
+  /// and the Note written meanwhile goes (#124). A voice capture stays on
+  /// the list as a Section with its recording, the items said in its
+  /// Transcript added as Lines at once or once it is there (#311), and
+  /// it is the Note left to show, as Add to Note… leaves it. What cannot
+  /// go stays a Note, announced at the top. Returns the Note left to
+  /// show; null when none is.
   Captured? _intoShopping(String listId) {
     final notes = widget.notes;
     final t = context.t;
     final announcements = AnnouncementsScope.of(context);
     // Taken now: the announcement may come once this page has closed.
     final navigator = Navigator.of(context, rootNavigator: true);
-    void announce({required bool untranscribed}) => announceFailureWith(
+    void announce() => announceFailureWith(
       announcements,
       navigator,
-      untranscribed ? t.captureShoppingUntranscribed : t.captureShoppingGone,
+      t.captureShoppingGone,
       title: t.captureShoppingNotAddedTitle,
-      cause: untranscribed
-          ? t.captureShoppingUntranscribedCause
-          : t.captureShoppingGoneCause,
+      cause: t.captureShoppingGoneCause,
       fix: t.captureShoppingKeptFix,
-      details: untranscribed
-          ? 'capture into a Shopping List: a recording got no Transcript'
-          : 'capture into a Shopping List: the list can no longer be added to',
+      details:
+          'capture into a Shopping List: the list can no longer be added to',
     );
     // The list used last goes to the top of the pick (#276).
     void used() => notes.store.lastShoppingList = listId;
@@ -1304,45 +1271,35 @@ class _CaptureScreenState extends State<CaptureScreen> {
       }
       _shopping = null;
       _write(null, leaving: true);
-      announce(untranscribed: false);
+      announce();
       return _captured;
     }
     // The Note holds what was typed last, in case it stays.
     _write(null);
     final captured = _captured;
     if (captured == null) return null;
-    final note = notes.byId(captured.noteId);
-    final waiting = [
-      if (note != null)
-        for (final hash in note.recordings)
-          if (!note.transcripts.containsKey(hash) &&
-              !note.removedTranscripts.contains(hash))
-            hash,
-    ];
-    if (waiting.isEmpty) {
-      if (pourIntoShopping(notes, captured.noteId, listId) == true) {
+    if (notes.byId(captured.noteId)?.recordings.isNotEmpty ?? false) {
+      try {
+        ShoppingLists(notes.store)
+            .addVoiceCapture(listId, captured.noteId, deviceWallClock);
         used();
-        return null;
+        return captured;
+      } on StateError {
+        // The list can no longer be added to: the Note stays.
+      } on ArgumentError {
+        // The same.
+      } on HiddenFromAiRefused {
+        // Hidden from AI, it goes into no Shared Area (#267).
       }
-      announce(untranscribed: false);
+      announce();
       return captured;
     }
-    used();
-    return (
-      noteId: captured.noteId,
-      editing: null,
-      attached: [
-        ...captured.attached,
-        intoShoppingLater(
-          notes,
-          SpeechScope.of(context)?.transcriber,
-          captured.noteId,
-          listId,
-          waiting,
-          announce: announce,
-        ),
-      ],
-    );
+    if (pourIntoShopping(notes, captured.noteId, listId) == true) {
+      used();
+      return null;
+    }
+    announce();
+    return captured;
   }
 
   @override

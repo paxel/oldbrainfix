@@ -1580,7 +1580,9 @@ final _scenarios = <Scenario>[
         'its box and one checked again last (#276); last, open Lines moved '
         'by hand before another, past the keys of two struck ones that come '
         'back a week on, and after the open ones, a move before itself and '
-        'one to where it is writing nothing (#283).',
+        'one to where it is writing nothing (#283); then a voice capture with '
+        'a typed line said into a list, still owing the items of its '
+        'Transcript, and one transcribed since (#311).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1757,6 +1759,21 @@ final _scenarios = <Scenario>[
         ..move(line(errands, 'Milk'), wall)
         ..move(line(errands, 'Eggs'), wall, before: line(errands, 'Eggs'))
         ..move(line(errands, 'Milk'), wall);
+      // Said into a list (#311): a voice capture with a typed line still
+      // owing the items of its Transcript, and one transcribed since,
+      // which added them once.
+      final market = notes.capture('Market\nFlour').id;
+      lists.make(market);
+      final waiting = notes.capture('Sugar', recordings: [_recording(31)]);
+      lists.addVoiceCapture(market, waiting.id, wall);
+      final said = notes.capture('', recordings: [_recording(32)]);
+      lists.addVoiceCapture(market, said.id, wall);
+      notes.setTranscript(
+        said.id,
+        said.recordings.single,
+        'Butter, flour und 1,5 Liter Milch.',
+      );
+      lists.addOwedLines(said.id, wall);
     },
   ),
   (
@@ -3563,6 +3580,28 @@ Map<String, Object?> _shoppingLists(Store store) {
         '﻿Bom',
       ])
         text: ShoppingLists.nameKey(text),
+    },
+    // The voice captures that still owe a list the items said (#311).
+    'owing': {for (final id in ids) id: ?lists.owedTo(id)},
+    'spoken': {
+      for (final text in [
+        'Milch, Eier und Brot.',
+        'milk, eggs, and bread',
+        'Butter UND Käse And tea',
+        'Hundefutter und Brandsalbe',
+        'sand and candy',
+        'Milch. Eier? Brot! Käse; Wurst… Senf\nTee\r\nZucker',
+        '1,5 Liter Milch, 2.5 kg Mehl, 3, 4',
+        '1.5.2026, 7,',
+        '  Oat\tmilk ,, and , und\n\n',
+        '\u3000Tee\u00a0und\ufeffKaffee\u2028Reis',
+        ' . , und ',
+        '',
+        'Milch und Milch',
+        'und',
+        'Und so weiter',
+      ])
+        text: ShoppingLists.spokenItems(text),
     },
   };
 }
@@ -10947,7 +10986,9 @@ Future<void> main(List<String> args) async {
     'one and may become one, how each list shows on the Agenda by each '
     'value of that setting and whether the choice applies to each Note, '
     'the Routines with what is Done, reappear '
-    'times read, and names as an added one is compared.\n'
+    'times read, names as an added one is compared, the voice captures '
+    'that still owe a list the items said and Transcripts split into the '
+    'items said (#311).\n'
     '- `sent-checklist/`: Ada sends a Checklist to Ben (ADR 0030): her log '
     '(`sender.jsonl`) and Profile settings (`settings.json`), what sending '
     'wrote (`sent.jsonl`, ids counted from 0xa01, at held clocks), the '

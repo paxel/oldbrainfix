@@ -6680,29 +6680,17 @@ abstract class AppLocalizations {
   /// **'Shopping List: {list}'**
   String captureChoiceShopping(String list);
 
-  /// Announcement after a voice capture sorted into a Shopping List whose recording got no Transcript: the Note stays (CONTEXT.md: Transcript).
-  ///
-  /// In en, this message translates to:
-  /// **'Kept as a Note: its recording could not be transcribed for the Shopping List.'**
-  String get captureShoppingUntranscribed;
-
   /// Announcement after a capture sorted into a Shopping List that was deleted or changed meanwhile: the Note stays.
   ///
   /// In en, this message translates to:
   /// **'Kept as a Note: that Shopping List can no longer be added to.'**
   String get captureShoppingGone;
 
-  /// Title of the dialog behind captureShoppingUntranscribed and captureShoppingGone.
+  /// Title of the dialog behind captureShoppingGone.
   ///
   /// In en, this message translates to:
   /// **'Not added to the Shopping List'**
   String get captureShoppingNotAddedTitle;
-
-  /// Cause in the dialog behind captureShoppingUntranscribed (CONTEXT.md: Transcript).
-  ///
-  /// In en, this message translates to:
-  /// **'Whisper could not write a Transcript of the recording.'**
-  String get captureShoppingUntranscribedCause;
 
   /// Cause in the dialog behind captureShoppingGone.
   ///
@@ -6710,7 +6698,7 @@ abstract class AppLocalizations {
   /// **'The Shopping List was deleted or made a plain Note meanwhile, here or on another Device.'**
   String get captureShoppingGoneCause;
 
-  /// Fix in the dialog behind captureShoppingUntranscribed and captureShoppingGone: nothing is lost.
+  /// Fix in the dialog behind captureShoppingGone: nothing is lost.
   ///
   /// In en, this message translates to:
   /// **'The Note keeps all of it: add its lines to a Shopping List by hand.'**

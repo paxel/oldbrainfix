@@ -120,9 +120,15 @@ replace a law of Both apps where they say so. A desktop law marked
   the list picked, and keeps no Note. While a list is picked, the other
   choices wait unshown. It is not offered with a photo on the screen, a
   photo taken afterwards drops it, and behind the App Lock it is not
-  offered. A recording gives the lines of its Transcript; until the
-  Transcript is there the Note waits Unsorted and goes into the list
-  once it is, and without one it stays a Note, announced at the top.
+  offered. **A voice capture is offered it with a speech model or
+  without** (#311, Q716): the capture, its text and recording, stays on
+  the list as a Section under a tear line, so a misheard item can be
+  listened to, and the typed lines become Lines at once. The items said
+  in the recording's Transcript become Lines too, split at commas, at
+  "und" and "and" and at the pauses Whisper marks; at once when it is
+  transcribed already, else as soon as it is, on this Device or another,
+  also when the speech model is downloaded later. They are added once:
+  transcribing again adds nothing.
 - **Everything is saved together** when the user leaves the screen or
   taps a save button. Nothing is half-saved: for an empty Note nothing
   is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs

@@ -72,7 +72,6 @@ use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
 };
 use crate::cli::note_text;
-use crate::enrich::Enricher;
 use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::format_bar::{self, Format};
 use crate::icons;
@@ -84,7 +83,6 @@ use crate::names::area_name;
 use crate::paste;
 use crate::routine_editor::{Intent, RoutineEditor};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
-use crate::speech::SpeechModel;
 use crate::tally_view::{FieldForm, FormIntent, TallyForm};
 use crate::text_menu::{self, Pick};
 use crate::theme;
@@ -198,9 +196,6 @@ pub struct CapturePopup {
     /// The Shopping Lists the lines can go into, by their Note's id with
     /// their title, read with the Areas.
     lists: Vec<ListTitle>,
-    /// The thread making Transcripts, and the speech model it needs; a
-    /// recording goes into a Shopping List only with both.
-    transcriber: Option<(Enricher, Option<SpeechModel>)>,
     wall: Wall,
     page: Option<Page>,
     /// Whether "Discard changes?" shows over the page left (#275).
@@ -235,7 +230,6 @@ impl CapturePopup {
             areas: Vec::new(),
             spawns: true,
             lists: Vec::new(),
-            transcriber: None,
             wall: Arc::new(local_wall),
             page: None,
             discarding: false,
@@ -257,31 +251,15 @@ impl CapturePopup {
         self.clipboard = Some(clipboard);
     }
 
-    /// The thread making Transcripts and the speech model it needs, for
-    /// a voice capture going into a Shopping List; without a model it
-    /// waits for none.
-    pub fn set_transcriber(&mut self, transcriber: Enricher, speech: Option<SpeechModel>) {
-        self.transcriber = Some((transcriber, speech));
-    }
-
     /// The wall clock the days of a Shopping List's Lines are on.
     pub fn set_wall_clock(&mut self, wall: Wall) {
         self.wall = wall;
     }
 
-    /// Whether a recording captured now gets its Transcript here.
-    fn transcribes(&self) -> bool {
-        self.transcriber
-            .as_ref()
-            .is_some_and(|(_, speech)| speech.as_ref().is_none_or(|s| s.current().is_some()))
-    }
-
     /// The Shopping Lists the lines can go into: none while a photo is
-    /// held or a recording gets no Transcript here.
+    /// held; a recording goes with a speech model or without (#311).
     fn offered_lists(&self) -> &[ListTitle] {
-        let voice = self.recording() || !self.recorded.is_empty();
-        let photo = !self.photos.is_empty();
-        capture_choices::shopping_offer(&self.lists, photo, voice, self.transcribes())
+        capture_choices::shopping_offer(&self.lists, !self.photos.is_empty())
     }
 
     /// Whether a voice recording runs.
@@ -463,9 +441,7 @@ impl CapturePopup {
             photos: &self.photos,
             recordings: &self.recorded,
             files: &[],
-            transcribes: self.transcribes(),
         };
-        let transcriber = self.transcriber.as_ref().map(|(enricher, _)| enricher);
         let saved = capture_choices::save(
             (&self.store, &self.wall),
             &self.text,
@@ -473,7 +449,7 @@ impl CapturePopup {
             nudge_in,
             held,
             &self.choices,
-            (transcriber, self.t),
+            self.t,
         );
         match saved {
             // Only once all of it is written: a failed save keeps it here.

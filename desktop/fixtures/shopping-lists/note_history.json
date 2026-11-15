@@ -1034,6 +1034,151 @@
           "mayUse": true
         }
       ]
+    },
+    {
+      "id": "note:00000000000000000000000000000034",
+      "history": [
+        {
+          "at": "2026-01-31T11:38:50.000Z",
+          "entity": "line:0000000000000000000000000000003b",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "1,5 Liter Milch",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:41.000Z",
+          "entity": "line:0000000000000000000000000000003a",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Butter",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:37.000Z",
+          "entity": "note:00000000000000000000000000000039",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:29.000Z",
+          "entity": "note:00000000000000000000000000000037",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "Sugar",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:22.000Z",
+          "entity": "line:00000000000000000000000000000038",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Sugar",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:08.000Z",
+          "entity": "line:00000000000000000000000000000036",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Flour",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:05.000Z",
+          "entity": "note:00000000000000000000000000000034",
+          "kind": "text",
+          "before": "Market\nFlour",
+          "after": "Market",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:04.000Z",
+          "entity": "note:00000000000000000000000000000034",
+          "kind": "kind",
+          "before": null,
+          "after": "shopping",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:00.000Z",
+          "entity": "note:00000000000000000000000000000034",
+          "kind": "captured",
+          "before": null,
+          "after": "Market\nFlour",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000037",
+      "history": [
+        {
+          "at": "2026-01-31T11:38:15.000Z",
+          "entity": "note:00000000000000000000000000000037",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:15.000Z",
+          "entity": "note:00000000000000000000000000000037",
+          "kind": "captured",
+          "before": null,
+          "after": "Sugar",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000039",
+      "history": [
+        {
+          "at": "2026-01-31T11:38:31.000Z",
+          "entity": "note:00000000000000000000000000000039",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:31.000Z",
+          "entity": "note:00000000000000000000000000000039",
+          "kind": "captured",
+          "before": null,
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
     }
   ]
 }

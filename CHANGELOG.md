@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 - Capture offers "Add to Note…", on the phone and on the desktop, in the quick note and the capture popup: it picks another Note with a filter, the Notes added to last at the top, and adds the text, voice recording, photos or files to it at once as a Section, so nothing waits in Unsorted. Added from Capture to a Note in a Shared Area, the Section is there for everyone in it. On an Unsorted Note's card, Merge into… is now called "Add to Note…" and picks the Note the same way. ([obf-1001](https://github.com/paxel/oldbrainfix/issues/308))
 - Capture offers Text, Checklist and Shopping List above the field, on the phone and on the desktop, in the quick note and the capture popup. Checklist or Shopping List saves the Note as that list at once, each typed line a Line unless the first line is a heading, which becomes its name. A recording, photo or file stays on the list, and with nothing typed the Note stays a Plain Note. ([obf-1003](https://github.com/paxel/oldbrainfix/issues/310))
+- A voice capture can go into a Shopping List without the speech model too, on the phone and on the desktop. The recording now stays on the list as a Section, so a misheard item can be listened to, instead of the Note being discarded, and the items said become Lines once the recording is transcribed, split at commas, at "and" and "und" and at pauses. Without the speech model they follow once it is downloaded. ([obf-1004](https://github.com/paxel/oldbrainfix/issues/311))
 
 ### Changed
 

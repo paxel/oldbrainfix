@@ -4172,19 +4172,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get captureShoppingUntranscribed =>
-      'Kept as a Note: its recording could not be transcribed for the Shopping List.';
-
-  @override
   String get captureShoppingGone =>
       'Kept as a Note: that Shopping List can no longer be added to.';
 
   @override
   String get captureShoppingNotAddedTitle => 'Not added to the Shopping List';
-
-  @override
-  String get captureShoppingUntranscribedCause =>
-      'Whisper could not write a Transcript of the recording.';
 
   @override
   String get captureShoppingGoneCause =>

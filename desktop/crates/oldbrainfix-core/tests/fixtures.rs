@@ -4751,6 +4751,21 @@ fn write_shopping_lists(store: &Store) -> Built {
         Some(&line(&errands, "Eggs")?),
     )?;
     lists.move_line(&line(&errands, "Milk")?, &wall, None)?;
+    // Said into a list (#311): a voice capture with a typed line still
+    // owing the items of its Transcript, and one transcribed since, which
+    // added them once.
+    let market = notes.capture("Market\nFlour", None, None)?.id;
+    lists.make(&market)?;
+    let waiting = notes.capture_with("Sugar", None, None, &[], &[recording(31)])?;
+    lists.add_voice_capture(&market, &waiting.id, &wall)?;
+    let said = notes.capture_with("", None, None, &[], &[recording(32)])?;
+    lists.add_voice_capture(&market, &said.id, &wall)?;
+    notes.set_transcript(
+        &said.id,
+        &said.recordings[0],
+        "Butter, flour und 1,5 Liter Milch.",
+    )?;
+    lists.add_owed_lines(&said.id, &wall)?;
     Ok(())
 }
 
@@ -4913,6 +4928,17 @@ fn shopping_lists_of_come_to_what_the_dart_core_says(scenario: &str) -> TestResu
     }
     for (text, key) in expected["names"].as_object().ok_or("names")? {
         assert_eq!(json!(ShoppingLists::name_key(text)), *key, "{text:?}");
+    }
+    // The voice captures that still owe a list the items said (#311).
+    let mut owing = serde_json::Map::new();
+    for id in &ids {
+        if let Some(list) = lists.owed_to(id)? {
+            owing.insert(id.clone(), json!(list));
+        }
+    }
+    assert_eq!(Value::Object(owing), expected["owing"]);
+    for (text, items) in expected["spoken"].as_object().ok_or("spoken")? {
+        assert_eq!(json!(ShoppingLists::spoken_items(text)), *items, "{text:?}");
     }
     Ok(())
 }

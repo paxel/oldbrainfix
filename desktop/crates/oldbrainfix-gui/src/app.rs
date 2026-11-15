@@ -9061,7 +9061,6 @@ impl App {
             photos,
             recordings: &recordings,
             files: &self.held_files,
-            transcribes: self.transcribes(),
         };
         let (captured, said) = capture_choices::save(
             (&self.store, &self.wall),
@@ -9070,7 +9069,7 @@ impl App {
             nudge_in,
             held,
             &self.capture_choices,
-            (self.transcriber.as_ref(), self.t),
+            self.t,
         )?;
         // Kept as a Note instead of going into the list: said at the top.
         if let Some((said, details)) = said {
@@ -9079,7 +9078,7 @@ impl App {
         let shown = match captured {
             Captured::Nothing => return Ok(None),
             Captured::Note(note) | Captured::Kept(note) => Some(note),
-            Captured::Poured | Captured::Waiting(_) => None,
+            Captured::Poured => None,
         };
         // Only once all of it is written: a failed save keeps it here.
         self.capture.clear();
@@ -9124,19 +9123,13 @@ impl App {
         !self.recorded.is_empty() || !self.held_photos.is_empty() || !self.held_files.is_empty()
     }
 
-    /// Whether a recording captured now gets its Transcript here: with
-    /// the thread making them and a speech model in use.
-    fn transcribes(&self) -> bool {
-        self.transcriber.is_some() && self.speech.as_ref().is_none_or(|s| s.current().is_some())
-    }
-
     /// The Shopping Lists the Note being captured can go into: none while
-    /// it holds a photo or a recording that gets no Transcript here.
+    /// it holds a photo; a recording goes with a speech model or without
+    /// (#311).
     fn capture_lists(&self) -> &[ListTitle] {
-        let voice = self.recording() || !self.recorded.is_empty();
         // No Line holds a file either (#267).
         let photo = !self.held_photos.is_empty() || !self.held_files.is_empty();
-        capture_choices::shopping_offer(&self.view.capture_lists, photo, voice, self.transcribes())
+        capture_choices::shopping_offer(&self.view.capture_lists, photo)
     }
 
     /// Where the Note being captured goes: the Area or Topic picked with

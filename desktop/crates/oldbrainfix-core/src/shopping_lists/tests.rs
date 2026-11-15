@@ -1643,3 +1643,170 @@ fn an_agenda_choice_another_persons_device_wrote_counts_for_nothing() -> TestRes
     assert!(agenda_rows(&ann)?.is_empty());
     Ok(())
 }
+
+/// A recording; `n` tells them apart.
+fn recording(n: u8) -> Vec<u8> {
+    vec![0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, n]
+}
+
+fn spoken(text: &str) -> Vec<String> {
+    ShoppingLists::spoken_items(text)
+}
+
+#[test]
+fn the_items_said_split_at_commas_und_and_and_whole_words() {
+    assert_eq!(spoken("Milch, Eier und Brot."), ["Milch", "Eier", "Brot"]);
+    assert_eq!(spoken("milk, eggs, and bread"), ["milk", "eggs", "bread"]);
+    assert_eq!(spoken("Butter UND Käse And tea"), ["Butter", "Käse", "tea"]);
+    // Part of a word is no "und".
+    assert_eq!(
+        spoken("Hundefutter und Brandsalbe"),
+        ["Hundefutter", "Brandsalbe"]
+    );
+    assert_eq!(spoken("sand and candy"), ["sand", "candy"]);
+}
+
+#[test]
+fn the_items_said_split_at_pauses_as_whisper_marks_them_and_line_breaks() {
+    assert_eq!(
+        spoken("Milch. Eier? Brot! Käse; Wurst… Senf\nTee"),
+        ["Milch", "Eier", "Brot", "Käse", "Wurst", "Senf", "Tee"]
+    );
+}
+
+#[test]
+fn the_items_said_keep_a_number_with_a_comma_or_point_in_it() {
+    assert_eq!(
+        spoken("1,5 Liter Milch, 2.5 kg Mehl"),
+        ["1,5 Liter Milch", "2.5 kg Mehl"]
+    );
+    assert_eq!(spoken("3, 4"), ["3", "4"]);
+}
+
+#[test]
+fn the_items_said_are_trimmed_with_one_space_none_empty_in_order() {
+    assert_eq!(spoken("  Oat\tmilk ,, and , und\n\n"), ["Oat milk"]);
+    assert!(spoken("").is_empty());
+    assert!(spoken(" . , und ").is_empty());
+    assert_eq!(spoken("Milch und Milch"), ["Milch", "Milch"]);
+}
+
+#[test]
+fn a_voice_capture_makes_its_typed_lines_lines_and_stays_as_a_section_owing_the_items() -> TestResult
+{
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("Sugar", None, None, &[], &[recording(1)])?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Sugar"]);
+    let merged = notes.by_id(&voice.id)?.ok_or("the Note")?;
+    assert_eq!(merged.merged_into.as_deref(), Some(list.as_str()));
+    assert_eq!(merged.text, "Sugar");
+    assert_eq!(notes.sections(&list)?[0].recordings, voice.recordings);
+    assert_eq!(lists.owed_to(&voice.id)?, Some(list));
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_adds_the_items_said_once_its_transcript_comes_once() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("", None, None, &[], &[recording(1)])?;
+    let hash = voice.recordings[0].clone();
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    assert!(lists.add_owed_lines(&voice.id, &wall)?.is_empty());
+    assert_eq!(shown(&store, &list)?, ["Flour"]);
+
+    notes.set_transcript(&voice.id, &hash, "Butter, flour und Eier")?;
+    lists.add_owed_lines(&voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Butter", "Eier"]);
+    assert_eq!(lists.owed_to(&voice.id)?, None);
+
+    // Struck, and transcribed again: it stays struck.
+    lists.check(&id_of(&store, &list, "Butter")?, &wall)?;
+    notes.set_transcript(&voice.id, &hash, "Butter und Tee")?;
+    assert!(lists.add_owed_lines(&voice.id, &wall)?.is_empty());
+    assert_eq!(shown(&store, &list)?, ["Flour", "Eier", "~Butter"]);
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_transcribed_already_adds_the_items_at_once() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("Sugar", None, None, &[], &[recording(1)])?;
+    notes.set_transcript(&voice.id, &voice.recordings[0], "Salt and tea")?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Sugar", "Salt", "tea"]);
+    assert_eq!(lists.owed_to(&voice.id)?, None);
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_waits_for_every_recording_then_adds_in_their_order() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("", None, None, &[], &[recording(1)])?;
+    notes.add_recording(&voice.id, &recording(2))?;
+    let hashes = notes.by_id(&voice.id)?.ok_or("the Note")?.recordings;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    notes.set_transcript(&voice.id, &hashes[1], "Tea")?;
+    lists.add_owed_lines(&voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour"]);
+    notes.set_transcript(&voice.id, &hashes[0], "Milk")?;
+    lists.add_owed_lines(&voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Milk", "Tea"]);
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_goes_where_the_list_lies() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let home = Places::new(&store).add_area("Home")?;
+    notes.file(&list, &home.id)?;
+    let voice = notes.capture_with("", None, None, &[], &[recording(1)])?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    let placed = notes.by_id(&voice.id)?.ok_or("the Note")?.place;
+    assert_eq!(placed, Some(home.id));
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_owes_nothing_once_unmerged_or_the_list_is_plain() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("", None, None, &[], &[recording(1)])?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    notes.undo_merge(&voice.id)?;
+    notes.set_transcript(&voice.id, &voice.recordings[0], "Tea")?;
+    assert!(lists.add_owed_lines(&voice.id, &wall)?.is_empty());
+    assert_eq!(lists.owed_to(&voice.id)?, None);
+    assert_eq!(shown(&store, &list)?, ["Flour"]);
+
+    let other = notes.capture_with("", None, None, &[], &[recording(2)])?;
+    lists.add_voice_capture(&list, &other.id, &wall)?;
+    lists.to_plain(&list, &wall)?;
+    notes.set_transcript(&other.id, &other.recordings[0], "Tea")?;
+    assert!(lists.add_owed_lines(&other.id, &wall)?.is_empty());
+    assert_eq!(lists.owed_to(&other.id)?, None);
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_into_a_note_that_is_no_shopping_list_writes_nothing() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let plain = notes.capture("Plain", None, None)?.id;
+    let voice = notes.capture_with("", None, None, &[], &[recording(1)])?;
+    let before = store.current_seq()?;
+    assert!(lists.add_voice_capture(&plain, &voice.id, &wall).is_err());
+    assert_eq!(store.current_seq()?, before);
+    Ok(())
+}

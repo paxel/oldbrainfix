@@ -33,12 +33,13 @@
 //! "Add to a Shopping List" in "More" (#124) makes each line typed a Line
 //! of the list picked instead, and keeps no Note; the other choices wait
 //! unshown and unwritten meanwhile, and come back when its chip is
-//! dropped. A recording gives the lines of its Transcript: as the desktop
-//! transcribes only what is written, such a capture is written Unsorted
-//! with nothing else and goes into the list once the Transcripts are
-//! there ([`pour_later`]); without one it stays a Note, announced at the
-//! top. No Line holds a photo: a photo held drops the list picked, and
-//! no list is offered while one is ([`shopping_offer`], [`hold_photo`]).
+//! dropped. A voice capture (#311) is offered it with a speech model or
+//! without: it stays on the list as a Section, its recording to be
+//! listened to, and the items said in its Transcript become Lines once
+//! the desktop or the phone transcribed it, the model downloaded later
+//! too (`ShoppingLists::add_voice_capture`). No Line holds a photo: a
+//! photo held drops the list picked, and no list is offered while one is
+//! ([`shopping_offer`], [`hold_photo`]).
 //! The popup and the window both save through [`save`], so the two
 //! cannot tell this apart.
 
@@ -55,7 +56,7 @@ use oldbrainfix_core::{
 
 use crate::app::{Wall, icon_button};
 use crate::attachment_view::HeldFile;
-use crate::enrich::{Enricher, Said};
+use crate::enrich::Said;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
@@ -378,11 +379,9 @@ pub enum Captured {
     Nothing,
     /// This Note, with all that was set up for it.
     Note(Note),
-    /// Its lines went into the Shopping List; no Note is kept.
+    /// Its lines went into the Shopping List; no Note is kept but a voice
+    /// capture's, merged into the list as a Section (#311).
     Poured,
-    /// This Note, Unsorted with nothing else, until the Transcripts of
-    /// its recordings are there to go into the Shopping List with it.
-    Waiting(Note),
     /// This Note, with all that was set up for it but the Shopping List,
     /// which can no longer be added to.
     Kept(Note),
@@ -395,8 +394,9 @@ pub enum Captured {
 ///
 /// With a Shopping List picked, each line of `text` becomes a Line of
 /// it, days as `wall` shows them, and no Note is written; with
-/// recordings, the Note waits Unsorted for their Transcripts. A photo
-/// keeps it a Note, as does a list that can no longer be added to.
+/// recordings, the Note is merged into the list, owing it the items said
+/// in their Transcripts (#311). A photo keeps it a Note, as does a list
+/// that can no longer be added to.
 pub fn capture(
     store: &Store,
     text: &str,
@@ -452,11 +452,23 @@ pub fn capture(
             Err(e) => Err(e),
         };
     }
-    // Until the Transcripts are there, the Note holds all of it.
-    let note = Notes::new(store).capture_with(text, None, None, &[], recordings)?;
-    formatted(store, &note)?;
-    used()?;
-    Ok(Captured::Waiting(note))
+    // The recordings stay on the list as a Section, to be listened to.
+    let voiced = store.batch(|| {
+        let note = Notes::new(store).capture_with(text, None, None, &[], recordings)?;
+        formatted(store, &note)?;
+        ShoppingLists::new(store).add_voice_capture(list, &note.id, wall)
+    });
+    match voiced {
+        Ok(_) => {
+            used()?;
+            Ok(Captured::Poured)
+        }
+        // The list went meanwhile, or it lies in a Shared Area a Note
+        // Hidden from AI goes into none of (#267): a Note with all that
+        // was set up.
+        Err(Error::Invalid(_) | Error::HiddenFromAi(_)) => note(choices).map(Captured::Kept),
+        Err(e) => Err(e),
+    }
 }
 
 /// The full text behind "kept as a Note": the Shopping List `list` can
@@ -465,29 +477,20 @@ fn gone_details(list: &str) -> String {
     format!("shopping list {list}: it can no longer be added to")
 }
 
-/// The full text behind "kept as a Note": the recording for the Shopping
-/// List `list` gets no Transcript here.
-fn untranscribed_details(list: &str) -> String {
-    format!("shopping list {list}: no speech model to transcribe with")
-}
-
 /// What is held with the text being captured: the photos, the
-/// recordings and the files, and whether a recording gets its Transcript here.
+/// recordings and the files.
 #[derive(Debug, Clone, Copy)]
 pub struct Held<'a> {
     pub photos: &'a [Vec<u8>],
     pub recordings: &'a [Vec<u8>],
     /// The files to attach (#267).
     pub files: &'a [HeldFile],
-    pub transcribes: bool,
 }
 
 /// Saves a capture as the popup and the window do: [`capture`] of `text`
-/// with what is `held` and `choices`, a recording without a Transcript to
-/// come keeping it a Note. A Note waiting for its Transcripts goes into
-/// the Shopping List through `transcriber` once they are there. With it,
-/// what to announce at the top when the capture was kept as a Note
-/// instead of going into the list picked.
+/// with what is `held` and `choices`. With it, what to announce at the
+/// top, in the words of `t`, when the capture was kept as a Note instead
+/// of going into the list picked.
 pub fn save(
     (store, wall): (&Arc<Store>, &Wall),
     text: &str,
@@ -495,42 +498,19 @@ pub fn save(
     nudge_in: Duration,
     held: Held<'_>,
     choices: &CaptureChoices,
-    (transcriber, t): (Option<&Enricher>, L10n),
+    t: L10n,
 ) -> oldbrainfix_core::Result<(Captured, Option<Said>)> {
-    let picked = choices.shopping.as_deref();
-    // Without a Transcript to come, a recording keeps it a Note, as said
-    // once it is saved; a photo keeps it a Note anyway.
-    let untranscribed = picked.is_some()
-        && held.photos.is_empty()
-        && held.files.is_empty()
-        && !held.recordings.is_empty()
-        && !held.transcribes;
-    let mut writing = choices.clone();
-    if untranscribed {
-        writing.shopping = None;
-    }
     let captured = capture(
         store,
         text,
         place,
         nudge_in,
         (held.photos, held.recordings, held.files),
-        (&writing, &**wall),
+        (choices, &**wall),
     )?;
-    let list = picked.unwrap_or("");
+    let list = choices.shopping.as_deref().unwrap_or("");
     let said = match &captured {
-        Captured::Waiting(note) => {
-            if let (Some(transcriber), Some(list)) = (transcriber, &writing.shopping) {
-                let kept = (store.clone(), wall.clone());
-                pour_later(transcriber, kept, t, &note.id, list);
-            }
-            None
-        }
         Captured::Kept(_) => Some((t.capture_shopping_gone(), gone_details(list))),
-        Captured::Note(_) if untranscribed => Some((
-            t.capture_shopping_untranscribed(),
-            untranscribed_details(list),
-        )),
         _ => None,
     };
     Ok((captured, said))
@@ -581,15 +561,10 @@ pub fn hold_photo(photos: &mut Vec<Vec<u8>>, choices: &mut CaptureChoices, photo
 }
 
 /// The Shopping Lists among `lists` a capture can go into: none while it
-/// holds a photo (`photo_held`), nor while it holds voice that gets no
-/// Transcript here.
-pub fn shopping_offer(
-    lists: &[ListTitle],
-    photo_held: bool,
-    voice: bool,
-    transcribes: bool,
-) -> &[ListTitle] {
-    if photo_held || (voice && !transcribes) {
+/// holds a photo (`photo_held`); a recording goes with a speech model or
+/// without (#311).
+pub fn shopping_offer(lists: &[ListTitle], photo_held: bool) -> &[ListTitle] {
+    if photo_held {
         return &[];
     }
     lists
@@ -602,79 +577,6 @@ fn formatted(store: &Store, note: &Note) -> oldbrainfix_core::Result<()> {
         Notes::new(store).set_format(&note.id, text_format::MARKDOWN)?;
     }
     Ok(())
-}
-
-/// Makes each line of the text of the Note `note_id` and of its
-/// recordings' Transcripts a Line of the Shopping List `list_id`, a name
-/// the list has bringing its Line back, and discards the Note, all in one
-/// batch (#124). `Some(true)` when it did; `Some(false)` when the list can
-/// no longer be added to, and `None` when the Note may no longer go:
-/// deleted, merged or with something spawned from it meanwhile. Either
-/// way the Note stays.
-pub fn pour(
-    store: &Store,
-    note_id: &str,
-    list_id: &str,
-    wall: &WallClock,
-) -> oldbrainfix_core::Result<Option<bool>> {
-    let notes = Notes::new(store);
-    let Some(note) = notes.by_id(note_id)? else {
-        return Ok(None);
-    };
-    if note.is_trashed() || note.is_merged() || note.spawned {
-        return Ok(None);
-    }
-    let mut lines = vec![note.text.as_str()];
-    lines.extend(
-        note.recordings
-            .iter()
-            .filter_map(|hash| note.transcripts.get(hash).map(String::as_str)),
-    );
-    let text = lines.join("\n");
-    let poured = store.batch(|| {
-        ShoppingLists::new(store).add_lines(list_id, &text, wall)?;
-        notes.discard(note_id)
-    });
-    match poured {
-        Ok(()) => Ok(Some(true)),
-        Err(Error::Invalid(_)) => Ok(Some(false)),
-        Err(e) => Err(e),
-    }
-}
-
-/// Pours the Note `note_id` into the Shopping List `list_id` as [`pour`]
-/// does once `transcriber` has read its recordings. Until then the Note
-/// holds all of it, so nothing is lost when the app ends meanwhile.
-/// Without a Transcript, or when the list can no longer be added to, the
-/// Note stays and the window announces why at the top.
-pub fn pour_later(
-    transcriber: &Enricher,
-    (store, wall): (Arc<Store>, Wall),
-    t: L10n,
-    note_id: &str,
-    list_id: &str,
-) {
-    let (note, list) = (note_id.to_string(), list_id.to_string());
-    transcriber.when_read(
-        note_id,
-        Box::new(move |read| -> Option<Said> {
-            if !read {
-                // Said unless it went meanwhile.
-                let stays = Notes::new(&store)
-                    .by_id(&note)
-                    .ok()
-                    .flatten()
-                    .is_some_and(|n| !n.is_trashed());
-                let details = format!("shopping list {list}: no Transcript for {note}");
-                return stays.then_some((t.capture_shopping_untranscribed(), details));
-            }
-            match pour(&store, &note, &list, &*wall) {
-                Ok(Some(false)) => Some((t.capture_shopping_gone(), gone_details(&list))),
-                Ok(_) => None,
-                Err(e) => Some((t.action_failed(), e.to_string())),
-            }
-        }),
-    );
 }
 
 /// What a Shopping List is called where it is picked: the first line of

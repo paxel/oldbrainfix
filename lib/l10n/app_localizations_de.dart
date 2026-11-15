@@ -4211,20 +4211,12 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get captureShoppingUntranscribed =>
-      'Als Notiz behalten: Die Aufnahme ließ sich für die Einkaufsliste nicht transkribieren.';
-
-  @override
   String get captureShoppingGone =>
       'Als Notiz behalten: Zu dieser Einkaufsliste lässt sich nichts mehr hinzufügen.';
 
   @override
   String get captureShoppingNotAddedTitle =>
       'Nicht zur Einkaufsliste hinzugefügt';
-
-  @override
-  String get captureShoppingUntranscribedCause =>
-      'Whisper konnte kein Transkript der Aufnahme schreiben.';
 
   @override
   String get captureShoppingGoneCause =>

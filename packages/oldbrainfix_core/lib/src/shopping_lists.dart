@@ -30,6 +30,11 @@ abstract final class ShoppingKeys {
   /// Shopping List shows on their Agenda (#186), a [ShoppingOnAgenda]'s
   /// code.
   static const agenda = 'shopping';
+
+  /// On a voice capture merged into a Shopping List (#311): the Note id
+  /// of the list it still owes the Lines of its Transcripts; cleared
+  /// once they are added, so they are added once.
+  static const owesLines = 'owesLines';
 }
 
 /// The unit of a [Reappear] time (#195), the letter its code ends in.
@@ -787,6 +792,174 @@ class ShoppingLists {
     return store.batch(
       () => [for (final row in rows) add(noteId, row, wallClock)],
     );
+  }
+
+  /// The items said in the Transcript [text] (#311), in the order said:
+  /// it is split at line breaks, at `;`, `!`, `?` and `…`, at a comma or
+  /// a full stop but one between two digits ("1,5", "1.5"), and at the
+  /// words "und" and "and" in any case, whole words only. Whisper writes
+  /// a pause as such a mark, and the app keeps no time of its pauses.
+  /// Each item is its words with one space between them; empty ones are
+  /// dropped, a repeated one is kept.
+  static List<String> spokenItems(String text) {
+    final runes = text.runes.toList();
+    final items = <String>[];
+    final piece = <int>[];
+    bool digit(int at) =>
+        at >= 0 && at < runes.length && runes[at] >= 0x30 && runes[at] <= 0x39;
+    void flush() {
+      final words = <String>[];
+      void item() {
+        if (words.isNotEmpty) items.add(words.join(' '));
+        words.clear();
+      }
+
+      final word = StringBuffer();
+      void endWord() {
+        if (word.isEmpty) return;
+        final said = word.toString();
+        word.clear();
+        if (_joins.contains(said.toLowerCase())) {
+          item();
+        } else {
+          words.add(said);
+        }
+      }
+
+      for (final rune in piece) {
+        if (_isSpace(rune)) {
+          endWord();
+        } else {
+          word.writeCharCode(rune);
+        }
+      }
+      endWord();
+      item();
+      piece.clear();
+    }
+
+    for (final (at, rune) in runes.indexed) {
+      final ends = switch (rune) {
+        0x0a || 0x0d || 0x3b || 0x21 || 0x3f || 0x2026 => true,
+        0x2c || 0x2e => !(digit(at - 1) && digit(at + 1)),
+        _ => false,
+      };
+      if (ends) {
+        flush();
+      } else {
+        piece.add(rune);
+      }
+    }
+    flush();
+    return items;
+  }
+
+  /// The words that join two items said ([spokenItems]), in lower case.
+  static const _joins = {'und', 'and'};
+
+  /// Unicode's White_Space and the byte order mark.
+  static bool _isSpace(int rune) =>
+      (rune >= 0x09 && rune <= 0x0d) ||
+      rune == 0x20 ||
+      rune == 0x85 ||
+      rune == 0xa0 ||
+      rune == 0x1680 ||
+      (rune >= 0x2000 && rune <= 0x200a) ||
+      rune == 0x2028 ||
+      rune == 0x2029 ||
+      rune == 0x202f ||
+      rune == 0x205f ||
+      rune == 0x3000 ||
+      rune == 0xfeff;
+
+  /// Adds the voice capture [noteId] to the Shopping List [listId]
+  /// (#311), all in one batch: each line of its text that is not blank
+  /// becomes a Line as [addLines] makes it, and the Note, with its text
+  /// and recordings, goes where the list lies and is merged into it, so
+  /// its recordings stay on the list as a Section, to be listened to. It
+  /// owes the list the items said in its Transcripts ([spokenItems]),
+  /// added at once when every recording has one, else once the last one
+  /// comes ([addOwedLines]). Refused as [add] and [Notes.merge] refuse.
+  /// Returns the ids of the Lines added, brought back or found now.
+  List<String> addVoiceCapture(
+    String listId,
+    String noteId,
+    WallClock wallClock,
+  ) {
+    final (into, _) = _requireList(listId, wallClock);
+    if (!mayCheck(listId)) {
+      throw StateError('no role in the Shared Area of $listId');
+    }
+    final notes = Notes(store);
+    final note = notes.byId(noteId);
+    if (note == null || note.isTrashed || note.isMerged) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
+    }
+    return store.batch(() {
+      final typed = addLines(listId, note.shownText, wallClock);
+      final place = into.place;
+      if (note.place != place) {
+        if (place == null) {
+          notes.unfile(noteId);
+        } else {
+          notes.file(noteId, place);
+        }
+      }
+      notes.merge(noteId, listId);
+      store.append(noteId, ShoppingKeys.owesLines, listId);
+      return [...typed, ...addOwedLines(noteId, wallClock)];
+    });
+  }
+
+  /// The Note id of the Shopping List the voice capture [noteId] still
+  /// owes the items said in its Transcripts (#311); null when it owes
+  /// none.
+  String? owedTo(String noteId) =>
+      store.current(noteId, ShoppingKeys.owesLines);
+
+  /// Adds the items said in the Transcripts of the voice capture
+  /// [noteId] to the Shopping List it owes them ([owedTo]), once every
+  /// recording has a Transcript or a removed one, recording by recording
+  /// in their order, each as [add] adds it, and clears what it owes in
+  /// the same batch, so they are added once (#311). While a recording
+  /// waits for its Transcript nothing is written. A Note no longer merged
+  /// into that list, in the trash, or a list that can no longer be added
+  /// to owes nothing any more: that is cleared, and no Line is added.
+  /// Returns the ids of the Lines added, brought back or found.
+  List<String> addOwedLines(String noteId, WallClock wallClock) {
+    final listId = owedTo(noteId);
+    if (listId == null) return const [];
+    final note = Notes(store).byId(noteId);
+    if (note == null) return const [];
+    void settled() => store.append(noteId, ShoppingKeys.owesLines, null);
+    if (note.isTrashed || note.mergedInto != listId) {
+      settled();
+      return const [];
+    }
+    if (note.recordings.any(
+      (hash) =>
+          !note.transcripts.containsKey(hash) &&
+          !note.removedTranscripts.contains(hash),
+    )) {
+      return const [];
+    }
+    try {
+      return store.batch(() {
+        final added = [
+          for (final hash in note.recordings)
+            for (final item in spokenItems(note.transcripts[hash] ?? ''))
+              add(listId, item, wallClock),
+        ];
+        settled();
+        return added;
+      });
+    } on StateError {
+      // No role there any more: nothing is owed.
+    } on ArgumentError {
+      // No Shopping List any more: the same.
+    }
+    settled();
+    return const [];
   }
 
   /// Renames the Line [lineId].
