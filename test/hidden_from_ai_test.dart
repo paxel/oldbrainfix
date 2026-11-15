@@ -210,12 +210,15 @@ void main() {
     final milk = notes.capture('Milk for the family', place: shared).id;
     await allNotes(tester);
 
+    // The Unsorted one's card names it Add to Note… (#308).
     Future<void> mergeFromCard(String text, String into) async {
       await tap(
         tester,
         find.descendant(
           of: card(text),
-          matching: find.byTooltip('Merge into…'),
+          matching: find.byTooltip(
+            text == 'Diary' ? 'Add to Note…' : 'Merge into…',
+          ),
         ),
       );
       await tap(

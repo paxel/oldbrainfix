@@ -169,6 +169,15 @@
   "topicChoice": "Topic",
   "mergeInto": "Merge into…",
   "noOtherNotes": "There is no other Note to merge into.",
+  "addToNote": "Add to Note…",
+  "@addToNote": {
+    "description": "Picks another Note and adds the capture to it as a Section; on an Unsorted Note's card, Merge into… under this name (#308)"
+  },
+  "addToNoteRecent": "Added to recently",
+  "@addToNoteRecent": {
+    "description": "Heading over the last three Notes this Device added to, at the top of Add to Note…"
+  },
+  "noNoteToAddTo": "There is no Note to add to.",
   "locationExplainTitle": "Remember where you were?",
   "locationExplainBody": "Old Brain Fix can note where you are when you capture a Note, so “nees mor sauce” still makes sense days later. Name your own places, like Home or Work, and a Note says “Home” instead of coordinates. The place goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.",
   "notNow": "Not now",
@@ -2696,7 +2705,7 @@
   "@toFullEditor": {"description": "Button on the quick note (the text capture screen): saves the Note at once as Unsorted, nudged in 1 h, and opens it in the full Note editor."},
   "settingsQuickNote": "Quick note",
   "@settingsQuickNote": {"description": "Section title in Settings for what the quick note (the text capture screen) shows."},
-  "settingsQuickNoteDetail": "The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.",
+  "settingsQuickNoteDetail": "The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.",
   "@settingsQuickNoteDetail": {"description": "Explanation under the Settings section 'Quick note'."},
   "quickNoteFormatBar": "Format bar",
   "@quickNoteFormatBar": {"description": "Switch in Settings ▸ Quick note: the format bar above the keyboard."},

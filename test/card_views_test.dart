@@ -349,7 +349,8 @@ void main() {
       );
       await tap(tester, menu);
       expect(find.text('File into…'), findsOneWidget);
-      expect(find.text('Merge into…'), findsOneWidget);
+      // So named on an Unsorted Note's card (#308).
+      expect(find.text('Add to Note…'), findsOneWidget);
       await tap(tester, key('note-file'));
       expect(find.byType(FileIntoScreen), findsOneWidget);
       await tester.pageBack();
@@ -431,7 +432,7 @@ void main() {
         expect(key('note-spawn-${spawn.name}'), findsNothing);
       }
       expect(find.byTooltip('File into…'), findsOneWidget);
-      expect(find.byTooltip('Merge into…'), findsOneWidget);
+      expect(find.byTooltip('Add to Note…'), findsOneWidget);
     });
   });
 

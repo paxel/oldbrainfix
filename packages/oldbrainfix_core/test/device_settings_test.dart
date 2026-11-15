@@ -133,6 +133,30 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('Add to Note… keeps the last three Notes added to, latest first', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.recentlyAddedTo, isEmpty);
+    store
+      ..addedTo('a')
+      ..addedTo('b')
+      ..addedTo('c');
+    expect(store.recentlyAddedTo, ['c', 'b', 'a']);
+    store.addedTo('a');
+    expect(store.recentlyAddedTo, ['a', 'c', 'b'], reason: 'once, moved up');
+    store.addedTo('d');
+    expect(store.recentlyAddedTo, ['d', 'a', 'c'], reason: 'b forgotten');
+    expect(store.localSetting('recentlyAddedTo'), '["d","a","c"]');
+    expect(store.recentlyFiledInto, isEmpty, reason: 'a list of its own');
+    store.setLocalSetting('recentlyAddedTo', '["x",7,"x","y","z","w"]');
+    expect(store.recentlyAddedTo, ['x', 'y', 'z']);
+    store.setLocalSetting('recentlyAddedTo', 'not json');
+    expect(store.recentlyAddedTo, isEmpty);
+    store.addedTo('e');
+    expect(store.recentlyAddedTo, ['e']);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the alarm setup is offered until this Device has walked it', () {
     final store = Store.inMemory();
     addTearDown(store.close);

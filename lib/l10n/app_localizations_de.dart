@@ -362,6 +362,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noOtherNotes => 'Es gibt keine andere Notiz zum Zusammenführen.';
 
   @override
+  String get addToNote => 'Zu einer Notiz hinzufügen …';
+
+  @override
+  String get addToNoteRecent => 'Zuletzt hinzugefügt zu';
+
+  @override
+  String get noNoteToAddTo => 'Es gibt keine Notiz zum Hinzufügen.';
+
+  @override
   String get locationExplainTitle => 'Merken, wo du warst?';
 
   @override
@@ -5054,7 +5063,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, Datei, „Zum vollen Editor“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, Datei, „Zum vollen Editor“, „Zu einer Notiz hinzufügen …“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';

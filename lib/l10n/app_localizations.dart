@@ -740,6 +740,24 @@ abstract class AppLocalizations {
   /// **'There is no other Note to merge into.'**
   String get noOtherNotes;
 
+  /// Picks another Note and adds the capture to it as a Section; on an Unsorted Note's card, Merge into… under this name (#308)
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Note…'**
+  String get addToNote;
+
+  /// Heading over the last three Notes this Device added to, at the top of Add to Note…
+  ///
+  /// In en, this message translates to:
+  /// **'Added to recently'**
+  String get addToNoteRecent;
+
+  /// No description provided for @noNoteToAddTo.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no Note to add to.'**
+  String get noNoteToAddTo;
+
   /// No description provided for @locationExplainTitle.
   ///
   /// In en, this message translates to:
@@ -8123,7 +8141,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
+  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.

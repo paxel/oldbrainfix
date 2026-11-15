@@ -69,9 +69,11 @@ extension DeviceSettings on Store {
   static const _quickNoteNudgeButtonsOff = 'quickNoteNudgeButtonsOff';
   static const _lastShoppingList = 'lastShoppingList';
   static const _recentlyFiledInto = 'recentlyFiledInto';
+  static const _recentlyAddedTo = 'recentlyAddedTo';
   static const _askAllowed = 'askAllowed';
 
-  /// How many places filed into File into… shows at its top (#272).
+  /// How many places filed into File into… shows at its top (#272), and
+  /// how many Notes added to Add to Note… shows at its top (#308).
   static const recentPlacesKept = 3;
 
   /// The Re-nag interval when nothing else is set.
@@ -310,10 +312,27 @@ extension DeviceSettings on Store {
   /// The ids of the Areas and Topics this Device last filed into, the
   /// latest first, at most [recentPlacesKept] (#272). They may name a
   /// place deleted since; File into… shows only those it lists.
-  List<String> get recentlyFiledInto {
+  List<String> get recentlyFiledInto => _recent(_recentlyFiledInto);
+
+  /// Puts [placeId] first among [recentlyFiledInto], once, and forgets
+  /// the oldest beyond [recentPlacesKept].
+  void filedInto(String placeId) => _used(_recentlyFiledInto, placeId);
+
+  /// The ids of the Notes this Device last added a capture or an
+  /// Unsorted Note to with Add to Note…, the latest first, at most
+  /// [recentPlacesKept] (#308). They may name a Note gone since; Add to
+  /// Note… shows only those it lists.
+  List<String> get recentlyAddedTo => _recent(_recentlyAddedTo);
+
+  /// Puts [noteId] first among [recentlyAddedTo], once, and forgets the
+  /// oldest beyond [recentPlacesKept].
+  void addedTo(String noteId) => _used(_recentlyAddedTo, noteId);
+
+  /// The ids kept under [key], the latest first, each once, at most
+  /// [recentPlacesKept]; none for a broken setting.
+  List<String> _recent(String key) {
     try {
-      if (jsonDecode(localSetting(_recentlyFiledInto) ?? '[]')
-          case final List<Object?> ids) {
+      if (jsonDecode(localSetting(key) ?? '[]') case final List<Object?> ids) {
         return [
           ...{...ids.whereType<String>()},
         ].take(recentPlacesKept).toList();
@@ -324,14 +343,14 @@ extension DeviceSettings on Store {
     return [];
   }
 
-  /// Puts [placeId] first among [recentlyFiledInto], once, and forgets
-  /// the oldest beyond [recentPlacesKept].
-  void filedInto(String placeId) => setLocalSetting(
-    _recentlyFiledInto,
+  /// Puts [id] first among the ids kept under [key], as [_recent] reads
+  /// them.
+  void _used(String key, String id) => setLocalSetting(
+    key,
     jsonEncode(
       [
-        placeId,
-        ...recentlyFiledInto.where((id) => id != placeId),
+        id,
+        ..._recent(key).where((kept) => kept != id),
       ].take(recentPlacesKept).toList(),
     ),
   );

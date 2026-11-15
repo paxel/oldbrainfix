@@ -16,6 +16,7 @@ import 'file_into_screen.dart';
 import 'file_platform.dart';
 import 'l10n.dart';
 import 'location.dart';
+import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'photo_platform.dart';
@@ -246,6 +247,14 @@ void announceUntranscribable(
 /// three buttons' place, and so it does where the Nudge buttons are
 /// switched off. The App Lock keeps the Areas and Tallies out of reach
 /// here, so "File into…" and the Session are not offered behind it.
+///
+/// "Add to Note…" beside it (#308) picks another Note and adds the
+/// capture to it at once, as a Section of it, and leaves: written in no
+/// Area but the Note's, with no Nudge, and merged into it, so nothing
+/// waits in Unsorted. It waits while there is nothing to save, and is not
+/// offered behind the App Lock, while a Shopping List is picked, nor once
+/// a Routine, Reminder, Session, Frog or Tally is set up, which need the
+/// Note itself.
 ///
 /// "Add to a Shopping List" (#124) makes each line typed, and of
 /// each recording's Transcript, a Line of the list picked, and keeps no
@@ -1114,6 +1123,90 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
+  /// "Add to Note…" (#308): a recording running is ended and kept, and
+  /// pictures and files still coming are written first; then the Note is
+  /// picked, and the capture goes into it at once as a Section and the
+  /// screen leaves, back where Capture was opened from; what is captured
+  /// is the Note added, so its Capture Context, the location asked after
+  /// the first capture too, lands on the Section. Nothing picked, the
+  /// screen stays as it was.
+  Future<void> _addToNote() async {
+    if (_leaving) return;
+    await _stopRecording();
+    await _picking;
+    await _filing;
+    if (!mounted || _leaving) return;
+    final store = widget.notes.store;
+    final captured = _captured;
+    final intoId = await Navigator.of(context).push(
+      MaterialPageRoute<String>(
+        builder: (_) => MergeIntoScreen(
+          notes: widget.notes,
+          places: Places(store),
+          noteId: captured?.noteId,
+          adding: true,
+          // A Note hidden from AI goes into no Shared Area (#267).
+          hidden:
+              captured != null &&
+              store.hiddenFromAiBy(captured.noteId).isNotEmpty,
+        ),
+      ),
+    );
+    if (!mounted || intoId == null || _leaving) return;
+    _leaving = true;
+    try {
+      _intoNote(intoId);
+    } catch (_) {
+      // Nothing of it was written: the screen stays.
+      _leaving = false;
+      rethrow;
+    }
+    Navigator.of(context).pop(_captured);
+  }
+
+  /// Adds the capture to the Note [intoId] as a Section (#308), in one
+  /// batch: the Note written now, or the one written already with what
+  /// was typed since, goes where [intoId] lies, so it is sealed for the
+  /// same people, with no Nudge, and is merged into it. Nothing is written
+  /// while there is nothing to save.
+  void _intoNote(String intoId) {
+    final notes = widget.notes;
+    final place = notes.byId(intoId)?.place;
+    final text = _text.text.trim();
+    final captured = _captured;
+    if (captured == null && text.isEmpty) return;
+    final written = notes.store.batch(() {
+      if (captured == null) {
+        final note = notes.capture(
+          text,
+          format: _formatOf(text) ?? TextFormats.plain,
+          place: place,
+          sourceApp: widget.shared?.sourceApp,
+        );
+        notes.merge(note.id, intoId);
+        return note;
+      }
+      final id = captured.noteId;
+      final note = notes.byId(id);
+      if (text.isNotEmpty &&
+          note != null &&
+          note.textEditable &&
+          TextBoxes.strip(note.text) != text) {
+        notes.edit(id, text, format: _formatOf(text));
+      }
+      if (note?.place != place) {
+        if (place == null) {
+          notes.unfile(id);
+        } else {
+          notes.file(id, place);
+        }
+      }
+      notes.merge(id, intoId);
+      return null;
+    });
+    if (written != null) _adopt(written);
+  }
+
   /// Makes each line of the text a Line of the Shopping List [listId],
   /// and the Note written meanwhile goes, with the lines of its
   /// recordings' Transcripts (#124). While a recording has no Transcript
@@ -1331,17 +1424,26 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
-  /// The line above the Nudge buttons or Save: "To full editor", then
-  /// the action row with what Settings ▸ Quick note switched on; null
-  /// while neither shows.
+  /// The line above the Nudge buttons or Save: "To full editor" and "Add
+  /// to Note…", then the action row with what Settings ▸ Quick note
+  /// switched on; null while none of them shows.
   Widget? _actionLine(BuildContext context) {
-    final editor = _toEditorButton(context);
+    final words = [?_toEditorButton(context), ?_addToNoteButton(context)];
     final actions = _actions(context);
-    if (editor == null) return actions;
+    if (words.isEmpty) return actions;
     return Row(
       children: [
         Expanded(
-          child: Align(alignment: Alignment.centerLeft, child: editor),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            // Where both do not fit, as the German words on a small
+            // phone, they shrink together rather than one alone.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(mainAxisSize: MainAxisSize.min, children: words),
+            ),
+          ),
         ),
         // The row's icons side by side, at the end.
         if (actions != null) IntrinsicWidth(child: actions),
@@ -1366,6 +1468,36 @@ class _CaptureScreenState extends State<CaptureScreen> {
         label: FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(context.t.toFullEditor, maxLines: 1, softWrap: false),
+        ),
+      ),
+    );
+  }
+
+  /// "Add to Note…" (#308): none behind the App Lock, which keeps the
+  /// Notes out of reach, while the lines go into a Shopping List, or once
+  /// a Routine, Reminder, Session, Frog or Tally is set up for the Note
+  /// itself; it waits while there is nothing to save.
+  Widget? _addToNoteButton(BuildContext context) {
+    if ((_lock?.locked ?? false) || _shopping != null) return null;
+    if (_schedules.isNotEmpty ||
+        _writtenSchedules.isNotEmpty ||
+        _frog ||
+        _tally != null) {
+      return null;
+    }
+    return ListenableBuilder(
+      listenable: _text,
+      builder: (context, _) => TextButton.icon(
+        key: const ValueKey('captureAddToNote'),
+        onPressed: _captured != null || _text.text.trim().isNotEmpty
+            ? _addToNote
+            : null,
+        icon: const Icon(Icons.post_add),
+        // Beside To full editor and the row's icons: a long word shrinks
+        // rather than being cut.
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(context.t.addToNote, maxLines: 1, softWrap: false),
         ),
       ),
     );

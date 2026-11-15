@@ -314,7 +314,8 @@ fn the_cards_selected_merge_into_another_and_one_undo_parts_them() -> TestResult
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, ROSES, "Merge into…")?;
+    // On an Unsorted Note's card it is Add to Note… (#308).
+    right_pick(&mut harness, ROSES, "Add to Note…")?;
     // Picked in the dialog, drawn after the cards.
     harness
         .query_all_by_label(PLUMBER)
@@ -346,7 +347,7 @@ fn a_card_selected_picked_in_merge_into_takes_the_others_in() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, MILK, "Merge into…")?;
+    right_pick(&mut harness, MILK, "Add to Note…")?;
     harness
         .query_all_by_label(ROSES)
         .next_back()
@@ -425,7 +426,8 @@ fn a_merge_leaves_out_a_note_this_device_may_not_change() -> TestResult {
     let mut harness = harness(shared()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, ROSES, "Merge into…")?;
+    // Ben's Unsorted Note's card names it Add to Note… (#308).
+    right_pick(&mut harness, ROSES, "Add to Note…")?;
     pick_note(&mut harness, PLUMBER)?;
     // Ben's own Note merged; Ann's, in her Shared Area, did not stop it
     // and stayed.
@@ -566,7 +568,8 @@ fn a_cards_menu_offers_its_routines_after_file_into_and_before_merge_into() -> T
         "Reminder…",
         "Frog",
         "Session…",
-        "Merge into…",
+        // On an Unsorted Note's card (#308).
+        "Add to Note…",
         "Importance ⏵",
     ];
     assert_eq!(menu_of(&mut harness, MILK, &order), order);

@@ -11,8 +11,14 @@
 //! choices shown at the top ([`chips`]), each with a button that drops it
 //! again. Of the buttons the alarm clock for a Routine or Reminder always
 //! shows (#223), the rest only once this Device switched it on in
-//! Settings ▸ Quick note ([`QuickNote`], #142). Merging, sending and the trash
+//! Settings ▸ Quick note ([`QuickNote`], #142). Sending and the trash
 //! need a saved Note and are not offered here.
+//!
+//! "Add to Note…" beside "To full editor" (#308) picks another Note and
+//! adds the capture to it at once as a Section ([`add_to_note`]): written
+//! where that Note lies, with no Nudge, and merged into it, so nothing
+//! waits in Unsorted. It is not offered once a Routine, Reminder,
+//! Session, Frog or Tally is set up, which need the Note itself.
 //!
 //! "Add to a Shopping List" in "More" (#124) makes each line typed a Line
 //! of the list picked instead, and keeps no Note; the other choices wait
@@ -468,6 +474,42 @@ pub fn save(
     Ok((captured, said))
 }
 
+/// Adds `text` with the `photos`, `recordings` and `files` held to the
+/// Note `into` at once as a Section of it (#308), in one batch: a new
+/// Note written where `into` lies, so it is sealed for the same people,
+/// with no Nudge, and merged into it, so nothing waits in Unsorted. A
+/// recording gets its Transcript as a merged Note's does. The new Note's
+/// id; `None` when there is nothing to add, and nothing is written.
+pub fn add_to_note(
+    store: &Store,
+    text: &str,
+    into: &str,
+    (photos, recordings, files): (&[Vec<u8>], &[Vec<u8>], &[HeldFile]),
+) -> oldbrainfix_core::Result<Option<String>> {
+    let text = text.trim();
+    if text.is_empty() && photos.is_empty() && recordings.is_empty() && files.is_empty() {
+        return Ok(None);
+    }
+    let notes = Notes::new(store);
+    let place = notes.by_id(into)?.and_then(|n| n.place);
+    let attached: Vec<NewFile> = files.iter().map(HeldFile::new_file).collect();
+    store
+        .batch(|| {
+            let note = notes.capture_with_files(
+                text,
+                place.as_deref(),
+                None,
+                photos,
+                recordings,
+                &attached,
+            )?;
+            formatted(store, &note)?;
+            notes.merge(&note.id, into)?;
+            Ok(note.id)
+        })
+        .map(Some)
+}
+
 /// Holds `photo` with the `photos` of the Note being captured. No Line
 /// holds a photo, so the Shopping List picked in `choices` is dropped
 /// (UI laws, "Capture").
@@ -756,12 +798,15 @@ pub enum RowAsk {
     Choice(Ask),
     /// "To full editor": save the Note and open it in the Note editor.
     ToEditor,
+    /// "Add to Note…" (#308): pick the Note to add the capture to.
+    AddToNote,
 }
 
 /// The capture's action row: "To full editor", waiting until `ready`,
-/// "File into…", opening its picker, once `quick` switched it on, the alarm
-/// clock while `spawns`, else why not, its menu a Routine or Reminder
-/// (#223) and, switched on, a Frog and Session, and "More" with what
+/// "Add to Note…", waiting as well, unless something is set up that needs
+/// the Note itself (#308), "File into…", opening its picker, once `quick`
+/// switched it on, the alarm clock while `spawns`, else why not, its menu
+/// a Routine or Reminder (#223) and, switched on, a Frog and Session, and "More" with what
 /// `quick` switched on: the Importance, "Make it a Tally", which goes
 /// with the Frog and Session (Q481), and "Add to a Shopping List" over
 /// `lists`, offered while there is one. While a
@@ -794,6 +839,14 @@ pub fn action_row(
         let editor = egui::Button::new(RichText::new(t.to_full_editor()).color(text));
         if ui.add_enabled(ready, editor).clicked() {
             asked = Some(RowAsk::ToEditor);
+        }
+        // At once into another Note (#308); a Routine, Reminder, Session,
+        // Frog or Tally needs the Note itself.
+        if choices.tally.is_none() && choices.schedules.is_empty() && !choices.frog {
+            let add = egui::Button::new(RichText::new(t.add_to_note()).color(text));
+            if ui.add_enabled(ready, add).clicked() {
+                asked = Some(RowAsk::AddToNote);
+            }
         }
         // Its picker opens over the capture, with a filter (#272).
         if quick.file_into

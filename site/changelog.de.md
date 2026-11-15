@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.6.1]
 
+### Neu
+
+- Die Schnellnotiz bietet „Zu einer Notiz hinzufügen …“, auf dem Handy und auf dem Desktop, im Schnellnotiz-Dialog und im Fenster „Notiz erfassen“: Es wählt eine andere Notiz mit einem Filter, die zuletzt ergänzten oben, und fügt ihr den Text, die Sprachaufnahme, die Fotos oder Dateien sofort als Abschnitt hinzu, sodass nichts in Unsortiert wartet. Beim Erfassen einer Notiz in einem geteilten Bereich hinzugefügt, ist der Abschnitt dort für alle darin. Auf der Karte einer unsortierten Notiz heißt „Zusammenführen mit …“ jetzt „Zu einer Notiz hinzufügen …“ und wählt die Notiz auf dieselbe Weise. ([obf-1001](https://github.com/paxel/oldbrainfix/issues/308))
+
 ### Geändert
 
 - Getippter Text, der zur Checkliste oder Einkaufsliste wird, behält jede Zeile als Zeile der Liste, auch seine erste; nur eine erste Zeile, die wie eine Überschrift aussieht, eine Markdown-Überschrift oder eine Zeile, die mit „:“ endet, wird der Name der Liste, und eine Liste ohne Namen zeigt „Checkliste“ oder „Einkaufsliste“, bis einer getippt wird. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))

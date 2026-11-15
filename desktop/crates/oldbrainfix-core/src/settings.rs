@@ -34,8 +34,10 @@ const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
 const RECENTLY_FILED_INTO: &str = "recentlyFiledInto";
+const RECENTLY_ADDED_TO: &str = "recentlyAddedTo";
 
-/// How many places filed into File into… shows at its top (#272).
+/// How many places filed into File into… shows at its top (#272), and
+/// how many Notes added to Add to Note… shows at its top (#308).
 pub const RECENT_PLACES_KEPT: usize = 3;
 
 /// Which theme this Device shows: the system's, or a fixed one, as the
@@ -500,7 +502,33 @@ impl<'a> DeviceSettings<'a> {
     /// latest first, at most [`RECENT_PLACES_KEPT`] (#272). They may name
     /// a place deleted since; File into… shows only those it lists.
     pub fn recently_filed_into(&self) -> Result<Vec<String>> {
-        let kept = self.store.local_setting(RECENTLY_FILED_INTO)?;
+        self.recent(RECENTLY_FILED_INTO)
+    }
+
+    /// Puts `place_id` first among [`Self::recently_filed_into`], once,
+    /// and forgets the oldest beyond [`RECENT_PLACES_KEPT`].
+    pub fn filed_into(&self, place_id: &str) -> Result<()> {
+        self.used(RECENTLY_FILED_INTO, place_id)
+    }
+
+    /// The ids of the Notes this Device last added a capture or an
+    /// Unsorted Note to with Add to Note…, the latest first, at most
+    /// [`RECENT_PLACES_KEPT`] (#308). They may name a Note gone since;
+    /// Add to Note… shows only those it lists.
+    pub fn recently_added_to(&self) -> Result<Vec<String>> {
+        self.recent(RECENTLY_ADDED_TO)
+    }
+
+    /// Puts `note_id` first among [`Self::recently_added_to`], once, and
+    /// forgets the oldest beyond [`RECENT_PLACES_KEPT`].
+    pub fn added_to(&self, note_id: &str) -> Result<()> {
+        self.used(RECENTLY_ADDED_TO, note_id)
+    }
+
+    /// The ids kept under `key`, the latest first, each once, at most
+    /// [`RECENT_PLACES_KEPT`]; none for a broken setting.
+    fn recent(&self, key: &str) -> Result<Vec<String>> {
+        let kept = self.store.local_setting(key)?;
         let ids = match kept.as_deref().map(serde_json::from_str) {
             Some(Ok(serde_json::Value::Array(ids))) => ids,
             _ => return Ok(Vec::new()),
@@ -514,18 +542,14 @@ impl<'a> DeviceSettings<'a> {
         Ok(recent)
     }
 
-    /// Puts `place_id` first among [`Self::recently_filed_into`], once,
-    /// and forgets the oldest beyond [`RECENT_PLACES_KEPT`].
-    pub fn filed_into(&self, place_id: &str) -> Result<()> {
-        let mut recent = vec![place_id.to_owned()];
-        recent.extend(
-            self.recently_filed_into()?
-                .into_iter()
-                .filter(|id| id != place_id),
-        );
+    /// Puts `id` first among the ids kept under `key`, as [`Self::recent`]
+    /// reads them.
+    fn used(&self, key: &str, id: &str) -> Result<()> {
+        let mut recent = vec![id.to_owned()];
+        recent.extend(self.recent(key)?.into_iter().filter(|r| r != id));
         recent.truncate(RECENT_PLACES_KEPT);
         let json = serde_json::to_string(&recent).map_err(|e| Error::Invalid(e.to_string()))?;
-        self.store.set_local_setting(RECENTLY_FILED_INTO, &json)
+        self.store.set_local_setting(key, &json)
     }
 }
 

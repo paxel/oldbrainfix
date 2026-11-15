@@ -289,7 +289,8 @@ class NoteCard extends StatelessWidget {
   /// Opens "file into…"; no button when null.
   final VoidCallback? onFile;
 
-  /// Opens "merge into…"; no button when null.
+  /// Opens "merge into…", on an Unsorted Note's card named "Add to
+  /// Note…" (#308); no button when null.
   final VoidCallback? onMerge;
 
   /// Spawns a Routine, Reminder, Frog or Session from the Note, picked
@@ -583,6 +584,7 @@ class NoteCard extends StatelessWidget {
             onSchedule: onSchedule,
             spawnsNow: spawnsNow,
             onMerge: onMerge,
+            adding: note.isUnsorted,
           )
         : null;
     final bottom = full && acts;
@@ -706,6 +708,7 @@ class NoteCard extends StatelessWidget {
                         onFile: onFile,
                         onSchedule: onSchedule,
                         onMerge: onMerge,
+                        adding: note.isUnsorted,
                         actions: actions,
                         spawnsNow: spawnsNow,
                       ),
@@ -738,6 +741,10 @@ class NoteActionRow extends StatelessWidget {
   final VoidCallback? onFile;
   final ValueChanged<Spawn>? onSchedule;
   final VoidCallback? onMerge;
+
+  /// Whether [onMerge] is named "Add to Note…", as on an Unsorted Note's
+  /// card (#308), not "Merge into…".
+  final bool adding;
   final NoteActions? actions;
 
   /// What the spawn menu offers, in this order.
@@ -752,6 +759,7 @@ class NoteActionRow extends StatelessWidget {
     this.onFile,
     this.onSchedule,
     this.onMerge,
+    this.adding = false,
     this.actions,
     this.spawns = Spawn.values,
     this.spawnsNow,
@@ -797,7 +805,7 @@ class NoteActionRow extends StatelessWidget {
               ),
             if (onMerge != null)
               IconButton(
-                tooltip: t.mergeInto,
+                tooltip: adding ? t.addToNote : t.mergeInto,
                 onPressed: onMerge,
                 icon: const Icon(Icons.call_merge),
               ),
@@ -856,6 +864,9 @@ class _MoreButton extends StatelessWidget {
   final List<Spawn> Function()? spawnsNow;
   final VoidCallback? onMerge;
 
+  /// Whether [onMerge] is named "Add to Note…" (#308).
+  final bool adding;
+
   const _MoreButton({
     required this.importance,
     required this.actions,
@@ -863,6 +874,7 @@ class _MoreButton extends StatelessWidget {
     this.onSchedule,
     this.spawnsNow,
     this.onMerge,
+    this.adding = false,
   });
 
   @override
@@ -949,7 +961,12 @@ class _MoreButton extends StatelessWidget {
                 () => schedule(spawn),
               ),
           if (onMerge case final merge?)
-            item('note-merge', Icons.call_merge, t.mergeInto, merge),
+            item(
+              'note-merge',
+              Icons.call_merge,
+              adding ? t.addToNote : t.mergeInto,
+              merge,
+            ),
           if (onFile != null || spawns.isNotEmpty || onMerge != null)
             const PopupMenuDivider(),
           if (actions.onImportance case final set?) ...[

@@ -105,6 +105,7 @@ use oldbrainfix_core::{
 };
 
 use crate::about_view;
+use crate::add_to_note::{self, NoteAsk, NotePicker};
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::{Event, OccurrenceWanted};
 use crate::all_routines_view::{self, AllRoutinesAction};
@@ -813,7 +814,7 @@ struct UpdateNotice {
 }
 
 /// What File into… files (#272): these Notes, or the Note being
-/// captured.
+/// captured; and what Add to Note… adds (#308).
 #[derive(Debug, Clone, PartialEq)]
 enum Filing {
     Notes(Vec<String>),
@@ -1038,6 +1039,13 @@ enum Dialog {
     FileInto {
         into: Filing,
         picker: Box<FileIntoPicker>,
+    },
+    /// Add to Note… (#308): the Note the capture goes into as a Section,
+    /// or, from an Unsorted Note's card, the Note the Notes are merged
+    /// into, picked with a filter and the Notes added to last on top.
+    AddToNote {
+        adding: Filing,
+        picker: Box<NotePicker>,
     },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
@@ -1400,6 +1408,9 @@ enum Action {
     /// "To full editor" (#142): captures as leaving does and opens the
     /// Note in the Note dialog (#146), its text taking the keyboard.
     CaptureToEditor,
+    /// "Add to Note…" in the quick note (#308): asks which Note the
+    /// capture goes into.
+    CaptureAddToNote,
     /// Starts recording voice into the Note being captured.
     Record,
     /// Ends the recording and holds it on the capture field.
@@ -1499,6 +1510,10 @@ enum Action {
     ImportanceOf(Vec<String>, Importance),
     /// Asks which Note they are merged into, together (#273).
     AskMergeNotes(Vec<String>),
+    /// The same as Add to Note…, from an Unsorted Note's card (#308).
+    AskAddToNote(Vec<String>),
+    /// Add to Note…'s answer (#308).
+    AddToNotePicked(NoteAsk),
     /// Merges the selected Note into this one.
     Merge(String),
     NewArea,
@@ -6849,6 +6864,29 @@ impl App {
                 }
             }
             Action::CaptureChoice(asked) => self.capture_choice(asked)?,
+            Action::CaptureAddToNote => {
+                // A running recording is ended and held with the rest, so
+                // it goes with them.
+                if let Some(r) = &mut self.recorder
+                    && r.recording()
+                    && let Some(bytes) = r.stop()
+                {
+                    self.recorded.push(bytes);
+                }
+                let picker = NotePicker::read(&self.store, &self.t, &[])?;
+                self.dialog = Some(Dialog::AddToNote {
+                    adding: Filing::Capture,
+                    picker: Box::new(picker),
+                });
+            }
+            Action::AskAddToNote(ids) => {
+                let picker = NotePicker::read(&self.store, &self.t, &ids)?;
+                self.dialog = Some(Dialog::AddToNote {
+                    adding: Filing::Notes(ids),
+                    picker: Box::new(picker),
+                });
+            }
+            Action::AddToNotePicked(asked) => self.add_to_note_picked(asked)?,
             Action::StopRecording => {
                 if let Some(bytes) = self.recorder.as_mut().and_then(|r| r.stop()) {
                     self.recorded.push(bytes);
@@ -11500,6 +11538,67 @@ impl App {
         Ok(())
     }
 
+    /// Does what Add to Note… asked (#308): the Notes found again for
+    /// what is typed, or the Note picked, kept as added to last, gets the
+    /// capture as a Section, the quick note going as a save makes it go,
+    /// or has the Notes from the card merged into it, as Merge into…
+    /// merges them.
+    fn add_to_note_picked(&mut self, asked: NoteAsk) -> oldbrainfix_core::Result<()> {
+        let into = match asked {
+            NoteAsk::Find => {
+                if let Some(Dialog::AddToNote { picker, .. }) = &mut self.dialog {
+                    picker.find(&self.store, &self.t)?;
+                }
+                return Ok(());
+            }
+            NoteAsk::Close => {
+                self.dialog = None;
+                return Ok(());
+            }
+            NoteAsk::Note(into) => into,
+        };
+        match self.dialog.take() {
+            Some(Dialog::AddToNote {
+                adding: Filing::Notes(notes),
+                ..
+            }) => {
+                add_to_note::picked(&self.store, &into)?;
+                self.merge_picked(notes, into)?;
+            }
+            Some(Dialog::AddToNote {
+                adding: Filing::Capture,
+                ..
+            }) => {
+                add_to_note::picked(&self.store, &into)?;
+                self.capture_into_note(&into)?;
+            }
+            other => self.dialog = other,
+        }
+        Ok(())
+    }
+
+    /// Adds what the quick note holds to the Note `into` at once as a
+    /// Section (#308); emptied, the quick note goes as a save makes it go.
+    /// A failure keeps all of it there.
+    fn capture_into_note(&mut self, into: &str) -> oldbrainfix_core::Result<()> {
+        let held = (
+            &self.held_photos[..],
+            &self.recorded[..],
+            &self.held_files[..],
+        );
+        capture_choices::add_to_note(&self.store, &self.capture, into, held)?;
+        self.capture.clear();
+        self.recorded.clear();
+        self.held_photos.clear();
+        self.held_files.clear();
+        // Added to what still waits to be clicked, so none goes unsaid.
+        self.untranscribable.append(&mut self.held_problems);
+        self.capture_choices = CaptureChoices::default();
+        self.quick_open = false;
+        self.capture_focus = false;
+        Ok(())
+    }
+
     /// Files what File into… was for into the place picked, a new one
     /// made first, which stays even when a Note captured is not saved.
     fn file_into_picked(&mut self, picked: Picked) -> oldbrainfix_core::Result<()> {
@@ -13061,6 +13160,7 @@ impl App {
             match capture_choices::action_row(ui, &t, &self.capture_choices, offer, row) {
                 Some(RowAsk::Choice(asked)) => actions.push(Action::CaptureChoice(asked)),
                 Some(RowAsk::ToEditor) => actions.push(Action::CaptureToEditor),
+                Some(RowAsk::AddToNote) => actions.push(Action::CaptureAddToNote),
                 None => {}
             }
             ui.add_space(4.0);
@@ -13344,6 +13444,7 @@ impl App {
                     actions.push(match picked {
                         Action::AskFileInto(_) => Action::AskFileInto(along()),
                         Action::AskMergeNotes(_) => Action::AskMergeNotes(along()),
+                        Action::AskAddToNote(_) => Action::AskAddToNote(along()),
                         Action::ImportanceOf(_, importance) => {
                             Action::ImportanceOf(along(), importance)
                         }
@@ -14728,6 +14829,12 @@ impl App {
                         }
                         if let Some(picked) = picker.show(ui, &t) {
                             actions.push(Action::FileIntoPicked(picked));
+                        }
+                    }
+                    Dialog::AddToNote { picker, .. } => {
+                        title(ui, t.add_to_note());
+                        if let Some(asked) = picker.show(ui, (&t, tones)) {
+                            actions.push(Action::AddToNotePicked(asked));
                         }
                     }
                     Dialog::ProfileQr { link } => {
@@ -19355,7 +19462,7 @@ fn row(
 /// A Note the merge picks as a row, as [`row`] draws one, its tags in the
 /// accent colour: a click on one picks the Note, as anywhere on the row
 /// (#126).
-fn merge_row(ui: &mut Ui, tones: Tones, label: &str) -> egui::Response {
+pub(crate) fn merge_row(ui: &mut Ui, tones: Tones, label: &str) -> egui::Response {
     let height = 30.0;
     let width = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, height), Sense::click());
@@ -21725,11 +21832,15 @@ fn note_card(
         // These too with the cards selected along (#273).
         let one = || vec![note.id.clone()];
         if look.may {
-            if ui
-                .button(RichText::new(t.merge_into()).color(text))
-                .clicked()
-            {
-                picked = Some(Action::AskMergeNotes(one()));
+            // On an Unsorted Note's card Merge into… is Add to Note…
+            // (#308): the same Merge, picked as a capture picks its Note.
+            let (label, merge) = if note.is_unsorted() {
+                (t.add_to_note(), Action::AskAddToNote(one()))
+            } else {
+                (t.merge_into(), Action::AskMergeNotes(one()))
+            };
+            if ui.button(RichText::new(label).color(text)).clicked() {
+                picked = Some(merge);
             }
             ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
                 if let Some(importance) = importance_entries(ui, t, false) {

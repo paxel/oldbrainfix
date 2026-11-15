@@ -2412,7 +2412,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
-    if (await mergeNote(context, widget.notes, widget.places, note)) {
+    // The editor names it Merge into… (#308).
+    if (await mergeNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      adding: false,
+    )) {
       if (!mounted) return;
       Navigator.of(context).pop();
     }

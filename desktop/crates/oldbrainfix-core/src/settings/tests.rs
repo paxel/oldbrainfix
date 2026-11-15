@@ -291,3 +291,42 @@ fn file_into_keeps_the_last_three_places_filed_into_latest_first() -> Result<()>
     assert!(store.all_entries()?.is_empty(), "settings are never logged");
     Ok(())
 }
+
+#[test]
+fn add_to_note_keeps_the_last_three_notes_added_to_latest_first() -> Result<()> {
+    let store = crate::store::tests::store();
+    let settings = DeviceSettings::new(&store);
+    assert!(settings.recently_added_to()?.is_empty());
+    for id in ["a", "b", "c"] {
+        settings.added_to(id)?;
+    }
+    assert_eq!(settings.recently_added_to()?, ["c", "b", "a"]);
+    settings.added_to("a")?;
+    assert_eq!(
+        settings.recently_added_to()?,
+        ["a", "c", "b"],
+        "once, moved up"
+    );
+    settings.added_to("d")?;
+    assert_eq!(
+        settings.recently_added_to()?,
+        ["d", "a", "c"],
+        "b forgotten"
+    );
+    assert_eq!(
+        store.local_setting(RECENTLY_ADDED_TO)?.as_deref(),
+        Some(r#"["d","a","c"]"#)
+    );
+    assert!(
+        settings.recently_filed_into()?.is_empty(),
+        "a list of its own"
+    );
+    store.set_local_setting(RECENTLY_ADDED_TO, r#"["x",7,"x","y","z","w"]"#)?;
+    assert_eq!(settings.recently_added_to()?, ["x", "y", "z"]);
+    store.set_local_setting(RECENTLY_ADDED_TO, "not json")?;
+    assert!(settings.recently_added_to()?.is_empty());
+    settings.added_to("e")?;
+    assert_eq!(settings.recently_added_to()?, ["e"]);
+    assert!(store.all_entries()?.is_empty(), "settings are never logged");
+    Ok(())
+}

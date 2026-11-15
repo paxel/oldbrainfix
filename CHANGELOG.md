@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [0.6.1]
 
+### Added
+
+- Capture offers "Add to Note…", on the phone and on the desktop, in the quick note and the capture popup: it picks another Note with a filter, the Notes added to last at the top, and adds the text, voice recording, photos or files to it at once as a Section, so nothing waits in Unsorted. Added from Capture to a Note in a Shared Area, the Section is there for everyone in it. On an Unsorted Note's card, Merge into… is now called "Add to Note…" and picks the Note the same way. ([obf-1001](https://github.com/paxel/oldbrainfix/issues/308))
+
 ### Changed
 
 - Typed text made a Checklist or a Shopping List keeps every line as a Line, its first line too; only a first line that looks like a heading, a Markdown heading or a line ending in ":", becomes the list's name, and a list without one shows "Checklist" or "Shopping List" until a name is typed. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))

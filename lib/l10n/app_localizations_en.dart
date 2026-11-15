@@ -360,6 +360,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noOtherNotes => 'There is no other Note to merge into.';
 
   @override
+  String get addToNote => 'Add to Note…';
+
+  @override
+  String get addToNoteRecent => 'Added to recently';
+
+  @override
+  String get noNoteToAddTo => 'There is no Note to add to.';
+
+  @override
   String get locationExplainTitle => 'Remember where you were?';
 
   @override
@@ -4991,7 +5000,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
+      'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';

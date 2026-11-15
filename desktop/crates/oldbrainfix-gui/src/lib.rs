@@ -14,6 +14,7 @@
 //! newer version.
 
 pub mod about_view;
+pub mod add_to_note;
 pub mod ai_view;
 pub mod alerts;
 pub mod all_routines_view;

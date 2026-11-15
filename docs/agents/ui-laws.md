@@ -286,7 +286,11 @@ replace a law of Both apps where they say so. A desktop law marked
   right** and offers after Edit File into…, Routine…, Reminder…, in
   Advanced Frog and Session… (#197), and Merge into…, as far as the
   action row would (#281): the spawns only for who may set them up
-  (ADR 0013) and Session… only on a plain Note. In the detailed view a Shopping List shows its open Lines,
+  (ADR 0013) and Session… only on a plain Note. **On an Unsorted Note's
+  card Merge into… is named "Add to Note…"** (#308), in the action row,
+  the ⋮ and on the desktop the right-click: the same Merge, picked in
+  Add to Note… (see Dialogs and pages); the Note editor, the Note
+  dialog, the Note menu and a selection keep Merge into…. In the detailed view a Shopping List shows its open Lines,
   tickable, the struck ones folded under them ("2 struck through") until
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
@@ -504,6 +508,15 @@ replace a law of Both apps where they say so. A desktop law marked
   stays when the Note is not saved; Cancel makes nothing and stays. A
   place File into… does not list (deleted, a Topic of a closed locked
   Area, a Shared Area the Device left) is not offered among the recent
+  ones either.
+- **Add to Note…** (#308), from capture or an Unsorted Note's card, is
+  a filter over the Notes, the core's search (focused on the desktop,
+  not on the phone), then "Added to recently" with the last three Notes
+  this Device added to, the latest first, while nothing is typed, then
+  every Note found, newest first. It offers only Notes this Device may
+  add to (ADR 0013), none in the trash, none of a closed locked Area,
+  not the Note being added, and to a capture Hidden from AI none of a
+  Shared Area (#267). A Note it does not offer is not among the recent
   ones either.
 - **The Shopping List pick** of Add to a Shopping List lists the lists
   this Device may add to, oldest capture first, but the one a capture on
@@ -995,7 +1008,7 @@ replace a law of Both apps where they say so. A desktop law marked
   settings, where only the user turns it on; the iPhone has no row.
 - **The quick note is uncluttered** (#142): by default it shows the
   text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
-  **To full editor** and the alarm clock beside it (#223), whose menu
+  **To full editor**, **Add to Note…** (#308) and the alarm clock beside them (#223), whose menu
   offers Routine and Reminder as the Note editor's "+" does, in Simple
   too; nothing else that sorts and no chips. The Routine or Reminder
   editor opens over the quick note and comes back to it with the choice
@@ -1005,6 +1018,18 @@ replace a law of Both apps where they say so. A desktop law marked
   returns to where Capture was opened from. It waits while there is
   nothing to save and is not offered behind the App Lock or while a
   Shopping List is picked.
+- **Add to Note… adds the capture to another Note at once** (#308,
+  Q713): it picks the Note in Add to Note…, a running recording ended
+  and kept first, and the text, recording, photos and files become one
+  Section of it with their Capture Context, the capture written where
+  that Note lies (so in a Shared Area for its people), with no Nudge,
+  and merged into it, so nothing waits in Unsorted; Capture then closes,
+  on the phone back where it was opened from, which shows that Note.
+  Back in the picker leaves the capture as it was. It waits as To full
+  editor does and is not offered behind the App Lock, while a Shopping
+  List is picked, nor once a Routine, Reminder, Session, Frog or Tally
+  is set up, which need the Note itself; a place picked gives way to
+  the Note's.
 - **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
   all off by default, for File into…, Frog, Session or Tally (only in
   Advanced, #197), Add to a Shopping List, the Importance and the format
@@ -1588,7 +1613,8 @@ replace a law of Both apps where they say so. A desktop law marked
   from the keyboard (#274, see Menu bar and keys). A double-click, Edit
   or Enter opens the Note dialog.
 - **A selection is acted on from a card's right-click** (#273, Q656):
-  its menu offers, after File into…, Merge into… and Importance ▸
+  its menu offers, after File into…, Merge into… (on an Unsorted Note's
+  card Add to Note…, #308) and Importance ▸
   Important, Normal or Unimportant, and Move to trash last, each only on
   a card this Device may change; a card in the Trash has no ⋮, and its
   right-click offers Restore alone. Between File into… and Merge into…
@@ -1669,8 +1695,9 @@ replace a law of Both apps where they say so. A desktop law marked
   dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
   quick note and follow the same switches (desktop Settings ▸ Quick
   note, beside Quick capture): by default the text, Record voice, Paste
-  (the dialog also From file…), the Nudge buttons, To full editor and
-  the alarm clock, whose menu offers Routine and Reminder (#223), its
+  (the dialog also From file…), the Nudge buttons, To full editor, Add
+  to Note… (#308), a dialog over the quick note dialog or a page of the
+  popup, and the alarm clock, whose menu offers Routine and Reminder (#223), its
   editor a dialog over the quick note dialog or a page of the popup;
   switched on, File into…, Frog and Session in the clock's menu, and
   More with the Importance, Make it a Tally and Add to a Shopping List

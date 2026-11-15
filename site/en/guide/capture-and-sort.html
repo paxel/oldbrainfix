@@ -19,7 +19,7 @@
 <li>After speaking, tap <strong>Stop</strong>.</li>
 <li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The quick note as a dialog over the desktop Agenda with a typed text, From file…, To full editor, the alarm clock and the Nudge buttons">
+<box-tab device="desktop" alt="The quick note as a dialog over the desktop Agenda with a typed text, From file…, To full editor, Add to Note…, the alarm clock and the Nudge buttons">
 <li>Press Ctrl+N, or click <strong>File ▸ New Note</strong>.</li>
 <li>Type, or click <strong>Record voice</strong>, <strong>Paste</strong> or <strong>From file…</strong>.</li>
 <li>After speaking, click <strong>Stop</strong>.</li>
@@ -42,7 +42,7 @@
 <p>
   The capture screen, the quick note, holds the text field ("What's on your mind?"), the buttons
   <strong>Photo</strong>, <strong>Voice</strong>, <strong>Gallery</strong>, <strong>Paste</strong>
-  and <strong>File</strong>, <strong>To full editor</strong>, and at the bottom "Remind me to sort it in"
+  and <strong>File</strong>, <strong>To full editor</strong>, <strong>Add to Note…</strong>, and at the bottom "Remind me to sort it in"
   with <strong>10 min</strong>, <strong>30 min</strong> and <strong>1 h</strong>. Each of the three
   saves the Note and sets its Nudge to that time. The alarm clock beside To full editor sets up a
   Routine or Reminder; nothing else on the screen sorts the Note unless it is switched on in
@@ -53,6 +53,7 @@
   <li><strong>Photo</strong> and <strong>Gallery</strong>: the photos show above the text field, and the text becomes optional ("A few words about it (optional)").</li>
   <li><strong>Paste</strong>: the clipboard is read only on this tap. Its text goes into the field at the cursor, its picture into the Note as a photo. When it holds neither, a line above the field says so.</li>
   <li><strong>To full editor</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note editor with everything the editor offers. Filing it there drops the Nudge, as filing always does. Leaving the editor goes back to where the capture was opened from. The button waits until something is typed, recorded or picked, and behind the App Lock it is not offered, as the editor shows the Areas.</li>
+  <li><strong>Add to Note…</strong> adds the thought to a Note you already have instead of making a new one. It opens your Notes with a filter at the top; while nothing is typed, "Added to recently" lists the last three Notes this Device added to. Tapping a Note adds the text, the recording, the photos and the files to it at once as a new Section, with no Nudge, and the capture screen closes; nothing is left in Unsorted. A Note in a Shared Area gets the Section for everyone in it. Back in the list leaves the capture as it was. The button waits until something is typed, recorded or picked; it is not offered behind the App Lock, while a Shopping List is picked, or once a Routine, Reminder, Session, Frog or Tally is set up for the Note.</li>
 </ul>
 <p>
   <strong>Save</strong> in the top bar, Back and the app going to the background save as well; the
@@ -75,6 +76,7 @@
 </p>
 <ul>
   <li><strong>To full editor</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note dialog in place of the quick note, its text ready for typing. The list stays where it was.</li>
+  <li><strong>Add to Note…</strong> opens the same list of Notes over the quick note, its filter taking the keyboard. Enter adds to the first Note shown, while nothing is typed the one added to last; a click adds to the Note clicked. A recording still running is ended and added with the rest, and the quick note closes. Esc and <strong>Cancel</strong> go back to the quick note.</li>
   <li>With an Area or Topic shown in the list, the Note is filed there and needs no Nudge: one <strong>Save</strong> takes the place of the three Nudge buttons, and To full editor files it there too.</li>
   <li><strong>Record voice</strong> starts recording at once; <strong>Stop</strong> ends it, the recording waits under the field as a "Voice recording" line and is saved with the Note.</li>
   <li><strong>Paste</strong>, or Ctrl+V in the empty field, puts the clipboard's text into the field. A pasted picture waits under the field as a "Photo" line and is saved with what is typed as the Note's photo.</li>
@@ -185,14 +187,14 @@
 <guide-box name="capture-outside">
 <h2 id="the-hotkey-and-the-popup">Capture without opening the app</h2>
 <p>Start a Note from the home screen, or from anywhere on the computer.</p>
-<box-tab device="phone" alt="The quick note with a typed text, To full editor, the alarm clock and the three Nudge buttons">
+<box-tab device="phone" alt="The quick note with a typed text, To full editor, Add to Note…, the alarm clock and the three Nudge buttons">
 <li>Long-press the Old Brain Fix icon.</li>
 <li>Tap <strong>Voice</strong>, <strong>Text</strong> or <strong>Photo</strong>.</li>
 <li>Type, speak or take the photo.</li>
 <li>After speaking, tap <strong>Stop</strong>.</li>
 <li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The capture popup with a typed text, To full editor, the alarm clock and the Nudge buttons">
+<box-tab device="desktop" alt="The capture popup with a typed text, To full editor, Add to Note…, the alarm clock and the Nudge buttons">
 <li>Press Ctrl+Alt+N anywhere.</li>
 <li>Type what's on your mind.</li>
 <li>Press Enter.</li>
@@ -219,8 +221,9 @@
   other windows; <strong>File ▸ Quick note</strong> opens it too. It works while Old Brain Fix runs;
   where there is a tray, the app keeps running there after its window is closed. The popup holds a
   field, <strong>Record voice</strong>, <strong>Paste</strong>, <strong>To full
-  editor</strong>, the alarm clock, what Settings under "Quick note" switched on, and the Nudge
-  buttons. Enter saves
+  editor</strong>, <strong>Add to Note…</strong>, the alarm clock, what Settings under "Quick note" switched on, and the Nudge
+  buttons. Add to Note… shows the list of Notes as a page of the popup; the Note picked there gets
+  what is typed and recorded as a Section, and the popup closes. Enter saves
   the Note with a Nudge in 1 h, or without one once the Note is sorted, and Shift+Enter starts a
   new line; Ctrl+1, Ctrl+2 and Ctrl+3 (Cmd on macOS) save it with a Nudge in 10 min, 30 min or 1 h,
   as the Nudge buttons do. Esc and the close button
@@ -299,6 +302,12 @@
   into…</strong>, <strong>Importance</strong> and <strong>Move to trash</strong> for all of them, and
   in the Trash <strong>Restore</strong>; Ctrl+Z takes back the trash or the Merge of all of them at
   once.
+</p>
+<p>
+  On the card of an Unsorted Note, on the phone and on the desktop, Merge into… is called
+  <strong>Add to Note…</strong>: it merges the Note into the one picked, which it then shows as a
+  Section, from the same list as the quick note's Add to Note…, the Notes added to last at the top.
+  On a filed Note's card, in the Note editor and in the Note menu it stays Merge into….
 </p>
 <p>
   Without the mouse, Down selects the next card in Unsorted, Ctrl+M opens File into…, a few letters
