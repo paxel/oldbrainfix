@@ -7578,8 +7578,8 @@ Map<String, Object?> _ask() {
   const passport = 'note:0a1b2c3d4e5f60718293a4b5c6d7e8f9';
   return {
     'questions': [
-      for (final (question, earlier) in [
-        ('Where is my passport?', <AskExchange>[]),
+      for (final (question, earlier, id) in [
+        ('Where is my passport?', <AskExchange>[], null),
         (
           'Und jetzt? „Pass“ im Ordner 📁',
           [
@@ -7590,15 +7590,40 @@ Map<String, Object?> _ask() {
             ),
             const AskExchange('Where?', 'In the blue folder.'),
           ],
+          null,
         ),
+        // With the id its status and stop name (#317).
+        ('Where is my passport?', <AskExchange>[], 'ask:0a1b2c'),
       ])
         {
           'question': question,
           'earlier': [
             for (final e in earlier) [e.question, e.answer],
           ],
-          'body': jsonEncode(askBody(question, earlier)),
+          'id': ?id,
+          'body': jsonEncode(askBody(question, earlier, id: id)),
         },
+    ],
+    // How far the desktop is with a question (#317), and bodies of it
+    // whose count is none, read as 0.
+    'progress': [
+      for (final progress in const [
+        AskProgress(asking: true, read: 3),
+        AskProgress(asking: false),
+      ])
+        {
+          'asking': progress.asking,
+          'read': progress.read,
+          'body': jsonEncode(progress.toJson()),
+        },
+    ],
+    'laterProgress': [
+      for (final body in [
+        {'asking': true, 'read': -1},
+        {'asking': true, 'read': 2.5},
+        {'asking': true},
+      ])
+        {'asking': true, 'read': 0, 'body': jsonEncode(body)},
     ],
     'providers': [
       for (final provider in const [
@@ -11045,7 +11070,9 @@ Future<void> main(List<String> args) async {
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, what is no code and codes of a later version (ADR 0034).\n'
     '- `ask.json`: the phone\'s question through the desktop (#267, ADR '
-    '0051): question bodies with their earlier exchanges, the provider as '
+    '0051): question bodies with their earlier exchanges and the id the '
+    'phone gives one (#317), how far the desktop is with a question, the '
+    'provider as '
     'the phone learns it, answers (one whose unread Note links were '
     'removed, #294) and every kind of failure as bodies with what they '
     'hold, replies of a later desktop, and addresses typed by '

@@ -693,14 +693,7 @@ impl Conversation {
     /// or none at all without an error.
     pub fn answer(&mut self, done: &[(ToolCall, ToolOutput)]) {
         for (call, output) in done {
-            let key = match call.name.as_str() {
-                "read_note" => "id",
-                "read_attachment_text" => "note",
-                _ => continue,
-            };
-            if !output.is_error
-                && let Some(id) = call.args.get(key).and_then(Value::as_str)
-                && id.starts_with("note:")
+            if let Some(id) = note_read(call, output)
                 && !self.read.iter().any(|r| r == id)
             {
                 self.read.push(id.to_string());
@@ -837,6 +830,27 @@ pub fn checked(text: &str, read: &[String]) -> (String, bool) {
     }
 }
 
+/// The Note `call` read in full, as `output` handed it out: the id that
+/// `read_note` or `read_attachment_text` was given, when it answered
+/// without an error. A tool that only names a Note, such as
+/// `read_check_offs`, reads none. The one rule for what counts as read,
+/// for the check of the answer's links (#294) and for how many Notes the
+/// question has read so far (#317).
+pub fn note_read<'a>(call: &'a ToolCall, output: &ToolOutput) -> Option<&'a str> {
+    let key = match call.name.as_str() {
+        "read_note" => "id",
+        "read_attachment_text" => "note",
+        _ => return None,
+    };
+    if output.is_error {
+        return None;
+    }
+    call.args
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|id| id.starts_with("note:"))
+}
+
 /// Asks `conversation` through `transport` until the model answers, the
 /// tools it calls answered by `tools`, an output for each call in
 /// order; `None` from `tools` stops it ([`AskError::Stopped`]).
@@ -881,10 +895,36 @@ impl Store {
         transport: &dyn Transport,
         wall: &WallClock,
     ) -> std::result::Result<Asked, AskError> {
+        self.ask_with(conversation, transport, wall, &|_| true)
+    }
+
+    /// [`Store::ask`], telling `progress` how many Notes the model read
+    /// so far ([`note_read`]) before and after each round of tools (#317);
+    /// `false` from it stops the question there ([`AskError::Stopped`]),
+    /// as the phone's Stop does.
+    pub fn ask_with(
+        &self,
+        conversation: &mut Conversation,
+        transport: &dyn Transport,
+        wall: &WallClock,
+        progress: &dyn Fn(usize) -> bool,
+    ) -> std::result::Result<Asked, AskError> {
         let before = self.ai_task().ok().flatten();
         let mut task = before.clone();
+        let mut read: Vec<String> = Vec::new();
         let answered = run(conversation, transport, |calls| {
-            Some(self.ask_calls(calls, wall, &mut task))
+            if !progress(read.len()) {
+                return None;
+            }
+            let outputs = self.ask_calls(calls, wall, &mut task);
+            for (call, output) in calls.iter().zip(&outputs) {
+                if let Some(id) = note_read(call, output)
+                    && !read.iter().any(|r| r == id)
+                {
+                    read.push(id.to_string());
+                }
+            }
+            progress(read.len()).then_some(outputs)
         });
         if before.is_none()
             && let Some(id) = &task

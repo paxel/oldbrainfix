@@ -49,7 +49,8 @@ use oldbrainfix_core::lan::{
     DEVICE_HEADER, NONCE_HEADER, PROOF_HEADER, paired_proof_bytes, sync_request,
 };
 use oldbrainfix_core::lan_ask::{
-    ASK_PATH, AskDesk, AskFailure, AskReply, PROVIDER_PATH, ProviderShown, Question,
+    ASK_PATH, AskDesk, AskFailure, AskProgress, AskReply, PROVIDER_PATH, ProviderShown, Question,
+    STATUS_PATH,
 };
 use oldbrainfix_core::{Notes, PairedDevice, SigningKey, Store};
 use oldbrainfix_gui::App;
@@ -577,12 +578,14 @@ fn phone_request(
 }
 
 /// What the phone heard: the provider shown, and the reply to its
-/// question with its raw body and how long it took.
+/// question with its raw body and how long it took, and what
+/// `/ask/status` said while it waited (#317).
 struct PhoneAsked {
     provider: (u16, String),
     status: u16,
     body: String,
     took: Duration,
+    progress: Vec<(u16, String)>,
 }
 
 /// The desktop seeded with the Notes asking `url` for `model`, hosting
@@ -623,18 +626,43 @@ fn ask_phone(
     let body = Question {
         question: question.into(),
         earlier: Vec::new(),
+        id: Some("ask:e2e".into()),
     }
     .to_json();
     let started = Instant::now();
+    let phone = Arc::new(phone);
     let asked = std::thread::spawn(move || {
         let provider = phone_request(port, &desk_id, &phone, PROVIDER_PATH, None)?;
         let started = Instant::now();
-        let (status, body) = phone_request(port, &desk_id, &phone, ASK_PATH, Some(&body))?;
+        // The phone polls how far the desktop is while it waits.
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let poller = {
+            let (done, phone, desk_id) = (done.clone(), phone.clone(), desk_id.clone());
+            std::thread::spawn(move || {
+                let mut heard = Vec::new();
+                let about = serde_json::json!({"id": "ask:e2e"});
+                while !done.load(std::sync::atomic::Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_millis(500));
+                    if let Ok(said) =
+                        phone_request(port, &desk_id, &phone, STATUS_PATH, Some(&about))
+                    {
+                        heard.push(said);
+                    }
+                }
+                heard
+            })
+        };
+        let asked = phone_request(port, &desk_id, &phone, ASK_PATH, Some(&body));
+        let took = started.elapsed();
+        done.store(true, std::sync::atomic::Ordering::SeqCst);
+        let progress = poller.join().map_err(|_| "the poller panicked")?;
+        let (status, body) = asked?;
         Ok::<_, String>(PhoneAsked {
             provider,
             status,
             body,
-            took: started.elapsed(),
+            took,
+            progress,
         })
     });
     let syncing = Syncing::default();
@@ -669,11 +697,27 @@ fn phone_answer(
     );
     print_rounds(&transport.rounds());
     println!(
+        "  POST {STATUS_PATH} while it waited: {:?}",
+        asked
+            .progress
+            .iter()
+            .map(|(status, body)| format!("{status} {body}"))
+            .collect::<Vec<_>>()
+    );
+    println!(
         "  POST {ASK_PATH} after {:.1}s: HTTP {} {}",
         asked.took.as_secs_f64(),
         asked.status,
         asked.body
     );
+    for (status, body) in &asked.progress {
+        assert_eq!(*status, 200, "{body}");
+        let progress = AskProgress::from_json(&serde_json::from_str(body)?).ok_or("no progress")?;
+        assert!(
+            progress.read <= transport.read_asked().len(),
+            "{body}: more Notes read than the model asked for"
+        );
+    }
     println!(
         "  read_note asked for: {:?}",
         transport
@@ -828,17 +872,23 @@ fn shoot_panel(url: &str, model: &str, question: &str, name: &str) -> TestResult
             );
         }
         None => println!(
-            "  no answer after {:.1}s; announced at the top",
-            took.as_secs_f64()
+            "  no answer after {:.1}s; under the question: {:?}",
+            took.as_secs_f64(),
+            harness
+                .state()
+                .ask_panel()
+                .failed
+                .as_ref()
+                .map(|f| (&f.cause, &f.fix, &f.details))
         ),
     }
     let file = shots_dir().join(name);
     harness.render()?.save(&file)?;
     println!("  drawn: {}", file.display());
-    // A failure is announced at the top; its click shows why.
-    let failed = L10n::new("en").ask_failed();
-    if harness.query_by_label(failed).is_some() {
-        harness.get_by_label(failed).click();
+    // A failure stays under its question; Details… shows why (#317).
+    let details = L10n::new("en").ask_failure_details();
+    if harness.query_by_label(details).is_some() {
+        harness.get_by_label(details).click();
         harness.run_steps(4);
         let file = shots_dir().join(name.replace(".png", "-details.png"));
         harness.render()?.save(&file)?;

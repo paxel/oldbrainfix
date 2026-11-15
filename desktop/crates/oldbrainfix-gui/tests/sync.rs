@@ -450,6 +450,7 @@ fn a_paired_phones_question_is_answered_by_the_ask_desk_beside_the_syncs() -> Te
         let question = Question {
             question: "Where is my passport?".into(),
             earlier: Vec::new(),
+            id: None,
         };
         let mut res = agent
             .post(format!("{base}{ASK_PATH}"))

@@ -292,6 +292,49 @@ fn the_panel_names_the_provider_and_what_is_sent_or_what_is_missing() -> TestRes
     harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
     harness.run();
     assert!(shows(&harness, t.ask_unready_key()));
+    // Typed, the question still cannot be asked (#317).
+    field(&harness, t.ask_hint()).type_text("Where is my passport?");
+    harness.run();
+    assert!(
+        harness
+            .get_by_role_and_label(Role::Button, t.ask_button())
+            .accesskit_node()
+            .is_disabled()
+    );
+    harness.key_press(Key::Enter);
+    harness.run();
+    assert!(harness.state().ask_panel().exchanges.is_empty());
+    assert!(harness.state().ask_panel().failed.is_none());
+
+    // No model named, and an address it may not ask: the same.
+    let reopen_typed = |harness: &mut Harness<'_, App>| {
+        harness.state_mut().select(Selection::Agenda);
+        harness.run();
+        harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
+        harness.run();
+        field(harness, t.ask_hint()).type_text("Where is my passport?");
+        harness.run();
+    };
+    harness.state().store().set_ask_protocol(Protocol::OpenAi)?;
+    reopen_typed(&mut harness);
+    assert!(shows(&harness, t.ask_unready_model()));
+    assert!(
+        harness
+            .get_by_role_and_label(Role::Button, t.ask_button())
+            .accesskit_node()
+            .is_disabled()
+    );
+    let store = harness.state().store();
+    store.set_ask_model("qwen2.5:3b")?;
+    store.set_ask_url("http://example.org:11434/v1")?;
+    reopen_typed(&mut harness);
+    assert!(shows(&harness, t.ask_unready_url()));
+    assert!(
+        harness
+            .get_by_role_and_label(Role::Button, t.ask_button())
+            .accesskit_node()
+            .is_disabled()
+    );
     harness
         .get_by_role_and_label(Role::Button, t.ask_open_settings())
         .click();
@@ -437,17 +480,147 @@ fn a_change_the_model_makes_waits_for_its_review_with_sync() -> TestResult {
     Ok(())
 }
 
+/// A provider that answers each request with the next of its replies,
+/// a status and a body, or no reply at all.
+#[derive(Clone)]
+struct Replies(Arc<Mutex<Vec<Result<Reply, String>>>>);
+
+impl Replies {
+    fn new(replies: Vec<Result<Reply, String>>) -> Replies {
+        Replies(Arc::new(Mutex::new(replies.into_iter().rev().collect())))
+    }
+}
+
+impl Transport for Replies {
+    fn post(&self, _: &Request) -> Result<Reply, String> {
+        self.0
+            .lock()
+            .unwrap()
+            .pop()
+            .unwrap_or(Err("no reply".into()))
+    }
+}
+
+/// What a provider replies, and the cause, the fix and the provider's
+/// words the panel then shows.
+type Failing<'a> = (Vec<Result<Reply, String>>, String, &'a str, &'a str);
+
+fn reply(status: u16, body: &str) -> Result<Reply, String> {
+    Ok(Reply {
+        status,
+        body: body.into(),
+    })
+}
+
 #[test]
-fn a_question_not_answered_is_announced_and_goes_back_into_the_field() -> TestResult {
-    let (store, _) = store()?;
-    let fake = Fake::new(vec![json!({"content": [], "stop_reason": "refusal"})]);
+fn a_question_not_answered_stays_under_it_with_its_cause_and_fix_until_asked_again() -> TestResult {
     let t = L10n::new("en");
-    let mut harness = harness(store, &fake);
-    ask(&mut harness, "Tell me something");
-    assert_eq!(harness.state().notice(), Some(t.ask_failed()));
-    assert_eq!(harness.state().ask_panel().question, "Tell me something");
-    assert!(harness.state().ask_panel().exchanges.is_empty());
-    assert!(!shows(&harness, "sk-ant-test-key"));
+    let refusal = json!({"content": [], "stop_reason": "refusal"}).to_string();
+    let searching = tool_use("find_notes", json!({"words": ["x"]})).to_string();
+    let kinds: Vec<Failing<'_>> = vec![
+        (
+            vec![reply(200, &refusal)],
+            t.ask_refused().into(),
+            t.ask_refused_fix(),
+            "",
+        ),
+        (
+            vec![reply(401, r#"{"error":{"message":"invalid x-api-key"}}"#)],
+            t.ask_key_refused("Anthropic"),
+            t.ask_key_fix(),
+            "invalid x-api-key",
+        ),
+        (
+            vec![reply(
+                404,
+                r#"{"error":{"message":"model: qwen9 not found"}}"#,
+            )],
+            t.ask_provider_failed("Anthropic"),
+            t.ask_provider_fix(),
+            "HTTP 404",
+        ),
+        (
+            vec![Err("Connection refused".into())],
+            t.ask_no_reply("Anthropic"),
+            t.ask_no_reply_fix(),
+            "Connection refused",
+        ),
+        (
+            vec![reply(200, "<html>")],
+            t.ask_unreadable("Anthropic"),
+            t.ask_unreadable_fix(),
+            "",
+        ),
+        (
+            (0..30).map(|_| reply(200, &searching)).collect(),
+            t.ask_too_many_rounds().into(),
+            t.ask_too_many_rounds_fix(),
+            "",
+        ),
+    ];
+    for (replies, cause, fix, said) in kinds {
+        let (store, _) = store()?;
+        let mut app = App::new(store, "en");
+        app.set_ask_transport(Arc::new(Replies::new(replies)));
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1280.0, 900.0))
+            .build_ui_state(
+                |ui, app: &mut App| {
+                    App::install(ui.ctx());
+                    app.show(ui);
+                },
+                app,
+            );
+        harness.run();
+        ask(&mut harness, "Tell me something");
+        // Under its question, not at the top.
+        assert_eq!(harness.state().notice(), None, "{cause}");
+        assert!(shows(&harness, &cause), "{cause}");
+        assert!(shows(&harness, fix), "{cause}");
+        assert!(labelled(&harness, "Tell me something"), "{cause}");
+        assert_eq!(harness.state().ask_panel().question, "Tell me something");
+        assert!(harness.state().ask_panel().exchanges.is_empty());
+        assert!(!shows(&harness, "sk-ant-test-key"));
+        // It stays while the user does something else.
+        harness.run_steps(5);
+        field(&harness, t.ask_hint()).type_text(" now");
+        harness.run();
+        assert!(shows(&harness, &cause), "{cause} stays");
+        // Its details show the provider's words, with Report.
+        harness
+            .get_by_role_and_label(Role::Button, t.ask_failure_details())
+            .click();
+        harness.run();
+        assert!(shows(&harness, said), "{cause}: {said}");
+        assert!(shows(&harness, t.report()), "{cause}");
+    }
+
+    // Asked again, the failure goes and the answer shows.
+    let (store, _) = store()?;
+    let mut app = App::new(store, "en");
+    app.set_ask_transport(Arc::new(Replies::new(vec![
+        Err("Connection refused".into()),
+        reply(200, &end_turn("In the blue folder.").to_string()),
+    ])));
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    ask(&mut harness, "Where is my passport?");
+    assert!(shows(&harness, &t.ask_no_reply("Anthropic")));
+    field(&harness, t.ask_hint()).focus();
+    harness.run();
+    harness.key_press(Key::Enter);
+    harness.run();
+    assert!(!shows(&harness, &t.ask_no_reply("Anthropic")));
+    assert!(harness.state().ask_panel().failed.is_none());
+    assert!(shows(&harness, "In the blue folder."));
     Ok(())
 }
 
@@ -591,6 +764,79 @@ impl Transport for Slow {
         std::thread::sleep(std::time::Duration::from_millis(300));
         self.0.post(request)
     }
+}
+
+/// A provider whose first reply comes at once and each later one only
+/// once the test lets it go.
+struct Held {
+    fake: Fake,
+    gate: Mutex<std::sync::mpsc::Receiver<()>>,
+    first: std::sync::atomic::AtomicBool,
+}
+
+impl Transport for Held {
+    fn post(&self, request: &Request) -> Result<Reply, String> {
+        if self.first.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            return self.fake.post(request);
+        }
+        self.gate
+            .lock()
+            .unwrap()
+            .recv()
+            .map_err(|e| e.to_string())?;
+        self.fake.post(request)
+    }
+}
+
+#[test]
+fn while_it_asks_the_status_line_says_whom_and_how_many_notes_were_read_with_stop() -> TestResult {
+    let (store, passport) = store()?;
+    let t = L10n::new("en");
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"id": passport})),
+        end_turn(&format!("[Here](oldbrainfix://note/{passport})")),
+    ]);
+    let (open, gate) = std::sync::mpsc::channel();
+    let mut app = App::new(store, "en");
+    app.set_ask_transport(Arc::new(Held {
+        fake,
+        gate: Mutex::new(gate),
+        first: std::sync::atomic::AtomicBool::new(true),
+    }));
+    app.set_redraw(Arc::new(|| {}));
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    ask_off_thread(&mut harness, "Where is my passport?");
+    assert!(shows(&harness, &t.ask_asking("Anthropic")));
+    // Still asking, the spinner keeps the window drawing: stepped.
+    for _ in 0..300 {
+        harness.step();
+        if harness.state().ask_panel().read == 1 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    harness.run_steps(2);
+    assert!(shows(&harness, &t.ask_asking_reading("Anthropic", 1)));
+    assert!(labelled(&harness, "Where is my passport?"));
+    assert!(
+        harness
+            .query_by_role_and_label(Role::Button, t.ask_stop())
+            .is_some()
+    );
+    open.send(())?;
+    until(&mut harness, |app| !app.ask_panel().exchanges.is_empty());
+    assert!(!shows(&harness, &t.ask_asking("Anthropic")));
+    assert!(!shows(&harness, &t.ask_asking_reading("Anthropic", 1)));
+    Ok(())
 }
 
 #[test]

@@ -6248,8 +6248,45 @@ class AppLocalizationsDe extends AppLocalizations {
   String get phoneAskStartOver => 'Neu beginnen';
 
   @override
-  String phoneAskAsking(String provider) {
-    return 'Warte auf die Antwort von $provider …';
+  String phoneAskAsking(String computer) {
+    return '$computer wird gefragt …';
+  }
+
+  @override
+  String phoneAskAskingReading(String computer, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen',
+      one: '1 Notiz',
+    );
+    return '$computer wird gefragt … $_temp0 gelesen';
+  }
+
+  @override
+  String get phoneAskStop => 'Anhalten';
+
+  @override
+  String get phoneAskFailureDetails => 'Details';
+
+  @override
+  String phoneAskUnreadyAiOffCause(String computer) {
+    return 'Die KI ist auf $computer ausgeschaltet.';
+  }
+
+  @override
+  String phoneAskUnreadyModelCause(String computer) {
+    return 'Auf $computer ist kein Modell angegeben.';
+  }
+
+  @override
+  String phoneAskUnreadyKeyCause(String provider, String computer) {
+    return 'Für $provider ist auf $computer kein API-Schlüssel eingegeben.';
+  }
+
+  @override
+  String phoneAskUnreadyUrlCause(String provider, String computer) {
+    return '$computer darf $provider unter dieser Adresse nicht fragen.';
   }
 
   @override
@@ -6358,9 +6395,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get phoneAskAllow => 'Erlauben';
-
-  @override
-  String get phoneAskFailed => 'Die Frage wurde nicht beantwortet.';
 
   @override
   String get phoneAskFailedTitle => 'Nicht beantwortet';

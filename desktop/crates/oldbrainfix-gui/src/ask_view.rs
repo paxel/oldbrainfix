@@ -1,10 +1,13 @@
 //! The Ask panel on the desktop's screen (#267, ADR 0051): AI ▸ Ask…
 //! (Ctrl+K) shows it in the list. A question goes to the provider the
 //! user entered in the AI settings (#335), the line under the heading
-//! naming it and that only what the model finds and reads is sent; each answer shows
-//! with links to the Notes it came from, which open them, and "Keep as
-//! Note". What the model changed waits as an AI Task for its review. The
-//! answers are gone once the list shows another place.
+//! naming it and that only what the model finds and reads is sent; while
+//! it runs, a status line under it says whom it asks and how many Notes
+//! the model has read, and a question not answered stays under its
+//! question with its cause and fix until the next is asked (#317). Each
+//! answer shows with links to the Notes it came from, which open them,
+//! and "Keep as Note". What the model changed waits as an AI Task for its
+//! review. The answers are gone once the list shows another place.
 //!
 //! The AI settings' card where the provider is entered is here too: the
 //! protocol, the base URL of an OpenAI-compatible provider, the model and
@@ -28,14 +31,32 @@ pub struct AskPanel {
     pub exchanges: Vec<Asked>,
     /// The question waiting for its answer.
     pub asking: Option<String>,
+    /// How many Notes the model read in full for it so far (#317).
+    pub read: usize,
+    /// The last question not answered, with why, until the next is asked
+    /// (#317).
+    pub failed: Option<AskFailed>,
     /// Whether the question field takes the keyboard.
     pub focus: bool,
+}
+
+/// A question not answered (#317): why, how to fix it, and what the
+/// provider said, which "Details…" shows with Report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AskFailed {
+    pub question: String,
+    pub cause: String,
+    pub fix: String,
+    pub details: String,
 }
 
 impl AskPanel {
     /// Whether nothing was asked nor typed.
     pub fn is_empty(&self) -> bool {
-        self.question.is_empty() && self.exchanges.is_empty() && self.asking.is_none()
+        self.question.is_empty()
+            && self.exchanges.is_empty()
+            && self.asking.is_none()
+            && self.failed.is_none()
     }
 
     /// The questions answered so far, which a follow-up is asked after;
@@ -81,6 +102,9 @@ pub enum AskAsked {
     Review,
     /// Opens the AI settings at the provider's card (#335).
     Settings,
+    /// Shows why the question failed, with the provider's message and
+    /// Report (#317).
+    Details,
 }
 
 /// What the panel shows besides its questions.
@@ -93,8 +117,8 @@ pub struct PanelShown<'a> {
 }
 
 /// Why a question was not answered, how to fix it, and what the
-/// provider said, for the failure announced (UI laws,
-/// "Announcements"); `None` for one stopped, which nobody waits for.
+/// provider said, shown under its question (#317); `None` for one
+/// stopped, which nobody waits for.
 pub fn failure(t: &L10n, provider: &str, why: &AskError) -> Option<(String, String, String)> {
     let said = |message: &str| message.to_string();
     Some(match why {
@@ -144,10 +168,11 @@ pub fn unready_line(t: &L10n, unready: Unready) -> &'static str {
 
 /// The panel: its heading, whom the questions go to and what is sent,
 /// the review an AI Task waits for, the question field with Ask (Stop
-/// while asking, Start over once something was asked), and the
-/// questions asked, the newest first, each with its answer, the Notes it
-/// came from and "Keep as Note". A question not answered is announced
-/// at the top, by the window.
+/// while asking, Start over once something was asked), under it what the
+/// provider lacks while it cannot be asked, and the questions asked, the
+/// newest first: the one asked with its status line, the last one not
+/// answered with its cause and fix (#317), and each answered with its
+/// answer, the Notes it came from and "Keep as Note".
 pub fn page(
     ui: &mut Ui,
     t: &L10n,
@@ -162,25 +187,12 @@ pub fn page(
     let provider = shown.provider;
     let unready = provider.unready();
     ui.heading(RichText::new(t.ask_title()).color(text));
-    match unready {
-        None => {
-            ui.label(
-                RichText::new(t.ask_sends(&provider.name(), provider.model.trim()))
-                    .small()
-                    .color(weak),
-            );
-        }
-        Some(why) => {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(unready_line(t, why)).color(error));
-                if ui
-                    .button(RichText::new(t.ask_open_settings()).color(text))
-                    .clicked()
-                {
-                    asked.push(AskAsked::Settings);
-                }
-            });
-        }
+    if unready.is_none() {
+        ui.label(
+            RichText::new(t.ask_sends(&provider.name(), provider.model.trim()))
+                .small()
+                .color(weak),
+        );
     }
     if shown.task_waits {
         ui.horizontal_wrapped(|ui| {
@@ -229,6 +241,18 @@ pub fn page(
             asked.push(AskAsked::StartOver);
         }
     });
+    // The field says what the provider lacks, and Ask waits (#317).
+    if let Some(why) = unready {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(unready_line(t, why)).color(error));
+            if ui
+                .button(RichText::new(t.ask_open_settings()).color(text))
+                .clicked()
+            {
+                asked.push(AskAsked::Settings);
+            }
+        });
+    }
     ui.add_space(6.0);
     list_scroll(ui, "ask answers", |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
@@ -237,8 +261,24 @@ pub fn page(
                 ui.label(RichText::new(question).strong().color(text));
                 ui.horizontal(|ui| {
                     ui.spinner();
-                    ui.label(RichText::new(t.ask_asking(&provider.name())).color(weak));
+                    let status = match panel.read {
+                        0 => t.ask_asking(&provider.name()),
+                        read => t.ask_asking_reading(&provider.name(), read as i64),
+                    };
+                    ui.label(RichText::new(status).color(weak));
                 });
+            });
+        } else if let Some(failed) = &panel.failed {
+            embossed(ui, tones, false, None, |ui| {
+                ui.label(RichText::new(&failed.question).strong().color(text));
+                ui.label(RichText::new(&failed.cause).color(error));
+                ui.label(RichText::new(&failed.fix).color(text));
+                if ui
+                    .button(RichText::new(t.ask_failure_details()).color(text))
+                    .clicked()
+                {
+                    asked.push(AskAsked::Details);
+                }
             });
         }
         for (at, exchange) in panel.exchanges.iter().enumerate().rev() {

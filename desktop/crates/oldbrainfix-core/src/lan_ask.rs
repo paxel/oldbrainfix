@@ -5,12 +5,15 @@
 //! Notes it links, or why there is none. The phone holds no provider and
 //! no key; neither ever crosses the wire.
 //!
-//! Two requests on the paired host, each with the paired Device's proof
+//! Requests on the paired host, each with the paired Device's proof
 //! over a nonce as a sync's (ADR 0003): `GET /ask/provider` names the
 //! provider the desktop uses (its protocol, model and host, never its
 //! key nor the whole address), which the phone shows before its first
 //! question (App Store guideline 5.1.2(i)); `POST /ask` carries the
-//! question and the earlier exchanges of the same conversation as text.
+//! question and the earlier exchanges of the same conversation as text,
+//! with an id the phone gives it; `POST /ask/status` with that id says
+//! how many Notes the model read so far while it runs, and
+//! `POST /ask/stop` stops it at its next round (#317).
 //! Only the user's own paired Devices ask; another person's Device,
 //! paired by invite, is declined, as is any Device without its proof. A
 //! failure of the question is answered with 200 and its kind in the
@@ -25,6 +28,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
+use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 
 use crate::Result;
@@ -37,10 +41,15 @@ use crate::store::Store;
 pub const ASK_PATH: &str = "/ask";
 /// Where the phone learns which provider the desktop asks.
 pub const PROVIDER_PATH: &str = "/ask/provider";
+/// Where the phone learns how far the desktop is with its question
+/// (#317).
+pub const STATUS_PATH: &str = "/ask/status";
+/// Where the phone stops its question (#317).
+pub const STOP_PATH: &str = "/ask/stop";
 
 /// Whether `request` is one of the phone's questions rather than a sync.
 pub fn is_ask(request: &Request) -> bool {
-    request.path == ASK_PATH || request.path == PROVIDER_PATH
+    [ASK_PATH, PROVIDER_PATH, STATUS_PATH, STOP_PATH].contains(&request.path.as_str())
 }
 
 /// The provider as the phone may learn it: how the desktop asks, the
@@ -125,11 +134,13 @@ fn unready_of(name: &str) -> Option<Unready> {
 }
 
 /// The phone's question: its text and the earlier exchanges of the same
-/// conversation, which it is asked after, as the panel's follow-ups.
+/// conversation, which it is asked after, as the panel's follow-ups, and
+/// the id its status and stop name (#317); none from a phone of 0.6.0.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Question {
     pub question: String,
     pub earlier: Vec<Exchange>,
+    pub id: Option<String>,
 }
 
 impl Question {
@@ -141,11 +152,17 @@ impl Question {
             .iter()
             .map(|e| json!({"answer": e.answer, "question": e.question}))
             .collect();
-        json!({"earlier": earlier, "question": self.question})
+        let mut map = Map::new();
+        map.insert("earlier".into(), Value::Array(earlier));
+        if let Some(id) = &self.id {
+            map.insert("id".into(), json!(id));
+        }
+        map.insert("question".into(), json!(self.question));
+        Value::Object(map)
     }
 
     /// The question `json` carries; none without one. An earlier exchange
-    /// that is not two texts is left out.
+    /// that is not two texts is left out, an id that is no text too.
     pub fn from_json(json: &Value) -> Option<Question> {
         let question = json.get("question")?.as_str()?;
         if question.trim().is_empty() {
@@ -166,6 +183,46 @@ impl Question {
         Some(Question {
             question: question.to_string(),
             earlier,
+            id: asked_id(json),
+        })
+    }
+}
+
+/// The id of the question `json` names, the body of `POST /ask`,
+/// `/ask/status` or `/ask/stop`; none when it names none as text.
+pub fn asked_id(json: &Value) -> Option<String> {
+    json.get("id")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())
+        .map(str::to_string)
+}
+
+/// How far the desktop is with the phone's question (#317): whether it
+/// still asks its provider about it, and how many Notes the model read in
+/// full so far ([`ask::note_read`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AskProgress {
+    pub asking: bool,
+    pub read: usize,
+}
+
+impl AskProgress {
+    /// The body of the answer to `POST /ask/status` and `/ask/stop`, keys
+    /// in order as the Dart core writes them.
+    pub fn to_json(&self) -> Value {
+        json!({"asking": self.asking, "read": self.read})
+    }
+
+    /// The progress `json` holds; none without the flag. A count that is
+    /// no whole number of zero or more is 0.
+    pub fn from_json(json: &Value) -> Option<AskProgress> {
+        Some(AskProgress {
+            asking: json.get("asking")?.as_bool()?,
+            read: json
+                .get("read")
+                .and_then(Value::as_u64)
+                .and_then(|n| usize::try_from(n).ok())
+                .unwrap_or(0),
         })
     }
 }
@@ -438,6 +495,19 @@ impl Store {
         transport: &dyn Transport,
         wall: &WallClock,
     ) -> Result<AskReply> {
+        self.answer_question_with(question, transport, wall, &|_| true)
+    }
+
+    /// [`Store::answer_question`], telling `progress` how many Notes the
+    /// model read so far, which stops it with `false`
+    /// ([`Store::ask_with`], #317).
+    pub fn answer_question_with(
+        &self,
+        question: &Question,
+        transport: &dyn Transport,
+        wall: &WallClock,
+        progress: &dyn Fn(usize) -> bool,
+    ) -> Result<AskReply> {
         let provider = self.ask_provider()?;
         // The AI switched off answers as a provider not set up, so that
         // an older phone says that much (#334).
@@ -452,7 +522,7 @@ impl Store {
                     &question.question,
                     &now,
                 );
-                self.ask(&mut conversation, transport, wall)
+                self.ask_with(&mut conversation, transport, wall, progress)
                     .map(|asked| Answered {
                         text: asked.answer.text,
                         notes: asked.answer.notes,
@@ -483,16 +553,28 @@ impl Store {
 pub type SharedWall = Arc<dyn Fn(DateTime<Utc>) -> NaiveDateTime + Send + Sync>;
 
 /// Answers the phone's asking requests as the paired host hands them
-/// over: a refusal and the provider at once, a question on a thread of
-/// its own, so that the host's other requests, the syncs, go on
-/// meanwhile. One question at a time: another one meanwhile hears
-/// [`AskFailure::Busy`].
+/// over: a refusal, the provider and how far a question is at once, a
+/// question on a thread of its own, so that the host's other requests,
+/// the syncs, go on meanwhile. One question at a time: another one
+/// meanwhile hears [`AskFailure::Busy`], also while one stopped waits for
+/// its provider's reply, as a request on its way is not taken back.
 pub struct AskDesk {
     store: Arc<Store>,
     transport: Arc<dyn Transport>,
     wall: SharedWall,
     asking: Arc<AtomicBool>,
     answered: Arc<dyn Fn() + Send + Sync>,
+    /// The question being answered, as its status and stop find it.
+    running: Arc<Mutex<Option<Running>>>,
+}
+
+/// The question being answered (#317): its id, how many Notes it read so
+/// far, and whether the phone stopped it.
+#[derive(Debug, Default)]
+struct Running {
+    id: Option<String>,
+    read: usize,
+    stop: bool,
 }
 
 /// A question being answered, until dropped, also when it panics.
@@ -520,6 +602,26 @@ impl AskDesk {
             wall,
             asking: Arc::new(AtomicBool::new(false)),
             answered: Arc::new(answered),
+            running: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// How far the question `id` is, stopping it at its next round when
+    /// `stop` (#317): not asking for any other id, nor for none.
+    fn progress(&self, id: Option<&str>, stop: bool) -> AskProgress {
+        let mut running = self.running.lock();
+        match running.as_mut() {
+            Some(question) if id.is_some() && question.id.as_deref() == id => {
+                question.stop |= stop;
+                AskProgress {
+                    asking: true,
+                    read: question.read,
+                }
+            }
+            _ => AskProgress {
+                asking: false,
+                read: 0,
+            },
         }
     }
 
@@ -538,6 +640,14 @@ impl AskDesk {
             request.reply(refusal);
             return;
         }
+        if request.method == "POST" && (request.path == STATUS_PATH || request.path == STOP_PATH) {
+            let id = serde_json::from_slice::<Value>(&request.body)
+                .ok()
+                .and_then(|body| asked_id(&body));
+            let progress = self.progress(id.as_deref(), request.path == STOP_PATH);
+            request.reply(Response::json(200, &progress.to_json()));
+            return;
+        }
         if request.method != "POST" || request.path != ASK_PATH {
             let response = self
                 .store
@@ -554,17 +664,39 @@ impl AskDesk {
             request.reply(Response::json(200, &busy.to_json()));
             return;
         }
+        let Some(question) = serde_json::from_slice::<Value>(&request.body)
+            .ok()
+            .and_then(|body| Question::from_json(&body))
+        else {
+            self.asking.store(false, Ordering::SeqCst);
+            request.reply(Response::status(400));
+            return;
+        };
         let asking = Asking(self.asking.clone());
-        let (store, transport, wall, answered) = (
+        *self.running.lock() = Some(Running {
+            id: question.id.clone(),
+            ..Running::default()
+        });
+        let (store, transport, wall, answered, running) = (
             self.store.clone(),
             self.transport.clone(),
             self.wall.clone(),
             self.answered.clone(),
+            self.running.clone(),
         );
         std::thread::spawn(move || {
+            let progress = |read: usize| match running.lock().as_mut() {
+                Some(question) => {
+                    question.read = read;
+                    !question.stop
+                }
+                None => true,
+            };
             let response = store
-                .serve_ask(&request, &*transport, &*wall)
+                .answer_question_with(&question, &*transport, &*wall, &progress)
+                .map(|reply| Response::json(200, &reply.to_json()))
                 .unwrap_or_else(|_| Response::status(500));
+            *running.lock() = None;
             drop(asking);
             request.reply(response);
             answered();

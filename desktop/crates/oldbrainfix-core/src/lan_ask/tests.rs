@@ -139,6 +139,7 @@ fn question(text: &str) -> Value {
     Question {
         question: text.into(),
         earlier: Vec::new(),
+        id: None,
     }
     .to_json()
 }
@@ -303,6 +304,7 @@ fn the_phones_question_is_answered_with_its_notes_and_hidden_ones_stay_out() -> 
             question: "Do I have a passport?".into(),
             answer: "Yes.".into(),
         }],
+        id: None,
     }
     .to_json();
     let (request, _) = asked(&desk, &phone, "POST", ASK_PATH, &body, true)?;
@@ -464,4 +466,147 @@ fn a_question_runs_off_the_hosts_thread_one_at_a_time() -> TestResult {
     ask_desk.take(request);
     assert_eq!(refused.recv_timeout(Duration::from_secs(10))?.status, 403);
     Ok(())
+}
+
+/// `signer`'s status or stop request for the question `id` on `desk`.
+fn about(
+    desk: &Store,
+    signer: &Store,
+    path: &str,
+    id: &str,
+) -> Result<(Request, Receiver<Response>)> {
+    asked(desk, signer, "POST", path, &json!({"id": id}), true)
+}
+
+/// What `ask_desk` says about the question `id` on `path`.
+fn progress_of(
+    ask_desk: &AskDesk,
+    desk: &Store,
+    phone: &Store,
+    path: &str,
+    id: &str,
+) -> std::result::Result<AskProgress, Box<dyn std::error::Error>> {
+    let (request, answer) = about(desk, phone, path, id)?;
+    ask_desk.take(request);
+    let response = answer.recv_timeout(Duration::from_secs(10))?;
+    assert_eq!(response.status, 200);
+    let body: Value = serde_json::from_slice(&response.body)?;
+    Ok(AskProgress::from_json(&body).ok_or("a progress")?)
+}
+
+#[test]
+fn a_question_tells_the_notes_it_read_by_its_id_and_stops_at_its_next_round() -> TestResult {
+    let (desk, phone) = paired(false)?;
+    let passport = Notes::new(&desk).capture("Passport in the blue folder", None, None)?;
+    let desk = Arc::new(desk);
+    let (fake, open) = Fake::gated(vec![
+        tool_use("read_note", json!({"id": passport.id})),
+        tool_use("find_notes", json!({"words": ["folder"]})),
+        end_turn("Never asked for."),
+    ]);
+    let wall: SharedWall = Arc::new(|t: DateTime<Utc>| t.naive_utc());
+    let ask_desk = AskDesk::new(desk.clone(), Arc::new(fake), wall, || {});
+    let body = Question {
+        question: "Where is my passport?".into(),
+        earlier: Vec::new(),
+        id: Some("ask:1".into()),
+    }
+    .to_json();
+    let (first, first_answer) = asked(&desk, &phone, "POST", ASK_PATH, &body, true)?;
+    ask_desk.take(first);
+    let running = |read| AskProgress { asking: true, read };
+    let none = AskProgress {
+        asking: false,
+        read: 0,
+    };
+    assert_eq!(
+        progress_of(&ask_desk, &desk, &phone, STATUS_PATH, "ask:1")?,
+        running(0)
+    );
+    assert_eq!(
+        progress_of(&ask_desk, &desk, &phone, STATUS_PATH, "ask:2")?,
+        none
+    );
+    // The model reads the Note: the count says so while it asks again.
+    open.send(())?;
+    let mut seen = none;
+    for _ in 0..500 {
+        seen = progress_of(&ask_desk, &desk, &phone, STATUS_PATH, "ask:1")?;
+        if seen.read == 1 {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(seen, running(1));
+    // Another id stops nothing.
+    assert_eq!(
+        progress_of(&ask_desk, &desk, &phone, STOP_PATH, "ask:2")?,
+        none
+    );
+    assert_eq!(
+        progress_of(&ask_desk, &desk, &phone, STOP_PATH, "ask:1")?,
+        running(1)
+    );
+    // Until the provider's reply on its way is in, a new question waits.
+    let (second, second_answer) = asked(&desk, &phone, "POST", ASK_PATH, &question("Q2"), true)?;
+    ask_desk.take(second);
+    let busy = second_answer.recv_timeout(Duration::from_secs(10))?;
+    assert_eq!(reply_of(&busy)?.outcome, Err(AskFailure::Busy));
+    open.send(())?;
+    let stopped = first_answer.recv_timeout(Duration::from_secs(10))?;
+    assert_eq!(reply_of(&stopped)?.outcome, Err(AskFailure::Stopped));
+    assert!(!ask_desk.asking());
+    assert_eq!(
+        progress_of(&ask_desk, &desk, &phone, STATUS_PATH, "ask:1")?,
+        none
+    );
+    // A stranger hears no more than a refusal.
+    let stranger = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([3; 32])))?;
+    let (request, refused) = about(&desk, &stranger, STATUS_PATH, "ask:1")?;
+    ask_desk.take(request);
+    assert_eq!(refused.recv_timeout(Duration::from_secs(10))?.status, 403);
+    Ok(())
+}
+
+#[test]
+fn the_progress_and_the_question_id_go_both_ways() {
+    for progress in [
+        AskProgress {
+            asking: true,
+            read: 3,
+        },
+        AskProgress {
+            asking: false,
+            read: 0,
+        },
+    ] {
+        assert_eq!(AskProgress::from_json(&progress.to_json()), Some(progress));
+    }
+    for read in [json!(-1), json!(2.5), json!("3"), Value::Null] {
+        assert_eq!(
+            AskProgress::from_json(&json!({"asking": true, "read": read})).map(|p| p.read),
+            Some(0),
+            "{read}"
+        );
+    }
+    assert_eq!(AskProgress::from_json(&json!({"read": 3})), None);
+    let question = Question {
+        question: "Q".into(),
+        earlier: Vec::new(),
+        id: Some("ask:7".into()),
+    };
+    assert_eq!(
+        question.to_json().to_string(),
+        r#"{"earlier":[],"id":"ask:7","question":"Q"}"#
+    );
+    assert_eq!(Question::from_json(&question.to_json()), Some(question));
+    // A phone of 0.6.0 gives none; an id that is no text is none.
+    assert_eq!(
+        Question::from_json(&json!({"earlier": [], "question": "Q"})).and_then(|q| q.id),
+        None
+    );
+    assert_eq!(
+        Question::from_json(&json!({"id": 7, "question": "Q"})).and_then(|q| q.id),
+        None
+    );
 }

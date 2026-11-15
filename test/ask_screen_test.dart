@@ -11,7 +11,6 @@ import 'package:oldbrainfix/src/ask_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../packages/oldbrainfix_core/test/test_host.dart';
-import 'announced.dart';
 import 'fake_alarms.dart';
 import 'fake_ask.dart';
 import 'open_settings.dart';
@@ -185,32 +184,100 @@ void main() {
     });
 
     testWidgets('a provider the computer cannot ask yet offers no '
-        'permission', (tester) async {
+        'permission: the question field says why and what to do, and Ask '
+        'cannot be pressed (#317)', (tester) async {
+      const openai = DesktopProvider(
+        protocol: AskProtocol.openai,
+        model: 'qwen2.5:3b',
+        host: 'llm.example.org',
+      );
+      for (final (why, said) in [
+        (
+          AskUnready.aiOff,
+          "The AI is switched off on Desk. Switch on AI (experimental) in "
+              "the computer's AI menu.",
+        ),
+        (
+          AskUnready.noModel,
+          "No model is named on Desk. Name a model under Ask panel in the "
+              "computer's AI settings.",
+        ),
+        (
+          AskUnready.noKey,
+          "llm.example.org has no API key on Desk. Enter the API key under "
+              "Ask panel in the computer's AI settings.",
+        ),
+        (
+          AskUnready.badUrl,
+          'Desk may not ask llm.example.org at its address. Give the '
+              'provider an https:// address under Ask panel in the '
+              "computer's AI settings; http:// only on the computer or the "
+              'home network.',
+        ),
+      ]) {
+        final desk = FakeAsking(
+          shown: DesktopProvider(
+            protocol: openai.protocol,
+            model: openai.model,
+            host: openai.host,
+            unready: why,
+          ),
+        );
+        await pumpAsk(tester, desk);
+        expect(key('ask-consent'), findsNothing, reason: '$why');
+        expect(key('ask-question'), findsOneWidget, reason: '$why');
+        expect(find.text(said), findsOneWidget, reason: '$why');
+        expect(key('ask-sends'), findsNothing, reason: '$why');
+        expect(
+          tester.widget<FilledButton>(key('ask-button')).onPressed,
+          isNull,
+          reason: 'Ask cannot be pressed: $why',
+        );
+        await tester.enterText(key('ask-question'), 'Where?');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
+        expect(desk.asked, isEmpty, reason: '$why');
+        expect(find.text(said), findsOneWidget, reason: 'it stays: $why');
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+
       final desk = FakeAsking(
         shown: const DesktopProvider(
           protocol: AskProtocol.anthropic,
           model: 'claude-opus-5-5',
           host: 'api.anthropic.com',
-          unready: AskUnready.noKey,
+          unready: AskUnready.aiOff,
         ),
       );
       await pumpAsk(tester, desk);
-      expect(key('ask-consent'), findsNothing);
-      expect(key('ask-question'), findsNothing);
-      expect(
-        find.text('Anthropic is not set up on the computer yet.'),
-        findsOneWidget,
-      );
-      expect(
-        find.text(
-          "Enter the API key under Ask panel in the computer's AI settings.",
-        ),
-        findsOneWidget,
-      );
       desk.shown = fakeClaude;
       await tester.tap(key('ask-try-again'));
       await tester.pumpAndSettle();
       expect(key('ask-consent'), findsOneWidget);
+    });
+
+    testWidgets('a provider that cannot be asked since keeps the question '
+        'in the field, which says why (#317)', (tester) async {
+      store.allowAsking(fakeClaude);
+      final desk = FakeAsking();
+      await pumpAsk(tester, desk);
+      desk.shown = const DesktopProvider(
+        protocol: AskProtocol.anthropic,
+        model: 'claude-opus-5-5',
+        host: 'api.anthropic.com',
+        unready: AskUnready.aiOff,
+      );
+      await ask(tester, 'Where?');
+      expect(desk.asked, isEmpty);
+      expect(
+        tester.widget<TextField>(key('ask-question')).controller?.text,
+        'Where?',
+      );
+      expect(
+        find.textContaining('The AI is switched off on Desk.'),
+        findsOneWidget,
+      );
+      expect(tester.widget<FilledButton>(key('ask-button')).onPressed, isNull);
     });
   });
 
@@ -310,61 +377,233 @@ void main() {
   });
 
   group('failures', () {
-    testWidgets('a question not answered goes back into the field and says '
-        'why at the top', (tester) async {
+    testWidgets('a question not answered goes back into the field, and '
+        'its cause and fix stay under it until it is asked again (#317)', (
+      tester,
+    ) async {
+      final t = lookupAppLocalizations(const Locale('en'));
+      store.allowAsking(fakeClaude);
+      final desk = FakeAsking();
+      await pumpAsk(tester, desk);
+      void fails(AskReply reply) {
+        desk
+          ..askTrouble = null
+          ..answer = (_) => reply;
+      }
+
+      final kinds = <(void Function(), String, String, String)>[
+        (
+          () => fails(
+            const AskReply.failed(
+              AskFailure.unready,
+              unready: AskUnready.aiOff,
+            ),
+          ),
+          'The AI is switched off on Desk.',
+          "Switch on AI (experimental) in the computer's AI menu.",
+          'ask: unready',
+        ),
+        (
+          () => fails(const AskReply.failed(AskFailure.unready)),
+          t.phoneAskUnreadyCause('Anthropic'),
+          t.phoneAskUnreadyFix,
+          'ask: unready',
+        ),
+        (
+          () => fails(
+            const AskReply.failed(
+              AskFailure.key,
+              message: 'invalid x-api-key',
+              review: true,
+            ),
+          ),
+          "Anthropic refused the computer's API key.",
+          "Check the API key under Ask panel in the computer's AI settings.",
+          'invalid x-api-key',
+        ),
+        (
+          () => fails(
+            const AskReply.failed(
+              AskFailure.provider,
+              status: 404,
+              message: 'model not found',
+            ),
+          ),
+          t.phoneAskProviderFailed('Anthropic'),
+          t.phoneAskProviderFix,
+          'HTTP 404: model not found',
+        ),
+        (
+          () => fails(
+            const AskReply.failed(
+              AskFailure.network,
+              message: 'Connection refused',
+            ),
+          ),
+          'No answer came from Anthropic to the computer.',
+          t.phoneAskNoReplyFix,
+          'Connection refused',
+        ),
+        (
+          () => fails(
+            const AskReply.failed(AskFailure.unreadable, message: '<html>'),
+          ),
+          t.phoneAskUnreadable('Anthropic'),
+          t.phoneAskUnreadableFix,
+          '<html>',
+        ),
+        (
+          () => fails(const AskReply.failed(AskFailure.rounds)),
+          t.phoneAskTooManyRounds,
+          t.phoneAskNarrowerFix,
+          'ask: rounds',
+        ),
+        (
+          () => fails(const AskReply.failed(AskFailure.refused)),
+          t.phoneAskRefused,
+          t.phoneAskOtherWordsFix,
+          'ask: refused',
+        ),
+        (
+          () => fails(const AskReply.failed(AskFailure.stopped)),
+          t.phoneAskStopped,
+          t.phoneAskAgainFix,
+          'ask: stopped',
+        ),
+        (
+          () => fails(const AskReply.failed(AskFailure.busy)),
+          'The computer is answering another question.',
+          'Ask again in a moment.',
+          'ask: busy',
+        ),
+        (
+          () => fails(const AskReply.failed(AskFailure.unknown)),
+          'The computer answered in a way this version cannot read.',
+          'Install the latest Old Brain Fix on this phone.',
+          'ask: unknown',
+        ),
+        for (final trouble in AskTrouble.values)
+          (
+            () => desk.askTrouble = trouble,
+            askTroubleWhy(t, trouble).$1,
+            askTroubleWhy(t, trouble).$2,
+            'ask: ${trouble.name}',
+          ),
+      ];
+      for (final (fail, cause, fix, details) in kinds) {
+        fail();
+        await ask(tester, 'Where?');
+        expect(
+          tester.widget<TextField>(key('ask-question')).controller?.text,
+          'Where?',
+          reason: cause,
+        );
+        expect(
+          tester.widget<Text>(key('ask-failure')).data,
+          cause,
+          reason: cause,
+        );
+        expect(
+          tester.widget<Text>(key('ask-failure-fix')).data,
+          fix,
+          reason: cause,
+        );
+        expect(
+          tester.widget<Text>(key('ask-failure-question')).data,
+          'Where?',
+          reason: 'under its question: $cause',
+        );
+        expect(announcements.visible, isNull, reason: 'not at the top: $cause');
+        // It stays while the user does something else.
+        await tester.enterText(key('ask-question'), 'Where now?');
+        await tester.pump(const Duration(minutes: 1));
+        expect(find.text(cause), findsOneWidget, reason: 'stays: $cause');
+        await tester.tap(key('ask-failure-details'));
+        await tester.pumpAndSettle();
+        expect(find.text(details), findsOneWidget, reason: cause);
+        expect(find.text('Report'), findsOneWidget, reason: cause);
+        await tester.tap(find.text('Close'));
+        await tester.pumpAndSettle();
+        await tester.enterText(key('ask-question'), 'Where?');
+      }
+      // A draft the model made before it failed waits for its review.
+      fails(
+        const AskReply.failed(AskFailure.network, message: 'x', review: true),
+      );
+      await ask(tester, 'Where?');
+      expect(key('ask-review'), findsOneWidget, reason: 'a draft waits');
+
+      // Asked again, the failure goes and the answer shows.
+      desk
+        ..askTrouble = null
+        ..answer = (_) => const AskReply.answered(
+          DesktopAnswer(text: 'In the blue folder.', notes: []),
+        );
+      await ask(tester, 'Where?');
+      expect(key('ask-failure'), findsNothing);
+      expect(find.text('In the blue folder.'), findsOneWidget);
+    });
+
+    testWidgets('while a question runs, the status line says whom it asks '
+        'and how many Notes were read, and Stop puts it back and drops '
+        'what comes after (#317)', (tester) async {
       store.allowAsking(fakeClaude);
       final desk = FakeAsking(
-        answer: (_) => const AskReply.failed(
-          AskFailure.key,
-          message: 'invalid x-api-key',
-          review: true,
+        answer: (_) => const AskReply.answered(
+          DesktopAnswer(text: 'Too late.', notes: []),
         ),
       );
+      var read = 0;
+      desk
+        ..hold = Completer<void>()
+        ..progressOf = (id) => AskProgress(asking: true, read: read);
       await pumpAsk(tester, desk);
-      await ask(tester, 'Where?');
+      await tester.enterText(key('ask-question'), 'Where is my passport?');
+      await tester.tap(key('ask-button'));
+      await tester.pump();
+      expect(tester.widget<Text>(key('ask-status')).data, 'Asking Desk…');
+      expect(find.text('Where is my passport?'), findsOneWidget);
+      read = 3;
+      await tester.pump(const Duration(seconds: 3));
+      expect(
+        tester.widget<Text>(key('ask-status')).data,
+        'Asking Desk… reading 3 Notes',
+      );
+      expect(key('ask-stop'), findsOneWidget);
+
+      await tester.tap(key('ask-stop'));
+      await tester.pump();
+      expect(key('ask-status'), findsNothing);
+      expect(desk.stopped, [desk.ids.single]);
       expect(
         tester.widget<TextField>(key('ask-question')).controller?.text,
-        'Where?',
+        'Where is my passport?',
       );
-      expect(key('ask-review'), findsOneWidget, reason: 'a draft waits');
-      await expectFailureAnnounced(
-        tester,
-        announcements,
-        'The question was not answered.',
-        title: 'Not answered',
-        cause: "Anthropic refused the computer's API key.",
-        fix: "Check the API key under Ask panel in the computer's AI settings.",
-      );
+      expect(key('ask-failure'), findsNothing, reason: 'the user stopped it');
+      desk.hold!.complete();
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Too late.'), findsNothing, reason: 'dropped');
+      expect(key('ask-answer-0'), findsNothing);
+    });
 
-      desk.answer = (_) => const AskReply.failed(AskFailure.busy);
-      await ask(tester, 'Where?');
-      await expectFailureAnnounced(
-        tester,
-        announcements,
-        'The question was not answered.',
-        cause: 'The computer is answering another question.',
-        fix: 'Ask again in a moment.',
-      );
-
-      desk.answer = (_) => const AskReply.failed(AskFailure.unknown);
-      await ask(tester, 'Where?');
-      await expectFailureAnnounced(
-        tester,
-        announcements,
-        'The question was not answered.',
-        cause: 'The computer answered in a way this version cannot read.',
-        fix: 'Install the latest Old Brain Fix on this phone.',
-      );
-
-      desk.askTrouble = AskTrouble.timedOut;
-      await ask(tester, 'Where?');
-      await expectFailureAnnounced(
-        tester,
-        announcements,
-        'The question was not answered.',
-        cause: 'Your computer did not answer in time.',
-        fix: 'Check that the computer is on and awake, then ask again.',
-      );
+    testWidgets('a computer that tells no progress, as 0.6.0, shows that it '
+        'asks, and is not asked again', (tester) async {
+      store.allowAsking(fakeClaude);
+      final desk = FakeAsking()..hold = Completer<void>();
+      var polls = 0;
+      desk.progressOf = (_) {
+        polls++;
+        return null;
+      };
+      await pumpAsk(tester, desk);
+      await tester.enterText(key('ask-question'), 'Where?');
+      await tester.tap(key('ask-button'));
+      await tester.pump(const Duration(seconds: 10));
+      expect(tester.widget<Text>(key('ask-status')).data, 'Asking Desk…');
+      expect(polls, 1);
+      desk.hold!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('An answer.'), findsOneWidget);
     });
 
     testWidgets('no computer of the user\'s that answers says why in the '
@@ -450,11 +689,80 @@ void main() {
     await settle(() => find.text('From these Notes').evaluate().isNotEmpty);
     expect(host.asked.single, {
       'earlier': <Object?>[],
+      'id': isA<String>(),
       'question': 'Where is my passport?',
     });
     expect(host.askers.toSet(), {store.deviceId});
     expect(find.text('From these Notes'), findsOneWidget);
     expect(find.text('Passport'), findsOneWidget);
+  });
+
+  testWidgets('an announcement that shows at the top while a question '
+      'waits loses no question: it reaches the computer, and the status line '
+      'names it (#317)', (tester) async {
+    HttpOverrides.global = null;
+    store.askOn = true;
+    final desk = Store.inMemory(clock: () => DateTime.utc(2026, 11, 13, 9));
+    final host = TestHost(desk);
+    addTearDown(desk.close);
+    await tester.runAsync(() async {
+      await host.start();
+      host
+        ..provider = fakeClaude
+        ..answering = ((body) => const AskReply.answered(
+          DesktopAnswer(text: 'In the blue folder.', notes: []),
+        ))
+        ..progress = ((id) => const AskProgress(asking: true));
+      await lanSync(store, decodePairCode(host.code())!, name: 'Phone');
+    });
+    addTearDown(() => tester.runAsync(host.stop));
+    store.allowAsking(fakeClaude);
+    desk.rememberDevice(
+      PairedDevice(
+        id: store.deviceId,
+        name: 'Phone',
+        fingerprint: '',
+        host: null,
+        port: null,
+        lastSync: desk.clock(),
+      ),
+    );
+    Future<void> settle(bool Function() done) async {
+      for (var i = 0; i < 100 && !done(); i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump();
+    }
+
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      OldBrainFixApp(
+        store: store,
+        alarms: FakeAlarms(),
+        announcements: announcements,
+      ),
+    );
+    await settle(() => key('ask').evaluate().isNotEmpty);
+    await tester.tap(key('ask'));
+    await settle(() => key('ask-question').evaluate().isNotEmpty);
+    await tester.enterText(key('ask-question'), 'Where is my passport?');
+    await tester.tap(key('ask-button'));
+    await tester.pump();
+    // Something else finishes meanwhile: the strip at the top shows, and
+    // the page is built anew under it.
+    announcements.announce('Something else finished');
+    await tester.pump();
+    expect(tester.widget<Text>(key('ask-status')).data, 'Asking Desk…');
+    await settle(() => find.text('In the blue folder.').evaluate().isNotEmpty);
+    expect(host.asked.single['question'], 'Where is my passport?');
+    expect(find.text('In the blue folder.'), findsOneWidget);
+    expect(key('ask-failure'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   /// The user's own computer that hosts, paired.
@@ -614,6 +922,16 @@ class _OnRealClock implements DesktopAsking {
   Future<DesktopProvider> provider() => Zone.root.run(inner.provider);
 
   @override
-  Future<AskReply> ask(String question, List<AskExchange> earlier) =>
-      Zone.root.run(() => inner.ask(question, earlier));
+  Future<AskReply> ask(
+    String question,
+    List<AskExchange> earlier, {
+    required String id,
+  }) => Zone.root.run(() => inner.ask(question, earlier, id: id));
+
+  @override
+  Future<AskProgress?> progress(String id) =>
+      Zone.root.run(() => inner.progress(id));
+
+  @override
+  Future<void> stop(String id) => Zone.root.run(() => inner.stop(id));
 }

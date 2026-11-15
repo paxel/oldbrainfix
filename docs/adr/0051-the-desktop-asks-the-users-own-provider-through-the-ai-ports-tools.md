@@ -21,7 +21,7 @@ A `Conversation` is the protocol alone: it gives the next request, takes the rep
 
 ## The answer
 
-The model is told to link every Note it uses as an app link (ADR 0046), `[title](oldbrainfix://note/<id>)`. The answer is its Markdown text, the ids of the Notes it links in the order first linked, the ids of the Notes the tools handed out in full, whether it was cut off, and whether a source could not be checked (see "Answers only from the Notes read" below). The panel draws the text as a formatted text, each link opening its Note, and lists the Notes it came from by their titles. A question not answered goes back into the field, and why is announced at the top with the provider's own message. An answer is gone once the list shows another place, unless "Keep as Note" saved the question and the answer, with its links, as a new Unsorted Note in Markdown. A follow-up is asked after the earlier questions and answers of the panel, as text.
+The model is told to link every Note it uses as an app link (ADR 0046), `[title](oldbrainfix://note/<id>)`. The answer is its Markdown text, the ids of the Notes it links in the order first linked, the ids of the Notes the tools handed out in full, whether it was cut off, and whether a source could not be checked (see "Answers only from the Notes read" below). The panel draws the text as a formatted text, each link opening its Note, and lists the Notes it came from by their titles. A question not answered goes back into the field, and its cause and fix stay under it until the next is asked, the provider's own message behind Details (#317). An answer is gone once the list shows another place, unless "Keep as Note" saved the question and the answer, with its links, as a new Unsorted Note in Markdown. A follow-up is asked after the earlier questions and answers of the panel, as text.
 
 ## The provider is a local setting
 
@@ -56,6 +56,16 @@ Amended by #267 (Q640, Q641): the phone holds no provider and no key; it asks th
 - A phone's question reads the desktop's Notes, those Hidden from AI aside, and reaches the desktop's provider; the desktop must be running, at home or through the user's VPN.
 - One question at a time on the desktop: a second phone asking meanwhile hears that the desktop is busy.
 - A phone's question that opened an AI Task and left it without a change declines it at its end, as the panel does; unlike the panel, it does not see whether the AI port's client works in that task meanwhile without having changed anything yet.
+
+## What it is doing and why it failed (#317)
+
+Amended by #317 (Q722): a question that came back after a second with nothing said looked like one never asked.
+
+- While the provider cannot be asked, no model, no key, an address it may not ask, or "AI (experimental)" off, the question field says so with the fix and Ask cannot be pressed.
+- While a question runs, a status line under it says whom it asks and how many Notes the model has read in full so far, with Stop. The count follows the one rule of what a question has read (`ask::note_read`), the same that checks the answer's links: the panel counts the tools it answers on the window's thread, `Store::ask_with` counts for the phone's question.
+- The phone learns the count by asking `POST /ask/status` every two seconds by the id it gave the question, and its Stop sends `POST /ask/stop` and drops what comes for that question later (the wire in ADR 0003). A stream of the answer was rejected: the host replies once per request, and a phone of 0.6.0 reads one body.
+- A failure stays under its question with its cause and fix until the next question is asked, on the phone and the panel alike, rather than as an announcement at the top, which waits unseen behind another and says only that a question was not answered. Its Details open the cause, the fix and the provider's full message, with Report.
+- The phone keeps one connection to its computer for the page (`openAsk`): one made anew whenever the route builds its page again, as it does when an announcement shows at the top, had forgotten the computer, and a question waiting then went nowhere.
 
 ## Answers only from the Notes read (#294)
 

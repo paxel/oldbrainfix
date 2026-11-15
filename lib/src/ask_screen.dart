@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
-import 'announcements.dart';
 import 'app_links.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
@@ -30,6 +29,17 @@ typedef QuestionCall = Future<AskReply> Function(
   required List<PairedAddress> at,
   required String question,
   List<AskExchange> earlier,
+  String? id,
+});
+
+/// How the phone learns how far a paired Device is with the question
+/// [id], or stops it; the app passes the core's [askProgress] and
+/// [stopAsking].
+typedef ProgressCall = Future<AskProgress?> Function(
+  Store store,
+  PairedDevice device, {
+  required List<PairedAddress> at,
+  required String id,
 });
 
 Future<DesktopProvider> _desktopProvider(
@@ -44,7 +54,29 @@ Future<AskReply> _askDesktop(
   required List<PairedAddress> at,
   required String question,
   List<AskExchange> earlier = const [],
-}) => askDesktop(store, device, at: at, question: question, earlier: earlier);
+  String? id,
+}) => askDesktop(
+  store,
+  device,
+  at: at,
+  question: question,
+  earlier: earlier,
+  id: id,
+);
+
+Future<AskProgress?> _askProgress(
+  Store store,
+  PairedDevice device, {
+  required List<PairedAddress> at,
+  required String id,
+}) => askProgress(store, device, at: at, id: id);
+
+Future<AskProgress?> _stopAsking(
+  Store store,
+  PairedDevice device, {
+  required List<PairedAddress> at,
+  required String id,
+}) => stopAsking(store, device, at: at, id: id);
 
 /// The user's own desktop as the phone asks it (#267, ADR 0051): which
 /// provider it asks, and the question. Throws an [AskException] when no
@@ -55,9 +87,20 @@ abstract interface class DesktopAsking {
 
   Future<DesktopProvider> provider();
 
-  /// Asks the Device that named the provider last; a question once sent
-  /// is not sent again elsewhere.
-  Future<AskReply> ask(String question, List<AskExchange> earlier);
+  /// Asks the Device that named the provider last the question [id]; a
+  /// question once sent is not sent again elsewhere.
+  Future<AskReply> ask(
+    String question,
+    List<AskExchange> earlier, {
+    required String id,
+  });
+
+  /// How far that Device is with the question [id] (#317); null when it
+  /// does not tell, as a desktop of 0.6.0.
+  Future<AskProgress?> progress(String id);
+
+  /// Stops the question [id] on that Device at its next round (#317).
+  Future<void> stop(String id);
 }
 
 /// The paired Devices of the user's own that host, the one synced with
@@ -80,6 +123,8 @@ class PairedDesktops implements DesktopAsking {
   final PairedAddress? Function(String id) found;
   final ProviderCall providerCall;
   final QuestionCall questionCall;
+  final ProgressCall progressCall;
+  final ProgressCall stopCall;
 
   PairedDevice? _device;
 
@@ -88,6 +133,8 @@ class PairedDesktops implements DesktopAsking {
     required this.found,
     this.providerCall = _desktopProvider,
     this.questionCall = _askDesktop,
+    this.progressCall = _askProgress,
+    this.stopCall = _stopAsking,
   });
 
   @override
@@ -126,7 +173,11 @@ class PairedDesktops implements DesktopAsking {
   };
 
   @override
-  Future<AskReply> ask(String question, List<AskExchange> earlier) async {
+  Future<AskReply> ask(
+    String question,
+    List<AskExchange> earlier, {
+    required String id,
+  }) async {
     final device = _device;
     if (device == null) throw const AskException(AskTrouble.notOwn);
     return questionCall(
@@ -135,27 +186,55 @@ class PairedDesktops implements DesktopAsking {
       at: _at(device),
       question: question,
       earlier: earlier,
+      id: id,
     );
+  }
+
+  @override
+  Future<AskProgress?> progress(String id) async {
+    final device = _device;
+    if (device == null) return null;
+    return progressCall(store, device, at: _at(device), id: id);
+  }
+
+  @override
+  Future<void> stop(String id) async {
+    final device = _device;
+    if (device == null) return;
+    await stopCall(store, device, at: _at(device), id: id);
   }
 }
 
 /// Opens the Ask page, asking the user's own desktop through [asking],
-/// or over the paired connection when none is given.
+/// or over the paired connection when none is given. The connection is
+/// made once, here: the route builds its page again whenever what is
+/// above it changes, such as an announcement showing at the top, and a
+/// connection made anew there would have forgotten the computer that
+/// named its provider, so that the question waiting went nowhere (#317).
 Future<void> openAsk(
   BuildContext context,
   Store store, {
   DesktopAsking? asking,
 }) {
   final auto = AutoSyncScope.of(context);
+  final desktops =
+      asking ?? PairedDesktops(store, found: (id) => auto?.foundAt(id));
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => AskScreen(
-        store: store,
-        asking:
-            asking ?? PairedDesktops(store, found: (id) => auto?.foundAt(id)),
-      ),
+      builder: (_) => AskScreen(store: store, asking: desktops),
     ),
   );
+}
+
+/// A question not answered (#317): why, how to fix it, and what the
+/// desktop or the provider said, which Details shows with Report.
+class _Failed {
+  final String question;
+  final String cause;
+  final String fix;
+  final String details;
+
+  const _Failed(this.question, this.cause, this.fix, this.details);
 }
 
 /// A question asked and its answer.
@@ -173,8 +252,9 @@ class _Asked {
   _Asked(this.question, this.answer, this.sources);
 }
 
-/// What the page shows above its answers.
-enum _Phase { looking, unreachable, unready, consent, ready }
+/// What the page shows above its answers: in [ready] the question field,
+/// which says what the computer lacks while its provider cannot be asked.
+enum _Phase { looking, unreachable, consent, ready }
 
 /// Ask, from the Agenda's bar (#267, ADR 0051): the phone runs no model
 /// and talks to no provider; it asks the user's own desktop, which runs
@@ -185,9 +265,12 @@ enum _Phase { looking, unreachable, unready, consent, ready }
 /// user did not allow is asked about again, and nothing is sent before.
 /// A follow-up is asked after the earlier answers; Start over drops them,
 /// as leaving the page does. Keep as Note saves a question and its answer
-/// as a Markdown Note in Unsorted, with no Nudge. A question not answered
-/// goes back into the field and is announced at the top, its tap the
-/// cause and the fix.
+/// as a Markdown Note in Unsorted, with no Nudge. While the computer's
+/// provider cannot be asked, the field says why and what to do, and Ask
+/// waits. While a question runs, a status line under it says whom it asks
+/// and how many Notes were read, with Stop (#317). A question not
+/// answered goes back into the field, and its cause and fix stay under
+/// it until the next is asked.
 class AskScreen extends StatefulWidget {
   final Store store;
   final DesktopAsking asking;
@@ -207,8 +290,16 @@ class _AskScreenState extends State<AskScreen> {
   /// Why no desktop named its provider, while [_Phase.unreachable].
   AskTrouble _trouble = AskTrouble.unreachable;
 
-  /// The question waiting for its answer.
+  /// The question waiting for its answer, and its id.
   String? _asking;
+  String? _askingId;
+
+  /// How many Notes the computer's model read for it so far (#317).
+  var _read = 0;
+  Timer? _polling;
+
+  /// The last question not answered, until the next is asked (#317).
+  _Failed? _failed;
 
   /// The questions answered, the newest first.
   final _asked = <_Asked>[];
@@ -225,10 +316,14 @@ class _AskScreenState extends State<AskScreen> {
 
   @override
   void dispose() {
+    _polling?.cancel();
     _question.dispose();
     _focus.dispose();
     super.dispose();
   }
+
+  /// How often the page asks how far the computer is.
+  static const _pollEvery = Duration(seconds: 2);
 
   /// Learns which provider the desktop asks.
   Future<void> _look() async {
@@ -246,12 +341,11 @@ class _AskScreenState extends State<AskScreen> {
     }
   }
 
-  /// Shows [provider]: asked about first, unless the user allowed it.
+  /// Shows [provider]: asked about first, unless the user allowed it or
+  /// it cannot be asked yet, which the field says.
   void _show(DesktopProvider provider) {
     _provider = provider;
-    _phase = !provider.ready
-        ? _Phase.unready
-        : widget.store.askAllowed(provider)
+    _phase = !provider.ready || widget.store.askAllowed(provider)
         ? _Phase.ready
         : _Phase.consent;
   }
@@ -272,26 +366,40 @@ class _AskScreenState extends State<AskScreen> {
         AskExchange(asked.question, asked.answer.text),
   ];
 
+  /// Whether the question typed may be asked now.
+  bool get _mayAsk => _asking == null && (_provider?.ready ?? false);
+
   /// Asks the question typed, once the provider the desktop asks now is
-  /// one the user allowed; else the question stays in the field.
+  /// one the user allowed; else the question stays in the field. Its
+  /// failure stays under it until the next is asked (#317).
   Future<void> _ask() async {
     final question = _question.text.trim();
-    if (question.isEmpty || _asking != null) return;
+    if (question.isEmpty || !_mayAsk) return;
     final t = context.t;
-    final announcements = AnnouncementsScope.of(context);
-    final navigator = Navigator.of(context, rootNavigator: true);
-    setState(() => _asking = question);
+    // One connection for the whole question, whatever the page is
+    // rebuilt with meanwhile.
+    final asking = widget.asking;
+    final id = newAskId();
+    setState(() {
+      _asking = question;
+      _askingId = id;
+      _read = 0;
+      _failed = null;
+    });
     _question.clear();
+    bool current() => mounted && _askingId == id;
     void back() {
+      _stopPolling();
       _asking = null;
+      _askingId = null;
       if (_question.text.isEmpty) _question.text = question;
     }
 
     try {
       // Read again before each question: the desktop may ask another
       // provider since.
-      final provider = await widget.asking.provider();
-      if (!mounted) return;
+      final provider = await asking.provider();
+      if (!current()) return;
       if (!provider.ready || !widget.store.askAllowed(provider)) {
         setState(() {
           back();
@@ -300,51 +408,95 @@ class _AskScreenState extends State<AskScreen> {
         return;
       }
       if (provider != _provider) setState(() => _provider = provider);
-      final reply = await widget.asking.ask(question, _earlier);
-      if (!mounted) return;
+      _poll(asking, id);
+      final reply = await asking.ask(question, _earlier, id: id);
+      // Stopped meanwhile, or another question asked: dropped.
+      if (!current()) return;
       final answer = reply.answer;
       setState(() {
         _review = reply.review;
         if (answer == null) {
           back();
+          final (cause, fix, details) = _failureWhy(t, reply);
+          _failed = _Failed(question, cause, fix, details);
         } else {
+          _stopPolling();
           _asking = null;
+          _askingId = null;
           _asked.insert(0, _Asked(question, answer, _sources(answer)));
         }
       });
-      if (answer == null) {
-        _announce(t, announcements, navigator, _failureWhy(t, reply));
-      }
     } on Object catch (e) {
-      if (!mounted) return;
-      setState(back);
+      if (!current()) return;
       final trouble = e is AskException ? e.trouble : AskTrouble.failed;
       final (cause, fix) = askTroubleWhy(t, trouble);
-      _announce(t, announcements, navigator, (
-        cause,
-        fix,
-        e is AskException ? 'ask: ${trouble.name}' : '$e',
-      ));
+      setState(() {
+        back();
+        _failed = _Failed(
+          question,
+          cause,
+          fix,
+          e is AskException ? 'ask: ${trouble.name}' : '$e',
+        );
+      });
     }
   }
 
-  void _announce(
-    AppLocalizations t,
-    Announcements? announcements,
-    NavigatorState navigator,
-    (String, String, String) why,
-  ) {
-    final (cause, fix, details) = why;
-    announceFailureWith(
-      announcements,
-      navigator,
-      t.phoneAskFailed,
-      title: t.phoneAskFailedTitle,
-      cause: cause,
-      fix: fix,
-      details: details,
-    );
+  /// Asks how far the computer is with the question [id] now and then
+  /// while it runs; a computer that does not tell is not asked again.
+  void _poll(DesktopAsking asking, String id) {
+    _stopPolling();
+    var waiting = false;
+    _polling = Timer.periodic(_pollEvery, (_) async {
+      if (waiting) return;
+      waiting = true;
+      try {
+        final progress = await asking.progress(id);
+        if (!mounted || _askingId != id) return;
+        if (progress == null) {
+          _stopPolling();
+        } else if (progress.asking && progress.read != _read) {
+          setState(() => _read = progress.read);
+        }
+      } on Object {
+        // The answer says what went wrong; the line stays as it was.
+      } finally {
+        waiting = false;
+      }
+    });
   }
+
+  void _stopPolling() {
+    _polling?.cancel();
+    _polling = null;
+  }
+
+  /// Stops waiting for the answer: the question goes back into the field,
+  /// what comes for it later is dropped, and the computer is told to stop
+  /// it at its next round (#317).
+  void _stop() {
+    final id = _askingId;
+    final question = _asking;
+    if (id == null || question == null) return;
+    setState(() {
+      _stopPolling();
+      _asking = null;
+      _askingId = null;
+      if (_question.text.isEmpty) _question.text = question;
+    });
+    unawaited(widget.asking.stop(id).catchError((Object _) {}));
+    _focus.requestFocus();
+  }
+
+  void _details(_Failed failed) => unawaited(
+    showFailure(
+      context,
+      title: context.t.phoneAskFailedTitle,
+      cause: failed.cause,
+      fix: failed.fix,
+      details: failed.details,
+    ),
+  );
 
   /// Why the desktop gave no answer, how to fix it, and what the
   /// provider said.
@@ -352,13 +504,13 @@ class _AskScreenState extends State<AskScreen> {
     final provider = providerName(_provider);
     final failure = reply.failure ?? AskFailure.unknown;
     final (cause, fix) = switch (failure) {
-      AskFailure.unready => (
-        t.phoneAskUnreadyCause(provider),
-        switch (reply.unready) {
-          final why? => unreadyLine(t, why),
-          null => t.phoneAskUnreadyFix,
-        },
-      ),
+      AskFailure.unready => switch (reply.unready) {
+        final why? => (
+          unreadyCause(t, why, widget.asking.computer ?? '', provider),
+          unreadyLine(t, why),
+        ),
+        null => (t.phoneAskUnreadyCause(provider), t.phoneAskUnreadyFix),
+      },
       AskFailure.key => (t.phoneAskKeyRefused(provider), t.phoneAskKeyFix),
       AskFailure.provider => (
         t.phoneAskProviderFailed(provider),
@@ -424,6 +576,7 @@ class _AskScreenState extends State<AskScreen> {
   void _startOver() {
     setState(() {
       _asked.clear();
+      _failed = null;
       _review = false;
     });
     _focus.requestFocus();
@@ -451,7 +604,6 @@ class _AskScreenState extends State<AskScreen> {
         children: switch (_phase) {
           _Phase.looking => [_looking(t)],
           _Phase.unreachable => _unreachable(t),
-          _Phase.unready => _unready(t),
           _Phase.consent => _consent(t),
           _Phase.ready => _ready(t),
         },
@@ -495,22 +647,14 @@ class _AskScreenState extends State<AskScreen> {
     ];
   }
 
-  List<Widget> _unready(AppLocalizations t) {
+  /// What the computer lacks to ask its provider, and where to set it,
+  /// for the question field while it cannot be asked (#317).
+  String? _unreadyText(AppLocalizations t) {
     final provider = _provider;
-    return [
-      Text(
-        t.phoneAskUnreadyCause(providerName(provider)),
-        key: const ValueKey('ask-unready'),
-        style: TextStyle(color: Theme.of(context).colorScheme.error),
-      ),
-      const SizedBox(height: 8),
-      Text(switch (provider?.unready) {
-        final why? => unreadyLine(t, why),
-        null => t.phoneAskUnreadyFix,
-      }),
-      const SizedBox(height: 16),
-      _tryAgain(t),
-    ];
+    final why = provider?.unready;
+    if (provider == null || why == null) return null;
+    return '${unreadyCause(t, why, widget.asking.computer ?? '', providerName(provider))} '
+        '${unreadyLine(t, why)}';
   }
 
   /// What is sent where, and the permission, before the first question
@@ -575,17 +719,17 @@ class _AskScreenState extends State<AskScreen> {
     final theme = Theme.of(context);
     final provider = _provider;
     final name = providerName(provider);
+    final computer = widget.asking.computer ?? '';
     final asking = _asking;
+    final unready = _unreadyText(t);
+    final failed = _failed;
     return [
-      Text(
-        t.phoneAskSends(
-          widget.asking.computer ?? '',
-          name,
-          provider?.model ?? '',
+      if (unready == null)
+        Text(
+          t.phoneAskSends(computer, name, provider?.model ?? ''),
+          key: const ValueKey('ask-sends'),
+          style: theme.textTheme.bodySmall,
         ),
-        key: const ValueKey('ask-sends'),
-        style: theme.textTheme.bodySmall,
-      ),
       if (_review) ...[
         const SizedBox(height: 8),
         Text(
@@ -608,17 +752,24 @@ class _AskScreenState extends State<AskScreen> {
         decoration: InputDecoration(
           hintText: t.phoneAskHint,
           border: const OutlineInputBorder(),
+          errorText: unready,
+          errorMaxLines: 6,
         ),
       ),
       const SizedBox(height: 8),
       if (asking == null)
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton(
-            key: const ValueKey('ask-button'),
-            onPressed: () => unawaited(_ask()),
-            child: Text(t.phoneAskButton),
-          ),
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (unready != null) _tryAgain(t),
+            FilledButton(
+              key: const ValueKey('ask-button'),
+              onPressed: _mayAsk ? () => unawaited(_ask()) : null,
+              child: Text(t.phoneAskButton),
+            ),
+          ],
         )
       else ...[
         Text(asking, style: theme.textTheme.titleSmall),
@@ -631,11 +782,55 @@ class _AskScreenState extends State<AskScreen> {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             const SizedBox(width: 12),
-            Expanded(child: Text(t.phoneAskAsking(name))),
+            Expanded(
+              child: Text(
+                _read == 0
+                    ? t.phoneAskAsking(computer)
+                    : t.phoneAskAskingReading(computer, _read),
+                key: const ValueKey('ask-status'),
+              ),
+            ),
+            TextButton(
+              key: const ValueKey('ask-stop'),
+              onPressed: _stop,
+              child: Text(t.phoneAskStop),
+            ),
           ],
         ),
       ],
+      if (asking == null && failed != null) ..._failure(t, failed),
       for (final (i, asked) in _asked.indexed) ..._answer(t, asked, i),
+    ];
+  }
+
+  /// The last question not answered, with its cause and fix (#317).
+  List<Widget> _failure(AppLocalizations t, _Failed failed) {
+    final theme = Theme.of(context);
+    return [
+      const SizedBox(height: 16),
+      const Divider(),
+      const SizedBox(height: 8),
+      Text(
+        failed.question,
+        key: const ValueKey('ask-failure-question'),
+        style: theme.textTheme.titleSmall,
+      ),
+      const SizedBox(height: 8),
+      Text(
+        failed.cause,
+        key: const ValueKey('ask-failure'),
+        style: TextStyle(color: theme.colorScheme.error),
+      ),
+      const SizedBox(height: 4),
+      Text(failed.fix, key: const ValueKey('ask-failure-fix')),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton(
+          key: const ValueKey('ask-failure-details'),
+          onPressed: () => _details(failed),
+          child: Text(t.phoneAskFailureDetails),
+        ),
+      ),
     ];
   }
 
@@ -710,6 +905,19 @@ String providerName(DesktopProvider? provider) => switch (provider) {
   null => '',
   DesktopProvider(protocol: AskProtocol.anthropic) => 'Anthropic',
   DesktopProvider(:final host) => host,
+};
+
+/// Why the desktop [computer] cannot ask [provider] yet (#317).
+String unreadyCause(
+  AppLocalizations t,
+  AskUnready why,
+  String computer,
+  String provider,
+) => switch (why) {
+  AskUnready.noModel => t.phoneAskUnreadyModelCause(computer),
+  AskUnready.noKey => t.phoneAskUnreadyKeyCause(provider, computer),
+  AskUnready.badUrl => t.phoneAskUnreadyUrlCause(provider, computer),
+  AskUnready.aiOff => t.phoneAskUnreadyAiOffCause(computer),
 };
 
 /// What the desktop lacks to ask its provider, and where to set it.

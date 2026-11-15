@@ -5655,7 +5655,7 @@ fn ask_reply_of(
 #[test]
 fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::ask::{Exchange, Protocol, Unready};
-    use oldbrainfix_core::lan_ask::{AskReply, ProviderShown, Question};
+    use oldbrainfix_core::lan_ask::{AskProgress, AskReply, ProviderShown, Question};
     use oldbrainfix_core::pairing::HandAddress;
     let fixture = read_json(&fixtures().join("ask.json"))?;
     let text = |v: &Value, k: &str| -> Result<String, Box<dyn std::error::Error>> {
@@ -5677,12 +5677,36 @@ fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult
         let question = Question {
             question: text(item, "question")?,
             earlier,
+            id: item["id"].as_str().map(str::to_string),
         };
         let body = text(item, "body")?;
         assert_eq!(question.to_json().to_string(), body);
         assert_eq!(
             Question::from_json(&serde_json::from_str(&body)?),
             Some(question)
+        );
+    }
+    for item in fixture["progress"].as_array().ok_or("progress")? {
+        let progress = AskProgress {
+            asking: item["asking"].as_bool().ok_or("asking")?,
+            read: usize::try_from(item["read"].as_u64().ok_or("read")?)?,
+        };
+        let body = text(item, "body")?;
+        assert_eq!(progress.to_json().to_string(), body);
+        assert_eq!(
+            AskProgress::from_json(&serde_json::from_str(&body)?),
+            Some(progress)
+        );
+    }
+    for item in fixture["laterProgress"].as_array().ok_or("laterProgress")? {
+        let body = text(item, "body")?;
+        assert_eq!(
+            AskProgress::from_json(&serde_json::from_str(&body)?),
+            Some(AskProgress {
+                asking: item["asking"].as_bool().ok_or("asking")?,
+                read: usize::try_from(item["read"].as_u64().ok_or("read")?)?,
+            }),
+            "{body}"
         );
     }
     for item in fixture["providers"].as_array().ok_or("providers")? {

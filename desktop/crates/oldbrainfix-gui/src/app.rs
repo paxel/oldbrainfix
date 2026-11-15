@@ -2258,6 +2258,9 @@ struct AskRun {
     before: Option<String>,
     /// The AI Task its changes go into.
     task: Option<String>,
+    /// The Notes its model read in full so far, for the status line
+    /// (#317).
+    read: Vec<String>,
 }
 
 /// What comes from the thread asking.
@@ -5208,6 +5211,7 @@ impl App {
             AskAsked::StartOver => {
                 self.ask_stop()?;
                 self.ask.exchanges.clear();
+                self.ask.failed = None;
                 self.ask.focus = true;
             }
             AskAsked::Keep(at) => {
@@ -5234,6 +5238,16 @@ impl App {
             AskAsked::OpenNote(id) => self.act(Action::SelectNote(id))?,
             AskAsked::Review => self.act(Action::Ai(AiAction::Review))?,
             AskAsked::Settings => self.act(Action::OpenAiSettings(Some(ASK_SECTION)))?,
+            AskAsked::Details => {
+                if let Some(failed) = &self.ask.failed {
+                    self.dialog = Some(Dialog::Failure {
+                        title: self.t.ask_failed_title().into(),
+                        cause: failed.cause.clone(),
+                        fix: failed.fix.clone(),
+                        details: failed.details.clone(),
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -5255,6 +5269,9 @@ impl App {
             .to_string();
         let mut conversation = Conversation::new(provider, &self.ask.earlier(), &question, &now);
         self.ask.question.clear();
+        // Asked again, the failure before goes (#317).
+        self.ask.failed = None;
+        self.ask.read = 0;
         let Some(redraw) = self.redraw.clone() else {
             let asked = self
                 .store
@@ -5282,6 +5299,7 @@ impl App {
             outputs,
             task: before.clone(),
             before,
+            read: Vec::new(),
         });
         Ok(())
     }
@@ -5299,6 +5317,14 @@ impl App {
             match run.arrives.try_recv() {
                 Ok(AskArrived::Tools(calls)) => {
                     let outputs = self.store.ask_calls(&calls, &*self.wall, &mut run.task);
+                    for (call, output) in calls.iter().zip(&outputs) {
+                        if let Some(id) = ask::note_read(call, output)
+                            && !run.read.iter().any(|r| r == id)
+                        {
+                            run.read.push(id.to_string());
+                        }
+                    }
+                    self.ask.read = run.read.len();
                     drop(run.outputs.send(outputs));
                     answered = true;
                 }
@@ -5353,8 +5379,8 @@ impl App {
 
     /// Shows the answer to `question` in the Ask panel, with the Notes it
     /// links that are here, by their titles. A question not answered goes
-    /// back into the field, and why is announced at the top (UI laws,
-    /// "Announcements"), but for one stopped.
+    /// back into the field, and why stays under it with the fix until the
+    /// next is asked (#317), but for one stopped.
     fn ask_answered(&mut self, question: String, done: Result<ask::Answer, ask::AskError>) {
         self.ask.focus = true;
         let answer = match done {
@@ -5367,12 +5393,12 @@ impl App {
                     .map(|p| p.name())
                     .unwrap_or_default();
                 if let Some((cause, fix, details)) = ask_view::failure(&t, &provider, &why) {
-                    self.announce_failure(
-                        t.ask_failed(),
-                        t.ask_failed_title(),
-                        (&cause, &fix),
+                    self.ask.failed = Some(ask_view::AskFailed {
+                        question: question.clone(),
+                        cause,
+                        fix,
                         details,
-                    );
+                    });
                 }
                 if self.ask.question.trim().is_empty() {
                     self.ask.question = question;

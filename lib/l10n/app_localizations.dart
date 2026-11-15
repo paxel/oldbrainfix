@@ -10070,11 +10070,53 @@ abstract class AppLocalizations {
   /// **'Start over'**
   String get phoneAskStartOver;
 
-  /// Shown under the question while the computer asks its provider.
+  /// The status line under the question while the user's computer asks its provider (#317), before its model has read a Note.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for the answer from {provider}…'**
-  String phoneAskAsking(String provider);
+  /// **'Asking {computer}…'**
+  String phoneAskAsking(String computer);
+
+  /// The status line under the question while the user's computer asks its provider (#317): how many Notes its model has read in full so far.
+  ///
+  /// In en, this message translates to:
+  /// **'Asking {computer}… reading {count, plural, =1{1 Note} other{{count} Notes}}'**
+  String phoneAskAskingReading(String computer, int count);
+
+  /// Button in the status line under the question (#317): stops waiting for the answer and puts the question back into the field.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get phoneAskStop;
+
+  /// Button under a question not answered (#317): opens the cause, the fix and the full text, with Report.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get phoneAskFailureDetails;
+
+  /// Under the question field while the user's computer has its AI (experimental) switched off (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'The AI is switched off on {computer}.'**
+  String phoneAskUnreadyAiOffCause(String computer);
+
+  /// Under the question field while the user's computer names no model for its provider (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'No model is named on {computer}.'**
+  String phoneAskUnreadyModelCause(String computer);
+
+  /// Under the question field while the user's computer has no API key for its provider (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} has no API key on {computer}.'**
+  String phoneAskUnreadyKeyCause(String provider, String computer);
+
+  /// Under the question field while the provider's address on the user's computer is not https:// nor on the home network (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'{computer} may not ask {provider} at its address.'**
+  String phoneAskUnreadyUrlCause(String provider, String computer);
 
   /// Line at the top of the Ask page naming the computer, its provider and model.
   ///
@@ -10236,12 +10278,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow'**
   String get phoneAskAllow;
-
-  /// Announcement at the top when a question got no answer; its tap gives cause and fix.
-  ///
-  /// In en, this message translates to:
-  /// **'The question was not answered.'**
-  String get phoneAskFailed;
 
   /// Title of its details.
   ///

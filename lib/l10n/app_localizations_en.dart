@@ -6175,8 +6175,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneAskStartOver => 'Start over';
 
   @override
-  String phoneAskAsking(String provider) {
-    return 'Waiting for the answer from $provider…';
+  String phoneAskAsking(String computer) {
+    return 'Asking $computer…';
+  }
+
+  @override
+  String phoneAskAskingReading(String computer, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes',
+      one: '1 Note',
+    );
+    return 'Asking $computer… reading $_temp0';
+  }
+
+  @override
+  String get phoneAskStop => 'Stop';
+
+  @override
+  String get phoneAskFailureDetails => 'Details';
+
+  @override
+  String phoneAskUnreadyAiOffCause(String computer) {
+    return 'The AI is switched off on $computer.';
+  }
+
+  @override
+  String phoneAskUnreadyModelCause(String computer) {
+    return 'No model is named on $computer.';
+  }
+
+  @override
+  String phoneAskUnreadyKeyCause(String provider, String computer) {
+    return '$provider has no API key on $computer.';
+  }
+
+  @override
+  String phoneAskUnreadyUrlCause(String provider, String computer) {
+    return '$computer may not ask $provider at its address.';
   }
 
   @override
@@ -6284,9 +6321,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskAllow => 'Allow';
-
-  @override
-  String get phoneAskFailed => 'The question was not answered.';
 
   @override
   String get phoneAskFailedTitle => 'Not answered';

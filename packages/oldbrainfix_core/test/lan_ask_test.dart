@@ -101,6 +101,54 @@ void main() {
       expect(host.nonces, hasLength(2), reason: 'a fresh nonce each time');
     });
 
+    test('a question carries its id, whose progress the desktop tells '
+        'and whose stop it takes (#317)', () async {
+      final device = await pair();
+      host
+        ..answering = ((body) => const AskReply.failed(AskFailure.stopped))
+        ..progress = ((id) =>
+            AskProgress(asking: id == 'ask:1', read: id == 'ask:1' ? 3 : 0));
+      final reply = await askDesktop(
+        phone,
+        device,
+        at: here(),
+        question: 'Q',
+        id: 'ask:1',
+      );
+      expect(reply.failure, AskFailure.stopped);
+      expect(host.asked.single, {
+        'earlier': <Object?>[],
+        'id': 'ask:1',
+        'question': 'Q',
+      });
+      expect(
+        await askProgress(phone, device, at: here(), id: 'ask:1'),
+        const AskProgress(asking: true, read: 3),
+      );
+      expect(
+        await askProgress(phone, device, at: here(), id: 'ask:2'),
+        const AskProgress(asking: false),
+      );
+      expect(host.stopped, isEmpty);
+      expect(
+        await stopAsking(phone, device, at: here(), id: 'ask:1'),
+        const AskProgress(asking: true, read: 3),
+      );
+      expect(host.stopped, ['ask:1']);
+    });
+
+    test('a desktop that tells no progress, as 0.6.0, is answered with '
+        'none, and its question still goes', () async {
+      final device = await pair();
+      host.answering = (body) =>
+          const AskReply.answered(DesktopAnswer(text: 'A.', notes: []));
+      expect(await askProgress(phone, device, at: here(), id: 'ask:1'), isNull);
+      expect(await stopAsking(phone, device, at: here(), id: 'ask:1'), isNull);
+      final reply = await askDesktop(phone, device, at: here(), question: 'Q');
+      expect(reply.answer?.text, 'A.');
+      expect(host.asked.single, {'earlier': <Object?>[], 'question': 'Q'});
+    });
+
     test('a failure on the desktop comes back as its kind', () async {
       final device = await pair();
       host.answering = (body) => const AskReply.failed(
@@ -284,6 +332,30 @@ void main() {
         final reply = AskReply.fromJson({'answer': later, 'review': false});
         expect(reply?.answer?.unchecked, isFalse, reason: '$later');
       }
+    });
+
+    test('the progress goes both ways; a count that is none is 0, and a '
+        'body without the flag is none', () {
+      for (final progress in const [
+        AskProgress(asking: true, read: 3),
+        AskProgress(asking: false),
+      ]) {
+        expect(AskProgress.fromJson(progress.toJson()), progress);
+      }
+      expect(const AskProgress(asking: true, read: 2).toJson(), {
+        'asking': true,
+        'read': 2,
+      });
+      for (final read in [-1, 2.5, '3', null]) {
+        expect(
+          AskProgress.fromJson({'asking': true, 'read': read})?.read,
+          0,
+          reason: '$read',
+        );
+      }
+      expect(AskProgress.fromJson({'read': 3}), isNull);
+      expect(AskProgress.fromJson({'asking': 'yes'}), isNull);
+      expect(AskProgress.fromJson([]), isNull);
     });
 
     test('a provider of a later protocol is none, a reason not known is '

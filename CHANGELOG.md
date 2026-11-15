@@ -27,6 +27,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, a Session's Tally opens only its entry form, not its Note as well. ([obf-1013](https://github.com/paxel/oldbrainfix/issues/320))
 - On the phone, a tap in the Note editor puts the cursor where the finger is. ([obf-1005](https://github.com/paxel/oldbrainfix/issues/312))
 - The Linux .deb, AppImage and Homebrew build start on older systems with glibc 2.35, such as Ubuntu 22.04 or Debian 12. ([obf-1025](https://github.com/paxel/oldbrainfix/issues/332))
+- A phone's question no longer goes missing, and Ask on the phone and desktop says what it is doing and why it failed. ([obf-1010](https://github.com/paxel/oldbrainfix/issues/317))
 
 ---
 

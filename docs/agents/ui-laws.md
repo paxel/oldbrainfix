@@ -884,9 +884,15 @@ replace a law of Both apps where they say so. A desktop law marked
   its model and host and what is sent, with Allow and Not now; nothing
   is sent before Allow, and a provider not allowed is asked about again
   before the next question, which stays in the field. While no computer
-  of the user's answers, or its provider is not set up, the page says
-  why and what to do in the error colour, with Try again; a question not
-  answered goes back into the field and is announced at the top. The
+  of the user's answers, the page says why and what to do in the error
+  colour, with Try again; while its provider is not set up or its AI is
+  off, the question field says so with the fix as its error, Ask cannot
+  be pressed, and Try again asks again (#317). While a question runs, a
+  status line under it says "Asking Desk…", once Notes were read
+  "Asking Desk… reading 3 Notes", with Stop, which puts the question
+  back into the field. A question not answered goes back into the field,
+  and its cause and fix stay under it, with Details, until the next is
+  asked (#317). The
   answers stand under the field, the newest first, each with "From
   these Notes" and Keep as Note; Start over in the bar drops them, and
   so does leaving the page. **An address by hand** sits under each such
@@ -1533,16 +1539,18 @@ replace a law of Both apps where they say so. A desktop law marked
   dialog and put the cursor into its question field. Under its heading
   a line names the provider and the model and says that only what the
   model finds and reads is sent, never what is Hidden from AI; while
-  the provider cannot be asked, the line says what is missing in the
-  error colour with "AI settings…", which opens the AI settings at the
-  provider's card. Enter or Ask (Ctrl+Enter) asks; while it waits,
-  Stop puts the question back into the field. The answers stand under
+  the provider cannot be asked, a line under the question field says
+  what is missing in the error colour with "AI settings…", which opens
+  the AI settings at the provider's card, and Ask cannot be pressed
+  (#317). Enter or Ask (Ctrl+Enter) asks; while it waits, a status line
+  under the question says whom it asks and how many Notes were read,
+  and Stop puts the question back into the field. The answers stand under
   the field, the newest first, each with its question, its text as a
   formatted text whose links open their Notes, "From these Notes" with
   each Note's title as a link, and Keep as Note, then "Kept as a Note"
-  opening it. A question not answered goes back into the field and is
-  announced at the top, its tap the cause, the fix and the provider's
-  message. A Note
+  opening it. A question not answered goes back into the field, and
+  its cause and fix stay under it until the next is asked, "Details…"
+  opening them with the provider's message and Report (#317). A Note
   opens in the Note dialog over the panel, which stays. A follow-up is
   asked after the earlier answers; Start over drops them, and so does
   showing another place. While an AI Task waits, a line says that its

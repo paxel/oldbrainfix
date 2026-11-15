@@ -18,6 +18,41 @@
         ]
       ],
       "body": "{\"earlier\":[{\"answer\":\"Yes: [Passport](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\\nIt says \\\"valid until 2031\\\".\",\"question\":\"Do I have a passport?\"},{\"answer\":\"In the blue folder.\",\"question\":\"Where?\"}],\"question\":\"Und jetzt? „Pass“ im Ordner 📁\"}"
+    },
+    {
+      "question": "Where is my passport?",
+      "earlier": [],
+      "id": "ask:0a1b2c",
+      "body": "{\"earlier\":[],\"id\":\"ask:0a1b2c\",\"question\":\"Where is my passport?\"}"
+    }
+  ],
+  "progress": [
+    {
+      "asking": true,
+      "read": 3,
+      "body": "{\"asking\":true,\"read\":3}"
+    },
+    {
+      "asking": false,
+      "read": 0,
+      "body": "{\"asking\":false,\"read\":0}"
+    }
+  ],
+  "laterProgress": [
+    {
+      "asking": true,
+      "read": 0,
+      "body": "{\"asking\":true,\"read\":-1}"
+    },
+    {
+      "asking": true,
+      "read": 0,
+      "body": "{\"asking\":true,\"read\":2.5}"
+    },
+    {
+      "asking": true,
+      "read": 0,
+      "body": "{\"asking\":true}"
     }
   ],
   "providers": [
