@@ -49,7 +49,7 @@ enum _Importing { folder, keep }
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; Send feedback (#214); and About. Each is a local setting, never synced,
+/// Google Keep export; in Advanced, Ask (#333); Send feedback (#214); and About. Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -133,6 +133,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _trashesDone = widget.store.trashesDoneReminder;
   late bool _advanced = widget.store.advanced;
   late bool _twoRows = widget.store.twoRowEditorOn;
+  late bool _askOn = widget.store.askOn;
   late String? _sound = widget.store.alarmSound;
   late ClockTime _allDayFrom = widget.store.allDayFrom;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
@@ -224,6 +225,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setStreaks(bool on) {
     widget.store.streaksOn = on;
     setState(() => _streaksOn = on);
+  }
+
+  /// Ask, experimental (#333): the Agenda reads it again on the way
+  /// back.
+  void _setAsk(bool on) {
+    widget.store.askOn = on;
+    setState(() => _askOn = on);
   }
 
   void _setTwoRows(bool on) {
@@ -1008,6 +1016,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   detail: t.importKeepDetail,
                                   reading: t.importKeepReading,
                                   onTap: _importKeep,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    // Asking the computer is experimental and offered
+                    // in Advanced only (#333); switched on, it stays on
+                    // in Simple, where what exists still works.
+                    if (_advanced)
+                      SettingsGroup(
+                        heading: t.phoneAskTitle,
+                        children: [
+                          SettingsSection(
+                            children: [
+                              SettingsRow(
+                                words: [
+                                  t.phoneAskSwitch,
+                                  t.phoneAskSwitchDetail,
+                                ],
+                                child: SwitchBelow(
+                                  switchKey: const ValueKey('askOn'),
+                                  leading: const Icon(
+                                    Icons.question_answer_outlined,
+                                  ),
+                                  value: _askOn,
+                                  onChanged: _setAsk,
+                                  title: Text(t.phoneAskSwitch),
+                                  subtitle: Text(t.phoneAskSwitchDetail),
                                 ),
                               ),
                             ],

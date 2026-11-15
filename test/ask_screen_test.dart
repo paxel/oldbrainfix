@@ -12,7 +12,9 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../packages/oldbrainfix_core/test/test_host.dart';
 import 'announced.dart';
+import 'fake_alarms.dart';
 import 'fake_ask.dart';
+import 'open_settings.dart';
 
 /// Asking from the phone (#267, ADR 0051): the phone asks the user's own
 /// desktop, only once the user allowed the provider it names; answers
@@ -455,8 +457,108 @@ void main() {
     expect(find.text('Passport'), findsOneWidget);
   });
 
-  testWidgets('the Agenda offers Ask once a computer of the user\'s is '
-      'paired', (tester) async {
+  /// The user's own computer that hosts, paired.
+  void pairLaptop() => store.rememberDevice(
+    PairedDevice(
+      id: 'device:laptop',
+      name: 'Laptop',
+      fingerprint: 'cd' * 32,
+      host: '192.168.1.6',
+      port: 4000,
+      lastSync: store.clock(),
+    ),
+  );
+
+  Future<void> startApp(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(2400, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(OldBrainFixApp(store: store, alarms: FakeAlarms()));
+    await tester.pumpAndSettle();
+  }
+
+  /// Scrolls Settings to [finder] and taps it.
+  Future<void> tapInSettings(WidgetTester tester, Finder finder) async {
+    if (finder.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        finder,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+    }
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
+  group('Ask (experimental)', () {
+    testWidgets('is off at first: no Ask in the Agenda\'s bar, even with a '
+        'computer of the user\'s paired', (tester) async {
+      pairLaptop();
+      await startApp(tester);
+      expect(store.askOn, isFalse);
+      expect(key('ask'), findsNothing);
+      expect(find.byTooltip('Ask'), findsNothing);
+    });
+
+    testWidgets('is switched on in Settings in Advanced only, found by the '
+        'search, and shows Ask in the Agenda\'s bar at once', (tester) async {
+      // Never chosen is Advanced.
+      pairLaptop();
+      await startApp(tester);
+      await openDeviceSettings(tester);
+      final askSwitch = find.byKey(
+        const ValueKey('askOn'),
+        skipOffstage: false,
+      );
+      expect(askSwitch, findsOneWidget);
+      expect(find.text('Ask (experimental)', skipOffstage: false), findsOne);
+
+      await tester.enterText(
+        find.descendant(
+          of: key('settingsSearch'),
+          matching: find.byType(TextField),
+        ),
+        'experimental',
+      );
+      await tester.pumpAndSettle();
+      expect(askSwitch, findsOneWidget, reason: 'the search finds it');
+      expect(key('settingsSearchNothing'), findsNothing);
+      await tapInSettings(tester, askSwitch);
+      expect(store.askOn, isTrue);
+      expect(store.allEntries(), isEmpty, reason: 'a setting of this Device');
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(key('ask'), findsOneWidget);
+
+      // Simple hides the switch; what was switched on stays on.
+      store.advanced = false;
+      await openDeviceSettings(tester);
+      expect(askSwitch, findsNothing);
+      await tester.enterText(
+        find.descendant(
+          of: key('settingsSearch'),
+          matching: find.byType(TextField),
+        ),
+        'experimental',
+      );
+      await tester.pumpAndSettle();
+      expect(key('settingsSearchNothing'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(key('ask'), findsOneWidget);
+    });
+  });
+
+  testWidgets('the Agenda offers Ask once it is switched on and a computer '
+      'of the user\'s is paired', (tester) async {
+    store.askOn = true;
     tester.view.physicalSize = const Size(2400, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);

@@ -10154,6 +10154,18 @@ abstract class AppLocalizations {
   /// **'Switch on AI (experimental) in the computer\'s Settings.'**
   String get phoneAskUnreadyAiOff;
 
+  /// The phone's switch for Ask in Settings, Advanced only (#333); off by default. Ask is the phone's Ask page (phoneAskTitle).
+  ///
+  /// In en, this message translates to:
+  /// **'Ask (experimental)'**
+  String get phoneAskSwitch;
+
+  /// Under the switch phoneAskSwitch in the phone's Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask in the Agenda\'s bar, which asks your computer about your Notes, and Address by hand on the Sync page. An address typed before stays, and sync still tries it.'**
+  String get phoneAskSwitchDetail;
+
   /// Heading of the permission asked on the Ask page before the first question to a provider (App Store guideline 5.1.2(i)).
   ///
   /// In en, this message translates to:

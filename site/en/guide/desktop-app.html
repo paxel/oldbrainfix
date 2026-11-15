@@ -644,11 +644,11 @@
 <h2>Ask about your Notes</h2>
 <p>Ask an AI model of your choice about your Notes, answered with links to them.</p>
 <box-tab device="phone" alt="Ask on the phone: the line naming the computer, the provider and the model, the question Where is the spare key?, the answer with a link to the Note, From these Notes with the Note's title, and Keep as Note">
+<li>Switch on <strong>Ask (experimental)</strong> in the Settings.</li>
 <li>Mark private Notes and Areas <strong>Hidden from AI</strong>.</li>
 <li>Tap <strong>Ask</strong> in the Agenda's bar.</li>
 <li>Read what is sent, then tap <strong>Allow</strong>.</li>
 <li>Type your question and tap <strong>Ask</strong>.</li>
-<li>Tap a Note under <strong>From these Notes</strong> to open it.</li>
 </box-tab>
 <box-tab device="desktop" alt="The Ask panel: the question Where are the winter tyres?, the answer with a link to the Note, From these Notes with the Note's title, and Keep as Note">
 <li>Tick <strong>AI (experimental)</strong> at the top of the <strong>AI</strong> menu.</li>
@@ -697,8 +697,12 @@
   <a href="#open-the-ai-port">Open the AI port</a>). Sync waits until you decide.
 </p>
 <p>
-  On the phone, <strong>Ask</strong> shows in the Agenda's bar once a computer of yours is paired. The
-  phone runs no model and talks to no provider: it sends the question over the paired connection to your
+  On the phone, asking is experimental and off at first as well. <strong>Ask (experimental)</strong>
+  in the Settings, offered in Advanced only, switches it on for this phone; the switch is not synced,
+  and it stays on in Simple. While it is off there is no <strong>Ask</strong> in the Agenda's bar and
+  no <strong>Address by hand</strong> on the Sync page. Once it is on, <strong>Ask</strong> shows in
+  the Agenda's bar while a computer of yours is paired, and a tap on a Note under
+  <strong>From these Notes</strong> opens it. The phone runs no model and talks to no provider: it sends the question over the paired connection to your
   computer, which asks its provider with its own key, as the panel does, and sends back the answer with
   its links, which open the Notes on the phone. The computer must be running, at home or through your VPN
   (see <a href="#ask-from-away-from-home">Ask from away from home</a>). Before the first question, and
@@ -718,6 +722,7 @@
 <h2>Ask from away from home</h2>
 <p>Reach your computer from the phone through a VPN, to ask and to sync.</p>
 <box-tab device="phone" alt="Sync on the phone: the paired computer Desk with Sync automatically and Address by hand desk.tail1234.ts.net">
+<li>Switch on <strong>Ask (experimental)</strong> in the Settings.</li>
 <li>Install Tailscale on the phone and sign in.</li>
 <li>Tap the Profile picture, then <strong>Sync with another Device</strong>.</li>
 <li>Type the computer's Tailscale name under <strong>Address by hand</strong>.</li>
@@ -743,6 +748,8 @@
   where it was last. It trusts only the certificate it paired with, at every address, so a device that
   answers there in its place gets nothing. Automatic sync takes the same way, so the phone syncs from
   away too. The address stays on this phone: it is not synced and goes when the computer is forgotten.
+  The field shows while <strong>Ask (experimental)</strong> is on; while it is off, an address typed
+  before stays, and sync still tries it.
   An address that is none, or a port outside 1 to 65535, is said under the field and not kept.
 </p>
 </box-more>

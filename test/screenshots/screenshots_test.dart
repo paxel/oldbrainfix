@@ -2855,7 +2855,9 @@ void main() {
                   lastSync: _now,
                 ),
               )
-              ..setHandAddress('device:guide-desk', 'desk.tail1234.ts.net');
+              ..setHandAddress('device:guide-desk', 'desk.tail1234.ts.net')
+              // Shown while Ask is switched on (#333).
+              ..askOn = true;
             final t = await sharingApp(tester, seeded);
             await openSync(
               tester,

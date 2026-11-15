@@ -170,8 +170,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final _frogs = Frogs(widget.notes.store);
   late final _sessions = Sessions(widget.notes.store);
 
-  /// Whether a computer of the user's own is paired to ask (#267).
-  late var _mayAsk = askableDevices(widget.notes.store).isNotEmpty;
+  /// Whether Ask is switched on (#333) and a computer of the user's own
+  /// is paired to ask (#267), read with the rows.
+  var _mayAsk = false;
   late final _checklists = Checklists(widget.notes.store);
   late final _shopping = ShoppingLists(widget.notes.store);
 
@@ -389,6 +390,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   void _load() {
     AgendaScreen.loads++;
     final store = widget.notes.store;
+    // Settings and Sync, behind the Profile or an app link, switch Ask
+    // and pair and forget computers.
+    _mayAsk = store.askOn && askableDevices(store).isNotEmpty;
     final FutureOr<AgendaLoad> loading;
     // Writes today's picks when they are new, before the rows read their
     // Done; the log's change they make is no reason to read again.
@@ -710,8 +714,6 @@ class _AgendaScreenState extends State<AgendaScreen> {
       trail: widget.trail,
     );
     if (!mounted) return;
-    // Sync, behind the Profile, pairs and forgets computers.
-    _mayAsk = askableDevices(widget.notes.store).isNotEmpty;
     _reload();
     // Settings lead to the Calendar page too.
     unawaited(_readCalendar());
@@ -1384,8 +1386,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ),
             // What does not fit goes into ⋮ from the end, the folder
             // and the Profile picture never (UI laws, "The bar").
-            // Asking the computer, once one of the user's is paired
-            // (#267).
+            // Asking the computer, once Ask is switched on (#333) and
+            // one of the user's is paired (#267).
             if (_mayAsk)
               BarAction(
                 key: const ValueKey('ask'),

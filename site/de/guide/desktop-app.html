@@ -681,11 +681,11 @@
 <h2>Zu deinen Notizen fragen</h2>
 <p>Frag ein KI-Modell deiner Wahl zu deinen Notizen und bekomm Antworten mit Links zu ihnen.</p>
 <box-tab device="phone" alt="Fragen auf dem Handy: die Zeile mit Computer, Anbieter und Modell, die Frage Wo ist der Ersatzschlüssel?, die Antwort mit einem Link zur Notiz, Aus diesen Notizen mit dem Titel der Notiz, und Als Notiz behalten">
+<li>Schalte <strong>Fragen (experimentell)</strong> in den Einstellungen ein.</li>
 <li>Markiere private Notizen und Bereiche als <strong>Vor KI verborgen</strong>.</li>
 <li>Tippe in der Leiste der Agenda auf <strong>Fragen</strong>.</li>
 <li>Lies, was gesendet wird, und tippe auf <strong>Erlauben</strong>.</li>
 <li>Tipp deine Frage ein und tippe auf <strong>Fragen</strong>.</li>
-<li>Tippe eine Notiz unter <strong>Aus diesen Notizen</strong>, um sie zu öffnen.</li>
 </box-tab>
 <box-tab device="desktop" alt="Die Fragen-Ansicht: die Frage Wo sind die Winterreifen?, die Antwort mit einem Link zur Notiz, Aus diesen Notizen mit dem Titel der Notiz, und Als Notiz behalten">
 <li>Hake <strong>KI (experimentell)</strong> ganz oben im Menü <strong>KI</strong> an.</li>
@@ -736,8 +736,13 @@
   <a href="#den-ki-port-oeffnen">Den KI-Port öffnen</a>). Der Abgleich wartet, bis du entscheidest.
 </p>
 <p>
-  Auf dem Handy steht <strong>Fragen</strong> in der Leiste der Agenda, sobald ein Computer von dir
-  gekoppelt ist. Das Handy führt kein Modell aus und spricht mit keinem Anbieter: Es schickt die Frage
+  Auch auf dem Handy ist das Fragen experimentell und anfangs aus. <strong>Fragen (experimentell)</strong>
+  in den Einstellungen, nur in Erweitert angeboten, schaltet es für dieses Handy ein; der Schalter wird
+  nicht synchronisiert und bleibt in Einfach an. Solange er aus ist, gibt es kein <strong>Fragen</strong>
+  in der Leiste der Agenda und keine <strong>Adresse von Hand</strong> auf der Seite Synchronisieren.
+  Ist er an, steht <strong>Fragen</strong> in der Leiste der Agenda, solange ein Computer von dir
+  gekoppelt ist, und ein Tippen auf eine Notiz unter <strong>Aus diesen Notizen</strong> öffnet sie.
+  Das Handy führt kein Modell aus und spricht mit keinem Anbieter: Es schickt die Frage
   über die gekoppelte Verbindung an deinen Computer, der seinen Anbieter mit seinem eigenen Schlüssel
   fragt, wie die Ansicht es tut, und die Antwort mit ihren Links zurückschickt, die die Notizen auf dem
   Handy öffnen. Der Computer muss laufen, zu Hause oder über dein VPN (siehe
@@ -759,6 +764,7 @@
 <h2>Von unterwegs fragen</h2>
 <p>Erreich deinen Computer vom Handy über ein VPN, um zu fragen und abzugleichen.</p>
 <box-tab device="phone" alt="Synchronisieren auf dem Handy: der gekoppelte Computer Desk mit Automatisch synchronisieren und Adresse von Hand desk.tail1234.ts.net">
+<li>Schalte <strong>Fragen (experimentell)</strong> in den Einstellungen ein.</li>
 <li>Installiere Tailscale auf dem Handy und melde dich an.</li>
 <li>Tippe auf das Profilbild, dann <strong>Mit einem anderen Gerät synchronisieren</strong>.</li>
 <li>Tipp den Tailscale-Namen des Computers unter <strong>Adresse von Hand</strong> ein.</li>
@@ -785,7 +791,9 @@
   dann dort, wo er zuletzt war. Es vertraut an jeder Adresse nur dem Zertifikat, mit dem es gekoppelt
   hat, sodass ein Gerät, das dort an seiner Stelle antwortet, nichts bekommt. Der automatische Abgleich
   nimmt denselben Weg, also gleicht das Handy auch von unterwegs ab. Die Adresse bleibt auf diesem
-  Handy: Sie wird nicht synchronisiert und mit dem Computer vergessen. Eine Adresse, die
+  Handy: Sie wird nicht synchronisiert und mit dem Computer vergessen. Das Feld steht da, solange
+  <strong>Fragen (experimentell)</strong> an ist; ist es aus, bleibt eine schon eingetippte Adresse,
+  und die Synchronisierung versucht sie weiter. Eine Adresse, die
   keine ist, oder ein Port außerhalb von 1 bis 65535 steht unter dem Feld und wird nicht behalten.
 </p>
 </box-more>

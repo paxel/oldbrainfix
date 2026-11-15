@@ -6303,6 +6303,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schalte KI (experimentell) in den Einstellungen des Computers ein.';
 
   @override
+  String get phoneAskSwitch => 'Fragen (experimentell)';
+
+  @override
+  String get phoneAskSwitchDetail =>
+      'Fragen in der Leiste der Agenda, das deinen Computer zu deinen Notizen fragt, und Adresse von Hand auf der Seite Synchronisieren. Eine schon eingetippte Adresse bleibt, und die Synchronisierung versucht sie weiter.';
+
+  @override
   String get phoneAskConsentTitle => 'Vor deiner ersten Frage';
 
   @override

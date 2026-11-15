@@ -6229,6 +6229,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Switch on AI (experimental) in the computer\'s Settings.';
 
   @override
+  String get phoneAskSwitch => 'Ask (experimental)';
+
+  @override
+  String get phoneAskSwitchDetail =>
+      'Ask in the Agenda\'s bar, which asks your computer about your Notes, and Address by hand on the Sync page. An address typed before stays, and sync still tries it.';
+
+  @override
   String get phoneAskConsentTitle => 'Before your first question';
 
   @override

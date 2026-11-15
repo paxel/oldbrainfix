@@ -263,6 +263,19 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('Ask is off until this Device switches it on, and is never '
+      'synced', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.askOn, isFalse);
+    store.askOn = true;
+    expect(store.askOn, isTrue);
+    expect(store.localSetting('askOn'), 'true');
+    store.askOn = false;
+    expect(store.askOn, isFalse);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the two-row editor is on until this Device switches it off', () {
     final store = Store.inMemory();
     addTearDown(store.close);

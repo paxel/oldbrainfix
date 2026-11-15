@@ -71,6 +71,7 @@ extension DeviceSettings on Store {
   static const _recentlyFiledInto = 'recentlyFiledInto';
   static const _recentlyAddedTo = 'recentlyAddedTo';
   static const _askAllowed = 'askAllowed';
+  static const _askOn = 'askOn';
 
   /// How many places filed into File into… shows at its top (#272), and
   /// how many Notes added to Add to Note… shows at its top (#308).
@@ -354,6 +355,14 @@ extension DeviceSettings on Store {
       ].take(recentPlacesKept).toList(),
     ),
   );
+
+  /// Whether this phone offers Ask (#333): the Ask page, its button in
+  /// the Agenda's bar and the address by hand on the Sync page; off
+  /// until switched on, as Ask is experimental. An address by hand kept
+  /// meanwhile still serves sync either way.
+  bool get askOn => localSetting(_askOn) == 'true';
+
+  set askOn(bool on) => setLocalSetting(_askOn, '$on');
 
   /// Whether the user allowed this Device to send questions through the
   /// desktop to [provider] (#267, App Store guideline 5.1.2(i)): once for

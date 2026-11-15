@@ -871,7 +871,11 @@ replace a law of Both apps where they say so. A desktop law marked
   twelve, the one typed exactly left out; a tap fills it in. The tree
   and the chips leave out the Notes of a locked Area while it is closed,
   as every list does.
-- **Ask** (#267, ADR 0051) is a `BarAction` in the Agenda's bar after
+- **Ask** (#267, ADR 0051) is experimental and off until "Ask
+  (experimental)" (#333), a switch of the phone in Settings offered in
+  Advanced only, is on; while it is off there is no Ask button, no Ask
+  page and no address by hand, and nothing else of pairing or sync
+  changes. It is a `BarAction` in the Agenda's bar after
   the folder, shown once a Device of the user's own that hosts is
   paired, and opens the Ask page, which asks the user's computer as the
   desktop's Ask panel does (see Desktop, "Menu bar and keys"). Before
@@ -887,7 +891,8 @@ replace a law of Both apps where they say so. A desktop law marked
   these Notes" and Keep as Note; Start over in the bar drops them, and
   so does leaving the page. **An address by hand** sits under each such
   paired Device on the Sync page, a field with its line of what it is
-  for and its error under it once it is left or submitted.
+  for and its error under it once it is left or submitted; one kept
+  while Ask is off is still tried by sync.
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and
