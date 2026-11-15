@@ -1349,7 +1349,8 @@ final _scenarios = <Scenario>[
         'indented and back, a parent deleted with its group brought up, '
         'one deleted and restored, and one placed by a key no app writes; '
         '"Uncheck all", back to a plain Note and made again; an Unsorted '
-        'Note beside them.',
+        'Note beside them; then typed text made a Checklist, every line a '
+        'Line, and one under a Markdown heading, its Name (#309).',
     build: (store) {
       final notes = Notes(store);
       final lists = Checklists(store);
@@ -1393,6 +1394,12 @@ final _scenarios = <Scenario>[
       lists.toPlain(shop);
       lists.make(shop);
       notes.capture('Unsorted thought\nwith a second line');
+      // Typed text made a Checklist (#309): every line a Line, unless the
+      // first looks like a heading.
+      final typed = notes.capture('Socks\n  Blue\n✓ Passport').id;
+      lists.makeFromText(typed);
+      final weekly = notes.capture('# Weekly\nTowel').id;
+      lists.makeFromText(weekly);
     },
   ),
   (
@@ -1759,7 +1766,9 @@ final _scenarios = <Scenario>[
         'a checked Line and a description typed after it was made becoming a '
         'Shopping List, a Shopping List with a struck Line and one gone Once '
         'becoming a Checklist, and one switched there and back; a Tally with '
-        'a description and a plain Note beside them.',
+        'a description and a plain Note beside them; then typed text made a '
+        'Shopping List, one under a line ending in ":", its Name, and one of '
+        'every line (#309).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1784,6 +1793,12 @@ final _scenarios = <Scenario>[
       final gym = notes.capture('Gym\nMondays and Thursdays').id;
       Tallies(store).addField(gym, name: 'Reps', unit: 'reps');
       notes.capture('Call Ben\nabout the car');
+      // Typed text made a Shopping List (#309): under a line ending in ":",
+      // its Name, and every line a Line.
+      final shopping = notes.capture('Shopping:\nFlour\nSugar').id;
+      lists.makeFromText(shopping);
+      final typed = notes.capture('Soap\n✓ Sponge').id;
+      lists.makeFromText(typed);
     },
   ),
   (
@@ -3158,6 +3173,46 @@ const _markdownRows = [
   '-\tTab',
 ];
 
+/// First lines of a typed text as they name a list made of it (#309),
+/// beside [_rows] and [_markdownRows]: headings of each level and none,
+/// and lines ending in ":".
+const _headingRows = [
+  '#',
+  '# Weekly',
+  '#\tTab',
+  '## Two',
+  '###### Six',
+  '####### Seven',
+  '#tag',
+  '#\u00a0Nbsp',
+  '  # Indented',
+  '    # Four spaces',
+  '# Title #',
+  '#  \u3000Wide ',
+  '# Weekly:',
+  'Shopping:',
+  ':',
+  'Milk: 2',
+  '✓ Done:',
+  '- Fruit:',
+  'Fruit :\u00a0',
+];
+
+/// Typed texts as they become a list (#309), each read plain and
+/// formatted.
+const _listTexts = [
+  '',
+  'Socks',
+  'Socks\nTent',
+  '# Weekly\nSocks\n  Blue',
+  'Shopping:\r\nMilk\r✓ Eggs',
+  '\n# Weekly\nSocks',
+  '  \nSocks',
+  '- Socks\n- ✓ Tent',
+  '## Trip\n- Map\n  - Pen',
+  '✓ Socks\n  Blue',
+];
+
 /// Each Checklist of [store] with its Lines, the one-pass read of them
 /// all, which Notes may become one, what each goes back to as a plain
 /// Note, and how lines of text and keys are read and made.
@@ -3234,6 +3289,23 @@ Map<String, Object?> _checklists(Store store) {
           null => null,
           final l => {'text': l.text, 'indent': l.indent, 'checked': l.checked},
         },
+    ],
+    'headingNames': [
+      for (final row in [..._rows, ..._markdownRows, ..._headingRows])
+        headingName(row),
+    ],
+    'listsOfText': [
+      for (final text in _listTexts)
+        for (final markdown in [false, true])
+          switch (listOfText(text, markdown: markdown)) {
+            (:final name, :final lines) => {
+              'name': name,
+              'lines': [
+                for (final l in lines)
+                  {'text': l.text, 'indent': l.indent, 'checked': l.checked},
+              ],
+            },
+          },
     ],
     'split': splitLines('a\r\nb\rc\n\nd\r\r\n'),
     'after': {for (final k in keys) k: LineOrder.after(k)},

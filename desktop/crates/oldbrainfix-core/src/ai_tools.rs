@@ -24,7 +24,7 @@ use serde_json::{Value, json};
 
 use crate::boxes::Boxes;
 use crate::checklists::{
-    Checklists, LineChecks, keys as checklist_keys, parse_line_in, parse_list_kind, split_lines,
+    Checklists, LineChecks, keys as checklist_keys, list_of_text, parse_list_kind,
 };
 use crate::entry::{dart_iso, parse_time};
 use crate::frogs::Frogs;
@@ -582,7 +582,7 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "make_list",
-            "Makes a Note a Checklist or a Shopping List: its first line stays its text and every other line not blank becomes a Line, on a Checklist under the line above when it starts with a space. A text with a line marked \"✓ \" is refused, as that Line would be checked.",
+            "Makes a Note a Checklist or a Shopping List: every line not blank becomes a Line, on a Checklist under the line above when it starts with a space, but a first line that looks like a heading, a Markdown heading (\"# Weekly\", any level) or a line ending in \":\", stays as the list's name, a heading without its \"#\"; without one the list has no name. A text with a line marked \"✓ \" is refused, as that Line would be checked.",
             false,
             json!({"id": id("Note"), "list": {"enum": ["checklist", "shoppingList"], "type": "string"}}),
             &["id", "list"],
@@ -2420,13 +2420,11 @@ impl Store {
             }
             "make_list" => {
                 let note = id()?;
+                // The Lines the typed text becomes (#309), its first line
+                // among them unless it is a heading.
                 let text = Notes::new(self).by_id(note)?.map(|n| {
                     let markdown = n.text_format == text_format::MARKDOWN;
-                    split_lines(&n.text)
-                        .iter()
-                        .skip(1)
-                        .filter_map(|r| parse_line_in(r, markdown))
-                        .any(|l| l.checked)
+                    list_of_text(&n.text, markdown).1.iter().any(|l| l.checked)
                 });
                 if text == Some(true) {
                     return Err(Error::Invalid(format!(
@@ -2434,8 +2432,8 @@ impl Store {
                     )));
                 }
                 match text_arg(args, "list")? {
-                    CHECKLIST => checklists.make(note)?,
-                    SHOPPING_LIST => shopping.make(note)?,
+                    CHECKLIST => checklists.make_from_text(note)?,
+                    SHOPPING_LIST => shopping.make_from_text(note)?,
                     other => return Err(Error::Invalid(format!("no list {other}"))),
                 }
                 done(note)

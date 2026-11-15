@@ -684,9 +684,12 @@ fn every_list_set_up_waits_for_the_review() -> TestResult {
             },
             |s, a| {
                 let id = arg(a, "id")?;
+                // Every line a Line, the first one too (#309).
                 Ok(match is {
-                    true => Checklists::new(s).is_checklist(&id)?,
-                    false => ShoppingLists::new(s).is_shopping_list(&id)?,
+                    true => Checklists::new(s).is_checklist(&id)? && lines(s, &id)?.len() == 3,
+                    false => ShoppingLists::new(s)
+                        .by_note(&id, &utc)?
+                        .is_some_and(|l| l.count() == 3),
                 })
             },
         )?;
@@ -990,6 +993,16 @@ fn a_list_with_checked_lines_or_a_checked_name_is_refused_with_words() -> TestRe
     )?;
     assert!(made.is_error);
     assert!(format!("{made:?}").contains("✓"), "{made:?}");
+    // A marked first line becomes a checked Line too (#309).
+    let first = Notes::new(&store).capture("✓ Socks\nShirt", None, None)?;
+    let made = call(
+        &store,
+        &task,
+        "make_list",
+        &json!({"id": first.id, "list": "shoppingList"}),
+    )?;
+    assert!(made.is_error, "{made:?}");
+    assert!(format!("{made:?}").contains("edit_note"), "{made:?}");
     let added = call(
         &store,
         &task,

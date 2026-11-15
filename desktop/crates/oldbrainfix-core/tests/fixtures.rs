@@ -3987,6 +3987,12 @@ fn write_checklists(store: &Store) -> Built {
     lists.to_plain(&shop)?;
     lists.make(&shop)?;
     notes.capture("Unsorted thought\nwith a second line", None, None)?;
+    // Typed text made a Checklist (#309): every line a Line, unless the
+    // first looks like a heading.
+    let typed = notes.capture("Socks\n  Blue\n✓ Passport", None, None)?.id;
+    lists.make_from_text(&typed)?;
+    let weekly = notes.capture("# Weekly\nTowel", None, None)?.id;
+    lists.make_from_text(&weekly)?;
     Ok(())
 }
 
@@ -4180,6 +4186,45 @@ const ROWS: [&str; 17] = [
     "✓ ✓ Twice",
 ];
 
+/// First lines of a typed text as they name a list, as the Dart
+/// generator's `_headingRows` (#309).
+const HEADING_ROWS: [&str; 19] = [
+    "#",
+    "# Weekly",
+    "#\tTab",
+    "## Two",
+    "###### Six",
+    "####### Seven",
+    "#tag",
+    "#\u{a0}Nbsp",
+    "  # Indented",
+    "    # Four spaces",
+    "# Title #",
+    "#  \u{3000}Wide ",
+    "# Weekly:",
+    "Shopping:",
+    ":",
+    "Milk: 2",
+    "✓ Done:",
+    "- Fruit:",
+    "Fruit :\u{a0}",
+];
+
+/// Typed texts as they become a list, as the Dart generator's
+/// `_listTexts` (#309).
+const LIST_TEXTS: [&str; 10] = [
+    "",
+    "Socks",
+    "Socks\nTent",
+    "# Weekly\nSocks\n  Blue",
+    "Shopping:\r\nMilk\r✓ Eggs",
+    "\n# Weekly\nSocks",
+    "  \nSocks",
+    "- Socks\n- ✓ Tent",
+    "## Trip\n- Map\n  - Pen",
+    "✓ Socks\n  Blue",
+];
+
 /// Lines of a formatted text, as the Dart generator's `_markdownRows`.
 const MARKDOWN_ROWS: [&str; 23] = [
     "- Socks",
@@ -4224,7 +4269,9 @@ fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
 }
 
 fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
-    use oldbrainfix_core::checklists::{order, parse_line, parse_line_in, split_lines};
+    use oldbrainfix_core::checklists::{
+        heading_name, list_of_text, order, parse_line, parse_line_in, split_lines,
+    };
     let dir = fixtures().join(scenario);
     let expected = read_json(&dir.join("checklists.json"))?;
     let read_at = read_json(&dir.join("expected.json"))?;
@@ -4316,6 +4363,25 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         })
         .collect();
     assert_eq!(json!(markdown_rows), expected["markdownRows"]);
+    let names: Vec<Option<String>> = ROWS
+        .iter()
+        .chain(MARKDOWN_ROWS.iter())
+        .chain(HEADING_ROWS.iter())
+        .map(|row| heading_name(row))
+        .collect();
+    assert_eq!(json!(names), expected["headingNames"]);
+    let mut of_text = Vec::new();
+    for text in LIST_TEXTS {
+        for markdown in [false, true] {
+            let (name, lines) = list_of_text(text, markdown);
+            let lines: Vec<Value> = lines
+                .iter()
+                .map(|l| json!({"text": l.text, "indent": l.indent, "checked": l.checked}))
+                .collect();
+            of_text.push(json!({"name": name, "lines": lines}));
+        }
+    }
+    assert_eq!(json!(of_text), expected["listsOfText"]);
     assert_eq!(
         json!(split_lines("a\r\nb\rc\n\nd\r\r\n")),
         expected["split"]
@@ -4430,6 +4496,12 @@ fn write_list_switch(store: &Store) -> Built {
     let gym = notes.capture("Gym\nMondays and Thursdays", None, None)?.id;
     Tallies::new(store).add_field(&gym, "Reps", "reps", None, None)?;
     notes.capture("Call Ben\nabout the car", None, None)?;
+    // Typed text made a Shopping List (#309): under a line ending in ":",
+    // its Name, and every line a Line.
+    let shopping = notes.capture("Shopping:\nFlour\nSugar", None, None)?.id;
+    lists.make_from_text(&shopping)?;
+    let typed = notes.capture("Soap\n✓ Sponge", None, None)?.id;
+    lists.make_from_text(&typed)?;
     Ok(())
 }
 

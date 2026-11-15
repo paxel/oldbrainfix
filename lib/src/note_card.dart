@@ -1599,13 +1599,21 @@ class _CompactNoteState extends State<_CompactNote> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (NoteKinds.name(shown).length case final end when end > 0)
+          if (NoteKinds.name(shown) case final name when name.trim().isNotEmpty)
             marked(
               0,
-              end,
+              name.length,
               key: const ValueKey('card-name'),
               style: text.titleMedium,
               lines: 1,
+            )
+          else if (untitledList(t, _kind) case final untitled?)
+            Text(
+              untitled,
+              key: const ValueKey('card-name'),
+              style: text.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ?widget.list,
           ...glance,
@@ -1814,6 +1822,7 @@ class _FullNoteState extends State<_FullNote> {
           list: widget.list,
           onTable: widget.onTable,
           named: _kind != NoteKind.plain,
+          untitled: untitledList(context.t, _kind),
         ),
         const SizedBox(height: 8),
         CaptureLine(
@@ -1902,6 +1911,9 @@ class _Whole extends StatelessWidget {
   /// (#188).
   final bool named;
 
+  /// What a list without a name shows as its name ([untitledList]).
+  final String? untitled;
+
   const _Whole({
     required this.id,
     required this.text,
@@ -1922,14 +1934,16 @@ class _Whole extends StatelessWidget {
     this.ticking,
     this.onTable,
     this.named = false,
+    this.untitled,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge;
     final list = this.list;
-    // A photo Note may have no words.
-    final Widget? words = text.isEmpty
+    // A photo Note may have no words; a list without a name shows its
+    // kind.
+    final Widget? words = text.isEmpty && untitled == null
         ? null
         : named
         ? _NameAndDescription(
@@ -1940,6 +1954,7 @@ class _Whole extends StatelessWidget {
             format: format,
             ticking: ticking,
             onTable: onTable,
+            untitled: untitled,
           )
         : MarkedText(
             text,
@@ -2063,6 +2078,9 @@ class _NameAndDescription extends StatefulWidget {
   final BoxTicking? ticking;
   final TableEditing? onTable;
 
+  /// What shows as the name while it is blank ([untitledList]).
+  final String? untitled;
+
   const _NameAndDescription({
     required this.noteId,
     required this.text,
@@ -2071,6 +2089,7 @@ class _NameAndDescription extends StatefulWidget {
     required this.format,
     this.ticking,
     this.onTable,
+    this.untitled,
   });
 
   @override
@@ -2132,11 +2151,15 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
       children: [
         KeyedSubtree(
           key: const ValueKey('card-name'),
-          child: part(
-            start: 0,
-            end: nameEnd,
-            style: theme.textTheme.titleMedium,
-          ),
+          child: switch (widget.untitled) {
+            final untitled? when text.substring(0, nameEnd).trim().isEmpty =>
+              Text(untitled, style: theme.textTheme.titleMedium),
+            _ => part(
+              start: 0,
+              end: nameEnd,
+              style: theme.textTheme.titleMedium,
+            ),
+          },
         ),
         if (description.trim().isNotEmpty)
           Semantics(

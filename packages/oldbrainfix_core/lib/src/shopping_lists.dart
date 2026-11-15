@@ -538,23 +538,31 @@ class ShoppingLists {
         store.mayChange(noteId);
   }
 
-  /// Makes the Note [noteId] a Shopping List: its first line stays its
+  /// Makes the Note [noteId] a Shopping List named by its first line, as
+  /// a new list is from the name typed for it: its first line stays its
   /// text, every other line not blank becomes a Line, indented or not,
   /// struck when it starts with "✓ ", in a formatted text without the
   /// mark of an item or a quote ([parseLine]). Every Line comes in at one moment,
   /// so they show in the order of the text. Takes it out of Unsorted, as
-  /// a Checklist does. The text keeps its format.
-  void make(String noteId) {
+  /// a Checklist does. The text keeps its format. Typed text is made a
+  /// Shopping List by [makeFromText].
+  void make(String noteId) => _make(noteId, fromText: false);
+
+  /// Makes the typed text of the Note [noteId] a Shopping List (#309), as
+  /// [make] does but with every line a Line unless the first looks like
+  /// a heading ([listOfText]): only then is it the Name, else the list
+  /// has none.
+  void makeFromText(String noteId) => _make(noteId, fromText: true);
+
+  void _make(String noteId, {required bool fromText}) {
     final note = Notes(store).byId(noteId);
     if (note == null || !mayMake(noteId)) {
       throw StateError('$noteId may not be made a Shopping List here');
     }
-    final rows = splitLines(note.text);
-    final title = rows.first.trim();
     final markdown = note.textFormat == TextFormats.markdown;
-    final parsed = [
-      for (final row in rows.skip(1)) ?parseLine(row, markdown: markdown),
-    ];
+    final (name: title, lines: parsed) = fromText
+        ? listOfText(note.text, markdown: markdown)
+        : namedList(note.text, markdown: markdown);
     final making = Store.newId();
     store.batch(() {
       store.append(noteId, ChecklistKeys.kind, ShoppingKeys.kindOf(making));

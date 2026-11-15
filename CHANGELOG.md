@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [0.6.1]
 
+### Changed
+
+- Typed text made a Checklist or a Shopping List keeps every line as a Line, its first line too; only a first line that looks like a heading, a Markdown heading or a line ending in ":", becomes the list's name, and a list without one shows "Checklist" or "Shopping List" until a name is typed. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))
+
 ### Fixed
 
 - On the desktop, Cut, Copy and Paste in a text field's right-click menu and in the Edit menu reach the system clipboard, also in a Note's own window, as Ctrl+X, Ctrl+C and Ctrl+V do. ([obf-1012](https://github.com/paxel/oldbrainfix/issues/319))

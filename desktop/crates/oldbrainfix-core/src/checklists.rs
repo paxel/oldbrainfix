@@ -391,6 +391,53 @@ pub fn parse_line_in(row: &str, markdown: bool) -> Option<ParsedLine> {
     })
 }
 
+/// The Name and the Lines a list made of a text has.
+pub type ListOfText = (String, Vec<ParsedLine>);
+
+/// The Name and the Lines a list made of `text` named by its first line
+/// has, as the Dart core's `namedList`: that line trimmed, and every
+/// other line not blank a Line ([`parse_line_in`]).
+pub fn named_list(text: &str, markdown: bool) -> ListOfText {
+    let rows = split_lines(text);
+    let name = dart_trim(rows.first().map(String::as_str).unwrap_or("")).to_string();
+    let lines = rows
+        .iter()
+        .skip(1)
+        .filter_map(|r| parse_line_in(r, markdown))
+        .collect();
+    (name, lines)
+}
+
+/// The Name and the Lines a list made of the typed `text` has (#309),
+/// as the Dart core's `listOfText`: every line not blank becomes a Line
+/// ([`parse_line_in`]), but a first line that looks like a heading is
+/// the Name ([`heading_name`]); without one the Name is empty.
+pub fn list_of_text(text: &str, markdown: bool) -> ListOfText {
+    let rows = split_lines(text);
+    let name = heading_name(rows.first().map(String::as_str).unwrap_or(""));
+    let skip = usize::from(name.is_some());
+    let lines = rows
+        .iter()
+        .skip(skip)
+        .filter_map(|r| parse_line_in(r, markdown))
+        .collect();
+    (name.unwrap_or_default(), lines)
+}
+
+/// The Name the first line `row` of a typed text gives the list made of
+/// it (#309), or `None` when that line is no heading and becomes a Line,
+/// as the Dart core's `headingName`: a Markdown heading of any level,
+/// one to six "#" and a space or a tab before its words, without its
+/// marks, or a line ending in ":", as it is. Both trimmed.
+pub fn heading_name(row: &str) -> Option<String> {
+    let line = dart_trim(row);
+    let marks = line.bytes().take_while(|&b| b == b'#').count();
+    if (1..=6).contains(&marks) && matches!(line.as_bytes().get(marks), Some(b' ' | b'\t')) {
+        return Some(dart_trim(&line[marks..]).to_string());
+    }
+    line.ends_with(':').then(|| line.to_string())
+}
+
 /// `row` without the mark it starts with as a bulleted or numbered item
 /// or a quote of formatted text; as it is when it is none of them.
 fn without_item_mark(row: &str) -> &str {
@@ -959,13 +1006,27 @@ impl<'a> Checklists<'a> {
             && self.store.may_change(note_id)?)
     }
 
-    /// Makes the Note `note_id` a Checklist: its first line stays its
+    /// Makes the Note `note_id` a Checklist named by its first line, as a
+    /// new list is from the name typed for it: its first line stays its
     /// text, every other line not blank becomes a Line, under the line
     /// above when it starts with a space or a tab, checked when it starts
     /// with "✓ ", in a formatted text without the mark of an item or a
     /// quote ([`parse_line_in`]). Takes it out of Unsorted, as a Tally
-    /// does. The text keeps its format.
+    /// does. The text keeps its format. Typed text is made a Checklist by
+    /// [`Self::make_from_text`].
     pub fn make(&self, note_id: &str) -> Result<()> {
+        self.make_by(note_id, false)
+    }
+
+    /// Makes the typed text of the Note `note_id` a Checklist (#309), as
+    /// [`Self::make`] does but with every line a Line unless the first
+    /// looks like a heading ([`list_of_text`]): only then is it the Name,
+    /// else the list has none.
+    pub fn make_from_text(&self, note_id: &str) -> Result<()> {
+        self.make_by(note_id, true)
+    }
+
+    fn make_by(&self, note_id: &str, from_text: bool) -> Result<()> {
         let note = Notes::new(self.store).by_id(note_id)?;
         let Some(note) = note else {
             return Err(Error::Invalid(format!(
@@ -977,14 +1038,13 @@ impl<'a> Checklists<'a> {
                 "{note_id} may not be made a Checklist here"
             )));
         }
-        let rows = split_lines(&note.text);
-        let title = dart_trim(rows.first().map(String::as_str).unwrap_or(""));
         let markdown = note.text_format == text_format::MARKDOWN;
-        let parsed: Vec<ParsedLine> = rows
-            .iter()
-            .skip(1)
-            .filter_map(|r| parse_line_in(r, markdown))
-            .collect();
+        let (title, parsed) = if from_text {
+            list_of_text(&note.text, markdown)
+        } else {
+            named_list(&note.text, markdown)
+        };
+        let title = title.as_str();
         let making = self.store.new_id()?;
         self.store.batch(|| {
             let s = self.store;

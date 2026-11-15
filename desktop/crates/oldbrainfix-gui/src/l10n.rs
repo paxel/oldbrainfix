@@ -4,18 +4,36 @@
 
 include!(concat!(env!("OUT_DIR"), "/l10n.rs"));
 
-use oldbrainfix_core::Wordless;
+use oldbrainfix_core::{Note, Wordless};
 
 /// What a Note without words is titled as where only its words fit, as
 /// in a row or an alarm ([`oldbrainfix_core::Note::wordless`]): a file by
 /// its `name` ([`oldbrainfix_core::Note::wordless_name`]), the word for
-/// an Attachment when it has none.
+/// an Attachment when it has none; a list without a Name by its kind
+/// (#309).
 pub fn wordless(t: &L10n, wordless: Wordless, name: &str) -> String {
     match wordless {
         Wordless::Photo => t.photo().to_string(),
         Wordless::VoiceRecording => t.voice_recording().to_string(),
         Wordless::File if name.is_empty() => t.attachment().to_string(),
         Wordless::File => name.to_string(),
+        Wordless::Checklist => t.checklist_heading().to_string(),
+        Wordless::ShoppingList => t.shopping_heading().to_string(),
+    }
+}
+
+/// What a list without a name shows where its name would be (#309):
+/// "Checklist" or "Shopping List" by the list `note` is, as the phone's
+/// `untitledList`; `None` for any other Note, which shows nothing there.
+pub fn untitled_list(t: &L10n, note: &Note) -> Option<String> {
+    match note.list_kind.as_deref() {
+        Some(oldbrainfix_core::checklists::keys::CHECKLIST) => {
+            Some(t.checklist_heading().to_string())
+        }
+        Some(oldbrainfix_core::shopping_lists::keys::SHOPPING) => {
+            Some(t.shopping_heading().to_string())
+        }
+        _ => None,
     }
 }
 

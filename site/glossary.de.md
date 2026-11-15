@@ -17,7 +17,7 @@ Eine Notiz der Art, die nur ihr Text ist, ohne Zeilen und ohne Felder einer Stri
 _Avoid_: Textnotiz, normale Notiz
 
 **Name** [Name]:
-Die erste Zeile des Textes einer Notiz jeder Art außer der einfachen Notiz, als Überschrift ihrer Seite und Karte gezeigt. Im Editor ist er ein einzeiliges Feld; der Text wird dafür nicht umgeschrieben.
+Die erste Zeile des Textes einer Notiz jeder Art außer der einfachen Notiz, als Überschrift ihrer Seite und Karte gezeigt. Im Editor ist er ein einzeiliges Feld; der Text wird dafür nicht umgeschrieben. Getippter Text, der zur Checkliste oder Einkaufsliste wird, behält seine erste Zeile nur als Namen, wenn sie wie eine Überschrift aussieht, als Markdown-Überschrift (der Name ohne ihr „#“) oder als Zeile, die mit „:“ endet; sonst wird jede Zeile eine Zeile der Liste, und die Liste hat keinen Namen, bis einer getippt wird, ihre Art an seiner Stelle gezeigt.
 _Avoid_: Titel, Überschrift, Bezeichnung
 
 **Beschreibung** [Description]:

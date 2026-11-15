@@ -5654,7 +5654,7 @@ abstract class AppLocalizations {
   /// **'This Tally is no longer there.'**
   String get tallyShortcutGone;
 
-  /// Makes a Note a Checklist: its first line stays its text, every other line becomes a Line (CONTEXT.md: Checklist, Line).
+  /// Makes a Note a Checklist: every line becomes a Line, unless the first looks like a heading, which stays as its name (CONTEXT.md: Checklist, Line, Name).
   ///
   /// In en, this message translates to:
   /// **'Make it a Checklist'**
@@ -5792,7 +5792,7 @@ abstract class AppLocalizations {
   /// **'Delete this Line?'**
   String get checklistDeleteQuestion;
 
-  /// Makes a Note a Shopping List: its first line stays its text, every other line becomes a Line that comes back a while after it is checked (CONTEXT.md: Shopping List, Line).
+  /// Makes a Note a Shopping List: every line becomes a Line that comes back a while after it is checked, unless the first looks like a heading, which stays as its name (CONTEXT.md: Shopping List, Line, Name).
   ///
   /// In en, this message translates to:
   /// **'Make it a Shopping List'**

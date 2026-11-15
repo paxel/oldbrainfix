@@ -161,15 +161,20 @@ void main() {
   group('on the card', () {
     testWidgets('"Make it a Checklist" in the ⋮ makes its lines Lines, an '
         'indented one under the line above, the group in a frame with '
-        'its parent', (tester) async {
+        'its parent; without a heading on top it has no name and its card '
+        'says "Checklist" (#309)', (tester) async {
       final note = notes.capture('Trip\nBath\n  Soap\nTent').id;
       await startAtNotes(tester);
       await cardMenu(tester);
       expect(key('note-to-plain'), findsNothing);
       await tap(tester, key('note-make-checklist'));
 
-      expect(notes.byId(note)!.text, 'Trip');
-      expect(shown(note), ['Bath', '  Soap', 'Tent']);
+      expect(notes.byId(note)!.text, '');
+      expect(shown(note), ['Trip', 'Bath', '  Soap', 'Tent']);
+      expect(
+        find.descendant(of: key('card-name'), matching: find.text('Checklist')),
+        findsOneWidget,
+      );
       expect(notes.unsorted(), isEmpty);
       final bath = idOf(note, 'Bath');
       final soap = idOf(note, 'Soap');
@@ -250,6 +255,24 @@ void main() {
       expect(key('note-uncheck-all'), findsNothing);
     });
 
+    testWidgets('a compact card of a list without a name says "Checklist" '
+        'over its count (#309)', (tester) async {
+      final note = notes.capture('Milk\nEggs').id;
+      lists.makeFromText(note);
+      await startAtNotes(tester);
+      await tap(tester, key('compactNotes'));
+      expect(
+        find.descendant(
+          of: key('card-name'),
+          matching: find.text('Checklist'),
+          matchRoot: true,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('2 of 2 open'), findsOneWidget);
+      expect(notes.byId(note)!.text, '');
+    });
+
     testWidgets('"Back to a plain Note" in the ⋮ writes every Line into the '
         'text, checked ones marked, group Lines indented', (tester) async {
       final note = notes.capture('Trip\nBath\n  Soap\n✓ Tent').id;
@@ -288,7 +311,11 @@ void main() {
         'the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
-      await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
+      // Under a heading, which stays its name (#309).
+      await tester.enterText(
+        find.byType(TextField).first,
+        '# Shop\nMilk\nEggs',
+      );
       await pickKind(tester, NoteKind.checklist);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('checklist'), findsOneWidget);
@@ -299,6 +326,24 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(notes.byId(note)!.text, 'Shop');
+      expect(shown(note), ['Milk', 'Eggs']);
+    });
+
+    testWidgets('Checklist in the kind badge makes typed lines without a '
+        'heading every one a Line, the name left empty, also after leaving '
+        '(#309)', (tester) async {
+      final note = notes.capture('Milk').id;
+      await openEditor(tester, 'Milk');
+      await tester.enterText(find.byType(TextField).first, 'Milk\nEggs');
+      await pickKind(tester, NoteKind.checklist);
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        '',
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(notes.byId(note)!.text, '');
       expect(shown(note), ['Milk', 'Eggs']);
     });
 
@@ -376,8 +421,9 @@ void main() {
 
     testWidgets('a new list starts with one empty Line, the cursor in it; '
         'Return makes the next, and the only Line stays', (tester) async {
-      final note = notes.capture('Trip').id;
-      await openEditor(tester, 'Trip');
+      // A heading alone stays its name (#309).
+      final note = notes.capture('Trip:').id;
+      await openEditor(tester, 'Trip:');
       await pickKind(tester, NoteKind.checklist);
       expect(shown(note), isEmpty);
       expect(key('checklist-field-new-1'), findsOneWidget);

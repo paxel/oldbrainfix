@@ -178,8 +178,11 @@
 <p>
   Eine Checkliste ist eine Notiz, deren Zeilen abgehakt werden. <strong>Zur Checkliste
   machen</strong> steht im ⋮ der Karte der Notiz, und die Plakette „Art“ im Editor der Notiz bietet
-  es an. Die erste Zeile der Notiz bleibt ihr Text, als ihr Name; jede andere Zeile, die nicht leer
-  ist, wird eine Zeile der Liste. Eine Zeile, die mit einem Leerzeichen oder Tabulator beginnt,
+  es an. Jede Zeile, die nicht leer ist, wird eine Zeile der Liste. Nur eine erste Zeile, die wie
+  eine Überschrift aussieht, bleibt der Name: eine Markdown-Überschrift wie „# Packen“, ohne ihr
+  „#“, oder eine Zeile, die mit „:“ endet, wie „Packen:“. Sonst hat die Liste keinen Namen, bis
+  einer in ihr Namensfeld getippt wird, und ihre Karte zeigt an seiner Stelle „Checkliste“. Eine
+  Zeile, die mit einem Leerzeichen oder Tabulator beginnt,
   kommt unter die Zeile darüber, und eine, die mit „✓ “ beginnt, ist abgehakt. Eine Notiz, die zur
   Checkliste wird, ist nicht mehr unsortiert.
 </p>
@@ -293,9 +296,10 @@
 <p>
   Eine Einkaufsliste ist eine Notiz, deren Zeilen eine Weile nach dem Abhaken wiederkommen, etwa der
   Wocheneinkauf. <strong>Zur Einkaufsliste machen</strong> steht im ⋮ der Karte der Notiz, und die
-  Plakette „Art“ im Editor der Notiz bietet es an. Wie bei einer Checkliste bleibt die erste Zeile
-  der Name, und jede andere wird eine Zeile der Liste; Einkaufslisten haben keine Gruppen, und eine
-  Zeile mit „✓ “ ist durchgestrichen.
+  Plakette „Art“ im Editor der Notiz bietet es an. Wie bei einer Checkliste wird jede Zeile eine
+  Zeile der Liste, und nur eine erste Zeile, die wie eine Überschrift aussieht, bleibt der Name;
+  ohne sie zeigt die Karte „Einkaufsliste“. Einkaufslisten haben keine Gruppen, und eine Zeile mit
+  „✓ “ ist durchgestrichen.
 </p>
 <ul>
   <li>Eine abgehakte Zeile wird durchgestrichen und rückt ans Ende, mit dem Tag, an dem sie wiederkommt, etwa „wieder Sa., 31. Okt.“. Zu Beginn dieses Tages ist sie wieder offen, an ihrem Platz.</li>

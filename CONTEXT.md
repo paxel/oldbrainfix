@@ -19,7 +19,7 @@ A Note of the Kind that is its text alone, with no Lines and no Tally fields. Ge
 _Avoid_: text note, normal note
 
 **Name**:
-The first line of the text of a Note of any Kind but a Plain Note, shown as the heading of its page and card. In the editor it is a one-line field; the text is not rewritten for it. German: Name.
+The first line of the text of a Note of any Kind but a Plain Note, shown as the heading of its page and card. In the editor it is a one-line field; the text is not rewritten for it. Typed text made a Checklist or a Shopping List keeps its first line as the Name only when it looks like a heading, a Markdown heading (the Name without its "#") or a line ending in ":"; otherwise every line becomes a Line and the list has no Name until one is typed, its Kind shown where the Name would be. German: Name.
 _Avoid_: title, heading, label
 
 **Description**:

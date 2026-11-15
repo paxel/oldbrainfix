@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'boxes.dart';
+import 'checklists.dart';
 import 'entry.dart';
 import 'file_text.dart';
 import 'hidden_from_ai.dart';
@@ -9,6 +10,7 @@ import 'named_places.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'shared_areas.dart';
+import 'shopping_lists.dart';
 import 'store.dart';
 import 'sync.dart';
 import 'text_boxes.dart';
@@ -144,8 +146,9 @@ enum Importance { unimportant, normal, important }
 
 /// What a Note without words is titled as where only its words fit, as
 /// in a row or an alarm: a photo, a voice recording, or a file, which
-/// goes by its name ([Note.wordlessName]).
-enum Wordless { photo, voiceRecording, file }
+/// goes by its name ([Note.wordlessName]); a list without a Name and
+/// any of them by the list it is (#309).
+enum Wordless { photo, voiceRecording, file, checklist, shoppingList }
 
 /// The largest file that can be attached: the most a bundle, a Backup and
 /// the local network carry of one (ADR 0003, 0047).
@@ -533,6 +536,11 @@ class Note {
   /// (ADR 0035); none in a text this version may not change.
   final List<ShownBox> boxes;
 
+  /// The list its `kind` names ([parseListKind]), [ChecklistKeys.checklist]
+  /// or [ShoppingKeys.shopping] and any other an app may write, or null:
+  /// what a list without a Name is titled as ([wordless], #309).
+  final String? listKind;
+
   const Note({
     required this.id,
     required this.text,
@@ -559,6 +567,7 @@ class Note {
     this.removedAttachments = const [],
     this.removedAttachmentTexts = const [],
     this.boxes = const [],
+    this.listKind,
   });
 
   /// When the Note was captured.
@@ -602,7 +611,8 @@ class Note {
   /// What the Note is titled as while its text is blank, removed photos,
   /// recordings and files whose texts stay included: a photo when it has
   /// one; else a voice recording when it has one; else a file when it has
-  /// one, by [wordlessName]; a photo otherwise.
+  /// one, by [wordlessName]; else a Checklist or a Shopping List by the
+  /// list it is (#309); a photo otherwise.
   Wordless get wordless {
     if (photos.isNotEmpty || removedPhotos.isNotEmpty) return Wordless.photo;
     if (recordings.isNotEmpty || removedRecordings.isNotEmpty) {
@@ -611,7 +621,11 @@ class Note {
     if (attachments.isNotEmpty || removedAttachments.isNotEmpty) {
       return Wordless.file;
     }
-    return Wordless.photo;
+    return switch (listKind) {
+      ChecklistKeys.checklist => Wordless.checklist,
+      ShoppingKeys.shopping => Wordless.shoppingList,
+      _ => Wordless.photo,
+    };
   }
 
   /// The name a Note titled [Wordless.file] goes by (#267): its first
@@ -1846,6 +1860,7 @@ class Notes {
           if (_removedText(fields, NoteKeys.fileText(file.hash))) file.hash,
       ],
       boxes: _boxes(id, text, fields),
+      listKind: parseListKind(fields[ChecklistKeys.kind])?.list,
     );
   }
 

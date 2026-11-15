@@ -300,8 +300,9 @@ fn opening_and_leaving_a_note_of_a_kind_writes_nothing() -> TestResult {
 #[test]
 fn the_kind_badge_changes_the_kind_the_lines_carried_over() -> TestResult {
     let (store, elsewhere) = store()?;
+    // Under a heading, which stays its name (#309).
     let id = Notes::new(&store)
-        .capture("Packing\nPassport\nTicket", None, None)?
+        .capture("# Packing\nPassport\nTicket", None, None)?
         .id;
     let wall = |at: DateTime<Utc>| at.naive_utc();
     let mut harness = dialog(&store, &elsewhere, &id);

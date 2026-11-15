@@ -255,6 +255,43 @@ fn from_a_formatted_text_the_marks_of_items_and_quotes_go() -> TestResult {
 }
 
 #[test]
+fn typed_text_becomes_lines_unless_its_first_line_looks_like_a_heading() -> TestResult {
+    let clock = Clock::new()?;
+    let ann = clock.device(1, "Ann")?;
+    let typed = |text: &str, format: &str| -> Made<String> {
+        let id = Notes::new(&ann).capture_as(text, format, None, None)?.id;
+        ShoppingLists::new(&ann).make_from_text(&id)?;
+        Ok(id)
+    };
+    let name =
+        |note: &str| -> Made<String> { Ok(Notes::new(&ann).by_id(note)?.ok_or("the Note")?.text) };
+    let note = typed("Milk\n  Eggs\n\n✓ Bread\nTea", text_format::PLAIN)?;
+    assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Tea", "~Bread"]);
+    assert_eq!(name(&note)?, "");
+    assert!(
+        !Notes::new(&ann)
+            .by_id(&note)?
+            .ok_or("the Note")?
+            .is_unsorted()
+    );
+    assert!(ShoppingLists::new(&ann).is_shopping_list(&note)?);
+    let weekly = typed("## Weekly\n- Milk", text_format::MARKDOWN)?;
+    assert_eq!(name(&weekly)?, "Weekly");
+    assert_eq!(shown(&ann, &weekly)?, ["Milk"]);
+    let shop = typed("Shopping:\nMilk\nEggs", text_format::PLAIN)?;
+    assert_eq!(name(&shop)?, "Shopping:");
+    assert_eq!(shown(&ann, &shop)?, ["Milk", "Eggs"]);
+    let blank = typed("  \nMilk", text_format::PLAIN)?;
+    assert_eq!(name(&blank)?, "");
+    assert_eq!(shown(&ann, &blank)?, ["Milk"]);
+    // The name typed for a new list stays its Name.
+    let named = shopping(&ann, "Groceries", None)?;
+    assert_eq!(name(&named)?, "Groceries");
+    assert!(shown(&ann, &named)?.is_empty());
+    Ok(())
+}
+
+#[test]
 fn a_line_came_back_on_the_day_its_check_runs_out() -> TestResult {
     let clock = Clock::new()?;
     let ann = clock.device(1, "Ann")?;

@@ -17,13 +17,25 @@ String noteText(AppLocalizations t, Note note) => note.text.trim().isEmpty
 
 /// "Photo" or "Voice recording" for a Note without words; for one of
 /// files by the [name] of its first file (#267, [Note.wordlessName]), or
-/// the word for an Attachment when it has none.
+/// the word for an Attachment when it has none; "Checklist" or "Shopping
+/// List" for a list without a Name (#309).
 String wordlessTitle(AppLocalizations t, Wordless wordless, String name) =>
     switch (wordless) {
       Wordless.photo => t.photo,
       Wordless.voiceRecording => t.voiceRecording,
       Wordless.file => name.isEmpty ? t.attachment : name,
+      Wordless.checklist => t.checklistHeading,
+      Wordless.shoppingList => t.shoppingHeading,
     };
+
+/// What a Note of the kind [kind] shows where its name would be while it
+/// has none (#309): "Checklist" or "Shopping List" for a list; null for
+/// any other kind, which shows nothing there.
+String? untitledList(AppLocalizations t, NoteKind kind) => switch (kind) {
+  NoteKind.checklist => t.checklistHeading,
+  NoteKind.shoppingList => t.shoppingHeading,
+  _ => null,
+};
 
 /// [names] as a sentence lists them: "Bob", "Bob and Carol", "Bob, Carol
 /// and Dave".

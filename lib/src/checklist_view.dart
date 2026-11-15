@@ -841,12 +841,12 @@ class _RemovedLinesState extends State<RemovedLines> {
   }
 }
 
-/// Makes the Note [noteId] a Checklist where this Device may; whether it
-/// did.
+/// Makes the typed text of the Note [noteId] a Checklist where this
+/// Device may (#309, [Checklists.makeFromText]); whether it did.
 bool makeChecklist(Notes notes, String noteId) {
   final lists = Checklists(notes.store);
   if (!lists.mayMake(noteId)) return false;
-  lists.make(noteId);
+  lists.makeFromText(noteId);
   return true;
 }
 

@@ -169,10 +169,12 @@
 <box-more>
 <p>
   A Checklist is a Note whose Lines are checked off. <strong>Make it a Checklist</strong> is in the
-  ⋮ of the Note's card, and the kind badge in the Note's editor offers it. The Note's first line
-  stays its text, as its name; every other line that is not blank becomes a Line. A line that starts
-  with a space or a tab goes under the Line above, and one that starts with "✓ " is checked. A Note
-  made a Checklist leaves Unsorted.
+  ⋮ of the Note's card, and the kind badge in the Note's editor offers it. Every line that is not
+  blank becomes a Line. Only a first line that looks like a heading stays the name: a Markdown
+  heading such as "# Packing", without its "#", or a line ending in ":", such as "Packing:".
+  Otherwise the list has no name until one is typed into its name field, and its card shows
+  "Checklist" in its place. A line that starts with a space or a tab goes under the Line above, and
+  one that starts with "✓ " is checked. A Note made a Checklist leaves Unsorted.
 </p>
 <ul>
   <li>In the detailed view every Line has its checkbox; a checked Line is struck through in place. The compact view shows "3 of 5 open".</li>
@@ -276,8 +278,9 @@
 <p>
   A Shopping List is a Note whose Lines come back a while after they are checked, such as the weekly
   shopping. <strong>Make it a Shopping List</strong> is in the ⋮ of the Note's card, and the kind
-  badge in the Note's editor offers it. As for a Checklist, the first line stays the name and every
-  other line becomes a Line; Shopping Lists have no groups, and a line marked "✓ " is struck.
+  badge in the Note's editor offers it. As for a Checklist, every line becomes a Line, and only a
+  first line that looks like a heading stays the name; without one the card shows "Shopping List".
+  Shopping Lists have no groups, and a line marked "✓ " is struck.
 </p>
 <ul>
   <li>Checking a Line strikes it through and moves it to the end, showing the day it comes back, such as "back Sat, Oct 31". At the start of that day it is open again, in its place.</li>

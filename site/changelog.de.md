@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.6.1]
 
+### Geändert
+
+- Getippter Text, der zur Checkliste oder Einkaufsliste wird, behält jede Zeile als Zeile der Liste, auch seine erste; nur eine erste Zeile, die wie eine Überschrift aussieht, eine Markdown-Überschrift oder eine Zeile, die mit „:“ endet, wird der Name der Liste, und eine Liste ohne Namen zeigt „Checkliste“ oder „Einkaufsliste“, bis einer getippt wird. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))
+
 ### Behoben
 
 - Auf dem Desktop erreichen Ausschneiden, Kopieren und Einfügen im Rechtsklick-Menü eines Textfelds und im Menü Bearbeiten die Zwischenablage des Systems, auch im eigenen Fenster einer Notiz, wie Strg+X, Strg+C und Strg+V. ([obf-1012](https://github.com/paxel/oldbrainfix/issues/319))

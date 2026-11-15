@@ -400,9 +400,9 @@ void main() {
     });
 
     testWidgets('a plain Note offers every kind as radio buttons, its own '
-        'marked; Checklist makes it one at once, its first line the name, '
-        'the rest its Lines', (tester) async {
-      final id = notes.capture('Trip\nPassport\nTickets').id;
+        'marked; Checklist makes it one at once, its first line, ending in '
+        '":", the name, the rest its Lines', (tester) async {
+      final id = notes.capture('Trip:\nPassport\nTickets').id;
       await edit(tester, id);
       // The badge replaces the buttons at the bottom.
       expect(key('checklist-make'), findsNothing);
@@ -428,7 +428,7 @@ void main() {
       expect(key('note-text'), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'Trip',
+        'Trip:',
       );
       expect(
         [for (final line in Checklists(store).byNote(id)!.lines) line.text],

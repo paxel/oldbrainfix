@@ -150,13 +150,16 @@ impl Importance {
 
 /// What a Note without words is titled as where only its words fit, as
 /// in a row or an alarm: a photo, a voice recording, or a file, which
-/// goes by its name ([`Note::wordless_name`]).
+/// goes by its name ([`Note::wordless_name`]); a list without a Name and
+/// any of them by the list it is (#309).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Wordless {
     #[default]
     Photo,
     VoiceRecording,
     File,
+    Checklist,
+    ShoppingList,
 }
 
 impl Wordless {
@@ -166,6 +169,8 @@ impl Wordless {
             Wordless::Photo => "photo",
             Wordless::VoiceRecording => "voiceRecording",
             Wordless::File => "file",
+            Wordless::Checklist => "checklist",
+            Wordless::ShoppingList => "shoppingList",
         }
     }
 }
@@ -353,6 +358,11 @@ pub struct Note {
     /// The boxes of `text` as they show now, in the order they come (ADR
     /// 0035); none in a text this version may not change.
     pub boxes: Vec<ShownBox>,
+    /// The list its `kind` names ([`crate::checklists::parse_list_kind`]),
+    /// `checklist` or `shopping` and any other an app may write, or
+    /// `None`: what a list without a Name is titled as
+    /// ([`Note::wordless`], #309).
+    pub list_kind: Option<String>,
 }
 
 impl Note {
@@ -409,8 +419,8 @@ impl Note {
     /// What the Note is titled as while its text is blank, removed
     /// photos, recordings and files whose texts stay included: a photo
     /// when it has one; else a voice recording when it has one; else a
-    /// file when it has one, by [`Note::wordless_name`]; a photo
-    /// otherwise.
+    /// file when it has one, by [`Note::wordless_name`]; else a Checklist
+    /// or a Shopping List by the list it is (#309); a photo otherwise.
     pub fn wordless(&self) -> Wordless {
         if !(self.photos.is_empty() && self.removed_photos.is_empty()) {
             Wordless::Photo
@@ -419,7 +429,11 @@ impl Note {
         } else if !(self.attachments.is_empty() && self.removed_attachments.is_empty()) {
             Wordless::File
         } else {
-            Wordless::Photo
+            match self.list_kind.as_deref() {
+                Some(crate::checklists::keys::CHECKLIST) => Wordless::Checklist,
+                Some(crate::shopping_lists::keys::SHOPPING) => Wordless::ShoppingList,
+                _ => Wordless::Photo,
+            }
         }
     }
 
@@ -1889,6 +1903,10 @@ impl<'a> Notes<'a> {
             removed_attachments,
             removed_attachment_texts,
             boxes,
+            list_kind: crate::checklists::parse_list_kind(
+                fields.get(crate::checklists::keys::KIND),
+            )
+            .map(|(list, _)| list.to_string()),
         }))
     }
 

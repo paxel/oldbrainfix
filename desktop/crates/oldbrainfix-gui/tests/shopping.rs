@@ -288,19 +288,23 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
     assert!(!shows(&harness, "Shopping List"));
     click(&mut harness, "Kind: Plain Note")?;
     pick(&mut harness, "Shopping List")?;
-    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
+    // Every line a Line, the first one too (#309).
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Weekly", "Milk", "Bread", "Apples"]
+    );
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
-    assert_eq!(now.text, "Weekly");
-    // The name holds the title now, so leaving it writes nothing old
-    // (#188).
+    assert_eq!(now.text, "");
+    // The name is empty, to be typed later, so leaving it writes nothing
+    // old (#188).
     assert_eq!(
         harness
             .get_by_role_and_label(Role::TextInput, "Name")
             .value()
-            .as_deref(),
-        Some("Weekly")
+            .unwrap_or_default(),
+        ""
     );
     assert!(shows(&harness, "Shopping List"));
     assert!(!shows(&harness, "Make it a Shopping List"));
@@ -874,8 +878,13 @@ fn the_cards_menu_makes_a_shopping_list_and_turns_it_back() -> TestResult {
     click(&mut harness, "More: Weekly")?;
     assert!(shows(&harness, "Make it a Checklist"));
     click(&mut harness, "Make it a Shopping List")?;
-    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
-    click(&mut harness, "More: Weekly")?;
+    // Every line a Line (#309): the list has no name, and its card shows
+    // its kind instead.
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Weekly", "Milk", "Bread", "Apples"]
+    );
+    click(&mut harness, "More: Shopping List")?;
     assert!(!shows(&harness, "Make it a Shopping List"));
     assert!(!shows(&harness, "Make it a Checklist"));
     assert!(!shows(&harness, "Uncheck all"));

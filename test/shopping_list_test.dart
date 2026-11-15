@@ -195,10 +195,18 @@ void main() {
       expect(key('note-to-plain'), findsNothing);
       await tap(tester, key('note-make-shopping'));
 
-      expect(notes.byId(note)!.text, 'Shop');
-      expect(shown(note), ['Milk', 'Eggs']);
+      // Every line a Line (#309): no name, and its card says what it is.
+      expect(notes.byId(note)!.text, '');
+      expect(shown(note), ['Shop', 'Milk', 'Eggs']);
+      expect(
+        find.descendant(
+          of: key('card-name'),
+          matching: find.text('Shopping List'),
+        ),
+        findsOneWidget,
+      );
       expect(notes.unsorted(), isEmpty);
-      for (final text in ['Milk', 'Eggs']) {
+      for (final text in ['Shop', 'Milk', 'Eggs']) {
         expect(key('checklist-check-${idOf(note, text)}'), findsOneWidget);
       }
       expect(lineOf(note, 'Milk').reappear, Reappear.unset);
@@ -315,17 +323,36 @@ void main() {
         'one; the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
-      await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
+      // Under a line ending in ":", which stays its name (#309).
+      await tester.enterText(find.byType(TextField).first, 'Shop:\nMilk\nEggs');
       await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('shopping'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'Shop',
+        'Shop:',
       );
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(notes.byId(note)!.text, 'Shop');
+      expect(notes.byId(note)!.text, 'Shop:');
+      expect(shown(note), ['Milk', 'Eggs']);
+    });
+
+    testWidgets('Shopping List in the kind badge makes typed lines without '
+        'a heading every one a Line, the name left empty, also after leaving '
+        '(#309)', (tester) async {
+      final note = notes.capture('Milk').id;
+      await openEditor(tester, 'Milk');
+      await tester.enterText(find.byType(TextField).first, 'Milk\nEggs');
+      await pickKind(tester, NoteKind.shoppingList);
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        '',
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(notes.byId(note)!.text, '');
       expect(shown(note), ['Milk', 'Eggs']);
     });
 
@@ -396,8 +423,9 @@ void main() {
     testWidgets('a new list starts with one empty Line, the cursor in it; '
         'the Lines stay in the order typed, one checked in its row until the '
         'editor is opened again, then below the open ones', (tester) async {
-      final note = notes.capture('Trip').id;
-      await openEditor(tester, 'Trip');
+      // A heading alone stays its name (#309).
+      final note = notes.capture('Trip:').id;
+      await openEditor(tester, 'Trip:');
       await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), isEmpty);
       expect(cursor(tester), ('', 0));
@@ -427,7 +455,7 @@ void main() {
       await leave(tester);
       final tea = idOf(note, 'Tea');
       expect(shown(note), ['Tea', 'Eggs', 'Bread', '[x] Milk']);
-      await reopen(tester, 'Trip');
+      await reopen(tester, 'Trip:');
       expect(inOrder(tester, [tea, eggs, bread, milk]), isTrue);
     });
 

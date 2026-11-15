@@ -8597,13 +8597,13 @@ impl App {
                 if !lists.may_make(note)? {
                     return Ok(());
                 }
-                lists.make(note)?;
+                lists.make_from_text(note)?;
             }
             Kind::ShoppingList => {
                 if !shopping.may_make(note)? {
                     return Ok(());
                 }
-                shopping.make(note)?;
+                shopping.make_from_text(note)?;
             }
             Kind::Plain => {
                 if lists.is_checklist(note)? {
@@ -20773,7 +20773,12 @@ fn kinded_text(
         // and links are found.
         let named = note_kinds::name(whole).len();
         let mut spots = Spots::default();
-        if named > 0 {
+        if note_kinds::name(whole).trim().is_empty() {
+            // A list without a name by its kind (#309).
+            if let Some(kind) = l10n::untitled_list(&t, note) {
+                ui.label(RichText::new(kind).size(NAME_SIZE).color(text));
+            }
+        } else if named > 0 {
             let heading = (Some(NAME_SIZE), text);
             let label = read_text::shown(ui, |ui| {
                 text_marks_view::formatted_label(ui, look, (0, named), heading, false)
@@ -21116,13 +21121,16 @@ fn card_text(ui: &mut Ui, (text, format, look): (&str, &str, &BoxLook), marks: &
 fn card_kinded_text(
     ui: &mut Ui,
     (text, format, look): (&str, &str, &BoxLook),
-    unfolded: bool,
+    (unfolded, untitled): (bool, Option<String>),
     marks: &mut Spots,
 ) -> Option<egui::Rect> {
     let colour = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let named = note_kinds::name(text).len();
-    if named > 0 {
+    if let Some(kind) = untitled.filter(|_| note_kinds::name(text).trim().is_empty()) {
+        // A list without a name by its kind (#309).
+        ui.label(RichText::new(kind).size(20.0).color(colour));
+    } else if named > 0 {
         let heading = (Some(20.0), colour);
         let label =
             text_marks_view::formatted_label(ui, (text, format, look), (0, named), heading, false);
@@ -21324,7 +21332,9 @@ fn note_card(
                         // Its name as its title, its description folded
                         // under it (#188), its Lines right under them.
                         let text = (part.text, part.format, look.boxes.look(part.id));
-                        description_rect = card_kinded_text(ui, text, unfolded, &mut marks);
+                        let untitled = l10n::untitled_list(t, note);
+                        description_rect =
+                            card_kinded_text(ui, text, (unfolded, untitled), &mut marks);
                         if let Some(lines) = &lines {
                             // A Shopping List's struck Lines fold under its
                             // open ones (#189).
@@ -21413,7 +21423,12 @@ fn note_card(
                 // Its name, then how many Lines are open, or the Tally's
                 // totals today, or the Session's next run and week (#191).
                 let named = note_kinds::name(&note.text).len();
-                if named > 0 {
+                let untitled = l10n::untitled_list(t, note)
+                    .filter(|_| note_kinds::name(&note.text).trim().is_empty());
+                if let Some(kind) = untitled {
+                    // A list without a name by its kind (#309).
+                    ui.label(RichText::new(kind).size(20.0).color(text));
+                } else if named > 0 {
                     marks = text_marks_view::formatted_label(
                         ui,
                         text_of,

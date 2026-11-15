@@ -178,3 +178,7 @@ Considered Options:
 
 - Struck Lines moved too (rejected: they show in the order of their checks, so a new key would only say where the Line comes back, which nobody sees while it is struck).
 - A move writing the keys of the Lines around it as well (rejected: a Member may not write another person's `order`, and one key between two always fits).
+
+## Typed text made a list (#309)
+
+Amended by #309 (Q714 (b)): the first line of a typed text was often its first item, lost to the name. Typed text made a Checklist or a Shopping List, on its kind badge, in the ⋮ of its card, in the Note menu or by the AI port's `make_list`, now becomes a Line on every line not blank, unless its first line looks like a heading: a Markdown heading of one to six `#` and a space or a tab before its words, in a plain text too, which becomes the name without its marks, or a line ending in ":", which becomes the name as it is, both trimmed. Without one the list has no name: the Note's text is written empty, and its card, its rows and the Pack's tree show its kind, "Checklist" or "Shopping List", where the name would be, until one is typed (`Note.wordless`, `note.wordless()`: after a photo, a recording or a file, a list by the `kind` it holds). A new list made from the name typed for it keeps that name, and Lines as before (`Checklists.make`, `make`; the typed text: `makeFromText`, `make_from_text`, `listOfText`, `list_of_text`, `headingName`, `heading_name`). No format changed: the same fields are written, an empty text among them.

@@ -109,6 +109,46 @@ void main() {
       expect(shown(ann, shopping(ann, 'Shop\n- Milk')), ['- Milk']);
     });
 
+    group('from typed text (#309)', () {
+      String typed(String text, {String format = TextFormats.plain}) {
+        final id = Notes(ann).capture(text, format: format).id;
+        ShoppingLists(ann).makeFromText(id);
+        return id;
+      }
+
+      String name(String note) => Notes(ann).byId(note)!.text;
+
+      test('every line becomes a Line, and the list has no Name', () {
+        final note = typed('Milk\n  Eggs\n\n✓ Bread\nTea');
+        expect(shown(ann, note), ['Milk', 'Eggs', 'Tea', '~Bread']);
+        expect(name(note), '');
+        expect(Notes(ann).byId(note)!.isUnsorted, isFalse);
+        expect(ShoppingLists(ann).isShoppingList(note), isTrue);
+      });
+
+      test('a Markdown heading is the Name without its marks, a line '
+          'ending in ":" as it is', () {
+        final weekly = typed('## Weekly\n- Milk', format: TextFormats.markdown);
+        expect(name(weekly), 'Weekly');
+        expect(shown(ann, weekly), ['Milk']);
+        final shop = typed('Shopping:\nMilk\nEggs');
+        expect(name(shop), 'Shopping:');
+        expect(shown(ann, shop), ['Milk', 'Eggs']);
+      });
+
+      test('a blank first line leaves the Name empty', () {
+        final note = typed('  \nMilk');
+        expect(name(note), '');
+        expect(shown(ann, note), ['Milk']);
+      });
+
+      test('the name typed for a new list stays its Name', () {
+        final note = shopping(ann, 'Groceries');
+        expect(name(note), 'Groceries');
+        expect(shown(ann, note), isEmpty);
+      });
+    });
+
     test('a Note is at most one of a Tally, a Checklist and a Shopping '
         'List', () {
       final lists = ShoppingLists(ann);

@@ -13,8 +13,8 @@ use std::collections::{BTreeMap, HashMap};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
 use crate::checklists::{
-    Checklists, DeletedLine, NewLine, deleted_lines_of, keys as checklist_keys, line_text, order,
-    parse_line_in, parse_list_kind, split_lines, write_line,
+    Checklists, DeletedLine, NewLine, deleted_lines_of, keys as checklist_keys, line_text,
+    list_of_text, named_list, order, parse_list_kind, split_lines, write_line,
 };
 use crate::entry::{Entry, dart_iso, parse_time};
 use crate::notes::{Note, Notes, keys as note_keys};
@@ -811,26 +811,39 @@ impl<'a> ShoppingLists<'a> {
             && self.store.may_change(note_id)?)
     }
 
-    /// Makes the Note `note_id` a Shopping List: its first line stays its
-    /// text, every other line not blank becomes a Line, indented or not,
-    /// struck when it starts with "✓ ", in a formatted text without the
-    /// mark of an item or a quote ([`parse_line_in`]). Every Line comes in
-    /// at one moment, so they show in the order of the text. Takes it out of Unsorted, as
-    /// a Checklist does. The text keeps its format.
+    /// Makes the Note `note_id` a Shopping List named by its first line,
+    /// as a new list is from the name typed for it: its first line stays
+    /// its text, every other line not blank becomes a Line, indented or
+    /// not, struck when it starts with "✓ ", in a formatted text without
+    /// the mark of an item or a quote ([`crate::checklists::parse_line_in`]). Every Line comes
+    /// in at one moment, so they show in the order of the text. Takes it out of Unsorted, as
+    /// a Checklist does. The text keeps its format. Typed text is made a
+    /// Shopping List by [`Self::make_from_text`].
     pub fn make(&self, note_id: &str) -> Result<()> {
+        self.make_by(note_id, false)
+    }
+
+    /// Makes the typed text of the Note `note_id` a Shopping List (#309),
+    /// as [`Self::make`] does but with every line a Line unless the first
+    /// looks like a heading ([`list_of_text`]): only then is it the Name,
+    /// else the list has none.
+    pub fn make_from_text(&self, note_id: &str) -> Result<()> {
+        self.make_by(note_id, true)
+    }
+
+    fn make_by(&self, note_id: &str, from_text: bool) -> Result<()> {
         let refused = || Error::Invalid(format!("{note_id} may not be made a Shopping List here"));
         let note = Notes::new(self.store).by_id(note_id)?.ok_or_else(refused)?;
         if !self.may_make(note_id)? {
             return Err(refused());
         }
-        let rows = split_lines(&note.text);
-        let title = dart_trim(rows.first().map(String::as_str).unwrap_or(""));
         let markdown = note.text_format == text_format::MARKDOWN;
-        let parsed: Vec<_> = rows
-            .iter()
-            .skip(1)
-            .filter_map(|r| parse_line_in(r, markdown))
-            .collect();
+        let (title, parsed) = if from_text {
+            list_of_text(&note.text, markdown)
+        } else {
+            named_list(&note.text, markdown)
+        };
+        let title = title.as_str();
         let making = self.store.new_id()?;
         self.store.batch(|| {
             let s = self.store;

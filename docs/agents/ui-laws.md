@@ -356,7 +356,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A Note is its kind** (#188): a Plain Note, a Checklist, a Shopping
   List, a Tally or a Session (#191). A Plain Note shows as its text. Every other kind's
   page, in the Note editor and in the detailed view, starts with its
-  **name**, the text's first line, as a heading, its **description**,
+  **name**, the text's first line, as a heading (a list without one,
+  made of typed text whose first line was no heading, shows its kind
+  there, "Checklist" or "Shopping List", #309), its **description**,
   the rest of the text, small right under it and folded to one line
   until a tap unfolds it (on a card kept open per Note on this Device,
   #189), then **the kind's content** (the Lines; of a Tally its setup in

@@ -769,12 +769,12 @@ class _ShoppingSectionState extends State<ShoppingSection>
   }
 }
 
-/// Makes the Note [noteId] a Shopping List where this Device may; whether
-/// it did.
+/// Makes the typed text of the Note [noteId] a Shopping List where this
+/// Device may (#309, [ShoppingLists.makeFromText]); whether it did.
 bool makeShoppingList(Notes notes, String noteId) {
   final lists = ShoppingLists(notes.store);
   if (!lists.mayMake(noteId)) return false;
-  lists.make(noteId);
+  lists.makeFromText(noteId);
   return true;
 }
 
