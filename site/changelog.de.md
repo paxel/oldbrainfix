@@ -8,6 +8,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 - Auf dem Desktop erreichen Ausschneiden, Kopieren und Einfügen im Rechtsklick-Menü eines Textfelds und im Menü Bearbeiten die Zwischenablage des Systems, auch im eigenen Fenster einer Notiz, wie Strg+X, Strg+C und Strg+V. ([obf-1012](https://github.com/paxel/oldbrainfix/issues/319))
 - Auf dem Desktop öffnet ein Klick auf eine Strichliste der Auswahl einer Einheit nur ihr Eintragsformular, in der Agenda wie auf der Karte der Einheit und in ihrer Notiz. Die Notiz der Strichliste öffnet sich nicht mehr mit, und nach dem Speichern zeigt sich wieder die Agenda oder die Einheit. ([obf-1013](https://github.com/paxel/oldbrainfix/issues/320))
+- Auf dem Handy setzt ein Tippen in den Text des Notiz-Editors und von „Zur Notiz hinzufügen“ den Cursor dorthin, wo der Finger ist, statt an die nächste Wortgrenze. ([obf-1005](https://github.com/paxel/oldbrainfix/issues/312))
 
 ## [0.6.0] - 2026-11-14
 

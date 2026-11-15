@@ -1199,9 +1199,10 @@ replace a law of Both apps where they say so. A desktop law marked
   system's text field back.
 - The top row is the whole text in the system's text field, so the
   keyboard's suggestions, autocorrect, swipe typing and voice input
-  work. A tap puts the cursor at the nearest word boundary; there is no
-  magnifier and no dragging the cursor. A long press selects as usual,
-  with Copy, Cut and Delete in the system's menu.
+  work. A tap puts the cursor where the finger is (#312, Q717); there is
+  no magnifier and no dragging the cursor. A long press selects a word
+  as usual, its handles drag its ends, with Copy, Cut and Delete in the
+  system's menu.
 - The bottom row shows the cursor's line as a text field does: from
   its start, the cursor right after the text before it; a line wider
   than the row scrolls sideways only as far as keeps the cursor in

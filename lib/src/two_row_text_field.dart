@@ -55,30 +55,6 @@ int _lineAt(String text, int offset) {
   return line;
 }
 
-final _wordCharacter = RegExp(r'^[\p{L}\p{N}\p{M}]', unicode: true);
-
-/// The word boundary in [text] nearest to [offset]: the start or end of a
-/// word, the start or end of the text. A tie goes to the earlier one.
-int wordEdgeNear(String text, int offset) {
-  if (offset <= 0 || offset >= text.length) return offset.clamp(0, text.length);
-  var before = 0;
-  var at = 0;
-  bool? previousWord;
-  for (final grapheme in text.characters) {
-    final word = _wordCharacter.hasMatch(grapheme);
-    if (previousWord != null && word != previousWord) {
-      if (at == offset) return offset;
-      if (at > offset) {
-        return offset - before <= at - offset ? before : at;
-      }
-      before = at;
-    }
-    previousWord = word;
-    at += grapheme.length;
-  }
-  return offset - before <= text.length - offset ? before : text.length;
-}
-
 /// What an edit of a formatted text leaves of its tables, each drawn as
 /// one block (#152): [value] is what the field holds now; [asked], when
 /// the edit deletes a table with words in its cells, what it holds once
@@ -294,8 +270,8 @@ typedef FieldAction = ({
 
 /// The text field of the Note editor and of Amend on the phone: the whole
 /// text on top, as a system text field without magnifier and without
-/// dragging the cursor, whose tap puts the cursor at the nearest word
-/// boundary, and, while the keyboard is open, the cursor's line directly
+/// dragging the cursor, whose tap puts the cursor where the finger is,
+/// and, while the keyboard is open, the cursor's line directly
 /// above it, as a text field shows it, with ◀ and ▶ stepping the cursor one
 /// character at a time (UI laws, "Text editor"). [twoRows] false gives the
 /// plain system text field.
@@ -944,17 +920,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
   }
 
-  /// A tap in the top row: the cursor went where the finger was; it goes
-  /// on to the nearest word boundary.
+  /// A tap in the top row: the cursor went where the finger was (#312),
+  /// and selecting in the bottom row ends.
   void _tapped() {
     if (_selecting) setState(() => _selecting = false);
-    final value = widget.controller.value;
-    final selection = value.selection;
-    if (!selection.isValid || !selection.isCollapsed) return;
-    final edge = wordEdgeNear(value.text, selection.baseOffset);
-    if (edge != selection.baseOffset) {
-      _select(TextSelection.collapsed(offset: edge));
-    }
   }
 
   bool get _inserts => widget.boxes && !widget.readOnly && !_code;
@@ -1692,7 +1661,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 }
 
 /// The top row's gestures: those of a text field, but a drag moves no
-/// cursor, and a tap goes on to the nearest word boundary.
+/// cursor.
 class _TopRowGestures extends TextSelectionGestureDetectorBuilder {
   final _TwoRowTextFieldState _field;
 
