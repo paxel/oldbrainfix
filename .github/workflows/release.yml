@@ -38,7 +38,9 @@
 #                    refused when signed with the debug key; the bundle
 #                    goes to Google Play's internal track with What's new
 #                    from docs/release-notes-<version>.md
-#   build-linux    — Rust desktop: tar.gz, .deb and AppImage per arch
+#   build-linux    — Rust desktop: tar.gz, .deb and AppImage per arch, built
+#                    on Ubuntu 22.04 and refused when the binary needs a
+#                    newer glibc than its 2.35
 #   build-flatpak  — the Flatpak per arch, built from source; the built
 #                    repository past flatpak-builder-lint (x86_64), a gate
 #                    before the bundle is uploaded
@@ -368,10 +370,10 @@ jobs:
       - name: Site — unit tests
         if: env.TESTED_BEFORE_MERGE != 'true'
         run: node --test "tool/site/*.test.js"
-      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing, iPhone icon, tested tree and Sonar gate tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing, iPhone icon, tested tree, Sonar gate and glibc ceiling tools — unit tests
         if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon test_tested_tree test_sonar_gate
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon test_tested_tree test_sonar_gate test_glibc_ceiling
       # The Flatpak's files, as CI checks them: cargo-sources.json current,
       # and the metainfo, desktop file and manifest past Flathub's linters
       # (without the network: the screenshots exist once the Release does).
@@ -631,9 +633,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: ubuntu-latest
+          # The tarball, the .deb and the AppImage use the system's glibc,
+          # so they run on the runner's glibc and newer only: Ubuntu 22.04
+          # has 2.35 (ubuntu-latest is Ubuntu 26.04 with 2.43, #332). The
+          # 2.35 is also in the check below, packaging/linux/pack.sh's
+          # Depends and the install page.
+          - runner: ubuntu-22.04
             arch: x86_64
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-22.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
@@ -644,6 +651,9 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: desktop
+          # Per runner image: C objects compiled against a newer glibc's
+          # headers do not link against 2.35.
+          key: ${{ matrix.runner }}
       - name: Build dependencies
         run: |
           sudo apt-get update
@@ -651,6 +661,8 @@ jobs:
       - name: Build
         working-directory: desktop
         run: cargo build --release --locked --bin oldbrainfix
+      - name: The binary needs glibc 2.35 at most
+        run: python3 tool/glibc_ceiling.py desktop/target/release/oldbrainfix 2.35
       - name: Pack tar.gz, .deb and AppImage
         run: |
           v="${RELEASE_TAG#v}"
