@@ -1,12 +1,12 @@
 //! The Ask panel on the desktop's screen (#267, ADR 0051): AI ▸ Ask…
 //! (Ctrl+K) shows it in the list. A question goes to the provider the
-//! user entered in the Settings, the line under the heading naming it and
-//! that only what the model finds and reads is sent; each answer shows
+//! user entered in the AI settings (#335), the line under the heading
+//! naming it and that only what the model finds and reads is sent; each answer shows
 //! with links to the Notes it came from, which open them, and "Keep as
 //! Note". What the model changed waits as an AI Task for its review. The
 //! answers are gone once the list shows another place.
 //!
-//! The Settings card where the provider is entered is here too: the
+//! The AI settings' card where the provider is entered is here too: the
 //! protocol, the base URL of an OpenAI-compatible provider, the model and
 //! the API key, a local setting of this computer.
 
@@ -79,7 +79,7 @@ pub enum AskAsked {
     OpenNote(String),
     /// Shows the review of the AI Task.
     Review,
-    /// Opens the Settings at the provider's card.
+    /// Opens the AI settings at the provider's card (#335).
     Settings,
 }
 
@@ -351,7 +351,7 @@ pub enum AskSetting {
     Key(String),
 }
 
-/// The provider's card in the Settings: what it is for, the protocol as
+/// The provider's card in the AI settings (#335): what it is for, the protocol as
 /// radio buttons, the base URL of an OpenAI-compatible provider, the
 /// model and the API key, hidden as it is typed, and that the key stays
 /// on this computer; under the base URL why it cannot be asked, when it
@@ -435,6 +435,10 @@ pub fn settings_card(
             changed = Some(AskSetting::Key(fields.key.clone()));
         }
         ui.label(RichText::new(t.ask_key_stays()).small().color(weak));
+        // Here, after the key, "Let the model think" and the models tried
+        // with Ask, with their size and what they need, join the card
+        // (#318), in the words the search of the Settings' row "AI…"
+        // finds (`ai_settings_words` in app.rs).
     });
     changed
 }

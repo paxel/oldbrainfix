@@ -1512,21 +1512,29 @@ replace a law of Both apps where they say so. A desktop law marked
   line shows the gap the Area goes into; let go where it stands or
   away from the Areas, it stays and nothing is written. A card dropped
   on an Area's row files there instead.
-- **The AI menu leads to the AI port** (#279): its main switch "AI
-  (experimental)" (#334) comes first, off by default and also in the
-  Settings; only while it is on are there Ask… (Ctrl+K, #267), the Ask
-  panel and its provider's card, and does the desktop answer the
-  phone's questions. The AI port works either way. Ask…
-  shows the Ask panel, AI port… opens the Settings at the AI port's
-  card, and Review the AI Task shows the review of the AI Task that
-  waits, greyed while none waits or the port is open.
+- **The AI menu leads to every AI setting** (#279, #335): its main
+  switch "AI (experimental)" (#334) comes first, off by default and
+  also at the top of the AI settings; only while it is on are there
+  Ask… (Ctrl+K, #267), the Ask panel and its provider's card, and does
+  the desktop answer the phone's questions. The AI port works either
+  way. Ask… shows the Ask panel, AI settings… opens the page with every
+  AI setting, and Review the AI Task shows the review of the AI Task
+  that waits, greyed while none waits or the port is open.
+- **The AI settings are one page** (#335, Q748): a Page dialog like
+  the Settings, with "AI (experimental)" on top, under it the
+  provider's card only while it is on, then the AI port's card with its
+  token's client config to copy. The Settings keep one row "AI…" in
+  its place, which opens the page with the arrow back to the Settings;
+  the Settings' search finds the row by the words of every setting on
+  the page. The announcement of the open AI port opens the page at the
+  port's card.
 - **The Ask panel is a place in the list** (#267, ADR 0051), reached
   by Ask… and Ctrl+K, which also work while typing and over the Note
   dialog and put the cursor into its question field. Under its heading
   a line names the provider and the model and says that only what the
   model finds and reads is sent, never what is Hidden from AI; while
   the provider cannot be asked, the line says what is missing in the
-  error colour with "Settings…", which opens the Settings at the
+  error colour with "AI settings…", which opens the AI settings at the
   provider's card. Enter or Ask (Ctrl+Enter) asks; while it waits,
   Stop puts the question back into the field. The answers stand under
   the field, the newest first, each with its question, its text as a
@@ -1539,7 +1547,7 @@ replace a law of Both apps where they say so. A desktop law marked
   asked after the earlier answers; Start over drops them, and so does
   showing another place. While an AI Task waits, a line says that its
   changes wait for review with sync, beside Review. The provider's
-  card in the Settings sits after the AI port's: the protocol as
+  card in the AI settings sits before the AI port's: the protocol as
   radio buttons, the base URL only for an OpenAI-compatible provider
   with its error under it, the model, the API key hidden as typed, and
   that the key stays on this computer.
@@ -1577,8 +1585,8 @@ replace a law of Both apps where they say so. A desktop law marked
   from it (Q665). The first field of a dialog takes the
   keyboard as it opens, where it has one (the Routine editor's text, else
   its When line, a Tally's pages, Send feedback, a person's name for me);
-  the Page dialogs of sections (Settings, Profile, People, Backups, Sync,
-  Pair) open without it. Alt+Left rests in that field as in any; Esc and
+  the Page dialogs of sections (Settings, AI settings, Profile, People,
+  Backups, Sync, Pair) open without it. Alt+Left rests in that field as in any; Esc and
   the mouse's back button leave. In the quick note and the
   popup Ctrl+1, Ctrl+2 and Ctrl+3 save with the Nudge buttons' 10 min,
   30 min and 1 h while those show, named in the hint under them; the
@@ -1611,8 +1619,9 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Dialogs
 
-- **The Settings, About and everything under Sync (Sync, Pair a Device,
-  People, Profile, Backups) open as dialogs over the window**, never as
+- **The Settings, the AI settings, About and everything under Sync
+  (Sync, Pair a Device, People, Profile, Backups) open as dialogs over
+  the window**, never as
   views replacing the list, and no button on the main window leads to
   them. A dialog opened from another has a way back to it; the cross,
   Esc and a click beside it close it. While a dialog is open,
@@ -1835,7 +1844,7 @@ replace a law of Both apps where they say so. A desktop law marked
   options' names, in any case, in the app's language; each under its
   card's heading, a card left out when none of its settings match, a
   heading that matches showing its card whole. A card drawn as one
-  piece (the AI port, Quick capture, the speech model, Units, Features)
+  piece (the row "AI…", Quick capture, the speech model, Units, Features)
   is one setting. The intro line goes while a search runs, and a search
   that finds nothing says so in the dialog ("No setting matches “…”."),
   not at the top. ✕ in the field, or emptying it, shows everything

@@ -203,7 +203,7 @@ void main() {
       );
       expect(
         find.text(
-          "Enter the API key under Ask panel in the computer's Settings.",
+          "Enter the API key under Ask panel in the computer's AI settings.",
         ),
         findsOneWidget,
       );
@@ -333,7 +333,7 @@ void main() {
         'The question was not answered.',
         title: 'Not answered',
         cause: "Anthropic refused the computer's API key.",
-        fix: "Check the API key under Ask panel in the computer's Settings.",
+        fix: "Check the API key under Ask panel in the computer's AI settings.",
       );
 
       desk.answer = (_) => const AskReply.failed(AskFailure.busy);

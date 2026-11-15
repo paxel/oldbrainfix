@@ -3,6 +3,8 @@
 //! on screen, under their card's heading, a whole card when its heading
 //! matches, and says so when none does; Ctrl+F puts the cursor into it,
 //! nothing on opening; ✕ and opening the Settings anew show everything.
+//! The row "AI…" is found by the words of every AI setting and opens
+//! the AI settings (#335).
 
 // A test may panic, its helpers too (#229).
 #![allow(clippy::panic)]
@@ -192,5 +194,39 @@ fn the_search_stays_into_about_and_back_and_goes_when_the_settings_open_anew() -
     harness.run();
     assert!(shows(&harness, "Start at login"));
     assert!(shows(&harness, "About Old Brain Fix"));
+    Ok(())
+}
+
+#[test]
+fn a_word_of_any_ai_setting_finds_the_row_that_opens_the_ai_settings() -> TestResult {
+    let mut harness = settings("en")?;
+    harness.state().store().set_ai_on(true)?;
+    let t = *harness.state().t();
+    for (word, there) in [
+        ("key", t.ask_key()),
+        ("port", t.ai_port_open()),
+        ("provider", t.ask_settings_title()),
+        ("docker", t.ai_reach_docker()),
+        ("experimental", t.ai_switch()),
+    ] {
+        search(&mut harness, word);
+        assert!(shows(&harness, t.ai_settings_detail()), "{word}");
+        harness
+            .get_by_role_and_label(Role::Button, t.ai_settings_open())
+            .click();
+        harness.run();
+        assert_eq!(harness.state().page(), Some(Page::AiSettings), "{word}");
+        assert!(shows(&harness, there), "{word}: {there}");
+        // Back, the search still there, for the next word anew.
+        harness.get_by_label("Back to Settings").click();
+        harness.run();
+        assert_eq!(harness.state().page(), Some(Page::Settings));
+        assert!(!shows(&harness, "Start at login"), "{word}");
+        harness.get_by_label("Clear search").click();
+        harness.run();
+    }
+    // A word of none of them leaves the row out.
+    search(&mut harness, "login");
+    assert!(!shows(&harness, t.ai_settings_detail()));
     Ok(())
 }

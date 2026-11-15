@@ -6284,23 +6284,23 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get phoneAskUnreadyFix =>
-      'Richte den Anbieter unter Fragen-Ansicht in den Einstellungen des Computers ein.';
+      'Richte den Anbieter unter Fragen-Ansicht in den KI-Einstellungen des Computers ein.';
 
   @override
   String get phoneAskUnreadyModel =>
-      'Gib unter Fragen-Ansicht in den Einstellungen des Computers ein Modell an.';
+      'Gib unter Fragen-Ansicht in den KI-Einstellungen des Computers ein Modell an.';
 
   @override
   String get phoneAskUnreadyKey =>
-      'Gib unter Fragen-Ansicht in den Einstellungen des Computers den API-Schlüssel ein.';
+      'Gib unter Fragen-Ansicht in den KI-Einstellungen des Computers den API-Schlüssel ein.';
 
   @override
   String get phoneAskUnreadyUrl =>
-      'Gib dem Anbieter unter Fragen-Ansicht in den Einstellungen des Computers eine https://-Adresse; http:// nur auf dem Computer oder im Heimnetz.';
+      'Gib dem Anbieter unter Fragen-Ansicht in den KI-Einstellungen des Computers eine https://-Adresse; http:// nur auf dem Computer oder im Heimnetz.';
 
   @override
   String get phoneAskUnreadyAiOff =>
-      'Schalte KI (experimentell) in den Einstellungen des Computers ein.';
+      'Schalte KI (experimentell) im Menü KI des Computers ein.';
 
   @override
   String get phoneAskSwitch => 'Fragen (experimentell)';
@@ -6372,7 +6372,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get phoneAskKeyFix =>
-      'Prüfe den API-Schlüssel unter Fragen-Ansicht in den Einstellungen des Computers.';
+      'Prüfe den API-Schlüssel unter Fragen-Ansicht in den KI-Einstellungen des Computers.';
 
   @override
   String phoneAskProviderFailed(String provider) {
@@ -6381,7 +6381,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get phoneAskProviderFix =>
-      'Prüfe den Namen des Modells in den Einstellungen des Computers, oder frag später noch einmal.';
+      'Prüfe den Namen des Modells in den KI-Einstellungen des Computers, oder frag später noch einmal.';
 
   @override
   String phoneAskNoReply(String provider) {
@@ -6390,7 +6390,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get phoneAskNoReplyFix =>
-      'Prüfe das Netz des Computers und die Adresse des Anbieters in seinen Einstellungen, dann frag noch einmal.';
+      'Prüfe das Netz des Computers und die Adresse des Anbieters in seinen KI-Einstellungen, dann frag noch einmal.';
 
   @override
   String phoneAskUnreadable(String provider) {
@@ -6399,7 +6399,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get phoneAskUnreadableFix =>
-      'Prüfe, ob die Basis-URL in den Einstellungen des Computers zu einer OpenAI-kompatiblen API führt.';
+      'Prüfe, ob die Basis-URL in den KI-Einstellungen des Computers zu einer OpenAI-kompatiblen API führt.';
 
   @override
   String get phoneAskTooManyRounds =>

@@ -10127,31 +10127,31 @@ abstract class AppLocalizations {
   /// Fix when the computer's provider is not set up, for a reason this version does not know.
   ///
   /// In en, this message translates to:
-  /// **'Set up the provider under Ask panel in the computer\'s Settings.'**
+  /// **'Set up the provider under Ask panel in the computer\'s AI settings.'**
   String get phoneAskUnreadyFix;
 
   /// Fix: the computer's provider has no model.
   ///
   /// In en, this message translates to:
-  /// **'Name a model under Ask panel in the computer\'s Settings.'**
+  /// **'Name a model under Ask panel in the computer\'s AI settings.'**
   String get phoneAskUnreadyModel;
 
   /// Fix: the computer's Anthropic provider has no key.
   ///
   /// In en, this message translates to:
-  /// **'Enter the API key under Ask panel in the computer\'s Settings.'**
+  /// **'Enter the API key under Ask panel in the computer\'s AI settings.'**
   String get phoneAskUnreadyKey;
 
   /// Fix: the computer's provider address may not be asked.
   ///
   /// In en, this message translates to:
-  /// **'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.'**
+  /// **'Give the provider an https:// address under Ask panel in the computer\'s AI settings; http:// only on the computer or the home network.'**
   String get phoneAskUnreadyUrl;
 
   /// Fix: the computer's main switch 'AI (experimental)' is off (#334).
   ///
   /// In en, this message translates to:
-  /// **'Switch on AI (experimental) in the computer\'s Settings.'**
+  /// **'Switch on AI (experimental) in the computer\'s AI menu.'**
   String get phoneAskUnreadyAiOff;
 
   /// The phone's switch for Ask in Settings, Advanced only (#333); off by default. Ask is the phone's Ask page (phoneAskTitle).
@@ -10258,7 +10258,7 @@ abstract class AppLocalizations {
   /// Fix for a refused key.
   ///
   /// In en, this message translates to:
-  /// **'Check the API key under Ask panel in the computer\'s Settings.'**
+  /// **'Check the API key under Ask panel in the computer\'s AI settings.'**
   String get phoneAskKeyFix;
 
   /// Why a question was not answered.
@@ -10270,7 +10270,7 @@ abstract class AppLocalizations {
   /// Fix for an error of the provider.
   ///
   /// In en, this message translates to:
-  /// **'Check the model\'s name in the computer\'s Settings, or ask again later.'**
+  /// **'Check the model\'s name in the computer\'s AI settings, or ask again later.'**
   String get phoneAskProviderFix;
 
   /// Why a question was not answered.
@@ -10282,7 +10282,7 @@ abstract class AppLocalizations {
   /// Fix for no reply from the provider.
   ///
   /// In en, this message translates to:
-  /// **'Check the computer\'s network and the provider\'s address in its Settings, then ask again.'**
+  /// **'Check the computer\'s network and the provider\'s address in its AI settings, then ask again.'**
   String get phoneAskNoReplyFix;
 
   /// Why a question was not answered.
@@ -10294,7 +10294,7 @@ abstract class AppLocalizations {
   /// Fix for an unreadable reply.
   ///
   /// In en, this message translates to:
-  /// **'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.'**
+  /// **'Check that the base URL in the computer\'s AI settings leads to an OpenAI-compatible API.'**
   String get phoneAskUnreadableFix;
 
   /// Why a question was not answered.

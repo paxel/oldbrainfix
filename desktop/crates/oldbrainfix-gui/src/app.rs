@@ -255,6 +255,10 @@ pub enum Selection {
 pub enum Page {
     /// This Device's settings: Edit ▸ Settings… (Ctrl+,).
     Settings,
+    /// Every AI setting on one page (#335): the main switch, the Ask
+    /// panel's provider and the AI port; AI ▸ AI settings…, and "AI…" in
+    /// the Settings.
+    AiSettings,
     /// The version and the source: Help ▸ About, and from the Settings.
     About,
     /// Every third-party component and its licence, reached from About.
@@ -1372,8 +1376,11 @@ enum Action {
     SwitchView(String),
     /// Keeps a fold of a card open, by its setting, or forgets it (#189).
     Fold(String, bool),
-    /// Opens the Settings at the AI port's card: AI ▸ AI port… (#279).
-    OpenAiPort,
+    /// Opens the AI settings (#335), at the card of this section when
+    /// one is named: AI ▸ AI settings… at the top, the Ask panel's
+    /// "AI settings…" at the provider, the AI port's announcement at the
+    /// port.
+    OpenAiSettings(Option<&'static str>),
     /// Shows the Ask panel in the list, the cursor in its question field:
     /// AI ▸ Ask… and Ctrl+K (#267).
     OpenAsk,
@@ -5226,10 +5233,7 @@ impl App {
             }
             AskAsked::OpenNote(id) => self.act(Action::SelectNote(id))?,
             AskAsked::Review => self.act(Action::Ai(AiAction::Review))?,
-            AskAsked::Settings => {
-                self.settings_section = Some((ASK_SECTION.to_string(), 2));
-                self.act(Action::OpenPage(Page::Settings))?;
-            }
+            AskAsked::Settings => self.act(Action::OpenAiSettings(Some(ASK_SECTION)))?,
         }
         Ok(())
     }
@@ -7068,9 +7072,9 @@ impl App {
                     self.store.remove_local_setting(&setting)?;
                 }
             }
-            Action::OpenAiPort => {
-                self.settings_section = Some((AI_PORT_SECTION.to_string(), 2));
-                self.act(Action::OpenPage(Page::Settings))?;
+            Action::OpenAiSettings(section) => {
+                self.act(Action::OpenPage(Page::AiSettings))?;
+                self.settings_section = section.map(|s| (s.to_string(), 2));
             }
             // Not while the AI is switched off (#334), also from a Note
             // window.
@@ -11357,7 +11361,7 @@ impl App {
             let (text, asked) = if self.ai_port.is_some() {
                 (
                     self.t.ai_port_open_banner(),
-                    Action::OpenPage(Page::Settings),
+                    Action::OpenAiSettings(Some(AI_PORT_SECTION)),
                 )
             } else {
                 (self.t.ai_review_banner(), Action::Ai(AiAction::Review))
@@ -12382,9 +12386,9 @@ impl App {
                 menu_entries(ui, [last], actions);
             });
             // The main switch first (#334), then the Ask panel (#267)
-            // only while it is on, the AI port (#279) either way: its card
-            // in the Settings, and the review of the AI Task that waits,
-            // greyed while none does.
+            // only while it is on, every AI setting on one page (#335) and
+            // the review of the AI Task that waits (#279), greyed while
+            // none does.
             ui.menu_button(RichText::new(t.menu_ai()).color(text), |ui| {
                 let mut on = self.view.ai_on;
                 if theme::checkbox(ui, &mut on, RichText::new(t.ai_switch()).color(text)).changed()
@@ -12398,7 +12402,12 @@ impl App {
                     menu_entries(ui, ask, actions);
                 }
                 let items = [
-                    (t.menu_ai_port(), None, true, Action::OpenAiPort),
+                    (
+                        t.menu_ai_settings(),
+                        None,
+                        true,
+                        Action::OpenAiSettings(None),
+                    ),
                     (
                         t.ai_review_title(),
                         None,
@@ -12533,6 +12542,7 @@ impl App {
                 });
                 match page {
                     Page::Settings => self.settings_pane(ui, tones, actions),
+                    Page::AiSettings => self.ai_settings_pane(ui, tones, actions),
                     Page::About => {
                         if about_view::about(ui, &t, tones) {
                             actions.push(Action::PageInto(Page::Licences));
@@ -15808,6 +15818,74 @@ impl App {
         });
     }
 
+    /// The AI settings (#335): the main switch "AI (experimental)", the
+    /// Ask panel's provider under it only while it is on (#334), then the
+    /// AI port, which works either way. Scrolled to the card the section
+    /// asked for names, as the Settings are.
+    fn ai_settings_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let ai_url = self.ai_port.as_ref().map(AiPort::url);
+        let ai_waiting = self.ai_port.is_none() && self.view.ai_task.is_some();
+        let ai_reach = self.store.ai_reach().unwrap_or_default();
+        // Looked for every frame while it matters: Docker started
+        // meanwhile shows at once.
+        let ai_no_bridge = self.ai_port.is_none()
+            && ai_reach == Reach::Docker
+            && cfg!(target_os = "linux")
+            && docker_bridge().is_none();
+        let section = self.settings_section.as_ref().map(|(s, _)| s.clone());
+        self.settings_section = self
+            .settings_section
+            .take()
+            .and_then(|(s, frames)| (frames > 1).then_some((s, frames - 1)));
+        ui.heading(RichText::new(t.ai_settings_title()).color(text));
+        ui.add_space(8.0);
+        egui::ScrollArea::vertical()
+            .id_salt("ai settings")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 16.0;
+                ui.add_space(4.0);
+                embossed(ui, tones, false, None, |ui| {
+                    let mut on = self.view.ai_on;
+                    if theme::checkbox(ui, &mut on, RichText::new(t.ai_switch()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::AiOn(on)));
+                    }
+                    ui.label(RichText::new(t.ai_switch_detail()).small().color(weak));
+                });
+                // The provider, its model and key; "Let the model think"
+                // and the models tried with Ask (#318) join this card.
+                if self.view.ai_on {
+                    if self.ask_fields.is_none()
+                        && let Ok(provider) = self.store.ask_provider()
+                    {
+                        self.ask_fields = Some(AskFields::of(&provider));
+                    }
+                    if let Some(fields) = &mut self.ask_fields {
+                        let at = section.as_deref() == Some(ASK_SECTION);
+                        if let Some(changed) = ask_view::settings_card(ui, &t, tones, fields, at) {
+                            actions.push(Action::AskSetting(changed));
+                        }
+                    }
+                }
+                let ai_shown = ai_view::PortShown {
+                    at: section.as_deref() == Some(AI_PORT_SECTION),
+                    url: ai_url.as_deref(),
+                    waiting: ai_waiting,
+                    copied: self.ai_copied,
+                    reach: ai_reach,
+                    no_bridge: ai_no_bridge,
+                };
+                if let Some(asked) = ai_view::port_card(ui, &t, tones, ai_shown) {
+                    actions.push(Action::Ai(asked));
+                }
+            });
+    }
+
     /// This Device's settings (ADR 0008): its notifications and login
     /// start, its Re-nag interval and alarm sound, and the Nudges' repeat
     /// and Quiet Hours.
@@ -15890,16 +15968,6 @@ impl App {
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
         let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
         let speech = self.speech.as_ref();
-        let ai_url = self.ai_port.as_ref().map(AiPort::url);
-        let ai_waiting = self.ai_port.is_none() && self.view.ai_task.is_some();
-        let ai_copied = self.ai_copied;
-        let ai_reach = self.store.ai_reach().unwrap_or_default();
-        // Looked for every frame while it matters: Docker started
-        // meanwhile shows at once.
-        let ai_no_bridge = self.ai_port.is_none()
-            && ai_reach == Reach::Docker
-            && cfg!(target_os = "linux")
-            && docker_bridge().is_none();
         let units = settings.chosen_unit_system().ok().flatten();
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         let streaks = settings.streaks_on().unwrap_or(true);
@@ -15992,75 +16060,20 @@ impl App {
                     }
                 });
             }
-            // The AI port's card is one setting: who may connect and
-            // opening the port.
-            let [port] = settings_search::rows(
-                q,
-                Some(t.ai_port_title()),
-                [&[
-                    t.ai_port_intro(),
-                    t.ai_reach_heading(),
-                    t.ai_reach_local(),
-                    t.ai_reach_docker(),
-                    t.ai_port_open(),
-                ]],
-            );
-            if port {
-                found = true;
-                let ai_shown = ai_view::PortShown {
-                    at: section.as_deref() == Some(AI_PORT_SECTION),
-                    url: ai_url.as_deref(),
-                    waiting: ai_waiting,
-                    copied: ai_copied,
-                    reach: ai_reach,
-                    no_bridge: ai_no_bridge,
-                };
-                if let Some(asked) = ai_view::port_card(ui, &t, tones, ai_shown) {
-                    actions.push(Action::Ai(asked));
-                }
-            }
-            // The main switch "AI (experimental)" (#334), before the
-            // provider it gates.
-            let [switch] = settings_search::rows(q, None, [&[t.ai_switch(), t.ai_switch_detail()]]);
-            if switch {
+            // Every AI setting is on a page of its own (#335): one row
+            // here, found by the words of each of them.
+            let [ai] = settings_search::rows(q, None, [&ai_settings_words(&t)[..]]);
+            if ai {
                 found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    let mut on = self.view.ai_on;
-                    if theme::checkbox(ui, &mut on, RichText::new(t.ai_switch()).color(text))
-                        .changed()
+                    if ui
+                        .button(RichText::new(t.ai_settings_open()).color(text))
+                        .clicked()
                     {
-                        actions.push(Action::Setting(Setting::AiOn(on)));
+                        actions.push(Action::PageInto(Page::AiSettings));
                     }
-                    ui.label(RichText::new(t.ai_switch_detail()).small().color(weak));
+                    ui.label(RichText::new(t.ai_settings_detail()).small().color(weak));
                 });
-            }
-            // The Ask panel's provider (#267): one setting, as the AI
-            // port's card is; hidden while the AI is off (#334).
-            let [asks] = settings_search::rows(
-                q,
-                Some(t.ask_settings_title()),
-                [&[
-                    t.ask_settings_intro(),
-                    t.ask_anthropic(),
-                    t.ask_openai(),
-                    t.ask_url(),
-                    t.ask_model(),
-                    t.ask_key(),
-                ]],
-            );
-            if asks && self.view.ai_on {
-                found = true;
-                if self.ask_fields.is_none()
-                    && let Ok(provider) = self.store.ask_provider()
-                {
-                    self.ask_fields = Some(AskFields::of(&provider));
-                }
-                if let Some(fields) = &mut self.ask_fields {
-                    let at = section.as_deref() == Some(ASK_SECTION);
-                    if let Some(changed) = ask_view::settings_card(ui, &t, tones, fields, at) {
-                        actions.push(Action::AskSetting(changed));
-                    }
-                }
             }
             let [feedback] = settings_search::rows(
                 q,
@@ -16725,10 +16738,35 @@ fn crumb(ui: &mut Ui, name: &str, colour: Color32, up: Option<&str>) -> bool {
         .clicked()
 }
 
+/// The words the Settings' row "AI…" is found by (#335): those of every
+/// setting on the AI settings page, so a search for any of them shows it.
+fn ai_settings_words(t: &L10n) -> [&'static str; 17] {
+    [
+        t.ai_settings_open(),
+        t.ai_settings_detail(),
+        t.ai_switch(),
+        t.ai_switch_detail(),
+        t.ask_settings_title(),
+        t.ask_settings_intro(),
+        t.ask_anthropic(),
+        t.ask_openai(),
+        t.ask_url(),
+        t.ask_model(),
+        t.ask_key(),
+        t.ai_port_title(),
+        t.ai_port_intro(),
+        t.ai_reach_heading(),
+        t.ai_reach_local(),
+        t.ai_reach_docker(),
+        t.ai_port_open(),
+    ]
+}
+
 /// The title of the dialog `page` (#145).
 fn page_title(t: &L10n, page: Page) -> &'static str {
     match page {
         Page::Settings => t.settings_title(),
+        Page::AiSettings => t.ai_settings_title(),
         Page::About => t.about_title(),
         Page::Licences => t.open_source_licenses(),
         Page::Feedback => t.feedback_title(),
@@ -16962,12 +17000,12 @@ fn cancel(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
 /// open (#90), the phone's.
 const BLOCKED_OPEN: &str = "peopleBlockedOpen";
 
-/// Where AI ▸ AI port… opens the Settings (#279): at the AI port's card,
-/// which no app link names.
+/// Where the AI port's announcement opens the AI settings (#279, #335):
+/// at the AI port's card, which no app link names.
 const AI_PORT_SECTION: &str = "ai port";
 
-/// Where the Ask panel opens the Settings when its provider cannot be
-/// asked (#267): at the provider's card, which no app link names.
+/// Where the Ask panel opens the AI settings when its provider cannot be
+/// asked (#267, #335): at the provider's card, which no app link names.
 const ASK_SECTION: &str = "ask";
 
 /// What the settings of this Device start with that keep an Area's Topics

@@ -6210,23 +6210,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskUnreadyFix =>
-      'Set up the provider under Ask panel in the computer\'s Settings.';
+      'Set up the provider under Ask panel in the computer\'s AI settings.';
 
   @override
   String get phoneAskUnreadyModel =>
-      'Name a model under Ask panel in the computer\'s Settings.';
+      'Name a model under Ask panel in the computer\'s AI settings.';
 
   @override
   String get phoneAskUnreadyKey =>
-      'Enter the API key under Ask panel in the computer\'s Settings.';
+      'Enter the API key under Ask panel in the computer\'s AI settings.';
 
   @override
   String get phoneAskUnreadyUrl =>
-      'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.';
+      'Give the provider an https:// address under Ask panel in the computer\'s AI settings; http:// only on the computer or the home network.';
 
   @override
   String get phoneAskUnreadyAiOff =>
-      'Switch on AI (experimental) in the computer\'s Settings.';
+      'Switch on AI (experimental) in the computer\'s AI menu.';
 
   @override
   String get phoneAskSwitch => 'Ask (experimental)';
@@ -6298,7 +6298,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskKeyFix =>
-      'Check the API key under Ask panel in the computer\'s Settings.';
+      'Check the API key under Ask panel in the computer\'s AI settings.';
 
   @override
   String phoneAskProviderFailed(String provider) {
@@ -6307,7 +6307,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskProviderFix =>
-      'Check the model\'s name in the computer\'s Settings, or ask again later.';
+      'Check the model\'s name in the computer\'s AI settings, or ask again later.';
 
   @override
   String phoneAskNoReply(String provider) {
@@ -6316,7 +6316,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskNoReplyFix =>
-      'Check the computer\'s network and the provider\'s address in its Settings, then ask again.';
+      'Check the computer\'s network and the provider\'s address in its AI settings, then ask again.';
 
   @override
   String phoneAskUnreadable(String provider) {
@@ -6325,7 +6325,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskUnreadableFix =>
-      'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.';
+      'Check that the base URL in the computer\'s AI settings leads to an OpenAI-compatible API.';
 
   @override
   String get phoneAskTooManyRounds =>

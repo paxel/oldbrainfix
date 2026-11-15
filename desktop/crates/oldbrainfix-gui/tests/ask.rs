@@ -176,7 +176,7 @@ fn the_ai_is_off_by_default_also_with_a_provider_set_up_before() -> TestResult {
     let switch = harness.get_by_label(t.ai_switch());
     assert_eq!(switch.accesskit_node().toggled(), Some(Toggled::False));
     assert!(!shows(&harness, t.menu_ask()));
-    assert!(labelled(&harness, t.menu_ai_port()));
+    assert!(labelled(&harness, t.menu_ai_settings()));
     harness.key_press(Key::Escape);
     harness.run();
     // Ctrl+K does nothing.
@@ -196,20 +196,29 @@ fn the_ai_is_off_by_default_also_with_a_provider_set_up_before() -> TestResult {
     harness.run();
     assert_eq!(harness.state().query(), "");
     assert_eq!(harness.state().selection(), &Selection::All);
-    // The Settings: the switch and the AI port's card, no provider's.
-    harness.state_mut().open(Page::Settings);
+    // The AI settings (#335): the switch and the AI port's card, no
+    // provider's.
+    harness.state_mut().open(Page::AiSettings);
     harness.run();
     assert!(labelled(&harness, t.ai_switch()));
     assert!(labelled(&harness, t.ai_port_title()));
     assert!(labelled(&harness, t.ai_port_open()));
     assert!(!labelled(&harness, t.ask_settings_title()));
     assert!(!labelled(&harness, t.ask_key()));
-    // Not even found by a search.
+    // Found by a search of the Settings, the page still has none.
+    harness.state_mut().open(Page::Settings);
+    harness.run();
     let search = t.settings_search_hint();
     field(&harness, search).click();
     harness.run();
     field(&harness, search).type_text("API key");
     harness.run();
+    harness
+        .get_by_role_and_label(Role::Button, t.ai_settings_open())
+        .click();
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::AiSettings));
+    assert!(labelled(&harness, t.ai_switch()));
     assert!(!labelled(&harness, t.ask_settings_title()));
     // The key stays kept.
     assert_eq!(
@@ -239,10 +248,10 @@ fn switched_on_in_the_ai_menu_all_comes_back_and_off_the_panel_goes() -> TestRes
     harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::Ask);
-    harness.state_mut().open(Page::Settings);
+    harness.state_mut().open(Page::AiSettings);
     harness.run();
     assert!(labelled(&harness, t.ask_settings_title()));
-    // Switched off in the Settings: the provider's card goes, and the
+    // Switched off in the AI settings: the provider's card goes, and the
     // panel with it, back where it was opened from.
     harness
         .get_all_by_label(t.ai_switch())
@@ -287,7 +296,7 @@ fn the_panel_names_the_provider_and_what_is_sent_or_what_is_missing() -> TestRes
         .get_by_role_and_label(Role::Button, t.ask_open_settings())
         .click();
     harness.run();
-    assert_eq!(harness.state().page(), Some(Page::Settings));
+    assert_eq!(harness.state().page(), Some(Page::AiSettings));
     assert!(shows(&harness, t.ask_settings_title()));
     Ok(())
 }
@@ -447,6 +456,8 @@ fn the_providers_card_keeps_it_on_this_computer_only() -> TestResult {
     let (store, _) = store()?;
     let t = L10n::new("en");
     let mut harness = harness(store, &Fake::default());
+    // Found by a search of the Settings, its row opens the AI settings
+    // (#335).
     harness.state_mut().open(Page::Settings);
     harness.run();
     let search = t.settings_search_hint();
@@ -454,6 +465,11 @@ fn the_providers_card_keeps_it_on_this_computer_only() -> TestResult {
     harness.run();
     field(&harness, search).type_text("API key");
     harness.run();
+    harness
+        .get_by_role_and_label(Role::Button, t.ai_settings_open())
+        .click();
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::AiSettings));
     assert!(shows(&harness, t.ask_settings_title()));
     assert!(shows(&harness, t.ask_key_stays()));
     harness
