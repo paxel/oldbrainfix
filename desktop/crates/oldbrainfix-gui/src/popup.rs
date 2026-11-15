@@ -631,6 +631,12 @@ impl CapturePopup {
                 if self.paste_empty {
                     paste::empty_line(ui, &t);
                 }
+                // The Kind it is made, above the field (#310).
+                if recording.is_none()
+                    && let Some(kind) = capture_choices::kind_choice(ui, &t, &self.choices)
+                {
+                    asked = Some(kind);
+                }
                 if quick.format_bar {
                     format_bar::capture_bar(ui, &t, id, &mut self.text, (text, tones.accent));
                 }

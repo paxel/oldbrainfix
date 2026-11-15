@@ -8,9 +8,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Added
 
 - Capture offers "Add to Note…", on the phone and on the desktop, in the quick note and the capture popup: it picks another Note with a filter, the Notes added to last at the top, and adds the text, voice recording, photos or files to it at once as a Section, so nothing waits in Unsorted. Added from Capture to a Note in a Shared Area, the Section is there for everyone in it. On an Unsorted Note's card, Merge into… is now called "Add to Note…" and picks the Note the same way. ([obf-1001](https://github.com/paxel/oldbrainfix/issues/308))
+- Capture offers Text, Checklist and Shopping List above the field, on the phone and on the desktop, in the quick note and the capture popup. Checklist or Shopping List saves the Note as that list at once, each typed line a Line unless the first line is a heading, which becomes its name. A recording, photo or file stays on the list, and with nothing typed the Note stays a Plain Note. ([obf-1003](https://github.com/paxel/oldbrainfix/issues/310))
 
 ### Changed
 
+- The kind badge of the Note editor and of the desktop's Note dialog comes first and names the kind in words, such as "Plain Note ▾" or "Checklist ▾", instead of showing an icon. ([obf-1003](https://github.com/paxel/oldbrainfix/issues/310))
 - Typed text made a Checklist or a Shopping List keeps every line as a Line, its first line too; only a first line that looks like a heading, a Markdown heading or a line ending in ":", becomes the list's name, and a list without one shows "Checklist" or "Shopping List" until a name is typed. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))
 - A Note reads as one Note: its Sections, each an Amend or a Note merged in, have no box of their own and are parted from the text before them only by a dashed tear line, with their time in a small grey line under them. In the Note editor and the desktop's Note dialog and Note window, a Plain Note's Sections now follow its text in the same box, above the badges; a Checklist, Shopping List, Tally or Session keeps them at the end of the page. ([obf-1000](https://github.com/paxel/oldbrainfix/issues/307))
 

@@ -9,6 +9,7 @@ import 'app_lock.dart';
 import 'announcements.dart';
 import 'attachment_views.dart';
 import 'capture_choices.dart';
+import 'checklist_view.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
@@ -16,6 +17,7 @@ import 'file_into_screen.dart';
 import 'file_platform.dart';
 import 'l10n.dart';
 import 'location.dart';
+import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
@@ -24,6 +26,7 @@ import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'shopping_list_view.dart';
 import 'shopping_pick_screen.dart';
 import 'speech_platform.dart';
 import 'sync_line.dart';
@@ -256,6 +259,20 @@ void announceUntranscribable(
 /// a Routine, Reminder, Session, Frog or Tally is set up, which need the
 /// Note itself.
 ///
+/// The Kind choice above the field (#310, Q715) makes the Note a
+/// Checklist or a Shopping List as it is saved, each typed line a Line
+/// unless the first is a heading (#309); Text, the default, keeps it a
+/// Plain Note. It applies to the typed text only: a recording, photo or
+/// file stays on the Note as its own, and with nothing typed the Note
+/// stays a Plain Note. A list made so leaves Unsorted, so one Save takes
+/// the Nudge buttons' place; it needs the Note itself, so Add to Note…,
+/// "Make it a Tally" and the Session are not offered meanwhile, and a
+/// Tally or Session set up hides the choice. While an existing Shopping
+/// List is picked with "Add to a Shopping List" it waits unshown, as the
+/// other choices do. The app going to the background writes the text as
+/// a Plain Note, nudged; the Kind is made only on leaving, so typing on
+/// meanwhile is not lost into the list's Name.
+///
 /// "Add to a Shopping List" (#124) makes each line typed, and of
 /// each recording's Transcript, a Line of the list picked, and keeps no
 /// Note; the other choices wait unshown meanwhile. It is not offered
@@ -459,6 +476,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// meanwhile holds only the text and recordings.
   ({String id, String title})? _shopping;
 
+  /// The Kind the Note is made as it is saved (#310): a Checklist or a
+  /// Shopping List of its typed lines; a Plain Note while [NoteKind.plain].
+  var _kind = NoteKind.plain;
+
   AppLock? _lock;
 
   @override
@@ -546,8 +567,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// Whether the Note leaves Unsorted: filed, with something spawned
-  /// from it, or going into a Shopping List. It needs no Nudge then.
-  bool get _sorted =>
+  /// from it, made a list (#310), or going into a Shopping List. It needs
+  /// no Nudge then.
+  bool get _sorted => _sortedByChoices || _listKind;
+
+  /// Whether a Checklist or Shopping List is chosen as the Kind (#310).
+  bool get _listKind => _kind != NoteKind.plain;
+
+  /// [_sorted] but for the Kind, which is made only on leaving: a Note
+  /// written before, as the app went to the background, keeps its Nudge
+  /// while it is still Unsorted.
+  bool get _sortedByChoices =>
       _shopping != null ||
       _place != null ||
       _schedules.isNotEmpty ||
@@ -570,16 +600,24 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// [nudgeIn] is given. A photo Note keeps its text when it is emptied.
   /// All of it is one batch: when a write on the way fails, none of it
   /// is written, and the screen still holds all of it (#113).
-  void _write(Duration? nudgeIn) {
+  ///
+  /// Only when [leaving] is the Note made the Kind chosen (#310), and
+  /// only with something typed; written before, as the app went to the
+  /// background, it stays a Plain Note, so what is typed on is not lost
+  /// into the list's Name.
+  void _write(Duration? nudgeIn, {bool leaving = false}) {
     final text = _text.text.trim();
     final captured = _captured;
     if (captured == null && text.isEmpty) return;
     final notes = widget.notes;
+    // Going into a Shopping List, the Note waits without the rest.
+    final choose = _shopping == null;
+    final makes = leaving && choose && _listKind && text.isNotEmpty;
+    final sorted = _sortedByChoices || makes;
     final (created, choices) = notes.store.batch(() {
-      // Going into a Shopping List, the Note waits without the rest.
-      final choose = _shopping == null;
       if (captured == null) {
-        final note = _captureNote(text, nudgeIn: nudgeIn);
+        final note = _captureNote(text, nudgeIn: nudgeIn, sorted: sorted);
+        if (makes) _makeKind(note.id);
         return (note, choose ? _writeChoices(note.id) : null);
       }
       final note = notes.byId(captured.noteId);
@@ -590,9 +628,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
           TextBoxes.strip(note.text) != text) {
         notes.edit(captured.noteId, text, format: _formatOf(text));
       }
-      if (nudgeIn != null && !_sorted) {
+      if (nudgeIn != null && !sorted) {
         notes.setNudge(captured.noteId, nudgeIn);
       }
+      if (makes) _makeKind(captured.noteId);
       return (null, choose ? _writeChoices(captured.noteId) : null);
     });
     if (created != null) _adopt(created);
@@ -655,6 +694,20 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
     if (_frog && !_frogWritten) Frogs(store).spawn(noteId);
     return (filed: filed);
+  }
+
+  /// Makes the Note [noteId] the Kind chosen (#310), each typed line a
+  /// Line unless the first is a heading (#309), where this Device may;
+  /// otherwise it stays a Plain Note, as Capture asks nothing.
+  void _makeKind(String noteId) {
+    switch (_kind) {
+      case NoteKind.checklist:
+        makeChecklist(widget.notes, noteId);
+      case NoteKind.shoppingList:
+        makeShoppingList(widget.notes, noteId);
+      case NoteKind.plain || NoteKind.tally || NoteKind.session:
+        break;
+    }
   }
 
   /// Marks what [_writeChoices] wrote as written, the Note in [filed].
@@ -798,10 +851,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
   );
 
   /// Writes the new Note with [text], [photos], [recordings] and [files],
-  /// nudged [nudgeIn] from now, 1 h when null, unless it is sorted.
+  /// nudged [nudgeIn] from now, 1 h when null, unless it is [sorted], by
+  /// default by what is set up for it but the Kind, made only on leaving.
   Note _captureNote(
     String text, {
     Duration? nudgeIn,
+    bool? sorted,
     List<Uint8List> photos = const [],
     List<Uint8List> recordings = const [],
     List<NewFile> files = const [],
@@ -810,7 +865,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
     format: _formatOf(text) ?? TextFormats.plain,
     place: _shopping == null ? _place : null,
     // A sorted Note needs no Nudge (#113).
-    nudgeIn: _sorted ? null : nudgeIn ?? Notes.defaultNudge,
+    nudgeIn: (sorted ?? _sortedByChoices)
+        ? null
+        : nudgeIn ?? Notes.defaultNudge,
     photos: photos,
     recordings: recordings,
     files: files,
@@ -1066,7 +1123,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         Navigator.of(context).pop(_intoShopping(shopping.id));
         return;
       }
-      _write(nudgeIn);
+      _write(nudgeIn, leaving: true);
     } catch (_) {
       // Nothing of it was written: the screen stays, to change and leave
       // again.
@@ -1089,7 +1146,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     await _picking;
     if (!mounted) return;
     try {
-      _write(null);
+      _write(null, leaving: true);
     } catch (_) {
       _leaving = false;
       rethrow;
@@ -1246,7 +1303,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         // The same.
       }
       _shopping = null;
-      _write(null);
+      _write(null, leaving: true);
       announce(untranscribed: false);
       return _captured;
     }
@@ -1308,6 +1365,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   SliverToBoxAdapter(child: choices),
                 for (final attachment in _attachments(context))
                   SliverToBoxAdapter(child: attachment),
+                if (_kindChoice(context) case final kinds?)
+                  SliverToBoxAdapter(child: kinds),
                 if (_pasteEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -1389,6 +1448,42 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   )
                 : column(null),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The Kind choice above the field (#310): Text, Checklist or Shopping
+  /// List as choice chips, Text at first. None while an existing Shopping
+  /// List is picked, where the other choices wait unshown too, nor while
+  /// a Tally or Session is set up, which makes the Note that kind.
+  Widget? _kindChoice(BuildContext context) {
+    if (_shopping != null || _tally != null) return null;
+    if ([..._schedules, ..._writtenSchedules].any((c) => c.session != null)) {
+      return null;
+    }
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: ChoiceChips<NoteKind>(
+          value: _kind,
+          options: [
+            for (final kind in const [
+              NoteKind.plain,
+              NoteKind.checklist,
+              NoteKind.shoppingList,
+            ])
+              RadioOption(
+                key: ValueKey('capture-kind-${kind.name}'),
+                value: kind,
+                title: Text(
+                  kind == NoteKind.plain ? t.text : kindName(t, kind),
+                ),
+              ),
+          ],
+          onChanged: (picked) => setState(() => _kind = picked),
         ),
       ),
     );
@@ -1476,10 +1571,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// "Add to Note…" (#308): none behind the App Lock, which keeps the
   /// Notes out of reach, while the lines go into a Shopping List, or once
   /// a Routine, Reminder, Session, Frog or Tally is set up for the Note
-  /// itself; it waits while there is nothing to save.
+  /// itself, or a Checklist or Shopping List is chosen as its Kind (#310),
+  /// which needs the Note too; it waits while there is nothing to save.
   Widget? _addToNoteButton(BuildContext context) {
     if ((_lock?.locked ?? false) || _shopping != null) return null;
-    if (_schedules.isNotEmpty ||
+    if (_listKind ||
+        _schedules.isNotEmpty ||
         _writtenSchedules.isNotEmpty ||
         _frog ||
         _tally != null) {
@@ -1523,8 +1620,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final schedule = _shows.contains(QuickNoteControl.schedule);
     final onSchedule = _mayManage && !shopping ? _spawn : null;
     // "Make it a Tally" goes with the Frog and Session (Q481), only in
-    // Advanced (#197).
-    final onMakeTally = schedule && !shopping && _advanced ? _makeTally : null;
+    // Advanced (#197); a Note of a list Kind becomes neither (#310).
+    final onMakeTally = schedule && !shopping && _advanced && !_listKind
+        ? _makeTally
+        : null;
     if (onFile == null &&
         onSchedule == null &&
         onMakeTally == null &&
@@ -1542,7 +1641,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
               spawn == Spawn.reminder ||
               // Frogs and Sessions are made only in Advanced (#197), and
               // only once switched on.
-              (schedule && _advanced && (!locked || spawn != Spawn.session)))
+              (schedule &&
+                  _advanced &&
+                  (spawn != Spawn.session || (!locked && !_listKind))))
             spawn,
       ],
       actions: importance || toShopping || onMakeTally != null

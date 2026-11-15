@@ -400,11 +400,9 @@ void main() {
       // Its page: the name, the pool and the count, then its badges.
       expect(key('note-name'), findsOneWidget);
       expect(key('session-pool'), findsOneWidget);
+      // The kind in words (#310).
       expect(
-        find.descendant(
-          of: key('badge-kind'),
-          matching: find.byIcon(Icons.event_repeat),
-        ),
+        find.descendant(of: key('badge-kind'), matching: find.text('Session')),
         findsOneWidget,
       );
       expect(key('badge-session-rule'), findsOneWidget);

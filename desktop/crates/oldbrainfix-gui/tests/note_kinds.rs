@@ -213,6 +213,15 @@ fn a_plain_note_keeps_its_one_text_field_and_shows_its_kind() -> TestResult {
     );
     assert!(!shows(&harness, "Show the whole description"));
     assert!(shows(&harness, "Kind: Plain Note"));
+    // The first badge, before the Importance (#310), as wide as its
+    // name in words with ▾ after it, wider than an icon's badge.
+    let kind = harness.get_by_label("Kind: Plain Note").rect();
+    let importance = harness.get_by_label("Importance: Normal").rect();
+    assert!(
+        kind.right() <= importance.left() && (kind.top() - importance.top()).abs() < 1.0,
+        "{kind:?} {importance:?}"
+    );
+    assert!(kind.width() > importance.width() + 40.0, "{kind:?}");
     // Its kind badge is no longer above a "Make it a Checklist".
     assert!(!shows(&harness, "Make it a Checklist"));
     assert!(!shows(&harness, "Make it a Shopping List"));

@@ -1775,7 +1775,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// The row of badges under the text (#160): each setting of the Note
   /// as its icon and its value, an icon for a fixed set of values, short
   /// text otherwise (#192), a tap opening its small editor; a setting
-  /// that does not apply has none. "+" ends it.
+  /// that does not apply has none. The kind comes first, in words (#310);
+  /// "+" ends it.
   Widget _badges(
     PlacedNote placed,
     DateFormat when,
@@ -1792,6 +1793,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       spacing: 8,
       runSpacing: 8,
       children: [
+        // Every Note has a kind (#188), first and in words (#310), with ▾
+        // while there is another to change it to; else it only shows it.
+        SettingBadge(
+          key: const ValueKey('badge-kind'),
+          setting: t.badgeKind,
+          icon: kindBadgeIcon,
+          value: kindName(t, _kind),
+          dropDown: true,
+          onTap: _kinds.isEmpty ? null : (_) => _editKind(),
+        ),
         SettingBadge(
           key: const ValueKey('badge-importance'),
           setting: t.importance,
@@ -1850,16 +1861,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         // Its open Frog, or one eaten today or yesterday (#259).
         if (_frog case final frog?) _frogBadge(frog),
-        // Every Note has a kind (#188); with nothing to change it to,
-        // the badge only shows it.
-        SettingBadge(
-          key: const ValueKey('badge-kind'),
-          setting: t.badgeKind,
-          icon: kindBadgeIcon,
-          value: kindName(t, _kind),
-          valueIcon: kindIcon(_kind),
-          onTap: _kinds.isEmpty ? null : (_) => _editKind(),
-        ),
         // A Plain Note's text is plain, formatted or code (#213).
         if (_kind == NoteKind.plain && note.textEditable)
           SettingBadge(
@@ -3100,7 +3101,7 @@ String textFormatName(AppLocalizations t, String format) => switch (format) {
 };
 
 /// The icon of the kind badge (#192), the same for every kind; the
-/// badge shows the kind itself as [kindIcon].
+/// badge shows the kind itself in words, [kindName] (#310).
 const kindBadgeIcon = Icons.category_outlined;
 
 /// The value icon of the Importance [importance] in its badge (#192).
@@ -3118,7 +3119,7 @@ IconData listOnAgendaIcon(ListOnAgenda shows) => switch (shows) {
   ListOnAgenda.lines => Icons.format_list_bulleted,
 };
 
-/// The icon of the kind [kind] (#188), the value of its badge.
+/// The icon of the kind [kind] (#188), as a Pack's tree shows it.
 IconData kindIcon(NoteKind kind) => switch (kind) {
   NoteKind.plain => Icons.notes,
   NoteKind.checklist => Icons.checklist,

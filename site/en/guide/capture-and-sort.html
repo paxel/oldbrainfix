@@ -19,7 +19,7 @@
 <li>After speaking, tap <strong>Stop</strong>.</li>
 <li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The quick note as a dialog over the desktop Agenda with a typed text, From file…, To full editor, Add to Note…, the alarm clock and the Nudge buttons">
+<box-tab device="desktop" alt="The quick note as a dialog over the desktop Agenda with Text, Checklist and Shopping List above a typed text, From file…, To full editor, Add to Note…, the alarm clock and the Nudge buttons">
 <li>Press Ctrl+N, or click <strong>File ▸ New Note</strong>.</li>
 <li>Type, or click <strong>Record voice</strong>, <strong>Paste</strong> or <strong>From file…</strong>.</li>
 <li>After speaking, click <strong>Stop</strong>.</li>
@@ -40,7 +40,8 @@
   button, and on the iPhone VoiceOver lists it among the button's actions.
 </p>
 <p>
-  The capture screen, the quick note, holds the text field ("What's on your mind?"), the buttons
+  The capture screen, the quick note, holds <strong>Text</strong>, <strong>Checklist</strong> and
+  <strong>Shopping List</strong> above the text field ("What's on your mind?"), the buttons
   <strong>Photo</strong>, <strong>Voice</strong>, <strong>Gallery</strong>, <strong>Paste</strong>
   and <strong>File</strong>, <strong>To full editor</strong>, <strong>Add to Note…</strong>, and at the bottom "Remind me to sort it in"
   with <strong>10 min</strong>, <strong>30 min</strong> and <strong>1 h</strong>. Each of the three
@@ -52,8 +53,9 @@
   <li><strong>Voice</strong>: the elapsed time runs above one big <strong>Stop</strong> button. There is no holding a button and no stop on silence. After Stop you are back on the capture screen with the recording and can type or add more. The first time, the app explains why it needs the microphone and asks for it.</li>
   <li><strong>Photo</strong> and <strong>Gallery</strong>: the photos show above the text field, and the text becomes optional ("A few words about it (optional)").</li>
   <li><strong>Paste</strong>: the clipboard is read only on this tap. Its text goes into the field at the cursor, its picture into the Note as a photo. When it holds neither, a line above the field says so.</li>
+  <li><strong>Checklist</strong> or <strong>Shopping List</strong> above the field saves the Note as that list: each typed line becomes a Line, unless the first line is a heading, such as "# Weekend" or "Weekend:", which then becomes the list's name. <strong>Text</strong>, picked at first, keeps it a Plain Note. A list made this way is sorted, so one <strong>Save</strong> takes the place of the Nudge buttons. Only the typed text becomes Lines: a recording, a photo or a file stays on the list as its own, and with nothing typed the Note stays a Plain Note. While a list is chosen, Add to Note…, Make it a Tally and Session are not offered, and a Tally or Session set up hides the choice. <strong>Add to a Shopping List</strong> adds the lines to a list you already have instead of making a new one.</li>
   <li><strong>To full editor</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note editor with everything the editor offers. Filing it there drops the Nudge, as filing always does. Leaving the editor goes back to where the capture was opened from. The button waits until something is typed, recorded or picked, and behind the App Lock it is not offered, as the editor shows the Areas.</li>
-  <li><strong>Add to Note…</strong> adds the thought to a Note you already have instead of making a new one. It opens your Notes with a filter at the top; while nothing is typed, "Added to recently" lists the last three Notes this Device added to. Tapping a Note adds the text, the recording, the photos and the files to it at once as a new Section, with no Nudge, and the capture screen closes; nothing is left in Unsorted. A Note in a Shared Area gets the Section for everyone in it. Back in the list leaves the capture as it was. The button waits until something is typed, recorded or picked; it is not offered behind the App Lock, while a Shopping List is picked, or once a Routine, Reminder, Session, Frog or Tally is set up for the Note.</li>
+  <li><strong>Add to Note…</strong> adds the thought to a Note you already have instead of making a new one. It opens your Notes with a filter at the top; while nothing is typed, "Added to recently" lists the last three Notes this Device added to. Tapping a Note adds the text, the recording, the photos and the files to it at once as a new Section, with no Nudge, and the capture screen closes; nothing is left in Unsorted. A Note in a Shared Area gets the Section for everyone in it. Back in the list leaves the capture as it was. The button waits until something is typed, recorded or picked; it is not offered behind the App Lock, while a Shopping List is picked, while Checklist or Shopping List is chosen above the field, or once a Routine, Reminder, Session, Frog or Tally is set up for the Note.</li>
 </ul>
 <p>
   <strong>Save</strong> in the top bar, Back and the app going to the background save as well; the
@@ -187,14 +189,14 @@
 <guide-box name="capture-outside">
 <h2 id="the-hotkey-and-the-popup">Capture without opening the app</h2>
 <p>Start a Note from the home screen, or from anywhere on the computer.</p>
-<box-tab device="phone" alt="The quick note with a typed text, To full editor, Add to Note…, the alarm clock and the three Nudge buttons">
+<box-tab device="phone" alt="The quick note with Text, Checklist and Shopping List above a typed text, To full editor, Add to Note…, the alarm clock and the three Nudge buttons">
 <li>Long-press the Old Brain Fix icon.</li>
 <li>Tap <strong>Voice</strong>, <strong>Text</strong> or <strong>Photo</strong>.</li>
 <li>Type, speak or take the photo.</li>
 <li>After speaking, tap <strong>Stop</strong>.</li>
 <li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The capture popup with a typed text, To full editor, Add to Note…, the alarm clock and the Nudge buttons">
+<box-tab device="desktop" alt="The capture popup with Text, Checklist and Shopping List above a typed text, To full editor, Add to Note…, the alarm clock and the Nudge buttons">
 <li>Press Ctrl+Alt+N anywhere.</li>
 <li>Type what's on your mind.</li>
 <li>Press Enter.</li>
@@ -347,7 +349,7 @@
 <guide-box name="edit">
 <h2 id="the-note-editor">Change a Note</h2>
 <p>Change a Note's text and its settings.</p>
-<box-tab device="phone" alt="The Note editor with the text and two dated Sections under it in one box, then the badges Important, Household, the capture time, the kind, the text format and Hidden from AI, and the + badge">
+<box-tab device="phone" alt="The Note editor with the text and two dated Sections under it in one box, then the badges Plain Note, Important, Household, the capture time, the text format and Hidden from AI, and the + badge">
 <li>Long-press the Note's card.</li>
 <li>Change the text.</li>
 <li>Tap a badge to change its setting.</li>
@@ -376,16 +378,17 @@
 <p>
   The Note's settings sit under the text and its Sections, or under the Lines or the Tally, in one row of badges.
   Each starts with the setting's icon, the same whatever its value, then shows the value: as an icon
-  where the setting has a few fixed values, such as the kind, the Importance, Show on the Agenda and
-  Show ticks, and as short text otherwise, such as "Household" or "Every day · 08:00":
+  where the setting has a few fixed values, such as the Importance, Show on the Agenda and
+  Show ticks, and as short text otherwise, such as "Household" or "Every day · 08:00". The kind comes
+  first and shows its name in words:
 </p>
 <ul>
+  <li>The kind: <strong>Plain Note</strong>, <strong>Checklist</strong>, <strong>Shopping List</strong>, <strong>Tally</strong> or <strong>Session</strong>, with ▾ after it while a tap can change it. A tap offers the kinds the Note can become, as choice chips; Tally and Session only in Advanced. A Tally's badge only shows it, and so does the badge of a Note whose text is Code.</li>
   <li><strong>Importance</strong>: Unimportant, Normal or Important. It is changed here, not in the card's ⋮; on the desktop a card's right-click offers it too.</li>
   <li><strong>Area and Topic</strong>: where the Note is filed, or Unsorted, or "Not filed" for a Note with a Routine or the like and no Area. A tap opens File into….</li>
   <li><strong>Captured</strong>: when the Note was captured; its editor also shows the place, the calendar event, the Bluetooth device and the app it was shared from, as far as they were recorded. Each of these but the time has <strong>Remove</strong> beside it, which asks once and then takes the detail off the Note on every Device; the time it was captured stays. Under its text, each Section shows its own in one small grey line, such as "12:40 · Home · Dentist", its time alone when it was captured the same day as the part before it; a tap on the line opens the same details, with the same Remove. In a Shared Area, the Note's author and the Area's Managers may remove them.</li>
   <li>Each <strong>Routine</strong> and <strong>Reminder</strong> of the Note with its schedule, such as "Every day · 08:00". A tap opens its editor.</li>
   <li><strong>Frog</strong>, while the Note has an open Frog or one eaten today or yesterday: Open, Eaten today or Eaten yesterday. A tap offers <strong>Eat now</strong> while it is open and <strong>Remove the Frog</strong> (see <a href="lists-tallies-sessions-frogs.html#eat-a-frog">Eat a frog</a>).</li>
-  <li>The kind: <strong>Plain Note</strong>, <strong>Checklist</strong>, <strong>Shopping List</strong>, <strong>Tally</strong> or <strong>Session</strong>. A tap offers the kinds the Note can become, as choice chips; Tally and Session only in Advanced. A Tally's badge only shows it, and so does the badge of a Note whose text is Code.</li>
   <li><strong>Text format</strong>, for a Plain Note: <strong>Plain text</strong>, <strong>Formatted text</strong> or <strong>Code</strong>, as choice chips; a formatted text does not become plain again (see <a href="formatted-text-transcripts-photo-texts.html">Formatted text</a>).</li>
   <li><strong>Show on the Agenda</strong> of a Checklist without a Routine or Reminder, and of a Shopping List: Off, One row with the number of open Lines, or Each open Line on its own row, with radio buttons in its editor.</li>
   <li><strong>Show ticks</strong>, while the Note has a box: On or Off, with a switch in its editor.</li>

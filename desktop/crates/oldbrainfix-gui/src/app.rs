@@ -13018,8 +13018,10 @@ impl App {
     /// one and Ctrl+1 to 3 each of them (#277); a Note filed or with something set up, or where the Nudge
     /// buttons are switched off, gets one Save instead, nudging only an
     /// Unsorted Note. With a Shopping List picked in "More", the lines go
-    /// into it instead of a Note (#124). The format bar shows over the
-    /// field where it is switched on.
+    /// into it instead of a Note (#124). Above the field the Kind choice,
+    /// Text, Checklist or Shopping List, makes the Note that Kind as it is
+    /// saved (#310). The format bar shows over the field where it is
+    /// switched on.
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let place = self.capture_place();
@@ -13065,6 +13067,14 @@ impl App {
             }
             if self.paste_empty {
                 paste::empty_line(ui, &t);
+            }
+            // The Kind it is made, above the field (#310); a pick hands the
+            // cursor back to the field, to type on.
+            if recording.is_none()
+                && let Some(kind) = capture_choices::kind_choice(ui, &t, &self.capture_choices)
+            {
+                actions.push(Action::CaptureChoice(kind));
+                self.capture_focus = true;
             }
             if quick.format_bar {
                 format_bar::capture_bar(ui, &t, id, &mut self.capture, (text, tones.accent));
@@ -19685,12 +19695,12 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 
 /// The row of badges under the Note's text (#160), each the setting's
 /// icon and its value, an icon for a fixed set of values, short text
-/// otherwise (#192), in the phone's order:
-/// the Importance; Area and Topic in one, opening File into…; Captured,
+/// otherwise (#192), in the phone's order: the kind, in words with ▾
+/// where it opens (#310); the Importance; Area and Topic in one, opening File into…; Captured,
 /// to read its details; each Routine and Reminder with its schedule,
 /// opening its editor, and those a newer version saved, only shown; its
 /// Frog, open or eaten today or yesterday, offering Eat now and Remove
-/// the Frog (#259); the kind; a Session's rule and weekdays' counts (#191); Show on the
+/// the Frog (#259); a Session's rule and weekdays' counts (#191); Show on the
 /// Agenda; Show ticks; and "+" with Routine, Reminder, Frog while none is
 /// open and, on a plain Note, Session, for who may set them up. A setting that does not
 /// apply has no badge; one this Device may not change only shows.
@@ -19706,6 +19716,19 @@ fn note_badges(
     let changes = shown.may.changes && !trashed;
     let look = (t, tones);
     badge_row(ui, |ui| {
+        // Every Note has its kind, a plain Note too (#188), first and in
+        // words (#310), with ▾ where there is another to make it.
+        let name = kind_look(t, shown.kind.kind).1;
+        let choosing = !shown.kind.choices.is_empty();
+        let value = Some(if choosing {
+            BadgeValue::Choice(name)
+        } else {
+            BadgeValue::Text(name)
+        });
+        let kind = (icons::KIND, None);
+        if badge(ui, look, kind, t.badge_kind(), value, choosing).clicked() {
+            actions.push(Action::Badge(Some(NoteBadge::Kind)));
+        }
         let importance = match note.importance {
             Importance::Unimportant => (icons::IMPORTANCE_LOW, t.importance_unimportant()),
             Importance::Normal => (icons::IMPORTANCE_NORMAL, t.importance_normal()),
@@ -19776,15 +19799,6 @@ fn note_badges(
         }
         if let Some(frog) = shown.frog {
             frog_badge(ui, look, frog, actions);
-        }
-        // Every Note has its kind, a plain Note too (#188); it opens
-        // where there is another to make it.
-        let (icon, name) = kind_look(t, shown.kind.kind);
-        let choosing = !shown.kind.choices.is_empty();
-        let value = Some(BadgeValue::Icon(icon, name));
-        let kind = (icons::KIND, None);
-        if badge(ui, look, kind, t.badge_kind(), value, choosing).clicked() {
-            actions.push(Action::Badge(Some(NoteBadge::Kind)));
         }
         // A Plain Note's text is plain, formatted or code (#213).
         if shown.kind.kind == NoteKind::Plain && note.text_editable {

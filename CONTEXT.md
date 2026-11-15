@@ -11,7 +11,7 @@ Anything the user captured: text, a voice recording, a photo, or something share
 _Avoid_: entry (that is a Tally's), memo, item, card (a card is only how a Note is drawn; a Profile card is a person's)
 
 **Kind**:
-What a Note is, and with it its page: a Plain Note, a Checklist, a Shopping List, a Tally or a Session. A Plain Note is its text; every other kind shows its content first, its text only as its Name and Description above it. The kind changes on the kind badge of the Note editor: a Plain Note becomes a Checklist, a Shopping List, a Tally or a Session, a list becomes the other list, keeping its Lines, or a Plain Note again, as a Session does; a Tally stays a Tally. What belonged to the old kind stays in the log and shows no more. A Frog is no kind but a mark any Note can carry. German: Art.
+What a Note is, and with it its page: a Plain Note, a Checklist, a Shopping List, a Tally or a Session. A Plain Note is its text; every other kind shows its content first, its text only as its Name and Description above it. Capture makes a Plain Note, a Checklist or a Shopping List as its Kind choice says (#310). The kind changes on the kind badge of the Note editor, the first badge, which names it: a Plain Note becomes a Checklist, a Shopping List, a Tally or a Session, a list becomes the other list, keeping its Lines, or a Plain Note again, as a Session does; a Tally stays a Tally. What belonged to the old kind stays in the log and shows no more. A Frog is no kind but a mark any Note can carry. German: Art.
 _Avoid_: type, template, mode
 
 **Plain Note**:
@@ -39,7 +39,7 @@ The act of creating a Note through one of the quick entry points (the "+" button
 _Avoid_: quick add, record
 
 **Quick note**:
-The text capture screen, and on the desktop the quick note dialog of the window (File ▸ New Note, Ctrl+N, "+") and the capture popup: the text, Photo, Voice, Gallery, Paste and File (on the desktop Record voice, Paste and From file…), the Nudge buttons, "To full editor", which saves the Note Unsorted and opens it in the Note editor, on the desktop the Note dialog, "Add to Note…", which adds the capture at once as a Section to another Note picked, the Notes added to last at the top (#308), and the alarm clock, whose menu sets up a Routine or Reminder saved with the Note (#223). What else sorts the Note (File into…, Frog, Session or Tally, Add to a Shopping List, the Importance) and the format bar show only where the Device's settings switch them on; the Nudge buttons can be switched off for a single Save. German: Schnellnotiz.
+The text capture screen, and on the desktop the quick note dialog of the window (File ▸ New Note, Ctrl+N, "+") and the capture popup: the text, Photo, Voice, Gallery, Paste and File (on the desktop Record voice, Paste and From file…), above the text the Kind it makes, Text, Checklist or Shopping List, the typed lines a list's Lines as it is saved (#310), the Nudge buttons, "To full editor", which saves the Note Unsorted and opens it in the Note editor, on the desktop the Note dialog, "Add to Note…", which adds the capture at once as a Section to another Note picked, the Notes added to last at the top (#308), and the alarm clock, whose menu sets up a Routine or Reminder saved with the Note (#223). What else sorts the Note (File into…, Frog, Session or Tally, Add to a Shopping List, the Importance) and the format bar show only where the Device's settings switch them on; the Nudge buttons can be switched off for a single Save. German: Schnellnotiz.
 _Avoid_: quick add
 
 **Capture Context**:

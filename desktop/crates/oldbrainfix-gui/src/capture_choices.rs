@@ -20,6 +20,16 @@
 //! waits in Unsorted. It is not offered once a Routine, Reminder,
 //! Session, Frog or Tally is set up, which need the Note itself.
 //!
+//! The Kind choice above the field (#310, Q715), Text, Checklist or
+//! Shopping List ([`kind_choice`]), makes the Note a Checklist or a
+//! Shopping List as it is written, each typed line a Line unless the
+//! first is a heading (#309); Text keeps it a Plain Note. It applies to
+//! the typed text only: with nothing typed the Note stays a Plain Note,
+//! a recording, photo or file stays on it as its own. A list made so
+//! leaves Unsorted, needing no Nudge; it needs the Note itself, so "Add
+//! to Note…", "Make it a Tally" and the Session are not offered
+//! meanwhile, and a Tally or Session set up hides the choice.
+//!
 //! "Add to a Shopping List" in "More" (#124) makes each line typed a Line
 //! of the list picked instead, and keeps no Note; the other choices wait
 //! unshown and unwritten meanwhile, and come back when its chip is
@@ -38,9 +48,9 @@ use std::sync::Arc;
 use chrono::Duration;
 use egui::{Frame, Key, Margin, Modifiers, RichText, Stroke, Ui};
 use oldbrainfix_core::{
-    Area, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes, PersonSettings,
-    QuickNoteControl, Routines, Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies,
-    TallyRule, Topic, WallClock, markdown, text_format,
+    Area, Checklists, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes,
+    PersonSettings, QuickNoteControl, Routines, Schedule, SessionRule, Sessions, ShoppingLists,
+    Store, Tallies, TallyRule, Topic, WallClock, markdown, text_format,
 };
 
 use crate::app::{Wall, icon_button};
@@ -135,9 +145,21 @@ pub struct TallyFieldChoice {
     pub check: bool,
 }
 
+/// The Kind a capture makes its Note (#310): a Plain Note of its text,
+/// or a Checklist or Shopping List of its typed lines.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CaptureKind {
+    #[default]
+    Text,
+    Checklist,
+    ShoppingList,
+}
+
 /// Everything set up for the Note being captured.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CaptureChoices {
+    /// The Kind it is made as it is written (#310).
+    pub kind: CaptureKind,
     /// The Area or Topic picked with "File into…".
     pub place: Option<String>,
     pub importance: Importance,
@@ -180,6 +202,8 @@ pub enum Ask {
     Spawn(Spawn),
     Importance(Importance),
     MakeTally,
+    /// The Kind it is made (#310).
+    Kind(CaptureKind),
     /// The lines go into the Shopping List of this Note.
     Shopping(String),
     /// Drops the choice again.
@@ -200,20 +224,52 @@ pub enum Opens {
 
 impl CaptureChoices {
     /// Whether the Note leaves Unsorted going into `place`: filed, with
-    /// something spawned from it or made of it, or going into a Shopping
-    /// List. It needs no Nudge then.
+    /// something spawned from it or made of it, made a list (#310), or
+    /// going into a Shopping List. It needs no Nudge then.
     pub fn sorted(&self, place: Option<&str>) -> bool {
         place.is_some()
+            || self.list_kind()
             || self.tally.is_some()
             || !self.schedules.is_empty()
             || self.frog
             || self.shopping.is_some()
     }
 
+    /// Whether a Checklist or Shopping List is chosen as the Kind (#310).
+    pub fn list_kind(&self) -> bool {
+        self.kind != CaptureKind::Text
+    }
+
+    /// Whether the Kind choice shows (#310): not while a Shopping List is
+    /// picked, where the other choices wait unshown too, nor while a Tally
+    /// or Session is set up, which makes the Note that kind.
+    pub fn offers_kind(&self) -> bool {
+        self.shopping.is_none()
+            && self.tally.is_none()
+            && self.schedules.iter().all(|s| s.session.is_none())
+    }
+
     /// Writes all of it into the Note `note_id`, which holds its place
-    /// already, one after the other; meant for the batch [`capture`]
-    /// runs, as anything failing on the way is to undo the rest.
+    /// and its format already, one after the other: first the Kind, made
+    /// where this Device may, else it stays a Plain Note, as Capture asks
+    /// nothing (#310). Meant for the batch [`capture`] runs, as anything
+    /// failing on the way is to undo the rest.
     pub fn write(&self, store: &Store, note_id: &str) -> oldbrainfix_core::Result<()> {
+        match self.kind {
+            CaptureKind::Text => {}
+            CaptureKind::Checklist => {
+                let lists = Checklists::new(store);
+                if lists.may_make(note_id)? {
+                    lists.make_from_text(note_id)?;
+                }
+            }
+            CaptureKind::ShoppingList => {
+                let lists = ShoppingLists::new(store);
+                if lists.may_make(note_id)? {
+                    lists.make_from_text(note_id)?;
+                }
+            }
+        }
         if self.importance != Importance::Normal {
             Notes::new(store).set_importance(note_id, self.importance)?;
         }
@@ -282,6 +338,7 @@ impl CaptureChoices {
             }
             Ask::Importance(importance) => self.importance = importance,
             Ask::MakeTally => return Ok(Some(Opens::Tally)),
+            Ask::Kind(kind) => self.kind = kind,
             Ask::Shopping(list) => self.shopping = Some(list),
             Ask::Remove(chip) => match chip {
                 Chip::Place => self.place = None,
@@ -356,6 +413,11 @@ pub fn capture(
     let note = |choices: &CaptureChoices| {
         let mut choices = choices.clone();
         choices.shopping = None;
+        // The Kind is made of the typed lines: nothing typed, it stays a
+        // Plain Note (#310).
+        if text.is_empty() {
+            choices.kind = CaptureKind::Text;
+        }
         // A sorted Note needs no Nudge (#113).
         let nudge = (!choices.sorted(place)).then_some(nudge_in);
         store.batch(|| {
@@ -841,8 +903,12 @@ pub fn action_row(
             asked = Some(RowAsk::ToEditor);
         }
         // At once into another Note (#308); a Routine, Reminder, Session,
-        // Frog or Tally needs the Note itself.
-        if choices.tally.is_none() && choices.schedules.is_empty() && !choices.frog {
+        // Frog or Tally needs the Note itself, as a list Kind does (#310).
+        if choices.tally.is_none()
+            && choices.schedules.is_empty()
+            && !choices.frog
+            && !choices.list_kind()
+        {
             let add = egui::Button::new(RichText::new(t.add_to_note()).color(text));
             if ui.add_enabled(ready, add).clicked() {
                 asked = Some(RowAsk::AddToNote);
@@ -872,8 +938,10 @@ pub fn action_row(
                     // A Note has one open Frog at a time; Frogs and
                     // Sessions are made only in Advanced (#197), once
                     // switched on.
+                    // A Note of a list Kind becomes no Session (#310).
                     let extra = matches!(spawn, Spawn::Frog | Spawn::Session);
                     if (spawn == Spawn::Frog && choices.frog)
+                        || (spawn == Spawn::Session && choices.list_kind())
                         || (extra && !(quick.schedule && quick.advanced))
                     {
                         continue;
@@ -887,7 +955,8 @@ pub fn action_row(
                 }
             });
         }
-        let tally = quick.schedule && quick.advanced && choices.tally.is_none();
+        let tally =
+            quick.schedule && quick.advanced && choices.tally.is_none() && !choices.list_kind();
         if !quick.importance && !tally && lists.is_empty() {
             return;
         }
@@ -931,6 +1000,23 @@ pub fn action_row(
         ui.label(RichText::new(t.only_managers()).small().color(weak));
     }
     asked
+}
+
+/// The Kind choice above the field (#310): Text, Checklist and Shopping
+/// List as choice chips, the one chosen picked; nothing while
+/// [`CaptureChoices::offers_kind`] says no. What was asked of it.
+pub fn kind_choice(ui: &mut Ui, t: &L10n, choices: &CaptureChoices) -> Option<Ask> {
+    if !choices.offers_kind() {
+        return None;
+    }
+    let mut picked = choices.kind;
+    let options = [
+        (CaptureKind::Text, t.text().to_string()),
+        (CaptureKind::Checklist, t.checklist_heading().to_string()),
+        (CaptureKind::ShoppingList, t.shopping_heading().to_string()),
+    ];
+    let changed = crate::app::chip_row(ui, &mut picked, options);
+    (changed && picked != choices.kind).then_some(Ask::Kind(picked))
 }
 
 /// What was set up for the Note, at the top, not saved yet: where it

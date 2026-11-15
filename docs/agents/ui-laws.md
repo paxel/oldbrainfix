@@ -102,6 +102,20 @@ replace a law of Both apps where they say so. A desktop law marked
   with that Nudge time, so the single-choice law does not apply to them.
   Where the Device switched the Nudge buttons off (Settings ▸ Quick
   note), one Save takes their place, and it nudges in 1 h as leaving does.
+- **Capture offers the Kind above the field** (#310, Q715): Text,
+  Checklist and Shopping List as choice chips, Text picked at first, on
+  every text capture screen, in Simple too, behind the App Lock too. A
+  Checklist or Shopping List makes the Note that list as it is saved, each
+  typed line a Line unless the first is a heading, which is then its Name
+  (#309); Text keeps it a Plain Note. **The Kind applies to the typed text
+  only**: a recording's Transcript, a photo and a file stay on the Note as
+  its own and never become Lines, and with nothing typed the Note stays a
+  Plain Note. The list needs the Note itself: while one is chosen, Add to
+  Note…, "Make it a Tally" and the Session are not offered, and a Tally or
+  Session set up hides the choice until its chip is dropped. The Kind is
+  made only on leaving; a Note written before, as the app went to the
+  background, waits as a Plain Note with its Nudge. The Kind "Shopping
+  List" makes a new list; Add to a Shopping List adds to one there is.
 - **Add to a Shopping List** makes each line of the capture a Line of
   the list picked, and keeps no Note. While a list is picked, the other
   choices wait unshown. It is not offered with a photo on the screen, a
@@ -113,9 +127,10 @@ replace a law of Both apps where they say so. A desktop law marked
   taps a save button. Nothing is half-saved: for an empty Note nothing
   is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs
   on an empty Note.
-- **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, or
-  a Routine, Reminder, Frog, Session or Tally is set up, the three
-  Nudge buttons become one Save and no Nudge is set; leaving saves too.
+- **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, a
+  Routine, Reminder, Frog, Session or Tally is set up, or a Checklist or
+  Shopping List is chosen as its Kind (#310), the three Nudge buttons
+  become one Save and no Nudge is set; leaving saves too.
 
 ### Agenda
 
@@ -391,13 +406,17 @@ replace a law of Both apps where they say so. A desktop law marked
   the kind's content for a Note of a kind (#188), like a shield: left an icon for *which
   setting* the badge is, the same for every value (one for the kind,
   one for the Importance, …), right its value (#192), as an **icon**
-  where the setting has a fixed set of values (the kind, the text
+  where the setting has a fixed set of values (the text
   format, the Importance, Show on the Agenda, Show ticks, a Tally
   field's rule, a Session's rule; an on-or-off setting as `toggle_on` /
   `toggle_off`),
   as **short text** otherwise ("Every day · 08:00", "Household",
   "50 pages", "Reps"). **Never an icon plus the same word.** The
-  desktop draws the same Material icons as the phone. Importance; Area and Topic in one; Captured (time, place,
+  desktop draws the same Material icons as the phone. **The kind comes
+  first and in words** (#310), Plain Note included (#188): "Plain
+  Note ▾", "Checklist ▾", the ▾ (`arrow_drop_down`) only while a tap
+  opens its choice, and a screen reader reads the words alone. Then the
+  Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
   its schedule; its Frog (#259) while one is open or was eaten today or
   yesterday, the frog with "Open", "Eaten today" or "Eaten yesterday",
@@ -405,7 +424,7 @@ replace a law of Both apps where they say so. A desktop law marked
   and this Device may check it off and "Remove the Frog" for who may
   manage it, which asks nothing and is undone as the Frog view's Delete
   is (#268); for a Member an
-  eaten one only shows; the kind, Plain Note included (#188); the text format of
+  eaten one only shows; the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box; "From Ann" while
@@ -1007,10 +1026,11 @@ replace a law of Both apps where they say so. A desktop law marked
   says whether Android has the service on and opens Android's print
   settings, where only the user turns it on; the iPhone has no row.
 - **The quick note is uncluttered** (#142): by default it shows the
+  Kind choice above the text field (#310, no switch in Settings), the
   text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
   **To full editor**, **Add to Note…** (#308) and the alarm clock beside them (#223), whose menu
   offers Routine and Reminder as the Note editor's "+" does, in Simple
-  too; nothing else that sorts and no chips. The Routine or Reminder
+  too; nothing else that sorts and no other chips. The Routine or Reminder
   editor opens over the quick note and comes back to it with the choice
   at the top, written only with the Note. To full editor
   saves the Note at once, Unsorted with the default Nudge, and opens the
@@ -1028,7 +1048,8 @@ replace a law of Both apps where they say so. A desktop law marked
   Back in the picker leaves the capture as it was. It waits as To full
   editor does and is not offered behind the App Lock, while a Shopping
   List is picked, nor once a Routine, Reminder, Session, Frog or Tally
-  is set up, which need the Note itself; a place picked gives way to
+  is set up or a Checklist or Shopping List is chosen as its Kind
+  (#310), which need the Note itself; a place picked gives way to
   the Note's.
 - **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
   all off by default, for File into…, Frog, Session or Tally (only in
@@ -1694,7 +1715,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **On the desktop** the capture popup and the window's quick note
   dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
   quick note and follow the same switches (desktop Settings ▸ Quick
-  note, beside Quick capture): by default the text, Record voice, Paste
+  note, beside Quick capture): by default the Kind choice above the
+  text as radio pills (#310), the text, Record voice, Paste
   (the dialog also From file…), the Nudge buttons, To full editor, Add
   to Note… (#308), a dialog over the quick note dialog or a page of the
   popup, and the alarm clock, whose menu offers Routine and Reminder (#223), its
