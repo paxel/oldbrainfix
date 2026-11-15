@@ -18,7 +18,8 @@ import 'open_settings.dart';
 /// Asking from the phone (#267, ADR 0051): the phone asks the user's own
 /// desktop, only once the user allowed the provider it names; answers
 /// link their Notes, which open here, and can be kept as a Note; a
-/// question not answered says why at the top.
+/// question not answered says why at the top. The questions stand as a
+/// thread, the oldest first, each with Edit (#315).
 void main() {
   late Store store;
   late Announcements announcements;
@@ -38,13 +39,15 @@ void main() {
 
   Finder key(String value) => find.byKey(ValueKey(value));
 
-  /// The Ask page over a page that opens it, on a tall screen.
+  /// The Ask page over a page that opens it, on a tall screen unless
+  /// [size] says otherwise.
   Future<void> pumpAsk(
     WidgetTester tester,
     DesktopAsking asking, {
     bool settle = true,
+    Size size = const Size(1200, 3600),
   }) async {
-    tester.view.physicalSize = const Size(1200, 3600);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -312,10 +315,10 @@ void main() {
         contains('blue folder'),
         reason: 'the earlier answer goes along',
       );
-      // Newest first.
+      // A thread, the oldest first (#315).
       expect(
-        tester.getTopLeft(find.text('Since when?')).dy,
-        lessThan(tester.getTopLeft(find.text('Where is my passport?')).dy),
+        tester.getTopLeft(find.text('Where is my passport?')).dy,
+        lessThan(tester.getTopLeft(find.text('Since when?')).dy),
       );
       await tester.tap(key('ask-start-over'));
       await tester.pumpAndSettle();
@@ -373,10 +376,10 @@ void main() {
       // order read.
       linked = false;
       await ask(tester, 'And now?');
-      expect(key('ask-source-0'), findsNothing);
+      expect(key('ask-source-1'), findsNothing);
       expect(
-        tester.getTopLeft(key('ask-also-read-0-${booth.id}')).dy,
-        lessThan(tester.getTopLeft(key('ask-also-read-0-${passport.id}')).dy),
+        tester.getTopLeft(key('ask-also-read-1-${booth.id}')).dy,
+        lessThan(tester.getTopLeft(key('ask-also-read-1-${passport.id}')).dy),
       );
     });
 
@@ -399,9 +402,10 @@ void main() {
       expect(find.text('A source could not be checked.'), findsOneWidget);
       unchecked = false;
       await ask(tester, 'And the ID card?');
-      // Newest first: the new answer is marked nothing, the first still.
-      expect(key('ask-unchecked-0'), findsNothing);
-      expect(key('ask-unchecked-1'), findsOneWidget);
+      // The oldest first: the new answer is marked nothing, the first
+      // still.
+      expect(key('ask-unchecked-0'), findsOneWidget);
+      expect(key('ask-unchecked-1'), findsNothing);
       expect(find.text('A source could not be checked.'), findsOneWidget);
     });
 
@@ -429,6 +433,118 @@ void main() {
       await tester.tap(key('ask-kept-0'));
       await tester.pumpAndSettle();
       expect(opened, [AppLink(AppLinkKind.note, kept.id)]);
+    });
+  });
+
+  group('the thread (#315)', () {
+    String field(WidgetTester tester) =>
+        tester.widget<TextField>(key('ask-question')).controller!.text;
+
+    testWidgets('holds the questions, the oldest first, above the field', (
+      tester,
+    ) async {
+      store.allowAsking(fakeClaude);
+      final desk = FakeAsking(
+        answer: (question) => AskReply.answered(
+          DesktopAnswer(text: 'Answer to $question', notes: const []),
+        ),
+      );
+      await pumpAsk(tester, desk);
+      await ask(tester, 'Where is my passport?');
+      await ask(tester, 'And which drawer?');
+      double top(String value) => tester.getTopLeft(key(value)).dy;
+      expect(top('ask-question-0'), lessThan(top('ask-answer-0')));
+      expect(top('ask-answer-0'), lessThan(top('ask-question-1')));
+      expect(top('ask-question-1'), lessThan(top('ask-answer-1')));
+      expect(top('ask-answer-1'), lessThan(top('ask-question')));
+      expect(
+        tester.widget<Text>(key('ask-question-1')).data,
+        'And which drawer?',
+      );
+    });
+
+    testWidgets('Edit puts a question into the field, the cursor at its end, '
+        'to ask it again after the others; the thread keeps it', (
+      tester,
+    ) async {
+      store.allowAsking(fakeClaude);
+      final desk = FakeAsking(
+        answer: (question) => AskReply.answered(
+          DesktopAnswer(text: 'Answer to $question', notes: const []),
+        ),
+      );
+      await pumpAsk(tester, desk);
+      await ask(tester, 'Where is my passport?');
+      await ask(tester, 'And which drawer?');
+      await tester.tap(key('ask-edit-0'));
+      await tester.pumpAndSettle();
+      final typed = tester.widget<TextField>(key('ask-question')).controller!;
+      expect(typed.text, 'Where is my passport?');
+      expect(
+        typed.selection,
+        const TextSelection.collapsed(offset: 'Where is my passport?'.length),
+      );
+      expect(
+        tester.widget<TextField>(key('ask-question')).focusNode?.hasFocus,
+        isTrue,
+      );
+      await tester.enterText(key('ask-question'), 'Where is my old passport?');
+      await tester.tap(key('ask-button'));
+      await tester.pumpAndSettle();
+      expect(desk.asked.last.$1, 'Where is my old passport?');
+      expect(
+        [for (final e in desk.asked.last.$2) e.question],
+        ['Where is my passport?', 'And which drawer?'],
+        reason: 'asked after the whole thread',
+      );
+      expect(
+        tester.widget<Text>(key('ask-question-0')).data,
+        'Where is my passport?',
+      );
+      expect(
+        tester.widget<Text>(key('ask-question-2')).data,
+        'Where is my old passport?',
+      );
+      expect(field(tester), isEmpty);
+    });
+
+    testWidgets('while a question runs, Edit waits', (tester) async {
+      store.allowAsking(fakeClaude);
+      final desk = FakeAsking();
+      await pumpAsk(tester, desk);
+      await ask(tester, 'Where is my passport?');
+      desk.hold = Completer<void>();
+      await tester.enterText(key('ask-question'), 'And which drawer?');
+      await tester.tap(key('ask-button'));
+      await tester.pump();
+      expect(tester.widget<TextButton>(key('ask-edit-0')).onPressed, isNull);
+      desk.hold!.complete();
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(key('ask-edit-0')).onPressed, isNotNull);
+    });
+
+    testWidgets('a question asked scrolls the thread to it, the field '
+        'staying under it', (tester) async {
+      store.allowAsking(fakeClaude);
+      final long = List.filled(30, 'The passport is in the blue folder.');
+      final desk = FakeAsking(
+        answer: (_) => AskReply.answered(
+          DesktopAnswer(text: long.join(' '), notes: const []),
+        ),
+      );
+      await pumpAsk(tester, desk, size: const Size(400, 800));
+      for (final question in ['First?', 'Second?', 'Third?', 'Fourth?']) {
+        await ask(tester, question);
+      }
+      final fieldTop = tester.getTopLeft(key('ask-question')).dy;
+      final newest = tester.getTopLeft(key('ask-question-3')).dy;
+      expect(newest, greaterThan(0));
+      expect(newest, lessThan(fieldTop));
+      // The first scrolled away, out of the list or above it.
+      final first = key('ask-question-0');
+      if (first.evaluate().isNotEmpty) {
+        expect(tester.getBottomLeft(first).dy, lessThan(80));
+      }
     });
   });
 

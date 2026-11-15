@@ -892,10 +892,14 @@ replace a law of Both apps where they say so. A desktop law marked
   "Asking Desk… reading 3 Notes", with Stop, which puts the question
   back into the field. A question not answered goes back into the field,
   and its cause and fix stay under it, with Details, until the next is
-  asked (#317). The
-  answers stand under the field, the newest first, each with "From
-  these Notes" and Keep as Note; Start over in the bar drops them, and
-  so does leaving the page. **An address by hand** sits under each such
+  asked (#317). **The questions stand as a thread above the field, the
+  oldest first** (#315), each with Edit, greyed while a question runs,
+  which puts it into the field with the cursor at its end to be asked
+  again after the whole thread, and under it its answer with "From
+  these Notes", "Also read" and Keep as Note; the question asked, or
+  the last one not answered, ends the thread, which scrolls to it once
+  it is asked and once it comes back. Start over in the bar drops
+  them, and so does leaving the page. **An address by hand** sits under each such
   paired Device on the Sync page, a field with its line of what it is
   for and its error under it once it is left or submitted; one kept
   while Ask is off is still tried by sync.
@@ -1544,11 +1548,16 @@ replace a law of Both apps where they say so. A desktop law marked
   the AI settings at the provider's card, and Ask cannot be pressed
   (#317). Enter or Ask (Ctrl+Enter) asks; while it waits, a status line
   under the question says whom it asks and how many Notes were read,
-  and Stop puts the question back into the field. The answers stand under
-  the field, the newest first, each with its question, its text as a
-  formatted text whose links open their Notes, "From these Notes" with
-  each Note's title as a link, and Keep as Note, then "Kept as a Note"
-  opening it. A question not answered goes back into the field, and
+  and Stop puts the question back into the field. **The questions stand
+  as a thread above the field, the oldest first** (#315), each with
+  Edit, greyed while a question runs, which puts it into the field with
+  the cursor at its end to be asked again after the whole thread, then
+  its answer as a formatted text whose links open their Notes, "From
+  these Notes" and "Also read" with each Note's title as a link, and
+  Keep as Note, then "Kept as a Note" opening it; the question asked,
+  or the last one not answered, ends the thread, which scrolls to it
+  once it is asked and once it comes back. Up in the empty field
+  fetches the last question. A question not answered goes back into the field, and
   its cause and fix stay under it until the next is asked, "Details…"
   opening them with the provider's message and Report (#317). A Note
   opens in the Note dialog over the panel, which stays. A follow-up is

@@ -5235,6 +5235,15 @@ impl App {
                     asked.kept = Some(note.id);
                 }
             }
+            // The question goes into the field to be asked again; its
+            // place in the thread stays (#315).
+            AskAsked::Edit(at) => {
+                if self.ask_run.is_none()
+                    && let Some(question) = self.ask.exchanges.get(at).map(|a| a.question.clone())
+                {
+                    self.ask.put(&question);
+                }
+            }
             AskAsked::OpenNote(id) => self.act(Action::SelectNote(id))?,
             AskAsked::Review => self.act(Action::Ai(AiAction::Review))?,
             AskAsked::Settings => self.act(Action::OpenAiSettings(Some(ASK_SECTION)))?,
@@ -5272,6 +5281,8 @@ impl App {
         // Asked again, the failure before goes (#317).
         self.ask.failed = None;
         self.ask.read = 0;
+        // The thread shows the question asked at its end (#315).
+        self.ask.scroll = true;
         let Some(redraw) = self.redraw.clone() else {
             let asked = self
                 .store
@@ -5383,6 +5394,8 @@ impl App {
     /// next is asked (#317), but for one stopped.
     fn ask_answered(&mut self, question: String, done: Result<ask::Answer, ask::AskError>) {
         self.ask.focus = true;
+        // The thread shows what came back (#315).
+        self.ask.scroll = true;
         let answer = match done {
             Ok(answer) => answer,
             Err(why) => {

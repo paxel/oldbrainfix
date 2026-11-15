@@ -3,7 +3,9 @@
 //! whose tools are answered as the AI sees the store, shows the answer
 //! with links that open the Notes it came from, keeps it as a Note, and
 //! leaves a change the model made waiting for its review; the provider's
-//! card in the Settings keeps it all on this computer. All of it only
+//! card in the Settings keeps it all on this computer. The questions
+//! stand as a thread, the oldest first, each with Edit, and Up in the
+//! empty field fetches the last (#315). All of it only
 //! while "AI (experimental)" is switched on (#334), off by default.
 //! Driven headless by egui_kittest, never over the network.
 
@@ -453,9 +455,10 @@ fn keep_as_note_saves_the_question_and_its_answer_and_leaving_drops_the_rest() -
     ask(&mut harness, "And the ID card?");
     // A follow-up is asked after the first exchange.
     assert!(fake.sent().contains("In the [blue folder]"));
+    // The thread holds the oldest first (#315).
     harness
         .get_all_by_role_and_label(Role::Button, t.ask_keep())
-        .last()
+        .next()
         .unwrap()
         .click();
     harness.run();
@@ -941,5 +944,234 @@ fn stop_puts_the_question_back_and_drops_what_comes_after() -> TestResult {
     harness.step();
     harness.step();
     assert!(harness.state().ask_panel().exchanges.is_empty());
+    Ok(())
+}
+
+// ------------------------------------------------------------ the thread
+
+/// The "Edit" beside `question` in the thread (#315).
+fn edit_of<'a>(harness: &'a Harness<'_, App>, question: &str) -> egui_kittest::Node<'a> {
+    let row = harness.get_all_by_label(question).next().unwrap().rect();
+    harness
+        .get_all_by_role_and_label(Role::Button, L10n::new("en").edit())
+        .find(|edit| {
+            let y = edit.rect().center().y;
+            row.min.y <= y && y <= row.max.y
+        })
+        .expect("no Edit beside the question")
+}
+
+/// A reply that reads the passport's Note, then one that answers `text`.
+fn read_then(passport: &str, text: &str) -> [Value; 2] {
+    [
+        tool_use("read_note", json!({"id": passport})),
+        end_turn(text),
+    ]
+}
+
+#[test]
+fn the_questions_stand_as_a_thread_the_oldest_first_above_the_field() -> TestResult {
+    let (store, passport) = store()?;
+    let fake = Fake::new(
+        [
+            read_then(&passport, "In the blue folder."),
+            read_then(&passport, "In the drawer of the desk."),
+        ]
+        .concat(),
+    );
+    let mut harness = harness(store, &fake);
+    ask(&mut harness, "Where is my passport?");
+    ask(&mut harness, "And which drawer?");
+    let panel = harness.state().ask_panel();
+    let questions: Vec<&str> = panel
+        .exchanges
+        .iter()
+        .map(|a| a.question.as_str())
+        .collect();
+    assert_eq!(questions, ["Where is my passport?", "And which drawer?"]);
+    // The follow-up is asked after the first exchange, as ADR 0051 has it.
+    assert!(fake.sent().contains("In the blue folder."));
+    let top = |label: &str| harness.get_all_by_label(label).next().unwrap().rect().min.y;
+    let field_top = field(&harness, L10n::new("en").ask_hint()).rect().min.y;
+    assert!(top("Where is my passport?") < top("In the blue folder."));
+    assert!(top("In the blue folder.") < top("And which drawer?"));
+    assert!(top("In the drawer of the desk.") < field_top);
+    Ok(())
+}
+
+#[test]
+fn edit_puts_a_question_into_the_field_to_ask_again_and_the_thread_keeps_it() -> TestResult {
+    let (store, passport) = store()?;
+    let fake = Fake::new(
+        [
+            read_then(&passport, "In the blue folder."),
+            read_then(&passport, "In the drawer of the desk."),
+            read_then(&passport, "Your passport is in the blue folder."),
+        ]
+        .concat(),
+    );
+    let hint = L10n::new("en").ask_hint();
+    let mut harness = harness(store, &fake);
+    ask(&mut harness, "Where is my passport?");
+    ask(&mut harness, "And which drawer?");
+    edit_of(&harness, "Where is my passport?").click();
+    harness.run();
+    assert_eq!(
+        harness.state().ask_panel().question,
+        "Where is my passport?"
+    );
+    assert!(field(&harness, hint).accesskit_node().is_focused());
+    // The cursor at its end: what is typed goes after it.
+    field(&harness, hint).type_text(" At home");
+    harness.run();
+    assert_eq!(
+        harness.state().ask_panel().question,
+        "Where is my passport? At home"
+    );
+    harness.key_press(Key::Enter);
+    harness.run();
+    let questions: Vec<String> = harness
+        .state()
+        .ask_panel()
+        .exchanges
+        .iter()
+        .map(|a| a.question.clone())
+        .collect();
+    assert_eq!(
+        questions,
+        [
+            "Where is my passport?",
+            "And which drawer?",
+            "Where is my passport? At home"
+        ]
+    );
+    assert!(harness.state().ask_panel().question.is_empty());
+    Ok(())
+}
+
+#[test]
+fn up_in_the_empty_field_fetches_the_last_question() -> TestResult {
+    let (store, passport) = store()?;
+    let fake = Fake::new(
+        [
+            read_then(&passport, "In the blue folder."),
+            read_then(&passport, "In the drawer of the desk."),
+        ]
+        .concat(),
+    );
+    let hint = L10n::new("en").ask_hint();
+    let mut harness = harness(store, &fake);
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
+    harness.run();
+    // Nothing asked yet: Up fetches nothing.
+    harness.key_press(Key::ArrowUp);
+    harness.run();
+    assert!(harness.state().ask_panel().question.is_empty());
+    ask(&mut harness, "Where is my passport?");
+    ask(&mut harness, "And which drawer?");
+    assert!(field(&harness, hint).accesskit_node().is_focused());
+    // With words in the field, Up leaves them.
+    field(&harness, hint).type_text("Wh");
+    harness.run();
+    harness.key_press(Key::ArrowUp);
+    harness.run();
+    assert_eq!(harness.state().ask_panel().question, "Wh");
+    // egui's own Up took the cursor to the start.
+    harness.key_press(Key::End);
+    harness.key_press(Key::Backspace);
+    harness.key_press(Key::Backspace);
+    harness.run();
+    assert!(harness.state().ask_panel().question.is_empty());
+    harness.key_press(Key::ArrowUp);
+    harness.run();
+    assert_eq!(harness.state().ask_panel().question, "And which drawer?");
+    // The cursor at its end.
+    field(&harness, hint).type_text(" Left?");
+    harness.run();
+    assert_eq!(
+        harness.state().ask_panel().question,
+        "And which drawer? Left?"
+    );
+    Ok(())
+}
+
+#[test]
+fn while_a_question_is_asked_edit_waits() -> TestResult {
+    let (store, passport) = store()?;
+    let fake = Fake::new(
+        [
+            read_then(&passport, "In the blue folder."),
+            read_then(&passport, "In the drawer of the desk."),
+        ]
+        .concat(),
+    );
+    let mut app = App::new(store, "en");
+    app.set_ask_transport(Arc::new(Slow(fake)));
+    app.set_redraw(Arc::new(|| {}));
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    ask_off_thread(&mut harness, "Where is my passport?");
+    until(&mut harness, |app| !app.ask_panel().exchanges.is_empty());
+    assert!(
+        !edit_of(&harness, "Where is my passport?")
+            .accesskit_node()
+            .is_disabled()
+    );
+    ask_off_thread(&mut harness, "And which drawer?");
+    assert!(harness.state().ask_panel().asking.is_some());
+    let edit = edit_of(&harness, "Where is my passport?");
+    assert!(edit.accesskit_node().is_disabled());
+    edit.click();
+    harness.step();
+    assert!(harness.state().ask_panel().question.is_empty());
+    until(&mut harness, |app| app.ask_panel().exchanges.len() == 2);
+    assert!(
+        !edit_of(&harness, "Where is my passport?")
+            .accesskit_node()
+            .is_disabled()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_question_asked_scrolls_the_thread_to_it() -> TestResult {
+    let (store, passport) = store()?;
+    let long = "The passport is in the blue folder. ".repeat(40);
+    let fake = Fake::new(
+        (0..4)
+            .flat_map(|_| read_then(&passport, &long))
+            .collect::<Vec<_>>(),
+    );
+    let mut app = App::new(store, "en");
+    app.set_ask_transport(Arc::new(fake.clone()));
+    let height = 600.0;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, height))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    for question in ["First?", "Second?", "Third?", "Fourth?"] {
+        ask(&mut harness, question);
+    }
+    harness.run_steps(4);
+    let top = |label: &str| harness.get_all_by_label(label).next().unwrap().rect().min.y;
+    let field_top = field(&harness, L10n::new("en").ask_hint()).rect().min.y;
+    // The newest in view above the field, the oldest scrolled away.
+    let newest = top("Fourth?");
+    assert!(0.0 < newest && newest < field_top, "{newest} {field_top}");
+    assert!(top("First?") < 0.0, "{}", top("First?"));
     Ok(())
 }

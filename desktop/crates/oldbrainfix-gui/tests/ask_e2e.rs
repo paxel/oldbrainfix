@@ -6,7 +6,9 @@
 //! connection, answered by the [`AskDesk`] beside the syncs as the app
 //! runs it, a phone of the user's own proving itself with its key as the
 //! Dart core's `askDesktop` does. The panel itself is drawn with a real
-//! answer into PNG files for the report.
+//! answer into PNG files for the report. Two questions in one session
+//! stand in the panel's thread, and reach the desktop from the phone the
+//! second after the first (#315).
 //!
 //! Every test is ignored: neither `cargo test` nor CI runs them. The
 //! script does, one at a time:
@@ -43,7 +45,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::ask::{
-    AskError, Asked, Conversation, Protocol, Reply, Request, Transport, Web,
+    AskError, Asked, Conversation, Exchange, Protocol, Reply, Request, Transport, Web,
 };
 use oldbrainfix_core::lan::{
     DEVICE_HEADER, NONCE_HEADER, PROOF_HEADER, paired_proof_bytes, sync_request,
@@ -193,6 +195,8 @@ struct Round {
 struct Recorded {
     web: Arc<Web>,
     rounds: Arc<Mutex<Vec<Round>>>,
+    /// The body of every request, in turn.
+    sent: Arc<Mutex<Vec<String>>>,
 }
 
 impl Recorded {
@@ -200,7 +204,12 @@ impl Recorded {
         Recorded {
             web: Arc::new(Web::new()),
             rounds: Arc::default(),
+            sent: Arc::default(),
         }
+    }
+
+    fn sent(&self) -> Vec<String> {
+        self.sent.lock().unwrap().clone()
     }
 
     fn rounds(&self) -> Vec<Round> {
@@ -229,6 +238,7 @@ impl Recorded {
 
 impl Transport for Recorded {
     fn post(&self, request: &Request) -> Result<Reply, String> {
+        self.sent.lock().unwrap().push(request.body.clone());
         let started = Instant::now();
         let reply = self.web.post(request);
         let took = started.elapsed();
@@ -588,16 +598,21 @@ struct PhoneAsked {
     progress: Vec<(u16, String)>,
 }
 
+/// What the phone heard to each question of a session, and the seeded
+/// Notes' ids.
+type PhoneSession = (Vec<PhoneAsked>, HashMap<String, String>);
+
 /// The desktop seeded with the Notes asking `url` for `model`, hosting
-/// for a phone of the user's own paired with it, which asks `question`
-/// after it learnt the provider; the desktop's rounds are recorded by
-/// `transport`.
+/// for a phone of the user's own paired with it, which asks `questions`
+/// in one session after it learnt the provider, each after the ones
+/// answered before it, as the phone's Ask page sends them (#315); the
+/// desktop's rounds are recorded by `transport`.
 fn ask_phone(
     url: &str,
     model: &str,
-    question: &str,
+    questions: &[&str],
     transport: &Recorded,
-) -> Result<(PhoneAsked, HashMap<String, String>), Box<dyn std::error::Error>> {
+) -> Result<PhoneSession, Box<dyn std::error::Error>> {
     let (desk, ids) = seeded(1, url, model)?;
     let desk = Arc::new(desk);
     let phone = Store::in_memory(Box::new(Utc::now), || Ok(SigningKey::from_seed([2; 32])))?;
@@ -623,47 +638,67 @@ fn ask_phone(
     hosting.check(&desk);
     let port = hosting.port().ok_or("not hosting")?;
     let desk_id = desk.device_id()?;
-    let body = Question {
-        question: question.into(),
-        earlier: Vec::new(),
-        id: Some("ask:e2e".into()),
-    }
-    .to_json();
+    let questions: Vec<String> = questions.iter().map(|q| q.to_string()).collect();
     let started = Instant::now();
     let phone = Arc::new(phone);
     let asked = std::thread::spawn(move || {
         let provider = phone_request(port, &desk_id, &phone, PROVIDER_PATH, None)?;
-        let started = Instant::now();
-        // The phone polls how far the desktop is while it waits.
-        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let poller = {
-            let (done, phone, desk_id) = (done.clone(), phone.clone(), desk_id.clone());
-            std::thread::spawn(move || {
-                let mut heard = Vec::new();
-                let about = serde_json::json!({"id": "ask:e2e"});
-                while !done.load(std::sync::atomic::Ordering::SeqCst) {
-                    std::thread::sleep(Duration::from_millis(500));
-                    if let Ok(said) =
-                        phone_request(port, &desk_id, &phone, STATUS_PATH, Some(&about))
-                    {
-                        heard.push(said);
+        let mut heard = Vec::new();
+        let mut earlier: Vec<Exchange> = Vec::new();
+        for (n, question) in questions.into_iter().enumerate() {
+            let id = format!("ask:e2e-{n}");
+            let body = Question {
+                question: question.clone(),
+                earlier: earlier.clone(),
+                id: Some(id.clone()),
+            }
+            .to_json();
+            let started = Instant::now();
+            // The phone polls how far the desktop is while it waits.
+            let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let poller = {
+                let (done, phone, desk_id) = (done.clone(), phone.clone(), desk_id.clone());
+                std::thread::spawn(move || {
+                    let mut heard = Vec::new();
+                    let about = serde_json::json!({ "id": id });
+                    while !done.load(std::sync::atomic::Ordering::SeqCst) {
+                        std::thread::sleep(Duration::from_millis(500));
+                        if let Ok(said) =
+                            phone_request(port, &desk_id, &phone, STATUS_PATH, Some(&about))
+                        {
+                            heard.push(said);
+                        }
                     }
-                }
-                heard
-            })
-        };
-        let asked = phone_request(port, &desk_id, &phone, ASK_PATH, Some(&body));
-        let took = started.elapsed();
-        done.store(true, std::sync::atomic::Ordering::SeqCst);
-        let progress = poller.join().map_err(|_| "the poller panicked")?;
-        let (status, body) = asked?;
-        Ok::<_, String>(PhoneAsked {
-            provider,
-            status,
-            body,
-            took,
-            progress,
-        })
+                    heard
+                })
+            };
+            let asked = phone_request(port, &desk_id, &phone, ASK_PATH, Some(&body));
+            let took = started.elapsed();
+            done.store(true, std::sync::atomic::Ordering::SeqCst);
+            let progress = poller.join().map_err(|_| "the poller panicked")?;
+            let (status, body) = asked?;
+            // An answer with words goes along with the next question, as
+            // the page sends it.
+            if let Some(reply) = serde_json::from_str(&body)
+                .ok()
+                .and_then(|v: Value| AskReply::from_json(&v))
+                && let Ok(answer) = &reply.outcome
+                && !answer.text.trim().is_empty()
+            {
+                earlier.push(Exchange {
+                    question,
+                    answer: answer.text.clone(),
+                });
+            }
+            heard.push(PhoneAsked {
+                provider: provider.clone(),
+                status,
+                body,
+                took,
+                progress,
+            });
+        }
+        Ok::<_, String>(heard)
     });
     let syncing = Syncing::default();
     while !asked.is_finished() {
@@ -689,7 +724,8 @@ fn phone_answer(
     question: &str,
 ) -> Result<PhoneHeard, Box<dyn std::error::Error>> {
     let transport = Recorded::new();
-    let (asked, ids) = ask_phone(url, model, question, &transport)?;
+    let (asked, ids) = ask_phone(url, model, &[question], &transport)?;
+    let asked = asked.into_iter().next().ok_or("nothing asked")?;
     println!("=== phone via the desktop, {model} at {url}: {question}");
     println!(
         "  GET {PROVIDER_PATH}: HTTP {} {}",
@@ -826,6 +862,79 @@ fn the_phone_hears_the_provider_failed_for_a_model_it_lacks() -> TestResult {
     Ok(())
 }
 
+const FIRST: &str = "Where is my passport?";
+const SECOND: &str = "What is the wifi password?";
+
+#[test]
+#[ignore = "needs Ollama with a model: tool/ask-e2e.sh run"]
+fn the_phone_asks_two_questions_in_one_session_the_second_after_the_first() -> TestResult {
+    let transport = Recorded::new();
+    let (heard, ids) = ask_phone(&url(), &model(), &[FIRST, SECOND], &transport)?;
+    println!(
+        "=== phone session via the desktop, {} at {}",
+        model(),
+        url()
+    );
+    print_rounds(&transport.rounds());
+    assert_eq!(heard.len(), 2);
+    let mut answers = Vec::new();
+    for (question, asked) in [FIRST, SECOND].iter().zip(&heard) {
+        println!(
+            "  {question} -> POST {ASK_PATH} after {:.1}s: HTTP {} {}",
+            asked.took.as_secs_f64(),
+            asked.status,
+            asked.body
+        );
+        assert_eq!(asked.status, 200, "{}", asked.body);
+        let reply = AskReply::from_json(&serde_json::from_str(&asked.body)?).ok_or("no reply")?;
+        let answer = match reply.outcome {
+            Ok(answer) => answer,
+            Err(failure) => panic!("no answer to {question:?}: {failure:?}"),
+        };
+        assert!(!answer.text.trim().is_empty(), "an empty answer");
+        assert!(
+            asked.took <= limit(),
+            "took {:?}, over {:?}",
+            asked.took,
+            limit()
+        );
+        answers.push(answer.text);
+    }
+    println!(
+        "  read_note asked for: {:?}",
+        transport
+            .read_asked()
+            .iter()
+            .map(|id| titled(&ids, id))
+            .collect::<Vec<_>>()
+    );
+    // The second question went with the first and its answer (#315).
+    let second = transport
+        .sent()
+        .into_iter()
+        .find(|body| body.contains(SECOND))
+        .ok_or("the second question never reached the model")?;
+    assert!(
+        second.contains(FIRST),
+        "the first question did not go along"
+    );
+    let first_answer = serde_json::to_string(&answers[0])?;
+    let first_answer = first_answer.trim_matches('"');
+    assert!(
+        second.contains(first_answer),
+        "the first answer did not go along"
+    );
+    assert!(
+        transport.read_asked().contains(&ids[PASSPORT]),
+        "the passport's Note was not read"
+    );
+    assert!(
+        transport.read_asked().contains(&ids[WIFI]),
+        "the wifi's Note was not read"
+    );
+    Ok(())
+}
+
 // ------------------------------------------------- the panel's frames
 
 /// The Ask panel over the seeded Notes asking `url` for `model`, with
@@ -930,5 +1039,98 @@ fn the_panel_is_drawn_with_real_answers_and_a_failure() -> TestResult {
         "Where is my passport?",
         "ask-ollama-stopped.png",
     )?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "needs Ollama with a model and a GPU or lavapipe: tool/ask-e2e.sh run"]
+fn the_panel_holds_two_questions_of_a_session_in_its_thread() -> TestResult {
+    let (store, ids) = seeded(1, &url(), &model())?;
+    let transport = Recorded::new();
+    let mut app = App::new(store, "en");
+    app.set_wall_clock(Arc::new(wall));
+    app.set_ask_transport(Arc::new(transport.clone()));
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .with_theme(egui::Theme::Light)
+        .wgpu()
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.input_mut().system_theme = Some(egui::Theme::Light);
+    harness.run_steps(4);
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::K);
+    harness.run();
+    println!("=== panel session, {} at {}", model(), url());
+    for question in [FIRST, SECOND] {
+        harness.get_by(|n| n.is_focused()).type_text(question);
+        harness.run();
+        let started = Instant::now();
+        // Without a way to wake the window the panel asks at once, here.
+        harness.key_press(egui::Key::Enter);
+        harness.run();
+        println!(
+            "  {question} answered after {:.1}s",
+            started.elapsed().as_secs_f64()
+        );
+        harness.run_steps(4);
+    }
+    print_rounds(&transport.rounds());
+    let panel = harness.state().ask_panel();
+    for asked in &panel.exchanges {
+        println!("  thread: {:?} -> {:?}", asked.question, asked.answer.text);
+        println!(
+            "    sources shown {:?}, also read shown {:?}, read {:?}",
+            asked.sources.iter().map(|(_, t)| t).collect::<Vec<_>>(),
+            asked.also_read.iter().map(|(_, t)| t).collect::<Vec<_>>(),
+            asked
+                .answer
+                .read
+                .iter()
+                .map(|id| titled(&ids, id))
+                .collect::<Vec<_>>()
+        );
+    }
+    if let Some(failed) = &panel.failed {
+        println!("  not answered: {:?}", (&failed.question, &failed.cause));
+    }
+    let file = shots_dir().join("ask-thread.png");
+    harness.render()?.save(&file)?;
+    println!("  drawn: {}", file.display());
+    let panel = harness.state().ask_panel();
+    let questions: Vec<&str> = panel
+        .exchanges
+        .iter()
+        .map(|a| a.question.as_str())
+        .collect();
+    assert_eq!(questions, [FIRST, SECOND], "both in the thread, in turn");
+    for asked in &panel.exchanges {
+        assert!(!asked.answer.text.trim().is_empty(), "an empty answer");
+    }
+    assert!(panel.exchanges[0].answer.read.contains(&ids[PASSPORT]));
+    assert!(panel.exchanges[1].answer.read.contains(&ids[WIFI]));
+    // Both stand in the panel, the first above the second.
+    let top = |label: &str| harness.get_all_by_label(label).next().unwrap().rect().min.y;
+    assert!(top(FIRST) < top(SECOND));
+    // Edit puts the first into the field to ask again (#315).
+    let row = harness.get_all_by_label(FIRST).next().unwrap().rect();
+    let edit = L10n::new("en").edit();
+    harness
+        .get_all_by_label(edit)
+        .find(|b| {
+            let y = b.rect().center().y;
+            row.min.y <= y && y <= row.max.y
+        })
+        .ok_or("no Edit beside the first question")?
+        .click();
+    harness.run();
+    assert_eq!(harness.state().ask_panel().question, FIRST);
+    let file = shots_dir().join("ask-thread-edit.png");
+    harness.render()?.save(&file)?;
+    println!("  drawn: {}", file.display());
     Ok(())
 }

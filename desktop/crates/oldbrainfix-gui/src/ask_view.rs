@@ -4,21 +4,25 @@
 //! naming it and that only what the model finds and reads is sent; while
 //! it runs, a status line under it says whom it asks and how many Notes
 //! the model has read, and a question not answered stays under its
-//! question with its cause and fix until the next is asked (#317). Each
+//! question with its cause and fix until the next is asked (#317). The
+//! questions stand as a thread, the oldest first, the question field
+//! under it (#315): each with "Edit", which puts it into the field to
+//! ask again, and Up in the empty field fetches the last one. Each
 //! answer shows with links to the Notes it came from, then to the other
 //! Notes the model read for it under "Also read" (#314), which open them,
 //! and "Keep as Note". What the model changed waits as an AI Task for its
-//! review. The answers are gone once the list shows another place.
+//! review. The thread is gone once the list shows another place.
 //!
 //! The AI settings' card where the provider is entered is here too: the
 //! protocol, the base URL of an OpenAI-compatible provider, the model and
 //! the API key, a local setting of this computer.
 
-use egui::{Id, Key, RichText, TextEdit, Ui};
+use egui::text::{CCursor, CCursorRange};
+use egui::{Align, Id, Key, Layout, RichText, TextEdit, Ui};
 use oldbrainfix_core::ask::{Answer, AskError, Exchange, Protocol, Provider, Unready};
 use oldbrainfix_core::text_format;
 
-use crate::app::{embossed, list_scroll, name_field};
+use crate::app::{embossed, name_field};
 use crate::l10n::L10n;
 use crate::text_marks_view::{self, BoxLook};
 use crate::theme::{self, Tones};
@@ -39,6 +43,12 @@ pub struct AskPanel {
     pub failed: Option<AskFailed>,
     /// Whether the question field takes the keyboard.
     pub focus: bool,
+    /// Whether the cursor goes to the end of the field's text, put there
+    /// by Edit or Up (#315).
+    pub to_end: bool,
+    /// Whether the thread scrolls to its newest question, once it was
+    /// asked or came back (#315).
+    pub scroll: bool,
 }
 
 /// A question not answered (#317): why, how to fix it, and what the
@@ -58,6 +68,23 @@ impl AskPanel {
             && self.exchanges.is_empty()
             && self.asking.is_none()
             && self.failed.is_none()
+    }
+
+    /// The last question asked, which Up in the empty field fetches
+    /// (#315): the one not answered, else the newest answered.
+    pub fn last_question(&self) -> Option<&str> {
+        match &self.failed {
+            Some(failed) => Some(&failed.question),
+            None => self.exchanges.last().map(|asked| asked.question.as_str()),
+        }
+    }
+
+    /// Puts `question` into the field to be asked again, the cursor at
+    /// its end (#315).
+    pub fn put(&mut self, question: &str) {
+        self.question = question.to_string();
+        self.focus = true;
+        self.to_end = true;
     }
 
     /// The questions answered so far, which a follow-up is asked after;
@@ -100,6 +127,8 @@ pub enum AskAsked {
     StartOver,
     /// Keeps the question and answer at this place as a Note.
     Keep(usize),
+    /// Puts the question at this place into the field (#315).
+    Edit(usize),
     /// Opens a Note an answer came from, or the one it was kept as.
     OpenNote(String),
     /// Shows the review of the AI Task.
@@ -171,12 +200,13 @@ pub fn unready_line(t: &L10n, unready: Unready) -> &'static str {
 }
 
 /// The panel: its heading, whom the questions go to and what is sent,
-/// the review an AI Task waits for, the question field with Ask (Stop
-/// while asking, Start over once something was asked), under it what the
-/// provider lacks while it cannot be asked, and the questions asked, the
-/// newest first: the one asked with its status line, the last one not
-/// answered with its cause and fix (#317), and each answered with its
-/// answer, the Notes it came from and "Keep as Note".
+/// the review an AI Task waits for, the questions asked as a thread, the
+/// oldest first (#315): each answered with "Edit", its answer, the Notes
+/// it came from and "Keep as Note", then the one asked with its status
+/// line, or the last one not answered with its cause and fix (#317);
+/// under the thread the question field with Ask (Stop while asking,
+/// Start over once something was asked), and under it what the provider
+/// lacks while it cannot be asked.
 pub fn page(
     ui: &mut Ui,
     t: &L10n,
@@ -187,7 +217,6 @@ pub fn page(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let error = ui.visuals().error_fg_color;
     let provider = shown.provider;
     let unready = provider.unready();
     ui.heading(RichText::new(t.ask_title()).color(text));
@@ -208,13 +237,64 @@ pub fn page(
         });
     }
     ui.add_space(6.0);
+    // The field under the thread: laid out from the bottom up, so the
+    // thread takes the room left above it.
+    ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
+        ui.add_space(8.0);
+        field_rows(ui, t, panel, provider, asked);
+        ui.add_space(6.0);
+        ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
+            thread(ui, t, tones, panel, provider, asked);
+        });
+    });
+}
+
+/// The question field with Ask, Stop or Start over, and under it what
+/// the provider lacks while it cannot be asked (#317). Up in the empty
+/// field fetches the last question (#315).
+fn field_rows(
+    ui: &mut Ui,
+    t: &L10n,
+    panel: &mut AskPanel,
+    provider: &Provider,
+    asked: &mut Vec<AskAsked>,
+) {
+    let text = ui.visuals().text_color();
+    let error = ui.visuals().error_fg_color;
+    let unready = provider.unready();
     let asking = panel.asking.is_some();
+    let id = Id::new("ask question");
+    // Laid out from the bottom up: the line under the field comes first.
+    // The field says what the provider lacks, and Ask waits (#317).
+    if let Some(why) = unready {
+        ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(unready_line(t, why)).color(error));
+                if ui
+                    .button(RichText::new(t.ask_open_settings()).color(text))
+                    .clicked()
+                {
+                    asked.push(AskAsked::Settings);
+                }
+            });
+        });
+    }
+    // Up in the empty field fetches the last question (#315).
+    let typing = ui.memory(|m| m.has_focus(id));
+    if typing
+        && !asking
+        && panel.question.is_empty()
+        && ui.input(|i| i.key_pressed(Key::ArrowUp))
+        && let Some(last) = panel.last_question().map(str::to_string)
+    {
+        panel.put(&last);
+    }
     ui.horizontal(|ui| {
         let width = (ui.available_width() - 220.0).max(160.0);
         let field = ui.add_enabled(
             !asking,
             TextEdit::singleline(&mut panel.question)
-                .id(Id::new("ask question"))
+                .id(id)
                 .hint_text(t.ask_hint())
                 .text_color(text)
                 .desired_width(width),
@@ -225,6 +305,13 @@ pub fn page(
             if !ui.is_sizing_pass() && field.has_focus() {
                 panel.focus = false;
             }
+        }
+        if std::mem::take(&mut panel.to_end)
+            && let Some(mut state) = egui::text_edit::TextEditState::load(ui.ctx(), id)
+        {
+            let end = CCursor::new(panel.question.chars().count());
+            state.cursor.set_char_range(Some(CCursorRange::one(end)));
+            state.store(ui.ctx(), id);
         }
         let typed = !panel.question.trim().is_empty();
         let may = unready.is_none() && !asking && typed;
@@ -245,54 +332,79 @@ pub fn page(
             asked.push(AskAsked::StartOver);
         }
     });
-    // The field says what the provider lacks, and Ask waits (#317).
-    if let Some(why) = unready {
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(unready_line(t, why)).color(error));
-            if ui
-                .button(RichText::new(t.ask_open_settings()).color(text))
-                .clicked()
-            {
-                asked.push(AskAsked::Settings);
+}
+
+/// The questions asked, the oldest first (#315), each answered with
+/// "Edit", greyed while a question is asked; then the one asked with its
+/// status line, or the last not answered with its cause and fix (#317).
+/// Once a question was asked or came back, it scrolls to the newest.
+fn thread(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    panel: &mut AskPanel,
+    provider: &Provider,
+    asked: &mut Vec<AskAsked>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let error = ui.visuals().error_fg_color;
+    let asking = panel.asking.is_some();
+    let scroll = std::mem::take(&mut panel.scroll);
+    // The newest: the one asked or not answered after the answers, else
+    // the last answered.
+    let newest = panel.exchanges.len().saturating_sub(usize::from(
+        panel.asking.is_none() && panel.failed.is_none(),
+    ));
+    egui::ScrollArea::vertical()
+        .id_salt("ask thread")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 10.0;
+            for (at, exchange) in panel.exchanges.iter().enumerate() {
+                if scroll && at == newest {
+                    ui.scroll_to_cursor(Some(Align::TOP));
+                }
+                embossed(ui, tones, false, None, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new(&exchange.question).strong().color(text));
+                        let edit = egui::Button::new(RichText::new(t.edit()).color(text));
+                        if ui.add_enabled(!asking, edit).clicked() {
+                            asked.push(AskAsked::Edit(at));
+                        }
+                    });
+                    answer_rows(ui, t, (at, exchange, &exchange.answer), asked);
+                });
+            }
+            if scroll && newest == panel.exchanges.len() {
+                ui.scroll_to_cursor(Some(Align::TOP));
+            }
+            if let Some(question) = &panel.asking {
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(question).strong().color(text));
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        let status = match panel.read {
+                            0 => t.ask_asking(&provider.name()),
+                            read => t.ask_asking_reading(&provider.name(), read as i64),
+                        };
+                        ui.label(RichText::new(status).color(weak));
+                    });
+                });
+            } else if let Some(failed) = &panel.failed {
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(&failed.question).strong().color(text));
+                    ui.label(RichText::new(&failed.cause).color(error));
+                    ui.label(RichText::new(&failed.fix).color(text));
+                    if ui
+                        .button(RichText::new(t.ask_failure_details()).color(text))
+                        .clicked()
+                    {
+                        asked.push(AskAsked::Details);
+                    }
+                });
             }
         });
-    }
-    ui.add_space(6.0);
-    list_scroll(ui, "ask answers", |ui| {
-        ui.spacing_mut().item_spacing.y = 10.0;
-        if let Some(question) = &panel.asking {
-            embossed(ui, tones, false, None, |ui| {
-                ui.label(RichText::new(question).strong().color(text));
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    let status = match panel.read {
-                        0 => t.ask_asking(&provider.name()),
-                        read => t.ask_asking_reading(&provider.name(), read as i64),
-                    };
-                    ui.label(RichText::new(status).color(weak));
-                });
-            });
-        } else if let Some(failed) = &panel.failed {
-            embossed(ui, tones, false, None, |ui| {
-                ui.label(RichText::new(&failed.question).strong().color(text));
-                ui.label(RichText::new(&failed.cause).color(error));
-                ui.label(RichText::new(&failed.fix).color(text));
-                if ui
-                    .button(RichText::new(t.ask_failure_details()).color(text))
-                    .clicked()
-                {
-                    asked.push(AskAsked::Details);
-                }
-            });
-        }
-        for (at, exchange) in panel.exchanges.iter().enumerate().rev() {
-            embossed(ui, tones, false, None, |ui| {
-                ui.label(RichText::new(&exchange.question).strong().color(text));
-                answer_rows(ui, t, (at, exchange, &exchange.answer), asked);
-            });
-        }
-        ui.add_space(8.0);
-    });
 }
 
 /// An answer as Markdown, its links opening the Notes they name, whether

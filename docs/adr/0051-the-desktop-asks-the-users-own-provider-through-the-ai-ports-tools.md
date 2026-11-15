@@ -104,3 +104,18 @@ Amended by #314 (Q719): with `qwen2.5:3b`, the end to end check of [obf-1024](ht
 - An answer before any tool, and one from an excerpt, cost one more request each; a provider that reads first pays nothing more.
 - On `qwen2.5:3b` the passport, wifi and tyres questions are read and answered from their Notes; whether the answer also links them still depends on the model, which "Also read" covers.
 
+
+## A thread with editable questions (#315)
+
+Amended by #315 (Q720): the answers stood the newest first under the field, and an earlier question could not be picked to ask it again in other words.
+
+- **The session is a thread.** The panel and the phone's page show the questions of the session the oldest first, each with its answer, the Notes it links, then "Also read", and Keep as Note; the question asked with its status line, or the last one not answered, ends it. The question field sits under the thread, which scrolls to the newest once a question is asked and once it comes back, its top at the top where it is longer than the room.
+- **Edit** beside each question puts it into the field with the cursor at its end; the question keeps its place in the thread, and the one asked from the field joins the thread at its end. Edit is greyed while a question runs, as the field is. On the desktop, Up in the empty field fetches the last question asked.
+- **What the model sees is unchanged.** Each question is still one conversation of its own with the earlier questions and answers of the thread before it, as text; a question asked again after Edit goes after the whole thread, the earlier wording included. The phone still sends each question as its own `POST /ask` with the earlier exchanges (ADR 0003); nothing on the wire changes.
+- **The thread lives as the answers did** (Q632): it is gone once the panel is left or the page closed, and Start over drops it. Nothing new is stored, and the AI port gains no tool.
+
+### Considered Options
+
+- Keeping the thread until the app quits (rejected: Q632 decided that an answer is gone when the panel closes, and #315 asks for a thread, not for a longer life).
+- An edited question replacing its place in the thread and dropping the questions after it (rejected: it throws away answers the user may still want, and the thread no longer shows what was asked).
+- Up walking further back through the questions, as a shell does (left out: #315 asks for the last question; Edit reaches every other).
