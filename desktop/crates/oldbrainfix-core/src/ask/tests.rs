@@ -424,6 +424,34 @@ fn the_provider_is_a_local_setting_that_goes_nowhere() -> TestResult {
 }
 
 #[test]
+fn the_ai_is_off_until_switched_on_and_off_keeps_the_provider() -> TestResult {
+    let store = store();
+    // A provider set up before the switch came: off all the same.
+    store.set_ask_key("sk-ant-kept")?;
+    assert!(!store.ai_on()?);
+    let provider = store.ask_provider()?;
+    assert_eq!(provider.unready(), None);
+    assert_eq!(store.ask_unready(&provider)?, Some(Unready::AiOff));
+    store.set_ai_on(true)?;
+    assert!(store.ai_on()?);
+    assert_eq!(store.ask_unready(&provider)?, None);
+    store.set_ai_on(false)?;
+    assert_eq!(store.ask_unready(&provider)?, Some(Unready::AiOff));
+    assert_eq!(store.ask_provider()?.key, "sk-ant-kept");
+    // A local setting: in no entry, so never synced.
+    store.set_ai_on(true)?;
+    for entry in store.all_entries()? {
+        assert!(!format!("{entry:?}").contains("ask:on"));
+    }
+    // The AI port only reads it: no tool but read_settings names it.
+    for tool in crate::ai_tools::tools() {
+        let named = tool.to_string().contains("aiOn");
+        assert_eq!(named, tool["name"] == "read_settings", "{}", tool["name"]);
+    }
+    Ok(())
+}
+
+#[test]
 fn plain_http_goes_only_to_this_computer_and_the_home_network() {
     for allowed in [
         "https://api.deepseek.com",

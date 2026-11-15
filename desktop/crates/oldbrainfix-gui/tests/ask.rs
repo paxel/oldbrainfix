@@ -3,8 +3,9 @@
 //! whose tools are answered as the AI sees the store, shows the answer
 //! with links that open the Notes it came from, keeps it as a Note, and
 //! leaves a change the model made waiting for its review; the provider's
-//! card in the Settings keeps it all on this computer. Driven headless by
-//! egui_kittest, never over the network.
+//! card in the Settings keeps it all on this computer. All of it only
+//! while "AI (experimental)" is switched on (#334), off by default.
+//! Driven headless by egui_kittest, never over the network.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -16,7 +17,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use egui::accesskit::Role;
+use egui::accesskit::{Role, Toggled};
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
@@ -73,12 +74,13 @@ fn end_turn(text: &str) -> Value {
 
 const PASSPORT: &str = "Passport in the blue folder";
 
-/// A store with "Passport in the blue folder", Anthropic's key entered;
-/// the Note's id.
+/// A store with "Passport in the blue folder", the AI switched on and
+/// Anthropic's key entered; the Note's id.
 fn store() -> Result<(Store, String), Box<dyn std::error::Error>> {
     let now = parse_time("2026-11-13T09:00:00.000Z")?;
     let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([7; 32])))?;
     let note = Notes::new(&store).capture(PASSPORT, None, None)?;
+    store.set_ai_on(true)?;
     store.set_ask_key("sk-ant-test-key")?;
     Ok((store, note.id))
 }
@@ -101,6 +103,17 @@ fn harness(store: Store, fake: &Fake) -> Harness<'static, App> {
 
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
+}
+
+/// Whether a widget is labelled `label` exactly, as a card's heading.
+fn labelled(harness: &Harness<'_, App>, label: &str) -> bool {
+    harness.query_all_by_label(label).next().is_some()
+}
+
+/// Opens the AI menu.
+fn ai_menu(harness: &mut Harness<'_, App>) {
+    harness.get_all_by_label("AI").next().unwrap().click();
+    harness.run();
 }
 
 /// The text field a screen reader calls `name`.
@@ -149,6 +162,106 @@ fn ai_ask_and_ctrl_k_show_the_panel_with_the_cursor_in_its_field() -> TestResult
     harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::Ask);
+    Ok(())
+}
+
+#[test]
+fn the_ai_is_off_by_default_also_with_a_provider_set_up_before() -> TestResult {
+    // Anthropic's key entered before the switch came, never switched on.
+    let (store, _) = store()?;
+    store.set_ai_on(false)?;
+    let t = L10n::new("en");
+    let mut harness = harness(store, &Fake::default());
+    ai_menu(&mut harness);
+    let switch = harness.get_by_label(t.ai_switch());
+    assert_eq!(switch.accesskit_node().toggled(), Some(Toggled::False));
+    assert!(!shows(&harness, t.menu_ask()));
+    assert!(labelled(&harness, t.menu_ai_port()));
+    harness.key_press(Key::Escape);
+    harness.run();
+    // Ctrl+K does nothing.
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    // In a text field it is the field's again: it deletes to the end.
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    harness.get_by_role(Role::TextInput).click();
+    harness.run();
+    harness.get_by_role(Role::TextInput).type_text("passport");
+    harness.run();
+    harness.key_press(Key::Home);
+    harness.run();
+    harness.key_press_modifiers(Modifiers::CTRL | Modifiers::COMMAND, Key::K);
+    harness.run();
+    assert_eq!(harness.state().query(), "");
+    assert_eq!(harness.state().selection(), &Selection::All);
+    // The Settings: the switch and the AI port's card, no provider's.
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    assert!(labelled(&harness, t.ai_switch()));
+    assert!(labelled(&harness, t.ai_port_title()));
+    assert!(labelled(&harness, t.ai_port_open()));
+    assert!(!labelled(&harness, t.ask_settings_title()));
+    assert!(!labelled(&harness, t.ask_key()));
+    // Not even found by a search.
+    let search = t.settings_search_hint();
+    field(&harness, search).click();
+    harness.run();
+    field(&harness, search).type_text("API key");
+    harness.run();
+    assert!(!labelled(&harness, t.ask_settings_title()));
+    // The key stays kept.
+    assert_eq!(
+        harness.state().store().ask_provider()?.key,
+        "sk-ant-test-key"
+    );
+    assert!(!harness.state().store().ai_on()?);
+    Ok(())
+}
+
+#[test]
+fn switched_on_in_the_ai_menu_all_comes_back_and_off_the_panel_goes() -> TestResult {
+    let (store, _) = store()?;
+    store.set_ai_on(false)?;
+    let t = L10n::new("en");
+    let mut harness = harness(store, &Fake::default());
+    ai_menu(&mut harness);
+    harness.get_by_label(t.ai_switch()).click();
+    harness.run();
+    assert!(harness.state().store().ai_on()?);
+    ai_menu(&mut harness);
+    let switch = harness.get_by_label(t.ai_switch());
+    assert_eq!(switch.accesskit_node().toggled(), Some(Toggled::True));
+    assert!(labelled(&harness, "Ask… Ctrl+K"));
+    harness.key_press(Key::Escape);
+    harness.run();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Ask);
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    assert!(labelled(&harness, t.ask_settings_title()));
+    // Switched off in the Settings: the provider's card goes, and the
+    // panel with it, back where it was opened from.
+    harness
+        .get_all_by_label(t.ai_switch())
+        .last()
+        .unwrap()
+        .click_accesskit();
+    harness.run();
+    assert!(!harness.state().store().ai_on()?);
+    assert!(!labelled(&harness, t.ask_settings_title()));
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    // Forward leads not back into it.
+    harness.state_mut().close_page();
+    harness.run();
+    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowRight);
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
     Ok(())
 }
 

@@ -373,17 +373,20 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     assert_eq!(read.pointer("/quickNote/nudgeButtons"), Some(&json!(true)));
     assert_eq!(read.pointer("/theme"), Some(&json!("system")));
     assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
+    assert_eq!(read.pointer("/aiOn"), Some(&json!(false)));
     assert_eq!(read.pointer("/allDayFrom"), Some(&json!("15:00")));
     assert_eq!(read.pointer("/agendaHidesChecked"), Some(&json!(true)));
     assert_eq!(read.pointer("/fatFingers"), Some(&json!(true)));
     assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
     assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
     PersonSettings::new(&store).set_advanced(false)?;
+    store.set_ai_on(true)?;
     let settings = call(&store, &task, "read_settings", &json!({}))?;
     assert_eq!(
         json_of(&settings)?.pointer("/features"),
         Some(&json!("simple"))
     );
+    assert_eq!(json_of(&settings)?.pointer("/aiOn"), Some(&json!(true)));
     Ok(())
 }
 

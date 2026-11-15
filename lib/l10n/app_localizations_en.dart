@@ -6225,6 +6225,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.';
 
   @override
+  String get phoneAskUnreadyAiOff =>
+      'Switch on AI (experimental) in the computer\'s Settings.';
+
+  @override
   String get phoneAskConsentTitle => 'Before your first question';
 
   @override

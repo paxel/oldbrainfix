@@ -5627,6 +5627,7 @@ fn ask_reply_of(
         Some("noModel") => Some(Unready::NoModel),
         Some("noKey") => Some(Unready::NoKey),
         Some("badUrl") => Some(Unready::BadUrl),
+        Some("aiOff") => Some(Unready::AiOff),
         Some(other) => return Err(format!("unready {other}").into()),
     };
     let failure = match item["failure"].as_str().ok_or("failure")? {
@@ -5696,6 +5697,7 @@ fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult
                 None => None,
                 Some("noModel") => Some(Unready::NoModel),
                 Some("noKey") => Some(Unready::NoKey),
+                Some("aiOff") => Some(Unready::AiOff),
                 Some(_) => Some(Unready::BadUrl),
             },
         };

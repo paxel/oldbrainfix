@@ -21,7 +21,7 @@ tool/ask-e2e.sh stop
 
 ## What it checks
 
-Real questions on seeded Notes, through the real code path: `Store::ask` with the real `Web` transport.
+Real questions on seeded Notes, through the real code path: `Store::ask` with the real `Web` transport. Each seeded store switches on "AI (experimental)" first (#334); without it the desktop asks no provider.
 
 - **Desktop**: three questions whose answer is in one Note (English and German), one whose answer is in none, an Ollama that is stopped, and a model it lacks.
 - **Phone**: the same through the paired host as the app runs it (`PairedHosting` with the `AskDesk`), over TLS with the phone's proof, timed out as the Dart core's `askDesktop`. It checks `GET /ask/provider` and `POST /ask`.

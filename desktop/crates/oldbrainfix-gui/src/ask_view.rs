@@ -138,6 +138,7 @@ pub fn unready_line(t: &L10n, unready: Unready) -> &'static str {
         Unready::NoModel => t.ask_unready_model(),
         Unready::NoKey => t.ask_unready_key(),
         Unready::BadUrl => t.ask_unready_url(),
+        Unready::AiOff => t.ask_unready_ai_off(),
     }
 }
 

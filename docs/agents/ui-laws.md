@@ -1507,7 +1507,11 @@ replace a law of Both apps where they say so. A desktop law marked
   line shows the gap the Area goes into; let go where it stands or
   away from the Areas, it stays and nothing is written. A card dropped
   on an Area's row files there instead.
-- **The AI menu leads to the AI port** (#279): Ask… (Ctrl+K, #267)
+- **The AI menu leads to the AI port** (#279): its main switch "AI
+  (experimental)" (#334) comes first, off by default and also in the
+  Settings; only while it is on are there Ask… (Ctrl+K, #267), the Ask
+  panel and its provider's card, and does the desktop answer the
+  phone's questions. The AI port works either way. Ask…
   shows the Ask panel, AI port… opens the Settings at the AI port's
   card, and Review the AI Task shows the review of the AI Task that
   waits, greyed while none waits or the port is open.

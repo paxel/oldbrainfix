@@ -2355,6 +2355,7 @@ fn ask_frame(
     path: &str,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let mut harness = Box::new(window_with(texts, language, theme, |store, _| {
+        store.set_ai_on(true)?;
         store.set_ask_key("sk-ant-frames")
     })?);
     let tyres = Notes::new(harness.state().store())

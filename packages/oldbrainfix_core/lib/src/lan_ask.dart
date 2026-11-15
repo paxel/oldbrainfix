@@ -39,8 +39,9 @@ const providerPath = '/ask/provider';
 enum AskProtocol { anthropic, openai }
 
 /// Why the desktop's provider cannot be asked yet: no model is named,
-/// Anthropic has no key, or the address is not one it may ask.
-enum AskUnready { noModel, noKey, badUrl }
+/// Anthropic has no key, the address is not one it may ask, or the user
+/// switched off "AI (experimental)" on the desktop (#334).
+enum AskUnready { noModel, noKey, badUrl, aiOff }
 
 /// The provider the desktop asks, as the phone may learn it: the
 /// protocol, the model, and the host of its address with its port; never
@@ -145,7 +146,8 @@ class DesktopAnswer {
 
 /// Why the desktop gave no answer to the question.
 enum AskFailure {
-  /// No provider is set up on the desktop yet ([AskReply.unready]).
+  /// No provider is set up on the desktop yet, or its AI is switched
+  /// off ([AskReply.unready]).
   unready,
 
   /// The provider refused the desktop's API key ([AskReply.message]).

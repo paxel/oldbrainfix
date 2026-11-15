@@ -7624,6 +7624,12 @@ Map<String, Object?> _ask() {
           host: 'api.anthropic.com',
           unready: AskUnready.noKey,
         ),
+        DesktopProvider(
+          protocol: AskProtocol.anthropic,
+          model: 'claude-opus-5-5',
+          host: 'api.anthropic.com',
+          unready: AskUnready.aiOff,
+        ),
       ])
         {
           'protocol': provider.protocol.name,
@@ -7658,6 +7664,7 @@ Map<String, Object?> _ask() {
         ),
         AskReply.failed(AskFailure.unready, unready: AskUnready.noKey),
         AskReply.failed(AskFailure.unready, unready: AskUnready.badUrl),
+        AskReply.failed(AskFailure.unready, unready: AskUnready.aiOff),
         AskReply.failed(AskFailure.unready),
         AskReply.failed(AskFailure.key, message: 'invalid x-api-key: …'),
         AskReply.failed(

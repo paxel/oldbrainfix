@@ -107,6 +107,8 @@ fn the_port_is_off_by_default_and_opens_from_the_settings() -> TestResult {
     let mut harness = settings(&store);
     assert!(harness.state().ai_port().is_none());
     assert!(!store.sync_paused()?);
+    // It works without "AI (experimental)", which is off (#334).
+    assert!(!store.ai_on()?);
     assert!(!shows(&harness, t.ai_port_open_banner()));
 
     click(&mut harness, t.ai_port_open());

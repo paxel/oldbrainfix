@@ -717,6 +717,7 @@ String unreadyLine(AppLocalizations t, AskUnready why) => switch (why) {
   AskUnready.noModel => t.phoneAskUnreadyModel,
   AskUnready.noKey => t.phoneAskUnreadyKey,
   AskUnready.badUrl => t.phoneAskUnreadyUrl,
+  AskUnready.aiOff => t.phoneAskUnreadyAiOff,
 };
 
 /// Why no desktop took the question or named its provider, and what to

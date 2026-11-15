@@ -110,6 +110,7 @@ pub fn unready_name(why: Unready) -> &'static str {
         Unready::NoModel => "noModel",
         Unready::NoKey => "noKey",
         Unready::BadUrl => "badUrl",
+        Unready::AiOff => "aiOff",
     }
 }
 
@@ -118,6 +119,7 @@ fn unready_of(name: &str) -> Option<Unready> {
         "noModel" => Some(Unready::NoModel),
         "noKey" => Some(Unready::NoKey),
         "badUrl" => Some(Unready::BadUrl),
+        "aiOff" => Some(Unready::AiOff),
         _ => None,
     }
 }
@@ -183,8 +185,9 @@ pub struct Answered {
 /// Why the phone's question got no answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AskFailure {
-    /// No provider is set up on the desktop yet, and why, when this build
-    /// knows the reason.
+    /// No provider is set up on the desktop yet, or the AI is switched
+    /// off there ([`Unready::AiOff`]), and why, when this build knows the
+    /// reason.
     Unready(Option<Unready>),
     /// The provider refused the API key, in its own words.
     Key(String),
@@ -402,7 +405,12 @@ impl Store {
         }
         Ok(match (request.method.as_str(), request.path.as_str()) {
             ("GET", PROVIDER_PATH) => {
-                Response::json(200, &ProviderShown::of(&self.ask_provider()?).to_json())
+                let provider = self.ask_provider()?;
+                let shown = ProviderShown {
+                    unready: self.ask_unready(&provider)?,
+                    ..ProviderShown::of(&provider)
+                };
+                Response::json(200, &shown.to_json())
             }
             ("POST", ASK_PATH) => {
                 let question = serde_json::from_slice::<Value>(&request.body)
@@ -431,7 +439,9 @@ impl Store {
         wall: &WallClock,
     ) -> Result<AskReply> {
         let provider = self.ask_provider()?;
-        let outcome = match provider.unready() {
+        // The AI switched off answers as a provider not set up, so that
+        // an older phone says that much (#334).
+        let outcome = match self.ask_unready(&provider)? {
             Some(why) => Err(AskFailure::Unready(Some(why))),
             None => {
                 // The time as the panel gives it.

@@ -144,8 +144,9 @@ fn wall(t: DateTime<Utc>) -> NaiveDateTime {
     t.with_timezone(&chrono::Local).naive_local()
 }
 
-/// A store with the seeded Notes, asking `url` for `model` with the
-/// OpenAI-compatible protocol; the Notes' ids by their texts.
+/// A store with the seeded Notes and "AI (experimental)" switched on
+/// (#334), asking `url` for `model` with the OpenAI-compatible protocol;
+/// the Notes' ids by their texts.
 fn seeded(
     seed: u8,
     url: &str,
@@ -160,6 +161,7 @@ fn seeded(
         let note = notes.capture(text, None, None)?;
         ids.insert(text.to_string(), note.id);
     }
+    store.set_ai_on(true)?;
     store.set_ask_protocol(Protocol::OpenAi)?;
     store.set_ask_url(url)?;
     store.set_ask_model(model)?;

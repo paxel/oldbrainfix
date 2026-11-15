@@ -249,6 +249,14 @@ void main() {
         AskReply.fromJson({'failure': 'quota', 'review': false})?.failure,
         AskFailure.unknown,
       );
+      expect(
+        AskReply.fromJson({
+          'failure': 'unready',
+          'review': false,
+          'unready': 'aiOff',
+        })?.unready,
+        AskUnready.aiOff,
+      );
       expect(AskReply.fromJson({'what': 1}), isNull);
       expect(AskReply.fromJson({'answer': 'text'}), isNull);
       expect(

@@ -3330,6 +3330,8 @@
   "@phoneAskUnreadyKey": {"description": "Fix: the computer's Anthropic provider has no key."},
   "phoneAskUnreadyUrl": "Give the provider an https:// address under Ask panel in the computer's Settings; http:// only on the computer or the home network.",
   "@phoneAskUnreadyUrl": {"description": "Fix: the computer's provider address may not be asked."},
+  "phoneAskUnreadyAiOff": "Switch on AI (experimental) in the computer's Settings.",
+  "@phoneAskUnreadyAiOff": {"description": "Fix: the computer's main switch 'AI (experimental)' is off (#334)."},
   "phoneAskConsentTitle": "Before your first question",
   "@phoneAskConsentTitle": {"description": "Heading of the permission asked on the Ask page before the first question to a provider (App Store guideline 5.1.2(i))."},
   "phoneAskConsentIntro": "Your questions go from this phone to your computer {computer}, which sends them to {provider}, model {model}, at {host}.",

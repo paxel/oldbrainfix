@@ -6299,6 +6299,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gib dem Anbieter unter Fragen-Ansicht in den Einstellungen des Computers eine https://-Adresse; http:// nur auf dem Computer oder im Heimnetz.';
 
   @override
+  String get phoneAskUnreadyAiOff =>
+      'Schalte KI (experimentell) in den Einstellungen des Computers ein.';
+
+  @override
   String get phoneAskConsentTitle => 'Vor deiner ersten Frage';
 
   @override

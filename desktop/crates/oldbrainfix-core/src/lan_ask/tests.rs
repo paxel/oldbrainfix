@@ -85,7 +85,8 @@ fn end_turn(text: &str) -> (u16, Value) {
     )
 }
 
-/// The desk with Anthropic and its key set up, and a phone paired
+/// The desk with the AI switched on and Anthropic and its key set up,
+/// and a phone paired
 /// with it as one of the user's own Devices, or by invite.
 fn paired(shared: bool) -> Result<(Store, Store)> {
     let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
@@ -101,6 +102,7 @@ fn paired(shared: bool) -> Result<(Store, Store)> {
         last_sync: desk.now(),
         shared,
     })?;
+    desk.set_ai_on(true)?;
     desk.set_ask_key(KEY)?;
     Ok((desk, phone))
 }
@@ -199,6 +201,7 @@ fn a_change_drafted_on_the_asking_connection_waits_for_the_windows_review() -> T
         last_sync: window.now(),
         shared: false,
     })?;
+    window.set_ai_on(true)?;
     window.set_ask_key(KEY)?;
     let note = Notes::new(&window).capture("Dentist on Friday", None, None)?;
     let area = Places::new(&window).add_area("Health")?;
@@ -371,9 +374,31 @@ fn a_desktop_without_a_provider_says_so() -> TestResult {
 }
 
 #[test]
+fn a_desktop_with_the_ai_switched_off_says_so_and_asks_nobody() -> TestResult {
+    let (desk, phone) = paired(false)?;
+    // The provider stays set up, its key kept, while the AI is off.
+    desk.set_ai_on(false)?;
+    let fake = Fake::new(vec![end_turn("never sent")]);
+    let (request, _) = asked(&desk, &phone, "POST", ASK_PATH, &question("Q"), true)?;
+    let reply = reply_of(&desk.serve_ask(&request, &fake, &utc)?)?;
+    assert_eq!(
+        reply.outcome,
+        Err(AskFailure::Unready(Some(Unready::AiOff)))
+    );
+    assert_eq!(fake.sent(), "");
+    assert_eq!(desk.ask_provider()?.key, KEY);
+    let (request, _) = asked(&desk, &phone, "GET", PROVIDER_PATH, &json!({}), true)?;
+    let body: Value = serde_json::from_slice(&desk.serve_ask(&request, &fake, &utc)?.body)?;
+    assert_eq!(body["ready"], json!(false));
+    assert_eq!(body["unready"], json!("aiOff"));
+    Ok(())
+}
+
+#[test]
 fn the_failure_kinds_go_both_ways() {
     let failures = [
         AskFailure::Unready(Some(Unready::BadUrl)),
+        AskFailure::Unready(Some(Unready::AiOff)),
         AskFailure::Unready(None),
         AskFailure::Key("refused".into()),
         AskFailure::Provider(529, "overloaded".into()),

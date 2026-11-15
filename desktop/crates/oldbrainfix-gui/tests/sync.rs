@@ -407,6 +407,7 @@ fn a_paired_phones_question_is_answered_by_the_ask_desk_beside_the_syncs() -> Te
     let first = sync_request(&phone, &HashMap::new(), "Pixel", "", "")?;
     desk.serve_sync(first.to_string().as_bytes(), "Desk")?;
     pair(&desk, &phone.device_id()?)?;
+    desk.set_ai_on(true)?;
     desk.set_ask_key("sk-test")?;
     let mut hosting = PairedHosting::new(IpAddr::V4(Ipv4Addr::LOCALHOST), false);
     hosting.set_asking(AskDesk::new(

@@ -762,6 +762,10 @@ struct View {
     ai_review: Option<ReviewShown>,
     /// The provider the Ask panel asks, while it shows (#267).
     ask_provider: Option<Provider>,
+    /// Whether "AI (experimental)" is switched on on this computer
+    /// (#334): the Ask panel, its provider and the phone's questions;
+    /// the AI port works either way.
+    ai_on: bool,
 }
 
 impl View {
@@ -1823,6 +1827,8 @@ enum Setting {
     QuickNote(QuickNoteControl, bool),
     /// Whether the quick note shows the three Nudge buttons (#142).
     QuickNoteNudgeButtons(bool),
+    /// The main switch "AI (experimental)" (#334).
+    AiOn(bool),
 }
 
 /// Opens an address in the browser; tests hand in one that keeps it.
@@ -5234,7 +5240,10 @@ impl App {
     fn ask_question(&mut self) -> oldbrainfix_core::Result<()> {
         let question = self.ask.question.trim().to_string();
         let provider = self.store.ask_provider()?;
-        if question.is_empty() || self.ask_run.is_some() || provider.unready().is_some() {
+        if question.is_empty()
+            || self.ask_run.is_some()
+            || self.store.ask_unready(&provider)?.is_some()
+        {
             return Ok(());
         }
         let now = (self.wall)(self.store.now())
@@ -5721,6 +5730,20 @@ impl App {
             self.arrive(to, left);
             read = self.read();
         }
+        // The AI switched off (#334): the Ask panel goes, its answers
+        // and a question under way with it, back where it was opened
+        // from.
+        if let (Ok(view), Selection::Ask) = (&read, &self.selection)
+            && !view.ai_on
+        {
+            let left = self.left();
+            let (to, left) = self
+                .nav
+                .back(self.selection.clone(), left)
+                .unwrap_or((Selection::Agenda, Left::default()));
+            self.arrive(to, left);
+            read = self.read();
+        }
         // Back and forward lead to no place gone meanwhile.
         if let Ok(view) = &read {
             let routines = Routines::new(&self.store);
@@ -5728,6 +5751,7 @@ impl App {
             self.nav.retain(&current, |place| match place {
                 Selection::Place(id) => view.area(id).is_some() || view.topic(id).is_some(),
                 Selection::History(id) => routines.by_id(id).ok().flatten().is_some(),
+                Selection::Ask => view.ai_on,
                 _ => true,
             });
         }
@@ -6608,6 +6632,7 @@ impl App {
             } else {
                 None
             },
+            ai_on: self.store.ai_on()?,
         })
     }
 
@@ -7047,6 +7072,9 @@ impl App {
                 self.settings_section = Some((AI_PORT_SECTION.to_string(), 2));
                 self.act(Action::OpenPage(Page::Settings))?;
             }
+            // Not while the AI is switched off (#334), also from a Note
+            // window.
+            Action::OpenAsk if !self.store.ai_on()? => {}
             Action::OpenAsk => {
                 // In the list, the dialogs over it closed, what was typed
                 // kept.
@@ -9796,6 +9824,11 @@ impl App {
             Setting::Advanced(on) => PersonSettings::new(&self.store).set_advanced(on)?,
             Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
+            Setting::AiOn(on) => {
+                self.store.set_ai_on(on)?;
+                // Read anew once it shows again.
+                self.ask_fields = None;
+            }
         }
         Ok(())
     }
@@ -10512,6 +10545,7 @@ impl App {
                 && !self.cards.is_empty()
                 && !ui.ctx().text_edit_focused()
                 && !egui::Popup::is_any_open(ui.ctx());
+            let ai_on = self.view.ai_on;
             ui.input_mut(|i| {
                 if clears && i.consume_key(Modifiers::NONE, Key::Escape) {
                     actions.push(Action::ClearCards);
@@ -10532,8 +10566,9 @@ impl App {
                     actions.push(Action::OpenPage(Page::Settings));
                 }
                 // The Ask panel (#267), taken before a text field's own
-                // Ctrl+K (delete to the line's end) sees it.
-                if i.consume_key(Modifiers::COMMAND, Key::K) {
+                // Ctrl+K (delete to the line's end) sees it; while the AI
+                // is off (#334) the field keeps it.
+                if ai_on && i.consume_key(Modifiers::COMMAND, Key::K) {
                     actions.push(Action::OpenAsk);
                 }
                 // F2 renames the Area or Topic shown (#279); in a text
@@ -12346,12 +12381,23 @@ impl App {
                 };
                 menu_entries(ui, [last], actions);
             });
-            // The Ask panel (#267), the AI port (#279): its card in the
-            // Settings, and the review of the AI Task that waits, greyed
-            // while none does.
+            // The main switch first (#334), then the Ask panel (#267)
+            // only while it is on, the AI port (#279) either way: its card
+            // in the Settings, and the review of the AI Task that waits,
+            // greyed while none does.
             ui.menu_button(RichText::new(t.menu_ai()).color(text), |ui| {
+                let mut on = self.view.ai_on;
+                if theme::checkbox(ui, &mut on, RichText::new(t.ai_switch()).color(text)).changed()
+                {
+                    actions.push(Action::Setting(Setting::AiOn(on)));
+                    ui.close();
+                }
+                ui.separator();
+                if self.view.ai_on {
+                    let ask = [(t.menu_ask(), keys(Key::K), true, Action::OpenAsk)];
+                    menu_entries(ui, ask, actions);
+                }
                 let items = [
-                    (t.menu_ask(), keys(Key::K), true, Action::OpenAsk),
                     (t.menu_ai_port(), None, true, Action::OpenAiPort),
                     (
                         t.ai_review_title(),
@@ -15973,8 +16019,23 @@ impl App {
                     actions.push(Action::Ai(asked));
                 }
             }
+            // The main switch "AI (experimental)" (#334), before the
+            // provider it gates.
+            let [switch] = settings_search::rows(q, None, [&[t.ai_switch(), t.ai_switch_detail()]]);
+            if switch {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    let mut on = self.view.ai_on;
+                    if theme::checkbox(ui, &mut on, RichText::new(t.ai_switch()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::AiOn(on)));
+                    }
+                    ui.label(RichText::new(t.ai_switch_detail()).small().color(weak));
+                });
+            }
             // The Ask panel's provider (#267): one setting, as the AI
-            // port's card is.
+            // port's card is; hidden while the AI is off (#334).
             let [asks] = settings_search::rows(
                 q,
                 Some(t.ask_settings_title()),
@@ -15987,7 +16048,7 @@ impl App {
                     t.ask_key(),
                 ]],
             );
-            if asks {
+            if asks && self.view.ai_on {
                 found = true;
                 if self.ask_fields.is_none()
                     && let Ok(provider) = self.store.ask_provider()

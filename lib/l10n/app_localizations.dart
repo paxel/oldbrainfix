@@ -10148,6 +10148,12 @@ abstract class AppLocalizations {
   /// **'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.'**
   String get phoneAskUnreadyUrl;
 
+  /// Fix: the computer's main switch 'AI (experimental)' is off (#334).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch on AI (experimental) in the computer\'s Settings.'**
+  String get phoneAskUnreadyAiOff;
+
   /// Heading of the permission asked on the Ask page before the first question to a provider (App Store guideline 5.1.2(i)).
   ///
   /// In en, this message translates to:

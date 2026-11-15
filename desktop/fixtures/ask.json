@@ -48,6 +48,13 @@
       "host": "api.anthropic.com",
       "unready": "noKey",
       "body": "{\"host\":\"api.anthropic.com\",\"model\":\"claude-opus-5-5\",\"protocol\":\"anthropic\",\"ready\":false,\"unready\":\"noKey\"}"
+    },
+    {
+      "protocol": "anthropic",
+      "model": "claude-opus-5-5",
+      "host": "api.anthropic.com",
+      "unready": "aiOff",
+      "body": "{\"host\":\"api.anthropic.com\",\"model\":\"claude-opus-5-5\",\"protocol\":\"anthropic\",\"ready\":false,\"unready\":\"aiOff\"}"
     }
   ],
   "replies": [
@@ -102,6 +109,14 @@
       "message": "",
       "status": 0,
       "unready": "badUrl",
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"unready\",\"review\":false,\"unready\":\"aiOff\"}",
+      "failure": "unready",
+      "message": "",
+      "status": 0,
+      "unready": "aiOff",
       "review": false
     },
     {

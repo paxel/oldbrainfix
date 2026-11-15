@@ -40,6 +40,10 @@ pub const ANTHROPIC_KEY_KEY: &str = "ask:anthropic:key";
 pub const OPENAI_URL_KEY: &str = "ask:openai:url";
 pub const OPENAI_MODEL_KEY: &str = "ask:openai:model";
 pub const OPENAI_KEY_KEY: &str = "ask:openai:key";
+/// The local setting of the main switch "AI (experimental)" (#334):
+/// `true` while on; absent, the default, is off, also where a provider
+/// was set up before the switch came.
+pub const ON_KEY: &str = "ask:on";
 
 /// Where Anthropic's Messages API is, its version, and the model asked
 /// while the user names none.
@@ -113,6 +117,8 @@ pub enum Unready {
     /// The base URL is no `https://` address, nor an `http://` one on
     /// this computer or the home network.
     BadUrl,
+    /// The main switch "AI (experimental)" is off on the desktop (#334).
+    AiOff,
 }
 
 impl Provider {
@@ -187,6 +193,31 @@ pub fn url_allowed(url: &str) -> bool {
 }
 
 impl Store {
+    /// Whether the main switch "AI (experimental)" is on on this computer
+    /// (#334): off until the user switches it on. It gates the Ask panel
+    /// and the phone's questions, never the AI port.
+    pub fn ai_on(&self) -> Result<bool> {
+        Ok(self.local_setting(ON_KEY)?.as_deref() == Some("true"))
+    }
+
+    /// Switches the AI on or off; off forgets nothing of the provider.
+    pub fn set_ai_on(&self, on: bool) -> Result<()> {
+        if on {
+            self.set_local_setting(ON_KEY, "true")
+        } else {
+            self.remove_local_setting(ON_KEY)
+        }
+    }
+
+    /// What keeps the Ask panel and the phone from asking now: the AI
+    /// switched off, else what the provider lacks ([`Provider::unready`]).
+    pub fn ask_unready(&self, provider: &Provider) -> Result<Option<Unready>> {
+        if !self.ai_on()? {
+            return Ok(Some(Unready::AiOff));
+        }
+        Ok(provider.unready())
+    }
+
     /// The provider the Ask panel asks, as this Device keeps it: the
     /// protocol chosen, with its base URL, model and key, Anthropic's
     /// model and Ollama's address while none is entered.
