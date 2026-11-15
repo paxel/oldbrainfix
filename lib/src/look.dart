@@ -338,6 +338,47 @@ class Embossed extends StatelessWidget {
   }
 }
 
+/// The tear line between the parts of a Note (#307): its text and each
+/// of its Sections read on as one text, parted only by a row of short
+/// dashes like the perforation of a roll of paper.
+class TearLine extends StatelessWidget {
+  const TearLine({super.key});
+
+  /// How long a dash is and the gap after it, in logical pixels.
+  static const dash = 4.0;
+  static const gap = 4.0;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 24,
+    width: double.infinity,
+    child: CustomPaint(
+      painter: _TearPainter(Theme.of(context).colorScheme.outline),
+    ),
+  );
+}
+
+class _TearPainter extends CustomPainter {
+  final Color colour;
+
+  const _TearPainter(this.colour);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = colour
+      ..strokeWidth = 1;
+    final y = size.height / 2;
+    for (var x = 0.0; x < size.width; x += TearLine.dash + TearLine.gap) {
+      final end = (x + TearLine.dash).clamp(0.0, size.width);
+      canvas.drawLine(Offset(x, y), Offset(end, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TearPainter old) => old.colour != colour;
+}
+
 /// A row of text with its control (a switch, button or dropdown) on its
 /// own line below the text, start-aligned with it, never beside it (UI
 /// laws, "Dialogs and pages").

@@ -13531,11 +13531,12 @@ impl App {
     }
 
     /// The selected Note's editor (UI laws, "Desktop").
-    /// The Note dialog's content (#146): the text, the badges of the
-    /// Note's settings under it (#160), its Lines, media, Tally and
-    /// Sections, Amend and the rest of what can be done to it. A Section
-    /// this Device may edit has a field of its own, as the Note's text
-    /// (#183); a text only read selects to be copied.
+    /// The Note dialog's content (#146): the text with its Sections
+    /// reading on under it (#307), the badges of the Note's settings
+    /// under them (#160), its Lines, media and Tally, Amend and the rest
+    /// of what can be done to it. A Section this Device may edit has a
+    /// field of its own, as the Note's text (#183); a text only read
+    /// selects to be copied.
     fn note_editor(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let Some((placed, sections)) = &self.view.detail else {
             return;
@@ -13623,103 +13624,248 @@ impl App {
                     }
                     None => {}
                 }
+                // Each Section under a tear line, in no box of its own
+                // (#307), its text where the Note's begins.
+                let mut draw_sections =
+                    |ui: &mut Ui, cache: &mut PhotoCache, actions: &mut Vec<Action>| {
+                        for (at, section) in sections.iter().enumerate() {
+                            theme::tear_line(ui);
+                            ui.scope(|ui| {
+                                if !section.text_editable {
+                                    ui.label(RichText::new(t.text_newer_format()).color(weak));
+                                }
+                                let look = look_of(&section.id);
+                                let section_ticks = box_ticks.contains(&section.id);
+                                let section_ticked = ticked_in(&section.boxes);
+                                if let Some(field) = section_texts.get_mut(&section.id) {
+                                    // Edited in place as the Note's text is, by the
+                                    // same people (#183).
+                                    let shown = EditedText {
+                                        id: Id::new(("section text", &section.id)),
+                                        of: &section.id,
+                                        section: true,
+                                        stored: &section.text,
+                                        formatted: section.text_format == text_format::MARKDOWN,
+                                        code: false,
+                                        offers_code: false,
+                                        bar: self.view.advanced,
+                                        boxes: look,
+                                        ticks: (section_ticks, &section_ticked),
+                                        name: t.section_text_field_name(),
+                                        look: (18.0, text),
+                                        hint: None,
+                                    };
+                                    let state = (
+                                        &mut field.text,
+                                        &mut field.editing,
+                                        &mut field.focus,
+                                        &mut field.select,
+                                    );
+                                    edited_text(ui, (t, tones), shown, state, actions);
+                                } else if !section.text.is_empty() {
+                                    // Its boxes tick; only read, its text selects
+                                    // to be copied (#183). A formatted one reads
+                                    // formatted.
+                                    ui.style_mut().interaction.selectable_labels = true;
+                                    let all = (0, section.text.len());
+                                    let shown = (None, text);
+                                    let spots = read_text::shown(ui, |ui| {
+                                        text_marks_view::formatted_label(
+                                            ui,
+                                            (&section.text, &section.text_format, look),
+                                            all,
+                                            shown,
+                                            false,
+                                        )
+                                    });
+                                    let of = Id::new(("text", &section.id));
+                                    if let Some(at) =
+                                        text_marks_view::table_clicks(ui, &t, of, &spots.tables)
+                                    {
+                                        actions.push(Action::OpenTable(Opening {
+                                            note: None,
+                                            text: section.text.clone(),
+                                            at,
+                                            cell: None,
+                                            tags: true,
+                                            boxes: Some(section.id.clone()),
+                                        }));
+                                    }
+                                    if let Some(asked) = text_marks_view::box_clicks(
+                                        ui,
+                                        &t,
+                                        of,
+                                        &spots.boxes,
+                                        (section_ticks, &section_ticked),
+                                    ) {
+                                        actions.push(box_action(section.id.clone(), asked));
+                                    }
+                                    if let Some(tag) =
+                                        text_marks_view::tag_clicks(ui, &t, of, &spots.tags)
+                                    {
+                                        actions.push(Action::SearchFor(tag));
+                                    }
+                                    text_marks_view::link_clicks(ui, of, &spots.links);
+                                    ui.style_mut().interaction.selectable_labels = false;
+                                }
+                                let media = Media {
+                                    id: &section.id,
+                                    photos: (
+                                        &section.photos,
+                                        &section.removed_photos,
+                                        &section.photo_texts,
+                                    ),
+                                    recordings: (
+                                        &section.recordings,
+                                        &section.removed_recordings,
+                                        &section.transcripts,
+                                    ),
+                                    files: (
+                                        &section.attachments,
+                                        &section.removed_attachments,
+                                        &section.attachment_texts,
+                                    ),
+                                };
+                                let shown = (&mut *cache, &**store, offering);
+                                editor_media(
+                                    ui,
+                                    &t,
+                                    media,
+                                    shown,
+                                    (playing, transcribing, can_play, speed),
+                                    actions,
+                                );
+                                // Its details, each removable on its own, in the
+                                // same dialog as the Note's Captured badge (#170).
+                                let before = at
+                                    .checked_sub(1)
+                                    .and_then(|above| sections.get(above))
+                                    .map_or(note.captured, |above| above.captured);
+                                let line = capture_line(
+                                    &t,
+                                    (section.captured, &section.context),
+                                    Some(before),
+                                );
+                                let edited = section_edited(&t, section);
+                                if capture_meta(ui, &t, &line, edited.as_deref(), true) {
+                                    actions
+                                        .push(Action::Badge(Some(NoteBadge::SectionCaptured(at))));
+                                }
+                            });
+                        }
+                    };
+                // A Plain Note's text and its Sections read on as one text
+                // (#307); a Note of a kind keeps them below, as its diary
+                // part (#188).
                 embossed(ui, tones, false, None, |ui| {
-                    // A Member reads someone else's Note (ADR 0013); a text
-                    // in a format not known here shows as it is stored
-                    // (ADR 0018).
-                    if !note.text_editable {
-                        ui.label(RichText::new(t.text_newer_format()).color(weak));
-                    }
-                    let formatted = note.text_format == text_format::MARKDOWN;
-                    let writes = !trashed && may.changes && note.text_editable;
-                    if kinded {
-                        let shown = KindedText {
-                            note,
-                            writes,
+                    ui.scope(|ui| {
+                        // A Member reads someone else's Note (ADR 0013); a text
+                        // in a format not known here shows as it is stored
+                        // (ADR 0018).
+                        if !note.text_editable {
+                            ui.label(RichText::new(t.text_newer_format()).color(weak));
+                        }
+                        let formatted = note.text_format == text_format::MARKDOWN;
+                        let writes = !trashed && may.changes && note.text_editable;
+                        if kinded {
+                            let shown = KindedText {
+                                note,
+                                writes,
+                                bar: self.view.advanced,
+                                boxes,
+                                ticks: (ticks, &ticked),
+                            };
+                            let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
+                            kinded_text(ui, (t, tones), shown, (&mut *name, state), actions);
+                            return;
+                        }
+                        if !writes {
+                            // Its marks show, to read (#125), and a formatted
+                            // text reads as it is formatted (#127); it selects
+                            // to be copied (#183).
+                            ui.style_mut().interaction.selectable_labels = true;
+                            let all = (0, note.text.len());
+                            // A Code text moves sideways (#213).
+                            if note.text_format == text_format::CODE {
+                                let look = (Some(18.0), text);
+                                read_text::shown(ui, |ui| {
+                                    text_marks_view::code_text_label(
+                                        ui,
+                                        &note.text,
+                                        all,
+                                        look,
+                                        (false, true),
+                                    )
+                                });
+                                return;
+                            }
+                            let spots = read_text::shown(ui, |ui| {
+                                text_marks_view::formatted_label(
+                                    ui,
+                                    (&note.text, &note.text_format, boxes),
+                                    all,
+                                    (Some(18.0), text),
+                                    false,
+                                )
+                            });
+                            let of = Id::new(("text", &note.id));
+                            // Its tables open to read (#128).
+                            if let Some(at) =
+                                text_marks_view::table_clicks(ui, &t, of, &spots.tables)
+                            {
+                                actions.push(Action::OpenTable(Opening {
+                                    note: None,
+                                    text: note.text.clone(),
+                                    at,
+                                    cell: None,
+                                    tags: true,
+                                    boxes: Some(note.id.clone()),
+                                }));
+                            }
+                            // A Member ticks the boxes of a Note not theirs.
+                            if let Some(asked) = text_marks_view::box_clicks(
+                                ui,
+                                &t,
+                                of,
+                                &spots.boxes,
+                                (ticks, &ticked),
+                            ) {
+                                actions.push(box_action(note.id.clone(), asked));
+                            }
+                            if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags)
+                            {
+                                actions.push(Action::SearchFor(tag));
+                            }
+                            text_marks_view::link_clicks(ui, of, &spots.links);
+                            return;
+                        }
+                        let code = note.text_format == text_format::CODE;
+                        let field = EditedText {
+                            // By its Note: another may show in a window of
+                            // its own meanwhile (#287).
+                            id: Id::new(("note text", &note.id)),
+                            of: &note.id,
+                            section: false,
+                            stored: &note.text,
+                            formatted,
+                            code,
+                            // A paste that looks like code offers it (#213).
+                            offers_code: !code,
                             bar: self.view.advanced,
                             boxes,
                             ticks: (ticks, &ticked),
+                            name: t.note_text_field_name(),
+                            look: (18.0, text),
+                            hint: None,
                         };
                         let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
-                        kinded_text(ui, (t, tones), shown, (&mut *name, state), actions);
-                        return;
-                    }
-                    if !writes {
-                        // Its marks show, to read (#125), and a formatted
-                        // text reads as it is formatted (#127); it selects
-                        // to be copied (#183).
-                        ui.style_mut().interaction.selectable_labels = true;
-                        let all = (0, note.text.len());
-                        // A Code text moves sideways (#213).
-                        if note.text_format == text_format::CODE {
-                            let look = (Some(18.0), text);
-                            read_text::shown(ui, |ui| {
-                                text_marks_view::code_text_label(
-                                    ui,
-                                    &note.text,
-                                    all,
-                                    look,
-                                    (false, true),
-                                )
-                            });
-                            return;
+                        edited_text(ui, (t, tones), field, state, actions);
+                        if offers_code {
+                            code_offer(ui, &t, actions);
                         }
-                        let spots = read_text::shown(ui, |ui| {
-                            text_marks_view::formatted_label(
-                                ui,
-                                (&note.text, &note.text_format, boxes),
-                                all,
-                                (Some(18.0), text),
-                                false,
-                            )
-                        });
-                        let of = Id::new(("text", &note.id));
-                        // Its tables open to read (#128).
-                        if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
-                            actions.push(Action::OpenTable(Opening {
-                                note: None,
-                                text: note.text.clone(),
-                                at,
-                                cell: None,
-                                tags: true,
-                                boxes: Some(note.id.clone()),
-                            }));
-                        }
-                        // A Member ticks the boxes of a Note not theirs.
-                        if let Some(asked) =
-                            text_marks_view::box_clicks(ui, &t, of, &spots.boxes, (ticks, &ticked))
-                        {
-                            actions.push(box_action(note.id.clone(), asked));
-                        }
-                        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags) {
-                            actions.push(Action::SearchFor(tag));
-                        }
-                        text_marks_view::link_clicks(ui, of, &spots.links);
-                        return;
-                    }
-                    let code = note.text_format == text_format::CODE;
-                    let field = EditedText {
-                        // By its Note: another may show in a window of
-                        // its own meanwhile (#287).
-                        id: Id::new(("note text", &note.id)),
-                        of: &note.id,
-                        section: false,
-                        stored: &note.text,
-                        formatted,
-                        code,
-                        // A paste that looks like code offers it (#213).
-                        offers_code: !code,
-                        bar: self.view.advanced,
-                        boxes,
-                        ticks: (ticks, &ticked),
-                        name: t.note_text_field_name(),
-                        look: (18.0, text),
-                        hint: None,
-                    };
-                    let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
-                    edited_text(ui, (t, tones), field, state, actions);
-                    if offers_code {
-                        code_offer(ui, &t, actions);
+                    });
+                    if !kinded {
+                        draw_sections(ui, &mut *cache, actions);
                     }
                 });
                 // The kind's content under its name and description (#188),
@@ -13826,124 +13972,12 @@ impl App {
                         actions.push(Action::AttachFiles);
                     }
                 }
-                for (at, section) in sections.iter().enumerate() {
-                    embossed(ui, tones, false, None, |ui| {
-                        if !section.text_editable {
-                            ui.label(RichText::new(t.text_newer_format()).color(weak));
-                        }
-                        let look = look_of(&section.id);
-                        let section_ticks = box_ticks.contains(&section.id);
-                        let section_ticked = ticked_in(&section.boxes);
-                        if let Some(field) = section_texts.get_mut(&section.id) {
-                            // Edited in place as the Note's text is, by the
-                            // same people (#183).
-                            let shown = EditedText {
-                                id: Id::new(("section text", &section.id)),
-                                of: &section.id,
-                                section: true,
-                                stored: &section.text,
-                                formatted: section.text_format == text_format::MARKDOWN,
-                                code: false,
-                                offers_code: false,
-                                bar: self.view.advanced,
-                                boxes: look,
-                                ticks: (section_ticks, &section_ticked),
-                                name: t.section_text_field_name(),
-                                look: (18.0, text),
-                                hint: None,
-                            };
-                            let state = (
-                                &mut field.text,
-                                &mut field.editing,
-                                &mut field.focus,
-                                &mut field.select,
-                            );
-                            edited_text(ui, (t, tones), shown, state, actions);
-                        } else if !section.text.is_empty() {
-                            // Its boxes tick; only read, its text selects
-                            // to be copied (#183). A formatted one reads
-                            // formatted.
-                            ui.style_mut().interaction.selectable_labels = true;
-                            let all = (0, section.text.len());
-                            let shown = (None, text);
-                            let spots = read_text::shown(ui, |ui| {
-                                text_marks_view::formatted_label(
-                                    ui,
-                                    (&section.text, &section.text_format, look),
-                                    all,
-                                    shown,
-                                    false,
-                                )
-                            });
-                            let of = Id::new(("text", &section.id));
-                            if let Some(at) =
-                                text_marks_view::table_clicks(ui, &t, of, &spots.tables)
-                            {
-                                actions.push(Action::OpenTable(Opening {
-                                    note: None,
-                                    text: section.text.clone(),
-                                    at,
-                                    cell: None,
-                                    tags: true,
-                                    boxes: Some(section.id.clone()),
-                                }));
-                            }
-                            if let Some(asked) = text_marks_view::box_clicks(
-                                ui,
-                                &t,
-                                of,
-                                &spots.boxes,
-                                (section_ticks, &section_ticked),
-                            ) {
-                                actions.push(box_action(section.id.clone(), asked));
-                            }
-                            if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags)
-                            {
-                                actions.push(Action::SearchFor(tag));
-                            }
-                            text_marks_view::link_clicks(ui, of, &spots.links);
-                            ui.style_mut().interaction.selectable_labels = false;
-                        }
-                        let media = Media {
-                            id: &section.id,
-                            photos: (
-                                &section.photos,
-                                &section.removed_photos,
-                                &section.photo_texts,
-                            ),
-                            recordings: (
-                                &section.recordings,
-                                &section.removed_recordings,
-                                &section.transcripts,
-                            ),
-                            files: (
-                                &section.attachments,
-                                &section.removed_attachments,
-                                &section.attachment_texts,
-                            ),
-                        };
-                        let shown = (&mut *cache, &**store, offering);
-                        editor_media(
-                            ui,
-                            &t,
-                            media,
-                            shown,
-                            (playing, transcribing, can_play, speed),
-                            actions,
-                        );
-                        // Its details, each removable on its own, in the
-                        // same dialog as the Note's Captured badge (#170).
-                        let before = at
-                            .checked_sub(1)
-                            .and_then(|above| sections.get(above))
-                            .map_or(note.captured, |above| above.captured);
-                        let line =
-                            capture_line(&t, (section.captured, &section.context), Some(before));
-                        let edited = section_edited(&t, section);
-                        if capture_meta(ui, &t, &line, edited.as_deref(), true) {
-                            actions.push(Action::Badge(Some(NoteBadge::SectionCaptured(at))));
-                        }
-                    });
+                // On the page, their text where the boxes' text begins and
+                // without the line an indent draws.
+                if kinded && !sections.is_empty() {
+                    Frame::NONE
+                        .inner_margin(Margin::symmetric(16, 0))
+                        .show(ui, |ui| draw_sections(ui, &mut *cache, actions));
                 }
                 if trashed {
                     // Where it is now, to be restored at once.
@@ -21388,8 +21422,9 @@ fn note_card(
                     let line = capture_line(t, (note.captured, &note.context), None);
                     capture_meta(ui, t, &line, None, false);
                     let mut before = note.captured;
+                    // Each Section reads on under a tear line (#307).
                     for section in look.sections {
-                        ui.separator();
+                        theme::tear_line(ui);
                         let part = Part::of_section(section);
                         let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);

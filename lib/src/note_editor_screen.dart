@@ -2418,6 +2418,143 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
+  /// The Section [section], the [i]th of the Note [note], as the Note's
+  /// text reads on (#307): a tear line, its text, edited in place where
+  /// this Device may (#183), its photos, recordings and files, and its
+  /// meta line, in no box of its own.
+  List<Widget> _sectionPart(
+    int i,
+    Section section,
+    Note note,
+    DateFormat when,
+  ) {
+    return [
+      TearLine(key: ValueKey('tear:${section.id}')),
+      if (!section.textEditable) ...[
+        NewerFormatNote(key: ValueKey('newer:${section.id}')),
+        const SizedBox(height: 8),
+      ],
+      // Edited in place as the Note's text, by the same people (#183);
+      // otherwise selected and copied with a long press, a tap on a box
+      // or tag still going to it.
+      if (_sectionTexts[section.id] case final field?)
+        TwoRowTextField(
+          key: ValueKey('section-text:${section.id}'),
+          controller: field,
+          twoRows: _twoRows,
+          boxes: true,
+          bar: widget.notes.store.advanced,
+          onBox: (start, at) => _tapBox(start, at, section: section.id),
+          formats: true,
+          onFormatted: () => setState(_saveText),
+          style: Theme.of(context).textTheme.bodyLarge,
+          // It sits where its text was read before.
+          decoration: const InputDecoration(
+            filled: false,
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        )
+      else if (section.text.isNotEmpty)
+        SelectionArea(
+          child: MarkedText(
+            section.shownText,
+            format: section.textFormat,
+            style: Theme.of(context).textTheme.bodyLarge,
+            boxes: section.boxes,
+            source: section.text,
+            ticking: _sectionTicking[section.id],
+          ),
+        ),
+      for (final hash in section.photos) ...[
+        const SizedBox(height: 8),
+        NotePhoto(
+          key: ValueKey(hash),
+          hash: hash,
+          onTap: () => viewPhoto(context, hash),
+        ),
+        PhotoText(
+          key: ValueKey('ocr:$hash'),
+          noteId: section.id,
+          hash: hash,
+          photoText: section.photoTexts[hash],
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.photoTexts[hash],
+          photo: true,
+        ),
+        ..._removeButton(section.id, hash, photo: true),
+      ],
+      for (final hash in section.removedPhotos) ...[
+        PhotoText(
+          key: ValueKey('ocr:$hash'),
+          noteId: section.id,
+          hash: hash,
+          photoText: section.photoTexts[hash],
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.photoTexts[hash],
+          photo: true,
+        ),
+      ],
+      for (final hash in section.recordings) ...[
+        const SizedBox(height: 8),
+        RecordingButton(key: ValueKey(hash), hash: hash, compact: false),
+        TranscriptText(
+          key: ValueKey('transcript:$hash'),
+          noteId: section.id,
+          hash: hash,
+          transcript: section.transcripts[hash],
+          compact: false,
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.transcripts[hash],
+          photo: false,
+        ),
+        ..._removeButton(section.id, hash, photo: false),
+      ],
+      for (final hash in section.removedRecordings) ...[
+        TranscriptText(
+          key: ValueKey('transcript:$hash'),
+          noteId: section.id,
+          hash: hash,
+          transcript: section.transcripts[hash],
+          compact: false,
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.transcripts[hash],
+          photo: false,
+        ),
+      ],
+      // A merged Note's files travel with it (ADR 0047).
+      ..._fileParts(
+        section.id,
+        section.attachments,
+        section.attachmentTexts,
+        section.removedAttachments,
+      ),
+      const SizedBox(height: 4),
+      // Its details, each removable on its own, in the same dialog as the
+      // Note's Captured badge (#170).
+      CaptureLine.ofSection(
+        section,
+        key: ValueKey('captured-line:${section.id}'),
+        when: when,
+        after: i == 0 ? note.captured : _sections[i - 1].context.captured,
+        onTap: () => _showCaptured(when, section: section.id),
+      ),
+    ];
+  }
+
   /// The text of a Note of a kind (#188): its name as a heading, one line,
   /// and under it its description, small and weak, folded to one line
   /// while it is not edited; a tap unfolds it, and puts the cursor in it
@@ -2739,13 +2876,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               const SizedBox(height: 8),
             ],
             ..._openLines(t, changes),
+            // The Note's text and its Sections read on as one text, each
+            // Section under a tear line, in no box of its own (#307).
             Embossed(
               strong: note.importance == Importance.important,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _named
-                    ? _nameAndDescription(note, editable: editable)
-                    : TwoRowTextField(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_named)
+                      _nameAndDescription(note, editable: editable)
+                    else
+                      TwoRowTextField(
                         key: const ValueKey('note-text'),
                         controller: _text,
                         twoRows: _twoRows,
@@ -2771,6 +2914,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           border: InputBorder.none,
                         ),
                       ),
+                    // A Note of a kind keeps them below, as its diary part
+                    // (#188).
+                    if (!_named) ...[
+                      for (final (i, section) in _sections.indexed)
+                        ..._sectionPart(i, section, note, when),
+                      if (_sections.isNotEmpty) const SizedBox(height: 16),
+                    ],
+                  ],
+                ),
               ),
             ),
             if (_offersCode && !_named) _codeOffer(t),
@@ -2892,145 +3044,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               note.attachmentTexts,
               note.removedAttachments,
             ),
-            const SizedBox(height: 16),
-            for (final (i, section) in _sections.indexed)
-              EditorPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!section.textEditable) ...[
-                      NewerFormatNote(key: ValueKey('newer:${section.id}')),
-                      const SizedBox(height: 8),
-                    ],
-                    // Edited in place as the Note's text, by the same
-                    // people (#183); otherwise selected and copied with a
-                    // long press, a tap on a box or tag still going to it.
-                    if (_sectionTexts[section.id] case final field?)
-                      TwoRowTextField(
-                        key: ValueKey('section-text:${section.id}'),
-                        controller: field,
-                        twoRows: _twoRows,
-                        boxes: true,
-                        bar: widget.notes.store.advanced,
-                        onBox: (start, at) =>
-                            _tapBox(start, at, section: section.id),
-                        formats: true,
-                        onFormatted: () => setState(_saveText),
-                        style: Theme.of(context).textTheme.bodyLarge,
-                        // It sits where its text was read before.
-                        decoration: const InputDecoration(
-                          filled: false,
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      )
-                    else if (section.text.isNotEmpty)
-                      SelectionArea(
-                        child: MarkedText(
-                          section.shownText,
-                          format: section.textFormat,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                          boxes: section.boxes,
-                          source: section.text,
-                          ticking: _sectionTicking[section.id],
-                        ),
-                      ),
-                    for (final hash in section.photos) ...[
-                      const SizedBox(height: 8),
-                      NotePhoto(
-                        key: ValueKey(hash),
-                        hash: hash,
-                        onTap: () => viewPhoto(context, hash),
-                      ),
-                      PhotoText(
-                        key: ValueKey('ocr:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        photoText: section.photoTexts[hash],
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.photoTexts[hash],
-                        photo: true,
-                      ),
-                      ..._removeButton(section.id, hash, photo: true),
-                    ],
-                    for (final hash in section.removedPhotos) ...[
-                      PhotoText(
-                        key: ValueKey('ocr:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        photoText: section.photoTexts[hash],
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.photoTexts[hash],
-                        photo: true,
-                      ),
-                    ],
-                    for (final hash in section.recordings) ...[
-                      const SizedBox(height: 8),
-                      RecordingButton(
-                        key: ValueKey(hash),
-                        hash: hash,
-                        compact: false,
-                      ),
-                      TranscriptText(
-                        key: ValueKey('transcript:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        transcript: section.transcripts[hash],
-                        compact: false,
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.transcripts[hash],
-                        photo: false,
-                      ),
-                      ..._removeButton(section.id, hash, photo: false),
-                    ],
-                    for (final hash in section.removedRecordings) ...[
-                      TranscriptText(
-                        key: ValueKey('transcript:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        transcript: section.transcripts[hash],
-                        compact: false,
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.transcripts[hash],
-                        photo: false,
-                      ),
-                    ],
-                    // A merged Note's files travel with it (ADR 0047).
-                    ..._fileParts(
-                      section.id,
-                      section.attachments,
-                      section.attachmentTexts,
-                      section.removedAttachments,
-                    ),
-                    const SizedBox(height: 4),
-                    // Its details, each removable on its own, in the
-                    // same dialog as the Note's Captured badge (#170).
-                    CaptureLine.ofSection(
-                      section,
-                      key: ValueKey('captured-line:${section.id}'),
-                      when: when,
-                      after: i == 0
-                          ? note.captured
-                          : _sections[i - 1].context.captured,
-                      onTap: () => _showCaptured(when, section: section.id),
-                    ),
-                  ],
+            // A Note of a kind's Sections, its diary part under all else
+            // (#188), each under a tear line in no box, its text where
+            // the text above begins (#307).
+            if (_named)
+              for (final (i, section) in _sections.indexed)
+                Padding(
+                  key: ValueKey('section:${section.id}'),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _sectionPart(i, section, note, when),
+                  ),
                 ),
-              ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             if (amends)
               Align(
                 alignment: Alignment.centerLeft,

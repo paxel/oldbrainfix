@@ -1732,9 +1732,10 @@ class _CompactNoteState extends State<_CompactNote> {
 String descriptionUnfoldedSetting(String noteId) =>
     'descriptionUnfolded:$noteId';
 
-/// The whole of a Note in the detailed view: its text, photos and recordings,
-/// then each Section under a separator and its own Capture Context. The
-/// Sections are read when the Note is, not while building.
+/// The whole of a Note in the detailed view: its text, photos and
+/// recordings, then each Section under a tear line (#307) and its own
+/// Capture Context. The Sections are read when the Note is, not while
+/// building.
 class _FullNote extends StatefulWidget {
   final Note note;
   final DateFormat when;
@@ -1835,7 +1836,7 @@ class _FullNoteState extends State<_FullNote> {
             key: ValueKey('section:${section.id}'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Divider(height: 24),
+              const TearLine(),
               _Whole(
                 id: section.id,
                 text: section.shownText,

@@ -374,5 +374,33 @@ pub fn area_band(rect: Rect, colour: Color32) -> Shape {
     Shape::convex_polygon(points, colour, Stroke::NONE)
 }
 
+/// How long a dash of a tear line is, and the gap after it (#307), as
+/// on the phone.
+pub const TEAR_DASH: f32 = 4.0;
+pub const TEAR_GAP: f32 = 4.0;
+
+/// The tear line from `left` to `right` at `y` (#307): a row of short
+/// dashes like the perforation of a roll of paper, parting a Note's
+/// text from each of its Sections, which read on as one text.
+pub fn tear_shapes(left: f32, right: f32, y: f32, stroke: Stroke) -> Vec<Shape> {
+    let ends = [egui::pos2(left, y), egui::pos2(right, y)];
+    Shape::dashed_line(&ends, stroke, TEAR_DASH, TEAR_GAP)
+}
+
+/// A tear line across `ui` (#307), in the weak text colour of the time
+/// stamp under it, wherever it is drawn, taking its room as a separator
+/// does.
+pub fn tear_line(ui: &mut Ui) -> Response {
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 8.0), egui::Sense::hover());
+    if ui.is_rect_visible(rect) {
+        let stroke = Stroke::new(1.0, ui.visuals().weak_text_color());
+        let y = rect.center().y;
+        let shapes = tear_shapes(rect.left(), rect.right(), y, stroke);
+        ui.painter().extend(shapes);
+    }
+    response
+}
+
 #[cfg(test)]
 mod tests;

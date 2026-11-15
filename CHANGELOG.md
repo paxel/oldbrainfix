@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Changed
 
 - Typed text made a Checklist or a Shopping List keeps every line as a Line, its first line too; only a first line that looks like a heading, a Markdown heading or a line ending in ":", becomes the list's name, and a list without one shows "Checklist" or "Shopping List" until a name is typed. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))
+- A Note reads as one Note: its Sections, each an Amend or a Note merged in, have no box of their own and are parted from the text before them only by a dashed tear line, with their time in a small grey line under them. In the Note editor and the desktop's Note dialog and Note window, a Plain Note's Sections now follow its text in the same box, above the badges; a Checklist, Shopping List, Tally or Session keeps them at the end of the page. ([obf-1000](https://github.com/paxel/oldbrainfix/issues/307))
 
 ### Fixed
 

@@ -7,6 +7,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Geändert
 
 - Getippter Text, der zur Checkliste oder Einkaufsliste wird, behält jede Zeile als Zeile der Liste, auch seine erste; nur eine erste Zeile, die wie eine Überschrift aussieht, eine Markdown-Überschrift oder eine Zeile, die mit „:“ endet, wird der Name der Liste, und eine Liste ohne Namen zeigt „Checkliste“ oder „Einkaufsliste“, bis einer getippt wird. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))
+- Eine Notiz liest sich als eine Notiz: Ihre Abschnitte, jeder eine Ergänzung oder eine zusammengeführte Notiz, haben keinen eigenen Kasten und sind vom Text davor nur durch eine gestrichelte Abrisslinie getrennt, mit ihrer Zeit in einer kleinen grauen Zeile darunter. Im Notiz-Editor und auf dem Desktop im Notiz-Dialog und im Notiz-Fenster folgen die Abschnitte einer einfachen Notiz jetzt ihrem Text im selben Kasten, über den Plaketten; eine Checkliste, Einkaufsliste, Strichliste oder Einheit behält sie am Ende der Seite. ([obf-1000](https://github.com/paxel/oldbrainfix/issues/307))
 
 ### Behoben
 

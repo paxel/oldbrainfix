@@ -259,6 +259,18 @@ replace a law of Both apps where they say so. A desktop law marked
   rule. A Section's "Edited … by …" is a second weak line under it. The
   Captured badge's dialog keeps each detail on a line of its own, with
   Remove; in the editor a Section's line opens the same dialog for it.
+- **A Note reads as one Note** (#307, Q712): a Section has no box or
+  border of its own and reads on as the Note's text does, parted from
+  the part before it only by a **tear line**, a row of short grey dashes
+  like the perforation of a roll of paper, its meta
+  line the small time stamp under it. In the detailed view each Section
+  follows the Note under its tear line. In the Note editor, the Note
+  dialog and a Note's own window a Plain Note's Sections read on in the
+  box of its text, under the text and above the badges; a Note of a
+  kind keeps them below as its diary part (#188), each under its tear
+  line on the page. Everything a Section does stays: its text edited
+  in place, its line's dialog, who edited it and when, its photos,
+  recordings, files, Transcripts and Photo Texts.
 - **The compact view is a glance, by the Note's kind** (#189): a Plain
   Note its first line and the two lines after it, a Checklist its name
   and how many Lines are open ("3 of 7 open"), a Shopping List its name
@@ -366,12 +378,13 @@ replace a law of Both apps where they say so. A desktop law marked
   Session its pool and count in the editor, its picks and history in the
   detailed view, #191), then
   the badges, the photos and recordings, and the Amends
-  below as the dated diary part. In the editor the name is a one-line
+  below as the dated diary part, each under a tear line in no box
+  (#307). In the editor the name is a one-line
   field and the description its own field; nothing is rewritten for the
   display, and leaving both unchanged writes nothing.
 - **The Note editor shows each setting of the Note as a badge** (#160),
-  in one wrapping row under the text, or under the kind's content for a
-  Note of a kind (#188), like a shield: left an icon for *which
+  in one wrapping row under the text and its Sections (#307), or under
+  the kind's content for a Note of a kind (#188), like a shield: left an icon for *which
   setting* the badge is, the same for every value (one for the kind,
   one for the Importance, …), right its value (#192), as an **icon**
   where the setting has a fixed set of values (the kind, the text

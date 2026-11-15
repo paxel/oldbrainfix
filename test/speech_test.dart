@@ -730,18 +730,18 @@ void main() {
       unawaited(openNote(agenda, notes, Places(store), notes.byId(into.id)!));
       await tester.pumpAndSettle();
       final editor = find.byType(NoteEditorScreen);
-      expect(
-        find.descendant(of: editor, matching: find.text('sauce from the shop')),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.text('and fresh basil'),
-        100,
-        scrollable: find
-            .descendant(of: editor, matching: find.byType(Scrollable))
-            .first,
-      );
-      expect(find.text('and fresh basil'), findsOneWidget);
+      final page = find
+          .descendant(of: editor, matching: find.byType(Scrollable))
+          .first;
+      // The merged Note's reads on in the Note's text (#307), the Note's
+      // own under the badges.
+      for (final text in ['and fresh basil', 'sauce from the shop']) {
+        await tester.scrollUntilVisible(find.text(text), 100, scrollable: page);
+        expect(
+          find.descendant(of: editor, matching: find.text(text)),
+          findsOneWidget,
+        );
+      }
     });
 
     testWidgets('the editor shows a Transcript written while it is open, '
