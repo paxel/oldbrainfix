@@ -380,22 +380,45 @@ fn the_trash_searches_itself_and_ctrl_f_stays_there() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn sorting_unsorted_is_down_ctrl_m_type_enter_for_each_note() -> TestResult {
-    let mut harness = harness(store()?, Selection::Unsorted);
-    let household = Places::new(harness.state().store())
+/// The id of the Area Household.
+fn household(harness: &Harness<'_, App>) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(Places::new(harness.state().store())
         .areas()?
         .into_iter()
         .next()
         .ok_or("Household")?
-        .id;
+        .id)
+}
+
+/// Ctrl+M, "hou" and Enter: the card selected, or the Note in the Note
+/// dialog, filed into Household.
+fn file_into_household(harness: &mut Harness<'_, App>) {
+    press_with(harness, Modifiers::COMMAND, Key::M);
+    harness.run_steps(8);
+    type_here(harness, "hou");
+    press(harness, Key::Enter);
+}
+
+/// The text of the Note in the Note dialog.
+fn open_text(harness: &Harness<'_, App>) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let Some(id) = harness.state().selected_note() else {
+        return Ok(None);
+    };
+    Ok(notes(harness)?
+        .into_iter()
+        .find(|n| n.id == id)
+        .map(|n| n.text))
+}
+
+#[test]
+fn sorting_unsorted_is_down_then_ctrl_m_type_enter_for_each_note() -> TestResult {
+    let mut harness = harness(store()?, Selection::Unsorted);
+    let household = household(&harness)?;
+    press(&mut harness, Key::ArrowDown);
     for (text, left) in [(MILK, 2), (BANK, 1)] {
-        press(&mut harness, Key::ArrowDown);
+        // Filed, the first card left is selected by itself (#313).
         assert_eq!(selected(&harness)?, [text]);
-        press_with(&mut harness, Modifiers::COMMAND, Key::M);
-        harness.run_steps(8);
-        type_here(&mut harness, "hou");
-        press(&mut harness, Key::Enter);
+        file_into_household(&mut harness);
         assert_eq!(
             note(&harness, text)?.place.as_deref(),
             Some(household.as_str())
@@ -403,6 +426,130 @@ fn sorting_unsorted_is_down_ctrl_m_type_enter_for_each_note() -> TestResult {
         assert_eq!(shown(&harness)?.len(), left);
     }
     assert_eq!(shown(&harness)?, [ROSES]);
+    assert_eq!(selected(&harness)?, [ROSES]);
+    // The last one filed, the Agenda shows.
+    file_into_household(&mut harness);
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    // Ctrl+Z brings it back where it was sorted, its card selected.
+    press_with(&mut harness, Modifiers::COMMAND, Key::Z);
+    assert_eq!(note(&harness, ROSES)?.place, None);
+    assert_eq!(harness.state().selection(), &Selection::Unsorted);
+    assert_eq!(selected(&harness)?, [ROSES]);
+    Ok(())
+}
+
+#[test]
+fn filed_in_the_note_dialog_opened_in_unsorted_the_next_note_opens() -> TestResult {
+    let mut harness = harness(store()?, Selection::Unsorted);
+    press(&mut harness, Key::ArrowDown);
+    press(&mut harness, Key::ArrowDown);
+    press(&mut harness, Key::Enter);
+    assert_eq!(open_text(&harness)?.as_deref(), Some(BANK));
+    file_into_household(&mut harness);
+    assert!(note(&harness, BANK)?.place.is_some());
+    // The next one in the list's order, then from the last the first.
+    assert_eq!(open_text(&harness)?.as_deref(), Some(ROSES));
+    file_into_household(&mut harness);
+    assert_eq!(open_text(&harness)?.as_deref(), Some(MILK));
+    // Ctrl+Z brings the roses back into Unsorted and into the dialog.
+    press_with(&mut harness, Modifiers::COMMAND, Key::Z);
+    assert_eq!(note(&harness, ROSES)?.place, None);
+    assert_eq!(open_text(&harness)?.as_deref(), Some(ROSES));
+    file_into_household(&mut harness);
+    file_into_household(&mut harness);
+    // Nothing left: the Agenda, no Note open.
+    assert!(note(&harness, MILK)?.place.is_some());
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    assert!(!harness.state().note_open());
+    press_with(&mut harness, Modifiers::COMMAND, Key::Z);
+    assert_eq!(note(&harness, MILK)?.place, None);
+    assert_eq!(harness.state().selection(), &Selection::Unsorted);
+    assert_eq!(open_text(&harness)?.as_deref(), Some(MILK));
+    Ok(())
+}
+
+#[test]
+fn merged_or_made_a_frog_in_the_note_dialog_the_next_unsorted_note_opens() -> TestResult {
+    let mut harness = harness(store()?, Selection::Unsorted);
+    press(&mut harness, Key::ArrowDown);
+    press(&mut harness, Key::Enter);
+    assert_eq!(open_text(&harness)?.as_deref(), Some(MILK));
+    // Merged into the roses, the dialog shows the bank, not the roses.
+    press_with(&mut harness, Modifiers::COMMAND | Modifiers::SHIFT, Key::M);
+    harness.run_steps(8);
+    harness
+        .query_all_by_label(ROSES)
+        .next_back()
+        .ok_or("the roses' Note to pick")?
+        .click();
+    harness.run();
+    let roses = note(&harness, ROSES)?.id;
+    assert_eq!(
+        note(&harness, MILK)?.merged_into.as_deref(),
+        Some(roses.as_str())
+    );
+    assert_eq!(open_text(&harness)?.as_deref(), Some(BANK));
+    // Ctrl+Z takes the Merge back and shows the milk again.
+    press_with(&mut harness, Modifiers::COMMAND, Key::Z);
+    assert_eq!(note(&harness, MILK)?.merged_into, None);
+    assert_eq!(open_text(&harness)?.as_deref(), Some(MILK));
+
+    // A Frog sorts it too.
+    harness
+        .get_by_label("Routine, Reminder, Frog or Session")
+        .click();
+    harness.run();
+    harness
+        .query_all_by_label("Frog")
+        .next_back()
+        .ok_or("Frog")?
+        .click();
+    harness.run_steps(8);
+    assert!(!note(&harness, MILK)?.is_unsorted());
+    assert_eq!(open_text(&harness)?.as_deref(), Some(BANK));
+    Ok(())
+}
+
+#[test]
+fn a_routine_saved_from_the_note_dialog_in_unsorted_opens_the_next_note() -> TestResult {
+    let mut harness = harness(store()?, Selection::Unsorted);
+    press(&mut harness, Key::ArrowDown);
+    press(&mut harness, Key::Enter);
+    assert_eq!(open_text(&harness)?.as_deref(), Some(MILK));
+    harness
+        .get_by_label("Routine, Reminder, Frog or Session")
+        .click();
+    harness.run();
+    harness
+        .get_all_by_label("Routine")
+        .last()
+        .ok_or("Routine")?
+        .click();
+    harness.run();
+    assert!(harness.state().routine_editor().is_some());
+    // Not saved yet: the Note is still Unsorted and still open.
+    assert_eq!(open_text(&harness)?.as_deref(), Some(MILK));
+    // The time its field holds, then Save.
+    harness.get_by_label("Add a time").click();
+    harness.run();
+    harness.get_by_label("Save").click_accesskit();
+    harness.run();
+    assert!(!note(&harness, MILK)?.is_unsorted());
+    assert!(harness.state().routine_editor().is_none());
+    assert_eq!(open_text(&harness)?.as_deref(), Some(BANK));
+    Ok(())
+}
+
+#[test]
+fn a_note_opened_outside_unsorted_stays_in_the_dialog_once_filed() -> TestResult {
+    let mut harness = harness(store()?, Selection::All);
+    let milk = note(&harness, MILK)?.id;
+    harness.state_mut().select_note(&milk);
+    harness.run();
+    file_into_household(&mut harness);
+    assert!(note(&harness, MILK)?.place.is_some());
+    assert_eq!(harness.state().selected_note(), Some(milk.as_str()));
+    assert_eq!(harness.state().selection(), &Selection::All);
     Ok(())
 }
 

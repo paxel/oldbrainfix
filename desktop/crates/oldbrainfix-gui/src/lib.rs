@@ -95,6 +95,7 @@ pub mod text_menu;
 pub mod theme;
 pub mod tray;
 pub mod undo;
+pub mod unsorted_steps;
 pub mod vault_view;
 pub mod window_sizes;
 

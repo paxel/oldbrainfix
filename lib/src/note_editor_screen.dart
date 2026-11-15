@@ -42,6 +42,7 @@ import 'session_note.dart';
 import 'setting_badges.dart';
 import 'share_note.dart';
 import 'shopping_list_view.dart';
+import 'sorting_unsorted.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 import 'tally_entry_screen.dart';
@@ -52,15 +53,16 @@ import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
-/// Opens the editor of [note]; returns once the user left it. With
-/// [typeLines] the cursor starts in a new Line of a list after its open
-/// ones (#161, #276).
+/// Opens the editor of [note]; returns once the user left it, or once it
+/// moved on to the next of [sorting]. With [typeLines] the cursor starts
+/// in a new Line of a list after its open ones (#161, #276).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
   Places places,
   Note note, {
   bool typeLines = false,
+  UnsortedShown? sorting,
 }) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (_) => NoteEditorScreen(
@@ -69,6 +71,7 @@ Future<void> openNote(
       drafts: DraftsScope.of(context),
       noteId: note.id,
       typeLines: typeLines,
+      sorting: sorting,
     ),
   ),
 );
@@ -643,6 +646,12 @@ class NoteEditorScreen extends StatefulWidget {
   /// (#276).
   final bool typeLines;
 
+  /// The Unsorted Notes of the list the Note was opened from (#313): once
+  /// a step here sorts it, the editor shows the next of them, and the
+  /// Agenda once none is left. Null where it was opened from anywhere
+  /// else.
+  final UnsortedShown? sorting;
+
   const NoteEditorScreen({
     super.key,
     required this.notes,
@@ -650,6 +659,7 @@ class NoteEditorScreen extends StatefulWidget {
     required this.drafts,
     required this.noteId,
     this.typeLines = false,
+    this.sorting,
   });
 
   @override
@@ -1578,6 +1588,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// the page of its first field.
   Future<void> _changeKind(NoteKind kind) async {
     _saveText();
+    final before = _sortingBefore();
     final notes = widget.notes;
     final id = widget.noteId;
     final changed = switch ((_kind, kind)) {
@@ -1591,7 +1602,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       (_, NoteKind.checklist || NoteKind.shoppingList) => _switchList(),
       _ => false,
     };
-    if (!mounted || !changed) return;
+    if (!mounted || !changed || _movedOn(before)) return;
     setState(_load);
     _show();
   }
@@ -2020,10 +2031,53 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
+    final before = _sortingBefore();
     if (await fileNote(context, widget.notes, widget.places, note)) {
-      if (!mounted) return;
+      if (!mounted || _movedOn(before)) return;
       _reload();
     }
+  }
+
+  /// The order of the Unsorted Notes [NoteEditorScreen.sorting] shows as
+  /// a step that may sort the Note begins (#313).
+  List<String> _sortingBefore() => [
+    for (final note in widget.sorting?.call() ?? const <Note>[]) note.id,
+  ];
+
+  /// After a step that may have sorted the Note (#313): opened from
+  /// Unsorted, Unsorted as the step began and no longer, nor in the
+  /// trash, the editor shows the next Unsorted Note of the list in its
+  /// place; with none left the Agenda, and with only some the list's
+  /// filter hides the list again. Whether it went.
+  bool _movedOn(List<String> before) {
+    final sorting = widget.sorting;
+    if (sorting == null || !mounted || !before.contains(widget.noteId)) {
+      return false;
+    }
+    final note = widget.notes.byId(widget.noteId);
+    if (note == null || note.isTrashed || note.isUnsorted) return false;
+    final navigator = Navigator.of(context);
+    final next = nextUnsorted(before, sorting(), widget.noteId);
+    if (next != null) {
+      unawaited(
+        navigator.pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => NoteEditorScreen(
+              notes: widget.notes,
+              places: widget.places,
+              drafts: widget.drafts,
+              noteId: next.id,
+              sorting: sorting,
+            ),
+          ),
+        ),
+      );
+    } else if (widget.notes.unsorted().isEmpty) {
+      showAgendaSorted(context);
+    } else {
+      navigator.pop();
+    }
+    return true;
   }
 
   Future<void> _amend() async {
@@ -2046,6 +2100,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
+    final before = _sortingBefore();
     await spawnFromNote(
       context,
       widget.notes,
@@ -2053,7 +2108,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       note,
       spawn: spawn,
     );
-    if (!mounted) return;
+    if (!mounted || _movedOn(before)) return;
     final named = _named;
     _reload();
     // Spawning a Session makes a plain Note one (#191).
@@ -2408,11 +2463,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Merges the Note, with its text as typed, into the one picked; it
-  /// then is a Section there and the editor closes.
+  /// then is a Section there and the editor closes, or opened from
+  /// Unsorted moves on (#313).
   Future<void> _merge() async {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
+    final before = _sortingBefore();
     // The editor names it Merge into… (#308).
     if (await mergeNote(
       context,
@@ -2421,7 +2478,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       note,
       adding: false,
     )) {
-      if (!mounted) return;
+      if (!mounted || _movedOn(before)) return;
       Navigator.of(context).pop();
     }
   }

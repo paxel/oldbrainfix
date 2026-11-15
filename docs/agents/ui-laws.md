@@ -756,6 +756,19 @@ replace a law of Both apps where they say so. A desktop law marked
   **A card a tap switched keeps its view** in another setting of this
   Device, per list, until the list's switch changes again, which shows
   every card in the view it sets (#189).
+- **Sorting Unsorted goes on to the next Note** (#313, Q718): once a
+  Note Unsorted shows is filed, merged or added to a Note, made a
+  Checklist, Shopping List or Tally, or given a Routine, Reminder, Frog
+  or Session, the Note editor opened from Unsorted or the Nudge screen,
+  on the desktop the Note dialog opened from Unsorted, shows the next
+  Unsorted Note the list shows (its person filter, on the desktop its
+  search), the one after it in the list's order, else the first. The
+  list itself stays, on the desktop with its first card selected. Once
+  nothing is Unsorted the Agenda shows. A Note opened anywhere else, an
+  Area, a search, the Agenda, stays open; a Note moved to the trash
+  moves nothing on. On the desktop Ctrl+Z, bringing a sorted Note back,
+  shows Unsorted again: the Note in the Note dialog where it was sorted
+  there, else its card selected.
 - Rows show what the user needs to act, not the stored encoding: dates
   in the device format, values translated, storage keys never.
 - **The Areas stand in the person's own order** (#280): on the phone's
@@ -1539,8 +1552,9 @@ replace a law of Both apps where they say so. A desktop law marked
   Unimportant; in the Trash Delete and the digits do nothing. Down in
   the search field goes to the first card found. The card reached
   scrolls into view; after an action, which ends the selection, Up and
-  Down go on from it while it still shows, else from the top. Sorting Unsorted is Down, Ctrl+M, type, Enter for
-  each Note.
+  Down go on from it while it still shows, else from the top. Sorting Unsorted is Down once, then Ctrl+M,
+  type, Enter for each Note, the first card left selected after each
+  (#313).
 - **Keys finish what is typed** (draft, #196, #277): Ctrl+Enter (Cmd on
   macOS) saves the quick note's Note and the text being edited in the
   Note dialog, while Enter alone starts a new line; in the capture popup

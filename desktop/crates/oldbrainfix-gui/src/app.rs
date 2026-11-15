@@ -191,6 +191,7 @@ use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::text_menu::{self, Clip, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::undo::Undo;
+use crate::unsorted_steps::{self, MovedOn, Sorting};
 use crate::vault_view::{self, VaultDone, VaultJob};
 use crate::window_sizes;
 use oldbrainfix_core::tag_tree::TagTree;
@@ -1960,6 +1961,9 @@ pub struct App {
     /// What Ctrl+Z and Edit ▸ Undo take back: the last delete, check-off,
     /// filing or Merge (#268).
     undo: Option<Undo>,
+    /// The Notes sorted in Unsorted before it moved on (#313), for Ctrl+Z
+    /// to show them where they were sorted once it brings them back.
+    moved_on: Option<MovedOn>,
     /// The Note whose text took a paste that looks like code, while
     /// "Keep as code" waits under it (#213).
     code_offer: Option<String>,
@@ -2540,6 +2544,7 @@ impl App {
             badge: None,
             reappear_line: None,
             undo: None,
+            moved_on: None,
             code_offer: None,
             start_lines: false,
             tally_whose: HashMap::new(),
@@ -6608,6 +6613,7 @@ impl App {
 
     /// Does `action`, reads the log again and announces what went wrong.
     fn apply(&mut self, action: Action) {
+        let sorting = self.sorting_now();
         let done = self.act(action);
         // One place per Note (#287): a Note open in its own window comes
         // forward there, not in the dialog.
@@ -6637,6 +6643,11 @@ impl App {
         }
 
         self.refresh();
+        // Sorted in Unsorted, it goes on to the next Note (#313).
+        let done = match (done, sorting) {
+            (Ok(()), Some(sorting)) => self.move_on(sorting),
+            (done, _) => done,
+        };
         match done {
             Ok(()) => {}
             // Waiting, not failed: said with what to do.
@@ -6780,6 +6791,7 @@ impl App {
                 if let Some(undo) = self.undo.take() {
                     self.save_text()?;
                     undo.apply(&self.store)?;
+                    self.back_to_sorted()?;
                 }
             }
             Action::OpenGuide => self.open_url = Some(about_view::guide_url(self.t.locale())),
@@ -11620,6 +11632,126 @@ impl App {
             }
             other => self.dialog = other,
         }
+        Ok(())
+    }
+
+    /// What Unsorted shows as a step begins (#313): its cards Unsorted
+    /// now, in the list's order, and the one of them open in the Note
+    /// dialog; nothing elsewhere and in a Note's own window (#287).
+    fn sorting_now(&self) -> Option<Sorting> {
+        if self.selection != Selection::Unsorted || self.alone.is_some() {
+            return None;
+        }
+        let notes = Notes::new(&self.store);
+        let order: Vec<String> = self
+            .shown_cards()
+            .into_iter()
+            .filter(|id| {
+                notes
+                    .by_id(id)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|n| n.is_unsorted())
+            })
+            .collect();
+        if order.is_empty() {
+            return None;
+        }
+        let open = self
+            .selected_note
+            .clone()
+            .filter(|id| self.note_open() && order.contains(id));
+        Some(Sorting { order, open })
+    }
+
+    /// Goes on in Unsorted once the step just done sorted a Note it
+    /// showed as the step began, `before` (#313, Q718): the Note dialog
+    /// opened there to the next Unsorted Note of the list, the list's
+    /// selection to its first card, and to the Agenda once nothing is
+    /// Unsorted. A Note moved to the trash is not sorted.
+    fn move_on(&mut self, before: Sorting) -> oldbrainfix_core::Result<()> {
+        if self.selection != Selection::Unsorted {
+            return Ok(());
+        }
+        let (sorted, empty) = {
+            let notes = Notes::new(&self.store);
+            let mut sorted = Vec::new();
+            for id in &before.order {
+                if notes
+                    .by_id(id)?
+                    .is_some_and(|n| !n.is_trashed() && !n.is_unsorted())
+                {
+                    sorted.push(id.clone());
+                }
+            }
+            (sorted, notes.unsorted()?.is_empty())
+        };
+        let moved = match &before.open {
+            Some(open) => sorted.contains(open) && self.selected_note.is_some(),
+            None => !sorted.is_empty() && self.selected_note.is_none(),
+        };
+        if !moved {
+            return Ok(());
+        }
+        let shown = self.shown_cards();
+        if empty {
+            self.act(Action::Select(Selection::Agenda))?;
+        } else if let Some(open) = &before.open {
+            match unsorted_steps::next_after(&before.order, open, &shown) {
+                Some(next) => self.act(Action::SelectNote(next))?,
+                // The search hides what is left.
+                None => self.leave_note()?,
+            }
+        } else if let Some(first) = shown.first() {
+            self.cards.click(first);
+            self.scroll_card = Some(first.clone());
+        }
+        self.moved_on = Some(match before.open {
+            Some(open) => MovedOn {
+                notes: vec![open],
+                dialog: true,
+            },
+            None => MovedOn {
+                notes: sorted,
+                dialog: false,
+            },
+        });
+        self.refresh();
+        Ok(())
+    }
+
+    /// After Ctrl+Z, the Notes it brought back to Unsorted that Unsorted
+    /// moved on from (#313) show where they were sorted: in Unsorted, the
+    /// first of them in the Note dialog when it was sorted there, else
+    /// their cards selected.
+    fn back_to_sorted(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(moved) = self.moved_on.take() else {
+            return Ok(());
+        };
+        let mut back = Vec::new();
+        {
+            let notes = Notes::new(&self.store);
+            for id in moved.notes {
+                if notes.by_id(&id)?.is_some_and(|n| n.is_unsorted()) {
+                    back.push(id);
+                }
+            }
+        }
+        let Some(first) = back.first().cloned() else {
+            return Ok(());
+        };
+        if self.selection != Selection::Unsorted {
+            self.act(Action::Select(Selection::Unsorted))?;
+        }
+        if moved.dialog {
+            return self.act(Action::SelectNote(first));
+        }
+        self.leave_note()?;
+        self.cards.clear();
+        for id in &back {
+            self.cards.toggle(id);
+        }
+        self.scroll_card = Some(first);
         Ok(())
     }
 
