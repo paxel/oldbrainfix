@@ -37,6 +37,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - A tapped box ticks and its Line strikes through at once, the save following; a failed save shows it as before with a message. ([obf-1031](https://github.com/paxel/oldbrainfix/issues/338))
 - A phone's question no longer goes missing, and Ask on the phone and desktop says what it is doing and why it failed. ([obf-1010](https://github.com/paxel/oldbrainfix/issues/317))
 - On the phone, the app stays quick while a recording is transcribed; a Transcript may take about twice as long. ([obf-1030](https://github.com/paxel/oldbrainfix/issues/337))
+- A Reminder's notification opens its Note at once, ticking, Capture and lists are quicker, and the phone stays responsive while syncing with the computer. ([obf-1032](https://github.com/paxel/oldbrainfix/issues/339))
 
 ---
 

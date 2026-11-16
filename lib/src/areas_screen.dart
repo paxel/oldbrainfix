@@ -145,12 +145,16 @@ class _AreasScreenState extends State<AreasScreen>
       for (final people in _people.values)
         for (final p in people) p.id: store.personShown(p.id).name,
     };
-    _hits = _search(
-      widget.places,
-      _query.text,
-      lock: LockScope.of(context),
-      people: _filter,
-    );
+    // Only a search shows Notes on this level; without one, reading
+    // every Note for nothing made each change wait on all of them.
+    _hits = _query.text.trim().isEmpty
+        ? const []
+        : _search(
+            widget.places,
+            _query.text,
+            lock: LockScope.of(context),
+            people: _filter,
+          );
     keepShown(_hits);
   }
 

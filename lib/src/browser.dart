@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show setEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, setEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -18,7 +18,9 @@ import 'routine_editor_screen.dart';
 /// Reloads a page's list once after the log changed, never in the middle
 /// of whatever changed it, so what a page opened on top sorted, like the
 /// Nudge screen from its notification, or what a sync brought, is gone
-/// or there once the page shows again.
+/// or there once the page shows again. A page out of sight, under
+/// another page or behind the lock, reads nothing on a change; it reads
+/// once as it shows again, before the frame that shows it (#339).
 mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
   /// The log whose changes the page follows.
   Store get log;
@@ -28,6 +30,14 @@ mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
 
   var _reloadQueued = false;
 
+  /// Whether the log changed while the page was out of sight.
+  var _missed = false;
+
+  /// Whether the page is in sight: its tickers run.
+  ValueListenable<TickerModeData>? _sight;
+
+  bool get _inSight => _sight?.value.enabled ?? true;
+
   @override
   void initState() {
     super.initState();
@@ -35,19 +45,48 @@ mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sight = TickerMode.getValuesNotifier(context);
+    if (sight == _sight) return;
+    _sight?.removeListener(_sightChanged);
+    _sight = sight..addListener(_sightChanged);
+    _sightChanged();
+  }
+
+  @override
   void dispose() {
+    _sight?.removeListener(_sightChanged);
     log.removeListener(_logChanged);
     super.dispose();
   }
 
-  void _logChanged() {
+  /// Back in sight after a change: reads now, in the build that shows
+  /// it again.
+  void _sightChanged() {
+    if (!_missed || !_inSight || !mounted) return;
+    _missed = false;
+    reloadLog();
+  }
+
+  /// Reads the list again once, with the next microtask, however many
+  /// changes and calls ask for it meanwhile: a page that saved calls it
+  /// rather than reading at once, as the log's change reads it too.
+  void reloadSoon() {
     if (_reloadQueued) return;
     _reloadQueued = true;
     scheduleMicrotask(() {
       _reloadQueued = false;
-      if (mounted) reloadLog();
+      if (!mounted) return;
+      if (!_inSight) {
+        _missed = true;
+        return;
+      }
+      reloadLog();
     });
   }
+
+  void _logChanged() => reloadSoon();
 }
 
 /// A Note list's switch between the compact and the detailed view (#114,

@@ -134,46 +134,75 @@ extension Sync on Store {
     required Iterable<KeyRecord> keys,
     required String? verifiedDevice,
     required ImportReport? report,
-  }) => batch(() {
-    learnKeys(keys, verifiedDevice: verifiedDevice, report: report);
+  }) {
+    final ahead = _checkedAhead(entries, keys);
+    return batch(() {
+      learnKeys(keys, verifiedDevice: verifiedDevice, report: report);
+      final self = deviceId;
+      final ownMax = versionVector()[self] ?? 0;
+      final own = signingKey.publicKey;
+      final known = <String, List<int>?>{};
+      final refusing = blockedDevices();
+      final refused = <Entry>[];
+      final applied = <Entry>[];
+      for (final (i, e) in entries.indexed) {
+        if (holds(e.device, e.dseq)) continue;
+        final key = e.device == self
+            ? (e.dseq > ownMax ? null : own)
+            : known.putIfAbsent(
+                e.device,
+                () => pinnedKey(e.device)?.record.publicKey,
+              );
+        if (key == null || !ahead.verifies(i, key, () => _bytes(e), e.sig)) {
+          report?.refuse(e.author, e.device);
+          continue;
+        }
+        // Checked first, so nobody moves the mark with a forged entry.
+        if (refusing.contains(e.device) && !keptFromBlocked(e)) {
+          refused.add(e);
+          continue;
+        }
+        // One of a later structure is kept and passed on, not applied.
+        if (insert(e) && e.applies) applied.add(e);
+      }
+      // Where each refused entity lay, once what is kept of this batch is
+      // in: a Note by its filing, a Section by the Note it names.
+      final links = {
+        for (final e in refused)
+          if (e.field == SectionKeys.note) e.entity: ?e.value,
+      };
+      for (final e in refused) {
+        noteRefused(e.device, e.dseq, scopeOf(links[e.entity] ?? e.entity));
+      }
+      return applied;
+    });
+  }
+
+  /// The signatures of [entries] checked before the write lock is taken
+  /// (#339), each under the key its Device most likely has: its pinned
+  /// one, else the one [keys] hands over, this Device's own for its own.
+  /// Checking them holds every other write, the app's taps among them,
+  /// for seconds in a large sync; what a check found is used under the
+  /// lock only for the very key it was made with.
+  _Checked _checkedAhead(List<Entry> entries, Iterable<KeyRecord> keys) {
     final self = deviceId;
-    final ownMax = versionVector()[self] ?? 0;
     final own = signingKey.publicKey;
-    final known = <String, List<int>?>{};
-    final refusing = blockedDevices();
-    final refused = <Entry>[];
-    final applied = <Entry>[];
-    for (final e in entries) {
+    final handed = {for (final k in keys) k.device: k.publicKey};
+    final likely = <String, List<int>?>{};
+    final found = <int, (List<int>, bool)>{};
+    for (final (i, e) in entries.indexed) {
       if (holds(e.device, e.dseq)) continue;
       final key = e.device == self
-          ? (e.dseq > ownMax ? null : own)
-          : known.putIfAbsent(
+          ? own
+          : likely.putIfAbsent(
               e.device,
-              () => pinnedKey(e.device)?.record.publicKey,
+              () => pinnedKey(e.device)?.record.publicKey ?? handed[e.device],
             );
-      if (key == null || !verifySignature(key, _bytes(e), e.sig)) {
-        report?.refuse(e.author, e.device);
-        continue;
-      }
-      // Checked first, so nobody moves the mark with a forged entry.
-      if (refusing.contains(e.device) && !keptFromBlocked(e)) {
-        refused.add(e);
-        continue;
-      }
-      // One of a later structure is kept and passed on, not applied.
-      if (insert(e) && e.applies) applied.add(e);
+      if (key == null) continue;
+      found[i] = (key, verifySignature(key, _bytes(e), e.sig));
     }
-    // Where each refused entity lay, once what is kept of this batch is
-    // in: a Note by its filing, a Section by the Note it names.
-    final links = {
-      for (final e in refused)
-        if (e.field == SectionKeys.note) e.entity: ?e.value,
-    };
-    for (final e in refused) {
-      noteRefused(e.device, e.dseq, scopeOf(links[e.entity] ?? e.entity));
-    }
-    return applied;
-  });
+    return _Checked(found);
+  }
 
   static Uint8List _bytes(Entry e) => entryBytes(
     device: e.device,
@@ -392,5 +421,34 @@ extension Moments on Store {
     if (!changed) return null;
     final id = addMoment(seq: before, cause: cause, label: label);
     return moments().firstWhere((m) => m.id == id);
+  }
+}
+
+/// Signatures checked ahead ([Sync._checkedAhead]), by the index of
+/// their entry: with the key each was checked under.
+final class _Checked {
+  final Map<int, (List<int>, bool)> _found;
+
+  _Checked(this._found);
+
+  /// Whether the entry at [index] verifies under [key]: as checked ahead
+  /// when it was checked under that key, else checked now.
+  bool verifies(
+    int index,
+    List<int> key,
+    Uint8List Function() bytes,
+    String? sig,
+  ) {
+    final (checked, ok) = _found[index] ?? (const <int>[], false);
+    if (_same(checked, key)) return ok;
+    return verifySignature(key, bytes(), sig);
+  }
+
+  static bool _same(List<int> a, List<int> b) {
+    if (a.length != b.length || a.isEmpty) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }

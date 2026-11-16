@@ -1825,6 +1825,12 @@ impl<'a> Notes<'a> {
     /// The Note `id`, trashed or not, or `None` when there is none.
     pub fn by_id(&self, id: &str) -> Result<Option<Note>> {
         let fields = self.store.current_fields(id)?;
+        self.note_of(id, fields)
+    }
+
+    /// The Note `id` made of its current `fields`, as [`Notes::by_id`]
+    /// reads it.
+    fn note_of(&self, id: &str, fields: Fields) -> Result<Option<Note>> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_NOTE) {
             return Ok(None);
         }
@@ -1971,9 +1977,15 @@ impl<'a> Notes<'a> {
 
     /// Every Note neither in the trash nor merged, newest capture first.
     pub fn all(&self) -> Result<Vec<Note>> {
+        // Every Note's fields in one read, not two per Note (#339), in the
+        // order [`Store::entities_of_type`] lists them.
+        let mut fields = self.store.current_fields_of_type(keys::TYPE_NOTE)?;
         let mut notes = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
-            if let Some(note) = self.by_id(&id)?
+        for id in self.store.ever_of_type(keys::TYPE_NOTE)? {
+            let Some(held) = fields.remove(&id) else {
+                continue;
+            };
+            if let Some(note) = self.note_of(&id, held)?
                 && !note.is_trashed()
                 && !note.is_merged()
             {
@@ -2036,11 +2048,28 @@ impl<'a> Notes<'a> {
     /// The Sections of the Note `note_id`, oldest first: its Amends, the
     /// Notes merged into it, and their Amends.
     pub fn sections(&self, note_id: &str) -> Result<Vec<Section>> {
+        // Only a Note that was merged can be merged into this one, and
+        // only a Section that once named one of them can belong to it:
+        // the others are not read, which made opening a Note wait on all
+        // of them (#339). In the order every Note and Section is listed.
+        let was_merged: HashSet<String> = self
+            .store
+            .fields_with_prefix(keys::MERGED)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
         let mut merged: Vec<String> = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
+        for id in self
+            .store
+            .entities_of_type_among(keys::TYPE_NOTE, &was_merged)?
+        {
             if self.merged_into(&id)?.as_deref() == Some(note_id) && !merged.contains(&id) {
                 merged.push(id);
             }
+        }
+        let mut named = self.store.ever_with(keys::NOTE, note_id)?;
+        for id in &merged {
+            named.extend(self.store.ever_with(keys::NOTE, id)?);
         }
         let mut sections = Vec::new();
         for id in &merged {
@@ -2048,7 +2077,10 @@ impl<'a> Notes<'a> {
                 sections.push(self.merged_section(note, note_id)?);
             }
         }
-        for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
+        for id in self
+            .store
+            .entities_of_type_among(keys::TYPE_SECTION, &named)?
+        {
             let owner = self.store.current(&id, keys::NOTE)?;
             let owned = owner
                 .as_deref()

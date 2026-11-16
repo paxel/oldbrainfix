@@ -561,7 +561,8 @@ class _ShoppingSectionState extends State<ShoppingSection>
       checked
           ? _lists.check(line, deviceWallClock)
           : _lists.uncheck(line, deviceWallClock);
-      if (mounted) setState(_load);
+      // Read once with the log's change, not twice (#339).
+      if (mounted) reloadSoon();
     });
   }
 

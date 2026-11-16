@@ -8,7 +8,7 @@
 //! same order and read from the clock as often, as the Dart core's.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
@@ -1085,7 +1085,17 @@ impl<'a> ShoppingLists<'a> {
     pub fn addable(&self) -> Result<Vec<Note>> {
         let notes = Notes::new(self.store);
         let mut found = Vec::new();
-        for id in self.store.entities_of_type(note_keys::TYPE_NOTE)? {
+        // Only a Note that was a list once can be one (#339).
+        let lists: HashSet<String> = self
+            .store
+            .fields_with_prefix(checklist_keys::KIND)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        for id in self
+            .store
+            .entities_of_type_among(note_keys::TYPE_NOTE, &lists)?
+        {
             if self.making(&id)?.is_none() || !self.may_check(&id)? {
                 continue;
             }

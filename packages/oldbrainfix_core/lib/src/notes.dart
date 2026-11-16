@@ -967,9 +967,8 @@ class Notes {
         !note.attachmentTexts.containsKey(file.hash) &&
         !note.removedAttachmentTexts.contains(file.hash);
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.attachments.any((a) => waits(note, a))) note,
+      for (final note in _holding(NoteKeys.filePrefix))
+        if (note.attachments.any((a) => waits(note, a))) note,
     ];
     // By id within one capture time, so both cores list them alike.
     notes.sort((a, b) {
@@ -1049,9 +1048,8 @@ class Notes {
   /// whose Transcript was removed is not among them.
   List<({String noteId, String hash})> untranscribed() {
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.recordings.any((h) => _untranscribed(note, h))) note,
+      for (final note in _holding(NoteKeys.audioPrefix))
+        if (note.recordings.any((h) => _untranscribed(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
@@ -1078,15 +1076,28 @@ class Notes {
   /// Text was removed is not among them.
   List<({String noteId, String hash})> unreadPhotos() {
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.photos.any((h) => _unread(note, h))) note,
+      for (final note in _holding(NoteKeys.photoPrefix))
+        if (note.photos.any((h) => _unread(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
       for (final note in notes)
         for (final hash in note.photos)
           if (_unread(note, hash)) (noteId: note.id, hash: hash),
+    ];
+  }
+
+  /// The Notes not in the trash, merged ones included, that hold a
+  /// field starting with [prefix], a photo, a recording or a file, in
+  /// the order [Store.entitiesOfType] lists Notes: only they can hold one
+  /// waiting to be read, and finding them reads no other Note, which
+  /// each change of the log made wait on all of them (#339).
+  List<Note> _holding(String prefix) {
+    final holding = {for (final (id, _) in store.fieldsWithPrefix(prefix)) id};
+    return [
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (holding.contains(id))
+          if (byId(id) case final note? when !note.isTrashed) note,
     ];
   }
 
@@ -1524,16 +1535,27 @@ class Notes {
   /// The Sections of the Note [noteId], oldest first: its Amends, the
   /// Notes merged into it, and their Amends.
   List<Section> sections(String noteId) {
+    // Only a Note that was merged can be merged into this one, and only
+    // a Section that once named one of them can belong to it: the others
+    // are not read, which made opening a Note wait on all of them
+    // (#339). In the order every Note and Section is listed in.
+    final wasMerged = {
+      for (final (id, _) in store.fieldsWithPrefix(NoteKeys.merged)) id,
+    };
     final merged = {
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (_mergedInto(id) == noteId) id,
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (wasMerged.contains(id) && _mergedInto(id) == noteId) id,
     };
     final owners = {noteId, ...merged};
+    final named = {
+      for (final owner in owners) ...store.everWith(SectionKeys.note, owner),
+    };
     final sections = [
       for (final id in merged)
         if (byId(id) case final note?) _merged(note, noteId),
-      for (final id in store.entitiesOfType(SectionKeys.typeSection))
-        if (owners.contains(store.current(id, SectionKeys.note)))
+      for (final id in store.everOfType(SectionKeys.typeSection))
+        if (named.contains(id) &&
+            owners.contains(store.current(id, SectionKeys.note)))
           ?_section(id, noteId: noteId),
     ];
     sections.sort((a, b) => a.context.captured.compareTo(b.context.captured));
@@ -1787,8 +1809,10 @@ class Notes {
   }
 
   /// The Note [id], trashed or not, or null when there is none.
-  Note? byId(String id) {
-    final fields = store.currentFields(id);
+  Note? byId(String id) => _note(id, store.currentFields(id));
+
+  /// The Note [id] made of its current [fields], as [byId] reads it.
+  Note? _note(String id, Map<String, String?> fields) {
     if (fields[NoteKeys.type] != NoteKeys.typeNote) return null;
     final captured = fields[NoteKeys.captured];
     if (captured == null) return null;
@@ -1925,10 +1949,15 @@ class Notes {
 
   /// Every Note neither in the trash nor merged, newest capture first.
   List<Note> all() {
+    // Every Note's fields in one read, not two per Note (#339), in the
+    // order [Store.entitiesOfType] lists them.
+    final fields = store.currentFieldsOfType(NoteKeys.typeNote);
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed && !note.isMerged)
-          note,
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (fields[id] case final held?)
+          if (_note(id, held) case final note?
+              when !note.isTrashed && !note.isMerged)
+            note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return notes;

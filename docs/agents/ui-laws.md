@@ -69,6 +69,10 @@ replace a law of Both apps where they say so. A desktop law marked
   strikes through, in the frame of the tap or click; the save follows
   after that frame. A save that fails shows the box as stored again and
   says so at the top. On the phone, on the desktop, everywhere a box is.
+- **A time budget** (#339, Q753): every tap or click shows its effect
+  within 100 ms, every page change within 500 ms, counted from the tap to
+  the frame that shows it. A notification tapped while the app runs
+  opens its Note within the 500 ms. On the phone and on the desktop.
 
 ### Announcements
 

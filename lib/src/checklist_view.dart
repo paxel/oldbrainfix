@@ -549,7 +549,8 @@ class _ChecklistSectionState extends State<ChecklistSection>
     final on = _list?.on;
     tickAtOnce(lineTickKey(line, on), checked, () {
       checked ? _lists.check(line, on: on) : _lists.uncheck(line, on: on);
-      if (mounted) setState(_load);
+      // Read once with the log's change, not twice (#339).
+      if (mounted) reloadSoon();
     });
   }
 
