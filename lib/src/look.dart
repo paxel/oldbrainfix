@@ -116,6 +116,66 @@ class FatFingersText extends StatelessWidget {
   }
 }
 
+/// How large this Device shows its text (#326, obf-1019): the factor of
+/// its [TextSize], 1 for normal. The theme carries it, so a change shows
+/// at once; [ContentText] applies it.
+class TextSizeScale extends ThemeExtension<TextSizeScale> {
+  final double factor;
+
+  const TextSizeScale(this.factor);
+
+  /// The factor of the theme around [context]; 1 without one.
+  static double of(BuildContext context) =>
+      Theme.of(context).extension<TextSizeScale>()?.factor ?? 1;
+
+  @override
+  TextSizeScale copyWith({double? factor}) =>
+      TextSizeScale(factor ?? this.factor);
+
+  @override
+  TextSizeScale lerp(TextSizeScale? other, double t) => other == null
+      ? this
+      : TextSizeScale(factor + (other.factor - factor) * t);
+}
+
+/// Grows the text under it by the Device's [TextSizeScale] (#326,
+/// obf-1019), on top of the system's font size and "Fat fingers": the
+/// text of Notes, Lines, Sections, the Agenda's rows and Ask's answers,
+/// not the buttons and labels around them. Icons keep their size, as
+/// they do not follow the text scaler. Once only: a [ContentText] inside
+/// another leaves the text as it is.
+class ContentText extends StatelessWidget {
+  final Widget child;
+
+  const ContentText({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final factor = TextSizeScale.of(context);
+    if (factor == 1 ||
+        context.dependOnInheritedWidgetOfExactType<_InContentText>() != null) {
+      return child;
+    }
+    final media = MediaQuery.of(context);
+    return _InContentText(
+      child: MediaQuery(
+        data: media.copyWith(
+          textScaler: TimesTextScaler(media.textScaler, factor),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Marks what a [ContentText] already grew.
+class _InContentText extends InheritedWidget {
+  const _InContentText({required super.child});
+
+  @override
+  bool updateShouldNotify(_InContentText oldWidget) => false;
+}
+
 /// [child] grown by the [LookScale] of the theme, in its room and on the
 /// screen alike, for a control whose size the density does not reach:
 /// the switch (#224).
@@ -224,7 +284,14 @@ class RenderGrown extends RenderProxyBox {
 /// (#224) icons and tap targets are [fatFingersScale] times their size:
 /// the icons through the icon themes, the targets through the density,
 /// whose largest step adds 4 dp a side to a 48 dp target.
-ThemeData lookTheme(Brightness brightness, {bool fatFingers = false}) {
+///
+/// [textSize] (#326, obf-1019) rides along as its [TextSizeScale], for
+/// [ContentText].
+ThemeData lookTheme(
+  Brightness brightness, {
+  bool fatFingers = false,
+  TextSize textSize = TextSize.normal,
+}) {
   final tones = LookTones.of(brightness);
   final scheme = ColorScheme.fromSeed(
     seedColor: tones.accent,
@@ -239,7 +306,7 @@ ThemeData lookTheme(Brightness brightness, {bool fatFingers = false}) {
   return ThemeData(
     colorScheme: scheme,
     scaffoldBackgroundColor: Colors.transparent,
-    extensions: [LookScale(scale)],
+    extensions: [LookScale(scale), TextSizeScale(textSize.factor)],
     visualDensity: fatFingers ? grown : null,
     iconTheme: fatFingers ? IconThemeData(size: icon) : null,
     // Material 3's icon buttons take no density: their target is set

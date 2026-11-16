@@ -43,7 +43,7 @@ enum _UnitChoice { region, metric, imperial }
 enum _Importing { folder, keep }
 
 /// This Device's settings (ADR 0008), reached only through the Profile
-/// page: the theme and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
+/// page: the theme, the text size (#326, obf-1019) and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
@@ -54,8 +54,8 @@ class SettingsScreen extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
 
-  /// Called after the theme or "Fat fingers" was changed, to show it at
-  /// once.
+  /// Called after the theme, the text size or "Fat fingers" was changed,
+  /// to show it at once.
   final VoidCallback? onThemeChanged;
 
   /// The notes browser's way back in, which the Area an Import made
@@ -126,6 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   late ThemeChoice _theme = widget.store.themeChoice;
   late bool _fatFingers = widget.store.fatFingers;
+  late TextSize _textSize = widget.store.textSize;
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
   late bool _hidesChecked = widget.store.agendaHidesChecked;
@@ -158,6 +159,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.onThemeChanged?.call();
     // The widget's text grows with it.
     unawaited(widget.alarms.refresh());
+  }
+
+  /// The text's own step (#326, obf-1019), shown at once; the Agenda's
+  /// widget keeps "Fat fingers" alone.
+  void _setTextSize(TextSize size) {
+    widget.store.textSize = size;
+    setState(() => _textSize = size);
+    widget.onThemeChanged?.call();
   }
 
   void _setRenag(Duration interval) {
@@ -633,6 +642,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         SettingsSection(
                           children: [
+                            SettingsRow(
+                              words: [
+                                t.textSize,
+                                t.textSizeDetail,
+                                t.textSizeNormal,
+                                t.textSizeLarger,
+                                t.textSizeLargest,
+                              ],
+                              child: ControlBelow(
+                                leading: const Icon(Icons.format_size),
+                                title: Text(t.textSize),
+                                subtitle: Text(t.textSizeDetail),
+                                control: ChoiceChips<TextSize>(
+                                  key: const ValueKey('textSize'),
+                                  value: _textSize,
+                                  options: [
+                                    RadioOption(
+                                      key: const ValueKey('textSize-normal'),
+                                      value: TextSize.normal,
+                                      title: Text(t.textSizeNormal),
+                                    ),
+                                    RadioOption(
+                                      key: const ValueKey('textSize-larger'),
+                                      value: TextSize.larger,
+                                      title: Text(t.textSizeLarger),
+                                    ),
+                                    RadioOption(
+                                      key: const ValueKey('textSize-largest'),
+                                      value: TextSize.largest,
+                                      title: Text(t.textSizeLargest),
+                                    ),
+                                  ],
+                                  onChanged: _setTextSize,
+                                ),
+                              ),
+                            ),
                             SettingsRow(
                               words: [t.fatFingers, t.fatFingersDetail],
                               child: SwitchBelow(

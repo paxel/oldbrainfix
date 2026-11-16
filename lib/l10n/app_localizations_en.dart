@@ -1609,6 +1609,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.';
 
   @override
+  String get textSize => 'Text size';
+
+  @override
+  String get textSizeDetail =>
+      'How large the text of Notes, Lines, the Agenda and Ask\'s answers shows, on top of the system\'s font size and “Fat fingers”.';
+
+  @override
+  String get textSizeNormal => 'Normal';
+
+  @override
+  String get textSizeLarger => 'Larger';
+
+  @override
+  String get textSizeLargest => 'Largest';
+
+  @override
   String get settingsAlarms => 'Alarms';
 
   @override

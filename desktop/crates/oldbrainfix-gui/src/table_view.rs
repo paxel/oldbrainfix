@@ -450,7 +450,7 @@ impl TableView {
         let found = Found::of(&self.text, text_format::MARKDOWN, &self.ticking.look);
         let laid = text_marks_view::lay_table(ui, (&self.text, &table), (&found, &look));
         let (mut widths, mut heights) = text_marks_view::grid(ui, &laid, &look, PAD);
-        let lowest = ui.fonts_mut(|f| f.row_height(&FontId::proportional(SIZE))) + PAD.y * 2.0;
+        let lowest = ui.fonts_mut(|f| f.row_height(&look.font())) + PAD.y * 2.0;
         for width in &mut widths {
             *width = width.max(NARROWEST);
         }
@@ -726,9 +726,11 @@ impl TableView {
         // Its boxes as they show, their ids not drawn and the cursor kept
         // out of them (ADR 0035).
         let look = &self.ticking.look;
+        // Typed at the Device's text size, as the cells read (#326, obf-1019).
+        let size = crate::theme::content(ui, SIZE);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
-            let font = FontId::proportional(SIZE);
+            let font = FontId::proportional(size);
             let job = text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent));
             let mut job = text_marks_view::field_job(job, look, &|_| 0.0);
             job.wrap.max_width = width;
@@ -739,7 +741,7 @@ impl TableView {
             rect.shrink2(egui::vec2(PAD.x, 0.0)),
             TextEdit::singleline(&mut editing.typed)
                 .id(id)
-                .font(FontId::proportional(SIZE))
+                .font(FontId::proportional(size))
                 .text_color(text)
                 .layouter(&mut layouter)
                 .lock_focus(true)

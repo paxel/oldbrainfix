@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'profile.dart';
 import 'table_screen.dart';
 import 'tick_saves.dart';
@@ -1069,8 +1070,13 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     return _found = _FoundIn(widget.text, widget.boxes);
   }
 
+  // The text grows with the Device's text size (#326, obf-1019); what is
+  // built reads the size it shows at below the [ContentText].
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ContentText(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     if (widget.format == TextFormats.markdown) return _formatted(context);
     if (widget.format == TextFormats.code) return _code(context);
     final found = _foundIn;
@@ -1199,6 +1205,9 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final base = DefaultTextStyle.of(context).style.merge(widget.style);
     final compact = widget.maxLines != null;
     final size = base.fontSize ?? 14;
+    // The room is in parts of the size the text shows at, the system's
+    // font size, "Fat fingers" and the text size in it (#326, obf-1019).
+    final em = MediaQuery.textScalerOf(context).scale(size);
     final lines = <Widget>[];
     // The kind of the line drawn last and the blank lines since: the room
     // before a line goes by both (#327); a compact card's lines keep only
@@ -1208,7 +1217,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     void room(MarkdownBlockKind kind) {
       if (!compact && (last != null || blank > 0)) {
         final gap = blank > 0 ? blank * blankGap : lineGap(last ?? kind, kind);
-        lines.add(SizedBox(height: gap * size));
+        lines.add(SizedBox(height: gap * em));
       }
       last = kind;
       blank = 0;
@@ -1252,7 +1261,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       }
     }
     // Blank lines at the end keep their room.
-    if (blank > 0) lines.add(SizedBox(height: blank * blankGap * size));
+    if (blank > 0) lines.add(SizedBox(height: blank * blankGap * em));
     if (lines.length == 1) return lines.single;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1303,12 +1312,14 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       MarkdownBlockKind.heading1 ||
       MarkdownBlockKind.heading2 => Semantics(header: true, child: words),
       MarkdownBlockKind.bullet => _item(
+        _grown(context, size),
         block.level == 0 ? '•' : '◦',
         block.level,
         style,
         words,
       ),
       MarkdownBlockKind.numbered => _item(
+        _grown(context, size),
         '${block.number}.',
         block.level,
         style,
@@ -1346,10 +1357,11 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
           text.substring(b.start, b.end),
     ].join('\n');
     final scheme = Theme.of(context).colorScheme;
+    final grow = _grown(context, base.fontSize ?? 14);
     return Container(
       key: ValueKey('code-${code.firstLine}'),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 8 * grow, vertical: 6 * grow),
       decoration: BoxDecoration(
         color: codeTint(scheme),
         borderRadius: BorderRadius.circular(4),
@@ -1486,23 +1498,34 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     return out;
   }
 
-  /// An item of a list: its bullet or number, the words beside it.
-  Widget _item(String sign, int level, TextStyle style, Widget words) =>
-      Padding(
-        padding: EdgeInsetsDirectional.only(start: level * 20.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 20),
-              child: Text(sign, style: style),
-            ),
-            const SizedBox(width: 4),
-            Flexible(child: words),
-          ],
+  /// How many times its [size] the text around [context] shows at (#326,
+  /// obf-1019): the room of an item and of a code block grows with it.
+  double _grown(BuildContext context, double size) =>
+      MediaQuery.textScalerOf(context).scale(size) / size;
+
+  /// An item of a list: its bullet or number, the words beside it, its
+  /// room [grow] times the usual.
+  Widget _item(
+    double grow,
+    String sign,
+    int level,
+    TextStyle style,
+    Widget words,
+  ) => Padding(
+    padding: EdgeInsetsDirectional.only(start: level * 20.0 * grow),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(minWidth: 20 * grow),
+          child: Text(sign, style: style),
         ),
-      );
+        SizedBox(width: 4 * grow),
+        Flexible(child: words),
+      ],
+    ),
+  );
 }
 
 /// How a cell of a column that lines up as [align] sets its words.
@@ -1599,8 +1622,12 @@ class _MarkedCellState extends State<MarkedCell> with _InlineSpans {
   @override
   BoxTicking? get _ticking => widget.ticking;
 
+  // A table's cell grows with the Device's text size too (#326, obf-1019).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ContentText(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final style = DefaultTextStyle.of(context).style.merge(widget.style);
     final spans = <InlineSpan>[];
     for (final span in widget.cell.spans) {

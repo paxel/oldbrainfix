@@ -30,6 +30,7 @@ const SHOPPING_AGENDA: &str = "shoppingAgenda";
 const STREAKS_OFF: &str = "streaksOff";
 const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
+const TEXT_SIZE: &str = "textSize";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
@@ -69,6 +70,59 @@ impl ThemeChoice {
             .into_iter()
             .find(|c| Some(c.name()) == name)
             .unwrap_or_default()
+    }
+}
+
+/// How large this Device shows the text of Notes, Lines, Sections, the
+/// Agenda's rows and Ask's answers (#326, obf-1019): its own step, apart
+/// from "Bigger text and icons", as the Dart core's `TextSize`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextSize {
+    #[default]
+    Normal,
+    Larger,
+    Largest,
+}
+
+impl TextSize {
+    /// All of them, smallest first.
+    pub const ALL: [TextSize; 3] = [TextSize::Normal, TextSize::Larger, TextSize::Largest];
+
+    /// How it is stored, as the Dart core's enum names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            TextSize::Normal => "normal",
+            TextSize::Larger => "larger",
+            TextSize::Largest => "largest",
+        }
+    }
+
+    /// The step `name` names; anything unknown is normal.
+    pub fn read(name: Option<&str>) -> TextSize {
+        TextSize::ALL
+            .into_iter()
+            .find(|s| Some(s.name()) == name)
+            .unwrap_or_default()
+    }
+
+    /// How many times the normal size the text shows.
+    pub fn factor(self) -> f32 {
+        match self {
+            TextSize::Normal => 1.0,
+            TextSize::Larger => 1.15,
+            TextSize::Largest => 1.3,
+        }
+    }
+
+    /// The step one larger, or one smaller; `None` at the end.
+    pub fn step(self, larger: bool) -> Option<TextSize> {
+        let at = TextSize::ALL.iter().position(|s| *s == self)?;
+        let to = if larger {
+            at.checked_add(1)?
+        } else {
+            at.checked_sub(1)?
+        };
+        TextSize::ALL.get(to).copied()
     }
 }
 
@@ -334,6 +388,18 @@ impl<'a> DeviceSettings<'a> {
 
     pub fn set_fat_fingers(&self, on: bool) -> Result<()> {
         self.store.set_local_setting(FAT_FINGERS, &on.to_string())
+    }
+
+    /// The step of this Device's text (#326, obf-1019); normal unless
+    /// one was picked.
+    pub fn text_size(&self) -> Result<TextSize> {
+        Ok(TextSize::read(
+            self.store.local_setting(TEXT_SIZE)?.as_deref(),
+        ))
+    }
+
+    pub fn set_text_size(&self, size: TextSize) -> Result<()> {
+        self.store.set_local_setting(TEXT_SIZE, size.name())
     }
 
     /// Whether the quick note on this Device shows `control`; off until

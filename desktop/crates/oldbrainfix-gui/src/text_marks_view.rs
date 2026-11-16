@@ -340,10 +340,14 @@ pub fn marked_label(
     let tagged = found.tags.iter().any(|t| t.start >= from && t.end <= to);
     let linked = found.links.iter().any(|&(s, e)| s >= from && e <= to);
     if !marked && !tagged && !linked {
-        let mut rich = RichText::new(part).color(look.1);
-        if let Some(size) = look.0 {
-            rich = rich.size(size);
-        }
+        // At the Device's text size, as [`Look::of`] has it (#326,
+        // obf-1019).
+        let size = look
+            .0
+            .unwrap_or_else(|| TextStyle::Body.resolve(ui.style()).size);
+        let rich = RichText::new(part)
+            .color(look.1)
+            .size(crate::theme::content(ui, size));
         let label = egui::Label::new(rich);
         crate::read_text::label(ui, if truncate { label.truncate() } else { label });
         return Spots::default();
@@ -564,13 +568,15 @@ pub(crate) struct Look {
 }
 
 impl Look {
-    /// The body's font of `size` (its own while `None`) in `colour`, the
-    /// rest as `ui`'s visuals have it.
+    /// The body's font of `size` (its own while `None`) in `colour`, at
+    /// the Device's text size (#326, obf-1019), the rest as `ui`'s
+    /// visuals have it.
     pub(crate) fn of(ui: &Ui, (size, colour): (Option<f32>, Color32)) -> Look {
         let mut font = TextStyle::Body.resolve(ui.style());
         if let Some(size) = size {
             font.size = size;
         }
+        font.size = crate::theme::content(ui, font.size);
         let visuals = ui.visuals();
         Look {
             font,
@@ -579,6 +585,11 @@ impl Look {
             weak: visuals.weak_text_color(),
             code: visuals.code_bg_color,
         }
+    }
+
+    /// Its font, at the size it shows.
+    pub(crate) fn font(&self) -> FontId {
+        self.font.clone()
     }
 
     /// The same, `scale` times as large.
@@ -950,7 +961,8 @@ fn block_label(
     };
     let row = ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        ui.add_space(indent);
+        // The indent grows with the text size (#326, obf-1019).
+        ui.add_space(crate::theme::content(ui, indent));
         if let Some(prefix) = item_prefix(block, &look, look.colour) {
             let galley = WidgetText::from(prefix).into_galley(
                 ui,

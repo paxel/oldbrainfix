@@ -248,6 +248,23 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the text shows normal until this Device picks a larger step, '
+      'apart from Fat fingers (#326, obf-1019)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.textSize, TextSize.normal);
+    for (final size in TextSize.values) {
+      store.textSize = size;
+      expect(store.textSize, size);
+      expect(store.localSetting('textSize'), size.name);
+    }
+    expect(store.fatFingers, isFalse, reason: 'a setting of its own');
+    expect([for (final s in TextSize.values) s.factor], [1.0, 1.15, 1.3]);
+    store.setLocalSetting('textSize', 'garbled');
+    expect(store.textSize, TextSize.normal);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the Agenda showed a row per Shopping List with Lines back unless '
       'this Device chose another way', () {
     final store = Store.inMemory();

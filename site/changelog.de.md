@@ -13,6 +13,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop bittet Fragen ein OpenAI-kompatibles Modell, nicht nachzudenken, außer „Das Modell nachdenken lassen“ ist an, und die KI-Einstellungen nennen ausprobierte Modelle. ([obf-1011](https://github.com/paxel/oldbrainfix/issues/318))
 - Eine kopierte Checkliste oder Einkaufsliste legt ihre Zeilen als Markdown-Aufgaben in die Zwischenablage, die beim Einfügen wieder Statuskästchen werden. ([obf-1016](https://github.com/paxel/oldbrainfix/issues/323))
 - Eine im Vollbild geöffnete Tabelle bietet „Kopieren“, das sich in formatierten Text als Tabelle und anderswo als Markdown einfügt. ([obf-1017](https://github.com/paxel/oldbrainfix/issues/324))
+- „Textgröße“ vergrößert den Text von Notizen, Zeilen, der Agenda und den Antworten von Fragen in Stufen; auf dem Desktop ändern Strg+Plus und Strg+Minus sie. ([obf-1019](https://github.com/paxel/oldbrainfix/issues/326))
 
 ### Geändert
 

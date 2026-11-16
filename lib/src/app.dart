@@ -234,8 +234,17 @@ class OldBrainFixApp extends StatefulWidget {
 class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _scroll = ParallaxScroll();
   late var _fatFingers = widget.store.fatFingers;
-  late var _light = lookTheme(Brightness.light, fatFingers: _fatFingers);
-  late var _dark = lookTheme(Brightness.dark, fatFingers: _fatFingers);
+  late var _textSize = widget.store.textSize;
+  late var _light = lookTheme(
+    Brightness.light,
+    fatFingers: _fatFingers,
+    textSize: _textSize,
+  );
+  late var _dark = lookTheme(
+    Brightness.dark,
+    fatFingers: _fatFingers,
+    textSize: _textSize,
+  );
   late final _announcements = widget.announcements ?? Announcements();
   late final _drafts = widget.drafts ?? MemoryDrafts();
   late var _themeMode = themeModeOf(widget.store.themeChoice);
@@ -511,13 +520,22 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     pager: _pager,
   );
 
-  /// Shows the theme this Device chose in Settings at once, and its
-  /// "Fat fingers" (#224).
+  /// Shows the theme this Device chose in Settings at once, its "Fat
+  /// fingers" (#224) and its text size (#326, obf-1019).
   void _themeChanged() => setState(() {
     _themeMode = themeModeOf(widget.store.themeChoice);
     _fatFingers = widget.store.fatFingers;
-    _light = lookTheme(Brightness.light, fatFingers: _fatFingers);
-    _dark = lookTheme(Brightness.dark, fatFingers: _fatFingers);
+    _textSize = widget.store.textSize;
+    _light = lookTheme(
+      Brightness.light,
+      fatFingers: _fatFingers,
+      textSize: _textSize,
+    );
+    _dark = lookTheme(
+      Brightness.dark,
+      fatFingers: _fatFingers,
+      textSize: _textSize,
+    );
   });
 }
 

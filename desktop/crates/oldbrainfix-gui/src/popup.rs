@@ -627,7 +627,8 @@ impl CapturePopup {
                                 .id(id)
                                 .hint_text(t.capture_hint())
                                 .text_color(text)
-                                .font(FontId::proportional(18.0))
+                                // At the Device's text size (#326, obf-1019).
+                                .font(FontId::proportional(theme::content(ui, 18.0)))
                                 .desired_rows(1)
                                 .desired_width(f32::INFINITY)
                                 .return_key(KeyboardShortcut::new(Modifiers::SHIFT, Key::Enter)),

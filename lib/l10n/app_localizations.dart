@@ -2612,6 +2612,36 @@ abstract class AppLocalizations {
   /// **'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.'**
   String get fatFingersDetail;
 
+  /// The choice in Settings > Look, on the desktop in Settings > This computer and View > Text size, of how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows on this Device, apart from Fat fingers (#326, obf-1019).
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get textSize;
+
+  /// Under the choice textSize on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'How large the text of Notes, Lines, the Agenda and Ask\'s answers shows, on top of the system\'s font size and “Fat fingers”.'**
+  String get textSizeDetail;
+
+  /// The text size of textSize as it was before, 1 times.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get textSizeNormal;
+
+  /// The text size of textSize at 1.15 times normal.
+  ///
+  /// In en, this message translates to:
+  /// **'Larger'**
+  String get textSizeLarger;
+
+  /// The text size of textSize at 1.3 times normal.
+  ///
+  /// In en, this message translates to:
+  /// **'Largest'**
+  String get textSizeLargest;
+
   /// No description provided for @settingsAlarms.
   ///
   /// In en, this message translates to:

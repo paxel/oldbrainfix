@@ -1833,31 +1833,37 @@ class _AppointmentRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
+                      // Its words grow with the text size (#326, obf-1019).
                       Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(time, style: text.labelLarge),
-                              Text(
-                                appointmentTitle(t, appointment),
-                                maxLines: unfolded ? null : 2,
-                                overflow: unfolded
-                                    ? null
-                                    : TextOverflow.ellipsis,
-                                style: text.bodyLarge,
-                              ),
-                              if (calendar != null)
-                                Text(calendar.name, style: text.labelSmall),
-                              if (unfolded && location.isNotEmpty)
-                                Text(t.appointmentPlace(location), style: dim),
-                              if (unfolded && description.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(description, style: dim),
+                        child: ContentText(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(time, style: text.labelLarge),
+                                Text(
+                                  appointmentTitle(t, appointment),
+                                  maxLines: unfolded ? null : 2,
+                                  overflow: unfolded
+                                      ? null
+                                      : TextOverflow.ellipsis,
+                                  style: text.bodyLarge,
                                 ),
-                            ],
+                                if (calendar != null)
+                                  Text(calendar.name, style: text.labelSmall),
+                                if (unfolded && location.isNotEmpty)
+                                  Text(
+                                    t.appointmentPlace(location),
+                                    style: dim,
+                                  ),
+                                if (unfolded && description.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(description, style: dim),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

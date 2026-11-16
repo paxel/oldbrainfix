@@ -135,6 +135,28 @@ fn settings_keep_what_they_are_set_to() -> Result<()> {
     assert!(!settings.fat_fingers()?);
     store.set_local_setting(FAT_FINGERS, "garbled")?;
     assert!(!settings.fat_fingers()?);
+    // The text's own step (#326, obf-1019), under the Dart core's key
+    // and names, apart from "Bigger text and icons".
+    assert_eq!(settings.text_size()?, TextSize::Normal);
+    for size in TextSize::ALL {
+        settings.set_text_size(size)?;
+        assert_eq!(settings.text_size()?, size);
+        assert_eq!(
+            store.local_setting(TEXT_SIZE)?.as_deref(),
+            Some(size.name())
+        );
+    }
+    assert!(!settings.fat_fingers()?);
+    store.set_local_setting(TEXT_SIZE, "garbled")?;
+    assert_eq!(settings.text_size()?, TextSize::Normal);
+    let factors: Vec<f32> = TextSize::ALL.iter().map(|s| s.factor()).collect();
+    assert_eq!(factors, [1.0, 1.15, 1.3]);
+    // One step at a time, kept at the ends.
+    assert_eq!(TextSize::Normal.step(true), Some(TextSize::Larger));
+    assert_eq!(TextSize::Larger.step(true), Some(TextSize::Largest));
+    assert_eq!(TextSize::Largest.step(true), None);
+    assert_eq!(TextSize::Largest.step(false), Some(TextSize::Larger));
+    assert_eq!(TextSize::Normal.step(false), None);
     for control in QuickNoteControl::ALL {
         settings.set_quick_note_shows(control, true)?;
         assert!(settings.quick_note_shows(control)?, "{control:?}");

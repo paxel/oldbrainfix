@@ -10,6 +10,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'table_grid.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
@@ -1249,35 +1250,39 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       20 + TwoRowTextField.above(twoRows: widget.twoRows, bar: _hasBar),
     );
     if (!widget.twoRows) {
-      final field = TextField(
-        key: _field,
-        controller: widget.controller,
-        focusNode: _focus,
-        readOnly: widget.readOnly,
-        autofocus: widget.autofocus,
-        maxLines: null,
-        // Code is typed as it is (#213).
-        textCapitalization: _code
-            ? TextCapitalization.none
-            : TextCapitalization.sentences,
-        autocorrect: !_code,
-        enableSuggestions: !_code,
-        style: widget.style,
-        strutStyle: strut,
-        decoration: widget.decoration,
-        onChanged: _userChanged,
-        inputFormatters: _formatters,
-        scrollPadding: scrollPadding,
-        textInputAction: _nextAction,
-        onEditingComplete: _onEditingComplete,
-        onSubmitted: _onSubmitted,
-        onTap: widget.onBox != null || _formatting != null
-            ? () {
-                if (_down case final at?) {
-                  _tappedBox(at);
+      // The text typed grows with the Device's text size (#326,
+      // obf-1019), the bar on the keyboard does not.
+      final field = ContentText(
+        child: TextField(
+          key: _field,
+          controller: widget.controller,
+          focusNode: _focus,
+          readOnly: widget.readOnly,
+          autofocus: widget.autofocus,
+          maxLines: null,
+          // Code is typed as it is (#213).
+          textCapitalization: _code
+              ? TextCapitalization.none
+              : TextCapitalization.sentences,
+          autocorrect: !_code,
+          enableSuggestions: !_code,
+          style: widget.style,
+          strutStyle: strut,
+          decoration: widget.decoration,
+          onChanged: _userChanged,
+          inputFormatters: _formatters,
+          scrollPadding: scrollPadding,
+          textInputAction: _nextAction,
+          onEditingComplete: _onEditingComplete,
+          onSubmitted: _onSubmitted,
+          onTap: widget.onBox != null || _formatting != null
+              ? () {
+                  if (_down case final at?) {
+                    _tappedBox(at);
+                  }
                 }
-              }
-            : null,
+              : null,
+        ),
       );
       final keyed = _keyed(field);
       final Widget shown = _code ? _sideways(context, keyed) : keyed;
@@ -1298,30 +1303,32 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         child: hits,
       );
     }
-    final field = TextField(
-      key: _field,
-      controller: widget.controller,
-      focusNode: _focus,
-      readOnly: widget.readOnly,
-      autofocus: widget.autofocus,
-      maxLines: null,
-      textCapitalization: _code
-          ? TextCapitalization.none
-          : TextCapitalization.sentences,
-      autocorrect: !_code,
-      enableSuggestions: !_code,
-      style: widget.style,
-      strutStyle: strut,
-      decoration: widget.decoration,
-      onChanged: _userChanged,
-      inputFormatters: _formatters,
-      magnifierConfiguration: TextMagnifierConfiguration.disabled,
-      selectionControls: _handles,
-      contextMenuBuilder: _menu,
-      scrollPadding: scrollPadding,
-      textInputAction: _nextAction,
-      onEditingComplete: _onEditingComplete,
-      onSubmitted: _onSubmitted,
+    final field = ContentText(
+      child: TextField(
+        key: _field,
+        controller: widget.controller,
+        focusNode: _focus,
+        readOnly: widget.readOnly,
+        autofocus: widget.autofocus,
+        maxLines: null,
+        textCapitalization: _code
+            ? TextCapitalization.none
+            : TextCapitalization.sentences,
+        autocorrect: !_code,
+        enableSuggestions: !_code,
+        style: widget.style,
+        strutStyle: strut,
+        decoration: widget.decoration,
+        onChanged: _userChanged,
+        inputFormatters: _formatters,
+        magnifierConfiguration: TextMagnifierConfiguration.disabled,
+        selectionControls: _handles,
+        contextMenuBuilder: _menu,
+        scrollPadding: scrollPadding,
+        textInputAction: _nextAction,
+        onEditingComplete: _onEditingComplete,
+        onSubmitted: _onSubmitted,
+      ),
     );
     // The field's own gestures would let a sideways drag move the cursor:
     // they are switched off, and these, which drag nothing, take their

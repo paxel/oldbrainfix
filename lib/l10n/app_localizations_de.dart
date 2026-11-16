@@ -1619,6 +1619,22 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schrift, Symbole und Knöpfe erscheinen 1,3-mal so groß, zusätzlich zur Schriftgröße des Systems, auch im Widget der Agenda.';
 
   @override
+  String get textSize => 'Textgröße';
+
+  @override
+  String get textSizeDetail =>
+      'Wie groß der Text von Notizen, Zeilen, der Agenda und den Antworten von Fragen erscheint, zusätzlich zur Schriftgröße des Systems und zu „Dicke Finger“.';
+
+  @override
+  String get textSizeNormal => 'Normal';
+
+  @override
+  String get textSizeLarger => 'Größer';
+
+  @override
+  String get textSizeLargest => 'Am größten';
+
+  @override
   String get settingsAlarms => 'Alarme';
 
   @override

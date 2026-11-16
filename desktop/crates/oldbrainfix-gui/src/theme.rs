@@ -9,7 +9,7 @@ use egui::{
     Button, Color32, Context, Key, Modifiers, Rect, Response, Shape, Stroke, Theme,
     ThemePreference, Ui, Visuals,
 };
-use oldbrainfix_core::ThemeChoice;
+use oldbrainfix_core::{TextSize, ThemeChoice};
 
 /// The colours of one brightness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -318,6 +318,30 @@ pub fn install(ctx: &Context) {
     for theme in [Theme::Light, Theme::Dark] {
         ctx.style_mut_of(theme, |s| s.spacing.button_padding = BUTTON_PADDING);
     }
+}
+
+/// Where the context keeps the factor of this Device's text size.
+fn text_size_id() -> egui::Id {
+    egui::Id::new("oldbrainfix-text-size")
+}
+
+/// Shows the text of Notes, Lines, Sections, the Agenda's rows and Ask's
+/// answers at `size`'s factor (#326, obf-1019), on top of the zoom of
+/// "Bigger text and icons"; the context keeps it, for every window.
+pub fn set_text_size(ctx: &Context, size: TextSize) {
+    ctx.data_mut(|d| d.insert_temp(text_size_id(), size.factor()));
+}
+
+/// The factor of the text size shown around `ctx`; 1 until one is set.
+pub fn text_factor(ctx: &Context) -> f32 {
+    ctx.data(|d| d.get_temp(text_size_id())).unwrap_or(1.0)
+}
+
+/// `size`, a content text's usual size in points, at the text size of
+/// this Device (#326, obf-1019). Buttons, icons and labels around the
+/// text keep theirs.
+pub fn content(ui: &Ui, size: f32) -> f32 {
+    size * text_factor(ui.ctx())
 }
 
 /// Shows the theme this Device chose: the system's, light or dark.

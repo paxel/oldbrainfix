@@ -11,6 +11,20 @@ import 'tally_units.dart';
 /// Which theme this Device shows: the system's, or a fixed one.
 enum ThemeChoice { system, light, dark }
 
+/// How large this Device shows the text of Notes, Lines, Sections, the
+/// Agenda's rows and Ask's answers (#326, obf-1019): its own step, apart from "Fat fingers", which grows icons and buttons.
+/// The step multiplies the system's font size and "Fat fingers".
+enum TextSize {
+  normal(1.0),
+  larger(1.15),
+  largest(1.3);
+
+  /// How many times the normal size the text shows.
+  final double factor;
+
+  const TextSize(this.factor);
+}
+
 /// What the quick note (the text capture screen) shows beyond its text
 /// field, its Photo, Voice, Gallery and Paste, its Nudge buttons, "To
 /// full editor" and the alarm clock for a Routine or Reminder (#223), each
@@ -61,6 +75,7 @@ extension DeviceSettings on Store {
   static const _streaksOff = 'streaksOff';
   static const _agendaHideChecked = 'agendaHideChecked';
   static const _fatFingers = 'fatFingers';
+  static const _textSize = 'textSize';
   static const _twoRowEditorOff = 'twoRowEditorOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
@@ -274,6 +289,13 @@ extension DeviceSettings on Store {
   bool get fatFingers => localSetting(_fatFingers) == 'true';
 
   set fatFingers(bool on) => setLocalSetting(_fatFingers, '$on');
+
+  /// The step of this Device's text (#326, obf-1019); anything unknown
+  /// shows it normal.
+  TextSize get textSize =>
+      TextSize.values.asNameMap()[localSetting(_textSize)] ?? TextSize.normal;
+
+  set textSize(TextSize size) => setLocalSetting(_textSize, size.name);
 
   /// Whether the Note editor and Amend on this Device type in two rows,
   /// the bottom one above the keyboard; on unless switched off, which

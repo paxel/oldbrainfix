@@ -851,6 +851,28 @@ replace a law of Both apps where they say so. A desktop law marked
   `LookGrown`. The Agenda's measures (`AgendaSizes`) grow by the same
   factor, and the widget's text with them. On the desktop it is egui's
   zoom at 1.3.
+- **The text has a size of its own** (#326, obf-1019, Q729): Text size,
+  a local setting of the Device, Normal (1), Larger (1.15) or Largest
+  (1.3), normal at first and for anything unknown, on the phone in
+  Settings ▸ Look between the theme and Fat fingers, on the desktop in
+  View ▸ Text size and Settings ▸ This computer beside "Bigger text and
+  icons". It grows content text only: Notes, Lines, Sections, a table's
+  cells, the Agenda's rows and Ask's answers, as they read and in the
+  fields they are typed in; buttons, icons, boxes, menus, bars, headings
+  of pages and the labels around the text keep their size, which stays
+  Fat fingers' alone. The step multiplies the system's font size and
+  Fat fingers (the desktop's zoom), never replaces them, and applies
+  once where content nests. A formatted text's room, a list item's
+  indent and a code block's padding grow with the size it shows at, so
+  "Formatted text reads calm" holds at every step. On the desktop
+  Ctrl+Plus (and Ctrl+=) and Ctrl+Minus step it, kept at Normal and
+  Largest, kept across starts, as the menu bar's keys do (not while
+  another dialog is open), and egui's own zoom keys are off: Ctrl+0 does
+  nothing. The Agenda's widget keeps Fat fingers alone. Phone:
+  `TextSizeScale` and `ContentText` in `look.dart`; desktop:
+  `theme::content` and `Look::of` in `text_marks_view.rs`. The AI port
+  reads it in read_settings (`textSize`) and, as every setting, does not
+  set it.
 - **Formatted text reads calm** (#327, obf-1020): wherever a formatted
   text shows, on both apps, every measure in parts of its font's size,
   so a bigger text keeps the look. Its lines lie 1.5 sizes apart. Between
@@ -1580,6 +1602,10 @@ replace a law of Both apps where they say so. A desktop law marked
   Notes'; over the Settings dialog it searches the Settings (#282). On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture, and only Help ▸ About Old Brain
   Fix to About, which the Settings do not show (#325, Q728).
+- **View ▸ Text size** (#326, obf-1019): Normal, Larger and Largest,
+  then Larger text (Ctrl+Plus, Ctrl+= too) and Smaller text
+  (Ctrl+Minus), each greyed at its end; the keys work as the menu bar's
+  others do, and egui's own zoom keys are off (Both apps ▸ Look).
 - **File ▸ Attach a file…** (#267) picks files of any kind and does
   with them what a drop does (see Capture): onto the Note in the Note
   dialog, else into the quick note for a new Note.

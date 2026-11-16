@@ -101,7 +101,7 @@ use oldbrainfix_core::{
     OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuickNoteControl,
     QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions,
     ShoppingLine, ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies,
-    ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
+    TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -1405,6 +1405,12 @@ enum Action {
     /// Shows the theme chosen in View ▸ Theme at once and keeps it on
     /// this Device (#147).
     Theme(ThemeChoice),
+    /// Shows the text at the size chosen in View ▸ Text size or the
+    /// Settings at once and keeps it on this Device (#326, obf-1019).
+    TextSize(TextSize),
+    /// The text one step larger (Ctrl+Plus) or smaller (Ctrl+Minus),
+    /// kept at the ends (#326, obf-1019).
+    TextStep(bool),
     /// Shows this photo full screen, to zoom and move (#114).
     ViewPhoto(String),
     /// Closes the photo shown full screen.
@@ -1917,6 +1923,9 @@ pub struct App {
     theme_shown: bool,
     /// Whether the window shows the zoom this Device chose yet (#224).
     zoom_shown: bool,
+    /// The text size this Device chose (#326, obf-1019), shown every
+    /// frame.
+    text_size: TextSize,
     /// The address the browser is to open, and who opens it; egui's
     /// `open_url` when none.
     open_url: Option<String>,
@@ -2505,6 +2514,8 @@ impl App {
         let speed = DeviceSettings::new(&store).playback_speed().unwrap_or(1.0);
         // The system's when it cannot be read.
         let theme = DeviceSettings::new(&store).theme().unwrap_or_default();
+        // Normal when it cannot be read.
+        let text_size = DeviceSettings::new(&store).text_size().unwrap_or_default();
         // As they were left on this computer (#278).
         let sidebar = window_sizes::sidebar_width(&store).unwrap_or(window_sizes::DEFAULT_SIDEBAR);
         let note_kept = window_sizes::note_dialog_size(&store);
@@ -2539,6 +2550,7 @@ impl App {
             theme,
             theme_shown: false,
             zoom_shown: false,
+            text_size,
             open_url: None,
             url_opener: None,
             linked_file_opener: None,
@@ -5732,8 +5744,12 @@ impl App {
             theme::prefer(ctx, self.theme);
             ctx.request_repaint();
         }
-        // The same for the zoom (#224): set every frame it would undo
-        // Ctrl+Plus and Ctrl+Minus.
+        // Ctrl+Plus and Ctrl+Minus are the text size's (#326, obf-1019),
+        // not egui's zoom, which stays that of "Bigger text and icons".
+        ctx.options_mut(|o| o.zoom_with_keyboard = false);
+        theme::set_text_size(ctx, self.text_size);
+        // The zoom is set once (#224), so it does not undo a zoom set
+        // from outside.
         if !std::mem::replace(&mut self.zoom_shown, true) {
             let bigger = DeviceSettings::new(&self.store)
                 .fat_fingers()
@@ -7355,6 +7371,17 @@ impl App {
                 self.theme = choice;
                 self.theme_shown = false;
                 DeviceSettings::new(&self.store).set_theme(choice)?;
+            }
+            Action::TextSize(size) => {
+                // Shown even when it cannot be kept.
+                self.text_size = size;
+                DeviceSettings::new(&self.store).set_text_size(size)?;
+            }
+            Action::TextStep(larger) => {
+                if let Some(size) = self.text_size.step(larger) {
+                    self.text_size = size;
+                    DeviceSettings::new(&self.store).set_text_size(size)?;
+                }
             }
             Action::Compact(on) => {
                 if let Some(key) = self.cards_key() {
@@ -10806,6 +10833,16 @@ impl App {
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
                 }
+                // The text size, a step either way (#326, obf-1019): Ctrl+=
+                // too, which is Ctrl+Plus without Shift on many keyboards.
+                if i.consume_key(Modifiers::COMMAND, Key::Plus)
+                    || i.consume_key(Modifiers::COMMAND, Key::Equals)
+                {
+                    actions.push(Action::TextStep(true));
+                }
+                if i.consume_key(Modifiers::COMMAND, Key::Minus) {
+                    actions.push(Action::TextStep(false));
+                }
                 // The Ask panel (#267), taken before a text field's own
                 // Ctrl+K (delete to the line's end) sees it; while the AI
                 // is off (#334) the field keeps it.
@@ -12440,6 +12477,43 @@ impl App {
                         }
                     }
                 });
+                // The text's own size (#326, obf-1019): its steps, and one
+                // step either way with its keys, greyed at the end.
+                ui.menu_button(RichText::new(t.text_size()).color(text), |ui| {
+                    for (label, size) in [
+                        (t.text_size_normal(), TextSize::Normal),
+                        (t.text_size_larger(), TextSize::Larger),
+                        (t.text_size_largest(), TextSize::Largest),
+                    ] {
+                        let on = self.text_size == size;
+                        let button = egui::Button::selectable(on, RichText::new(label).color(text));
+                        if ui.add(button).clicked() {
+                            actions.push(Action::TextSize(size));
+                            ui.close();
+                        }
+                    }
+                    ui.separator();
+                    let larger = self.text_size.step(true).is_some();
+                    let smaller = self.text_size.step(false).is_some();
+                    menu_entries(
+                        ui,
+                        [
+                            (
+                                t.menu_text_larger(),
+                                keys(Key::Plus),
+                                larger,
+                                Action::TextStep(true),
+                            ),
+                            (
+                                t.menu_text_smaller(),
+                                keys(Key::Minus),
+                                smaller,
+                                Action::TextStep(false),
+                            ),
+                        ],
+                        actions,
+                    );
+                });
             });
             // The Area or Topic the list shows, as the sidebar's
             // right-click offers it (#279); F2 renames.
@@ -13546,7 +13620,8 @@ impl App {
                     .id(id)
                     .hint_text(t.capture_hint())
                     .text_color(text)
-                    .font(FontId::proportional(16.0))
+                    // The text typed at the Device's text size (#326).
+                    .font(FontId::proportional(theme::content(ui, 16.0)))
                     .desired_rows(2)
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
@@ -14582,6 +14657,9 @@ impl App {
                     // Its tables as grids, as in the Note's text (#257).
                     let unticked = BoxLook::default();
                     let body = egui::TextStyle::Body.resolve(ui.style());
+                    // Typed at the Device's text size (#326, obf-1019).
+                    let mut typed_font = body.clone();
+                    typed_font.size = theme::content(ui, body.size);
                     let grids = markdown::uses(amend).then(|| {
                         let look = GridLook {
                             size: body.size,
@@ -14619,7 +14697,7 @@ impl App {
                     }
                     let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
                         let typed = typed.as_str();
-                        let format = egui::TextFormat::simple(body.clone(), text);
+                        let format = egui::TextFormat::simple(typed_font.clone(), text);
                         let mut job =
                             egui::text::LayoutJob::single_section(typed.to_string(), format);
                         if let Some(grids) = &grids {
@@ -16301,6 +16379,13 @@ impl App {
                     &[t.alerts_switch(), t.alerts_detail()],
                     &[t.autostart_switch(), t.autostart_detail()],
                     &[t.bigger_switch(), t.bigger_detail()],
+                    &[
+                        t.text_size(),
+                        t.text_size_detail_desktop(),
+                        t.text_size_normal(),
+                        t.text_size_larger(),
+                        t.text_size_largest(),
+                    ],
                 ],
             );
             if shows.contains(&true) {
@@ -16345,6 +16430,25 @@ impl App {
                             actions.push(Action::Setting(Setting::Bigger(on)));
                         }
                         ui.label(RichText::new(t.bigger_detail()).small().color(weak));
+                    }
+                    // The text's own size (#326, obf-1019), as in View ▸
+                    // Text size.
+                    if shows[3] {
+                        ui.label(RichText::new(t.text_size()).color(text));
+                        let mut chosen = self.text_size;
+                        let options = [
+                            (TextSize::Normal, t.text_size_normal().to_string()),
+                            (TextSize::Larger, t.text_size_larger().to_string()),
+                            (TextSize::Largest, t.text_size_largest().to_string()),
+                        ];
+                        if chip_row(ui, &mut chosen, options) && chosen != self.text_size {
+                            actions.push(Action::TextSize(chosen));
+                        }
+                        ui.label(
+                            RichText::new(t.text_size_detail_desktop())
+                                .small()
+                                .color(weak),
+                        );
                     }
                 });
             }
@@ -19227,7 +19331,10 @@ fn agenda_entry(
             .inner
             .clicked();
         ui.add_space(4.0);
-        let mut shown = RichText::new(words).size(15.0).color(text);
+        // The row's words at the Device's text size (#326, obf-1019).
+        let mut shown = RichText::new(words)
+            .size(theme::content(ui, 15.0))
+            .color(text);
         if struck {
             shown = shown.strikethrough().color(weak);
         }
@@ -19329,7 +19436,9 @@ fn agenda_row(
                 ui.set_max_width(width);
                 ui.spacing_mut().item_spacing.y = 2.0;
                 ui.label(RichText::new(&time).strong().color(text));
-                let mut line = RichText::new(&title).size(15.0).color(text);
+                let mut line = RichText::new(&title)
+                    .size(theme::content(ui, 15.0))
+                    .color(text);
                 if done || skipped {
                     line = line.strikethrough();
                 }
@@ -19491,7 +19600,10 @@ fn list_heading(
         let width = (ui.available_width() - 32.0).max(40.0);
         let body = ui.vertical(|ui| {
             ui.set_max_width(width);
-            ui.add(egui::Label::new(RichText::new(words).size(15.0).color(text)).truncate());
+            let words = RichText::new(words)
+                .size(theme::content(ui, 15.0))
+                .color(text);
+            ui.add(egui::Label::new(words).truncate());
         });
         let open = ui
             .interact(body.response.rect, Id::new((salt, note_id)), Sense::click())
@@ -21000,6 +21112,9 @@ fn edited_text(
 ) {
     let text = ui.visuals().text_color();
     let (size, written) = edit.look;
+    // Typed at the Device's text size (#326, obf-1019); what reads at
+    // `size` grows in its own drawing.
+    let typed_size = theme::content(ui, size);
     let (formatted, boxes) = (edit.formatted, edit.boxes);
     // Kept as a formatted text at once: the Note's, or the Section's.
     let format_text = || Action::FormatText(edit.section.then(|| edit.of.to_string()));
@@ -21097,10 +21212,10 @@ fn edited_text(
         let small = FontId::proportional(13.0);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
-            let font = FontId::proportional(size);
+            let font = FontId::proportional(typed_size);
             // A Code text as written in the fixed-width font, unwrapped.
             if as_code {
-                let format = egui::TextFormat::simple(FontId::monospace(size * 0.9), written);
+                let format = egui::TextFormat::simple(FontId::monospace(typed_size * 0.9), written);
                 let job = egui::text::LayoutJob::single_section(typed.to_string(), format);
                 return ui.fonts_mut(|f| f.layout_job(job));
             }
@@ -21131,7 +21246,7 @@ fn edited_text(
             }
             // As far apart as the text reads (#327).
             let extra = text_marks_view::line_extra(ui, &font, text_marks_view::LINE_HEIGHT);
-            text_marks_view::source_spread(galley, &lines, size, extra)
+            text_marks_view::source_spread(galley, &lines, typed_size, extra)
         };
         // Pasted, a text that looks like code offers it and formats
         // nothing (#213); else pasted with a format, a plain text
@@ -21174,19 +21289,19 @@ fn edited_text(
         // As wide as its longest line, for a Code text, which moves
         // sideways (#213).
         let widest = as_code.then(|| {
-            let font = FontId::monospace(size * 0.9);
+            let font = FontId::monospace(typed_size * 0.9);
             let galley = ui.fonts_mut(|f| f.layout_no_wrap(edited.clone(), font, written));
             galley.size().x + 8.0
         });
         let mut field = TextEdit::multiline(edited)
             .id(id)
-            .font(FontId::proportional(size))
+            .font(FontId::proportional(typed_size))
             .layouter(&mut layouter)
             .desired_rows(1)
             .desired_width(f32::INFINITY)
             .frame(Frame::NONE);
         if let Some(hint) = edit.hint {
-            field = field.hint_text(RichText::new(hint).size(size).color(weak));
+            field = field.hint_text(RichText::new(hint).size(typed_size).color(weak));
         }
         let output = match widest {
             None => field.show(ui),
@@ -21448,7 +21563,11 @@ fn kinded_text(
         if note_kinds::name(whole).trim().is_empty() {
             // A list without a name by its kind (#309).
             if let Some(kind) = l10n::untitled_list(&t, note) {
-                ui.label(RichText::new(kind).size(NAME_SIZE).color(text));
+                ui.label(
+                    RichText::new(kind)
+                        .size(theme::content(ui, NAME_SIZE))
+                        .color(text),
+                );
             }
         } else if named > 0 {
             let heading = (Some(NAME_SIZE), text);
@@ -21534,12 +21653,12 @@ fn kinded_text(
     } else if edited.trim().is_empty() {
         // Empty, its field with its hint; typed into, it is edited.
         let hint = RichText::new(t.note_description())
-            .size(DESCRIPTION_SIZE)
+            .size(theme::content(ui, DESCRIPTION_SIZE))
             .color(weak);
         let field = ui.add(
             TextEdit::multiline(edited)
                 .id(id)
-                .font(FontId::proportional(DESCRIPTION_SIZE))
+                .font(FontId::proportional(theme::content(ui, DESCRIPTION_SIZE)))
                 .text_color(weak)
                 .hint_text(hint)
                 .desired_rows(1)
@@ -21607,7 +21726,7 @@ fn name_edit(
     }
     let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
         let typed = typed.as_str();
-        let font = FontId::proportional(NAME_SIZE);
+        let font = FontId::proportional(theme::content(ui, NAME_SIZE));
         let job = if formatted {
             text_marks_view::source_job(typed, font, (text, accent, weak, code)).0
         } else {
@@ -21620,9 +21739,13 @@ fn name_edit(
     let cut = text_marks_view::guard_field(ui, id, name, true);
     let output = TextEdit::singleline(name)
         .id(id)
-        .font(FontId::proportional(NAME_SIZE))
+        .font(FontId::proportional(theme::content(ui, NAME_SIZE)))
         .layouter(&mut layouter)
-        .hint_text(RichText::new(t.note_name()).size(NAME_SIZE).color(weak))
+        .hint_text(
+            RichText::new(t.note_name())
+                .size(theme::content(ui, NAME_SIZE))
+                .color(weak),
+        )
         .desired_width(f32::INFINITY)
         .return_key(None)
         .frame(Frame::NONE)
@@ -21801,7 +21924,11 @@ fn card_kinded_text(
     let named = note_kinds::name(text).len();
     if let Some(kind) = untitled.filter(|_| note_kinds::name(text).trim().is_empty()) {
         // A list without a name by its kind (#309).
-        ui.label(RichText::new(kind).size(20.0).color(colour));
+        ui.label(
+            RichText::new(kind)
+                .size(theme::content(ui, 20.0))
+                .color(colour),
+        );
     } else if named > 0 {
         let heading = (Some(20.0), colour);
         let label =

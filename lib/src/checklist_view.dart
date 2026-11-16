@@ -5,6 +5,7 @@ import 'announcements.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
+import 'look.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'tick_saves.dart';
@@ -217,10 +218,13 @@ class _LineRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             field ??
-                Text(
-                  line.text,
-                  key: ValueKey('checklist-line-${line.id}'),
-                  style: lineStyle(context, checked: line.checked),
+                // At the Device's text size (#326, obf-1019).
+                ContentText(
+                  child: Text(
+                    line.text,
+                    key: ValueKey('checklist-line-${line.id}'),
+                    style: lineStyle(context, checked: line.checked),
+                  ),
                 ),
             if (line.below case final below?)
               Text(

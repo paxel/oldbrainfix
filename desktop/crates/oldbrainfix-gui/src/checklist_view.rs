@@ -670,7 +670,8 @@ fn drag_handle(ui: &mut Ui, t: &L10n, line: &ShownLine, colour: egui::Color32) {
 
 /// A Line's text, struck through and dimmed once checked.
 fn line_text(ui: &Ui, line: &ShownLine) -> RichText {
-    let words = RichText::new(&line.text).size(16.0);
+    // At the Device's text size (#326, obf-1019).
+    let words = RichText::new(&line.text).size(crate::theme::content(ui, 16.0));
     if line.checked {
         words.strikethrough().color(ui.visuals().weak_text_color())
     } else {
