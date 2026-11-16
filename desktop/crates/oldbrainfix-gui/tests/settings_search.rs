@@ -175,14 +175,15 @@ fn ctrl_f_puts_the_cursor_into_the_search_and_opening_does_not() -> TestResult {
 }
 
 #[test]
-fn the_search_stays_into_about_and_back_and_goes_when_the_settings_open_anew() -> TestResult {
+fn the_search_stays_into_send_feedback_and_back_and_goes_when_the_settings_open_anew() -> TestResult
+{
     let mut harness = settings("en")?;
-    search(&mut harness, "about");
+    search(&mut harness, "feedback");
     harness
-        .get_by_role_and_label(Role::Button, "About Old Brain Fix")
+        .get_by_role_and_label(Role::Button, "Send feedback")
         .click();
     harness.run();
-    assert_eq!(harness.state().page(), Some(Page::About));
+    assert_eq!(harness.state().page(), Some(Page::Feedback));
     harness.get_by_label("Back to Settings").click();
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::Settings));
@@ -193,7 +194,23 @@ fn the_search_stays_into_about_and_back_and_goes_when_the_settings_open_anew() -
     harness.state_mut().open(Page::Settings);
     harness.run();
     assert!(shows(&harness, "Start at login"));
-    assert!(shows(&harness, "About Old Brain Fix"));
+    assert!(shows(&harness, "Send feedback"));
+    Ok(())
+}
+
+#[test]
+fn the_settings_hold_no_about_and_its_words_find_none_as_it_is_under_help() -> TestResult {
+    let mut harness = settings("en")?;
+    assert!(shows(&harness, "Send feedback"));
+    assert!(!shows(&harness, "About Old Brain Fix"));
+    for words in [
+        "about old brain fix",
+        "third-party component",
+        "source code",
+    ] {
+        search(&mut harness, words);
+        assert!(!shows(&harness, "About Old Brain Fix"), "{words}");
+    }
     Ok(())
 }
 

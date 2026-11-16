@@ -945,11 +945,12 @@ replace a law of Both apps where they say so. A desktop law marked
   paired Device on the Sync page, a field with its line of what it is
   for and its error under it once it is left or submitted; one kept
   while Ask is off is still tried by sync.
-- Settings, Backups and Sync are reached only through the **Profile
-  picture in the Agenda's top corner**. It
+- Settings, Backups, Sync and About are reached only through the
+  **Profile picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and
-  recovery; Your Devices; People; Settings of this Device, with About
-  inside. No hamburger menu, no ⋮ menu for them.
+  recovery; Your Devices; People; Settings of this Device; then About
+  Old Brain Fix, an entry of its own beside them, never inside the
+  Settings (#325, Q728). No hamburger menu, no ⋮ menu for them.
 - The levels run Agenda, Areas list, Area, Topic: **the Agenda is the
   level above the Areas list**. **Swipe left on the Agenda opens the
   Areas list**, as the folder does. In the notes browser, **swipe
@@ -1547,7 +1548,8 @@ replace a law of Both apps where they say so. A desktop law marked
   (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
   finds its Routines, Reminders and Frogs by their Note), else All
   Notes'; over the Settings dialog it searches the Settings (#282). On the desktop the menu bar leads to Settings, Backups and
-  Sync in place of the Profile picture.
+  Sync in place of the Profile picture, and only Help ▸ About Old Brain
+  Fix to About, which the Settings do not show (#325, Q728).
 - **File ▸ Attach a file…** (#267) picks files of any kind and does
   with them what a drop does (see Capture): onto the Note in the Note
   dialog, else into the quick note for a new Note.
@@ -1925,7 +1927,7 @@ replace a law of Both apps where they say so. A desktop law marked
   is one setting. The intro line goes while a search runs, and a search
   that finds nothing says so in the dialog ("No setting matches “…”."),
   not at the top. ✕ in the field, or emptying it, shows everything
-  again; the search stays into About or Send feedback and back, and the
+  again; the search stays into Send feedback and back, and the
   Settings open anew with everything.
 
 ### Buttons and look

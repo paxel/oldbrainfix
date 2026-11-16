@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
-import 'about_screen.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
@@ -49,7 +48,7 @@ enum _Importing { folder, keep }
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; in Advanced, Ask (#333); Send feedback (#214); and About. Each is a local setting, never synced,
+/// Google Keep export; in Advanced, Ask (#333); and Send feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -1053,7 +1052,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     // The person's own, on all of their own Devices
                     // (#197): after the settings of this phone, before
-                    // About.
+                    // Send feedback.
                     SettingsGroup(
                       heading: t.features,
                       headingKey: _heading('features'),
@@ -1090,14 +1089,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 subtitle: Text(t.feedbackSettingsDetail),
                                 onTap: () =>
                                     _push(FeedbackScreen(store: widget.store)),
-                              ),
-                            ),
-                            SettingsRow(
-                              words: [t.aboutTitle],
-                              child: ListTile(
-                                leading: const Icon(Icons.info_outline),
-                                title: Text(t.aboutTitle),
-                                onTap: () => _push(const AboutScreen()),
                               ),
                             ),
                           ],

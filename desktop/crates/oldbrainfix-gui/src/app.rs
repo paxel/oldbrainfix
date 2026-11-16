@@ -16384,20 +16384,7 @@ impl App {
                     );
                 });
             }
-            let [about] =
-                settings_search::rows(q, None, [&[t.about_title(), t.about_settings_detail()]]);
-            if about {
-                found = true;
-                embossed(ui, tones, false, None, |ui| {
-                    if ui
-                        .button(RichText::new(t.about_title()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::PageInto(Page::About));
-                    }
-                    ui.label(RichText::new(t.about_settings_detail()).small().color(weak));
-                });
-            }
+            // About is under Help only (#325).
             // The hotkey is one setting, with the command beside it.
             let [capture] = settings_search::rows(
                 q,

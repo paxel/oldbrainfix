@@ -490,26 +490,31 @@ fn a_dialog_closes_by_its_button_esc_and_back_and_leads_back_to_the_one_it_came_
     harness.run();
     assert_eq!(harness.state().page(), None);
 
-    // About from the Settings, the licences from About; back leads
-    // through them, by the button and by Alt+Left.
+    // Send feedback from the Settings, the licences from About under
+    // Help (#325); back leads through them, by the button and by Alt+Left.
     harness.state_mut().open(Page::Settings);
     harness.run();
     assert!(harness.query_by_label("Back to Settings").is_none());
     // Below the AI cards, out of the dialog's view.
-    harness
-        .get_by_label("About Old Brain Fix")
-        .click_accesskit();
+    harness.get_by_label("Send feedback").click_accesskit();
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Feedback));
+    harness.get_by_label("Back to Settings").click();
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().page(), None);
+    pick(&mut harness, "Help", "About Old Brain Fix");
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::About));
+    assert!(harness.query_by_label("Back to Settings").is_none());
     harness.get_by_label("Open-source licenses").click();
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::Licences));
     harness.get_by_label("Back to About Old Brain Fix").click();
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::About));
-    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
-    harness.run();
-    assert_eq!(harness.state().page(), Some(Page::Settings));
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert_eq!(harness.state().page(), None);

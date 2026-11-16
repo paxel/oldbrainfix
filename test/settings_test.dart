@@ -464,7 +464,7 @@ void main() {
       });
     });
 
-    testWidgets('and About fit a phone in German', (tester) async {
+    testWidgets('fit a phone in German', (tester) async {
       tester.view.physicalSize = const Size(1080, 2340);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
@@ -473,9 +473,8 @@ void main() {
       await start(tester);
       await openDeviceSettings(tester);
       expect(find.text('Wie das System'), findsOneWidget);
-      await tester.ensureVisible(find.text('Über Old Brain Fix'));
-      await tap(tester, find.text('Über Old Brain Fix'));
-      expect(find.byType(AboutScreen), findsOneWidget);
+      await tester.ensureVisible(find.text('Feedback senden'));
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
 
@@ -548,11 +547,23 @@ void main() {
       );
     });
 
-    testWidgets('lead to About', (tester) async {
+    testWidgets('end with Send feedback; About is behind the Profile '
+        'picture', (tester) async {
       await start(tester);
       await openDeviceSettings(tester);
-      await tap(tester, find.text('About Old Brain Fix'));
-      expect(find.byType(AboutScreen), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Send feedback'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.text('About Old Brain Fix', skipOffstage: false),
+        ),
+        findsNothing,
+      );
     });
   });
 
