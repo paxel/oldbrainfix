@@ -719,6 +719,85 @@ class BrowserSearchField extends StatelessWidget {
   }
 }
 
+/// The header of a list page with a search field, the Areas list, an
+/// Area and a Topic (#336, Q749): the first sliver of the list, it scrolls
+/// away with it and comes back over it, the list staying where it is, as
+/// soon as the list is scrolled up a little; one half shown at the end of
+/// a scroll snaps shown or gone. While [child]'s field has the focus or
+/// [controller] holds a search it stays, so a search being typed or shown
+/// never goes away. Filled like the page bar, so no card shows through.
+class SearchHeaderSliver extends StatefulWidget {
+  /// The field's text: a search in it keeps the header.
+  final TextEditingController controller;
+
+  /// The search field, with what goes under it.
+  final Widget child;
+
+  const SearchHeaderSliver({
+    super.key,
+    required this.controller,
+    required this.child,
+  });
+
+  @override
+  State<SearchHeaderSliver> createState() => _SearchHeaderSliverState();
+}
+
+class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
+  /// Keeps the field with its focus, text and keyboard while the sliver
+  /// around it changes between scrolling away and staying.
+  final _kept = GlobalKey();
+  var _focused = false;
+  late var _searching = _search;
+
+  bool get _search => widget.controller.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_typed);
+  }
+
+  @override
+  void didUpdateWidget(SearchHeaderSliver old) {
+    super.didUpdateWidget(old);
+    if (old.controller == widget.controller) return;
+    old.controller.removeListener(_typed);
+    widget.controller.addListener(_typed);
+    _searching = _search;
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_typed);
+    super.dispose();
+  }
+
+  void _typed() {
+    if (_search != _searching) setState(() => _searching = _search);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final header = KeyedSubtree(
+      key: _kept,
+      child: ColoredBox(
+        color: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: (focused) => setState(() => _focused = focused),
+          child: widget.child,
+        ),
+      ),
+    );
+    return _focused || _searching
+        ? PinnedHeaderSliver(child: header)
+        : SliverFloatingHeader(child: header);
+  }
+}
+
 /// The tags of the tag tree that start with the `#…` typed into
 /// [controller], as chips that fill one in (#267, Q639), the one typed
 /// exactly left out; nothing while what is typed starts otherwise. They

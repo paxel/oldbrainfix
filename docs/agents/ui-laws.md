@@ -1379,6 +1379,12 @@ replace a law of Both apps where they say so. A desktop law marked
 - An action in ⋮ shows its icon and its words, as it does on the bar.
 - Labelled buttons (Save) and buttons that open a menu of their own
   never overflow.
+- **A list's search bar scrolls with it** (#336, Q749): on the Areas
+  list, an Area and a Topic the search field and its chips scroll away
+  with the list and come back over it, the list staying still, once it
+  is scrolled up a little; half shown, it snaps. While the field has the
+  focus or a search it stays; otherwise no edge under the bar cuts the
+  list.
 
 ### Settings
 

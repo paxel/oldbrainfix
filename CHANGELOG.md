@@ -26,6 +26,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Ask shows its questions as a thread, the oldest first, each with "Edit" to ask it again; on the desktop Up fetches the last. ([obf-1008](https://github.com/paxel/oldbrainfix/issues/315))
 - On the desktop, the Note menu says "Move to trash" instead of "Delete", as the phone and the card's right-click do. ([obf-1022](https://github.com/paxel/oldbrainfix/issues/329))
 - A card starts with its text: the place sits beside the buttons without a divider, and an Area's or Topic's list leaves it out. ([obf-1023](https://github.com/paxel/oldbrainfix/issues/330))
+- On the phone, the search bar of the Areas list, an Area and a Topic scrolls away with the list and returns once scrolled up. ([obf-1029](https://github.com/paxel/oldbrainfix/issues/336))
 
 ### Fixed
 
