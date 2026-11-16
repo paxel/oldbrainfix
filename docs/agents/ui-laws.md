@@ -1581,7 +1581,11 @@ replace a law of Both apps where they say so. A desktop law marked
   card in the AI settings sits before the AI port's: the protocol as
   radio buttons, the base URL only for an OpenAI-compatible provider
   with its error under it, the model, the API key hidden as typed, and
-  that the key stays on this computer.
+  that the key stays on this computer; for an OpenAI-compatible provider
+  then "Let the model think", off by default, with its line; last, for
+  either protocol, "Models tried with Ask", each model with its size on
+  disk, the memory it needs, how it did and its licence, as text without
+  links (#318).
 - **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
   Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the
   desktop's offer to undo, with no announcement: Edit ▸ Undo is first in its menu and greyed while

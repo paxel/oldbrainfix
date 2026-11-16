@@ -271,6 +271,7 @@ fn the_key_is_in_no_failure_the_phone_hears() -> TestResult {
         url: "https://me:pw@llm.example.org/v1?token=t0k".into(),
         model: "m".into(),
         key: String::new(),
+        thinks: false,
     };
     assert_eq!(
         AskFailure::of(

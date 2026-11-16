@@ -66,6 +66,7 @@ fn anthropic() -> Provider {
         url: ANTHROPIC_URL.into(),
         model: ANTHROPIC_MODEL.into(),
         key: "sk-test".into(),
+        thinks: true,
     }
 }
 
@@ -75,6 +76,7 @@ fn openai(key: &str) -> Provider {
         url: "http://localhost:11434/v1/".into(),
         model: "qwen3".into(),
         key: key.into(),
+        thinks: false,
     }
 }
 
@@ -990,4 +992,140 @@ fn also_read_are_the_notes_read_the_answer_does_not_link_in_the_order_read() {
         also_read(&[], &ids(&["note:a", "note:a"])),
         ids(&["note:a"])
     );
+}
+
+/// A provider that answers with `replies`, each a status and a body, in
+/// turn.
+fn replying(replies: Vec<(u16, Value)>) -> Fake {
+    Fake {
+        replies: Mutex::new(
+            replies
+                .into_iter()
+                .rev()
+                .map(|(status, body)| Reply {
+                    status,
+                    body: body.to_string(),
+                })
+                .collect(),
+        ),
+        sent: Mutex::new(Vec::new()),
+    }
+}
+
+fn openai_said(content: &str) -> Value {
+    json!({"choices": [{"finish_reason": "stop", "message": {
+        "content": content,
+        "role": "assistant",
+    }}]})
+}
+
+#[test]
+fn an_openai_compatible_model_is_asked_not_to_think_until_let_think() -> TestResult {
+    let store = store();
+    store.set_ask_protocol(Protocol::OpenAi)?;
+    store.set_ask_model("qwen3:4b")?;
+    // Off by default (#318): the request asks the model not to think, in
+    // the field Ollama's /v1 reads as think false.
+    assert!(!store.ask_thinks()?);
+    let body = |store: &Store| -> std::result::Result<Value, Box<dyn std::error::Error>> {
+        let request = Conversation::new(store.ask_provider()?, &[], "Q", "now").request();
+        Ok(serde_json::from_str(&request.body)?)
+    };
+    assert_eq!(body(&store)?["reasoning_effort"], "none");
+    assert!(body(&store)?.get("reasoning").is_none());
+    assert!(body(&store)?.get("think").is_none());
+    // "Let the model think" on: nothing is sent, the model thinks as it
+    // would; an effort such as "low" fails on a model that cannot think.
+    store.set_ask_thinks(true)?;
+    assert!(store.ask_thinks()?);
+    assert!(body(&store)?.get("reasoning_effort").is_none());
+    store.set_ask_thinks(false)?;
+    assert_eq!(body(&store)?["reasoning_effort"], "none");
+    // Anthropic is asked as before, thinking adaptively either way.
+    store.set_ask_protocol(Protocol::Anthropic)?;
+    for thinks in [false, true] {
+        store.set_ask_thinks(thinks)?;
+        let anthropic = body(&store)?;
+        assert!(anthropic.get("reasoning_effort").is_none());
+        assert_eq!(anthropic["thinking"], json!({"type": "adaptive"}));
+    }
+    // A local setting like the provider's: in no entry, so never synced.
+    for entry in store.all_entries()? {
+        let row = format!("{} {} {:?}", entry.entity, entry.field, entry.value);
+        assert!(!row.contains("ask:"), "{row}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_provider_that_refuses_the_no_think_field_is_asked_again_without_it() -> TestResult {
+    let store = store();
+    let refused = json!({"error": {
+        "message": "Unsupported parameter: 'reasoning_effort' is not supported with this model.",
+        "param": "reasoning_effort",
+    }});
+    // The answer without a search is sent back once (#314), and stays
+    // asked without the field.
+    let fake = replying(vec![
+        (400, refused.clone()),
+        (200, openai_said("Hello.")),
+        (200, openai_said("Hello.")),
+    ]);
+    let asked = ask(&store, &fake, openai(""), "Hi?")?;
+    assert_eq!(asked.answer.text, "Hello.");
+    let bodies = fake.bodies();
+    assert_eq!(bodies.len(), 3);
+    assert_eq!(bodies[0]["reasoning_effort"], "none");
+    assert!(bodies[1].get("reasoning_effort").is_none());
+    assert!(bodies[2].get("reasoning_effort").is_none());
+    assert_eq!(bodies[0]["messages"], bodies[1]["messages"]);
+
+    // Only once: a second refusal is the provider's error.
+    let fake = replying(vec![(400, refused.clone()), (400, refused.clone())]);
+    let failed = ask(&store, &fake, openai(""), "Hi?");
+    assert!(failed.is_err());
+    assert_eq!(fake.bodies().len(), 2);
+
+    // Nothing to leave out while the model may think: not asked again.
+    let fake = replying(vec![(400, refused), (200, openai_said("Hello."))]);
+    let thinking = Provider {
+        thinks: true,
+        ..openai("")
+    };
+    assert!(ask(&store, &fake, thinking, "Hi?").is_err());
+    assert_eq!(fake.bodies().len(), 1);
+    Ok(())
+}
+
+#[test]
+fn thinking_a_model_wrote_into_its_reply_is_left_out() -> TestResult {
+    // A model that thinks whatever it is asked, such as Qwen3-4B-Thinking
+    // (Ollama's qwen3:4b), writes its thinking into the content once
+    // asked not to think, ending it with </think> (#318).
+    let store = store();
+    let note = Notes::new(&store).capture("Passport in the blue folder", None, None)?;
+    let fake = Fake::new(vec![
+        json!({"choices": [{"finish_reason": "tool_calls", "message": {
+            "content": "Okay, the user asks where the passport is.\n</think>\n\n",
+            "role": "assistant",
+            "tool_calls": [{"function": {"arguments": json!({"id": note.id}).to_string(), "name": "read_note"}, "id": "c1", "type": "function"}],
+        }}]}),
+        openai_said(&format!(
+            "I should link it.\n</think>\n\nIn the blue folder, see [Passport](oldbrainfix://note/{}).",
+            note.id
+        )),
+    ]);
+    let asked = ask(&store, &fake, openai(""), "Where is the passport?")?;
+    assert_eq!(
+        asked.answer.text,
+        format!(
+            "In the blue folder, see [Passport](oldbrainfix://note/{}).",
+            note.id
+        )
+    );
+    assert_eq!(asked.answer.notes, [note.id]);
+    // The thinking does not go back to the model either.
+    let second = fake.bodies()[1]["messages"].to_string();
+    assert!(!second.contains("Okay, the user") && !second.contains("</think>"));
+    Ok(())
 }

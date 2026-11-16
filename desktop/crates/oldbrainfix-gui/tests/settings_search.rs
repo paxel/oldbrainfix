@@ -208,6 +208,7 @@ fn a_word_of_any_ai_setting_finds_the_row_that_opens_the_ai_settings() -> TestRe
         ("provider", t.ask_settings_title()),
         ("docker", t.ai_reach_docker()),
         ("experimental", t.ai_switch()),
+        ("tried", t.ask_models_title()),
     ] {
         search(&mut harness, word);
         assert!(shows(&harness, t.ai_settings_detail()), "{word}");

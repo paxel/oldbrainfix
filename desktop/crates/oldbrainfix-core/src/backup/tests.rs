@@ -195,6 +195,8 @@ fn the_ask_panels_provider_and_key_stay_out_of_a_backup() -> Result<()> {
     old.set_ask_key("sk-or-never-backed-up")?;
     // The AI switch too: a restored computer starts with it off (#334).
     old.set_ai_on(true)?;
+    // And "Let the model think" (#318).
+    old.set_ask_thinks(true)?;
     let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
     let path = dir.path().join(format!("b.{EXTENSION}"));
     write_backup(&old, &path, &mut system_random)?;
@@ -205,6 +207,7 @@ fn the_ask_panels_provider_and_key_stay_out_of_a_backup() -> Result<()> {
     assert!(store.local_settings_with_prefix("ask:")?.is_empty());
     assert_eq!(store.ask_provider()?.key, "");
     assert!(!store.ai_on()?);
+    assert!(!store.ask_thinks()?);
     Ok(())
 }
 

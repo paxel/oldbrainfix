@@ -40,6 +40,9 @@ pub const ANTHROPIC_KEY_KEY: &str = "ask:anthropic:key";
 pub const OPENAI_URL_KEY: &str = "ask:openai:url";
 pub const OPENAI_MODEL_KEY: &str = "ask:openai:model";
 pub const OPENAI_KEY_KEY: &str = "ask:openai:key";
+/// The local setting "Let the model think" of an OpenAI-compatible
+/// provider (#318): `true` while on; absent, the default, is off.
+pub const OPENAI_THINKS_KEY: &str = "ask:openai:think";
 /// The local setting of the main switch "AI (experimental)" (#334):
 /// `true` while on; absent, the default, is off, also where a provider
 /// was set up before the switch came.
@@ -53,6 +56,16 @@ pub const ANTHROPIC_MODEL: &str = "claude-opus-5-5";
 /// The base URL of an OpenAI-compatible provider while the user names
 /// none: Ollama on this computer.
 pub const OPENAI_URL: &str = "http://localhost:11434/v1";
+
+/// What an OpenAI-compatible request sends as `reasoning_effort` while
+/// the model may not think (#318): Ollama's `/v1` reads `none` as think
+/// false, and OpenAI lists it among its efforts.
+pub const NO_THINKING: &str = "none";
+
+/// Where the thinking a model wrote into its content ends (#318): a model
+/// that always thinks, such as Qwen3-4B-Thinking, writes it there once
+/// asked not to think.
+const THINK_END: &str = "</think>";
 
 /// How long Anthropic's answer may be, its thinking included.
 const MAX_TOKENS: u32 = 16_000;
@@ -157,6 +170,10 @@ pub struct Provider {
     pub model: String,
     /// The API key; empty for none, as a local Ollama needs.
     pub key: String,
+    /// Whether the model may think before it answers: "Let the model
+    /// think" of an OpenAI-compatible provider, off by default (#318);
+    /// Anthropic's thinks adaptively, always.
+    pub thinks: bool,
 }
 
 /// Why a provider cannot be asked yet.
@@ -286,6 +303,7 @@ impl Store {
                     m => m,
                 },
                 key: kept(ANTHROPIC_KEY_KEY)?,
+                thinks: true,
             },
             Protocol::OpenAi => Provider {
                 protocol,
@@ -295,6 +313,7 @@ impl Store {
                 },
                 model: kept(OPENAI_MODEL_KEY)?,
                 key: kept(OPENAI_KEY_KEY)?,
+                thinks: self.ask_thinks()?,
             },
         })
     }
@@ -327,6 +346,21 @@ impl Store {
     /// Ollama on this computer.
     pub fn set_ask_url(&self, url: &str) -> Result<()> {
         self.keep_or_remove(OPENAI_URL_KEY, url)
+    }
+
+    /// Whether "Let the model think" is on for an OpenAI-compatible
+    /// provider (#318): off until switched on.
+    pub fn ask_thinks(&self) -> Result<bool> {
+        Ok(self.local_setting(OPENAI_THINKS_KEY)?.as_deref() == Some("true"))
+    }
+
+    /// Switches "Let the model think" on or off.
+    pub fn set_ask_thinks(&self, thinks: bool) -> Result<()> {
+        if thinks {
+            self.set_local_setting(OPENAI_THINKS_KEY, "true")
+        } else {
+            self.remove_local_setting(OPENAI_THINKS_KEY)
+        }
     }
 
     fn keep_or_remove(&self, key: &str, value: &str) -> Result<()> {
@@ -539,6 +573,9 @@ pub struct Conversation {
     told_empty: bool,
     /// The question asked, which [`search_first`] quotes (#315).
     question: String,
+    /// Whether the provider refused the request asking its model not to
+    /// think, so that it is asked without (#318).
+    no_thinking_refused: bool,
 }
 
 impl Conversation {
@@ -573,6 +610,7 @@ impl Conversation {
             told_read: false,
             told_empty: false,
             question: question.to_string(),
+            no_thinking_refused: false,
         }
     }
 
@@ -636,11 +674,16 @@ impl Conversation {
                     .collect();
                 let mut messages = vec![json!({"role": "system", "content": SYSTEM})];
                 messages.extend(self.messages.iter().cloned());
-                let body = json!({
+                let mut body = json!({
                     "messages": messages,
                     "model": self.provider.model.trim(),
                     "tools": tools,
                 });
+                if self.asks_no_thinking()
+                    && let Some(fields) = body.as_object_mut()
+                {
+                    fields.insert("reasoning_effort".into(), json!(NO_THINKING));
+                }
                 let mut headers = vec![json_type];
                 let key = self.provider.key.trim();
                 if !key.is_empty() {
@@ -658,8 +701,24 @@ impl Conversation {
         }
     }
 
+    /// Whether the next request asks the model not to think: an
+    /// OpenAI-compatible one while "Let the model think" is off, unless
+    /// the provider refused that once.
+    fn asks_no_thinking(&self) -> bool {
+        self.provider.protocol == Protocol::OpenAi
+            && !self.provider.thinks
+            && !self.no_thinking_refused
+    }
+
     /// Takes the provider's `reply` to the last request.
     pub fn take(&mut self, reply: &Reply) -> std::result::Result<Step, AskError> {
+        // A server that knows no `reasoning_effort`, or not `none` for
+        // this model, refuses the request: it is asked once more without
+        // (#318), and a second refusal is its error.
+        if matches!(reply.status, 400 | 422) && self.asks_no_thinking() {
+            self.no_thinking_refused = true;
+            return Ok(Step::Again);
+        }
         if !(200..300).contains(&reply.status) {
             let message = error_message(&reply.body);
             return Err(match reply.status {
@@ -739,11 +798,20 @@ impl Conversation {
         if finish == Some("content_filter") {
             return Err(AskError::Refused);
         }
-        let text = message
-            .get("content")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
+        let mut message = message;
+        let text = without_thinking(
+            message
+                .get("content")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+        )
+        .to_string();
+        if let Some(content) = message.get_mut("content")
+            && content.is_string()
+        {
+            // Nor does the thinking go back to the model.
+            *content = json!(text);
+        }
         let mut calls = Vec::new();
         for call in message
             .get("tool_calls")
@@ -882,6 +950,15 @@ impl Conversation {
             }
         }
     }
+}
+
+/// `content` without the thinking a model wrote into it: what follows the
+/// last [`THINK_END`], its leading blank lines left out; all of it when
+/// there is none (#318).
+fn without_thinking(content: &str) -> &str {
+    content
+        .rsplit_once(THINK_END)
+        .map_or(content, |(_, after)| after.trim_start())
 }
 
 /// The text of a tool's output; a photo, which the panel's tools never

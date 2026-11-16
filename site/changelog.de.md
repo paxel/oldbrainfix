@@ -10,6 +10,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Die Schnellnotiz bietet Text, Checkliste und Einkaufsliste über dem Feld, und eine Liste behält jede getippte Zeile als Zeile. ([obf-1003](https://github.com/paxel/oldbrainfix/issues/310))
 - Eine gesprochene Einkaufsliste kommt als Zeilen in eine Einkaufsliste, mit ihrer Aufnahme, auch ohne Sprachmodell. ([obf-1004](https://github.com/paxel/oldbrainfix/issues/311))
 - Eine Antwort beim Fragen lässt sich auch kopieren, einer vorhandenen Notiz hinzufügen und teilen, am Desktop als Markdown speichern. ([obf-1009](https://github.com/paxel/oldbrainfix/issues/316))
+- Auf dem Desktop bittet Fragen ein OpenAI-kompatibles Modell, nicht nachzudenken, außer „Das Modell nachdenken lassen“ ist an, und die KI-Einstellungen nennen ausprobierte Modelle. ([obf-1011](https://github.com/paxel/oldbrainfix/issues/318))
 
 ### Geändert
 

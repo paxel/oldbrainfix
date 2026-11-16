@@ -7188,6 +7188,7 @@ impl App {
                 AskSetting::Url(url) => self.store.set_ask_url(&url)?,
                 AskSetting::Model(model) => self.store.set_ask_model(&model)?,
                 AskSetting::Key(key) => self.store.set_ask_key(&key)?,
+                AskSetting::Thinks(thinks) => self.store.set_ask_thinks(thinks)?,
             },
             Action::FoldArea(area, folded) => {
                 // Nothing kept means unfolded, the default.
@@ -15976,8 +15977,8 @@ impl App {
                     }
                     ui.label(RichText::new(t.ai_switch_detail()).small().color(weak));
                 });
-                // The provider, its model and key; "Let the model think"
-                // and the models tried with Ask (#318) join this card.
+                // The provider, its model and key, "Let the model think"
+                // and the models tried with Ask (#318).
                 if self.view.ai_on {
                     if self.ask_fields.is_none()
                         && let Ok(provider) = self.store.ask_provider()
@@ -16859,7 +16860,7 @@ fn crumb(ui: &mut Ui, name: &str, colour: Color32, up: Option<&str>) -> bool {
 
 /// The words the Settings' row "AI…" is found by (#335): those of every
 /// setting on the AI settings page, so a search for any of them shows it.
-fn ai_settings_words(t: &L10n) -> [&'static str; 17] {
+fn ai_settings_words(t: &L10n) -> [&'static str; 20] {
     [
         t.ai_settings_open(),
         t.ai_settings_detail(),
@@ -16872,6 +16873,9 @@ fn ai_settings_words(t: &L10n) -> [&'static str; 17] {
         t.ask_url(),
         t.ask_model(),
         t.ask_key(),
+        t.ask_thinks(),
+        t.ask_thinks_detail(),
+        t.ask_models_title(),
         t.ai_port_title(),
         t.ai_port_intro(),
         t.ai_reach_heading(),

@@ -772,6 +772,49 @@ fn the_providers_card_keeps_it_on_this_computer_only() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn let_the_model_think_is_off_and_shown_for_an_openai_compatible_provider_only() -> TestResult {
+    let (store, _) = store()?;
+    let t = L10n::new("en");
+    let mut harness = harness(store, &Fake::default());
+    harness.state_mut().open(Page::AiSettings);
+    harness.run();
+    // The models tried with Ask, for either protocol (#318).
+    for model in [
+        t.ask_models_title(),
+        t.ask_model_qwen25(),
+        t.ask_model_qwen3(),
+    ] {
+        assert!(shows(&harness, model), "{model}");
+    }
+    assert!(!labelled(&harness, t.ask_thinks()));
+    harness
+        .get_by_role_and_label(Role::RadioButton, t.ask_openai())
+        .click();
+    harness.run();
+    let thinks = harness.get_by_role_and_label(Role::CheckBox, t.ask_thinks());
+    assert_eq!(thinks.accesskit_node().toggled(), Some(Toggled::False));
+    assert!(shows(&harness, t.ask_thinks_detail()));
+    assert!(!harness.state().store().ask_provider()?.thinks);
+    harness
+        .get_by_role_and_label(Role::CheckBox, t.ask_thinks())
+        .click();
+    harness.run();
+    assert!(harness.state().store().ask_provider()?.thinks);
+    let thinks = harness.get_by_role_and_label(Role::CheckBox, t.ask_thinks());
+    assert_eq!(thinks.accesskit_node().toggled(), Some(Toggled::True));
+    // Found by a search of the Settings by its name.
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    let search = t.settings_search_hint();
+    field(&harness, search).click();
+    harness.run();
+    field(&harness, search).type_text("model think");
+    harness.run();
+    assert!(labelled(&harness, t.ai_settings_open()));
+    Ok(())
+}
+
 /// Asks `question` as [`ask`] does, off the window's thread: frames
 /// stepped, as the spinner keeps asking for them.
 fn ask_off_thread(harness: &mut Harness<'_, App>, question: &str) {

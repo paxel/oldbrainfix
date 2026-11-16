@@ -314,6 +314,23 @@ fn round_of(took: Duration, reply: &Reply) -> Round {
     }
 }
 
+/// "Let the model think" is off, the default (#318): every request asked
+/// the model not to think, Ollama split no thinking out of a reply, and
+/// none was left in the answer `text`.
+fn asked_not_to_think(transport: &Recorded, text: &str) {
+    for body in transport.sent() {
+        let body: Value = serde_json::from_str(&body).expect("a JSON request");
+        assert_eq!(
+            body["reasoning_effort"], "none",
+            "a request without reasoning_effort none"
+        );
+    }
+    for round in transport.rounds() {
+        assert_eq!(round.reasoning.unwrap_or(0), 0, "thinking came back");
+    }
+    assert!(!text.contains("</think>"), "thinking in the answer");
+}
+
 /// The Note `id` by its text, for the printout.
 fn titled(ids: &HashMap<String, String>, id: &str) -> String {
     ids.iter().find(|(_, v)| v.as_str() == id).map_or_else(
@@ -427,6 +444,7 @@ fn desktop_answers(question: &str, expected: &str) -> TestResult {
         answer.read.contains(id),
         "the Note {expected:?} was not read"
     );
+    asked_not_to_think(&transport, &answer.text);
     assert!(took <= limit(), "took {took:?}, over {:?}", limit());
     Ok(())
 }
@@ -1026,6 +1044,38 @@ fn shoot_panel(url: &str, model: &str, question: &str, name: &str) -> TestResult
         harness.render()?.save(&file)?;
         println!("  drawn: {}", file.display());
     }
+    Ok(())
+}
+
+/// The AI settings at the Ask panel's card for the seeded provider (#318):
+/// "Let the model think" off, and the models tried with Ask, into
+/// `ask-settings.png`. Needs no model, only lavapipe or a GPU.
+#[test]
+#[ignore = "needs a GPU or lavapipe: tool/ask-e2e.sh run"]
+fn the_ai_settings_name_the_models_tried_with_ask() -> TestResult {
+    let (store, _) = seeded(1, &url(), &model())?;
+    let mut app = App::new(store, "en");
+    app.open(oldbrainfix_gui::Page::AiSettings);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 1100.0))
+        .with_theme(egui::Theme::Light)
+        .wgpu()
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.input_mut().system_theme = Some(egui::Theme::Light);
+    harness.run_steps(4);
+    let t = L10n::new("en");
+    for shown in [t.ask_thinks(), t.ask_models_title(), t.ask_model_qwen25()] {
+        assert!(harness.query_by_label(shown).is_some(), "{shown}");
+    }
+    let file = shots_dir().join("ask-settings.png");
+    harness.render()?.save(&file)?;
+    println!("  drawn: {}", file.display());
     Ok(())
 }
 

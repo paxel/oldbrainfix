@@ -538,14 +538,15 @@ pub fn kept_text(asked: &Asked) -> String {
     format!("{}\n\n{}", asked.question.trim(), asked.answer.text.trim())
 }
 
-/// What the provider's card edits: the protocol, and the base URL, model
-/// and key as typed.
+/// What the provider's card edits: the protocol, the base URL, model
+/// and key as typed, and "Let the model think" (#318).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AskFields {
     pub protocol: Protocol,
     pub url: String,
     pub model: String,
     pub key: String,
+    pub thinks: bool,
 }
 
 impl AskFields {
@@ -570,6 +571,7 @@ impl AskFields {
                 provider.model.clone()
             },
             key: provider.key.clone(),
+            thinks: provider.thinks,
         }
     }
 }
@@ -581,13 +583,17 @@ pub enum AskSetting {
     Url(String),
     Model(String),
     Key(String),
+    /// "Let the model think" switched on or off (#318).
+    Thinks(bool),
 }
 
 /// The provider's card in the AI settings (#335): what it is for, the protocol as
 /// radio buttons, the base URL of an OpenAI-compatible provider, the
 /// model and the API key, hidden as it is typed, and that the key stays
 /// on this computer; under the base URL why it cannot be asked, when it
-/// cannot. `at` scrolls to it, as the Ask panel asks when the provider
+/// cannot; for an OpenAI-compatible provider "Let the model think", and
+/// last the models tried with Ask, with their size and what they need
+/// (#318). `at` scrolls to it, as the Ask panel asks when the provider
 /// cannot be asked.
 pub fn settings_card(
     ui: &mut Ui,
@@ -667,10 +673,23 @@ pub fn settings_card(
             changed = Some(AskSetting::Key(fields.key.clone()));
         }
         ui.label(RichText::new(t.ask_key_stays()).small().color(weak));
-        // Here, after the key, "Let the model think" and the models tried
-        // with Ask, with their size and what they need, join the card
-        // (#318), in the words the search of the Settings' row "AI…"
-        // finds (`ai_settings_words` in app.rs).
+        // In the words the search of the Settings' row "AI…" finds
+        // (`ai_settings_words` in app.rs).
+        if fields.protocol == Protocol::OpenAi {
+            let mut thinks = fields.thinks;
+            if theme::checkbox(ui, &mut thinks, RichText::new(t.ask_thinks()).color(text)).changed()
+            {
+                fields.thinks = thinks;
+                changed = Some(AskSetting::Thinks(thinks));
+            }
+            ui.label(RichText::new(t.ask_thinks_detail()).small().color(weak));
+        }
+        ui.add_space(4.0);
+        ui.label(RichText::new(t.ask_models_title()).color(text));
+        ui.label(RichText::new(t.ask_models_intro()).small().color(weak));
+        for model in [t.ask_model_qwen25(), t.ask_model_qwen3()] {
+            ui.label(RichText::new(model).small().color(weak));
+        }
     });
     changed
 }
