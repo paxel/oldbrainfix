@@ -1,12 +1,19 @@
 name: Pages
 
-# Builds the documentation site (site/ -> site-dist/) on every push to summer,
-# every pull request and every release tag, as Catlog does; deploys it to
+# Builds the documentation site (site/ -> site-dist/) and deploys it to
 # GitHub Pages only for release tags, so the site always describes the app
 # the stores have (#44). One version only, at the root: no frames, no
 # /vX.Y.Z/ copies. The build fails on a page without its twin in the other
 # language, a glossary term or a release without its German text, and a
 # broken link.
+#
+# The build is a check of every push to any branch (#234), so a pull
+# request's head commit has it before the merge; summer builds again after
+# a merge, and a tag builds again to deploy, as a build takes about a
+# minute (not worth carrying its artifact over). On a pull request only
+# for one from a fork, whose commits are never pushed here; one from this
+# repository skips it under another name, so the skipped job stands in for
+# no check of the push run.
 #
 # One-time steps in the repository settings:
 #   1. Settings -> Pages -> Source: "GitHub Actions".
@@ -15,7 +22,7 @@ name: Pages
 
 on:
   push:
-    branches: [summer]
+    branches: ["**"]
     tags: ["v*"]
   pull_request:
 
@@ -24,6 +31,8 @@ permissions:
 
 jobs:
   build:
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'build (runs on push)' || 'build' }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     concurrency:
       group: pages-build-${{ github.ref }}

@@ -169,8 +169,10 @@ private final class ModelPicker: NSObject, UIDocumentPickerDelegate {
 final class Speech {
   static let shared = Speech()
 
-  /// The one queue transcribing: recordings go one at a time.
-  private let worker = DispatchQueue(label: "io.github.paxel.oldbrainfix.speech")
+  /// The one queue transcribing: recordings go one at a time, at utility
+  /// QoS, below the app's own work (obf-1030); background QoS would pause
+  /// in Low Power Mode.
+  private let worker = DispatchQueue(label: "io.github.paxel.oldbrainfix.speech", qos: .utility)
 
   /// The model loaded on [worker], until [idle]; nil while none is.
   private var loadedModel: OpaquePointer?
@@ -355,7 +357,8 @@ final class Speech {
     guard let samples, !samples.isEmpty, samples.count <= Int(Int32.max) else { return nil }
     if loadedModel == nil { loadedModel = obf_whisper_open(model.path) }
     guard let context = loadedModel else { return nil }
-    let threads = Int32(SpeechFiles.threads(cores: ProcessInfo.processInfo.activeProcessorCount))
+    let threads = Int32(
+      SpeechFiles.whisperThreads(cores: ProcessInfo.processInfo.activeProcessorCount))
     let text: String? = samples.withUnsafeBufferPointer { pcm in
       english.withCString { english in
         german.withCString { german in

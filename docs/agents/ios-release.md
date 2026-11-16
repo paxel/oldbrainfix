@@ -4,7 +4,8 @@ What the user does once so the tag pipeline (`.github/workflows/release.yml`,
 job `testflight`) can sign the iPhone app, its Share extension and its
 Widgets extension and upload them to TestFlight. Until all nine secrets exist, that job skips with a
 notice and the release goes on without the iPhone. The build and XCTest (`.github/workflows/ios.yml`)
-need no secrets.
+need no secrets. They run on every push to a branch but `summer` (#234), and their job "iOS build and
+XCTest" is a required check of `summer`'s pull requests, so the iPhone build passes before a merge.
 
 ## 1. App IDs, App Group and app record
 

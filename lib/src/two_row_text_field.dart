@@ -10,6 +10,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'table_grid.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
@@ -53,30 +54,6 @@ int _lineAt(String text, int offset) {
     }
   }
   return line;
-}
-
-final _wordCharacter = RegExp(r'^[\p{L}\p{N}\p{M}]', unicode: true);
-
-/// The word boundary in [text] nearest to [offset]: the start or end of a
-/// word, the start or end of the text. A tie goes to the earlier one.
-int wordEdgeNear(String text, int offset) {
-  if (offset <= 0 || offset >= text.length) return offset.clamp(0, text.length);
-  var before = 0;
-  var at = 0;
-  bool? previousWord;
-  for (final grapheme in text.characters) {
-    final word = _wordCharacter.hasMatch(grapheme);
-    if (previousWord != null && word != previousWord) {
-      if (at == offset) return offset;
-      if (at > offset) {
-        return offset - before <= at - offset ? before : at;
-      }
-      before = at;
-    }
-    previousWord = word;
-    at += grapheme.length;
-  }
-  return offset - before <= text.length - offset ? before : text.length;
 }
 
 /// What an edit of a formatted text leaves of its tables, each drawn as
@@ -294,8 +271,8 @@ typedef FieldAction = ({
 
 /// The text field of the Note editor and of Amend on the phone: the whole
 /// text on top, as a system text field without magnifier and without
-/// dragging the cursor, whose tap puts the cursor at the nearest word
-/// boundary, and, while the keyboard is open, the cursor's line directly
+/// dragging the cursor, whose tap puts the cursor where the finger is,
+/// and, while the keyboard is open, the cursor's line directly
 /// above it, as a text field shows it, with ◀ and ▶ stepping the cursor one
 /// character at a time (UI laws, "Text editor"). [twoRows] false gives the
 /// plain system text field.
@@ -333,7 +310,7 @@ typedef FieldAction = ({
 /// ↵ of the keyboard does in it.
 ///
 /// A [TagTextController] holding a Code text (#213) has no bar of
-/// formats: its text shows in monospace, unwrapped, on the grey ground of
+/// formats: its text shows in monospace, unwrapped, on the tint of
 /// code, and a one-finger drag moves it sideways. With [onCodePasted], a
 /// pasted text that looks like code ([TextFormats.looksLikeCode]) calls
 /// it, and the paste does not make the text formatted.
@@ -944,17 +921,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
   }
 
-  /// A tap in the top row: the cursor went where the finger was; it goes
-  /// on to the nearest word boundary.
+  /// A tap in the top row: the cursor went where the finger was (#312),
+  /// and selecting in the bottom row ends.
   void _tapped() {
     if (_selecting) setState(() => _selecting = false);
-    final value = widget.controller.value;
-    final selection = value.selection;
-    if (!selection.isValid || !selection.isCollapsed) return;
-    final edge = wordEdgeNear(value.text, selection.baseOffset);
-    if (edge != selection.baseOffset) {
-      _select(TextSelection.collapsed(offset: edge));
-    }
   }
 
   bool get _inserts => widget.boxes && !widget.readOnly && !_code;
@@ -1266,7 +1236,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     // also where it is only read.
     final controller = widget.controller;
     final strut = controller is TagTextController && controller.markdown
-        ? StrutStyle.fromTextStyle(
+        ? formattedStrut(
             widget.style ??
                 Theme.of(context).textTheme.bodyLarge ??
                 const TextStyle(),
@@ -1280,35 +1250,39 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       20 + TwoRowTextField.above(twoRows: widget.twoRows, bar: _hasBar),
     );
     if (!widget.twoRows) {
-      final field = TextField(
-        key: _field,
-        controller: widget.controller,
-        focusNode: _focus,
-        readOnly: widget.readOnly,
-        autofocus: widget.autofocus,
-        maxLines: null,
-        // Code is typed as it is (#213).
-        textCapitalization: _code
-            ? TextCapitalization.none
-            : TextCapitalization.sentences,
-        autocorrect: !_code,
-        enableSuggestions: !_code,
-        style: widget.style,
-        strutStyle: strut,
-        decoration: widget.decoration,
-        onChanged: _userChanged,
-        inputFormatters: _formatters,
-        scrollPadding: scrollPadding,
-        textInputAction: _nextAction,
-        onEditingComplete: _onEditingComplete,
-        onSubmitted: _onSubmitted,
-        onTap: widget.onBox != null || _formatting != null
-            ? () {
-                if (_down case final at?) {
-                  _tappedBox(at);
+      // The text typed grows with the Device's text size (#326,
+      // obf-1019), the bar on the keyboard does not.
+      final field = ContentText(
+        child: TextField(
+          key: _field,
+          controller: widget.controller,
+          focusNode: _focus,
+          readOnly: widget.readOnly,
+          autofocus: widget.autofocus,
+          maxLines: null,
+          // Code is typed as it is (#213).
+          textCapitalization: _code
+              ? TextCapitalization.none
+              : TextCapitalization.sentences,
+          autocorrect: !_code,
+          enableSuggestions: !_code,
+          style: widget.style,
+          strutStyle: strut,
+          decoration: widget.decoration,
+          onChanged: _userChanged,
+          inputFormatters: _formatters,
+          scrollPadding: scrollPadding,
+          textInputAction: _nextAction,
+          onEditingComplete: _onEditingComplete,
+          onSubmitted: _onSubmitted,
+          onTap: widget.onBox != null || _formatting != null
+              ? () {
+                  if (_down case final at?) {
+                    _tappedBox(at);
+                  }
                 }
-              }
-            : null,
+              : null,
+        ),
       );
       final keyed = _keyed(field);
       final Widget shown = _code ? _sideways(context, keyed) : keyed;
@@ -1329,30 +1303,32 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         child: hits,
       );
     }
-    final field = TextField(
-      key: _field,
-      controller: widget.controller,
-      focusNode: _focus,
-      readOnly: widget.readOnly,
-      autofocus: widget.autofocus,
-      maxLines: null,
-      textCapitalization: _code
-          ? TextCapitalization.none
-          : TextCapitalization.sentences,
-      autocorrect: !_code,
-      enableSuggestions: !_code,
-      style: widget.style,
-      strutStyle: strut,
-      decoration: widget.decoration,
-      onChanged: _userChanged,
-      inputFormatters: _formatters,
-      magnifierConfiguration: TextMagnifierConfiguration.disabled,
-      selectionControls: _handles,
-      contextMenuBuilder: _menu,
-      scrollPadding: scrollPadding,
-      textInputAction: _nextAction,
-      onEditingComplete: _onEditingComplete,
-      onSubmitted: _onSubmitted,
+    final field = ContentText(
+      child: TextField(
+        key: _field,
+        controller: widget.controller,
+        focusNode: _focus,
+        readOnly: widget.readOnly,
+        autofocus: widget.autofocus,
+        maxLines: null,
+        textCapitalization: _code
+            ? TextCapitalization.none
+            : TextCapitalization.sentences,
+        autocorrect: !_code,
+        enableSuggestions: !_code,
+        style: widget.style,
+        strutStyle: strut,
+        decoration: widget.decoration,
+        onChanged: _userChanged,
+        inputFormatters: _formatters,
+        magnifierConfiguration: TextMagnifierConfiguration.disabled,
+        selectionControls: _handles,
+        contextMenuBuilder: _menu,
+        scrollPadding: scrollPadding,
+        textInputAction: _nextAction,
+        onEditingComplete: _onEditingComplete,
+        onSubmitted: _onSubmitted,
+      ),
     );
     // The field's own gestures would let a sideways drag move the cursor:
     // they are switched off, and these, which drag nothing, take their
@@ -1397,10 +1373,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   };
 
   /// A Code text's [field] (#213): as wide as its longest line and at
-  /// least as the room, on the grey ground of code, moved sideways.
+  /// least as the room, on the tint of code, moved sideways.
   Widget _sideways(BuildContext context, Widget field) => DecoratedBox(
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: codeTint(Theme.of(context).colorScheme),
       borderRadius: BorderRadius.circular(4),
     ),
     child: LayoutBuilder(
@@ -1692,7 +1668,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 }
 
 /// The top row's gestures: those of a text field, but a drag moves no
-/// cursor, and a tap goes on to the nearest word boundary.
+/// cursor.
 class _TopRowGestures extends TextSelectionGestureDetectorBuilder {
   final _TwoRowTextFieldState _field;
 

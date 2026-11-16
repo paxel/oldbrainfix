@@ -75,8 +75,14 @@ class FakeBundles implements BundlePlatform {
     return dismisses ? ShareOutcome.dismissed : ShareOutcome.taken;
   }
 
+  /// The folder each pick was asked to start in.
+  final pickedFrom = <String?>[];
+
   @override
-  Future<String?> pick() async => picks;
+  Future<String?> pick({String? from}) async {
+    pickedFrom.add(from);
+    return picks;
+  }
 
   /// What was handed to the print dialog.
   final printed = <String>[];
@@ -194,10 +200,32 @@ void main() {
       await importBundle(desk, bundles.shared.single);
       expect(Notes(desk).all().map((n) => n.text), ['From the phone']);
 
+      // A radio button per paired Device and one for everything, which
+      // is picked at first (#288): names the user made are no dropdown.
+      expect(find.byType(DropdownButton<String?>), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('bundle-for')),
+          matching: find.text('Desk'),
+        ),
+        findsOneWidget,
+      );
+      RadioGroup<String> group() => tester.widget<RadioGroup<String>>(
+        find.descendant(
+          of: find.byKey(const ValueKey('bundle-for')),
+          matching: find.byType(RadioGroup<String>),
+        ),
+      );
+      expect(group().groupValue, '', reason: 'everything');
+
       // For the desk: what it holds since the session is not sent again.
-      await tester.tap(find.byKey(const ValueKey('bundle-for')));
+      await tester.tap(find.byKey(ValueKey('bundle-for-${desk.deviceId}')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Desk').last);
+      expect(group().groupValue, desk.deviceId);
+      await tester.tap(find.byKey(const ValueKey('bundle-for-everything')));
+      await tester.pumpAndSettle();
+      expect(group().groupValue, '', reason: 'everything again');
+      await tester.tap(find.byKey(ValueKey('bundle-for-${desk.deviceId}')));
       await tester.pumpAndSettle();
       phone.noteHeldBy(desk.deviceId, phone.versionVector());
       await tester.tap(find.byKey(const ValueKey('send-bundle')));

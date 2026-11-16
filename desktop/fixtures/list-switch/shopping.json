@@ -13,6 +13,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -23,6 +24,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -33,6 +35,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -51,6 +54,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -61,6 +65,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -68,11 +73,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -90,6 +157,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -109,6 +191,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -127,6 +224,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -144,6 +256,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -164,9 +291,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-07T23:00:00.000Z",
@@ -181,6 +356,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -191,6 +367,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -201,6 +378,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -219,6 +397,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -229,6 +408,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -236,11 +416,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -258,6 +500,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -277,6 +534,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -295,6 +567,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -312,6 +599,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -332,9 +634,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-08T22:59:59.000Z",
@@ -349,6 +699,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -359,6 +710,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -369,6 +721,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -387,6 +740,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -397,6 +751,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -404,11 +759,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -426,6 +843,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -445,6 +877,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -463,6 +910,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -480,6 +942,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -500,9 +977,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-08T23:00:00.000Z",
@@ -517,6 +1042,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -527,6 +1053,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -537,6 +1064,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -555,6 +1083,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -565,6 +1094,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -572,11 +1102,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -594,6 +1186,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -613,6 +1220,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -631,6 +1253,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -648,6 +1285,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -668,9 +1320,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-14T22:59:59.000Z",
@@ -685,6 +1385,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -695,6 +1396,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -705,6 +1407,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -723,6 +1426,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -733,6 +1437,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -740,11 +1445,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -762,6 +1529,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -781,6 +1563,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -799,6 +1596,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -816,6 +1628,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -836,9 +1663,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-14T23:00:00.000Z",
@@ -853,6 +1728,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -863,6 +1739,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -873,6 +1750,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -891,6 +1769,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -901,6 +1780,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -908,11 +1788,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -930,6 +1872,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -949,6 +1906,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -967,6 +1939,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -984,6 +1971,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1004,9 +2006,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-21T23:00:00.000Z",
@@ -1021,6 +2071,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1031,6 +2082,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -1041,6 +2093,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -1059,6 +2112,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1069,6 +2123,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1076,11 +2131,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -1098,6 +2215,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1117,6 +2249,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -1135,6 +2282,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -1152,6 +2314,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1172,9 +2349,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-28T23:00:00.000Z",
@@ -1189,6 +2414,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1199,6 +2425,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -1209,6 +2436,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -1227,6 +2455,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1237,6 +2466,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1244,11 +2474,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -1266,6 +2558,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1285,6 +2592,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -1303,6 +2625,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -1320,6 +2657,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1340,9 +2692,400 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
+    },
+    {
+      "now": "2026-01-31T22:59:59.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000006",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Passport",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Socks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Tickets",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:00:31.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "X"
+            }
+          ],
+          "count": 3,
+          "openCount": 2,
+          "struckCount": 1
+        },
+        "note:00000000000000000000000000000012": {
+          "making": "00000000000000000000000000000019",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "lines",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
+          }
+        ],
+        "off": [],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
+          }
+        ]
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-01-31T23:00:00.000Z",
@@ -1357,6 +3100,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1367,6 +3111,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -1377,6 +3122,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -1395,6 +3141,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1405,6 +3152,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1412,11 +3160,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -1434,6 +3244,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1453,6 +3278,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -1471,6 +3311,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -1488,6 +3343,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1508,9 +3378,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-02-02T23:00:00.000Z",
@@ -1525,6 +3443,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1535,6 +3454,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -1545,6 +3465,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -1563,6 +3484,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1573,6 +3495,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1580,11 +3503,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -1602,6 +3587,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1621,6 +3621,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -1639,6 +3654,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -1656,6 +3686,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1676,9 +3721,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-02-27T23:00:00.000Z",
@@ -1693,6 +3786,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1703,6 +3797,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -1713,6 +3808,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -1731,6 +3827,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1741,6 +3838,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1748,11 +3846,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -1770,6 +3930,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1789,6 +3964,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -1807,6 +3997,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -1824,6 +4029,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1844,9 +4064,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2026-03-13T23:00:00.000Z",
@@ -1861,6 +4129,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1871,6 +4140,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -1881,6 +4151,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -1899,6 +4170,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -1909,6 +4181,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1916,11 +4189,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -1938,6 +4273,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -1957,6 +4307,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -1975,6 +4340,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -1992,6 +4372,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -2012,9 +4407,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     },
     {
       "now": "2027-01-30T23:00:00.000Z",
@@ -2029,6 +4472,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -2039,6 +4483,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             },
@@ -2049,6 +4494,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -2067,6 +4513,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "V"
             },
@@ -2077,6 +4524,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "backIn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -2084,11 +4532,73 @@
           "count": 2,
           "openCount": 2,
           "struckCount": 0
+        },
+        "note:0000000000000000000000000000001f": {
+          "making": "00000000000000000000000000000020",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000021",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000022",
+              "text": "Sugar",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000023": {
+          "making": "00000000000000000000000000000024",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Soap",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Sponge",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:03:12.000Z",
+              "backOn": null,
+              "backIn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 1,
+          "struckCount": 1
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
-        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue",
+        "note:0000000000000000000000000000001f": "Shopping:\nFlour\nSugar",
+        "note:00000000000000000000000000000023": "Soap\n✓ Sponge"
       },
       "agenda": {
         "none": [
@@ -2106,6 +4616,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -2125,6 +4650,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "back": [
@@ -2143,6 +4683,21 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ],
         "open": [
@@ -2160,6 +4715,21 @@
             "lines": [
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
             ]
           }
         ],
@@ -2180,9 +4750,57 @@
               "line:0000000000000000000000000000001a",
               "line:0000000000000000000000000000001b"
             ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001f",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000021",
+              "line:00000000000000000000000000000022"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000023",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000025"
+            ]
           }
         ]
-      }
+      },
+      "checkedToday": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000007",
+            "line:00000000000000000000000000000008"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000012",
+          "shows": "count",
+          "lines": [
+            "line:0000000000000000000000000000001a",
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001f",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000021",
+            "line:00000000000000000000000000000022"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000023",
+          "shows": "count",
+          "lines": [
+            "line:00000000000000000000000000000025"
+          ]
+        }
+      ]
     }
   ],
   "isShoppingList": {
@@ -2190,39 +4808,55 @@
     "note:0000000000000000000000000000000a": false,
     "note:00000000000000000000000000000012": true,
     "note:0000000000000000000000000000001c": false,
-    "note:0000000000000000000000000000001e": false
+    "note:0000000000000000000000000000001e": false,
+    "note:0000000000000000000000000000001f": true,
+    "note:00000000000000000000000000000023": true
   },
   "mayMake": {
     "note:00000000000000000000000000000001": false,
     "note:0000000000000000000000000000000a": false,
     "note:00000000000000000000000000000012": false,
     "note:0000000000000000000000000000001c": false,
-    "note:0000000000000000000000000000001e": true
+    "note:0000000000000000000000000000001e": true,
+    "note:0000000000000000000000000000001f": false,
+    "note:00000000000000000000000000000023": false
   },
   "onAgenda": {
     "none": {
       "note:00000000000000000000000000000001": "count",
-      "note:00000000000000000000000000000012": "count"
+      "note:00000000000000000000000000000012": "count",
+      "note:0000000000000000000000000000001f": "count",
+      "note:00000000000000000000000000000023": "count"
     },
     "lines": {
       "note:00000000000000000000000000000001": "lines",
-      "note:00000000000000000000000000000012": "lines"
+      "note:00000000000000000000000000000012": "lines",
+      "note:0000000000000000000000000000001f": "lines",
+      "note:00000000000000000000000000000023": "lines"
     },
     "back": {
       "note:00000000000000000000000000000001": "count",
-      "note:00000000000000000000000000000012": "count"
+      "note:00000000000000000000000000000012": "count",
+      "note:0000000000000000000000000000001f": "count",
+      "note:00000000000000000000000000000023": "count"
     },
     "open": {
       "note:00000000000000000000000000000001": "count",
-      "note:00000000000000000000000000000012": "count"
+      "note:00000000000000000000000000000012": "count",
+      "note:0000000000000000000000000000001f": "count",
+      "note:00000000000000000000000000000023": "count"
     },
     "off": {
       "note:00000000000000000000000000000001": "off",
-      "note:00000000000000000000000000000012": "off"
+      "note:00000000000000000000000000000012": "off",
+      "note:0000000000000000000000000000001f": "off",
+      "note:00000000000000000000000000000023": "off"
     },
     "sideways": {
       "note:00000000000000000000000000000001": "count",
-      "note:00000000000000000000000000000012": "count"
+      "note:00000000000000000000000000000012": "count",
+      "note:0000000000000000000000000000001f": "count",
+      "note:00000000000000000000000000000023": "count"
     }
   },
   "mayShowOnAgenda": {
@@ -2230,7 +4864,9 @@
     "note:0000000000000000000000000000000a": false,
     "note:00000000000000000000000000000012": true,
     "note:0000000000000000000000000000001c": false,
-    "note:0000000000000000000000000000001e": false
+    "note:0000000000000000000000000000001e": false,
+    "note:0000000000000000000000000000001f": true,
+    "note:00000000000000000000000000000023": true
   },
   "routines": [],
   "reappear": {
@@ -2263,5 +4899,68 @@
     "ΟΔΟΣ": "οδοσ",
     " Tea　": "tea",
     "﻿Bom": "bom"
+  },
+  "owing": {},
+  "spoken": {
+    "Milch, Eier und Brot.": [
+      "Milch",
+      "Eier",
+      "Brot"
+    ],
+    "milk, eggs, and bread": [
+      "milk",
+      "eggs",
+      "bread"
+    ],
+    "Butter UND Käse And tea": [
+      "Butter",
+      "Käse",
+      "tea"
+    ],
+    "Hundefutter und Brandsalbe": [
+      "Hundefutter",
+      "Brandsalbe"
+    ],
+    "sand and candy": [
+      "sand",
+      "candy"
+    ],
+    "Milch. Eier? Brot! Käse; Wurst… Senf\nTee\r\nZucker": [
+      "Milch",
+      "Eier",
+      "Brot",
+      "Käse",
+      "Wurst",
+      "Senf",
+      "Tee",
+      "Zucker"
+    ],
+    "1,5 Liter Milch, 2.5 kg Mehl, 3, 4": [
+      "1,5 Liter Milch",
+      "2.5 kg Mehl",
+      "3",
+      "4"
+    ],
+    "1.5.2026, 7,": [
+      "1.5.2026",
+      "7"
+    ],
+    "  Oat\tmilk ,, and , und\n\n": [
+      "Oat milk"
+    ],
+    "　Tee und﻿Kaffee Reis": [
+      "Tee",
+      "Kaffee Reis"
+    ],
+    " . , und ": [],
+    "": [],
+    "Milch und Milch": [
+      "Milch",
+      "Milch"
+    ],
+    "und": [],
+    "Und so weiter": [
+      "so weiter"
+    ]
   }
 }

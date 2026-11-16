@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'area_look.dart';
+import 'attachment_views.dart';
 import 'calendar_platform.dart';
 import 'card_occurrences.dart';
 import 'checklist_view.dart';
+import 'frogs_screen.dart' show FrogIcon;
+import 'hidden_from_ai_view.dart';
+import 'iphone_words.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'ocr_platform.dart';
@@ -94,11 +100,14 @@ String? whereCaptured(CaptureContext capture) =>
 /// events as one calendar file when there are any.
 typedef NoteCalendar = ({List<CalendarChoice> add, CalendarChoice? file});
 
-/// A photo ([photo]) or voice recording [hash] a card's ⋮ menu offers
-/// to remove while its [text] stays, shown to tell several apart; [run]
-/// asks once and removes it (ADR 0020).
+/// What a card's ⋮ menu offers to remove while its text stays.
+enum RemovedMedia { photo, recording, file }
+
+/// A photo, voice recording or Attachment (#267) [hash] of [kind] a
+/// card's ⋮ menu offers to remove while its [text] stays, shown to tell
+/// several apart; [run] asks once and removes it (ADR 0020).
 typedef MediaRemoval = ({
-  bool photo,
+  RemovedMedia kind,
   String hash,
   String text,
   VoidCallback run,
@@ -153,6 +162,11 @@ class NoteActions {
   /// Opens the entry page of the Note's Tally.
   final VoidCallback? onAddEntry;
 
+  /// Puts a shortcut to the entry page of the Note's Tally on the home
+  /// screen, on the iPhone into the app icon's menu (#284); offered, as
+  /// [onAddEntry], only for a Tally.
+  final VoidCallback? onAddToHome;
+
   /// What the menu offers of a Checklist (#120), read as the menu opens:
   /// whether the Note is one, and making it one, turning it back into a
   /// plain Note, unchecking all of its Lines and its "Show on the Agenda"
@@ -160,14 +174,20 @@ class NoteActions {
   final ChecklistMenu Function()? checklist;
 
   /// Picks a Shopping List for the lines of a Note being captured
-  /// (#124), read as the menu opens; left out while it is null or gives
-  /// null.
-  final VoidCallback? Function()? addToShopping;
+  /// (#124), read as the menu opens, with its entry's words: "Add to
+  /// Weekly" where there is one list to add to (#276); left out while it
+  /// is null or gives null.
+  final ({String label, VoidCallback run})? Function()? addToShopping;
 
   /// Whether the Note shows after each box who ticked it last and when,
   /// and switching that, read as the menu opens (ADR 0035); left out
   /// while it is null or gives null, as for a Note without boxes.
   final ({bool on, VoidCallback toggle})? Function()? showTicks;
+
+  /// Whether the Note is marked Hidden from AI and switching the mark,
+  /// read as the menu opens (#267, [hiddenFromAiEntry]); left out while
+  /// it is null or gives null, as in a Shared Area.
+  final ({bool on, VoidCallback toggle})? Function()? hideFromAi;
 
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
@@ -191,9 +211,11 @@ class NoteActions {
     this.isTally,
     this.onMakeTally,
     this.onAddEntry,
+    this.onAddToHome,
     this.checklist,
     this.addToShopping,
     this.showTicks,
+    this.hideFromAi,
     this.onDelete,
     this.advanced = true,
   });
@@ -230,8 +252,9 @@ List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
 /// own, ADR 0017); "From …" when a Pack brought it unclaimed (#164);
-/// with [showPlace] where it is filed; a separator under
-/// them; then the Note in its compact or its detailed view ([full], #189).
+/// with [showPlace] where it is filed; then, with no divider, the Note in
+/// its compact or its detailed view ([full], #189), its text in the
+/// second row (#330).
 /// Its Area's colour runs down the left edge and its icon leads the place
 /// line. An important Note gets an accent marker and a stronger emboss, an
 /// unimportant one is dimmed (UI laws, "Cards").
@@ -243,8 +266,8 @@ List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
 /// Transcript, both labelled and dimmed, its Capture Context as one line
 /// under its text (#170), then each of its [sections], oldest first, the
 /// same way; and under a separator its action row, icons only: file it,
-/// spawn a Routine, Reminder, Frog or Session from it, merge it, and ⋮ for
-/// the rest with words.
+/// spawn a Routine, Reminder, Frog or Session from it, merge it, a pencil
+/// opening the editor (#281) and ⋮ for the rest with words.
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -260,14 +283,15 @@ class NoteCard extends StatelessWidget {
   /// user's own, which shows no Profile line.
   final Profile? author;
 
-  /// Whether the card says its Area and Topic, or Unsorted: only where
-  /// the screen around it does not say it already.
+  /// Whether the card says its Area and Topic, or Unsorted: not in the
+  /// list of the Area or Topic it is in (#330).
   final bool showPlace;
 
   /// Opens "file into…"; no button when null.
   final VoidCallback? onFile;
 
-  /// Opens "merge into…"; no button when null.
+  /// Opens "merge into…", on an Unsorted Note's card named "Add to
+  /// Note…" (#308); no button when null.
   final VoidCallback? onMerge;
 
   /// Spawns a Routine, Reminder, Frog or Session from the Note, picked
@@ -339,6 +363,17 @@ class NoteCard extends StatelessWidget {
   /// null.
   final NoteOccurrences? occurrences;
 
+  /// Puts the Note into a list's selection or takes it out (#273): a
+  /// box at the card's top left, ticked while [selected]; the only thing
+  /// that does, as a tap still switches the view. No box when null.
+  final ValueChanged<bool>? onSelect;
+  final bool selected;
+
+  /// Whether the Note is Hidden from AI, by its own mark or another's,
+  /// such as its Area's (#267): a shield beside the Important marker
+  /// says so.
+  final bool hiddenFromAi;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -375,6 +410,9 @@ class NoteCard extends StatelessWidget {
     this.boxes,
     this.onTable,
     this.occurrences,
+    this.onSelect,
+    this.selected = false,
+    this.hiddenFromAi = false,
   });
 
   /// Where the first line with words of [text] starts and ends, without
@@ -509,13 +547,33 @@ class NoteCard extends StatelessWidget {
     // Its time and place show under the text of the detailed view (#170):
     // with no Profile or place over the text it has no header.
     final headed = author != null || place != null || actions?.packFrom != null;
-    final marker = important
+    final importantMark = important
         ? Icon(
             Icons.label_important,
             color: scheme.primary,
             semanticLabel: t.importanceImportant,
           )
         : null;
+    final hiddenMark = hiddenFromAi
+        ? const HiddenFromAiMark(key: ValueKey('note-hidden-from-ai-mark'))
+        : null;
+    final marker = hiddenMark == null
+        ? importantMark
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [?importantMark, hiddenMark],
+          );
+    // Only a plain Note becomes a Session (ADR 0039), and no Code text
+    // (#213); a Routine of a Session Note runs it already.
+    final spawnsNow = switch (kind) {
+      final kind? => () => [
+        for (final spawn in Spawn.values)
+          if (spawn != Spawn.session ||
+              (kind() == NoteKind.plain && note.textFormat != TextFormats.code))
+            spawn,
+      ],
+      null => null,
+    };
     // The compact view has no buttons at the bottom; its ⋮ sits top right
     // (#189).
     final menu = !full && actions != null
@@ -524,7 +582,10 @@ class NoteCard extends StatelessWidget {
             actions: actions,
             // What the action row offers, as the compact view has none.
             onFile: onFile,
+            onSchedule: onSchedule,
+            spawnsNow: spawnsNow,
             onMerge: onMerge,
+            adding: note.isUnsorted,
           )
         : null;
     final bottom = full && acts;
@@ -543,7 +604,8 @@ class NoteCard extends StatelessWidget {
             )
           else
             header,
-          const Divider(height: 24),
+          // No divider: the text follows in the second row (#330).
+          const SizedBox(height: 4),
         ],
         // Under where it is filed, over its text (#215).
         if (occurrences case final occurrences?)
@@ -593,6 +655,24 @@ class NoteCard extends StatelessWidget {
         ],
       );
     }
+    if (onSelect case final select?) {
+      content = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            // Beside the text's first line, clear of the coloured edge.
+            padding: EdgeInsets.only(top: menu == null ? 0 : 8, right: 4),
+            child: Checkbox(
+              key: ValueKey('select-${note.id}'),
+              value: selected,
+              semanticLabel: t.selectNote,
+              onChanged: (on) => select(on ?? false),
+            ),
+          ),
+          Expanded(child: content),
+        ],
+      );
+    }
     final card = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Embossed(
@@ -630,20 +710,9 @@ class NoteCard extends StatelessWidget {
                         onFile: onFile,
                         onSchedule: onSchedule,
                         onMerge: onMerge,
+                        adding: note.isUnsorted,
                         actions: actions,
-                        // Only a plain Note becomes a Session (ADR 0039),
-                        // and no Code text (#213); a Routine of a Session
-                        // Note runs it already.
-                        spawnsNow: switch (kind) {
-                          final kind? => () => [
-                            for (final spawn in Spawn.values)
-                              if (spawn != Spawn.session ||
-                                  (kind() == NoteKind.plain &&
-                                      note.textFormat != TextFormats.code))
-                                spawn,
-                          ],
-                          null => null,
-                        },
+                        spawnsNow: spawnsNow,
                       ),
                     ?footer,
                   ],
@@ -663,14 +732,21 @@ class NoteCard extends StatelessWidget {
 /// A Note's action row, icons only, so it stays one line in every
 /// language; the words show on a long press: file it, spawn one of
 /// [spawns] from it (a Routine, Reminder, Frog or Session), merge it, and
-/// ⋮ for the rest with words. Each is left out when its callback is
-/// null. The card draws it, and so does a capture screen (#113).
+/// at the end a pencil opening the editor and ⋮ for the rest with words. Each is left out when its callback is
+/// null. Where the card is too narrow for all of them, as with Fat
+/// fingers on a small phone (#224), the pencil and ⋮ go onto a line of
+/// their own under the others, each line at the right, so no button is
+/// cut. The card draws it, and so does a capture screen (#113).
 class NoteActionRow extends StatelessWidget {
   /// The Importance ⋮ marks.
   final Importance importance;
   final VoidCallback? onFile;
   final ValueChanged<Spawn>? onSchedule;
   final VoidCallback? onMerge;
+
+  /// Whether [onMerge] is named "Add to Note…", as on an Unsorted Note's
+  /// card (#308), not "Merge into…".
+  final bool adding;
   final NoteActions? actions;
 
   /// What the spawn menu offers, in this order.
@@ -685,6 +761,7 @@ class NoteActionRow extends StatelessWidget {
     this.onFile,
     this.onSchedule,
     this.onMerge,
+    this.adding = false,
     this.actions,
     this.spawns = Spawn.values,
     this.spawnsNow,
@@ -694,55 +771,84 @@ class NoteActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     final actions = this.actions;
-    return Row(
+    return OverflowBar(
+      alignment: MainAxisAlignment.spaceBetween,
+      overflowAlignment: OverflowBarAlignment.end,
       children: [
-        if (onFile != null)
-          IconButton(
-            tooltip: t.fileInto,
-            onPressed: onFile,
-            icon: const Icon(Icons.drive_file_move_outline),
-          ),
-        if (onSchedule case final onSchedule? when spawns.isNotEmpty)
-          PopupMenuButton<Spawn>(
-            tooltip: t.routineOrReminder,
-            icon: const Icon(Icons.alarm_add_outlined),
-            onSelected: onSchedule,
-            itemBuilder: (_) => [
-              for (final spawn in spawnsNow?.call() ?? spawns)
-                // Frogs and Sessions are made only in Advanced (#197).
-                if ((actions?.advanced ?? true) ||
-                    spawn == Spawn.routine ||
-                    spawn == Spawn.reminder)
-                  PopupMenuItem(
-                    value: spawn,
-                    child: Text(switch (spawn) {
-                      Spawn.routine => t.routine,
-                      Spawn.reminder => t.reminder,
-                      Spawn.frog => t.frog,
-                      Spawn.session => t.session,
-                    }),
-                  ),
-            ],
-          ),
-        if (onMerge != null)
-          IconButton(
-            tooltip: t.mergeInto,
-            onPressed: onMerge,
-            icon: const Icon(Icons.call_merge),
-          ),
-        const Spacer(),
-        if (actions != null)
-          _MoreButton(importance: importance, actions: actions),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onFile != null)
+              IconButton(
+                tooltip: t.fileInto,
+                onPressed: onFile,
+                icon: const Icon(Icons.drive_file_move_outline),
+              ),
+            if (onSchedule case final onSchedule? when spawns.isNotEmpty)
+              PopupMenuButton<Spawn>(
+                tooltip: t.routineOrReminder,
+                icon: const Icon(Icons.alarm_add_outlined),
+                onSelected: onSchedule,
+                itemBuilder: (_) => [
+                  for (final spawn in offeredSpawns(
+                    spawnsNow?.call() ?? spawns,
+                    advanced: actions?.advanced ?? true,
+                  ))
+                    PopupMenuItem(
+                      value: spawn,
+                      child: Text(switch (spawn) {
+                        Spawn.routine => t.routine,
+                        Spawn.reminder => t.reminder,
+                        Spawn.frog => t.frog,
+                        Spawn.session => t.session,
+                      }),
+                    ),
+                ],
+              ),
+            if (onMerge != null)
+              IconButton(
+                tooltip: adding ? t.addToNote : t.mergeInto,
+                onPressed: onMerge,
+                icon: const Icon(Icons.call_merge),
+              ),
+          ],
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The editor in one tap, beside the long press and ⋮ ▸ Edit
+            // (#281).
+            if (actions?.onEdit case final edit?)
+              IconButton(
+                key: const ValueKey('note-pencil'),
+                tooltip: t.edit,
+                onPressed: edit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            if (actions != null)
+              _MoreButton(importance: importance, actions: actions),
+          ],
+        ),
       ],
     );
   }
 }
 
+/// What of [spawns] a Note's menus offer, in their order: Frogs and
+/// Sessions only in Advanced (#197).
+List<Spawn> offeredSpawns(List<Spawn> spawns, {required bool advanced}) => [
+  for (final spawn in spawns)
+    if (advanced || spawn == Spawn.routine || spawn == Spawn.reminder) spawn,
+];
+
 /// The ⋮ of a card's action row, or of a compact card's top right: a menu
 /// at the button with words. It leads with Edit, then on a compact card
-/// File into… and Merge into… (#189), then, for a Note being captured, its Importance as radio
-/// buttons, the one it has marked, then Show ticks while it has boxes, then sending, sharing, copying its text, exporting it as a Pack and removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" of
-/// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
+/// File into…, Routine…, Reminder…, in Advanced Frog and Session…, and
+/// Merge into… (#189, #281), then, for a Note being captured, its Importance as radio
+/// buttons, the one it has marked, then Show ticks while it has boxes, then
+/// "Share…", which opens a small menu at the button of sending, sharing,
+/// copying its text and exporting it as a Pack (#281), then removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" and
+/// "Add to home screen" (#284) of a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
 /// switch, a Shopping List's three choices as radio buttons) and "Uncheck
 /// all" (a Checklist's) and "Back to a plain Note", removing a photo or recording while its
@@ -752,16 +858,25 @@ class _MoreButton extends StatelessWidget {
   final Importance importance;
   final NoteActions actions;
 
-  /// "File into…" and "Merge into…" after Edit, for a compact card, which
-  /// has no action row (#189); left out when null.
+  /// "File into…", the Routine, Reminder, Frog and Session of
+  /// [spawnsNow] and "Merge into…" after Edit, for a compact card, which
+  /// has no action row (#189, #281); left out when null.
   final VoidCallback? onFile;
+  final ValueChanged<Spawn>? onSchedule;
+  final List<Spawn> Function()? spawnsNow;
   final VoidCallback? onMerge;
+
+  /// Whether [onMerge] is named "Add to Note…" (#308).
+  final bool adding;
 
   const _MoreButton({
     required this.importance,
     required this.actions,
     this.onFile,
+    this.onSchedule,
+    this.spawnsNow,
     this.onMerge,
+    this.adding = false,
   });
 
   @override
@@ -780,9 +895,28 @@ class _MoreButton extends StatelessWidget {
         final list = actions.checklist?.call();
         final addToShopping = actions.addToShopping?.call();
         final ticks = actions.showTicks?.call();
-        PopupMenuItem<VoidCallback> item(
+        final hidden = actions.hideFromAi?.call();
+        final schedule = onSchedule;
+        final spawns = schedule == null
+            ? const <Spawn>[]
+            : offeredSpawns(
+                spawnsNow?.call() ?? Spawn.values,
+                advanced: actions.advanced,
+              );
+        // Send, Share, Copy and Export as Pack under one "Share…" (#281).
+        final shares = <_MenuEntry>[
+          if (actions.onSend case final send?)
+            ('note-send', Icons.send_outlined, t.sendToPerson, send),
+          if (actions.onShare case final share?)
+            ('note-share', Icons.share_outlined, t.shareToApp, share),
+          if (actions.onCopy case final copy?)
+            ('note-copy', Icons.copy_outlined, t.copyText, copy),
+          if (actions.onExportPack case final pack?)
+            ('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
+        ];
+        PopupMenuItem<VoidCallback> drawn(
           String key,
-          IconData icon,
+          Widget icon,
           String label,
           VoidCallback run,
         ) => PopupMenuItem(
@@ -790,12 +924,18 @@ class _MoreButton extends StatelessWidget {
           value: run,
           child: Row(
             children: [
-              Icon(icon),
+              icon,
               const SizedBox(width: 12),
               Flexible(child: Text(label)),
             ],
           ),
         );
+        PopupMenuItem<VoidCallback> item(
+          String key,
+          IconData icon,
+          String label,
+          VoidCallback run,
+        ) => drawn(key, Icon(icon), label, run);
         return [
           if (actions.onEdit case final edit?) ...[
             item('note-edit', Icons.edit_outlined, t.edit, edit),
@@ -803,9 +943,34 @@ class _MoreButton extends StatelessWidget {
           ],
           if (onFile case final file?)
             item('note-file', Icons.drive_file_move_outline, t.fileInto, file),
+          if (schedule != null)
+            for (final spawn in spawns)
+              drawn(
+                'note-spawn-${spawn.name}',
+                switch (spawn) {
+                  Spawn.routine => const Icon(Icons.repeat),
+                  Spawn.reminder => const Icon(Icons.notifications_outlined),
+                  Spawn.frog => const FrogIcon(size: 24),
+                  Spawn.session => const Icon(Icons.event_repeat),
+                },
+                switch (spawn) {
+                  Spawn.routine => t.spawnRoutine,
+                  Spawn.reminder => t.spawnReminder,
+                  // A Frog is made at once, nothing asked.
+                  Spawn.frog => t.frog,
+                  Spawn.session => t.spawnSession,
+                },
+                () => schedule(spawn),
+              ),
           if (onMerge case final merge?)
-            item('note-merge', Icons.call_merge, t.mergeInto, merge),
-          if (onFile != null || onMerge != null) const PopupMenuDivider(),
+            item(
+              'note-merge',
+              Icons.call_merge,
+              adding ? t.addToNote : t.mergeInto,
+              merge,
+            ),
+          if (onFile != null || spawns.isNotEmpty || onMerge != null)
+            const PopupMenuDivider(),
           if (actions.onImportance case final set?) ...[
             // The heading the choices continue: "Importance" "Important".
             PopupMenuItem(enabled: false, child: Text(t.importance)),
@@ -839,14 +1004,22 @@ class _MoreButton extends StatelessWidget {
             const PopupMenuDivider(),
           ],
           if (ticks != null) showTicksItem(button, ticks),
-          if (actions.onSend case final send?)
-            item('note-send', Icons.send_outlined, t.sendToPerson, send),
-          if (actions.onShare case final share?)
-            item('note-share', Icons.share_outlined, t.shareToApp, share),
-          if (actions.onCopy case final copy?)
-            item('note-copy', Icons.copy_outlined, t.copyText, copy),
-          if (actions.onExportPack case final pack?)
-            item('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
+          if (hidden != null)
+            hiddenFromAiMenuItem(
+              button,
+              key: const ValueKey('note-hidden-from-ai'),
+              value: hidden.toggle,
+              on: hidden.on,
+            ),
+          if (shares case [(final key, final icon, final label, final run)])
+            item(key, icon, label, run)
+          else if (shares.isNotEmpty)
+            item(
+              'note-share-menu',
+              Icons.share_outlined,
+              t.shareNote,
+              () => unawaited(_shareMenu(button, shares)),
+            ),
           if ((actions.onRemovePackFrom, actions.packFrom) case (
             final remove?,
             final name?,
@@ -876,17 +1049,20 @@ class _MoreButton extends StatelessWidget {
           if (tally == true)
             if (actions.onAddEntry case final add?)
               item('note-add-entry', Icons.add_chart, t.addTallyEntry, add),
+          if (tally == true)
+            if (actions.onAddToHome case final home?)
+              item(
+                'note-add-to-home',
+                Icons.add_to_home_screen,
+                t.addToHomeScreenHere,
+                home,
+              ),
           // A Checklist or Shopping List is no Tally, and a Tally neither.
           if (tally == false && !(list?.isList ?? false))
             if (actions.onMakeTally case final make?)
               item('note-make-tally', Icons.bar_chart, t.makeTally, make),
-          if (addToShopping != null)
-            item(
-              'note-add-to-shopping',
-              Icons.add_shopping_cart,
-              t.addToShoppingList,
-              addToShopping,
-            ),
+          if (addToShopping case (:final label, :final run))
+            item('note-add-to-shopping', Icons.add_shopping_cart, label, run),
           if (list?.make case final make?)
             item('note-make-checklist', Icons.checklist, t.makeChecklist, make),
           if (list?.makeShopping case final make?)
@@ -939,22 +1115,22 @@ class _MoreButton extends StatelessWidget {
               value: removal.run,
               child: Row(
                 children: [
-                  Icon(
-                    removal.photo
-                        ? Icons.hide_image_outlined
-                        : Icons.mic_off_outlined,
-                  ),
+                  Icon(switch (removal.kind) {
+                    RemovedMedia.photo => Icons.hide_image_outlined,
+                    RemovedMedia.recording => Icons.mic_off_outlined,
+                    RemovedMedia.file => Icons.link_off,
+                  }),
                   const SizedBox(width: 12),
                   Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          removal.photo
-                              ? t.removePhotoKeepText
-                              : t.removeRecordingKeepText,
-                        ),
+                        Text(switch (removal.kind) {
+                          RemovedMedia.photo => t.removePhotoKeepText,
+                          RemovedMedia.recording => t.removeRecordingKeepText,
+                          RemovedMedia.file => t.removeFileKeepText,
+                        }),
                         // Which one, when there are several.
                         Text(
                           removal.text.trim().split('\n').first,
@@ -978,6 +1154,41 @@ class _MoreButton extends StatelessWidget {
       },
     );
   }
+}
+
+/// An entry of a card's ⋮: its key, icon, words and what it does.
+typedef _MenuEntry = (String, IconData, String, VoidCallback);
+
+/// Opens the small menu of "Share…" where [button] is, its entries with
+/// their icons and words, and does the one picked (#281).
+Future<void> _shareMenu(BuildContext button, List<_MenuEntry> entries) async {
+  final box = button.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(button).context.findRenderObject() as RenderBox?;
+  if (box == null || overlay == null) return;
+  final at = box.localToGlobal(box.size.bottomLeft(Offset.zero));
+  final picked = await showMenu<VoidCallback>(
+    context: button,
+    position: RelativeRect.fromRect(
+      overlay.globalToLocal(at) & Size.zero,
+      Offset.zero & overlay.size,
+    ),
+    items: [
+      for (final (key, icon, label, run) in entries)
+        PopupMenuItem(
+          key: ValueKey(key),
+          value: run,
+          child: Row(
+            children: [
+              Icon(icon),
+              const SizedBox(width: 12),
+              Flexible(child: Text(label)),
+            ],
+          ),
+        ),
+    ],
+  );
+  if (picked == null || !button.mounted) return;
+  picked();
 }
 
 /// The menu entry that switches Show ticks of a Note on and off, [ticks]
@@ -1407,13 +1618,21 @@ class _CompactNoteState extends State<_CompactNote> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (NoteKinds.name(shown).length case final end when end > 0)
+          if (NoteKinds.name(shown) case final name when name.trim().isNotEmpty)
             marked(
               0,
-              end,
+              name.length,
               key: const ValueKey('card-name'),
               style: text.titleMedium,
               lines: 1,
+            )
+          else if (untitledList(t, _kind) case final untitled?)
+            Text(
+              untitled,
+              key: const ValueKey('card-name'),
+              style: text.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ?widget.list,
           ...glance,
@@ -1499,6 +1718,28 @@ class _CompactNoteState extends State<_CompactNote> {
               photoText: note.photoTexts[hash],
               compact: true,
             ),
+          // Its files (#267): one alone is the card, titled by its name.
+          for (final file in note.attachments) ...[
+            AttachmentRow(
+              key: ValueKey('file:${file.hash}'),
+              file: file,
+              large: note.aloneFile != null,
+              noteId: note.id,
+              text: note.attachmentTexts[file.hash],
+            ),
+            AttachmentText(
+              file: file,
+              text: note.attachmentTexts[file.hash],
+              compact: true,
+            ),
+          ],
+          for (final file in note.removedAttachments)
+            AttachmentText(
+              key: ValueKey('fileText:${file.hash}'),
+              file: file,
+              text: note.attachmentTexts[file.hash],
+              compact: true,
+            ),
         ],
       ],
     );
@@ -1510,9 +1751,10 @@ class _CompactNoteState extends State<_CompactNote> {
 String descriptionUnfoldedSetting(String noteId) =>
     'descriptionUnfolded:$noteId';
 
-/// The whole of a Note in the detailed view: its text, photos and recordings,
-/// then each Section under a separator and its own Capture Context. The
-/// Sections are read when the Note is, not while building.
+/// The whole of a Note in the detailed view: its text, photos and
+/// recordings, then each Section under a tear line (#307) and its own
+/// Capture Context. The Sections are read when the Note is, not while
+/// building.
 class _FullNote extends StatefulWidget {
   final Note note;
   final DateFormat when;
@@ -1593,9 +1835,14 @@ class _FullNoteState extends State<_FullNote> {
           recordings: note.recordings,
           transcripts: note.transcripts,
           removedRecordings: note.removedRecordings,
+          files: note.attachments,
+          fileTexts: note.attachmentTexts,
+          removedFiles: note.removedAttachments,
+          aloneFile: note.aloneFile != null,
           list: widget.list,
           onTable: widget.onTable,
           named: _kind != NoteKind.plain,
+          untitled: untitledList(context.t, _kind),
         ),
         const SizedBox(height: 8),
         CaptureLine(
@@ -1608,7 +1855,7 @@ class _FullNoteState extends State<_FullNote> {
             key: ValueKey('section:${section.id}'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Divider(height: 24),
+              const TearLine(),
               _Whole(
                 id: section.id,
                 text: section.shownText,
@@ -1622,6 +1869,9 @@ class _FullNoteState extends State<_FullNote> {
                 recordings: section.recordings,
                 transcripts: section.transcripts,
                 removedRecordings: section.removedRecordings,
+                files: section.attachments,
+                fileTexts: section.attachmentTexts,
+                removedFiles: section.removedAttachments,
               ),
               const SizedBox(height: 8),
               CaptureLine.ofSection(
@@ -1661,6 +1911,13 @@ class _Whole extends StatelessWidget {
   final Map<String, String> transcripts;
   final List<String> removedRecordings;
 
+  /// Its files with their Attachment Texts, and those removed while their
+  /// texts stay (#267); [aloneFile] when its one file is the card.
+  final List<Attachment> files;
+  final Map<String, String> fileTexts;
+  final List<Attachment> removedFiles;
+  final bool aloneFile;
+
   /// A Checklist's Lines, right under the text.
   final Widget? list;
 
@@ -1674,6 +1931,9 @@ class _Whole extends StatelessWidget {
   /// (#188).
   final bool named;
 
+  /// What a list without a name shows as its name ([untitledList]).
+  final String? untitled;
+
   const _Whole({
     required this.id,
     required this.text,
@@ -1686,18 +1946,24 @@ class _Whole extends StatelessWidget {
     required this.recordings,
     required this.transcripts,
     required this.removedRecordings,
+    this.files = const [],
+    this.fileTexts = const {},
+    this.removedFiles = const [],
+    this.aloneFile = false,
     this.list,
     this.ticking,
     this.onTable,
     this.named = false,
+    this.untitled,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge;
     final list = this.list;
-    // A photo Note may have no words.
-    final Widget? words = text.isEmpty
+    // A photo Note may have no words; a list without a name shows its
+    // kind.
+    final Widget? words = text.isEmpty && untitled == null
         ? null
         : named
         ? _NameAndDescription(
@@ -1708,6 +1974,7 @@ class _Whole extends StatelessWidget {
             format: format,
             ticking: ticking,
             onTable: onTable,
+            untitled: untitled,
           )
         : MarkedText(
             text,
@@ -1776,6 +2043,31 @@ class _Whole extends StatelessWidget {
           transcript: transcripts[hash],
           labelled: true,
         ),
+      for (final file in files)
+        Column(
+          key: ValueKey('file:${file.hash}'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AttachmentRow(
+              file: file,
+              large: aloneFile,
+              noteId: id,
+              text: fileTexts[file.hash],
+            ),
+            AttachmentText(
+              file: file,
+              text: fileTexts[file.hash],
+              labelled: true,
+            ),
+          ],
+        ),
+      for (final file in removedFiles)
+        AttachmentText(
+          key: ValueKey('fileText:${file.hash}'),
+          file: file,
+          text: fileTexts[file.hash],
+          labelled: true,
+        ),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1806,6 +2098,9 @@ class _NameAndDescription extends StatefulWidget {
   final BoxTicking? ticking;
   final TableEditing? onTable;
 
+  /// What shows as the name while it is blank ([untitledList]).
+  final String? untitled;
+
   const _NameAndDescription({
     required this.noteId,
     required this.text,
@@ -1814,6 +2109,7 @@ class _NameAndDescription extends StatefulWidget {
     required this.format,
     this.ticking,
     this.onTable,
+    this.untitled,
   });
 
   @override
@@ -1875,11 +2171,15 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
       children: [
         KeyedSubtree(
           key: const ValueKey('card-name'),
-          child: part(
-            start: 0,
-            end: nameEnd,
-            style: theme.textTheme.titleMedium,
-          ),
+          child: switch (widget.untitled) {
+            final untitled? when text.substring(0, nameEnd).trim().isEmpty =>
+              Text(untitled, style: theme.textTheme.titleMedium),
+            _ => part(
+              start: 0,
+              end: nameEnd,
+              style: theme.textTheme.titleMedium,
+            ),
+          },
         ),
         if (description.trim().isNotEmpty)
           Semantics(

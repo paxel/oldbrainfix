@@ -61,9 +61,11 @@ abstract interface class BundlePlatform {
     String? subject,
   });
 
-  /// Opens the system's file picker; the copy of the file picked, or
-  /// null when the user backed out.
-  Future<String?> pick();
+  /// Opens the system's file picker, in the folder [from] the folder
+  /// picker granted where the platform can start there (the Backups
+  /// folder, #285); the copy of the file picked, or null when the user
+  /// backed out.
+  Future<String?> pick({String? from});
 
   /// Opens the system's print dialog for the PDF at [path], written
   /// where [exportPath] said, titled [name]; false when there is none.
@@ -103,7 +105,7 @@ class NoBundles implements BundlePlatform {
   }) async => ShareOutcome.noApp;
 
   @override
-  Future<String?> pick() async => null;
+  Future<String?> pick({String? from}) async => null;
 
   @override
   Future<bool> print(String path, String name) async => false;
@@ -167,7 +169,8 @@ class AndroidBundles implements BundlePlatform {
   };
 
   @override
-  Future<String?> pick() => _ask<String>('pick', null);
+  Future<String?> pick({String? from}) =>
+      _ask<String>('pick', from == null ? null : {'from': from});
 
   @override
   Future<bool> print(String path, String name) async =>

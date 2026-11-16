@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'announcements.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -507,10 +508,16 @@ class _CardTallyState extends State<CardTally> {
     setState(_load);
   }
 
-  Future<void> _deleteEntry(TallyEntry entry) async {
-    if (!await deleteTallyEntry(context, _tallies, entry.id)) return;
-    if (!mounted) return;
-    setState(_load);
+  void _deleteEntry(TallyEntry entry) {
+    final deleted = deleteTallyEntry(
+      context,
+      _tallies,
+      entry.id,
+      restored: () {
+        if (mounted) setState(_load);
+      },
+    );
+    if (deleted) setState(_load);
   }
 
   void _restore(TallyEntry entry) {
@@ -545,7 +552,7 @@ class _CardTallyState extends State<CardTally> {
         ),
         PopupMenuItem(
           key: const ValueKey('tally-entry-delete'),
-          value: () => _deleteEntry(entry),
+          value: () async => _deleteEntry(entry),
           child: Row(
             children: [
               const Icon(Icons.delete_outline),
@@ -777,41 +784,26 @@ class _CardTallyState extends State<CardTally> {
   }
 }
 
-/// Asks once whether the entry [id] goes, with the verb on the button in
-/// the error colour, and removes it; whether it did. It can be restored.
-Future<bool> deleteTallyEntry(
+/// Removes the entry [id] without asking and offers to undo it at the
+/// top (#268); whether it went. It can also be restored under "Removed
+/// entries"; the undo restores it and then runs [restored].
+bool deleteTallyEntry(
   BuildContext context,
   Tallies tallies,
-  String id,
-) async {
-  final sure = await showDialog<bool>(
-    context: context,
-    builder: (context) {
-      final t = context.t;
-      return AlertDialog(
-        content: Text(t.deleteEntryQuestion),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            key: const ValueKey('tally-delete-confirm'),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.delete),
-          ),
-        ],
-      );
-    },
-  );
-  // A sync while the dialog was open may have taken it already.
+  String id, {
+  VoidCallback? restored,
+}) {
   final entry = tallies.entryById(id);
-  if (sure != true || entry == null || entry.isTrashed) return false;
+  if (entry == null || entry.isTrashed) return false;
   if (!tallies.store.mayChange(id)) return false;
   tallies.trashEntry(id);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoEntryDeleted, () {
+    // Restored under "Removed entries" meanwhile, or taken by a sync.
+    if (tallies.entryById(id)?.isTrashed != true) return;
+    if (!tallies.store.mayChange(id)) return;
+    tallies.restoreEntry(id);
+    restored?.call();
+  });
   return true;
 }
 

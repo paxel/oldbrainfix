@@ -267,10 +267,128 @@ void main() {
       await openAllNotes(tester);
 
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
       await tap(tester, find.byKey(const ValueKey('note-copy')));
       expect(copied, ['Pack ✅ the tent\n\nMerged in\n\nAmended later']);
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(find.byType(PopupMenuItem<VoidCallback>), findsNothing);
+    });
+
+    /// The texts copied, the clipboard giving the last one to a paste.
+    List<String?> clipboard(WidgetTester tester) {
+      final copied = <String?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          switch (call.method) {
+            case 'Clipboard.setData':
+              copied.add((call.arguments as Map)['text'] as String?);
+            case 'Clipboard.getData':
+              return copied.isEmpty ? null : {'text': copied.last};
+            case 'Clipboard.hasStrings':
+              return {'value': copied.isNotEmpty};
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      return copied;
+    }
+
+    Future<void> copyFromTheCard(WidgetTester tester) async {
+      await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-copy')));
+    }
+
+    testWidgets('Copy text puts a Checklist\'s Lines after its Name as a '
+        'Markdown task list, a group indented (#323)', (tester) async {
+      final copied = clipboard(tester);
+      final note = notes.capture('Trip\nTent\n ✓ Pegs\n Poles\n✓ Map');
+      Checklists(store).make(note.id);
+      await start(tester);
+      await openAllNotes(tester);
+
+      await copyFromTheCard(tester);
+      expect(copied, [
+        'Trip\n\n- [ ] Tent\n  - [x] Pegs\n  - [ ] Poles\n- [x] Map',
+      ]);
+    });
+
+    testWidgets('Copy text puts a Shopping List\'s struck Lines checked, '
+        'after the open ones (#323)', (tester) async {
+      final copied = clipboard(tester);
+      final note = notes.capture('Shop\n✓ Eggs\nMilk');
+      ShoppingLists(store).make(note.id);
+      await start(tester);
+      await openAllNotes(tester);
+
+      await copyFromTheCard(tester);
+      expect(copied, ['Shop\n\n- [ ] Milk\n- [x] Eggs']);
+    });
+
+    testWidgets('a copied Checklist pasted into a new Note gives the same '
+        'boxes (#323)', (tester) async {
+      clipboard(tester);
+      final list = notes.capture('Trip\nTent\n ✓ Pegs\n Poles\n✓ Map');
+      Checklists(store).make(list.id);
+      await start(tester);
+      await openAllNotes(tester);
+      await copyFromTheCard(tester);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await openTextCapture(tester);
+      await tester
+          .state<EditableTextState>(find.byType(EditableText))
+          .pasteText(SelectionChangedCause.toolbar);
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Save'));
+      final pasted = notes.all().firstWhere((n) => n.id != list.id);
+      expect(pasted.textFormat, TextFormats.markdown);
+      expect(
+        pasted.shownText,
+        'Trip\n\n- ☐ Tent\n  - ✅ Pegs\n  - ☐ Poles\n- ✅ Map',
+      );
+      expect(pasted.boxes, hasLength(4));
+    });
+
+    testWidgets('a copied Checklist pasted with + ▸ Paste gives the same '
+        'boxes (#323)', (tester) async {
+      final copied = clipboard(tester);
+      final photos = FakePhotos();
+      final list = notes.capture('Trip\nTent\n ✓ Pegs\n Poles\n✓ Map');
+      Checklists(store).make(list.id);
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(OldBrainFixApp(store: store, photos: photos));
+      await tester.pumpAndSettle();
+      await openAllNotes(tester);
+      await copyFromTheCard(tester);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      photos.clipboard = SharedItem(text: copied.single ?? '');
+      await tap(tester, find.byIcon(Icons.add));
+      await tap(tester, fanEntry('paste'));
+      await tap(tester, find.text('Save'));
+      final pasted = notes.all().firstWhere((n) => n.id != list.id);
+      expect(pasted.textFormat, TextFormats.markdown);
+      expect(
+        pasted.shownText,
+        'Trip\n\n- ☐ Tent\n  - ✅ Pegs\n  - ☐ Poles\n- ✅ Map',
+      );
+      expect(pasted.boxes, hasLength(4));
     });
 
     testWidgets('Edit in ⋮ opens the editor', (tester) async {

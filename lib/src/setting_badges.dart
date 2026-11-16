@@ -35,6 +35,11 @@ class SettingBadge extends StatefulWidget {
   final Color? iconColour;
   final void Function(Offset at)? onTap;
 
+  /// Draws ▾ after the value in words, for a badge whose tap picks among
+  /// values, such as the kind (#310); only while [onTap] is set, and not
+  /// read by a screen reader.
+  final bool dropDown;
+
   const SettingBadge({
     super.key,
     required this.setting,
@@ -45,6 +50,7 @@ class SettingBadge extends StatefulWidget {
     this.iconWidget,
     this.iconColour,
     this.onTap,
+    this.dropDown = false,
   });
 
   @override
@@ -126,6 +132,19 @@ class _SettingBadgeState extends State<SettingBadge> {
                           widthFactor: 1,
                           child: switch (widget.valueIcon) {
                             final valueIcon? => Icon(valueIcon, size: 18),
+                            null when widget.dropDown && widget.onTap != null =>
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      value,
+                                      style: theme.textTheme.labelLarge,
+                                    ),
+                                  ),
+                                  const Icon(Icons.arrow_drop_down, size: 18),
+                                ],
+                              ),
                             null => Text(
                               value,
                               style: theme.textTheme.labelLarge,

@@ -11,15 +11,16 @@
 //! declined or blocked before it too, and waits behind the Agenda's
 //! "x Sent Items waiting" until decided (#91); declined before it,
 //! nothing of its sender's picture or its Note's photos and recordings
-//! is decoded or played.
+//! is decoded or played. A new send picks nobody until the user does,
+//! and an update starts at the person it went to before (#288).
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use egui::accesskit::Role;
+use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::profile::{self, SignedProfile};
 use oldbrainfix_core::{
     ClockTime, Day, ImportReport, Notes, OwnProfile, PairedDevice, Routines, Schedule, SigningKey,
@@ -94,6 +95,16 @@ fn window(app: App) -> Harness<'static, App> {
     harness
 }
 
+/// Whether the radio button `label` is picked.
+fn picked(harness: &Harness<'_, App>, label: &str) -> bool {
+    harness.get_by_label(label).accesskit_node().toggled() == Some(Toggled::True)
+}
+
+/// Whether the button `label` may be clicked.
+fn enabled(harness: &Harness<'_, App>, label: &str) -> bool {
+    !harness.get_by_label(label).accesskit_node().is_disabled()
+}
+
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
 }
@@ -147,6 +158,8 @@ fn a_note_is_saved_to_send_encrypted_to_a_person_met_or_signed_only() -> TestRes
     harness.run();
     assert!(shows(&harness, "Ben, encrypted"));
     assert!(!shows(&harness, "Not encrypted: whoever"));
+    harness.get_by_label("Ben, encrypted").click_accesskit();
+    harness.run();
     harness.get_by_label("Send").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Saved. Send the file"));
@@ -172,6 +185,56 @@ fn a_note_is_saved_to_send_encrypted_to_a_person_met_or_signed_only() -> TestRes
     let again = ben.open_sent_item(&bytes)?.map_err(|_| "signed")?;
     assert_eq!(again.item.id, opened.item.id, "the same Sent Item");
     assert_eq!(again.item.version, 2);
+    Ok(())
+}
+
+#[test]
+fn a_new_send_picks_nobody_and_an_update_starts_at_the_person_before() -> TestResult {
+    let desk = store(1, "Ada")?;
+    let ben = store(2, "Ben")?;
+    let cleo = store(3, "Cleo")?;
+    meet(&desk, &ben, "Ben")?;
+    meet(&desk, &cleo, "Cleo")?;
+    let note = Notes::new(&desk).capture("Surprise party for Ben", None, None)?;
+    let dir = tempfile::tempdir()?;
+    let saved = dir.path().join("party.oldbrain");
+    let mut app = App::new(desk, "en");
+    app.select(Selection::All);
+    app.select_note(&note.id);
+    {
+        let save = saved.clone();
+        app.set_item_saver(Box::new(move |_, _| Some(save.clone())));
+    }
+    let mut harness = window(app);
+
+    // New: nobody picked, not even the first person, and Send waits.
+    harness.get_by_label("Send…").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Send this Note"));
+    assert!(!picked(&harness, "Ben, encrypted"));
+    assert!(!picked(&harness, "Cleo, encrypted"));
+    assert!(!picked(&harness, "Anyone, not encrypted"));
+    assert!(!enabled(&harness, "Send"));
+    harness.get_by_label("Send").click_accesskit();
+    harness.run();
+    assert!(!saved.exists(), "nothing written while nobody is picked");
+    assert!(shows(&harness, "Send this Note"), "the dialog stays");
+    harness.get_by_label("Cleo, encrypted").click_accesskit();
+    harness.run();
+    assert!(enabled(&harness, "Send"));
+    harness.get_by_label("Send").click_accesskit();
+    harness.run();
+    let bytes = std::fs::read(&saved)?;
+    assert!(cleo.open_sent_item(&bytes)?.is_ok(), "Cleo opens it");
+    assert!(ben.open_sent_item(&bytes)?.is_err(), "Ben does not");
+
+    // An update starts at Cleo, the person it went to before.
+    harness.get_by_label("Send…").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Send an update"));
+    assert!(picked(&harness, "Cleo, encrypted"));
+    assert!(!picked(&harness, "Ben, encrypted"));
+    assert!(enabled(&harness, "Send"));
     Ok(())
 }
 

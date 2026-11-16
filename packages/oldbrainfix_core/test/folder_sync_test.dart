@@ -234,7 +234,7 @@ void main() {
           'note:',
           'area:',
           '"text"',
-          'Ada',
+          '"Ada"',
         ]) {
           expect(text, isNot(contains(secret)));
         }

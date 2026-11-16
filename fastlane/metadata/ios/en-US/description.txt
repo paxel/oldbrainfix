@@ -7,10 +7,11 @@ Capture
 • Voice Notes are transcribed on the device with Whisper (English and German). The speech model (148 MB) is downloaded once, on request.
 • Text in photos and screenshots is recognised on the device with RustO.
 • Transcripts and recognised text are included in search.
+• Any file can be attached to a Note; a PDF opens full screen, and its text is searched.
 
 Organising
 • New Notes are kept in Unsorted. A notification (Nudge) reports Unsorted Notes at a set interval; Quiet Hours suppress it at night.
-• Notes are filed into Areas and Topics (two levels), each with a colour and an icon. A starter set of Areas is offered at first start.
+• Notes are filed into Areas and Topics (two levels), each with a colour and an icon; tags nest, such as #life/health. A starter set of Areas is offered at first start.
 • Notes can be edited, amended and merged. Deleted items stay in the trash for 30 days.
 • A Note can become a Checklist, a Shopping List whose items come back, a Tally or a Session. Its text can be formatted with headings, lists, tables, boxes to tick and links that open other Notes and places in the app.
 
@@ -30,7 +31,7 @@ Sync and sharing
 
 Privacy and security
 • No account, no server, no analytics, no advertising.
-• The app uses the network only for sync and for the speech model download.
+• The app uses the network only for sync, for questions to your own desktop and for the speech model download.
 • Optional App Lock (PIN, Face ID or Touch ID) and Area Locks. Capture and alarms keep working while locked.
 • Encrypted Backups (Argon2id, XChaCha20-Poly1305) into a chosen folder, optionally weekly, with a printable Recovery Sheet. The iPhone's own backup leaves the app's data out.
 

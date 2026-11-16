@@ -1,13 +1,17 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations_de.dart';
 import 'package:oldbrainfix/l10n/app_localizations_en.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/capture_requests.dart';
+import 'package:oldbrainfix/src/capture_fan.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/lock_screen.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -326,6 +330,114 @@ void main() {
       expect(find.text(en.pasteEmpty), findsNothing);
       await tap(tester, find.text('Save'));
       expect(notes.all().single.text, 'call');
+    });
+  });
+  group('A long press on "+" (#282)', () {
+    /// The hints a screen reader gives for the long press of [data].
+    List<String?> longPressHints(SemanticsData data) => [
+      for (final id in data.customSemanticsActionIds ?? const <int>[])
+        if (CustomSemanticsAction.getAction(id) case final action?
+            when action.action == SemanticsAction.longPress)
+          action.hint,
+    ];
+
+    testWidgets('opens text Capture at once, with no fan', (tester) async {
+      await start(tester);
+      await tester.longPress(plus);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      expectFanOpen(false);
+      expect(tester.widget<TextField>(find.byType(TextField)).autofocus, true);
+      expect(voice.starts, 0);
+      expect(photos.taken, 0);
+      expect(photos.pastes, 0);
+
+      await tester.enterText(find.byType(TextField), 'call the vet');
+      await tap(tester, find.text('Save'));
+      expect(notes.all().single.text, 'call the vet');
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      // A tap still fans out.
+      await tap(tester, plus);
+      expectFanOpen(true);
+    });
+
+    testWidgets('is told to a screen reader with the button', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await start(tester);
+
+      final data = tester.getSemantics(plus).getSemanticsData();
+      expect(data.tooltip, en.captureTooltip);
+      expect(data.hasAction(SemanticsAction.tap), isTrue);
+      expect(data.hasAction(SemanticsAction.longPress), isTrue);
+      expect(longPressHints(data), [en.captureLongPressHint]);
+
+      // The screen reader's long press opens it too.
+      tester.semantics.longPress(
+        find.semantics.byPredicate(
+          (node) => node.getSemanticsData().tooltip == en.captureTooltip,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('is an action of the button for VoiceOver on the iPhone', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await start(tester);
+        final data = tester.getSemantics(plus).getSemanticsData();
+        final labels = [
+          for (final id in data.customSemanticsActionIds ?? const <int>[])
+            CustomSemanticsAction.getAction(id)?.label,
+        ];
+        expect(labels, contains(en.captureLongPressAction));
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+      semantics.dispose();
+    });
+
+    testWidgets('speaks German', (tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      final semantics = tester.ensureSemantics();
+      await start(tester);
+
+      final de = AppLocalizationsDe();
+      final data = tester.getSemantics(plus).getSemanticsData();
+      expect(data.tooltip, de.captureTooltip);
+      expect(longPressHints(data), [de.captureLongPressHint]);
+      semantics.dispose();
+    });
+
+    testWidgets('on the lock screen opens text Capture too', (tester) async {
+      final lock = AppLock(store: store);
+      addTearDown(lock.dispose);
+      final picked = <CaptureWay>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: LockScope(
+            lock: lock,
+            child: LockScreen(lock: lock, onCapture: picked.add),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(plus);
+      await tester.pumpAndSettle();
+      expect(picked, [CaptureWay.text]);
+      expect(close, findsNothing);
+      // A tap still fans out.
+      await tap(tester, plus);
+      expect(close, findsOneWidget);
     });
   });
 }

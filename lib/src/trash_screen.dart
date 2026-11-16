@@ -8,6 +8,7 @@ import 'frogs_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'note_selection.dart';
 import 'page_bar.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
@@ -37,7 +38,8 @@ typedef _Trashed = ({
   Frog? frog,
 });
 
-class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
+class _TrashScreenState extends State<TrashScreen>
+    with ReloadsOnLogChange, SelectsNotes {
   late final _routines = Routines(widget.notes.store);
   late final _frogs = Frogs(widget.notes.store);
   late List<_Trashed> _trashed = _load();
@@ -46,7 +48,17 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
   Store get log => widget.notes.store;
 
   @override
-  void reloadLog() => setState(() => _trashed = _load());
+  void reloadLog() => _reload();
+
+  void _reload() => setState(() {
+    _trashed = _load();
+    keepShown(_notes);
+  });
+
+  /// The Notes among [_trashed], which the selection takes (#273).
+  Iterable<PlacedNote> get _notes => [
+    for (final trashed in _trashed) ?trashed.note,
+  ];
 
   List<_Trashed> _load() {
     final lock = LockScope.of(context);
@@ -89,17 +101,17 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
 
   void _restoreFrog(Frog frog) {
     _frogs.restore(frog.id);
-    setState(() => _trashed = _load());
+    _reload();
   }
 
   void _restoreNote(Note note) {
     _routines.restoreNote(note.id);
-    setState(() => _trashed = _load());
+    _reload();
   }
 
   void _restoreRoutine(Routine routine) {
     _routines.restore(routine.id);
-    setState(() => _trashed = _load());
+    _reload();
   }
 
   /// Whole days until [at], by the store's clock.
@@ -210,50 +222,69 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
     final t = context.t;
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
-    return Scaffold(
-      appBar: pageBar(context, title: t.trashTitle),
-      body: ListView(
-        padding: clearOfSystemBars(
+    final notes = _notes;
+    return selectionBack(
+      Scaffold(
+        appBar: pageBar(
           context,
-          const EdgeInsets.symmetric(vertical: 8),
+          title: selecting ? t.notesSelected(selected.length) : t.trashTitle,
+          actions: selecting
+              ? selectionActions(
+                  context,
+                  onRestore: () {
+                    restoreSelected(widget.notes, notes);
+                    _reload();
+                  },
+                )
+              : [if (mayTick(notes)) selectButton(context)],
         ),
-        children: _trashed.isEmpty
-            ? [BrowserEmpty(text: t.trashEmpty)]
-            : [
-                for (final trashed in _trashed)
-                  if (trashed.note case (
-                    :final note,
-                    :final area,
-                    :final topic,
-                    :final changes,
-                    schedules: _,
-                    amends: _,
-                    :final author,
-                  ))
-                    NoteCard(
-                      note: note,
-                      when: when,
-                      area: area,
-                      topic: topic,
-                      author: author,
-                      showPlace: true,
-                      // A Note in the trash is read before it is restored.
-                      full: true,
-                      sections: () => widget.notes.sections(note.id),
-                      kind: () => NoteKinds(widget.notes.store).of(note.id),
-                      // Only who may change it restores it (ADR 0013).
-                      footer: changes
-                          ? _footer(
-                              widget.notes.purgeAt(note),
-                              () => _restoreNote(note),
-                            )
-                          : null,
-                    )
-                  else if (trashed.routine case final routine?)
-                    _routineCard(routine)
-                  else if (trashed.frog case final frog?)
-                    _frogCard(frog),
-              ],
+        body: ListView(
+          padding: clearOfSystemBars(
+            context,
+            const EdgeInsets.symmetric(vertical: 8),
+          ),
+          children: _trashed.isEmpty
+              ? [BrowserEmpty(text: t.trashEmpty)]
+              : [
+                  for (final trashed in _trashed)
+                    if (trashed.note case (
+                      :final note,
+                      :final area,
+                      :final topic,
+                      :final changes,
+                      schedules: _,
+                      amends: _,
+                      :final author,
+                    ))
+                      NoteCard(
+                        note: note,
+                        when: when,
+                        area: area,
+                        topic: topic,
+                        author: author,
+                        showPlace: true,
+                        // A Note in the trash is read before it is restored.
+                        full: true,
+                        sections: () => widget.notes.sections(note.id),
+                        kind: () => NoteKinds(widget.notes.store).of(note.id),
+                        // Only who may change it restores it (ADR 0013).
+                        footer: changes
+                            ? _footer(
+                                widget.notes.purgeAt(note),
+                                () => _restoreNote(note),
+                              )
+                            : null,
+                        onSelect: selecting && changes
+                            ? (on) => setSelected(note, on)
+                            : null,
+                        selected: selected.contains(note.id),
+                      )
+                    else if (trashed.routine case final routine?)
+                      _routineCard(routine)
+                    else if (trashed.frog case final frog?)
+                      _frogCard(frog),
+                ],
+        ),
       ),
     );
   }

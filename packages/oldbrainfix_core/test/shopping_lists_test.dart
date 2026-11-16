@@ -109,6 +109,46 @@ void main() {
       expect(shown(ann, shopping(ann, 'Shop\n- Milk')), ['- Milk']);
     });
 
+    group('from typed text (#309)', () {
+      String typed(String text, {String format = TextFormats.plain}) {
+        final id = Notes(ann).capture(text, format: format).id;
+        ShoppingLists(ann).makeFromText(id);
+        return id;
+      }
+
+      String name(String note) => Notes(ann).byId(note)!.text;
+
+      test('every line becomes a Line, and the list has no Name', () {
+        final note = typed('Milk\n  Eggs\n\n✓ Bread\nTea');
+        expect(shown(ann, note), ['Milk', 'Eggs', 'Tea', '~Bread']);
+        expect(name(note), '');
+        expect(Notes(ann).byId(note)!.isUnsorted, isFalse);
+        expect(ShoppingLists(ann).isShoppingList(note), isTrue);
+      });
+
+      test('a Markdown heading is the Name without its marks, a line '
+          'ending in ":" as it is', () {
+        final weekly = typed('## Weekly\n- Milk', format: TextFormats.markdown);
+        expect(name(weekly), 'Weekly');
+        expect(shown(ann, weekly), ['Milk']);
+        final shop = typed('Shopping:\nMilk\nEggs');
+        expect(name(shop), 'Shopping:');
+        expect(shown(ann, shop), ['Milk', 'Eggs']);
+      });
+
+      test('a blank first line leaves the Name empty', () {
+        final note = typed('  \nMilk');
+        expect(name(note), '');
+        expect(shown(ann, note), ['Milk']);
+      });
+
+      test('the name typed for a new list stays its Name', () {
+        final note = shopping(ann, 'Groceries');
+        expect(name(note), 'Groceries');
+        expect(shown(ann, note), isEmpty);
+      });
+    });
+
     test('a Note is at most one of a Tally, a Checklist and a Shopping '
         'List', () {
       final lists = ShoppingLists(ann);
@@ -447,6 +487,81 @@ void main() {
     });
   });
 
+  group('moving (#283)', () {
+    test('an open Line moves before another or after the open ones, a '
+        'struck one keeping its place among them for when it comes back', () {
+      final note = shopping(
+        ann,
+        'Shop\nMilk\nBread\nHam\nJam\nEggs\nTea\nSoap',
+        weekly: true,
+      );
+      final lists = ShoppingLists(ann);
+      String id(String text) => idOf(ann, note, text);
+      for (final text in ['Bread', 'Ham', 'Jam']) {
+        lists.check(id(text), _wall);
+      }
+      lists.move(id('Soap'), _wall, before: id('Eggs'));
+      lists.move(id('Tea'), _wall, before: id('Milk'));
+      expect(shown(ann, note), [
+        'Tea',
+        'Milk',
+        'Soap',
+        'Eggs',
+        '~Bread',
+        '~Ham',
+        '~Jam',
+      ]);
+      lists.move(id('Milk'), _wall);
+      expect(shown(ann, note), [
+        'Tea',
+        'Soap',
+        'Eggs',
+        'Milk',
+        '~Bread',
+        '~Ham',
+        '~Jam',
+      ]);
+      // The struck ones lay between Milk and Eggs, so Soap went before
+      // them.
+      clock.set(DateTime.utc(2026, 3, 11, 23));
+      expect(shown(ann, note), [
+        'Tea',
+        'Soap',
+        'Bread',
+        'Ham',
+        'Jam',
+        'Eggs',
+        'Milk',
+      ]);
+    });
+
+    test('a struck Line does not move nor goes another before one, and '
+        'where a Line is already nothing is written', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea\nJam');
+      final lists = ShoppingLists(ann);
+      final milk = idOf(ann, note, 'Milk');
+      final eggs = idOf(ann, note, 'Eggs');
+      final jam = idOf(ann, note, 'Jam');
+      final tea = idOf(ann, note, 'Tea');
+      lists.check(tea, _wall);
+      expect(() => lists.move(tea, _wall), throwsArgumentError);
+      expect(() => lists.move(milk, _wall, before: tea), throwsArgumentError);
+      expect(
+        () => lists.move(milk, _wall, before: 'line:none'),
+        throwsArgumentError,
+      );
+      final before = ann.allEntries().length;
+      lists.move(milk, _wall, before: milk);
+      lists.move(milk, _wall, before: eggs);
+      lists.move(jam, _wall);
+      expect(ann.allEntries().length, before);
+      lists.move(jam, _wall, before: milk);
+      expect(shown(ann, note), ['Jam', 'Milk', 'Eggs', '~Tea']);
+      lists.delete(milk);
+      expect(() => lists.move(milk, _wall), throwsArgumentError);
+    });
+  });
+
   group('reappear times (#195)', () {
     Reappear after(int count, ReappearUnit unit) => Reappear.after(count, unit);
 
@@ -586,6 +701,105 @@ void main() {
     });
   });
 
+  group('struck in the order they come back (#328)', () {
+    Reappear after(int count, ReappearUnit unit) => Reappear.after(count, unit);
+
+    test('the soonest back first, the same day by the check, those without '
+        'a time last, the open ones before them as placed', () {
+      final note = shopping(ann, 'Shop\nA\nB\nC\nD\nE\nF\nG');
+      final lists = ShoppingLists(ann);
+      final times = {
+        'A': after(3, ReappearUnit.week),
+        'B': after(1, ReappearUnit.week),
+        'C': Reappear.unset,
+        'D': after(7, ReappearUnit.day),
+        'E': after(2, ReappearUnit.day),
+        'F': Reappear.unset,
+      };
+      for (final MapEntry(key: text, value: time) in times.entries) {
+        lists.setReappear(idOf(ann, note, text), time);
+      }
+      // F checked before C; each a second after the one before.
+      for (final text in ['A', 'B', 'F', 'C', 'D', 'E']) {
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      expect(shown(ann, note), ['G', '~E', '~B', '~D', '~A', '~F', '~C']);
+      // A day on, E checked again later stays the soonest.
+      clock.set(DateTime.utc(2026, 3, 6, 10));
+      expect(shown(ann, note), ['G', '~E', '~B', '~D', '~A', '~F', '~C']);
+      // E back, checked again: two days on, still before B.
+      clock.set(DateTime.utc(2026, 3, 7, 10));
+      expect(shown(ann, note).first, 'E');
+      lists.check(idOf(ann, note, 'E'), _wall);
+      expect(shown(ann, note), ['G', '~E', '~B', '~D', '~A', '~F', '~C']);
+      // B, D and E back; B checked last comes back before A.
+      clock.set(DateTime.utc(2026, 3, 12, 10));
+      lists.check(idOf(ann, note, 'B'), _wall);
+      expect(shown(ann, note), ['D', 'E', 'G', '~B', '~A', '~F', '~C']);
+    });
+
+    test('each struck Line says how far off its day back is: tomorrow and '
+        'days, then weeks, months and years', () {
+      final note = shopping(ann, 'Shop\nA\nB\nC\nD\nE\nF\nG');
+      final lists = ShoppingLists(ann);
+      final times = {
+        'A': after(1, ReappearUnit.day),
+        'B': after(1, ReappearUnit.week),
+        'C': after(3, ReappearUnit.week),
+        'D': after(3, ReappearUnit.month),
+        'E': after(1, ReappearUnit.year),
+        'F': Reappear.unset,
+      };
+      for (final MapEntry(key: text, value: time) in times.entries) {
+        lists.setReappear(idOf(ann, note, text), time);
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      expect(
+        {
+          for (final t in ['A', 'B', 'C', 'D', 'E', 'F', 'G'])
+            t: lineOf(ann, note, t).backIn,
+        },
+        {
+          'A': const BackIn(1, ReappearUnit.day),
+          'B': const BackIn(7, ReappearUnit.day),
+          'C': const BackIn(3, ReappearUnit.week),
+          'D': const BackIn(3, ReappearUnit.month),
+          'E': const BackIn(1, ReappearUnit.year),
+          'F': null,
+          'G': null,
+        },
+      );
+      // By the wall clock: late on the 5th in UTC is the 6th an hour on.
+      clock.set(DateTime.utc(2026, 3, 5, 23, 30));
+      expect(lineOf(ann, note, 'A').struck, isFalse);
+      expect(lineOf(ann, note, 'A').backIn, isNull);
+      expect(lineOf(ann, note, 'B').backIn, const BackIn(6, ReappearUnit.day));
+    });
+
+    test('how far off a number of days is', () {
+      final cases = {
+        1: const BackIn(1, ReappearUnit.day),
+        2: const BackIn(2, ReappearUnit.day),
+        13: const BackIn(13, ReappearUnit.day),
+        14: const BackIn(2, ReappearUnit.week),
+        17: const BackIn(2, ReappearUnit.week),
+        18: const BackIn(3, ReappearUnit.week),
+        59: const BackIn(8, ReappearUnit.week),
+        60: const BackIn(2, ReappearUnit.month),
+        92: const BackIn(3, ReappearUnit.month),
+        364: const BackIn(12, ReappearUnit.month),
+        365: const BackIn(1, ReappearUnit.year),
+        547: const BackIn(1, ReappearUnit.year),
+        548: const BackIn(2, ReappearUnit.year),
+        36159: const BackIn(99, ReappearUnit.year),
+      };
+      for (final MapEntry(key: days, value: back) in cases.entries) {
+        expect(BackIn.days(days), back, reason: '$days days');
+      }
+      expect(const BackIn(3, ReappearUnit.week).toString(), '3w');
+    });
+  });
+
   group('editing', () {
     test('Lines are renamed, deleted and restored, and their reappear time '
         'set', () {
@@ -609,6 +823,27 @@ void main() {
       lists.restore(milk);
       expect(shown(ann, note), ['Oat milk', 'Eggs']);
       expect(() => lists.restore(milk), throwsArgumentError);
+    });
+
+    test('the deleted Lines are listed for "Removed Lines", the last '
+        'deleted first, as long as a restore brings them back', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea');
+      final lists = ShoppingLists(ann);
+      expect(lists.deletedLines(note), isEmpty);
+      final milk = idOf(ann, note, 'Milk');
+      final tea = idOf(ann, note, 'Tea');
+      lists.delete(milk);
+      lists.delete(tea);
+      expect(lists.deletedLines(note).map((l) => (l.id, l.text)), [
+        (tea, 'Tea'),
+        (milk, 'Milk'),
+      ]);
+      lists.restore(milk);
+      expect(lists.deletedLines(note).map((l) => l.text), ['Tea']);
+      expect(Checklists(ann).deletedLines(note), isEmpty);
+      lists.toPlain(note, _wall);
+      lists.make(note);
+      expect(lists.deletedLines(note), isEmpty);
     });
 
     test('back to a plain Note, struck ones marked, and made again afresh', () {
@@ -689,6 +924,23 @@ void main() {
         lineOf(ann, note, 'Milk').reappear,
         Reappear.after(2, ReappearUnit.week),
       );
+    });
+
+    test('a Member moves their own Lines, not another person\'s (#283)', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea', place: area);
+      exchange(ben, ann);
+      final lists = ShoppingLists(ben);
+      final milk = idOf(ben, note, 'Milk');
+      final bread = lists.add(note, 'Bread', _wall);
+      expect(() => lists.move(milk, _wall), throwsStateError);
+      lists.move(bread, _wall, before: milk);
+      // As a modified app would.
+      final forged = ben.append(milk, ChecklistKeys.order, 'zz');
+      exchange(ben, ann);
+      expect(ann.allEntries().map((e) => e.id), contains(forged.id));
+      expect(shown(ann, note), ['Bread', 'Milk', 'Eggs', 'Tea']);
+      ShoppingLists(ann).move(bread, _wall);
+      expect(shown(ann, note), ['Milk', 'Eggs', 'Tea', 'Bread']);
     });
   });
 

@@ -221,6 +221,36 @@ void main() {
       expect(host.requests, before);
     });
 
+    test('the address typed by hand is reached outside the local network, '
+        'and the address found stays (#267)', () async {
+      final device = await pair();
+      // A name, as a Tailscale name is: no address of the local network.
+      await expectLater(
+        pairedSync(
+          phone,
+          device,
+          host: 'localhost',
+          port: host.port,
+          name: 'Phone',
+        ),
+        failsWith(SyncFailure.notPrivate),
+      );
+      phone.setHandAddress(device.id, 'LocalHost');
+      Notes(desk).capture('Through the VPN');
+      final [at, ...] = phone.pairedAddresses(device);
+      expect(at, (host: 'localhost', port: host.port));
+      await pairedSync(
+        phone,
+        device,
+        host: at.host,
+        port: at.port,
+        name: 'Phone',
+      );
+      expect(Notes(phone).all().map((n) => n.text), ['Through the VPN']);
+      final kept = phone.pairedDevice(desk.deviceId)!;
+      expect((kept.host, kept.port), ('127.0.0.1', host.port));
+    });
+
     test('only a verified key of a paired Device that syncs on its own is '
         'trusted', () async {
       await pair();

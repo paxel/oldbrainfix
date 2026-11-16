@@ -179,21 +179,25 @@ class AgendaGroup extends StatelessWidget {
           children: [
             lead,
             const SizedBox(width: 4),
+            // The row's words grow with the Device's text size (#326,
+            // obf-1019), its box, icons and ⋮ do not.
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (time != null) Text(time, style: text.labelLarge),
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.bodyLarge?.copyWith(
-                      decoration: struck ? TextDecoration.lineThrough : null,
+              child: ContentText(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (time != null) Text(time, style: text.labelLarge),
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: text.bodyLarge?.copyWith(
+                        decoration: struck ? TextDecoration.lineThrough : null,
+                      ),
                     ),
-                  ),
-                  ?under,
-                ],
+                    ?under,
+                  ],
+                ),
               ),
             ),
             for (final mark in marks)
@@ -314,14 +318,16 @@ class AgendaEntry extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Expanded(
-                child: Text(
-                  text,
-                  key: textKey,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    decoration: struck ? TextDecoration.lineThrough : null,
-                    color: struck ? theme.colorScheme.onSurfaceVariant : null,
+                child: ContentText(
+                  child: Text(
+                    text,
+                    key: textKey,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      decoration: struck ? TextDecoration.lineThrough : null,
+                      color: struck ? theme.colorScheme.onSurfaceVariant : null,
+                    ),
                   ),
                 ),
               ),

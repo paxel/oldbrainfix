@@ -27,7 +27,7 @@ dependencies:
   # pure Dart, which `cryptography` does not sign with. MIT.
   pointycastle: ^4.0.0
   qr: ^4.0.0
-  sqlite3: ^3.0.0
+  sqlite3: ^3.7.1
 
 dev_dependencies:
   # tool/no_null_assertions.dart (#230) reads the syntax tree; already in

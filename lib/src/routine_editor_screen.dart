@@ -3,10 +3,12 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'announcements.dart';
 import 'calendar_platform.dart';
 import 'capture_choices.dart';
 import 'iphone_words.dart';
 import 'l10n.dart';
+import 'leave_saves.dart';
 import 'look.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
@@ -52,8 +54,9 @@ Future<bool> spawnFromNote(
 
 /// Opens the editor of a new Routine, Reminder or Session ([spawn]) for
 /// the Note being captured, [draft], which is not written yet (#113):
-/// Save hands back what was set up, for Capture to write with the Note;
-/// null when it was left without Save.
+/// Save, or leaving with a change that can be saved (#275), hands back
+/// what was set up, for Capture to write with the Note; null when it was
+/// left unchanged or discarded.
 Future<ScheduleChoice?> chooseSchedule(
   BuildContext context,
   Notes notes,
@@ -111,8 +114,10 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// when ignored: its own interval or this Device's default from
 /// Settings. A folded Escalation section below it turns on the
 /// full-screen alarm after a number of ignored Re-nags (3 when first
-/// turned on). Save writes the Routine; leaving without saving drops the
-/// edit. A saved Routine's history
+/// turned on). Save writes the Routine, and so does leaving by Back with
+/// a change that can be saved (#275); one that can't, no text, no
+/// weekday or a changed schedule that never happens, asks once whether
+/// to discard it. A saved Routine's history
 /// opens from the top bar, and its calendar button adds it, as saved,
 /// to the calendar or shares it as a calendar file.
 ///
@@ -134,7 +139,9 @@ class RoutineEditorScreen extends StatefulWidget {
   /// the text typed here.
   final String? noteId;
 
-  /// A new one starts as a Reminder: once, at the next full hour.
+  /// A new one starts as a Reminder: once, at the next full hour. A new
+  /// Reminder, this or a new Routine set to Once, offers the chips In 1 h,
+  /// Tonight, Tomorrow and In a week under its schedule's sentence (#271).
   final bool reminder;
 
   /// A new one is a Session, spawned from [noteId] or [capture], or with
@@ -229,6 +236,14 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   String? _ruleError;
   List<Occurrence> _next = const [];
 
+  /// The chips a new Reminder offers, at the last change (#271).
+  List<QuickReminder> _quick = const [];
+
+  /// The schedule and the whole edit as the page opened, to tell on
+  /// leaving whether anything changed (#275).
+  late final String _scheduleAsOpened;
+  late final String _asOpened;
+
   @override
   void initState() {
     super.initState();
@@ -270,6 +285,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     }
     _text.addListener(_typed);
     _update();
+    _scheduleAsOpened = _scheduleKey();
+    _asOpened = _editKey();
   }
 
   @override
@@ -398,6 +415,47 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         ? null
         : Schedule(start: _start, times: _times, rule: rule);
     _next = _schedule?.next(_today, _preview) ?? const [];
+    _quick = _offersQuick ? quickReminders(_sentenceNow()) : const [];
+  }
+
+  /// Now by the store's clock, with this Device's day start, for the
+  /// sentence's relative words and the chips (#271).
+  SentenceNow _sentenceNow() => widget.notes.store.sentenceNow(deviceWallClock);
+
+  /// Whether the chips show: on a new Reminder in the simple editor, not
+  /// on a Session or its schedule.
+  bool get _offersQuick =>
+      widget.routineId == null &&
+      _draft == null &&
+      widget.initial == null &&
+      !_advanced &&
+      _kind == RepeatKind.once;
+
+  /// Sets the Reminder [chip] stands for, read again at the tap; a chip
+  /// whose time has passed since, as Tonight at 19:00, only goes.
+  void _pickQuick(QuickChip chip) {
+    final fresh = quickReminders(_sentenceNow());
+    final quick = fresh.where((q) => q.chip == chip).firstOrNull;
+    if (quick == null) {
+      _change(() {});
+    } else {
+      _takeSentence(quick.schedule);
+    }
+  }
+
+  /// [quick]'s label with its time.
+  static String _quickLabel(
+    AppLocalizations t,
+    String locale,
+    QuickReminder quick,
+  ) {
+    final time = clockText(locale, quick.time);
+    return switch (quick.chip) {
+      QuickChip.inAnHour => t.quickInAnHour(time),
+      QuickChip.tonight => t.quickTonight(time),
+      QuickChip.tomorrow => t.quickTomorrow(time),
+      QuickChip.inAWeek => t.quickInAWeek(time),
+    };
   }
 
   void _change(VoidCallback change) => setState(() {
@@ -454,6 +512,36 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     _change(() => _times = [..._times, ClockTime(picked.hour, picked.minute)]);
   }
 
+  /// The schedule edited, as text, to tell whether it changed.
+  String _scheduleKey() => switch (_schedule) {
+    final s? => '${s.start}|${s.times.join(',')}|${s.rule?.format() ?? ''}',
+    null => 'none|$_advanced|${_rule.text.trim()}',
+  };
+
+  /// Everything Save writes, as text, to tell whether it changed.
+  String _editKey() => [
+    _scheduleKey(),
+    _renag?.inMinutes ?? '',
+    _escalation ?? '',
+    _text.text.trim(),
+    _draft?.signature ?? '',
+  ].join('\n');
+
+  bool _changed() => !_locked && _editKey() != _asOpened;
+
+  /// Whether leaving may save (#275): what Save takes, a new Session's
+  /// pool chosen, and a schedule that still happens, unless it is the
+  /// one the page opened with, such as a past Reminder's.
+  bool _leaveValid() =>
+      _canSave &&
+      (_draft?.valid ?? true) &&
+      (_next.isNotEmpty || _scheduleKey() == _scheduleAsOpened);
+
+  /// Keep editing: a new Session's pool shows its error.
+  void _keepEditing() {
+    if (_draft case final draft?) setState(() => draft.checked = true);
+  }
+
   /// A Routine saves whatever became of its Note; a new one needs a Note
   /// in the lists to spawn from, or a text for one.
   bool get _canSave {
@@ -504,32 +592,23 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     Navigator.of(context).pop(true);
   }
 
-  Future<void> _delete() async {
+  /// Moves the Routine or Reminder to the trash without asking and
+  /// closes; the announcement at the top undoes it (#268).
+  void _delete() {
     final routine = _routine;
-    if (routine == null) return;
+    if (routine == null || routine.isTrashed) return;
+    final routines = _routines;
+    final store = widget.notes.store;
+    routines.trash(routine.id);
     final t = context.t;
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: Text(
-          routine.isReminder
-              ? t.deleteReminderQuestion
-              : t.deleteRoutineQuestion,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.delete),
-          ),
-        ],
-      ),
+    AnnouncementsScope.of(context)?.offerUndo(
+      routine.isReminder ? t.undoReminderTrashed : t.undoRoutineTrashed,
+      () {
+        if (routines.byId(routine.id)?.isTrashed != true) return;
+        if (!store.mayChangeRoutine(routine.id)) return;
+        routines.restore(routine.id);
+      },
     );
-    if (!mounted || sure != true) return;
-    _routines.trash(routine.id);
     Navigator.of(context).pop(true);
   }
 
@@ -586,32 +665,41 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             ? (once ? t.newReminder : t.newRoutine)
             : (once ? t.reminder : t.routine));
     final note = _note;
-    return Scaffold(
-      appBar: pageBar(
-        context,
-        title: title,
-        actions: [
-          if (routine != null)
-            CalendarButton(choices: () => _calendarChoices(routine)),
-          if (routine != null && !routine.isReminder)
-            IconButton(
-              tooltip: t.historyTitle,
-              onPressed: () => openHistory(context, widget.notes, routine),
-              icon: const Icon(Icons.history),
-            ),
-          if (routine != null && !_locked)
-            IconButton(
-              tooltip: t.delete,
-              onPressed: _delete,
-              icon: const Icon(Icons.delete_outline),
-            ),
-          if (!_locked)
-            TextButton(onPressed: _canSave ? _save : null, child: Text(t.save)),
-        ],
-      ),
-      body: AbsorbPointer(
-        absorbing: _locked,
-        child: _body(context, t, locale, routine, note, once: once),
+    return LeaveSaves(
+      changed: _changed,
+      valid: _leaveValid,
+      save: _save,
+      onKeep: _keepEditing,
+      child: Scaffold(
+        appBar: pageBar(
+          context,
+          title: title,
+          actions: [
+            if (routine != null)
+              CalendarButton(choices: () => _calendarChoices(routine)),
+            if (routine != null && !routine.isReminder)
+              IconButton(
+                tooltip: t.historyTitle,
+                onPressed: () => openHistory(context, widget.notes, routine),
+                icon: const Icon(Icons.history),
+              ),
+            if (routine != null && !_locked)
+              IconButton(
+                tooltip: t.delete,
+                onPressed: _delete,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            if (!_locked)
+              TextButton(
+                onPressed: _canSave ? _save : null,
+                child: Text(t.save),
+              ),
+          ],
+        ),
+        body: AbsorbPointer(
+          absorbing: _locked,
+          child: _body(context, t, locale, routine, note, once: once),
+        ),
       ),
     );
   }
@@ -719,8 +807,25 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   null => '',
                 },
                 today: _today,
+                now: _sentenceNow,
                 onRead: _takeSentence,
               ),
+              if (_quick.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  key: const ValueKey('quickReminders'),
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final quick in _quick)
+                      ActionChip(
+                        key: ValueKey('quick-${quick.chip.name}'),
+                        label: Text(_quickLabel(t, locale, quick)),
+                        onPressed: () => _pickQuick(quick.chip),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
               ChoiceChips<bool>(
                 value: _advanced,

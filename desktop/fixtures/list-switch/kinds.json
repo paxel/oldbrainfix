@@ -23,5 +23,15 @@
     "kind": "plain",
     "name": "Call Ben",
     "description": "about the car"
+  },
+  "note:0000000000000000000000000000001f": {
+    "kind": "shoppingList",
+    "name": "Shopping:",
+    "description": ""
+  },
+  "note:00000000000000000000000000000023": {
+    "kind": "shoppingList",
+    "name": "",
+    "description": ""
   }
 }

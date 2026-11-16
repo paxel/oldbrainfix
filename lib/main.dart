@@ -23,13 +23,16 @@ import 'src/capture_requests.dart';
 import 'src/context_platform.dart';
 import 'src/crash_guard.dart';
 import 'src/drafts.dart';
+import 'src/file_platform.dart';
 import 'src/folder_platform.dart';
 import 'src/help_notes.dart';
+import 'src/home_shortcuts.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
 import 'src/pairing_platform.dart';
 import 'src/photo_platform.dart';
+import 'src/print_platform.dart';
 import 'src/profile_platform.dart';
 import 'src/routine_editor_screen.dart';
 import 'src/speech_platform.dart';
@@ -117,9 +120,13 @@ Future<void> _openAndRun(Directory dir) async {
       // such as the setup's steps, do the rest (#238).
       alarms: Platform.isIOS ? IosAlarms() : AndroidAlarms(),
       photos: AndroidPhotos(),
+      files: const AndroidFiles(),
+      // Only Android lets an app be a printer (#293).
+      printing: Platform.isIOS ? const NoPrinting() : const AndroidPrinting(),
       voice: AndroidVoice(),
       context: const AndroidContext(),
       requests: AndroidCaptureRequests(),
+      shortcuts: ChannelHomeShortcuts(),
       speech: AndroidSpeech(),
       ocr: const AndroidOcr(),
       calendar: const AndroidCalendar(),

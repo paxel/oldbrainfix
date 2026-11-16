@@ -416,6 +416,25 @@ void main() {
       expect(ann.mayManage(h.area), isTrue);
     });
 
+    test('a Member skips an Occurrence and moves one to tomorrow, and it '
+        'counts on every Device (#269)', () {
+      final h = household(AreaRole.member);
+      final skipped = Occurrence(Day(2026, 3, 2), ClockTime(8, 0));
+      final moved = Occurrence(Day(2026, 3, 3), ClockTime(8, 0));
+      Routines(ben).skip(h.routine, skipped);
+      Routines(ben).tomorrow(h.routine, moved);
+      exchange(ben, ann);
+      for (final store in [ann, ben]) {
+        final routine = Routines(store).byId(h.routine)!;
+        expect(routine.skippedAt(skipped), isNotNull);
+        expect(routine.skippedAt(moved), isNotNull);
+        expect(routine.tomorrow, {moved.key});
+      }
+      Routines(ben).unskip(h.routine, skipped);
+      exchange(ben, ann);
+      expect(Routines(ann).byId(h.routine)!.skippedAt(skipped), isNull);
+    });
+
     test('a tick another person\'s Device wrote on a Note in no Shared '
         'Area counts for nothing (ADR 0035)', () {
       final h = household(AreaRole.member);
@@ -456,6 +475,25 @@ void main() {
       expect(ann.tickedBy(h.note, tick)?.name, 'Ben');
       expect(Notes(ben).byId(h.note)!.boxes.single.last!.own, isTrue);
       expect(ben.tickedBy(h.note, tick), isNull);
+    });
+
+    test('a file is named by the person whose Device added it', () {
+      final h = household(AreaRole.member);
+      NewFile file(String name) =>
+          NewFile(name: name, bytes: Uint8List.fromList(utf8.encode(name)));
+      final mine = Notes(ann)
+          .capture('Milk', place: h.topic, files: [file('list.txt')]);
+      final theirs = Notes(ben)
+          .capture('Eggs', place: h.area, files: [file('setup.exe')]);
+      exchange(ben, ann);
+      final mineHash = mine.attachments.single.hash;
+      final theirsHash = theirs.attachments.single.hash;
+      expect(ann.fileAddedBy(mine.id, mineHash), isNull);
+      expect(ann.fileAddedBy(theirs.id, theirsHash)?.name, 'Ben');
+      expect(ben.fileAddedBy(theirs.id, theirsHash), isNull);
+      expect(ben.fileAddedBy(mine.id, mineHash)?.name, 'Ann');
+      // A file the Note does not hold was added by nobody.
+      expect(ann.fileAddedBy(theirs.id, mineHash), isNull);
     });
 
     test('a Manager does everything, and Managers change roles', () {
@@ -621,6 +659,17 @@ void main() {
       final areas = ann.areasSharedWith(ben.deviceId);
       expect(ann.blobIn('photo/${inside.photos.single}', areas), isTrue);
       expect(ann.blobIn('photo/${outside.photos.single}', areas), isFalse);
+      // An attached file goes as a photo does (ADR 0047).
+      final lease = Notes(ann).attachFile(
+        inside.id,
+        NewFile(name: 'Lease.pdf', bytes: Uint8List.fromList([1, 2, 3])),
+      );
+      final bill = Notes(ann).attachFile(
+        outside.id,
+        NewFile(name: 'Bill.pdf', bytes: Uint8List.fromList([4, 5, 6])),
+      );
+      expect(ann.blobIn('file/$lease', areas), isTrue);
+      expect(ann.blobIn('file/$bill', areas), isFalse);
     });
   });
 

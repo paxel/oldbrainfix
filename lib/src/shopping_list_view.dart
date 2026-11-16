@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
@@ -13,6 +12,7 @@ import 'look.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'setting_badges.dart';
+import 'tick_saves.dart';
 
 /// What a Note's card knows of its Shopping List (#122): [read] gives it
 /// as it shows now, or null for a Note that is none, read when the card
@@ -56,7 +56,8 @@ String struckShownSetting(String noteId) => 'shoppingStruckShown:$noteId';
 
 /// A Shopping List on a Note's card (#122): on a [full] card the open
 /// Lines with their checkboxes, then the struck ones folded under how many
-/// they are, a tap showing them with the day they come back (#189),
+/// they are, a tap showing them, the soonest back first, each with when
+/// it comes back beside it (#189, #328),
 /// checkable where this Device may; else how many are open. Nothing for a Note that is none. It reads the list whenever
 /// the card is built anew, after a check and when a new day begins.
 class CardShoppingList extends StatefulWidget {
@@ -76,7 +77,7 @@ class CardShoppingList extends StatefulWidget {
 }
 
 class _CardShoppingListState extends State<CardShoppingList>
-    with _ReadsAtDayStart {
+    with _ReadsAtDayStart, TicksAtOnce {
   ShoppingList? _list;
   var _checks = false;
 
@@ -125,12 +126,15 @@ class _CardShoppingListState extends State<CardShoppingList>
     watchDay(list != null && list.struckCount > 0);
   }
 
+  /// Ticks the Line [id] at once and saves it after the frame (#338).
   void _check(String id, bool checked) {
     final lists = widget.shopping.lists;
-    checked
-        ? lists.check(id, deviceWallClock)
-        : lists.uncheck(id, deviceWallClock);
-    setState(_readOwn);
+    tickAtOnce(lineTickKey(id, null), checked, () {
+      checked
+          ? lists.check(id, deviceWallClock)
+          : lists.uncheck(id, deviceWallClock);
+      if (mounted) setState(_readOwn);
+    });
   }
 
   @override
@@ -208,25 +212,34 @@ class _CardShoppingListState extends State<CardShoppingList>
 }
 
 /// The Lines of [list] as they are drawn: open ones first, struck ones
-/// at the end with the day they come back under them, as a short weekday
-/// and date ("back Tue, Nov 12").
+/// at the end, the soonest back first, each with when it comes back
+/// beside it ("in 3 days", #328).
 List<ShownLine> _shown(BuildContext context, ShoppingList list) {
   final t = context.t;
-  final day = DateFormat.MMMEd(Localizations.localeOf(context).toString());
-  return [for (final line in list.lines) _shownLine(t, day, line)];
+  return [for (final line in list.lines) _shownLine(t, line)];
 }
 
-/// [line] as it is drawn, a struck one with the [day] it comes back.
-ShownLine _shownLine(AppLocalizations t, DateFormat day, ShoppingLine line) => (
+/// [line] as it is drawn, a struck one with when it comes back.
+ShownLine _shownLine(AppLocalizations t, ShoppingLine line) => (
   id: line.id,
   text: line.text,
   inGroup: false,
   checked: line.struck,
-  below: switch (line.backOn) {
-    final back? when line.struck => t.shoppingBack(day.format(back.wall)),
+  below: null,
+  beside: switch (line.backIn) {
+    final back? when line.struck => backInWords(t, back),
     _ => null,
   },
 );
+
+/// How far off a struck Line's day back is, in words (#328): "tomorrow",
+/// "in 3 days", "in 3 weeks", "in 2 months", "in 1 year".
+String backInWords(AppLocalizations t, BackIn back) => switch (back.unit) {
+  ReappearUnit.day => t.shoppingBackDays(back.count),
+  ReappearUnit.week => t.shoppingBackWeeks(back.count),
+  ReappearUnit.month => t.shoppingBackMonths(back.count),
+  ReappearUnit.year => t.shoppingBackYears(back.count),
+};
 
 /// A reappear time in words: "None", "Once", "3 months" (#195).
 String reappearWords(AppLocalizations t, Reappear reappear) =>
@@ -379,7 +392,7 @@ class _ReappearDialogState extends State<ReappearDialog> {
 }
 
 /// What the menu of a Shopping List's Line does.
-enum _ShopStep { delete }
+enum _ShopStep { up, down, delete }
 
 /// The Shopping List part of a Note's editor (#122), nothing while the
 /// Note is none: its Lines with their boxes, typed in place as one block
@@ -389,7 +402,9 @@ enum _ShopStep { delete }
 /// the list is read anew, then it shows below the open ones. A name the
 /// list has already brings its Line back instead. Each Line ends in the
 /// badge of its reappear time (#195), whose tap opens its dialog where
-/// this Device may change the Line; ⋮ of such a Line has Delete. "Back to
+/// this Device may change the Line; ⋮ of such a Line has Delete, and of
+/// an open one Move up and Move down among the open Lines as they show,
+/// which moves its row there too (#283). "Back to
 /// a plain Note" is in the editor's
 /// kind badge (#160). What is typed is stored as the cursor leaves a Line
 /// and whenever [typed] says so; a Line left empty goes as the editor is
@@ -402,7 +417,9 @@ class ShoppingSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
-  /// Whether the cursor starts in the empty Line of a new list (#161).
+  /// Whether the cursor starts in a new empty Line after the open ones:
+  /// the one of a new list (#161), or one opened from its group on the
+  /// Agenda (#276).
   final bool startLine;
 
   const ShoppingSection({
@@ -422,12 +439,14 @@ class _ShoppingSectionState extends State<ShoppingSection>
         ReloadsOnLogChange,
         _ReadsAtDayStart,
         TypedRows,
-        AutomaticKeepAliveClientMixin {
+        AutomaticKeepAliveClientMixin,
+        TicksAtOnce {
   late final _lists = ShoppingLists(widget.notes.store);
   late final _twoRows = widget.notes.store.twoRowEditorOn;
   ShoppingList? _list;
   var _checks = false;
   Set<String> _editable = const {};
+  List<DeletedLine> _removed = const [];
 
   @override
   Store get log => widget.notes.store;
@@ -452,7 +471,8 @@ class _ShoppingSectionState extends State<ShoppingSection>
     widget.typed?.listen(keepTyped);
     if (widget.startLine) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) focusEmptyRow();
+        // Before the struck Lines.
+        if (mounted) startRowAt(rows.lastIndexWhere(placesAmong) + 1);
       });
     }
   }
@@ -484,6 +504,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
       for (final line in list?.lines ?? const <ShoppingLine>[])
         if (_lists.mayEdit(line.id)) line.id,
     };
+    _removed = _lists.deletedLines(widget.noteId);
     rows = rowsInPlace(switch (list) {
       final list? => [
         for (final line in list.lines)
@@ -540,14 +561,18 @@ class _ShoppingSectionState extends State<ShoppingSection>
   @override
   void deleteLine(String id) => _lists.delete(id);
 
+  /// Ticks the Line [id] at once and saves it after the frame (#338).
   void _check(String id, bool checked) {
     // A new Line is stored first; an empty one has nothing to check.
     final line = storedId(id);
     if (line == null) return;
-    checked
-        ? _lists.check(line, deviceWallClock)
-        : _lists.uncheck(line, deviceWallClock);
-    setState(_load);
+    tickAtOnce(lineTickKey(line, null), checked, () {
+      checked
+          ? _lists.check(line, deviceWallClock)
+          : _lists.uncheck(line, deviceWallClock);
+      // Read once with the log's change, not twice (#339).
+      if (mounted) reloadSoon();
+    });
   }
 
   /// The reappear time dialog of the Line [shown], each pick written at
@@ -595,6 +620,22 @@ class _ShoppingSectionState extends State<ShoppingSection>
         Offset.zero & overlay.size,
       ),
       items: [
+        for (final (step, icon, label) in [
+          (_ShopStep.up, Icons.arrow_upward, t.checklistMoveUp),
+          (_ShopStep.down, Icons.arrow_downward, t.checklistMoveDown),
+        ])
+          if (!line.struck && _moveTo(id, up: step == _ShopStep.up).$1)
+            PopupMenuItem(
+              key: ValueKey('shopping-${step.name}'),
+              value: step,
+              child: Row(
+                children: [
+                  Icon(icon),
+                  const SizedBox(width: 12),
+                  Flexible(child: Text(label)),
+                ],
+              ),
+            ),
         PopupMenuItem(
           key: const ValueKey('shopping-delete'),
           value: _ShopStep.delete,
@@ -612,11 +653,62 @@ class _ShoppingSectionState extends State<ShoppingSection>
     // A sync while the menu was open may have taken it away.
     if (!linesWritable || !showsLine(id)) return;
     switch (picked) {
+      case _ShopStep.up || _ShopStep.down:
+        _move(id, up: picked == _ShopStep.up);
       case _ShopStep.delete:
-        if (!await confirmLineDelete(context)) return;
-        if (!mounted || !linesWritable || !showsLine(id)) return;
         _lists.delete(id);
+        offerLineUndo(
+          context,
+          _lists.deletedLines,
+          _lists.mayEdit,
+          _lists.restore,
+          widget.noteId,
+          id,
+        );
     }
+    setState(_load);
+  }
+
+  /// Where the open Line [id] goes by Move up, or with [up] false by Move
+  /// down, among the open Lines as their rows show (#283): whether it
+  /// can, and the Line it goes before, null after the open ones.
+  (bool, String?) _moveTo(String id, {required bool up}) {
+    final open = [
+      for (final row in rows)
+        if (placesAmong(row)) ?row.id,
+    ];
+    final at = open.indexOf(id);
+    if (at < 0) return (false, null);
+    if (up) return at > 0 ? (true, open[at - 1]) : (false, null);
+    if (at + 1 >= open.length) return (false, null);
+    return (true, at + 2 < open.length ? open[at + 2] : null);
+  }
+
+  /// Moves the open Line [id] one place up, or with [up] false down, and
+  /// its row with it, as rows stay where they are while the editor is
+  /// open (#283).
+  void _move(String id, {required bool up}) {
+    final (moves, before) = _moveTo(id, up: up);
+    if (!moves || !_lists.mayEdit(id)) return;
+    // A sync while the menu was open may have struck either.
+    final list = _lists.byNote(widget.noteId, deviceWallClock);
+    bool open(String? line) =>
+        line == null || list?.line(line)?.struck == false;
+    if (!open(id) || !open(before)) return;
+    _lists.move(id, deviceWallClock, before: before);
+    final row = rows.firstWhere((r) => r.id == id);
+    final rest = [...rows]..remove(row);
+    final at = before == null
+        ? rest.lastIndexWhere(placesAmong) + 1
+        : rest.indexWhere((r) => r.id == before);
+    rows = rest..insert(at < 0 ? rows.indexOf(row) : at, row);
+  }
+
+  /// Brings the deleted Line [id] back from "Removed Lines".
+  void _restore(String id) {
+    if (!linesWritable || !_lists.mayEdit(id)) return;
+    if (!_lists.deletedLines(widget.noteId).any((l) => l.id == id)) return;
+    _lists.restore(id);
     setState(_load);
   }
 
@@ -626,10 +718,9 @@ class _ShoppingSectionState extends State<ShoppingSection>
     final list = _list;
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
-    final day = DateFormat.MMMEd(Localizations.localeOf(context).toString());
     ShownLine shownRow(TypedLine row) {
       if (row.id case final id?) {
-        if (list.line(id) case final line?) return _shownLine(t, day, line);
+        if (list.line(id) case final line?) return _shownLine(t, line);
       }
       // New, or gone from the list a moment ago and read anew soon.
       return (
@@ -638,6 +729,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
         inGroup: false,
         checked: false,
         below: null,
+        beside: null,
       );
     }
 
@@ -647,47 +739,60 @@ class _ShoppingSectionState extends State<ShoppingSection>
       child: EditorPanel(
         key: const ValueKey('shopping'),
         heading: t.shoppingHeading,
-        child: ChecklistLines(
-          lines: [for (final row in rows) shownRow(row)],
-          onCheck: _checks ? _check : null,
-          onMenu: _menu,
-          editable: withMenus(_editable),
-          trailing: (shown) => switch (list.line(shown.id)) {
-            final line? => reappearBadge(
-              t,
-              line.id,
-              line.reappear,
-              onTap: _editable.contains(line.id)
-                  ? () => _reappear(shown.id)
-                  : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ChecklistLines(
+              lines: [for (final row in rows) shownRow(row)],
+              onCheck: _checks ? _check : null,
+              onMenu: _menu,
+              editable: withMenus(_editable),
+              trailing: (shown) => switch (list.line(shown.id)) {
+                final line? => reappearBadge(
+                  t,
+                  line.id,
+                  line.reappear,
+                  onTap: _editable.contains(line.id)
+                      ? () => _reappear(shown.id)
+                      : null,
+                ),
+                // A new Line has none yet; a tap stores it first.
+                null => reappearBadge(
+                  t,
+                  shown.id,
+                  Reappear.unset,
+                  onTap: _checks ? () => _reappear(shown.id) : null,
+                ),
+              },
+              field: (shown) => typedField(
+                shown,
+                prefix: 'shopping',
+                editable: _editable,
+                twoRows: _twoRows,
+              ),
+              compact: true,
             ),
-            // A new Line has none yet; a tap stores it first.
-            null => reappearBadge(
-              t,
-              shown.id,
-              Reappear.unset,
-              onTap: _checks ? () => _reappear(shown.id) : null,
-            ),
-          },
-          field: (shown) => typedField(
-            shown,
-            prefix: 'shopping',
-            editable: _editable,
-            twoRows: _twoRows,
-          ),
-          compact: true,
+            if (_removed.isNotEmpty)
+              RemovedLines(
+                store: widget.notes.store,
+                lines: _removed,
+                onRestore: linesWritable
+                    ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
+                    : (_) => null,
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// Makes the Note [noteId] a Shopping List where this Device may; whether
-/// it did.
+/// Makes the typed text of the Note [noteId] a Shopping List where this
+/// Device may (#309, [ShoppingLists.makeFromText]); whether it did.
 bool makeShoppingList(Notes notes, String noteId) {
   final lists = ShoppingLists(notes.store);
   if (!lists.mayMake(noteId)) return false;
-  lists.make(noteId);
+  lists.makeFromText(noteId);
   return true;
 }
 

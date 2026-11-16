@@ -103,14 +103,17 @@ void main() {
       expect(find.byType(AreasScreen), findsOneWidget);
       expect(searched(tester), '#Garten');
       expect(find.byType(NoteCard), findsNWidgets(3));
-      expect(find.text('#GARTEN'), findsOneWidget);
-      expect(find.text('#Gartenarbeit'), findsOneWidget);
+      // On the cards; the search's own suggestions name the tags too.
+      Finder onCards(String text) =>
+          find.descendant(of: find.byType(NoteCard), matching: find.text(text));
+      expect(onCards('#GARTEN'), findsOneWidget);
+      expect(onCards('#Gartenarbeit'), findsOneWidget);
       expect(find.textContaining('without', findRichText: true), findsNothing);
 
       // A tag on a hit searches for it in place.
       await tap(
         tester,
-        find.ancestor(of: find.text('#Gartenarbeit'), matching: links),
+        find.ancestor(of: onCards('#Gartenarbeit'), matching: links),
       );
       expect(find.byType(AreasScreen), findsOneWidget);
       expect(searched(tester), '#Gartenarbeit');

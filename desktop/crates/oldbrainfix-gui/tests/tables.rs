@@ -3,9 +3,13 @@
 //! screen, back leaves it; a cell is edited on one line, Enter writes it,
 //! Tab goes on, Esc leaves it as it was; a row's or column's heading opens
 //! its menu; the empty row adds one; a cell's box ticks in place, its
-//! text as it was; a table of a Note in the trash opens to read only. The
-//! editor edits a table as a grid in place (#257, tests/table_grid.rs).
+//! text as it was; a table of a Note in the trash opens to read only;
+//! Copy puts the table on the clipboard as an HTML table beside its
+//! Markdown (#324). The editor edits a table as a grid in place (#257,
+//! tests/table_grid.rs).
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
@@ -14,8 +18,10 @@ use egui::accesskit::Role;
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use oldbrainfix_core::markdown::table;
 use oldbrainfix_core::text_format::MARKDOWN;
 use oldbrainfix_core::{Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_gui::media::Clipboard;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -77,6 +83,34 @@ fn cards(store: &Arc<Store>) -> Harness<'static, App> {
         );
     harness.run();
     harness
+}
+
+/// What went to the fake clipboard: each text with its HTML.
+type Copied = Rc<RefCell<Vec<(String, Option<String>)>>>;
+
+struct FakeClipboard(Copied);
+
+impl Clipboard for FakeClipboard {
+    fn photo(&mut self) -> Option<Vec<u8>> {
+        None
+    }
+
+    fn put_text(&mut self, text: &str, html: Option<&str>) -> bool {
+        self.0
+            .borrow_mut()
+            .push((text.to_string(), html.map(str::to_string)));
+        true
+    }
+}
+
+/// [`cards`], its clipboard a fake one, and what went to it.
+fn cards_copying(store: &Arc<Store>) -> (Harness<'static, App>, Copied) {
+    let copied = Copied::default();
+    let mut harness = cards(store);
+    harness
+        .state_mut()
+        .set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    (harness, copied)
 }
 
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
@@ -280,5 +314,122 @@ fn a_table_in_the_trash_opens_to_read_only() -> TestResult {
     assert_eq!(harness.state().shown_table(), Some(TABLE));
     assert_eq!(buttons(&harness, "Row 1"), 0);
     assert_eq!(buttons(&harness, "Add a row"), 0);
+    Ok(())
+}
+
+#[test]
+fn copy_puts_the_table_on_the_clipboard_as_html_beside_its_markdown() -> TestResult {
+    // #324: each box in the state it shows, without its id; the HTML a
+    // table with its header row in <thead>, each cell escaped and
+    // formatted; nothing announced.
+    let text = "Shop\n\n| Item | Qty |\n| :-- | --: |\n| ☐ **milk** | 2 <3 |";
+    let (store, note) = with_note(text, MARKDOWN)?;
+    let before = stored(&store, &note)?.0;
+    let (mut harness, copied) = cards_copying(&store);
+    press(&mut harness, "Open")?;
+    press(&mut harness, "✅ Check")?;
+    press(&mut harness, "Open the table")?;
+    press(&mut harness, "Copy")?;
+    let markdown = "| Item | Qty |\n| :-- | --: |\n| ✅ **milk** | 2 <3 |";
+    let html = "<table><thead><tr><th align=\"left\">Item</th><th align=\"right\">Qty</th>\
+                </tr></thead><tbody><tr><td align=\"left\">✅ <strong>milk</strong></td>\
+                <td align=\"right\">2 &lt;3</td></tr></tbody></table>\n";
+    assert_eq!(
+        copied.borrow().as_slice(),
+        [(markdown.to_string(), Some(html.to_string()))]
+    );
+    // The table stays open, the Note as it was.
+    assert!(harness.state().shown_table().is_some());
+    assert_eq!(stored(&store, &note)?.0, before);
+    Ok(())
+}
+
+#[test]
+fn copy_writes_the_cell_being_edited_first() -> TestResult {
+    let (store, note) = with_note(TABLE, MARKDOWN)?;
+    let (mut harness, copied) = cards_copying(&store);
+    press(&mut harness, "Open the table")?;
+    click(&mut harness, "2")?;
+    typed(&mut harness, "0");
+    click(&mut harness, "Copy")?;
+    let written = "| Item | Qty |\n| --- | --- |\n| milk | 20 |";
+    assert_eq!(stored(&store, &note)?.0, written);
+    let copied = copied.borrow();
+    let [(text, html)] = copied.as_slice() else {
+        return Err(format!("{copied:?}").into());
+    };
+    assert_eq!(text, written);
+    assert!(html.as_deref().is_some_and(|h| h.contains("<td>20</td>")));
+    Ok(())
+}
+
+#[test]
+fn a_table_that_is_only_read_copies_too() -> TestResult {
+    let (store, note) = with_note("Shop", MARKDOWN)?;
+    let notes = Notes::new(&store);
+    notes.amend_as(&note, TABLE, MARKDOWN)?;
+    notes.trash(&note)?;
+    let copied = Copied::default();
+    let mut harness = editor(&store, &note);
+    harness
+        .state_mut()
+        .set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    press(&mut harness, "Open the table")?;
+    press(&mut harness, "Copy")?;
+    assert_eq!(copied.borrow().first().map(|c| c.0.as_str()), Some(TABLE));
+    Ok(())
+}
+
+#[test]
+fn without_the_systems_clipboard_copy_puts_the_markdown_through_the_window() -> TestResult {
+    // #324: where HTML cannot go along, the Markdown alone.
+    let (store, _) = with_note(TABLE, MARKDOWN)?;
+    let mut harness = cards(&store);
+    press(&mut harness, "Open the table")?;
+    harness
+        .query_all_by_role_and_label(Role::Button, "Copy")
+        .last()
+        .ok_or("Copy")?
+        .click_accesskit();
+    let mut copied = None;
+    for _ in 0..4 {
+        harness.step();
+        for command in &harness.output().platform_output.commands {
+            if let egui::OutputCommand::CopyText(text) = command {
+                copied = Some(text.clone());
+            }
+        }
+    }
+    harness.run();
+    assert_eq!(copied.as_deref(), Some(TABLE));
+    assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn a_copied_table_pasted_into_a_new_note_is_the_same_table() -> TestResult {
+    // #324: its rows, its columns' alignment and its first column as
+    // headings come back.
+    let text = "<!-- first column headings -->\n| Meter | Jan |\n| :-- | --: |\n\
+                | Water \\| m³ | **312** |";
+    let (store, _) = with_note(text, MARKDOWN)?;
+    let (mut harness, copied) = cards_copying(&store);
+    press(&mut harness, "Open the table")?;
+    press(&mut harness, "Copy")?;
+    let markdown = copied.borrow().first().ok_or("nothing copied")?.0.clone();
+    let pasted = Notes::new(&store).capture_as(&markdown, MARKDOWN, None, None)?;
+    let shape = |text: &str| {
+        table::all(text).first().map(|t| {
+            let rows: Vec<Vec<String>> = t
+                .rows
+                .iter()
+                .map(|r| r.cells.iter().map(|c| c.visible()).collect())
+                .collect();
+            (rows, t.aligns.clone(), t.heading_column)
+        })
+    };
+    let before = shape(text).ok_or("the table")?;
+    assert!(before.2);
+    assert_eq!(shape(&pasted.text), Some(before));
     Ok(())
 }

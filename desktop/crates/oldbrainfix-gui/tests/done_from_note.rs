@@ -135,6 +135,19 @@ fn done_and_move_to_trash_trashes_the_note_with_its_reminder_and_closes_the_dial
     let read = Routines::new(&store).by_id(&id)?.ok_or("the Reminder")?;
     assert!(read.done_at(&at(monday(), 8)).is_some());
     assert_eq!(read.trashed_with.as_deref(), Some(note.as_str()));
+    // Ctrl+Z takes both back (#268): the Note and its Reminder return,
+    // unchecked.
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert!(
+        !Notes::new(&store)
+            .by_id(&note)?
+            .ok_or("the Note")?
+            .is_trashed()
+    );
+    let read = Routines::new(&store).by_id(&id)?.ok_or("the Reminder")?;
+    assert!(read.done_at(&at(monday(), 8)).is_none());
+    assert!(!read.is_trashed());
     Ok(())
 }
 
@@ -263,5 +276,10 @@ fn with_done_reminders_trashed_a_cards_box_trashes_the_note() -> TestResult {
     let trashed = notes.by_id(&note)?.ok_or("the Note")?;
     assert!(trashed.is_trashed());
     assert!(ticked(&harness, "Done: 08:00").is_none(), "its card went");
+    // Ctrl+Z unchecks it and brings the Note back with it (#268).
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert!(!notes.by_id(&note)?.ok_or("the Note")?.is_trashed());
+    assert_eq!(ticked(&harness, "Done: 08:00"), Some(false));
     Ok(())
 }

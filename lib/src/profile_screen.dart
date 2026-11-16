@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'about_screen.dart';
 import 'alarm_sync.dart';
 import 'backup_screen.dart';
 import 'browser.dart';
@@ -340,6 +341,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           trail: widget.trail,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+                // Its own entry, beside Settings, Sync and Backups (#325).
+                SettingsSection(
+                  children: [
+                    ListTile(
+                      key: const ValueKey('about'),
+                      leading: const Icon(Icons.info_outline),
+                      title: Text(t.aboutTitle),
+                      onTap: () => _push(const AboutScreen()),
                     ),
                   ],
                 ),

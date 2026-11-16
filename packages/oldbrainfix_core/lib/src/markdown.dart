@@ -51,6 +51,7 @@
 library;
 
 import 'app_link.dart';
+import 'text_boxes.dart';
 import 'text_tags.dart';
 
 part 'markdown_table.dart';

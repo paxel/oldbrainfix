@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/missed_summary_card.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/notes_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -308,11 +312,11 @@ void main() {
       final places = Places(store);
       final household = places.addArea('Household');
       places.addTopic(household.id, 'Bills');
-      captureMany(2);
+      captureMany(3);
       await start(tester);
       await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
       expect(find.byType(UnsortedScreen), findsOneWidget);
-      expect(cards(tester), ['note 1', 'note 2']);
+      expect(cards(tester), ['note 1', 'note 2', 'note 3']);
 
       // The notification, tapped while the Unsorted list is open.
       alarms.tapNudge();
@@ -320,15 +324,15 @@ void main() {
       expect(find.byType(NudgeScreen), findsOneWidget);
       for (final text in ['note 1', 'note 2']) {
         await tap(tester, find.byTooltip('File into…').first);
-        await tap(tester, find.text('Bills'));
+        // From the second time on, Bills is also filed into recently.
+        await tap(tester, find.text('Bills').first);
         expect(cards(tester), isNot(contains(text)));
       }
       await tester.pageBack();
       await tester.pumpAndSettle();
 
       expect(find.byType(UnsortedScreen), findsOneWidget);
-      expect(cards(tester), isEmpty);
-      expect(find.text('Nothing is Unsorted. Well done!'), findsOneWidget);
+      expect(cards(tester), ['note 3']);
     });
 
     testWidgets('says so when nothing is left', (tester) async {
@@ -336,6 +340,160 @@ void main() {
       alarms.tapNudge();
       await tester.pumpAndSettle();
       expect(find.text('Nothing is Unsorted. Well done!'), findsOneWidget);
+    });
+  });
+
+  group('sorting Unsorted (#313)', () {
+    /// The id of the Note whose text is [text].
+    String idOf(String text) =>
+        notes.all().firstWhere((n) => n.text == text).id;
+
+    /// The Note the editor on top shows.
+    String? editing(WidgetTester tester) {
+      final editors = find.byType(NoteEditorScreen);
+      if (editors.evaluate().isEmpty) return null;
+      return tester.widget<NoteEditorScreen>(editors.last).noteId;
+    }
+
+    /// Opens Unsorted from the Agenda and the editor of [text] there.
+    Future<void> openFromUnsorted(WidgetTester tester, String text) async {
+      await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
+      expect(find.byType(UnsortedScreen), findsOneWidget);
+      await tester.longPress(find.text(text));
+      await tester.pumpAndSettle();
+      expect(editing(tester), idOf(text));
+    }
+
+    /// Files the Note in the editor into [area] by its Area and Topic
+    /// badge.
+    Future<void> fileInEditor(WidgetTester tester, String area) async {
+      await tap(tester, find.byKey(const ValueKey('badge-place')));
+      await tap(tester, find.text(area).last);
+    }
+
+    testWidgets('filed in the editor opened from Unsorted, the next '
+        'Unsorted Note opens in its place', (tester) async {
+      Places(store).addArea('Household');
+      captureMany(3);
+      await start(tester);
+      await openFromUnsorted(tester, 'note 2');
+
+      await fileInEditor(tester, 'Household');
+      expect(notes.byId(idOf('note 2'))?.isUnsorted, isFalse);
+      // The one after it in the list's order, in one editor.
+      expect(editing(tester), idOf('note 3'));
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+
+      // From the last in the list it goes on with the first left.
+      await fileInEditor(tester, 'Household');
+      expect(editing(tester), idOf('note 1'));
+
+      // Back leads to the list, which shows what is left.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(UnsortedScreen), findsOneWidget);
+      expect(cards(tester), ['note 1']);
+    });
+
+    testWidgets('made a Checklist in the editor, the Note is sorted and '
+        'the next opens', (tester) async {
+      captureMany(2);
+      await start(tester);
+      await openFromUnsorted(tester, 'note 1');
+      final first = idOf('note 1');
+      final second = idOf('note 2');
+
+      await tap(tester, find.byKey(const ValueKey('badge-kind')));
+      await tap(tester, find.byKey(const ValueKey('kind-checklist')));
+      expect(Checklists(store).isChecklist(first), isTrue);
+      expect(editing(tester), second);
+    });
+
+    testWidgets('the last one sorted in the editor leads to the Agenda', (
+      tester,
+    ) async {
+      Places(store).addArea('Household');
+      captureMany(1);
+      await start(tester);
+      await openFromUnsorted(tester, 'note 1');
+
+      await fileInEditor(tester, 'Household');
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(find.byType(UnsortedScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('unsortedBanner')), findsNothing);
+    });
+
+    testWidgets('the last card filed in the Unsorted list leads to the '
+        'Agenda; one deleted leaves the list', (tester) async {
+      Places(store).addArea('Household');
+      captureMany(2);
+      await start(tester);
+      await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
+
+      await tap(tester, find.byTooltip('File into…').first);
+      await tap(tester, find.text('Household').last);
+      // One is left: the list stays, its first card the next.
+      expect(find.byType(UnsortedScreen), findsOneWidget);
+      expect(cards(tester), ['note 2']);
+
+      await tap(tester, find.byTooltip('File into…').first);
+      await tap(tester, find.text('Household').last);
+      expect(find.byType(UnsortedScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+
+      // The last one moved to the trash sorts nothing: the list stays.
+      final junk = notes.capture('junk');
+      await tester.pumpAndSettle();
+      await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
+      await tap(tester, find.byKey(const ValueKey('note-menu')).first);
+      await tap(tester, find.byKey(const ValueKey('note-delete')));
+      expect(notes.byId(junk.id)?.isTrashed, isTrue);
+      expect(find.byType(UnsortedScreen), findsOneWidget);
+      expect(find.text('Nothing is Unsorted. Well done!'), findsOneWidget);
+    });
+
+    testWidgets('the last Notes filed from the selection bar lead to the '
+        'Agenda', (tester) async {
+      Places(store).addArea('Household');
+      captureMany(2);
+      await start(tester);
+      await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
+      await tap(tester, find.byKey(const ValueKey('selectNotes')));
+      for (final text in ['note 1', 'note 2']) {
+        await tap(tester, find.byKey(ValueKey('select-${idOf(text)}')));
+      }
+      await tap(tester, find.byKey(const ValueKey('selection-file')));
+      await tap(tester, find.text('Household').last);
+      expect(notes.unsorted(), isEmpty);
+      expect(find.byType(UnsortedScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+
+    testWidgets('a Note opened from anywhere but Unsorted stays in the '
+        'editor once filed', (tester) async {
+      final places = Places(store);
+      places.addArea('Household');
+      captureMany(2);
+      await start(tester);
+      final navigator = tester.state<NavigatorState>(
+        find.byType(Navigator).first,
+      );
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => AllNotesScreen(notes: notes, places: places),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('note 1'));
+      await tester.pumpAndSettle();
+      expect(editing(tester), idOf('note 1'));
+
+      await fileInEditor(tester, 'Household');
+      expect(notes.byId(idOf('note 1'))?.isUnsorted, isFalse);
+      expect(editing(tester), idOf('note 1'));
     });
   });
 

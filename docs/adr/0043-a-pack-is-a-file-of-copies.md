@@ -78,3 +78,23 @@ The desktop core reads and writes the same bytes (`packs.rs`), and the desktop s
 ## Sets and Check fields (#264)
 
 Amended by #264 (ADR 0028): a Tally's field carries `"check":true` when it is a Check field, and the Note its Tally's `"bar"` when it is not a day and `"sets":true` when it counts in sets; an unknown bar is no Pack. What a field multiplied still travels as before, so a former multiplier Tally arrives counting in sets.
+
+## A Backup's Notes (#285)
+
+Amended by #285 (Q682 (a), ADR 0016): a Backup opened to take Notes back from it shows the same tree, made by the same core from the Pack of what the Backup's Device held (`packOfEverything`, `pack_of_everything`): every Note but those merged into another, each where it was filed, the Areas in the person's own order as `packOfAll` lists them, then the Notes filed into no Area, newest capture first; the Notes that lay in its trash among them, filed where they were, the core saying which (`trashed`). Their kinds, photos with Photo Texts, recordings with Transcripts, Routines, Reminders and Frogs are a Pack's; a file's size is the Pack's, in base64, while the file itself keeps its size beside it.
+
+Nothing of a Note starts ticked, but everything under each does (`backupTicks`, `backup_ticks`), so a Note ticked comes back whole, files included; the Session rule holds as everywhere. "Add" is a Pack's "Add", claimed and without a Profile, so no "From …" badge: new private Areas named after the Backup's, with the suffix the app hands in where the name is taken ("Health (Backup)"), the Notes of no Area in a new Area of the app's name, Routines starting on the day of "Add", a Reminder already past left out, every entity under a new id. A Note that lay in the trash arrives out of it. A Backup's Notes have no AI port tool either: opening one is a person's own act with their own file and their own key, as a Pack's.
+
+A locked Area closed on this Device keeps its Notes out of the tree, as it keeps them out of a Pack exported and of the Notes sent with feedback: `openBackupNotes` and `backup::open_notes` take the closed Areas (`closed`), as `packOf` and `packOfAll` do, and the Pack holds none of their Notes and Topics, in the trash or not, nor a Tally of theirs a Session picks. The Area Locks are this Device's settings and no Backup carries them (ADR 0016), so the lock is the one here: an Area of the Backup that is an Area here under the same id, locked and not open now, stays out; one that is no Area here, deleted since or another person's, has no lock here and shows. The core says which closed Areas held Notes (`leftOut`, `left_out`); the phone says that their Notes are left out and offers to unlock them, the PIN or biometrics as for opening a locked Area, and reads the Backup again with their Notes. They are open on that page only: elsewhere the Areas stay closed, as nothing closes them again on the way back to the Agenda. The desktop has no Area Locks and hands in none.
+
+### Considered (#285)
+
+- Only the Notes outside the trash, as Feedback's Pack of everything (rejected: the trash keeps a Note 30 days and the folder the last four weekly Backups, so a Note purged from the trash mostly lies in the trash of every Backup still kept).
+- Everything ticked at the start, as when a Pack is opened (rejected: a Backup holds the whole log; "Add" would copy all of it beside itself).
+- Showing a closed locked Area's Notes, since a Backup is opened with the passphrase or the recovery key anyway (rejected: the Area stays closed even while the app is open, and whoever holds the phone unlocked may know the passphrase without the PIN).
+- Leaving the Notes of a locked Area out by the lock the Backup's Device had (rejected: no Backup carries the Area Locks, and the lock that counts is the one on the Device the person holds now).
+
+### Consequences (#285)
+
+- The `backup-notes` fixture holds a Backup with every kind of Note, a photo and a recording longer than a chunk, a Note in the trash and one of no Area; its tree, the tree with its Health closed, the ticks at the start, the Notes added back into the log of the Device that made it, their files read from the Backup, and its refusals. Both cores read the same trees and write the same entries, byte for byte.
+- Unlocking on the page reads the whole file again, as long as opening took, and the ticks start over.

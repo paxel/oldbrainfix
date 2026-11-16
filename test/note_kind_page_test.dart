@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -131,6 +132,18 @@ void main() {
       expect(
         tester.getTopLeft(key('section-text:$section')).dy,
         greaterThan(tester.getBottomLeft(key('note-badges')).dy),
+      );
+      // In no box, under a tear line (#307).
+      expect(
+        find.ancestor(
+          of: key('section-text:$section'),
+          matching: find.byType(Embossed),
+        ),
+        findsNothing,
+      );
+      expect(
+        tester.getBottomLeft(key('tear:$section')).dy,
+        lessThanOrEqualTo(tester.getTopLeft(key('section-text:$section')).dy),
       );
       await reveal(tester, find.text('Add to Note'));
       expect(
