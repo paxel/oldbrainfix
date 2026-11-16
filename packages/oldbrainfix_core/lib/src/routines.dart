@@ -38,6 +38,20 @@ abstract final class RoutineKeys {
 
   static const donePrefix = 'done@';
 
+  /// The field marking [occurrence] skipped (CONTEXT.md, Skip): its value
+  /// is when it was skipped, followed by a space and [tomorrowMark] when
+  /// Not today ▸ Tomorrow added a one-time Occurrence the day after at
+  /// the same time; null when it was unskipped again. Keyed by the
+  /// wall-clock Occurrence, as [done] is, so a Skip and a Tomorrow of the
+  /// same Occurrence on two Devices go by latest wins. The moved
+  /// Occurrence is never written: it follows from the key (ADR 0006).
+  static String skip(Occurrence occurrence) => '$skipPrefix${occurrence.key}';
+
+  static const skipPrefix = 'skip@';
+
+  /// The word after the moment in a [skip] value written by Tomorrow.
+  static const tomorrowMark = 'tomorrow';
+
   /// The Routine's own Re-nag interval in minutes; absent for this
   /// Device's default.
   static const renag = 'renag';
@@ -94,11 +108,25 @@ class Routine {
   /// or is not in the trash.
   final String? trashedWith;
 
+  /// When each skipped Occurrence was skipped, by [Occurrence.key]: by
+  /// Skip or by Tomorrow (CONTEXT.md, Not today).
+  final Map<String, DateTime> skipped;
+
+  /// The keys of the Occurrences of [skipped] that Tomorrow skipped.
+  final Set<String> tomorrow;
+
+  /// The one-time Occurrences Tomorrow added that the schedule does not
+  /// have, in order ([movedOccurrences]).
+  final List<Occurrence> moved;
+
   const Routine({
     required this.id,
     required this.noteId,
     required this.schedule,
     this.done = const {},
+    this.skipped = const {},
+    this.tomorrow = const {},
+    this.moved = const [],
     this.renag,
     this.escalation,
     this.scheduledAt,
@@ -112,6 +140,86 @@ class Routine {
 
   /// When [occurrence] was checked off, or null while it is not Done.
   DateTime? doneAt(Occurrence occurrence) => done[occurrence.key];
+
+  /// When [occurrence] was skipped, or null while it is not. One that is
+  /// Done as well counts as Done.
+  DateTime? skippedAt(Occurrence occurrence) => skipped[occurrence.key];
+
+  /// Whether [occurrence] is one Tomorrow added, a day after the one it
+  /// skipped.
+  bool isMoved(Occurrence occurrence) => moved.contains(occurrence);
+
+  /// Whether [occurrence] is one of the Routine's: of its schedule, or
+  /// added by Tomorrow.
+  bool has(Occurrence occurrence) =>
+      schedule.has(occurrence) || moved.contains(occurrence);
+
+  /// The Routine's Occurrences from [from] to [to], both days included,
+  /// those Tomorrow added among them, in order.
+  List<Occurrence> between(Day from, Day to) =>
+      occurrencesBetween(schedule, moved, from, to);
+
+  /// The Routine's Occurrences on [day], all-day first, then by time.
+  List<Occurrence> on(Day day) => between(day, day);
+
+  /// The Routine's first Occurrence on [from] or after it, within the
+  /// schedule's look-ahead; null when there is none.
+  Occurrence? firstFrom(Day from) => firstOccurrenceFrom(schedule, moved, from);
+}
+
+/// The one-time Occurrences that Tomorrow on the Occurrences [tomorrow]
+/// names added to [schedule], in order: each the day after the one it
+/// skipped, at the same time, as long as that one is an Occurrence of
+/// [schedule] or one added before it, and not one [schedule] has itself.
+/// Keys that name no Occurrence are left out.
+List<Occurrence> movedOccurrences(
+  Schedule schedule,
+  Iterable<String> tomorrow,
+) {
+  final origins = [
+    for (final key in tomorrow)
+      if (Occurrence.tryParse(key) case final o? when o.key == key) o,
+  ]..sort();
+  final moved = <Occurrence>[];
+  for (final origin in origins) {
+    if (!schedule.has(origin) && !moved.contains(origin)) continue;
+    final target = Occurrence(origin.day.addDays(1), origin.time);
+    if (!schedule.has(target) && !moved.contains(target)) moved.add(target);
+  }
+  return moved;
+}
+
+/// The Occurrences of [schedule] from [from] to [to] with those of
+/// [moved] in that span, in order.
+List<Occurrence> occurrencesBetween(
+  Schedule schedule,
+  List<Occurrence> moved,
+  Day from,
+  Day to,
+) {
+  final occurrences = schedule.between(from, to);
+  final added = [
+    for (final o in moved)
+      if (!(o.day < from) && o.day <= to) o,
+  ];
+  if (added.isEmpty) return occurrences;
+  return [...occurrences, ...added]..sort();
+}
+
+/// The first Occurrence of [schedule] or of [moved] on [from] or after
+/// it; null when there is none.
+Occurrence? firstOccurrenceFrom(
+  Schedule schedule,
+  List<Occurrence> moved,
+  Day from,
+) {
+  var first = schedule.next(from, 1).firstOrNull;
+  for (final o in moved) {
+    if (o.day < from) continue;
+    if (first == null || o.compareTo(first) < 0) first = o;
+    break;
+  }
+  return first;
 }
 
 /// A Routine or Reminder whose schedule this version cannot read: one of
@@ -164,6 +272,12 @@ class AgendaRow {
   });
 
   DateTime? get done => routine.doneAt(occurrence);
+
+  /// When it was skipped; null while it is not (CONTEXT.md, Skip).
+  DateTime? get skipped => routine.skippedAt(occurrence);
+
+  /// Whether Tomorrow added it, a day after the one it skipped.
+  bool get moved => routine.isMoved(occurrence);
 }
 
 /// The home screen's content (CONTEXT.md): today's Occurrences, all-day
@@ -358,7 +472,7 @@ class Routines {
   /// later. Early or late, the schedule stays as it is (ADR 0006).
   void markDone(String id, Occurrence occurrence, {DateTime? at}) {
     final routine = _require(id);
-    if (!routine.schedule.has(occurrence)) {
+    if (!routine.has(occurrence)) {
       throw ArgumentError.value(occurrence, 'occurrence', 'not due then');
     }
     store.append(
@@ -367,6 +481,85 @@ class Routines {
       (at ?? store.clock()).toUtc().toIso8601String(),
     );
   }
+
+  /// Skips [occurrence] of the Routine [id] (CONTEXT.md, Skip), at [at]
+  /// or the store's now: it is neither Done nor Missed, rings no more and
+  /// leaves the Adherence. The schedule stays as it is (ADR 0006).
+  /// Refused for an Occurrence already Done, and where this Device may
+  /// not check off.
+  void skip(String id, Occurrence occurrence, {DateTime? at}) =>
+      _writeSkip(id, occurrence, at, tomorrow: false);
+
+  /// Not today ▸ Tomorrow: skips [occurrence] of the Routine [id] as
+  /// [skip] does, and adds a one-time Occurrence of the Routine the day
+  /// after it at the same time. The schedule stays as it is (ADR 0006);
+  /// when it has that Occurrence already, nothing is added.
+  void tomorrow(String id, Occurrence occurrence, {DateTime? at}) =>
+      _writeSkip(id, occurrence, at, tomorrow: true);
+
+  /// Takes back the Skip or Tomorrow of [occurrence] of the Routine [id]:
+  /// it is due again as before, and an Occurrence Tomorrow added for it
+  /// is gone; what was Done on that one stays Done.
+  void unskip(String id, Occurrence occurrence) {
+    final routine = _require(id);
+    _requireCheckOff(id);
+    if (routine.skippedAt(occurrence) == null) return;
+    store.append(id, RoutineKeys.skip(occurrence), null);
+  }
+
+  void _writeSkip(
+    String id,
+    Occurrence occurrence,
+    DateTime? at, {
+    required bool tomorrow,
+  }) {
+    final routine = _require(id);
+    if (!routine.has(occurrence)) {
+      throw ArgumentError.value(occurrence, 'occurrence', 'not due then');
+    }
+    _requireCheckOff(id);
+    if (routine.doneAt(occurrence) != null) {
+      throw StateError('$occurrence of $id is Done');
+    }
+    final when = (at ?? store.clock()).toUtc().toIso8601String();
+    store.append(
+      id,
+      RoutineKeys.skip(occurrence),
+      tomorrow ? '$when ${RoutineKeys.tomorrowMark}' : when,
+    );
+  }
+
+  void _requireCheckOff(String id) {
+    if (!store.mayCheckOff(id)) {
+      throw StateError('no role in the Shared Area of $id');
+    }
+  }
+
+  /// What a [RoutineKeys.skip] value [value] says: when the Occurrence
+  /// was skipped and whether by Tomorrow; null when it says nothing this
+  /// version reads. A word after the moment other than
+  /// [RoutineKeys.tomorrowMark] is a later version's: a skip, moving
+  /// nothing here.
+  static ({DateTime at, bool tomorrow})? skipOf(String value) {
+    final space = value.indexOf(' ');
+    final text = space < 0 ? value : value.substring(0, space);
+    if (!_instant.hasMatch(text)) return null;
+    final at = DateTime.tryParse(text);
+    // A moment the calendar has, as the Rust core reads it.
+    if (at == null ||
+        at.toIso8601String().substring(0, 19) != text.substring(0, 19)) {
+      return null;
+    }
+    return (
+      at: at,
+      tomorrow:
+          space >= 0 && value.substring(space + 1) == RoutineKeys.tomorrowMark,
+    );
+  }
+
+  static final _instant = RegExp(
+    r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$',
+  );
 
   /// Checks off [occurrence] of the Routine [id] as [markDone] does, the
   /// way the user's Done does it everywhere (#211): with "Move a Note to
@@ -414,6 +607,18 @@ class Routines {
     final renag = int.tryParse(fields[RoutineKeys.renag] ?? '');
     final escalation = int.tryParse(fields[RoutineKeys.escalation] ?? '');
     final trashed = fields[RoutineKeys.trashed];
+    final skipped = <String, DateTime>{};
+    final tomorrow = <String>{};
+    for (final MapEntry(:key, :value) in fields.entries) {
+      if (!key.startsWith(RoutineKeys.skipPrefix) || value == null) continue;
+      final occurrence = key.substring(RoutineKeys.skipPrefix.length);
+      final skip = skipOf(value);
+      if (skip == null || Occurrence.tryParse(occurrence)?.key != occurrence) {
+        continue;
+      }
+      skipped[occurrence] = skip.at;
+      if (skip.tomorrow) tomorrow.add(occurrence);
+    }
     DateTime? scheduledAt;
     final history = store.history(id);
     for (final entry in history) {
@@ -435,6 +640,9 @@ class Routines {
       scheduledAt: scheduledAt,
       trashed: trashed == null ? null : DateTime.parse(trashed),
       trashedWith: trashed == null ? null : fields[RoutineKeys.trashedWith],
+      skipped: skipped,
+      tomorrow: tomorrow,
+      moved: movedOccurrences(schedule, tomorrow),
       done: {
         // An Occurrence of a Routine that ran a Session is Done too once
         // every pick has an entry (ADR 0029), whether the Note is still a
@@ -563,7 +771,7 @@ class Routines {
     List<AgendaRow> rowsOn(Day day) {
       final rows = [
         for (final (routine, note) in routines)
-          for (final occurrence in routine.schedule.on(day))
+          for (final occurrence in routine.on(day))
             AgendaRow(routine: routine, occurrence: occurrence, note: note),
       ];
       rows.sort((a, b) {
@@ -587,13 +795,15 @@ class Routines {
   /// What the cards tick today (#215), by the id of the Note each
   /// Routine and Reminder shows under, with days as [wallClock] shows
   /// them: of each with an Occurrence today, in the order of today's
-  /// Agenda, its first one today not Done, else its last one today, Done.
-  /// Read once for all the cards of a list.
+  /// Agenda, its first one today neither Done nor skipped, else its last
+  /// one today. Read once for all the cards of a list.
   Map<String, List<AgendaRow>> todayByNote(WallClock wallClock) {
     final byRoutine = <String, AgendaRow>{};
     for (final row in agenda(wallClock).todayRows) {
       final held = byRoutine[row.routine.id];
-      if (held == null || held.done != null) byRoutine[row.routine.id] = row;
+      if (held == null || held.done != null || held.skipped != null) {
+        byRoutine[row.routine.id] = row;
+      }
     }
     final byNote = <String, List<AgendaRow>>{};
     for (final row in byRoutine.values) {

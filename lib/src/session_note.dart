@@ -236,10 +236,10 @@ Future<void> _editWeekdays(
 }
 
 /// A week of a Session's history on its card: the day it starts, and how
-/// many runs of all its Routines were Done and Missed in it.
-typedef SessionWeek = ({Day from, int done, int missed});
+/// many runs of all its Routines were Done and skipped in it (#269).
+typedef SessionWeek = ({Day from, int done, int skipped});
 
-/// How often the Routines [runs] of a Session were Done and Missed in
+/// How often the Routines [runs] of a Session were Done and skipped in
 /// each of the last [weeks] weeks, this week first, up to [today], weeks
 /// starting on [weekStart].
 List<SessionWeek> sessionWeeks(
@@ -260,13 +260,13 @@ List<SessionWeek> sessionWeeks(
         final from = start.addDays(-7 * i);
         final to = i == 0 ? today : from.addDays(6);
         var done = 0;
-        var missed = 0;
+        var skipped = 0;
         for (final history in histories) {
           final week = history.adherence(from, to);
           done += week.done;
-          missed += week.missed;
+          skipped += week.skipped;
         }
-        return (from: from, done: done, missed: missed);
+        return (from: from, done: done, skipped: skipped);
       }(),
   ];
 }
@@ -561,7 +561,7 @@ class _CardSessionState extends State<CardSession> {
                   t.sessionHistoryWeek(
                     dayText(locale, week.from),
                     week.done,
-                    week.missed,
+                    week.skipped,
                   ),
                   key: ValueKey('card-session-week-$i'),
                   style: text.bodyMedium,

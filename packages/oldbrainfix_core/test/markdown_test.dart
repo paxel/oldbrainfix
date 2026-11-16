@@ -506,6 +506,76 @@ void main() {
         [for (final cell in row.cells) cell.visible],
     ];
 
+    test('a table is copied as its Markdown and as an HTML table (#324)', () {
+      // The header row in <thead>, the rows in <tbody>, each cell escaped
+      // and formatted; the Markdown as the editor writes it, the cells
+      // beyond the columns left out; each box in the glyph of its state
+      // and without its id. The same strings as `table.rs`'s test.
+      final eggs = '☐${TextBoxes.encodeId('a1b2')}';
+      final fail = '❌${TextBoxes.encodeId('c3d4')}';
+      final text =
+          'Before\n\n${MarkdownTables.headingColumnLine}\n'
+          '|Item|  Count | Note|\n|:--|--:|:-:|\n'
+          '| **Milk** | 2 | a \\| b <i> & |\n'
+          '| $eggs Eggs | `x` | $fail| beyond |\n\nAfter';
+      const states = {'a1b2': BoxState.done};
+      final copied = MarkdownTables.copy(
+        text,
+        text.indexOf('| **Milk**'),
+        states,
+      );
+      expect(
+        copied?.markdown,
+        '<!-- first column headings -->\n| Item | Count | Note |\n'
+        '| :-- | --: | :-: |\n| **Milk** | 2 | a \\| b <i> & |\n'
+        '| ✅ Eggs | `x` | ❌ |',
+      );
+      expect(
+        copied?.html,
+        '<table><thead><tr><th align="left">Item</th>'
+        '<th align="right">Count</th><th align="center">Note</th></tr>'
+        '</thead><tbody><tr><th align="left"><strong>Milk</strong></th>'
+        '<td align="right">2</td><td align="center">a | b &lt;i&gt; &amp;'
+        '</td></tr><tr><th align="left">✅ Eggs</th><td align="right">'
+        '<code>x</code></td><td align="center">❌</td></tr></tbody>'
+        '</table>\n',
+      );
+      bool tags(String s) => s.runes.any((c) => c >= 0xE0000 && c <= 0xE007F);
+      expect(tags(copied?.markdown ?? '') || tags(copied?.html ?? ''), false);
+      // The same from the line before its header row, and none outside it.
+      expect(
+        MarkdownTables.copy(
+          text,
+          text.indexOf(MarkdownTables.headingColumnLine),
+          states,
+        ),
+        copied,
+      );
+      expect(MarkdownTables.copy(text, 0, states), isNull);
+      expect(MarkdownTables.copy(text, text.length, states), isNull);
+    });
+
+    test('a table without rows or alignment copies its header alone', () {
+      final copied = MarkdownTables.copy('| a | b |\n| --- | --- |', 0);
+      expect(copied?.markdown, '| a | b |\n| --- | --- |');
+      expect(
+        copied?.html,
+        '<table><thead><tr><th>a</th><th>b</th></tr></thead></table>\n',
+      );
+    });
+
+    test('a copied table reads as the same table when pasted (#324)', () {
+      const text = '| x | y |\n|--:|:-:|\n| 1 \\| 2 | **b** |\n| | c |';
+      final copied = MarkdownTables.copy(text, 0);
+      final markdown = copied?.markdown ?? '';
+      expect(
+        MarkdownTables.at(markdown, 0)?.aligns,
+        MarkdownTables.at(text, 0)?.aligns,
+      );
+      expect(rows(markdown), rows(text));
+      expect(MarkdownTables.copy(markdown, 0), copied);
+    });
+
     test('a table is a header row, a delimiter row and the rows under', () {
       const text =
           'Shop\n'

@@ -11,9 +11,10 @@ import java.util.UUID
 
 /**
  * What other apps shared in and the app has not taken yet. The shared
- * pictures and sound files are copied at once, while the sharing app's
- * permission to read them lasts; pictures are made into photos when the
- * app takes them, sound files are kept as they are as voice recordings.
+ * pictures, sound files and other files are copied at once, while the
+ * sharing app's permission to read them lasts; pictures are made into
+ * photos when the app takes them, sound files are kept as they are as
+ * voice recordings, and any other file becomes an Attachment (#267).
  */
 object Shares {
     /**
@@ -27,7 +28,11 @@ object Shares {
         val files: List<File>,
         val source: Pair<String, String?>? = null,
         val sounds: List<File> = emptyList(),
+        val attachments: List<Files.Copied> = emptyList(),
     )
+
+    /** What a shared file becomes. */
+    enum class Kind { PICTURE, SOUND, FILE }
 
     private val waiting = ArrayDeque<Share>()
 
@@ -52,32 +57,93 @@ object Shares {
         isAudio(fileType) || (isAudio(shareType) && !isImage(fileType))
 
     /**
-     * Keeps what [intent] shares: its text, subject, pictures and sound
-     * files, from [source]. Each file goes by [isSound]; what is not
-     * sound is taken for a picture.
+     * What a shared file of MIME type [fileType], as its provider says,
+     * in a share of [shareType] becomes: sound by [isSound]; a picture by
+     * its own type, or by the share's while its own says no more than
+     * "some file"; any other file an Attachment (#267), so a PDF shared
+     * with pictures is never taken for one.
      */
-    fun receive(context: Context, intent: Intent, source: Pair<String, String?>? = null) {
+    fun kindOf(fileType: String?, shareType: String?): Kind = when {
+        isSound(fileType, shareType) -> Kind.SOUND
+        isImage(fileType) -> Kind.PICTURE
+        (fileType == null || fileType == "application/octet-stream") && isImage(shareType) -> Kind.PICTURE
+        else -> Kind.FILE
+    }
+
+    /** The endings of the app's own files: a bundle, a Sent Item, a Profile card, a Pack. */
+    private val ownEndings = listOf(".obfsync", ".oldbrain", ".obfcard", ".obfpack")
+
+    /**
+     * Whether a file of MIME [type] named [name] is one of the app's own,
+     * by its type or its ending in any case: shared to the share target
+     * instead of "Open with", it still opens as "Open with" opens it
+     * rather than becoming an Attachment.
+     */
+    fun isOwnFile(type: String?, name: String): Boolean =
+        type?.startsWith("application/vnd.oldbrainfix.") == true ||
+            ownEndings.any { name.endsWith(it, ignoreCase = true) }
+
+    /**
+     * Keeps what [intent] shares: its text, subject, pictures, sound
+     * files and other files, from [source], each file by [kindOf]; a file
+     * of the app's own ([isOwnFile]) goes to [Bundles] as if opened with
+     * the app. Whether one did, so the app is told.
+     */
+    fun receive(context: Context, intent: Intent, source: Pair<String, String?>? = null): Boolean {
         val streams: List<Uri> = when (intent.action) {
             Intent.ACTION_SEND ->
-                if (isImage(intent.type) || isAudio(intent.type)) {
-                    listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
-                } else {
-                    emptyList()
-                }
+                listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
             Intent.ACTION_SEND_MULTIPLE ->
                 IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
                     .orEmpty()
-            else -> return
+            else -> return false
         }
-        val (sounds, pictures) = streams.partition { uri ->
-            isSound(runCatching { context.contentResolver.getType(uri) }.getOrNull(), intent.type)
+        val types = streams.associateWith { uri ->
+            runCatching { context.contentResolver.getType(uri) }.getOrNull()
         }
-        val files = copy(context, pictures)
-        val soundFiles = copy(context, sounds)
+        val kinds = streams.groupBy { uri -> kindOf(types[uri], intent.type) }
+        val (own, others) = kinds[Kind.FILE].orEmpty().partition { uri ->
+            isOwnFile(types[uri], Files.nameOf(context, uri))
+        }
+        val opened = own.count { Bundles.keep(context, it) } > 0
+        val files = copy(context, kinds[Kind.PICTURE].orEmpty())
+        val soundFiles = copy(context, kinds[Kind.SOUND].orEmpty())
+        val attachments = Files.copy(context, others)
         val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
         val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
-        if (text.isNullOrBlank() && subject.isNullOrBlank() && files.isEmpty() && soundFiles.isEmpty()) return
-        synchronized(waiting) { waiting.addLast(Share(subject, text, files, source, soundFiles)) }
+        if (text.isNullOrBlank() && subject.isNullOrBlank() && files.isEmpty() && soundFiles.isEmpty() &&
+            attachments.isEmpty()
+        ) {
+            return opened
+        }
+        synchronized(waiting) {
+            waiting.addLast(Share(subject, text, files, source, soundFiles, attachments))
+        }
+        return opened
+    }
+
+    /**
+     * Keeps the files [uris] picked with the file picker while the app was
+     * gone, as with [keepPicked]: they come back as a share of their own.
+     */
+    fun keepPickedFiles(context: Context, uris: List<Uri>) {
+        val attachments = Files.copy(context, uris)
+        if (attachments.isEmpty()) return
+        synchronized(waiting) { waiting.addLast(Share(null, null, emptyList(), attachments = attachments)) }
+    }
+
+    /**
+     * Takes the pages printed to the app (#293) that wait in its files
+     * ([PrintIn.take]): each comes as a share of its own, its PDF an
+     * Attachment named after the print job, from no source app, as
+     * Android does not tell a print service which app printed.
+     */
+    fun keepPrinted(context: Context) {
+        val printed = PrintIn.take(PrintIn.dir(context), Files.dir(context))
+        if (printed.isEmpty()) return
+        synchronized(waiting) {
+            for (print in printed) waiting.addLast(Share(null, null, emptyList(), attachments = listOf(print)))
+        }
     }
 
     /** Copies the files behind [uris] to the side, while the permission to read them lasts. */
@@ -120,7 +186,9 @@ object Shares {
      * its pictures made into photos, or null. Its sound files come as
      * they are, each as a map of its `bytes` and, when this phone cannot
      * decode it to transcribe it, the `problem` and the `format`
-     * ([Speech.problem]). Slow: decodes pictures.
+     * ([Speech.problem]); its other files as their copies' `path`, `name`
+     * and `type`, which the app lets go of once attached. Slow: decodes
+     * pictures.
      */
     fun take(): Map<String, Any?>? {
         val share = synchronized(waiting) { waiting.removeFirstOrNull() } ?: return null
@@ -144,6 +212,7 @@ object Shares {
             "text" to share.text,
             "photos" to photos,
             "recordings" to recordings,
+            "files" to Files.handed(share.attachments),
             "sourcePackage" to share.source?.first,
             "sourceLabel" to share.source?.second,
         )
@@ -151,7 +220,7 @@ object Shares {
 }
 
 /**
- * Where other apps share images, sound files, text and links to. No screen of its
+ * Where other apps share images, sound files, any other file, text and links to. No screen of its
  * own: it keeps the share and hands over to the app's one running
  * [MainActivity], so the share never starts a second app inside the
  * sharing app.
@@ -161,10 +230,11 @@ class ShareActivity : Activity() {
         super.onCreate(savedInstanceState)
         // Only this activity knows who shared: MainActivity's referrer
         // is the app itself.
-        if (savedInstanceState == null) Shares.receive(this, intent, SourceApps.of(this))
+        val opened = savedInstanceState == null && Shares.receive(this, intent, SourceApps.of(this))
         startActivity(
             Intent(this, MainActivity::class.java)
                 .putExtra(MainActivity.EXTRA_SHARED, true)
+                .putExtra(MainActivity.EXTRA_BUNDLE, opened)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
         )
         finish()

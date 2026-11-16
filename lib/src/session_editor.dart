@@ -112,13 +112,16 @@ class SessionDraft {
   ];
 
   /// The Tallies of [order] the picker shows: with a [filter] those
-  /// carrying any of its tags, else all.
+  /// carrying any of its tags or a tag nested under one (#267: `#sport`
+  /// shows `#sport/run`), else all.
   List<String> get shown {
     final filter = this.filter;
     if (filter.isEmpty) return order;
+    bool under(String tag) =>
+        filter.any((f) => tag == f || tag.startsWith('$f/'));
     return [
       for (final id in order)
-        if (tagsOf(id).any(filter.contains)) id,
+        if (tagsOf(id).any(under)) id,
     ];
   }
 
@@ -146,6 +149,16 @@ class SessionDraft {
       own ? counts[day] = count : counts.remove(day);
 
   bool get valid => pool.isNotEmpty;
+
+  /// What it holds, as text, to tell whether it changed (#275); the
+  /// filter is a view and does not count.
+  String get signature => [
+    pool.join(','),
+    count,
+    [for (final day in counts.keys.toList()..sort()) '$day:${counts[day]}']
+        .join(','),
+    rule.name,
+  ].join('|');
 
   /// Whether the picker is ordered by hand for Rolling: with more than
   /// one Tally and no [filter].

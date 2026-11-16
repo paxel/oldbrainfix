@@ -172,6 +172,30 @@ void main() {
       expect(json.keys, ['pack', 'sig', 'type']);
     });
 
+    testWidgets('a list without a name shows its kind in the tree (#309)', (
+      tester,
+    ) async {
+      final socks = Notes(ann).capture('Socks\nTent', place: health.id).id;
+      Checklists(ann).makeFromText(socks);
+      store.close();
+      store = ann
+        ..starterSetOffered = true
+        ..alarmSetupDone = true;
+      ann = Store.inMemory();
+      await start(tester, store);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byKey(ValueKey('area-menu-${health.id}')));
+      await tap(tester, find.byKey(ValueKey('area-pack-${health.id}')));
+      final pack = store.packOf(health.id);
+      final list = PackItemKeys.note(
+        pack.notes.indexWhere((n) => n.lines != null),
+      );
+      expect(
+        find.descendant(of: item(list), matching: find.text('Checklist')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('from a Topic and a Note; unticking the last Tally of a '
         'Session unticks it', (tester) async {
       store.close();
@@ -211,6 +235,7 @@ void main() {
           matching: find.byKey(const ValueKey('note-menu')),
         ),
       );
+      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
       await tap(tester, find.byKey(const ValueKey('note-pack')));
       expect(find.byType(PackExportScreen), findsOneWidget);
       expect(find.text('Training'), findsWidgets);
@@ -356,6 +381,24 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('note-remove-pack-from')));
       expect(store.packFrom(water.id), isNull);
       expect(find.byKey(ValueKey('pack-from-${water.id}')), findsNothing);
+      // The announcement at the top brings it back (#268).
+      await tap(tester, find.text('“From” label removed'));
+      expect(store.packFrom(water.id)?.name, 'Ann');
+      expect(find.byKey(ValueKey('pack-from-${water.id}')), findsOneWidget);
+
+      // In the editor its badge offers the same at the finger.
+      await tester.longPress(find.text('Drink water'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('badge-pack-from')));
+      await tester.pumpAndSettle();
+      await tap(tester, find.byKey(const ValueKey('badge-pack-from')));
+      expect(find.byType(AlertDialog), findsNothing);
+      await tap(tester, find.byKey(const ValueKey('remove-pack-from')));
+      expect(store.packFrom(water.id), isNull);
+      expect(find.byKey(const ValueKey('badge-pack-from')), findsNothing);
+      await tap(tester, find.text('“From” label removed'));
+      expect(store.packFrom(water.id)?.name, 'Ann');
+      expect(find.byKey(const ValueKey('badge-pack-from')), findsOneWidget);
     });
 
     testWidgets('a name taken gets the suffix; without a Profile nothing '

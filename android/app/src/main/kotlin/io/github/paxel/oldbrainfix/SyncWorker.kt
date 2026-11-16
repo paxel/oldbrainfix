@@ -95,6 +95,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
             when (call.method) {
                 // Nothing was tapped to open: there is no screen.
                 "nudgeOpened", "changesOpened", "unsortedOpened" -> result.success(false)
+                "occurrenceOpened" -> result.success(null)
                 else -> if (!AlarmChannel.handle(context, call, result)) result.notImplemented()
             }
         }

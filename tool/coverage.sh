@@ -45,7 +45,11 @@ rust() {
   shift
   # The core's and the GUI's numbers come from their own tests only; the
   # floor tool keeps each crate's src/ (generated code is in target/).
+  # cargo-llvm-cov leaves out files named tests.rs by default; the tests
+  # live in such files (so that CodeQL can skip them) and count here as
+  # they did inline, which the floors were set on.
   (cd desktop && cargo llvm-cov --locked ${jobs:+-j "$jobs"} "$@" \
+    --no-default-ignore-filename-regex \
     --lcov --output-path "coverage/$group.lcov")
   floor "$group" "desktop/coverage/$group.lcov"
 }

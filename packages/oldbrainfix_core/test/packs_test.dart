@@ -178,6 +178,30 @@ void main() {
       expect(session.session!.pool, [indexOf(closed, 'Laps')]);
     });
 
+    test("of everything in the person's own order of the Areas (#280), "
+        'those missing from it by the name the app shows', () {
+      final h = health();
+      ann.moveArea(h.area, 0);
+      final places = Places(ann);
+      Notes(ann).capture('Boxes', place: places.addArea('attic').id);
+      Notes(ann).capture('Tyres', place: places.addArea('Bike').id);
+      expect(ann.packOfAll().areas.map((a) => a.name), [
+        'Health',
+        'Garden',
+        'attic',
+        'Bike',
+      ]);
+      final shown = ann.packOfAll(
+        shown: (a) => a.name == 'attic' ? 'Loft' : a.name,
+      );
+      expect(shown.areas.map((a) => a.name), [
+        'Health',
+        'Garden',
+        'Bike',
+        'attic',
+      ]);
+    });
+
     test('everything is ticked but Reminders and files; the size follows '
         'the ticks', () {
       final h = health();
@@ -503,6 +527,14 @@ void main() {
       expect(ben.packFrom(note.id), (id: ann.ownProfile!.id, name: 'Ann'));
       ben.removePackFrom(note.id);
       expect(ben.packFrom(note.id), isNull);
+      // Undone (#268): the badge comes back as it was, in one entry.
+      final before = ben.allEntries().length;
+      ben.restorePackFrom(note.id);
+      expect(ben.packFrom(note.id), (id: ann.ownProfile!.id, name: 'Ann'));
+      expect(ben.allEntries().length, before + 1);
+      ben.restorePackFrom(note.id);
+      expect(ben.allEntries().length, before + 1);
+      ben.removePackFrom(note.id);
       ben.addPack(
         opened,
         opened.pack.allKeys(),
@@ -548,6 +580,14 @@ void main() {
       expect(ben.packFrom(badged), isNull);
       ben.removePackFrom(own);
       expect(ben.current(own, PackKeys.from), from('Cy'));
+      // Undone, it is Ann's again, never Cy's; a Note that never had
+      // one gets none.
+      ben.restorePackFrom(badged);
+      expect(ben.packFrom(badged), badge);
+      final before = ben.allEntries().length;
+      ben.restorePackFrom(own);
+      expect(ben.packFrom(own), isNull);
+      expect(ben.allEntries().length, before);
     });
 
     test('a help Note arrives under a new id', () {

@@ -4,26 +4,31 @@
 //! last one as a notification (an Occurrence, its Re-nags, a snooze, the
 //! Nudge, the Changes Nudge), escalated ones urgent and with the
 //! system's alarm sound, the others of an Occurrence silent while the app
-//! rings its alarm sound itself (#102), and closes the notifications of Occurrences Done meanwhile, and the
+//! rings its alarm sound itself (#102), and closes the notifications of Occurrences Done or skipped meanwhile, and the
 //! Changes Nudge's once nobody waits. What became Missed while the app
 //! was not running is told in one Catch-up Notification, never rung
-//! late. Done and the snoozes tapped on a notification come back as
-//! [`Tap`]s and are applied to the log; a click on the Nudge opens the
+//! late. An Occurrence's notification offers Done, Snooze and Not today
+//! (#269); Snooze shows it again in place with 10 min, 30 min and 1 h,
+//! and Not today with Skip and Tomorrow, as the phone's Android
+//! notification does (Q650), as Windows toasts and some Linux desktops
+//! show only a few buttons. What is tapped comes back as [`Tap`]s and is
+//! applied to the log; a click on an Occurrence's notification opens
+//! the window with its Note (#270), a click on the Nudge the
 //! window on Unsorted, as the phone's Nudge screen, and a click on the
 //! Changes Nudge asks the window to send each person waiting their
 //! bundle (#109). Quiet
 //! Hours only hold back the Nudge and the Changes Nudge; with alerts off
 //! on this Device nothing shows (ADR 0008).
 
-use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
 use oldbrainfix_core::alarms::{PlannedAlarm, alarm_plan};
 use oldbrainfix_core::{
-    Alarms, DeviceSettings, Occurrence, PlannedChangesNudge, PlannedNudge, Routines, Store,
+    Alarms, Day, DeviceSettings, Occurrence, PlannedChangesNudge, PlannedNudge, Routines, Store,
     WallClock,
 };
 
@@ -73,6 +78,11 @@ pub const DONE: &str = "done";
 pub const SNOOZE_10: &str = "snooze10";
 pub const SNOOZE_30: &str = "snooze30";
 pub const SNOOZE_60: &str = "snooze60";
+/// Snooze and Not today, which show their choices in place (#269).
+pub const SNOOZE: &str = "snooze";
+pub const NOT_TODAY: &str = "notToday";
+pub const SKIP: &str = "skip";
+pub const TOMORROW: &str = "tomorrow";
 pub const OPEN: &str = "default";
 
 /// What a snooze button waits.
@@ -154,9 +164,61 @@ pub fn occurrence_key(routine_id: &str, occurrence: &Occurrence) -> String {
     oldbrainfix_core::alarms::snooze_key(routine_id, occurrence)
 }
 
+/// The Routine whose Occurrence's notification was clicked, held until
+/// the window opens its Note (#270).
+pub type OccurrenceWanted = Arc<Mutex<Option<String>>>;
+
 /// The Routine and Occurrence a notification's key names.
 fn split_key(key: &str) -> Option<(&str, &str)> {
     key.rsplit_once('@')
+}
+
+/// The buttons an Occurrence's notification offers first: Done, Snooze,
+/// Not today and Open, a click on it.
+pub fn occurrence_buttons(t: &L10n) -> Vec<(String, String)> {
+    buttons(&[
+        (DONE, t.mark_done()),
+        (SNOOZE, t.snooze()),
+        (NOT_TODAY, t.not_today()),
+        (OPEN, t.tray_open()),
+    ])
+}
+
+/// The buttons it shows in place once `action` was tapped, Snooze or
+/// Not today, with the text that asks for them; `None` for any other.
+/// Tomorrow only while `occurrence` is of `today` or later.
+pub fn choices(
+    t: &L10n,
+    action: &str,
+    occurrence: &Occurrence,
+    today: Day,
+) -> Option<(String, Vec<(String, String)>)> {
+    match action {
+        SNOOZE => Some((
+            t.snooze_question().to_string(),
+            buttons(&[
+                (SNOOZE_10, t.snooze10()),
+                (SNOOZE_30, t.snooze30()),
+                (SNOOZE_60, t.snooze60()),
+                (OPEN, t.tray_open()),
+            ]),
+        )),
+        NOT_TODAY => {
+            let mut offered = vec![(SKIP, t.skip())];
+            if occurrence.day >= today {
+                offered.push((TOMORROW, t.not_today_tomorrow()));
+            }
+            offered.push((OPEN, t.tray_open()));
+            Some((t.not_today_question().to_string(), buttons(&offered)))
+        }
+        _ => None,
+    }
+}
+
+fn buttons(list: &[(&str, &str)]) -> Vec<(String, String)> {
+    list.iter()
+        .map(|(id, label)| (id.to_string(), label.to_string()))
+        .collect()
 }
 
 /// The first line of a Note's text, or `None` when there is none.
@@ -171,13 +233,16 @@ pub struct Alerts {
     t: L10n,
     /// When the last tick looked; what came due before is shown.
     last: Option<DateTime<Utc>>,
-    /// The notifications showing, by key.
-    shown: BTreeSet<String>,
+    /// The notifications showing, by key, each as last shown.
+    shown: BTreeMap<String, Notice>,
     /// Bumped whenever a tap changed the log, for the window to read
     /// again.
     changed: Arc<AtomicU64>,
     /// Asked for by a click on a notification: the window is to open.
     pub open_requested: bool,
+    /// Given the Routine by a click on an Occurrence's notification: the
+    /// window is to open its Note.
+    occurrence_wanted: OccurrenceWanted,
     /// Raised by a click on the Nudge: the window is to show Unsorted.
     unsorted_wanted: Arc<AtomicBool>,
     /// Raised by a click on the Changes Nudge: the window is to send each
@@ -194,9 +259,10 @@ impl Alerts {
             notifier,
             t,
             last: None,
-            shown: BTreeSet::new(),
+            shown: BTreeMap::new(),
             changed,
             open_requested: false,
+            occurrence_wanted: Arc::new(Mutex::new(None)),
             unsorted_wanted: Arc::new(AtomicBool::new(false)),
             changes_wanted: Arc::new(AtomicBool::new(false)),
             ringer: None,
@@ -215,14 +281,28 @@ impl Alerts {
         self.unsorted_wanted = wanted;
     }
 
+    /// Puts the Routine into `wanted` when an Occurrence's notification
+    /// is clicked, for the window to open its Note
+    /// ([`crate::App::set_occurrence_wanted`]).
+    pub fn set_occurrence_wanted(&mut self, wanted: OccurrenceWanted) {
+        self.occurrence_wanted = wanted;
+    }
+
     /// Raises `wanted` when the Changes Nudge is clicked, for the window
     /// to send the bundles ([`crate::App::set_changes_wanted`]).
     pub fn set_changes_wanted(&mut self, wanted: Arc<AtomicBool>) {
         self.changes_wanted = wanted;
     }
 
-    /// Applies one tap to the log and this Device's snoozes.
-    pub fn apply(&mut self, store: &Store, tap: &Tap) -> oldbrainfix_core::Result<()> {
+    /// Applies one tap to the log and this Device's snoozes, `wall`
+    /// telling which day it is; Snooze and Not today show their choices
+    /// in place, quietly.
+    pub fn apply(
+        &mut self,
+        store: &Store,
+        wall: &WallClock,
+        tap: &Tap,
+    ) -> oldbrainfix_core::Result<()> {
         if tap.action == OPEN {
             // The Changes Nudge stays until the bundles went: a save
             // dialog cancelled keeps it for that person.
@@ -231,6 +311,12 @@ impl Alerts {
             }
             if tap.key == NUDGE_KEY {
                 self.unsorted_wanted.store(true, Ordering::SeqCst);
+            }
+            if let Some((routine, occurrence)) = split_key(&tap.key)
+                && Occurrence::parse(occurrence).is_some()
+                && let Ok(mut wanted) = self.occurrence_wanted.lock()
+            {
+                *wanted = Some(routine.to_string());
             }
             self.open_requested = true;
             return Ok(());
@@ -247,12 +333,30 @@ impl Alerts {
         let Some((routine, occurrence)) = split_key(&tap.key) else {
             return Ok(());
         };
-        if tap.action == DONE {
-            alarms.apply_done(routine, occurrence, tap.at)?;
-        } else if let Some(wait) = snooze_of(&tap.action) {
-            alarms.apply_snooze(routine, occurrence, tap.at + wait)?;
-        } else {
+        let today = Day::today(store.now(), wall);
+        if let (Some(parsed), Some(held)) =
+            (Occurrence::parse(occurrence), self.shown.get(&tap.key))
+            && let Some((body, actions)) = choices(&self.t, &tap.action, &parsed, today)
+        {
+            let notice = Notice {
+                body,
+                actions,
+                urgent: false,
+                silent: true,
+                ..held.clone()
+            };
+            self.notifier.show(&notice);
+            self.shown.insert(tap.key.clone(), notice);
             return Ok(());
+        }
+        match tap.action.as_str() {
+            DONE => drop(alarms.apply_done(routine, occurrence, tap.at)?),
+            SKIP => drop(alarms.apply_skip(routine, occurrence, tap.at)?),
+            TOMORROW => drop(alarms.apply_tomorrow(routine, occurrence, tap.at)?),
+            action => match snooze_of(action) {
+                Some(wait) => alarms.apply_snooze(routine, occurrence, tap.at + wait)?,
+                None => return Ok(()),
+            },
         }
         self.notifier.close(&tap.key);
         self.shown.remove(&tap.key);
@@ -273,7 +377,7 @@ impl Alerts {
         let last = self.last.replace(now);
         if !settings.alerts_on()? {
             // Nothing piles up to ring once they are on again.
-            for key in std::mem::take(&mut self.shown) {
+            for key in std::mem::take(&mut self.shown).into_keys() {
                 self.notifier.close(&key);
             }
             settings.set_last_fired(now)?;
@@ -369,7 +473,7 @@ impl Alerts {
         } else {
             t.catch_up_many(&missed.to_string())
         };
-        self.notifier.show(&Notice {
+        self.show(Notice {
             key: CATCH_UP_KEY.into(),
             title: t.catch_up_title().into(),
             body,
@@ -377,7 +481,6 @@ impl Alerts {
             silent: false,
             actions: vec![(OPEN.into(), t.tray_open().into())],
         });
-        self.shown.insert(CATCH_UP_KEY.into());
         Ok(())
     }
 
@@ -390,30 +493,19 @@ impl Alerts {
             if alarm.text.is_none() {
                 t.note_gone().to_string()
             } else {
-                wordless(&t, alarm.wordless).to_string()
+                wordless(&t, alarm.wordless, &alarm.wordless_name)
             }
         });
         let key = occurrence_key(&alarm.routine_id, &alarm.occurrence);
-        let actions = [
-            (DONE, t.mark_done()),
-            (SNOOZE_10, t.snooze10()),
-            (SNOOZE_30, t.snooze30()),
-            (SNOOZE_60, t.snooze60()),
-            (OPEN, t.tray_open()),
-        ];
         let urgent = escalates(alarm, now);
-        self.notifier.show(&Notice {
-            key: key.clone(),
+        self.show(Notice {
+            key,
             title,
             body: occurrence_time(&t, &alarm.occurrence),
             urgent,
             silent: !urgent,
-            actions: actions
-                .iter()
-                .map(|(id, label)| (id.to_string(), label.to_string()))
-                .collect(),
+            actions: occurrence_buttons(&t),
         });
-        self.shown.insert(key);
         !urgent
     }
 
@@ -425,18 +517,14 @@ impl Alerts {
             (SNOOZE_60, t.snooze60()),
             (OPEN, t.tray_open()),
         ];
-        self.notifier.show(&Notice {
+        self.show(Notice {
             key: NUDGE_KEY.into(),
             title: t.nudge_title(nudge.count() as i64),
             body: t.nudge_body().into(),
             urgent: false,
             silent: false,
-            actions: actions
-                .iter()
-                .map(|(id, label)| (id.to_string(), label.to_string()))
-                .collect(),
+            actions: buttons(&actions),
         });
-        self.shown.insert(NUDGE_KEY.into());
     }
 
     /// The Changes Nudge, naming the people waiting: "Changes for Bob and
@@ -452,7 +540,7 @@ impl Alerts {
             let shown = store.person_shown(person)?;
             names.push(display_name(&t, &shown.name).to_string());
         }
-        self.notifier.show(&Notice {
+        self.show(Notice {
             key: CHANGES_KEY.into(),
             title: t.changes_nudge_title(&names_text(&t, &names)),
             body: t.changes_nudge_body().into(),
@@ -460,11 +548,16 @@ impl Alerts {
             silent: false,
             actions: vec![(OPEN.into(), t.send_action().into())],
         });
-        self.shown.insert(CHANGES_KEY.into());
         Ok(())
     }
 
-    /// Closes the notifications of Occurrences Done meanwhile, the
+    /// Shows `notice`, in place of the one with its key.
+    fn show(&mut self, notice: Notice) {
+        self.notifier.show(&notice);
+        self.shown.insert(notice.key.clone(), notice);
+    }
+
+    /// Closes the notifications of Occurrences Done or skipped meanwhile, the
     /// Nudge's once nothing is Unsorted and the Changes Nudge's once
     /// nobody waits.
     fn close_settled(
@@ -481,7 +574,7 @@ impl Alerts {
             .collect();
         let settled: Vec<String> = self
             .shown
-            .iter()
+            .keys()
             .filter(|k| {
                 done.contains(*k) || (sorted && *k == NUDGE_KEY) || (sent && *k == CHANGES_KEY)
             })
@@ -519,7 +612,7 @@ pub fn run(
             .max(std::time::Duration::from_millis(200));
         match events.recv_timeout(wait) {
             Ok(Event::Tap(tap)) => {
-                if let Err(e) = alerts.apply(store, &tap) {
+                if let Err(e) = alerts.apply(store, wall, &tap) {
                     eprintln!("oldbrainfix: alerts: {e}");
                 }
                 on_tap(std::mem::take(&mut alerts.open_requested));
@@ -531,163 +624,4 @@ pub fn run(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use oldbrainfix_core::alarms::{AlarmKind, WallMoment};
-    use oldbrainfix_core::{ClockTime, Day, Wordless, parse_time};
-
-    fn alarm(
-        at: &str,
-        ends: &str,
-        escalation: Option<i64>,
-    ) -> oldbrainfix_core::Result<PlannedAlarm> {
-        let day = Day::new(2026, 1, 1);
-        let moment = WallMoment {
-            day,
-            time: ClockTime { hour: 9, minute: 0 },
-        };
-        Ok(PlannedAlarm {
-            kind: AlarmKind::Occurrence,
-            routine_id: "routine:a".into(),
-            occurrence: Occurrence::new(day, ClockTime::new(9, 0)),
-            at: parse_time(at)?,
-            wall: Some(moment),
-            renag: Duration::minutes(10),
-            escalation,
-            ends: moment,
-            ends_at: parse_time(ends)?,
-            text: Some("Pills".into()),
-            wordless: Wordless::Photo,
-        })
-    }
-
-    #[test]
-    fn an_occurrence_shows_once_per_tick_however_many_renags_passed() -> oldbrainfix_core::Result<()>
-    {
-        let a = alarm(
-            "2026-01-01T09:00:00.000Z",
-            "2026-01-01T12:00:00.000Z",
-            Some(2),
-        )?;
-        let plan = vec![a.clone()];
-        let t = |s: &str| parse_time(s);
-        assert_eq!(
-            due(
-                &plan,
-                t("2026-01-01T08:00:00.000Z")?,
-                t("2026-01-01T08:59:00.000Z")?
-            )
-            .len(),
-            0
-        );
-        assert_eq!(
-            due(
-                &plan,
-                t("2026-01-01T08:00:00.000Z")?,
-                t("2026-01-01T09:45:00.000Z")?
-            )
-            .len(),
-            1
-        );
-        assert_eq!(
-            next(&plan, t("2026-01-01T09:00:00.000Z")?),
-            Some(t("2026-01-01T09:10:00.000Z")?)
-        );
-        assert!(!escalates(&a, t("2026-01-01T09:20:00.000Z")?));
-        assert!(escalates(&a, t("2026-01-01T09:30:00.000Z")?));
-        assert!(!escalates(&a, t("2026-01-01T12:00:00.000Z")?));
-        // Missed while not running: told once, not rung.
-        assert_eq!(
-            catch_up(
-                &plan,
-                t("2026-01-01T08:00:00.000Z")?,
-                t("2026-01-01T13:00:00.000Z")?
-            ),
-            1
-        );
-        assert_eq!(
-            catch_up(
-                &plan,
-                t("2026-01-01T08:00:00.000Z")?,
-                t("2026-01-01T11:00:00.000Z")?
-            ),
-            0
-        );
-        assert_eq!(
-            catch_up(
-                &plan,
-                t("2026-01-01T14:00:00.000Z")?,
-                t("2026-01-01T13:00:00.000Z")?
-            ),
-            0
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn an_alarm_of_a_note_without_words_names_what_it_holds() -> oldbrainfix_core::Result<()> {
-        let notifier = crate::notify::RecordingNotifier::default();
-        let changed = Arc::new(AtomicU64::new(0));
-        let mut alerts = Alerts::new(Box::new(notifier.clone()), L10n::new("de"), changed);
-        let now = parse_time("2026-01-01T09:00:00.000Z")?;
-        let voice = PlannedAlarm {
-            text: Some(" \n".into()),
-            wordless: Wordless::VoiceRecording,
-            ..alarm("2026-01-01T09:00:00.000Z", "2026-01-01T12:00:00.000Z", None)?
-        };
-        let photo = PlannedAlarm {
-            wordless: Wordless::Photo,
-            ..voice.clone()
-        };
-        assert!(alerts.show_alarm(&voice, now));
-        assert!(alerts.show_alarm(&photo, now));
-        let titles: Vec<String> = notifier
-            .take()
-            .into_iter()
-            .filter_map(|r| match r {
-                crate::notify::Recorded::Shown(notice) => Some(notice.title),
-                crate::notify::Recorded::Closed(_) => None,
-            })
-            .collect();
-        assert_eq!(titles, ["Sprachaufnahme", "Foto"]);
-        Ok(())
-    }
-
-    #[test]
-    fn an_escalated_alarm_leaves_its_sound_to_the_system() -> oldbrainfix_core::Result<()> {
-        let notifier = crate::notify::RecordingNotifier::default();
-        let changed = Arc::new(AtomicU64::new(0));
-        let mut alerts = Alerts::new(Box::new(notifier.clone()), L10n::new("en"), changed);
-        let a = alarm(
-            "2026-01-01T09:00:00.000Z",
-            "2026-01-01T12:00:00.000Z",
-            Some(2),
-        )?;
-        assert!(alerts.show_alarm(&a, parse_time("2026-01-01T09:00:00.000Z")?));
-        assert!(!alerts.show_alarm(&a, parse_time("2026-01-01T09:30:00.000Z")?));
-        let sounds: Vec<(bool, bool)> = notifier
-            .take()
-            .into_iter()
-            .filter_map(|r| match r {
-                crate::notify::Recorded::Shown(notice) => Some((notice.urgent, notice.silent)),
-                crate::notify::Recorded::Closed(_) => None,
-            })
-            .collect();
-        // Silent while the app rings; urgent with the system's sound.
-        assert_eq!(sounds, [(false, true), (true, false)]);
-        Ok(())
-    }
-
-    #[test]
-    fn snooze_buttons_wait_what_they_say() {
-        assert_eq!(snooze_of(SNOOZE_10), Some(Duration::minutes(10)));
-        assert_eq!(snooze_of(SNOOZE_60), Some(Duration::hours(1)));
-        assert_eq!(snooze_of(DONE), None);
-        assert_eq!(
-            split_key("routine:a@2026-01-01T09:00"),
-            Some(("routine:a", "2026-01-01T09:00"))
-        );
-        assert_eq!(first_line(Some("  \n")), None);
-        assert_eq!(first_line(Some(" Pills \n and more")), Some("Pills".into()));
-    }
-}
+mod tests;

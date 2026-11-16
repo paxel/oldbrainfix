@@ -35,7 +35,10 @@ void main() {
   Future<void> open(WidgetTester tester, String name) async {
     await tester.pumpWidget(OldBrainFixApp(store: store, alarms: FakeAlarms()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(name).first);
+    // Through the row's Edit schedule, as a tap opens its Note (#270).
+    await tester.longPress(find.text(name).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-schedule')));
     await tester.pumpAndSettle();
   }
 

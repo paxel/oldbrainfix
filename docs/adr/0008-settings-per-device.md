@@ -27,3 +27,19 @@ Amended by #201: from when on an all-day Occurrence rings is a setting of each D
 Amended by #211: "Move a Note to the Trash when its one-time Reminder is done" belongs to the person, not the Device. It lies in the log as an Override does and is the same on all of their own Devices (ADR 0040).
 
 Amended by #197: Simple or Advanced is the second setting of the person, kept the same way and the same on all of their own Devices (ADR 0041).
+
+## The last Shopping List (#276)
+
+Amended by #276: the Shopping List a capture on a Device went into last is a setting of that Device (`lastShoppingList`, the list's Note id), put at the top of the lists Add to a Shopping List offers. An empty value reads as none, and it may name a list gone since, which the pick does not list. Capturing writes it; the user never sets it, so the AI port has no tool for it.
+
+## The window's geometry (#278)
+
+Amended by #278: on the desktop the window's size and position, whether it is maximized, the sidebar's width and the Note dialog's size are settings of that Device (`windowSize`, `windowPosition`, `windowMaximized`, `sidebarWidth`, `noteDialogSize`), written as the user leaves them and read at the next start. A position the system does not tell, as on Wayland, is not written, and one on no monitor any more opens the window centred. The user never sets them by name, so the AI port has no tool for them.
+
+## A Note window's size (#287)
+
+Amended by #287: on the desktop the size of a Note in a window of its own is a setting of that Device (`noteWindowSize`, `width,height` in the app's points, which "Bigger text and icons" enlarges as the window opens), written as a Note window closes and read as the next one opens; none kept, or one too small, opens it at 560 × 680. Whether a Note window is kept on top is not kept: it starts off each time. The user never sets the size by name, so the AI port has no tool for it.
+
+## The sidebar's folds (#279)
+
+Amended by #279: on the desktop, which Areas show their Topics folded in the sidebar is a setting of that Device (`areaTopicsFolded:<Area id>`, `true` while folded), as the folds of cards are; none kept means unfolded. The chevron writes it; the user never sets it by name, so the AI port has no tool for it.

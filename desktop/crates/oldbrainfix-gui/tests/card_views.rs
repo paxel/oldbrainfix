@@ -196,6 +196,32 @@ fn a_compact_list_or_tally_shows_its_name_and_its_counts() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn a_list_without_a_name_shows_its_kind_where_its_name_would_be() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    // Typed text made lists, every line a Line, no name (#309).
+    let socks = notes.capture("Socks\nTent", None, None)?.id;
+    Checklists::new(&store).make_from_text(&socks)?;
+    let milk = notes.capture("Milk\nBread", None, None)?.id;
+    ShoppingLists::new(&store).make_from_text(&milk)?;
+    let named = |harness: &Harness<'_, App>, kind: &str| {
+        harness
+            .query_all_by_role_and_label(Role::Label, kind)
+            .count()
+    };
+    let harness = window(&store);
+    assert_eq!(named(&harness, "Checklist"), 1);
+    assert_eq!(named(&harness, "Shopping List"), 1);
+    assert!(shows(&harness, "More: Checklist"));
+    assert!(shows(&harness, "More: Shopping List"));
+    let harness = compact(&store)?;
+    assert_eq!(named(&harness, "Checklist"), 1);
+    assert_eq!(named(&harness, "Shopping List"), 1);
+    assert!(shows(&harness, "2 of 2 open"));
+    Ok(())
+}
+
 /// Every day at `hour`:00 from `from`.
 fn daily_at(from: Day, hour: u32) -> Result<Schedule, Box<dyn std::error::Error>> {
     let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;
@@ -244,6 +270,23 @@ fn a_compact_session_shows_the_next_run_of_its_routines_and_their_week() -> Test
     assert!(shows(&harness, "Next: Tue, 10/27/2026 07:00"));
     assert!(shows(&harness, "done 1 / skipped 0 this week"));
     assert!(!shows(&harness, "morning moves"));
+    Ok(())
+}
+
+#[test]
+fn a_sessions_skipped_runs_count_as_skipped_not_its_missed_ones() -> TestResult {
+    let store = store()?;
+    let (pool, sport) = sport(&store)?;
+    let today = Day::new(2026, 10, 26);
+    let evening = daily_at(today, 18)?;
+    let run = Sessions::new(&store).spawn(&sport, &evening, &pool, 1, SessionRule::Rolling)?;
+    let at = oldbrainfix_core::ClockTime::new(18, 0).ok_or("a time")?;
+    let tonight = oldbrainfix_core::Occurrence::new(today, Some(at));
+    // Not today (#269): skipped, the run counts as skipped.
+    oldbrainfix_core::Routines::new(&store).skip(run.id(), &tonight, None)?;
+    let harness = compact(&store)?;
+    assert!(shows(&harness, "Next: Tue, 10/27/2026 18:00"));
+    assert!(shows(&harness, "done 0 / skipped 1 this week"));
     Ok(())
 }
 

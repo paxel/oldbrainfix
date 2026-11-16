@@ -44,6 +44,9 @@ class AlarmSync extends ChangeNotifier {
   StreamSubscription<void>? _arrivals;
   Future<void> _tail = Future.value();
   var _changeQueued = false;
+
+  /// Whether an arming for a change waits behind the jobs before it.
+  var _armWaiting = false;
   var _disposed = false;
 
   /// What was handed to the platform last, to skip handing it again.
@@ -76,6 +79,7 @@ class AlarmSync extends ChangeNotifier {
   var _changesOpened = false;
   var _unsortedOpened = false;
   WidgetPick? _pickOpened;
+  OpenedOccurrence? _occurrenceOpened;
 
   AlarmSync({
     required this.store,
@@ -162,11 +166,28 @@ class AlarmSync extends ChangeNotifier {
     return opened;
   }
 
+  /// The Occurrence whose notification was tapped and whose Note is
+  /// still to open, or null; taking it clears it (#270).
+  OpenedOccurrence? takeOccurrenceOpened() {
+    final opened = _occurrenceOpened;
+    _occurrenceOpened = null;
+    return opened;
+  }
+
   /// Done, or a snooze for [snooze], from the full-screen alarm: the
   /// platform stops ringing and queues it, and it is applied at once.
   Future<void> answer(Ringing ring, {Duration? snooze}) async {
     await platform.answerRing(ring, snooze: snooze);
     await refresh();
+  }
+
+  /// Snoozes [occurrence] of the Routine [routineId] from the app until
+  /// [until] (#269), as a snooze tapped on its notification does, and
+  /// arms the plan anew at once: a snooze is this Device's own setting,
+  /// which changes nothing in the log.
+  void snooze(String routineId, Occurrence occurrence, DateTime until) {
+    Alarms(store).applySnooze(routineId, occurrence.key, until);
+    _changed();
   }
 
   /// Applies the taps waiting on the platform, reads the permissions and
@@ -179,6 +200,10 @@ class AlarmSync extends ChangeNotifier {
       switch (action) {
         case DoneTapped(:final routineId, :final occurrenceKey, :final at):
           alarms.applyDone(routineId, occurrenceKey, at);
+        case SkipTapped(:final routineId, :final occurrenceKey, :final at):
+          alarms.applySkip(routineId, occurrenceKey, at);
+        case TomorrowTapped(:final routineId, :final occurrenceKey, :final at):
+          alarms.applyTomorrow(routineId, occurrenceKey, at);
         case SnoozeTapped(:final routineId, :final occurrenceKey, :final until):
           alarms.applySnooze(routineId, occurrenceKey, until);
         case NudgeSnoozed(:final at, :final until):
@@ -199,15 +224,28 @@ class AlarmSync extends ChangeNotifier {
     final changesOpened = await platform.changesOpened();
     final unsortedOpened = await platform.unsortedOpened();
     final pickOpened = await platform.pickOpened();
+    final occurrenceOpened = await platform.occurrenceOpened();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
     if (changesOpened) _changesOpened = true;
     if (unsortedOpened) _unsortedOpened = true;
     if (pickOpened != null) _pickOpened = pickOpened;
+    if (occurrenceOpened != null) _occurrenceOpened = occurrenceOpened;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
     _granted = granted;
     _ringing = ringing;
+    // What a tap opened, and the ringing, show at once, before the plan
+    // is read and armed anew, which waits on every alarm (#339).
+    if (permissionsChanged ||
+        ringingChanged ||
+        nudgeOpened ||
+        changesOpened ||
+        unsortedOpened ||
+        pickOpened != null ||
+        occurrenceOpened != null) {
+      notifyListeners();
+    }
     await _arm(force: true);
     // Acknowledged only once applied and armed: a crash in between
     // applies them again, which changes nothing.
@@ -216,16 +254,7 @@ class AlarmSync extends ChangeNotifier {
         actions.map((a) => a.seq).reduce((a, b) => a > b ? a : b),
       );
     }
-    if (!_disposed &&
-        (actions.isNotEmpty ||
-            permissionsChanged ||
-            ringingChanged ||
-            nudgeOpened ||
-            changesOpened ||
-            unsortedOpened ||
-            pickOpened != null)) {
-      notifyListeners();
-    }
+    if (!_disposed && actions.isNotEmpty) notifyListeners();
   });
 
   /// Checks the Line [lineId] for the Occurrence [occurrenceKey] of the
@@ -314,7 +343,16 @@ class AlarmSync extends ChangeNotifier {
     _changeQueued = true;
     scheduleMicrotask(() {
       _changeQueued = false;
-      if (!_disposed) unawaited(_serial(_arm));
+      // One arming waiting is enough: it reads the plan as it starts,
+      // with every change before it (#339).
+      if (_disposed || _armWaiting) return;
+      _armWaiting = true;
+      unawaited(
+        _serial(() {
+          _armWaiting = false;
+          return _arm();
+        }),
+      );
     });
   }
 
@@ -358,6 +396,10 @@ class AlarmSync extends ChangeNotifier {
         snooze10: t.snooze10,
         snooze30: t.snooze30,
         snooze60: t.snooze60,
+        notToday: t.notToday,
+        notTodayQuestion: t.notTodayQuestion,
+        skip: t.skip,
+        tomorrow: t.notTodayTomorrow,
         catchUpTitle: t.catchUpTitle,
         catchUpOne: t.catchUpOne,
         // The platform puts in the number.

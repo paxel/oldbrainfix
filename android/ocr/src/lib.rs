@@ -5,9 +5,14 @@
 //! The iPhone links the same crate as a static library and calls the C
 //! functions of its `ios` module (#239).
 //!
+//! It also reads the PDFs attached to Notes (#267, ADR 0047) with the
+//! desktop's `oldbrainfix-pdf`, in its `pdf` module.
+//!
 //! The app decodes the photo itself (an upright JPEG of at most 2048
 //! px) and hands in its RGBA pixels and the bytes of the model files, so
 //! neither an image decoder nor a file path is needed.
+
+pub mod pdf;
 
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};

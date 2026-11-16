@@ -37,11 +37,32 @@ object Bundles {
         file.path
     }.getOrNull()
 
+    /**
+     * Where the file picker starts for the folder [tree] the folder picker
+     * granted, such as the Backups folder (#285): the document of the
+     * tree's own root, as [android.provider.DocumentsContract.buildDocumentUriUsingTree]
+     * builds it; null for anything that is no document tree.
+     */
+    fun startOf(tree: String?): String? {
+        if (tree == null || !tree.startsWith("content://")) return null
+        val at = tree.indexOf("/tree/")
+        if (at < 0) return null
+        val id = tree.substring(at + "/tree/".length).substringBefore('/')
+        if (id.isEmpty()) return null
+        return "${tree.substring(0, at)}/tree/$id/document/$id"
+    }
+
     /** Keeps the bundle [intent] opens or sends, to be taken by the app. */
     fun receive(context: Context, intent: Intent) {
         val uri = uriOf(intent) ?: return
-        val path = copy(context, uri) ?: return
+        keep(context, uri)
+    }
+
+    /** Keeps the bundle at [uri], to be taken by the app; whether it could be read. */
+    fun keep(context: Context, uri: Uri): Boolean {
+        val path = copy(context, uri) ?: return false
         synchronized(waiting) { waiting.addLast(path) }
+        return true
     }
 
     /** The bundle an "open with" ([Intent.ACTION_VIEW]) or a share names. */

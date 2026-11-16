@@ -237,7 +237,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Send to a person'), findsOneWidget);
+    expect(find.text('Share…'), findsOneWidget);
     expect(find.byKey(ValueKey('note-remove-$hash')), findsNothing);
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();

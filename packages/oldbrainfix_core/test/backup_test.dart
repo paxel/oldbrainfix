@@ -560,6 +560,377 @@ void main() {
     });
   });
 
+  group('taking Notes back', () {
+    DateTime wall(DateTime utc) => utc;
+
+    /// A Backup of [fullDevice] with a Transcript on its recording, a
+    /// Note in its trash and one filed nowhere, and the key opening it.
+    Future<(Store, String, Uint8List)> withNotes() async {
+      final store = fullDevice(dir);
+      final notes = Notes(store);
+      final pills = notes.all().single;
+      notes.setTranscript(pills.id, pills.recordings.single, 'Eight sharp');
+      final area = Places(store).areas().single;
+      final old = notes.capture('Old list', place: area.id);
+      notes.trash(old.id);
+      notes.capture('Call the vet');
+      // A Shared Area whose role the old Device holds.
+      store.share(Places(store).addArea('Family').id);
+      final code = await setUpBackups(store, passphrase, kdf: cheap);
+      final path = '${dir.path}/n.$backupExtension';
+      await writeBackup(store, path);
+      return (store, path, decodeRecoveryCode(code)!);
+    }
+
+    Matcher refused(BackupProblem problem) => throwsA(
+      isA<BackupException>().having((e) => e.problem, 'problem', problem),
+    );
+
+    test('opens a Backup as a Pack\'s tree and leaves the log as it '
+        'is', () async {
+      final (old, path, key) = await withNotes();
+      addTearDown(old.close);
+      final store = fresh('o');
+      addTearDown(store.close);
+      Notes(store).capture('Already here');
+      final seq = store.currentSeq();
+      final before = settings(store);
+      final opened = await openBackupNotes(store, path, key);
+
+      expect(store.currentSeq(), seq);
+      expect(settings(store), before);
+      expect(heldBlobs(store), isEmpty);
+      expect(opened.created, readBackupHeader(path)!.created);
+      final pack = opened.pack;
+      expect([for (final a in pack.areas) a.name], ['Doctor']);
+      expect(
+        [for (final n in pack.notes) n.text],
+        ['Old list', 'Pills at eight', 'Call the vet'],
+      );
+      expect(opened.trashed, {0});
+      // As the Device that made it reads it, files and sizes alike.
+      final there = old.packOfEverything();
+      expect(
+        [for (final i in pack.tree()) _item(i)],
+        [for (final i in there.pack.tree()) _item(i)],
+      );
+      expect(opened.trashed, there.trashed);
+      final pills = opened.pack.notes[1];
+      expect(pills.photos.single.size, 150000);
+      expect(pills.recordings.single.size, 900);
+      expect(pills.recordings.single.text, 'Eight sharp');
+      expect(pills.routines, hasLength(1));
+      // Nothing of a Note is ticked, everything under each is.
+      final ticks = opened.pack.backupTicks();
+      expect(ticks, isNot(contains(PackItemKeys.note(1))));
+      expect(
+        ticks,
+        containsAll(opened.pack.allKeys().difference({'n0', 'n1', 'n2'})),
+      );
+      expect(opened.pack.size(ticks), 0);
+    });
+
+    test('Add takes the ticked Notes in as copies, their files read from '
+        'the Backup, and nothing of its identity, keys or roles', () async {
+      final (old, path, key) = await withNotes();
+      addTearDown(old.close);
+      final store = fresh('p');
+      addTearDown(store.close);
+      Places(store).addArea('Doctor');
+      final before = settings(store);
+      final opened = await openBackupNotes(store, path, key);
+      var ticks = opened.pack.backupTicks();
+      for (final i in [0, 1]) {
+        ticks = opened.pack.tick(ticks, PackItemKeys.note(i), true);
+      }
+      // The recording stays behind, its Transcript comes.
+      ticks.remove(PackItemKeys.recording(1, 0));
+      final mark = store.currentSeq();
+      final added = await addBackupNotes(
+        store,
+        opened,
+        ticks,
+        wallClock: wall,
+        suffix: 'Backup',
+        noArea: 'From a Backup',
+      );
+
+      expect(added.notes, 2);
+      expect(
+        [for (final id in added.areas) Places(store).areaById(id)?.name],
+        ['Doctor (Backup)'],
+      );
+      final area = added.areas.single;
+      final copies = Notes(store).inside(area);
+      expect({for (final n in copies) n.text}, {'Old list', 'Pills at eight'});
+      final pills = copies.firstWhere((n) => n.text == 'Pills at eight');
+      expect(pills.isTrashed, isFalse);
+      final photo = pills.photos.single;
+      expect(store.photo(photo), old.photo(photo));
+      expect(pills.recordings, isEmpty);
+      final recording = pills.removedRecordings.single;
+      expect(pills.transcripts[recording], 'Eight sharp');
+      expect(store.audio(recording), isNull);
+      expect(Routines(store).ofNote(pills.id), hasLength(1));
+      // Nothing of the Backup's identity, keys, Profile or roles.
+      expect(settings(store), before);
+      final oldIds = {for (final e in old.allEntries()) e.entity};
+      for (final e in store.entriesAfter(mark)) {
+        expect(e.device, store.deviceId);
+        expect(oldIds, isNot(contains(e.entity)));
+      }
+    });
+
+    test('an attached file comes back whole and into a copy', () async {
+      final old = fullDevice(dir);
+      addTearDown(old.close);
+      final notes = Notes(old);
+      final pills = notes.all().single;
+      final lease = notes.attachFile(
+        pills.id,
+        NewFile(
+          name: 'Lease.pdf',
+          bytes: Uint8List.fromList(utf8.encode('%PDF-1.4 lease')),
+          pages: 1,
+        ),
+      );
+      notes.setAttachmentText(pills.id, lease, 'Rent due');
+      final code = await setUpBackups(old, passphrase, kdf: cheap);
+      final path = '${dir.path}/f.$backupExtension';
+      await writeBackup(old, path);
+      final key = decodeRecoveryCode(code)!;
+      final restored = fresh('f');
+      addTearDown(restored.close);
+      await restoreBackup(restored, path, key);
+      expect(restored.file(lease), old.file(lease));
+      final other = fresh('g');
+      addTearDown(other.close);
+      final opened = await openBackupNotes(other, path, key);
+      final i = opened.pack.notes.indexWhere((n) => n.attachments.isNotEmpty);
+      await addBackupNotes(
+        other,
+        opened,
+        opened.pack.tick(opened.pack.backupTicks(), PackItemKeys.note(i), true),
+        wallClock: wall,
+        suffix: 'Backup',
+        noArea: 'From a Backup',
+      );
+      final copy = Notes(other)
+          .all()
+          .firstWhere((n) => n.attachments.isNotEmpty);
+      expect(copy.attachments.single.name, 'Lease.pdf');
+      expect(other.file(lease), old.file(lease));
+      expect(copy.attachmentTexts[lease], 'Rent due');
+    });
+
+    test('refuses as restoring does: a wrong key, a later format, a file '
+        'that is no Backup, a damaged one', () async {
+      final (old, path, key) = await withNotes();
+      addTearDown(old.close);
+      final store = fresh('r');
+      addTearDown(store.close);
+      await expectLater(
+        openBackupNotes(store, path, Uint8List(32)),
+        refused(BackupProblem.wrongSecret),
+      );
+      final bytes = File(path).readAsBytesSync();
+      final header = readBackupHeader(path)!;
+      final line = utf8.decode(header.line);
+      final variants = {
+        BackupProblem.needsUpdate: [
+          ...utf8.encode('{"format":2,${line.substring(1)}'),
+          ...bytes.sublist(header.line.length),
+        ],
+        BackupProblem.notABackup: utf8.encode('no Backup\n'),
+        BackupProblem.damaged: Uint8List.fromList(bytes)
+          ..[bytes.length - 5] ^= 1,
+      };
+      var n = 0;
+      for (final MapEntry(key: problem, value: changed) in variants.entries) {
+        final file = File('${dir.path}/r${n++}.$backupExtension')
+          ..writeAsBytesSync(changed);
+        await expectLater(
+          openBackupNotes(store, file.path, key),
+          refused(problem),
+          reason: problem.name,
+        );
+      }
+      final cut = File('${dir.path}/cut.$backupExtension')
+        ..writeAsBytesSync(bytes.sublist(0, bytes.length - 3));
+      await expectLater(
+        openBackupNotes(store, cut.path, key),
+        refused(BackupProblem.damaged),
+      );
+      expect(store.currentSeq(), 0);
+    });
+
+    test('a file changed after it was opened adds nothing', () async {
+      final (old, path, key) = await withNotes();
+      addTearDown(old.close);
+      final store = fresh('c');
+      addTearDown(store.close);
+      final opened = await openBackupNotes(store, path, key);
+      // Another Backup of the same Device in its place.
+      Notes(old).capture('Written since');
+      await writeBackup(old, path);
+      await expectLater(
+        addBackupNotes(
+          store,
+          opened,
+          opened.pack.tick(opened.pack.backupTicks(), 'n1', true),
+          wallClock: wall,
+          suffix: 'Backup',
+          noArea: 'From a Backup',
+        ),
+        refused(BackupProblem.damaged),
+      );
+      expect(store.currentSeq(), 0);
+    });
+
+    test('a blob whose bytes are not its hash is a damaged Backup', () async {
+      final store = Store.inMemory(clock: ticking());
+      addTearDown(store.close);
+      await setUpBackups(store, passphrase, kdf: cheap);
+      final backupKey = store.backupKey!;
+      final contentKey = Uint8List.fromList(List.filled(32, 9));
+      final line = BackupHeader.encode(
+        created: DateTime.utc(2026, 10, 1),
+        pass: store.backupPass!,
+        sealedKey: seal(backupKey, contentKey, aad: SealedAs.backupKey),
+      );
+      final hash = sha256.convert(utf8.encode('the photo')).toString();
+      final payload = utf8.encode(
+        '${jsonEncode({
+          'about': {'device': store.deviceId, 'seed': store.signingKey.seedHex},
+        })}\n'
+        '{"blob":"photo/$hash","size":9}\nnot it!!!',
+      );
+      final file = File('${dir.path}/crafted.$backupExtension')
+        ..writeAsBytesSync([
+          ...line,
+          0x0a,
+          ...seal(
+            contentKey,
+            payload,
+            aad: SealedAs.backupChunk(
+              sha256.convert(line).toString(),
+              0,
+              last: true,
+            ),
+          ),
+        ]);
+      await expectLater(
+        openBackupNotes(store, file.path, backupKey),
+        refused(BackupProblem.damaged),
+      );
+    });
+
+    test('reads as the Device that made it: its own order of the Areas, '
+        'not one another person\'s Device wrote', () async {
+      final ada = Store.inMemory(clock: ticking());
+      addTearDown(ada.close);
+      final places = Places(ada);
+      final health = places.addArea('Health');
+      final work = places.addArea('Work');
+      Notes(ada).capture('Stretch', place: health.id);
+      Notes(ada).capture('Report', place: work.id);
+      ada.setAreaOrder([work.id, health.id]);
+      final cy = Store.inMemory(clock: ticking(DateTime.utc(2026, 12, 1)));
+      addTearDown(cy.close);
+      final mark = cy.currentSeq();
+      cy.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.areaOrder,
+        jsonEncode([health.id, work.id]),
+      );
+      for (final e in cy.entriesAfter(mark)) {
+        ada.insert(e);
+      }
+      expect([for (final a in ada.areasInOrder()) a.name], ['Work', 'Health']);
+      await setUpBackups(ada, passphrase, kdf: cheap);
+      final path = '${dir.path}/order.$backupExtension';
+      await writeBackup(ada, path);
+      final store = fresh('w');
+      addTearDown(store.close);
+      final opened = await openBackupNotes(store, path, ada.backupKey!);
+      expect([for (final a in opened.pack.areas) a.name], ['Work', 'Health']);
+    });
+
+    test('leaves out the Notes of a locked Area closed on this Device and '
+        'a Tally of it a Session picks, never those of an Area that is '
+        'none here', () async {
+      final ada = Store.inMemory(clock: ticking());
+      addTearDown(ada.close);
+      final places = Places(ada);
+      final notes = Notes(ada);
+      final diary = places.addArea('Diary');
+      final dreams = places.addTopic(diary.id, 'Dreams');
+      final health = places.addArea('Health');
+      notes.capture('Dear diary', place: diary.id);
+      notes.capture('Flying', place: dreams.id);
+      notes.trash(notes.capture('Torn page', place: diary.id).id);
+      final laps = notes.capture('Laps', place: diary.id);
+      Tallies(ada).addField(laps.id, name: 'Laps', target: 10);
+      final training = notes.capture('Training', place: health.id);
+      Sessions(ada).spawn(
+        training.id,
+        Schedule(start: Day(2026, 10, 1), times: [ClockTime(7, 0)]),
+        pool: [laps.id],
+        count: 1,
+        rule: SessionRule.least,
+      );
+      notes.trash(notes.capture('Old list', place: health.id).id);
+      notes.capture('Call the vet');
+      await setUpBackups(ada, passphrase, kdf: cheap);
+      final path = '${dir.path}/closed.$backupExtension';
+      await writeBackup(ada, path);
+      final key = ada.backupKey!;
+      List<String> texts(OpenedBackup o) => [
+        for (final n in o.pack.notes) n.text,
+      ];
+
+      // Its own Backup, the Diary closed here.
+      final shut = await openBackupNotes(ada, path, key, closed: {diary.id});
+      expect([for (final a in shut.pack.areas) a.name], ['Health']);
+      expect(texts(shut), ['Old list', 'Training', 'Call the vet']);
+      expect(shut.trashed, {0});
+      expect(shut.leftOut, {diary.id});
+      final open = await openBackupNotes(ada, path, key);
+      expect(
+        texts(open),
+        containsAll(['Dear diary', 'Flying', 'Torn page', 'Laps']),
+      );
+      expect(open.leftOut, isEmpty);
+      // An Area of this name here is another Area: nothing stays out.
+      final other = fresh('c');
+      addTearDown(other.close);
+      final mine = Places(other).addArea('Diary');
+      final elsewhere = await openBackupNotes(
+        other,
+        path,
+        key,
+        closed: {mine.id},
+      );
+      expect(texts(elsewhere), texts(open));
+      expect(elsewhere.leftOut, isEmpty);
+
+      // "Tick all" adds nothing of the Diary, nor the Session left with
+      // none of its pool, as a Pack's Session goes only with a Tally.
+      final added = await addBackupNotes(
+        ada,
+        shut,
+        shut.pack.allKeys(),
+        wallClock: wall,
+        suffix: 'Backup',
+        noArea: 'From a Backup',
+      );
+      expect(added.notes, 2);
+      final copies = [for (final id in added.areas) ...Notes(ada).inside(id)]
+          .map((n) => n.text);
+      expect(copies, unorderedEquals(['Old list', 'Call the vet']));
+    });
+  });
+
   group('the Backup folder', () {
     test('keeps the last four Backups of this Device and leaves the '
         'others alone', () async {
@@ -1077,3 +1448,11 @@ void main() {
     });
   });
 }
+
+/// A Pack's tree item as the fixtures write it.
+Object? _item(PackItem i) => {
+  'key': i.key,
+  'kind': i.kind.name,
+  'size': i.size,
+  'children': [for (final c in i.children) _item(c)],
+};

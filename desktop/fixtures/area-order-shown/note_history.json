@@ -1,0 +1,39 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000009",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:42.000Z",
+          "entity": "note:00000000000000000000000000000009",
+          "kind": "filed",
+          "before": "area:starter-car",
+          "after": "area:0000000000000000000000000000000c",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:29.000Z",
+          "entity": "note:00000000000000000000000000000009",
+          "kind": "filed",
+          "before": null,
+          "after": "area:starter-car",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:29.000Z",
+          "entity": "note:00000000000000000000000000000009",
+          "kind": "captured",
+          "before": null,
+          "after": "Oil change",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

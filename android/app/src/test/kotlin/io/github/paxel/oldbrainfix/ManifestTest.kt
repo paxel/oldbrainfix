@@ -11,8 +11,10 @@ import org.w3c.dom.Element
 /**
  * The manifest's "open with" filters: a Profile card file (#144) and a
  * Pack (#164) come in as a bundle or a Sent Item does, and no card link
- * opens the app. Clear-text traffic is off, and the one exported receiver
- * hears only the system's broadcasts (#235).
+ * opens the app. Clear-text traffic is off, the one exported receiver
+ * hears only the system's broadcasts (#235), and a Tally's shortcut lands
+ * where no other app reaches (#284). The print service only the system
+ * binds, in the app's own process (#293).
  */
 class ManifestTest {
     private val android = "http://schemas.android.com/apk/res/android"
@@ -44,6 +46,18 @@ class ManifestTest {
     }
 
     @Test
+    fun anyFileCanBeSharedToTheAppForAnAttachment() {
+        val share = activity(".ShareActivity")
+        val filters = elements(share, "intent-filter")
+        for (action in listOf("android.intent.action.SEND", "android.intent.action.SEND_MULTIPLE")) {
+            val filter = filters.single { f ->
+                elements(f, "action").any { it.getAttributeNS(android, "name") == action }
+            }
+            assertEquals(listOf("*/*"), dataOf(filter, "mimeType"))
+        }
+    }
+
+    @Test
     fun aPackOpensWithTheAppAsACardFileDoes() {
         val types = dataOf(activity(".BundleActivity"), "mimeType")
         assertTrue(types.contains("application/vnd.oldbrainfix.pack"))
@@ -61,6 +75,16 @@ class ManifestTest {
             .single { it.getAttributeNS(android, "name") == ".AgendaWidgetService" }
         assertEquals("false", service.getAttributeNS(android, "exported"))
         assertEquals("android.permission.BIND_REMOTEVIEWS", service.getAttributeNS(android, "permission"))
+    }
+
+    @Test
+    fun aTallysShortcutLandsOnAnActivityNoOtherAppStarts() {
+        val entry = activity(".TallyEntryActivity")
+        assertEquals("false", entry.getAttributeNS(android, "exported"))
+        assertEquals("true", entry.getAttributeNS(android, "excludeFromRecents"))
+        assertEquals("true", entry.getAttributeNS(android, "noHistory"))
+        assertEquals("@android:style/Theme.NoDisplay", entry.getAttributeNS(android, "theme"))
+        assertTrue(elements(entry, "intent-filter").isEmpty())
     }
 
     @Test
@@ -86,5 +110,20 @@ class ManifestTest {
         assertEquals(listOf(".RearmReceiver"), exported.map { it.getAttributeNS(android, "name") })
         val actions = elements(exported.single(), "action").map { it.getAttributeNS(android, "name") }.toSet()
         assertEquals(RearmActions.all, actions)
+    }
+
+    @Test
+    fun thePrintServiceIsBoundOnlyByTheSystemInTheAppsOwnProcess() {
+        val service = elements(manifest.documentElement, "service")
+            .single { it.getAttributeNS(android, "name") == ".PrintInService" }
+        assertEquals("android.permission.BIND_PRINT_SERVICE", service.getAttributeNS(android, "permission"))
+        // The shares wait in MainActivity's process.
+        assertEquals("", service.getAttributeNS(android, "process"))
+        val actions = elements(service, "action").map { it.getAttributeNS(android, "name") }
+        assertEquals(listOf("android.printservice.PrintService"), actions)
+        val meta = elements(service, "meta-data").single()
+        assertEquals("android.printservice", meta.getAttributeNS(android, "name"))
+        assertEquals("@xml/print_service", meta.getAttributeNS(android, "resource"))
+        assertTrue(File("src/main/res/xml/print_service.xml").isFile)
     }
 }

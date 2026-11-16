@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
 import 'browser.dart';
+import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
 import 'note_card.dart';
 import 'page_bar.dart';
@@ -11,37 +12,60 @@ import 'system_bars.dart';
 import 'text_marks_view.dart';
 
 /// Opens "merge into…" for [note] and merges it into the Note picked
-/// there; true when it was merged.
+/// there; true when it was merged. Hidden from AI and a Shared Area do
+/// not meet in a Merge (#267): asked as when filing. With [adding], by
+/// default for an Unsorted Note, whose card names it so (#308), the page
+/// is "Add to Note…".
 Future<bool> mergeNote(
   BuildContext context,
   Notes notes,
   Places places,
-  Note note,
-) async {
+  Note note, {
+  bool? adding,
+}) async {
   final intoId = await Navigator.of(context).push(
     MaterialPageRoute<String>(
-      builder: (_) =>
-          MergeIntoScreen(notes: notes, places: places, noteId: note.id),
+      builder: (_) => MergeIntoScreen(
+        notes: notes,
+        places: places,
+        noteId: note.id,
+        adding: adding ?? note.isUnsorted,
+      ),
     ),
   );
-  if (intoId == null) return false;
-  notes.merge(note.id, intoId);
-  return true;
+  if (intoId == null || !context.mounted) return false;
+  final merged = await unlessHiddenFromAi(context, notes.store, () {
+    notes.merge(note.id, intoId);
+    return true;
+  });
+  return merged ?? false;
 }
 
 /// Picks the Note to merge the Note [noteId] into: every other Note as a
 /// card, newest first, with a search field over them. Pops with the
-/// picked Note's id.
+/// picked Note's id. Without [noteId], for several Notes (#273), every
+/// Note is offered.
+///
+/// With [adding] it is "Add to Note…" (#308), for a capture or an
+/// Unsorted Note: "Added to recently" with the Notes this Device added to
+/// last at the top while nothing is typed, as File into… has its places
+/// (#272), and only the Notes this Device may add to; the pick is kept
+/// as added to last. A capture [hidden] from AI is offered no Note of a
+/// Shared Area (#267).
 class MergeIntoScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
-  final String noteId;
+  final String? noteId;
+  final bool adding;
+  final bool hidden;
 
   const MergeIntoScreen({
     super.key,
     required this.notes,
     required this.places,
-    required this.noteId,
+    this.noteId,
+    this.adding = false,
+    this.hidden = false,
   });
 
   @override
@@ -52,6 +76,15 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
   final _query = TextEditingController();
   late List<PlacedNote> _shown = _load();
 
+  /// With [MergeIntoScreen.adding], the Notes added to last that are
+  /// offered, the latest first.
+  late final List<PlacedNote> _recent = widget.adding
+      ? [
+          for (final id in widget.notes.store.recentlyAddedTo)
+            ?_shown.where((placed) => placed.note.id == id).firstOrNull,
+        ]
+      : const [];
+
   @override
   void dispose() {
     _query.dispose();
@@ -59,14 +92,32 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
   }
 
   /// The Notes to merge into: not this one, nor those of closed locked
-  /// Areas.
+  /// Areas; adding, only those this Device may add to, and for a capture
+  /// hidden from AI none of a Shared Area.
   List<PlacedNote> _load() {
     final lock = LockScope.of(context);
+    final store = widget.notes.store;
+    bool offered(Note note) {
+      if (!widget.adding) return true;
+      if (!store.mayWriteIn(note.id)) return false;
+      if (!widget.hidden) return true;
+      final area = store.areaOf(note.id);
+      return area == null || !store.isShared(area);
+    }
+
     return [
-      for (final note in Search(widget.notes.store).notes(_query.text))
-        if (note.id != widget.noteId && !(lock?.hides(note) ?? false))
+      for (final note in Search(store).notes(_query.text))
+        if (note.id != widget.noteId &&
+            !(lock?.hides(note) ?? false) &&
+            offered(note))
           placeNote(widget.places, note),
     ];
+  }
+
+  /// Pops with [id]; adding, it is kept as added to last.
+  void _pick(String id) {
+    if (widget.adding) widget.notes.store.addedTo(id);
+    Navigator.of(context).pop(id);
   }
 
   void _search(String _) => setState(() => _shown = _load());
@@ -77,7 +128,10 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     return Scaffold(
-      appBar: pageBar(context, title: t.mergeInto),
+      appBar: pageBar(
+        context,
+        title: widget.adding ? t.addToNote : t.mergeInto,
+      ),
       body: Column(
         children: [
           BrowserSearchField(
@@ -94,39 +148,54 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
               children: _shown.isEmpty
                   ? [
                       BrowserEmpty(
-                        text: _query.text.trim().isEmpty
-                            ? t.noOtherNotes
-                            : t.nothingFound,
+                        text: _query.text.trim().isNotEmpty
+                            ? t.nothingFound
+                            : widget.adding
+                            ? t.noNoteToAddTo
+                            : t.noOtherNotes,
                       ),
                     ]
                   : [
-                      for (final (
-                            :note,
-                            :area,
-                            :topic,
-                            changes: _,
-                            schedules: _,
-                            amends: _,
-                            :author,
-                          )
-                          in _shown)
-                        // A tap picks the Note, also on a tag.
-                        TagSearchScope(
-                          onSearch: null,
-                          child: NoteCard(
-                            note: note,
-                            when: when,
-                            area: area,
-                            topic: topic,
-                            author: author,
-                            showPlace: true,
-                            onTap: () => Navigator.of(context).pop(note.id),
+                      if (_recent.isNotEmpty && _query.text.trim().isEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Text(
+                            t.addToNoteRecent,
+                            style: Theme.of(context).textTheme.labelLarge,
                           ),
                         ),
+                        for (final placed in _recent)
+                          KeyedSubtree(
+                            key: ValueKey(
+                              'add-to-note-recent-${placed.note.id}',
+                            ),
+                            child: _card(placed, when),
+                          ),
+                        const Divider(height: 24),
+                      ],
+                      for (final placed in _shown) _card(placed, when),
                     ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// [placed] as a card a tap picks, also on a tag.
+  Widget _card(PlacedNote placed, DateFormat when) {
+    final (:note, :area, :topic, changes: _, schedules: _, amends: _, :author) =
+        placed;
+    return TagSearchScope(
+      onSearch: null,
+      child: NoteCard(
+        note: note,
+        when: when,
+        area: area,
+        topic: topic,
+        author: author,
+        showPlace: true,
+        onTap: () => _pick(note.id),
       ),
     );
   }

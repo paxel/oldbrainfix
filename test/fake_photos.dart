@@ -131,6 +131,13 @@ class FakePhotos implements PhotoPlatform {
   /// The photo files put on the clipboard, with their types.
   final copied = <({String path, String type})>[];
 
+  /// Whether the clipboard takes HTML beside the text.
+  bool copiesHtml = true;
+
+  /// The texts put on the clipboard with HTML beside them, also those it
+  /// did not take.
+  final copiedHtml = <({String text, String html})>[];
+
   FakePhotos({this.nextPhoto, this.nextPicked = const []});
 
   /// Another app shares [item] while the app runs.
@@ -183,5 +190,11 @@ class FakePhotos implements PhotoPlatform {
   Future<bool> copyPhoto(String path, String type) async {
     copied.add((path: path, type: type));
     return copies;
+  }
+
+  @override
+  Future<bool> copyHtml(String text, String html) async {
+    copiedHtml.add((text: text, html: html));
+    return copiesHtml;
   }
 }

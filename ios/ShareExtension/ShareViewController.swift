@@ -2,7 +2,8 @@ import UIKit
 import UniformTypeIdentifiers
 
 /// "Old Brain Fix" in the share sheet (#241): keeps what another app
-/// shares, its text, links, pictures and files of the app's own types,
+/// shares, its text, links, pictures, files of the app's own types and
+/// any other files as Attachments (#267),
 /// in the App Group's inbox (ShareInbox.swift) and says so. A share
 /// extension cannot open its app, so the app takes it the next time it
 /// opens or comes back: text and pictures into Capture, a bundle, Sent
@@ -123,6 +124,18 @@ final class ShareViewController: UIViewController {
           if let url = load(provider, type: type) as? URL { manifest.texts.append(url.absoluteString) }
         case .text:
           if let text = loadText(provider, type: type) { manifest.texts.append(text) }
+        case .attachment:
+          let ext = UTType(type)?.preferredFilenameExtension ?? "bin"
+          if let file = copyFile(provider, type: type, into: folder, ext: ext) {
+            let name = provider.suggestedName.map { suggested in
+              (suggested as NSString).pathExtension.isEmpty ? "\(suggested).\(ext)" : suggested
+            }
+            manifest.attachments = (manifest.attachments ?? []) + [
+              SharedAttachment(
+                file: file, name: name ?? file,
+                type: UTType(type)?.preferredMIMEType ?? "")
+            ]
+          }
         }
       }
     }

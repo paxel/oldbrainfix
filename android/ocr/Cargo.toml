@@ -3,7 +3,7 @@ name = "oldbrainfix_ocr"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Text in photos for Old Brain Fix on Android: RustO behind JNI (ADR 0007)."
+description = "Text in photos and PDFs for Old Brain Fix on the phones: RustO and oldbrainfix-pdf behind JNI and C (ADR 0007, ADR 0047)."
 publish = false
 
 [lib]
@@ -19,6 +19,9 @@ rten = { version = "0.27.0", default-features = false, features = ["rten_format"
 rten-tensor = "0.27.0"
 ndarray = { version = "0.16.1", default-features = false }
 jni = "0.21.1"
+# The desktop's PDF reader for Attachment Texts (ADR 0047), pure Rust,
+# so a PDF reads the same on the phone and on the computer.
+oldbrainfix-pdf = { path = "../../desktop/crates/oldbrainfix-pdf" }
 
 [dev-dependencies]
 image = { version = "0.25.10", default-features = false, features = ["jpeg"] }

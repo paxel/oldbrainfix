@@ -44,7 +44,8 @@ cp "$here/$entry" "$deb/usr/share/applications/$entry"
 cp "$icons/icon_256.png" "$deb/usr/share/icons/hicolor/256x256/apps/oldbrainfix.png"
 cp "$root/LICENSE-APACHE" "$root/LICENSE-MIT" "$deb/usr/share/doc/oldbrainfix/"
 # Depends: what the binary links (readelf -d), plus the libraries winit
-# opens at run time.
+# opens at run time. libc6 at least the glibc of the release's build
+# runner, Ubuntu 22.04, which tool/glibc_ceiling.py holds the binary to.
 cat > "$deb/DEBIAN/control" <<CONTROL
 Package: oldbrainfix
 Version: $version
@@ -52,7 +53,7 @@ Section: utils
 Priority: optional
 Architecture: $deb_arch
 Maintainer: paxel <taum@tuta.io>
-Depends: libc6, libgcc-s1, libstdc++6, libxkbcommon0, libasound2t64 | libasound2
+Depends: libc6 (>= 2.35), libgcc-s1, libstdc++6, libxkbcommon0, libasound2t64 | libasound2
 Homepage: https://github.com/paxel/oldbrainfix
 Description: Memory aid for forgetful minds
  Old Brain Fix captures a thought in seconds and nags until it is

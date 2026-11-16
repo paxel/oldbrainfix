@@ -7,8 +7,15 @@
 //! Sent Item for the window to show. On systems without Unix sockets
 //! every start runs on its own.
 //!
+//! Before it hands anything over, a start asks the running app for its
+//! version (#290): one older than this start, or one that does not
+//! answer, as 0.5 and before, is asked to quit, and this start runs in
+//! its place once it has gone, so an update takes effect on the next
+//! start.
+//!
 //! The protocol: one line with a word (`open`, `capture`, `quit`,
-//! `none`), and nothing back; or the line `text`, then the text to the
+//! `none`), and nothing back; or the line `version`, answered by one
+//! line with the running app's version; or the line `text`, then the text to the
 //! end of the stream, answered by `ok` or by `error` and what went wrong;
 //! or the line `import`, then the path to the end of the stream,
 //! answered by `ok` and what came in, or by `error` and what went wrong;
@@ -17,6 +24,7 @@
 
 use std::path::Path;
 use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 use crate::tray::Command;
 
@@ -26,6 +34,9 @@ const TEXT: &str = "text";
 const IMPORT: &str = "import";
 /// The word before the path of a file for the window to open.
 const FILE: &str = "file";
+/// The word that asks the running app for its version.
+#[cfg(unix)]
+const VERSION: &str = "version";
 const OK: &str = "ok";
 const ERROR: &str = "error";
 
@@ -38,6 +49,87 @@ pub type Import = Box<dyn Fn(&Path) -> Result<String, String> + Send>;
 
 /// Takes the path of a file for the window to open.
 pub type OpenFile = Box<dyn Fn(&Path) + Send>;
+
+/// How long a start waits for an older app it asked to quit to go: it
+/// ends its syncs and its Backup first.
+pub const QUIT_WAIT: Duration = Duration::from_secs(5);
+
+/// How long a start waits for the running app to say its version; one
+/// of 0.5 or before answers at once, by closing the connection.
+#[cfg(unix)]
+const VERSION_WAIT: Duration = Duration::from_secs(5);
+
+/// What a start found at the socket, and did about it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Way {
+    /// No app runs: this start runs, or does its wish on its own.
+    Alone,
+    /// An older app ran and has gone: this start runs in its place.
+    Replaced,
+    /// An app of this version or newer runs: the wish goes to it.
+    HandOver,
+    /// An older app was asked to quit and is still there: this start
+    /// says so and ends, so reminders never come twice.
+    Stays,
+}
+
+/// Whether the running app's `theirs` is older than `own`: an answer
+/// that is no version, or none at all, counts as older.
+pub fn older(theirs: Option<&str>, own: &str) -> bool {
+    let Ok(own) = semver::Version::parse(own) else {
+        return false;
+    };
+    match theirs.map(semver::Version::parse) {
+        Some(Ok(theirs)) => theirs < own,
+        _ => true,
+    }
+}
+
+/// Makes way for this start, of version `own`: asks the app running at
+/// `socket` for its version and, when it is older, asks it to quit and
+/// waits up to `wait` for its socket to be free.
+#[cfg(unix)]
+pub fn make_way(socket: &Path, own: &str, wait: Duration) -> Way {
+    let Some(theirs) = running_version(socket) else {
+        return Way::Alone;
+    };
+    if !older(theirs.as_deref(), own) {
+        return Way::HandOver;
+    }
+    hand_over(socket, Some(Command::Quit));
+    let until = std::time::Instant::now() + wait;
+    loop {
+        if std::os::unix::net::UnixStream::connect(socket).is_err() {
+            return Way::Replaced;
+        }
+        if std::time::Instant::now() >= until {
+            return Way::Stays;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(not(unix))]
+pub fn make_way(_socket: &Path, _own: &str, _wait: Duration) -> Way {
+    Way::Alone
+}
+
+/// The version the app running at `socket` says: `None` when none runs,
+/// `Some(None)` when it says nothing.
+#[cfg(unix)]
+fn running_version(socket: &Path) -> Option<Option<String>> {
+    use std::io::{Read, Write};
+    let mut stream = std::os::unix::net::UnixStream::connect(socket).ok()?;
+    let answer = (|| -> std::io::Result<String> {
+        stream.set_read_timeout(Some(VERSION_WAIT))?;
+        writeln!(stream, "{VERSION}")?;
+        stream.shutdown(std::net::Shutdown::Write)?;
+        let mut answer = String::new();
+        stream.read_to_string(&mut answer)?;
+        Ok(answer.trim().to_string())
+    })();
+    Some(answer.ok().filter(|a| !a.is_empty()))
+}
 
 /// What a second start says.
 fn word(command: Option<Command>) -> &'static str {
@@ -159,6 +251,18 @@ pub fn listen(
     socket: &Path,
     commands: Sender<Command>,
     wake: Box<dyn Fn() + Send>,
+    handlers: (Capture, Import, OpenFile),
+) -> std::io::Result<()> {
+    listen_as(socket, env!("CARGO_PKG_VERSION"), commands, wake, handlers)
+}
+
+/// [`listen`], answering `version` with `version`.
+#[cfg(unix)]
+fn listen_as(
+    socket: &Path,
+    version: &'static str,
+    commands: Sender<Command>,
+    wake: Box<dyn Fn() + Send>,
     (capture, import, open): (Capture, Import, OpenFile),
 ) -> std::io::Result<()> {
     use std::io::{BufRead, Read, Write};
@@ -188,6 +292,8 @@ pub fn listen(
                     Err(e) => format!("{ERROR} {e}"),
                 };
                 drop(writeln!(reader.get_mut(), "{answer}"));
+            } else if word == VERSION {
+                drop(writeln!(reader.get_mut(), "{version}"));
             } else if word == FILE {
                 let mut path = String::new();
                 if reader.read_to_string(&mut path).is_ok() && !path.is_empty() {
@@ -215,129 +321,4 @@ pub fn listen(
 }
 
 #[cfg(all(test, unix))]
-mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use super::*;
-
-    #[test]
-    fn a_second_start_hands_its_wish_to_the_first() -> std::io::Result<()> {
-        let dir = tempfile::tempdir()?;
-        let socket = dir.path().join("instance.sock");
-        assert!(!hand_over(&socket, Some(Command::Open)));
-        let (tx, rx) = std::sync::mpsc::channel();
-        listen(
-            &socket,
-            tx,
-            Box::new(|| {}),
-            (
-                Box::new(|_| Ok(())),
-                Box::new(|_| Ok(String::new())),
-                Box::new(|_| {}),
-            ),
-        )?;
-        assert!(hand_over(&socket, Some(Command::Open)));
-        assert!(hand_over(&socket, None));
-        assert!(hand_over(&socket, Some(Command::Capture)));
-        let wait = std::time::Duration::from_secs(5);
-        assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
-        assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Capture));
-        Ok(())
-    }
-
-    #[test]
-    fn a_text_is_captured_by_the_running_app_and_answered() -> std::io::Result<()> {
-        let dir = tempfile::tempdir()?;
-        let socket = dir.path().join("instance.sock");
-        assert_eq!(hand_over_text(&socket, "buy milk"), None);
-        let kept = Arc::new(Mutex::new(Vec::<String>::new()));
-        let into = kept.clone();
-        let (tx, rx) = std::sync::mpsc::channel();
-        let capture: Capture = Box::new(move |text| {
-            if text.contains("fail") {
-                return Err("the log is locked".into());
-            }
-            into.lock().map_err(|e| e.to_string())?.push(text.into());
-            Ok(())
-        });
-        listen(
-            &socket,
-            tx,
-            Box::new(|| {}),
-            (capture, Box::new(|_| Ok(String::new())), Box::new(|_| {})),
-        )?;
-        assert_eq!(hand_over_text(&socket, "buy milk"), Some(Ok(())));
-        // Lines and blanks come through as given; a word is no command.
-        assert_eq!(hand_over_text(&socket, "open\nthe window\n"), Some(Ok(())));
-        assert_eq!(
-            hand_over_text(&socket, "fail"),
-            Some(Err("the log is locked".into()))
-        );
-        let kept = kept.lock().map(|k| k.clone()).unwrap_or_default();
-        assert_eq!(kept, ["buy milk", "open\nthe window\n"]);
-        assert!(rx.try_recv().is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn a_bundle_is_imported_by_the_running_app_and_answered() -> std::io::Result<()> {
-        let dir = tempfile::tempdir()?;
-        let socket = dir.path().join("instance.sock");
-        let file = dir.path().join("a b.obfsync");
-        assert_eq!(hand_over_import(&socket, &file), None);
-        let (tx, _rx) = std::sync::mpsc::channel();
-        let import: Import = Box::new(|path| {
-            if path.ends_with("a b.obfsync") {
-                Ok("3 changes came in.\nAnd more.".into())
-            } else {
-                Err("no sync bundle".into())
-            }
-        });
-        listen(
-            &socket,
-            tx,
-            Box::new(|| {}),
-            (Box::new(|_| Ok(())), import, Box::new(|_| {})),
-        )?;
-        assert_eq!(
-            hand_over_import(&socket, &file),
-            Some(Ok("3 changes came in.\nAnd more.".into()))
-        );
-        assert_eq!(
-            hand_over_import(&socket, &dir.path().join("other")),
-            Some(Err("no sync bundle".into()))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_file_to_open_goes_to_the_running_window() -> std::io::Result<()> {
-        let dir = tempfile::tempdir()?;
-        let socket = dir.path().join("instance.sock");
-        let file = dir.path().join("a note.oldbrain");
-        assert!(!hand_over_file(&socket, &file));
-        let opened = Arc::new(Mutex::new(Vec::new()));
-        let into = opened.clone();
-        let (tx, rx) = std::sync::mpsc::channel();
-        listen(
-            &socket,
-            tx,
-            Box::new(|| {}),
-            (
-                Box::new(|_| Ok(())),
-                Box::new(|_| Ok(String::new())),
-                Box::new(move |path| {
-                    if let Ok(mut held) = into.lock() {
-                        held.push(path.to_path_buf());
-                    }
-                }),
-            ),
-        )?;
-        assert!(hand_over_file(&socket, &file));
-        let wait = std::time::Duration::from_secs(5);
-        assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
-        let opened = opened.lock().map(|o| o.clone()).unwrap_or_default();
-        assert_eq!(opened, [file]);
-        Ok(())
-    }
-}
+mod tests;

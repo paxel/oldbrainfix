@@ -204,25 +204,14 @@ void main() {
       expect(key('replace-text', note.photos.single), findsNothing);
     });
 
-    testWidgets('Remove asks once, removes the Transcript and keeps the '
+    testWidgets('Remove removes the Transcript without asking and keeps the '
         'recording; only "again" stays', (tester) async {
       final note = mixed();
       final spoken = note.recordings.first;
       await start(tester);
       await edit(tester, note.id);
       await tap(tester, key('remove-text', spoken));
-
-      expect(find.text('Remove this Transcript?'), findsOneWidget);
-      final confirm = tester.widget<TextButton>(
-        find.byKey(const ValueKey('remove-media-confirm')),
-      );
-      final context = tester.element(find.byType(AlertDialog));
-      expect(
-        confirm.style?.foregroundColor?.resolve({}),
-        Theme.of(context).colorScheme.error,
-      );
-      await tester.tap(find.text('Remove'));
-      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
 
       final after = notes.byId(note.id)!;
       expect(after.recordings, note.recordings);
@@ -238,16 +227,35 @@ void main() {
       expect(key('again', spoken), findsOneWidget);
     });
 
-    testWidgets('Cancel keeps the Photo Text', (tester) async {
+    testWidgets('the announcement at the top brings a removed Photo Text '
+        'back, as it was (#268)', (tester) async {
       final note = mixed();
+      final photo = note.photos.single;
       await start(tester);
       await edit(tester, note.id);
-      await tap(tester, key('remove-text', note.photos.single));
-      expect(find.text('Remove this Photo Text?'), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
+      await tap(tester, key('remove-text', photo));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(notes.byId(note.id)!.photoTexts, isEmpty);
+      expect(find.text('Room 12'), findsNothing);
 
-      expect(notes.byId(note.id)!.photoTexts, {note.photos.single: 'Room 12'});
+      await tap(tester, find.text('Photo Text removed'));
+      expect(notes.byId(note.id)!.photoTexts, {photo: 'Room 12'});
+      expect(notes.byId(note.id)!.removedPhotoTexts, isEmpty);
+      await seek(tester, find.text('Room 12'));
+      expect(find.text('Room 12'), findsOneWidget);
+    });
+
+    testWidgets('the undo leaves a Transcript made again meanwhile', (
+      tester,
+    ) async {
+      final note = mixed();
+      final spoken = note.recordings.first;
+      await start(tester);
+      await edit(tester, note.id);
+      await tap(tester, key('remove-text', spoken));
+      notes.setTranscript(note.id, spoken, 'Bring the card');
+      await tap(tester, find.text('Transcript removed'));
+      expect(notes.byId(note.id)!.transcripts[spoken], 'Bring the card');
     });
 
     testWidgets('Transcribe again brings a removed Transcript back', (
@@ -404,8 +412,6 @@ void main() {
       final (note, _) = await merged(tester);
       final spoken = note.recordings.first;
       await tap(tester, key('remove-text', spoken));
-      await tester.tap(find.text('Remove'));
-      await tester.pumpAndSettle();
       expect(notes.byId(note.id)!.removedTranscripts, [spoken]);
       expect(key('replace-text', spoken), findsNothing);
 

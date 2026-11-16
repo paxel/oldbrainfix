@@ -1,10 +1,10 @@
 //! Desktop notifications, as Catlog's desktop shows them: the system's
 //! notification service through notify-rust outside tests, a recorder
-//! inside. On Linux a notification offers its buttons (Done, the
-//! snoozes, Open), shows again in place of the one with the same key,
-//! and is closed once its Occurrence is Done. A Windows toast offers the
-//! same buttons but is neither replaced nor closed: notify-rust shows
-//! each one anew and closes none. On macOS a click on it is heard, but
+//! inside. On Linux a notification offers its buttons (Done, Snooze,
+//! Not today, and their choices in place, #269), shows again in place of
+//! the one with the same key, and is closed once its Occurrence is Done
+//! or skipped. A Windows toast offers the same buttons but is neither
+//! replaced nor closed: notify-rust shows each one anew and closes none. On macOS a click on it is heard, but
 //! it offers no buttons: notify-rust puts more than one under a menu
 //! titled "Options" in English only.
 
@@ -77,6 +77,9 @@ impl Notifier for DesktopNotifier {
                 std::thread::spawn(move || {
                     let waiter = waiting.clone();
                     handle.wait_for_action(|action| {
+                        // It hears no more after one: the choices shown
+                        // in place for it need a waiter of their own.
+                        waiter.store(false, Ordering::SeqCst);
                         if action != "__closed" {
                             let tap = crate::alerts::Tap {
                                 key,

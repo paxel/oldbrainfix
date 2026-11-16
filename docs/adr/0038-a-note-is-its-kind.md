@@ -12,7 +12,7 @@ For every kind but the Plain Note, the text shrinks to the name: its first line,
 
 This is display only. No Note is rewritten to show this way, and the stored text keeps its format (ADR 0018, 0033). In the editor the name is a one-line field and the description its own field under it; saving writes them back as one text, the name alone while the description is empty, else the name, a line break and the description. A Note opened and left with neither changed writes nothing. Both cores split and join the same way (`NoteKinds.name`, `description`, `join`).
 
-A list made from a Note keeps only its first line as text (ADR 0030), so it starts with no description; one shows once the user types it, or for a Tally, which keeps its whole text.
+A list made from a Note keeps only its first line as text (ADR 0030), so it starts with no description; one shows once the user types it, or for a Tally, which keeps its whole text. Amended by #309: typed text made a list keeps its first line as the name only when that line looks like a heading, a Markdown heading or a line ending in ":"; else every line becomes a Line and the list starts without a name, its kind shown in its place (ADR 0030, "Typed text made a list").
 
 ## The kind changes on its badge
 

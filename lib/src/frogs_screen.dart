@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'agenda_group.dart';
+import 'announcements.dart';
 import 'app_lock.dart';
 import 'area_look.dart';
 import 'browser.dart';
@@ -11,6 +12,7 @@ import 'look.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
+import 'tick_saves.dart';
 
 /// The frog that marks Frogs, silent: there is none among the Material
 /// icons.
@@ -57,8 +59,9 @@ Future<void> openFrogs(BuildContext context, Notes notes, Places places) =>
     );
 
 /// A long press on a Frog's row opens a menu where the finger is, with
-/// Delete for who may manage it (ADR 0013), which asks once and moves
-/// the Frog to the trash; its Note stays. Nothing opens for others.
+/// Delete for who may manage it (ADR 0013), which moves the Frog to the
+/// trash without asking, the announcement at the top undoing it (#268);
+/// its Note stays. Nothing opens for others.
 Future<void> frogMenu(
   BuildContext context,
   Frogs frogs,
@@ -79,34 +82,20 @@ Future<void> frogMenu(
     items: [PopupMenuItem(value: true, child: Text(t.delete))],
   );
   if (choice != true || !context.mounted) return;
-  await trashFrog(context, frogs, frog);
+  trashFrog(context, frogs, frog);
 }
 
-/// Asks once whether [frog] goes to the trash, and moves it there; its
-/// Note stays. True when it went.
-Future<bool> trashFrog(BuildContext context, Frogs frogs, Frog frog) async {
-  final t = context.t;
-  final sure = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      content: Text(t.deleteFrogQuestion),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(t.cancel),
-        ),
-        TextButton(
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(t.delete),
-        ),
-      ],
-    ),
-  );
-  if (sure != true) return false;
+/// Moves [frog] to the trash without asking and offers to undo it at the
+/// top (#268); its Note stays. True when it went.
+bool trashFrog(BuildContext context, Frogs frogs, Frog frog) {
+  final store = frogs.store;
+  if (frogs.byId(frog.id)?.isTrashed != false) return false;
   frogs.trash(frog.id);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoFrogTrashed, () {
+    if (frogs.byId(frog.id)?.isTrashed != true) return;
+    if (!store.mayManage(store.areaOf(frog.id))) return;
+    frogs.restore(frog.id);
+  });
   return true;
 }
 
@@ -272,7 +261,8 @@ class FrogsScreen extends StatefulWidget {
   State<FrogsScreen> createState() => _FrogsScreenState();
 }
 
-class _FrogsScreenState extends State<FrogsScreen> with ReloadsOnLogChange {
+class _FrogsScreenState extends State<FrogsScreen>
+    with ReloadsOnLogChange, TicksAtOnce {
   /// The local setting that keeps the "Done" section open.
   static const _doneOpenKey = 'frogsDoneOpen';
 
@@ -309,13 +299,14 @@ class _FrogsScreenState extends State<FrogsScreen> with ReloadsOnLogChange {
     widget.notes.store.setLocalSetting(_doneOpenKey, '$open');
   }
 
+  /// Ticks [frog] at once and saves it after the frame (#338).
   void _toggle(Frog frog) {
-    if (frog.isDone) {
-      _frogs.unmarkDone(frog.id);
-    } else {
-      _frogs.markDone(frog.id);
-    }
-    setState(_load);
+    final key = tickKey(frog: frog.id);
+    final done = TickSaves.instance.waiting<bool>(key) ?? frog.isDone;
+    tickAtOnce(key, !done, () {
+      done ? _frogs.unmarkDone(frog.id) : _frogs.markDone(frog.id);
+      if (mounted) setState(_load);
+    });
   }
 
   Future<void> _openNote(Note note) async {
@@ -332,6 +323,7 @@ class _FrogsScreenState extends State<FrogsScreen> with ReloadsOnLogChange {
       area: area,
       title: noteText(context.t, note),
       subtitle: subtitle,
+      done: TickSaves.instance.waiting<bool>(tickKey(frog: frog.id)),
       onToggle: widget.notes.store.mayCheckOff(frog.id)
           ? () => _toggle(frog)
           : null,

@@ -14,13 +14,21 @@
 //! Markdown…"). `photos` and
 //! `recordings` are the hashes of the Note's and then its Sections'
 //! photos and recordings, each once, for the app to hand along as files.
+//!
+//! Copying a Checklist or Shopping List ([`list_share`], #323) puts its
+//! Lines as a task list of GFM between its text and its Sections.
 
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
 
+use crate::Result;
+use crate::checklists::{Checklists, keys as checklist_keys};
 use crate::markdown;
 use crate::notes::{Note, Section};
+use crate::schedule::WallClock;
+use crate::shopping_lists::ShoppingLists;
+use crate::store::Store;
 use crate::text_format;
 
 /// What a Note hands to another app.
@@ -33,10 +41,101 @@ pub struct NoteShare {
     pub recordings: Vec<String>,
 }
 
+/// One Line of a Checklist or Shopping List as it is copied (#323).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskLine {
+    pub text: String,
+    /// Checked, or on a Shopping List struck.
+    pub checked: bool,
+    /// Under the Line above, in its group.
+    pub in_group: bool,
+}
+
+/// The Lines of the Note `note_id` as they show now, a Checklist's
+/// checked as for the Occurrence it is on ([`Checklists::shown_now`]), a
+/// Shopping List's struck ones after its open ones and those checked
+/// Once left out; `None` when it is no Checklist or Shopping List.
+pub fn task_lines(store: &Store, note_id: &str, wall: &WallClock) -> Result<Option<Vec<TaskLine>>> {
+    if let Some(list) = Checklists::new(store).shown_now(note_id, wall)? {
+        return Ok(Some(
+            list.lines
+                .iter()
+                .map(|l| TaskLine {
+                    text: l.text.clone(),
+                    checked: l.checked,
+                    in_group: l.in_group(),
+                })
+                .collect(),
+        ));
+    }
+    Ok(ShoppingLists::new(store)
+        .by_note(note_id, wall)?
+        .map(|list| {
+            list.lines
+                .iter()
+                .map(|l| TaskLine {
+                    text: l.text.clone(),
+                    checked: l.struck,
+                    in_group: false,
+                })
+                .collect()
+        }))
+}
+
+/// `lines` as a task list of GFM (#263, #323), one item a line, `- [ ] `
+/// before an open Line, `- [x] ` before a checked one, a Line of a group
+/// indented by two spaces; each text as written when `escaped` is false,
+/// else escaped so it reads as written ([`markdown::escape`]); `glyphs`
+/// writes the boxes as ☐ and ✅ instead, as the app shows them.
+fn task_list_with(lines: &[TaskLine], escaped: bool, glyphs: bool) -> String {
+    lines
+        .iter()
+        .map(|l| {
+            let indent = if l.in_group {
+                checklist_keys::GROUP_INDENT
+            } else {
+                ""
+            };
+            let mark = match (glyphs, l.checked) {
+                (false, false) => "[ ]",
+                (false, true) => "[x]",
+                (true, false) => "☐",
+                (true, true) => "✅",
+            };
+            let text = if escaped {
+                markdown::escape(&l.text)
+            } else {
+                l.text.clone()
+            };
+            format!("{indent}- {mark} {text}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// `lines` as a task list of GFM (#323): `- [ ] Milk`, `- [x] Eggs`, a
+/// Line of a group indented by two spaces, each text as written.
+pub fn task_list(lines: &[TaskLine]) -> String {
+    task_list_with(lines, false, false)
+}
+
 /// What `note` with its `sections`, oldest first, hands along; `date`
 /// writes a Section's capture time as the app shows dates.
 pub fn note_share(
     note: &Note,
+    sections: &[Section],
+    date: impl Fn(DateTime<Utc>) -> String,
+) -> NoteShare {
+    list_share(note, &[], sections, date)
+}
+
+/// What a Checklist or Shopping List `note` copies (#323): as
+/// [`note_share`], with its `lines` after its own text as a task list
+/// ([`task_list`]), formatted: the HTML beside it holds them as items
+/// with their boxes as glyphs. Without `lines` it is [`note_share`].
+pub fn list_share(
+    note: &Note,
+    lines: &[TaskLine],
     sections: &[Section],
     date: impl Fn(DateTime<Utc>) -> String,
 ) -> NoteShare {
@@ -83,29 +182,35 @@ pub fn note_share(
         } else {
             vec![(own, format == text_format::MARKDOWN)]
         };
-        if words.is_empty() {
-            continue;
-        }
-        formatted = formatted || words.iter().any(|w| w.1);
-        let mut shown: Vec<String> = date.iter().cloned().collect();
-        let mut read: Vec<String> = date.iter().map(|d| markdown::escape(d)).collect();
-        let mut kept = read.clone();
-        for (t, md) in words {
-            // Boxes go out as task list items (#263), as glyphs in HTML.
-            if md {
-                let tasks = markdown::task_lists(t);
-                shown.push(tasks.clone());
-                kept.push(tasks);
-                read.push(t.to_string());
-            } else {
-                shown.push(t.to_string());
-                kept.push(markdown::escape(t));
-                read.push(markdown::escape(t));
+        if !words.is_empty() {
+            formatted = formatted || words.iter().any(|w| w.1);
+            let mut shown: Vec<String> = date.iter().cloned().collect();
+            let mut read: Vec<String> = date.iter().map(|d| markdown::escape(d)).collect();
+            let mut kept = read.clone();
+            for (t, md) in words {
+                // Boxes go out as task list items (#263), as glyphs in HTML.
+                if md {
+                    let tasks = markdown::task_lists(t);
+                    shown.push(tasks.clone());
+                    kept.push(tasks);
+                    read.push(t.to_string());
+                } else {
+                    shown.push(t.to_string());
+                    kept.push(markdown::escape(t));
+                    read.push(markdown::escape(t));
+                }
             }
+            written.push(shown.join("\n"));
+            source.push(read.join("\n"));
+            saved.push(kept.join("\n"));
         }
-        written.push(shown.join("\n"));
-        source.push(read.join("\n"));
-        saved.push(kept.join("\n"));
+        // The Lines follow the Note's own text, before its Sections.
+        if date.is_none() && !lines.is_empty() {
+            formatted = true;
+            written.push(task_list(lines));
+            source.push(task_list_with(lines, true, true));
+            saved.push(task_list_with(lines, true, false));
+        }
     }
     let once = |lists: Vec<&Vec<String>>| {
         let mut out: Vec<String> = Vec::new();
@@ -175,121 +280,4 @@ fn trim_end(text: &str) -> &str {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::notes::Notes;
-    use crate::{Error, Result};
-
-    fn day(d: DateTime<Utc>) -> String {
-        d.format("%H:%M:%S").to_string()
-    }
-
-    #[test]
-    fn the_text_and_each_section_under_its_date_plain_without_html() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let note = notes.capture("Milk\n", None, None)?;
-        let eggs = notes.amend_as(&note.id, "Eggs", text_format::PLAIN)?;
-        let note = notes
-            .by_id(&note.id)?
-            .ok_or_else(|| crate::Error::Invalid("gone".into()))?;
-        let share = note_share(&note, &notes.sections(&note.id)?, day);
-        assert_eq!(share.text, format!("Milk\n\n{}\nEggs", day(eggs.captured)));
-        assert_eq!(share.html, None);
-        Ok(())
-    }
-
-    #[test]
-    fn a_formatted_text_goes_as_written_with_html_beside_it() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let note = notes.capture_as("**Milk** *now*", text_format::MARKDOWN, None, None)?;
-        let more = notes.amend_as(&note.id, "2*3*4 # x", text_format::PLAIN)?;
-        let share = note_share(&note, &notes.sections(&note.id)?, day);
-        let at = day(more.captured);
-        assert_eq!(share.text, format!("**Milk** *now*\n\n{at}\n2*3*4 # x"));
-        assert_eq!(
-            share.html.as_deref(),
-            Some(
-                format!("<p><strong>Milk</strong> <em>now</em></p>\n<p>{at}<br>2*3*4 # x</p>\n")
-                    .as_str()
-            )
-        );
-        // Saved as Markdown, the plain Section reads as written.
-        let plain = markdown::escape("2*3*4 # x");
-        assert!(plain.contains("2\\*3\\*4"), "{plain}");
-        assert_eq!(
-            share.markdown,
-            format!("**Milk** *now*\n\n{}\n{plain}", markdown::escape(&at))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn boxes_go_as_task_list_items_and_as_glyphs_in_html() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let note =
-            notes.capture_as("- [ ] milk\n- [x] bread", text_format::MARKDOWN, None, None)?;
-        let id = notes
-            .by_id(&note.id)?
-            .ok_or_else(|| Error::Invalid("a Note".into()))?
-            .boxes[0]
-            .id
-            .clone();
-        crate::boxes::Boxes::new(&store).tick(
-            &note.id,
-            &id,
-            crate::text_boxes::BoxState::Failed,
-        )?;
-        let more = notes.amend_as(&note.id, "- ☐ plain", text_format::PLAIN)?;
-        let note = notes
-            .by_id(&note.id)?
-            .ok_or_else(|| Error::Invalid("a Note".into()))?;
-        let share = note_share(&note, &notes.sections(&note.id)?, day);
-        let at = day(more.captured);
-        assert_eq!(
-            share.text,
-            format!("- [x] ~~milk~~\n- [x] bread\n\n{at}\n- ☐ plain")
-        );
-        assert_eq!(
-            share.html.as_deref(),
-            Some(
-                format!("<ul><li>❌ milk</li><li>✅ bread</li></ul>\n<p>{at}<br>- ☐ plain</p>\n")
-                    .as_str()
-            )
-        );
-        assert!(
-            share
-                .markdown
-                .starts_with("- [x] ~~milk~~\n- [x] bread\n\n"),
-            "{}",
-            share.markdown
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn transcripts_go_along_only_without_words() -> Result<()> {
-        let store = crate::store::tests::store();
-        let notes = Notes::new(&store);
-        let voice = vec![0x52, 0x49, 0x46, 0x46, 1];
-        let silent = notes.capture_with("", None, None, &[], std::slice::from_ref(&voice))?;
-        let hash = silent.recordings[0].clone();
-        notes.set_transcript(&silent.id, &hash, "*buy* milk ")?;
-        let silent = notes
-            .by_id(&silent.id)?
-            .ok_or_else(|| crate::Error::Invalid("gone".into()))?;
-        let share = note_share(&silent, &[], day);
-        assert_eq!(share.text, "*buy* milk");
-        assert_eq!(share.html, None);
-        assert_eq!(share.recordings, vec![hash.clone()]);
-        let worded = notes.capture_with("Shop", None, None, &[], &[voice])?;
-        notes.set_transcript(&worded.id, &hash, "buy milk")?;
-        let worded = notes
-            .by_id(&worded.id)?
-            .ok_or_else(|| crate::Error::Invalid("gone".into()))?;
-        assert_eq!(note_share(&worded, &[], day).text, "Shop");
-        Ok(())
-    }
-}
+mod tests;

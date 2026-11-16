@@ -916,30 +916,27 @@ fn bundle_section(
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.bundle_title()).strong().color(text));
         ui.label(RichText::new(t.bundle_intro()).small().color(weak));
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(t.bundle_for()).color(text));
-            let shown = bundle_for
-                .as_ref()
-                .and_then(|id| devices.iter().find(|d| &d.id == id))
-                .map(named)
-                .unwrap_or_else(|| t.bundle_everything().to_string());
-            egui::ComboBox::from_id_salt("bundle-for")
-                .selected_text(RichText::new(shown).color(text))
-                .show_ui(ui, |ui| {
-                    for device in &devices {
-                        ui.selectable_value(
-                            bundle_for,
-                            Some(device.id.clone()),
-                            RichText::new(named(device)).color(text),
-                        );
-                    }
-                    ui.selectable_value(
-                        bundle_for,
-                        None,
-                        RichText::new(t.bundle_everything()).color(text),
-                    );
-                });
-        });
+        // Device names are the user's own: radio buttons, as on the
+        // phone (UI laws, "Dialogs and pages"), Everything last.
+        ui.label(RichText::new(t.bundle_for()).color(text));
+        for device in &devices {
+            let on = bundle_for.as_ref() == Some(&device.id);
+            if ui
+                .radio(on, RichText::new(named(device)).color(text))
+                .clicked()
+            {
+                *bundle_for = Some(device.id.clone());
+            }
+        }
+        if ui
+            .radio(
+                bundle_for.is_none(),
+                RichText::new(t.bundle_everything()).color(text),
+            )
+            .clicked()
+        {
+            *bundle_for = None;
+        }
         ui.horizontal(|ui| {
             if ui
                 .button(RichText::new(t.bundle_save()).color(text))

@@ -180,6 +180,9 @@ pub struct FeedbackForm {
     pub worked: pack_view::Worked,
     /// Whether the Pack is being saved: "Save the Pack…" waits meanwhile.
     pub busy: bool,
+    /// Whether the text still waits for the keyboard it takes as the
+    /// page opens (#277).
+    pub focus: bool,
 }
 
 impl Default for FeedbackForm {
@@ -194,6 +197,7 @@ impl Default for FeedbackForm {
             ticks: PackTicks::new(),
             worked: pack_view::Worked::default(),
             busy: false,
+            focus: true,
         }
     }
 }
@@ -251,6 +255,11 @@ pub fn form(
             );
             crate::text_menu::show(ui, t, &field, &form.text);
             app::name_field(ui, &field, t.feedback_text_label());
+            // Asked again past a dialog's first, sizing pass, which drops it.
+            if form.focus {
+                field.request_focus();
+                form.focus = ui.is_sizing_pass() || !field.has_focus();
+            }
             ui.label(RichText::new(t.feedback_goes_along()).strong().color(text));
             for (on, label, value) in [
                 (&mut form.version, t.feedback_version(), &facts.version),
@@ -297,7 +306,7 @@ pub fn form(
                         let size = pack_view::size_text(t, worked.1);
                         ui.label(RichText::new(t.pack_size(&size)).strong().color(text));
                         pack_view::tick_buttons(ui, t, pack, &mut form.ticks);
-                        pack_view::tree(ui, t, pack, &mut form.ticks);
+                        pack_view::tree(ui, t, pack, &mut form.ticks, &Default::default());
                     });
             }
             ui.separator();
@@ -320,7 +329,7 @@ pub fn form(
             let written = !form.text.trim().is_empty();
             let fits = body.chars().count() <= MAIL_BODY_LIMIT;
             ui.horizontal(|ui| {
-                if theme::primary(ui, written && fits, t.feedback_mail()).clicked() {
+                if theme::main_action(ui, written && fits, t.feedback_mail()) {
                     asked = Some(FeedbackAsk::Mail);
                 }
                 let save = RichText::new(t.feedback_save_file()).color(text);
@@ -353,107 +362,4 @@ pub fn form(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-    use std::path::PathBuf;
-
-    fn env(vars: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
-        let vars: HashMap<String, String> = vars
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect();
-        move |name| vars.get(name).cloned()
-    }
-
-    fn method(vars: &[(&str, &str)], exe: Option<&str>, deb: bool, os: &str) -> String {
-        let exe = exe.map(PathBuf::from);
-        install_method(&env(vars), exe.as_deref(), deb, os)
-    }
-
-    #[test]
-    fn the_install_method_comes_from_the_packaging_and_says_unknown_when_unsure() {
-        let id = [("FLATPAK_ID", "io.github.paxel.oldbrainfix")];
-        assert_eq!(
-            method(&id, Some("/app/bin/oldbrainfix"), false, "linux"),
-            "Flatpak"
-        );
-        let image = [("APPIMAGE", "/home/ann/Old.AppImage")];
-        assert_eq!(
-            method(
-                &image,
-                Some("/tmp/.mount/usr/bin/oldbrainfix"),
-                false,
-                "linux"
-            ),
-            "AppImage"
-        );
-        for exe in [
-            "/home/linuxbrew/.linuxbrew/Cellar/oldbrainfix/0.4.0/bin/oldbrainfix",
-            "/opt/homebrew/Caskroom/oldbrainfix/0.4.0/Old Brain Fix.app/Contents/MacOS/oldbrainfix",
-        ] {
-            assert_eq!(method(&[], Some(exe), false, "linux"), "Homebrew", "{exe}");
-        }
-        let scoop = r"C:\Users\Ann\scoop\apps\oldbrainfix\current\oldbrainfix.exe";
-        assert_eq!(method(&[], Some(scoop), false, "windows"), "Scoop");
-        assert_eq!(
-            method(&[], Some("/usr/bin/oldbrainfix"), true, "linux"),
-            ".deb"
-        );
-        assert_eq!(
-            method(&[], Some("/usr/bin/oldbrainfix"), false, "linux"),
-            "binary"
-        );
-        assert_eq!(
-            method(&[], Some("/home/ann/bin/oldbrainfix"), false, "linux"),
-            "binary"
-        );
-        let app = "/Applications/Old Brain Fix.app/Contents/MacOS/oldbrainfix";
-        assert_eq!(method(&[], Some(app), false, "macos"), "unknown");
-        assert_eq!(method(&[], None, false, "linux"), "unknown");
-        assert_eq!(
-            method(&[("FLATPAK_ID", "")], None, false, "linux"),
-            "unknown"
-        );
-    }
-
-    #[test]
-    fn the_system_line_names_the_distribution_and_the_processor() {
-        let release = "NAME=\"Fedora Linux\"\nPRETTY_NAME=\"Fedora Linux 44 (KDE Plasma)\"\n";
-        assert_eq!(
-            system_line(Some(release), "linux", "x86_64"),
-            "Fedora Linux 44 (KDE Plasma), x86_64"
-        );
-        assert_eq!(
-            system_line(Some("NAME=Debian\n"), "linux", "aarch64"),
-            "Debian, aarch64"
-        );
-        assert_eq!(system_line(None, "windows", "x86_64"), "windows, x86_64");
-    }
-
-    #[test]
-    fn the_body_is_the_words_then_each_fact_ticked_as_the_phone_writes_it() {
-        assert_eq!(
-            feedback_body(
-                " It counts wrong. ",
-                Some("0.4.0"),
-                Some("Debian, x86_64"),
-                Some("Flatpak")
-            ),
-            "It counts wrong.\n\nVersion: 0.4.0\nSystem: Debian, x86_64\nInstalled from: Flatpak"
-        );
-        assert_eq!(
-            feedback_body("Hi", None, Some("Debian, x86_64"), None),
-            "Hi\n\nSystem: Debian, x86_64"
-        );
-        assert_eq!(feedback_body("Hi", None, None, None), "Hi");
-    }
-
-    #[test]
-    fn the_mail_link_goes_to_the_developer_with_the_body_as_it_is() {
-        assert_eq!(
-            mail_url("A & B\n#1"),
-            "mailto:taum@tuta.io?subject=Old%20Brain%20Fix%20feedback&body=A%20%26%20B%0A%231"
-        );
-    }
-}
+mod tests;

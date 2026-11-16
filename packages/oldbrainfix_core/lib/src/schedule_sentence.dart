@@ -71,6 +71,89 @@ class SentenceRead {
   const SentenceRead(this.schedule, this.unknown);
 }
 
+/// The moment a sentence is read at, for its relative words (#271): the
+/// day and the time on this Device's wall clock, and when its day starts
+/// (`DeviceSettings.dayStart`), at which "tomorrow" rings.
+class SentenceNow {
+  final Day today;
+  final ClockTime time;
+  final ClockTime dayStart;
+
+  const SentenceNow(this.today, this.time, this.dayStart);
+
+  /// At [wall], a time on the wall clock, to the minute.
+  factory SentenceNow.at(DateTime wall, ClockTime dayStart) =>
+      SentenceNow(Day.of(wall), ClockTime(wall.hour, wall.minute), dayStart);
+
+  @override
+  bool operator ==(Object other) =>
+      other is SentenceNow &&
+      other.today == today &&
+      other.time == time &&
+      other.dayStart == dayStart;
+
+  @override
+  int get hashCode => Object.hash(today, time, dayStart);
+
+  @override
+  String toString() => 'SentenceNow($today $time, day from $dayStart)';
+}
+
+/// The chips over a new Reminder's schedule (#271), in their order.
+enum QuickChip { inAnHour, tonight, tomorrow, inAWeek }
+
+/// A chip with the day and time it sets.
+class QuickReminder {
+  final QuickChip chip;
+  final Day day;
+  final ClockTime time;
+
+  const QuickReminder(this.chip, this.day, this.time);
+
+  /// The Reminder the chip sets.
+  SimpleSchedule get schedule =>
+      SimpleSchedule(const SimpleRepeat.once(), day, [time]);
+
+  @override
+  bool operator ==(Object other) =>
+      other is QuickReminder &&
+      other.chip == chip &&
+      other.day == day &&
+      other.time == time;
+
+  @override
+  int get hashCode => Object.hash(chip, day, time);
+
+  @override
+  String toString() => 'QuickReminder(${chip.name}, $day $time)';
+}
+
+/// "Tonight", and "this evening" after a day.
+final _tonight = ClockTime(19, 0);
+
+/// [minutes] after [now], counted on the wall clock, the day carried.
+({Day day, ClockTime time}) _later(SentenceNow now, int minutes) {
+  final total = now.time.hour * 60 + now.time.minute + minutes;
+  return (
+    day: now.today.addDays(total ~/ (24 * 60)),
+    time: ClockTime(total ~/ 60 % 24, total % 60),
+  );
+}
+
+/// The chips' Reminders at [now], as the words read them: "in 1 hour",
+/// "tonight" while 19:00 is still to come, "tomorrow" and "in 1 week",
+/// these two at [SentenceNow.dayStart].
+List<QuickReminder> quickReminders(SentenceNow now) {
+  final hour = _later(now, 60);
+  return [
+    QuickReminder(QuickChip.inAnHour, hour.day, hour.time),
+    if (now.time.compareTo(_tonight) < 0)
+      QuickReminder(QuickChip.tonight, now.today, _tonight),
+    QuickReminder(QuickChip.tomorrow, now.today.addDays(1), now.dayStart),
+    QuickReminder(QuickChip.inAWeek, now.today.addDays(7), now.dayStart),
+  ];
+}
+
 /// A word to put in for the text from [start] to [end].
 class SentenceSuggestion {
   final int start;
@@ -124,10 +207,22 @@ String scheduleSentence(SimpleSchedule schedule, String locale, Day today) {
 
 /// Reads [text] in [locale] on [today]: what is left out is all day,
 /// from [today], never ending, and a day without its year lies in
-/// [today]'s. Parts not understood are skipped.
-SentenceRead readSchedule(String text, String locale, Day today) {
-  final parser = _Parser(_Words.of(locale), today);
-  for (final token in _tokens(text, 0)) {
+/// [today]'s. Parts not understood are skipped. The relative words are
+/// not understood here; [readScheduleAt] reads them.
+SentenceRead readSchedule(String text, String locale, Day today) =>
+    _read(text, locale, today, null);
+
+/// Reads [text] in [locale] at [now] as [readSchedule] does on its day,
+/// and also a one-time Reminder in relative words (#271): "today",
+/// "tonight", "tomorrow", "in 2 hours" and in German "heute",
+/// "heute Abend", "morgen", "in 2 Stunden".
+SentenceRead readScheduleAt(String text, String locale, SentenceNow now) =>
+    _read(text, locale, now.today, now);
+
+SentenceRead _read(String text, String locale, Day today, SentenceNow? now) {
+  final w = _Words.of(locale);
+  final parser = _Parser(w, today, now);
+  for (final token in _tokens(text, 0, w.german)) {
     parser.take(token);
   }
   parser.finish();
@@ -150,8 +245,13 @@ List<SentenceSuggestion> suggestSchedule(
     start--;
   }
   final typed = text.substring(start, cursor);
-  final parser = _Parser(w, Day(2000, 1, 1));
-  for (final token in _tokens(text.substring(0, start), 0)) {
+  final noon = ClockTime(12, 0);
+  final parser = _Parser(
+    w,
+    Day(2000, 1, 1),
+    SentenceNow(Day(2000, 1, 1), noon, noon),
+  );
+  for (final token in _tokens(text.substring(0, start), 0, w.german)) {
     parser.take(token);
   }
   // "8:3" is typed for "08:30".
@@ -186,8 +286,27 @@ bool _isLetter(int c) =>
     (c >= 0xc0 && c <= 0x24f && c != 0xd7 && c != 0xf7);
 
 /// Whitespace and the hyphen of "10-mal" part words.
-bool _isSpace(int c) =>
-    c <= 0x20 || c == 0xa0 || c == 0x2009 || c == 0x202f || c == 0x2d;
+bool _isSpace(int c) => _isBlank(c) || c == 0x2d;
+
+bool _isBlank(int c) => c <= 0x20 || c == 0xa0 || c == 0x2009 || c == 0x202f;
+
+/// The end of the "am" or "pm" (English) or "Uhr" (German) that follows
+/// a time or an hour ending at [i], blanks before it, with its dot; null
+/// when none does.
+int? _suffixEnd(String text, int i, bool german) {
+  var j = i;
+  while (j < text.length && _isBlank(text.codeUnitAt(j))) {
+    j++;
+  }
+  final from = j;
+  while (j < text.length && _isLetter(text.codeUnitAt(j))) {
+    j++;
+  }
+  final word = text.substring(from, j).toLowerCase();
+  if (!(german ? word == 'uhr' : word == 'am' || word == 'pm')) return null;
+  if (j < text.length && text.codeUnitAt(j) == 0x2e) j++;
+  return j;
+}
 
 enum _Kind { word, number, time, date, comma, other }
 
@@ -200,8 +319,9 @@ class _Token {
   const _Token(this.kind, this.text, this.start, this.end);
 }
 
-/// The tokens of [text], their offsets counted from [base].
-List<_Token> _tokens(String text, int base) {
+/// The tokens of [text], their offsets counted from [base]; an hour or a
+/// time with its "pm" or "Uhr" is one time.
+List<_Token> _tokens(String text, int base, bool german) {
   final tokens = <_Token>[];
   var i = 0;
   int at(int j) => j < text.length ? text.codeUnitAt(j) : -1;
@@ -249,6 +369,12 @@ List<_Token> _tokens(String text, int base) {
       } else if (sep == 0x2e) {
         // "am 15." is the 15th.
         i++;
+      }
+      if (kind == _Kind.time || (kind == _Kind.number && sep != 0x2e)) {
+        if (_suffixEnd(text, i, german) case final end?) {
+          i = end;
+          kind = _Kind.time;
+        }
       }
     } else {
       // One code point that is no part of a sentence.
@@ -326,6 +452,44 @@ class _Words {
   List<String> get weekdaysHeads =>
       german ? const ['Wochentags', 'Immer'] : const ['Weekdays'];
   List<String> get heads => [onceHead, ...everyHeads, weekdaysHead];
+
+  /// The relative words a one-time Reminder starts with (#271).
+  String get today => german ? 'heute' : 'today';
+  String get tomorrow => german ? 'morgen' : 'tomorrow';
+  List<String> get relativeHeads => german
+      ? const ['Heute', 'Morgen', 'In']
+      : const ['Today', 'Tonight', 'Tomorrow', 'In'];
+
+  /// The words after a day for its evening, the first one suggested.
+  List<String> get evenings =>
+      german ? const ['Abend'] : const ['evening', 'night'];
+
+  /// The words for one after "in".
+  List<String> get articles =>
+      german ? const ['eine', 'einer', 'einem', 'einen'] : const ['a', 'an'];
+
+  /// The units after "in N", for one and for more, as suggested.
+  List<String> get relativeUnits => german
+      ? const ['Minute', 'Stunde', 'Tag', 'Woche']
+      : const ['minute', 'hour', 'day', 'week'];
+  List<String> get relativeUnitsMany => german
+      ? const ['Minuten', 'Stunden', 'Tagen', 'Wochen']
+      : const ['minutes', 'hours', 'days', 'weeks'];
+
+  /// The unit after "in N" [word] names, 0 to 3 for minutes, hours,
+  /// days and weeks, in the singular, the plural or short; null for
+  /// none.
+  int? relativeUnit(String word) => switch ((german, _plain(word))) {
+    (false, 'minute' || 'minutes' || 'min' || 'mins') => 0,
+    (false, 'hour' || 'hours' || 'h' || 'hr' || 'hrs') => 1,
+    (false, 'day' || 'days') => 2,
+    (false, 'week' || 'weeks') => 3,
+    (true, 'minute' || 'minuten' || 'min') => 0,
+    (true, 'stunde' || 'stunden' || 'std' || 'h') => 1,
+    (true, 'tag' || 'tage' || 'tagen') => 2,
+    (true, 'woche' || 'wochen') => 3,
+    _ => null,
+  };
 
   String every(int n, RepeatUnit unit) {
     final i = unit.index;
@@ -414,6 +578,15 @@ enum _State {
   monthOnThe,
   monthOrd,
 
+  /// After "today" or "tomorrow", "evening" or a time may follow; after
+  /// the other relative words a time (#271).
+  relativeDay,
+  relative,
+
+  /// After "in" and after its number: a number, then a unit.
+  inRelative,
+  inRelativeN,
+
   /// Weekdays, more of them may follow.
   weekdays,
   weekdayAnd,
@@ -437,6 +610,9 @@ class _Parser {
   final _Words w;
   final Day today;
 
+  /// Now, for the relative words; without it they are not understood.
+  final SentenceNow? now;
+
   _State state = _State.start;
 
   /// Whether a repeat was read.
@@ -452,6 +628,10 @@ class _Parser {
   Day? start;
   final times = <ClockTime>[];
 
+  /// The time of a relative day when none is typed: 19:00 "tonight",
+  /// the day start "tomorrow"; none for all day.
+  ClockTime? dayTime;
+
   /// The number before "times", and the ordinal before its weekday.
   int pendingNumber = 0;
   int pendingOrdinal = 0;
@@ -460,7 +640,7 @@ class _Parser {
   final pending = <_Token>[];
   final unknown = <_Token>[];
 
-  _Parser(this.w, this.today);
+  _Parser(this.w, this.today, this.now);
 
   static const _waiting = {
     _State.onceOn,
@@ -470,6 +650,8 @@ class _Parser {
     _State.monthOnDay,
     _State.monthOnThe,
     _State.monthOrd,
+    _State.inRelative,
+    _State.inRelativeN,
     _State.weekdayAnd,
     _State.times0,
     _State.timesAnd,
@@ -480,7 +662,10 @@ class _Parser {
 
   /// Where a waiting state falls back to.
   _State _fallback(_State s) => switch (s) {
-    _State.every || _State.everyN => _State.start,
+    _State.every ||
+    _State.everyN ||
+    _State.inRelative ||
+    _State.inRelativeN => _State.start,
     _State.monthOn ||
     _State.monthOnDay ||
     _State.monthOnThe ||
@@ -531,13 +716,36 @@ class _Parser {
     return int.parse(digits);
   }
 
+  /// `08:00`, `8:00`, and `7 pm`, `7:30pm` or `19 Uhr`.
   ClockTime? _time(_Token t) {
     if (t.kind != _Kind.time) return null;
-    final [h, m] = t.text.split(':');
+    final text = t.text;
+    var i = 0;
+    while (i < text.length && _isDigit(text.codeUnitAt(i))) {
+      i++;
+    }
+    final h = text.substring(0, i);
+    var m = '00';
+    if (i < text.length && text.codeUnitAt(i) == 0x3a) {
+      final from = ++i;
+      while (i < text.length && _isDigit(text.codeUnitAt(i))) {
+        i++;
+      }
+      m = text.substring(from, i);
+    }
+    final suffix = text
+        .substring(i)
+        .replaceAll(RegExp('[^A-Za-z]'), '')
+        .toLowerCase();
     if (h.length > 2 || m.length != 2) return null;
-    final hour = int.parse(h);
+    var hour = int.parse(h);
     final minute = int.parse(m);
-    if (hour > 23 || minute > 59) return null;
+    if (minute > 59) return null;
+    if (suffix == 'am' || suffix == 'pm') {
+      if (hour < 1 || hour > 12) return null;
+      hour = hour % 12 + (suffix == 'pm' ? 12 : 0);
+    }
+    if (hour > 23) return null;
     return ClockTime(hour, minute);
   }
 
@@ -592,15 +800,35 @@ class _Parser {
           kind = RepeatKind.weekdays;
           return _done(_State.weekdays);
         }
+        return _relativeHead(t);
+      case _State.relativeDay:
+        if (_anyWord(t, w.evenings)) {
+          dayTime = _tonight;
+          return _done(_State.relative);
+        }
+        return _relative(t);
+      case _State.relative:
+        return _relative(t);
+      case _State.inRelative:
+        final n = _number(t) ?? (_anyWord(t, w.articles) ? 1 : null);
+        if (n != null && n >= 1) {
+          pendingNumber = n;
+          return _wait(_State.inRelativeN, t);
+        }
         return false;
+      case _State.inRelativeN:
+        final unit = t.kind == _Kind.word ? w.relativeUnit(t.text) : null;
+        return unit != null && _inUnits(pendingNumber, unit);
       case _State.once:
         if (_word(t, w.on)) return _wait(_State.onceOn, t);
+        if (_relativeDayWord(t)) return true;
         if (_date(t) case final day?) {
           start = day;
           return _done(_State.body);
         }
         return _body(t);
       case _State.onceOn:
+        if (_relativeDayWord(t)) return true;
         if (_date(t) case final day?) {
           start = day;
           return _done(_State.body);
@@ -725,6 +953,67 @@ class _Parser {
     }
   }
 
+  /// A relative word a Reminder starts with; false for none, and while
+  /// there is no now to read it at.
+  bool _relativeHead(_Token t) {
+    if (_relativeDayWord(t)) return true;
+    if (now != null && _word(t, 'in')) return _wait(_State.inRelative, t);
+    return false;
+  }
+
+  /// "today", "tonight" or "tomorrow", at the start or as the day of
+  /// Once; false for none, and while there is no now.
+  bool _relativeDayWord(_Token t) {
+    final now = this.now;
+    if (now == null) return false;
+    if (_word(t, w.today)) return _relativeDay(now.today, null, true);
+    if (!w.german && _word(t, 'tonight')) {
+      return _relativeDay(now.today, _tonight, false);
+    }
+    if (_word(t, w.tomorrow)) {
+      return _relativeDay(now.today.addDays(1), now.dayStart, true);
+    }
+    return false;
+  }
+
+  /// Once on [day], at [time] unless one is typed; "evening" may follow
+  /// when [evening].
+  bool _relativeDay(Day day, ClockTime? time, bool evening) {
+    headDone = true;
+    kind = RepeatKind.once;
+    start = day;
+    dayTime = time;
+    return _done(evening ? _State.relativeDay : _State.relative);
+  }
+
+  /// Once in [n] of the [unit]th of minutes, hours, days and weeks: at
+  /// the moment for minutes and hours, at the day start for days and
+  /// weeks unless a time is typed.
+  bool _inUnits(int n, int unit) {
+    final now = this.now;
+    if (now == null) return false;
+    if (unit < 2) {
+      final later = _later(now, unit == 0 ? n : n * 60);
+      times.add(later.time);
+      return _relativeDay(later.day, null, false);
+    }
+    return _relativeDay(
+      now.today.addDays(unit == 2 ? n : n * 7),
+      now.dayStart,
+      false,
+    );
+  }
+
+  /// After a relative word: a time without "at", or what follows a
+  /// repeat.
+  bool _relative(_Token t) {
+    if (_time(t) case final time?) {
+      _addTime(t, time);
+      return _done(_State.times);
+    }
+    return _body(t);
+  }
+
   /// The repeat is every [n] [u]s.
   bool _unit(int n, RepeatUnit u) {
     headDone = true;
@@ -791,7 +1080,12 @@ class _Parser {
         if (!weekdays.contains(d)) w.weekdays[d - 1],
     ];
     return switch (state) {
-      _State.start => w.heads,
+      _State.start => [...w.heads, ...w.relativeHeads],
+      _State.relativeDay => [w.evenings.first, ...body],
+      _State.relative => body,
+      _State.inRelative => const [],
+      _State.inRelativeN =>
+        pendingNumber == 1 ? w.relativeUnits : w.relativeUnitsMany,
       _State.once => [w.on, w.at],
       _State.onceOn || _State.fromDate || _State.untilDate => const [],
       _State.monthOnDay => const [],
@@ -806,7 +1100,8 @@ class _Parser {
       _State.body || _State.times => body,
       _State.times0 || _State.timesAnd => _times(typed),
       _State.timesComma => [..._times(typed), ...body],
-      _State.countN => [w.timesWord],
+      // Once has no end.
+      _State.countN => kind == RepeatKind.once ? const [] : [w.timesWord],
     };
   }
 
@@ -850,6 +1145,11 @@ class _Parser {
         until: until,
       ),
     };
-    return SimpleSchedule(repeat, start ?? today, times);
+    final dayTime = this.dayTime;
+    return SimpleSchedule(
+      repeat,
+      start ?? today,
+      times.isEmpty && dayTime != null ? [dayTime] : times,
+    );
   }
 }

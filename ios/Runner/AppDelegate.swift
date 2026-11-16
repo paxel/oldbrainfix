@@ -32,7 +32,9 @@ import UserNotifications
     ContextChannel.register(messenger: messenger)
     CalendarChannel.register(messenger: messenger)
     SharesChannel.register(messenger: messenger)
+    FilesChannel.register(messenger: messenger)
     CaptureChannel.register(messenger: messenger)
+    ShortcutsChannel.register(messenger: messenger)
     LockChannel.register(messenger: messenger)
     DeviceChannel.register(messenger: messenger)
   }

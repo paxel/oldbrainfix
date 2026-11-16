@@ -488,10 +488,12 @@ class _Words {
   };
 
   /// A Shopping List's group, as the Agenda's (#208): its name as the
-  /// heading, without a box, and its open Lines under it, each with its
-  /// box; or the heading alone with how many are open.
+  /// heading, without a box, and its open Lines under it, then those
+  /// checked today struck for the day (#276), each with its box; or the
+  /// heading alone with how many are open.
   List<WidgetRow> _shopping(ShoppingRow shopping) {
-    final (:note, :masked, :lines, :count, :checks, area: _) = shopping;
+    final (:note, :masked, :lines, :struck, :count, :checks, area: _) =
+        shopping;
     final title = _listTitle(note, t.shoppingHeading);
     final shown = masked ? t.maskedShoppingList : title;
     return [
@@ -504,6 +506,7 @@ class _Words {
         WidgetRow(
           kind: WidgetRow.shopping,
           title: line.text,
+          done: struck.contains(line.id),
           checks: checks,
           indent: 1,
           lineId: line.id,

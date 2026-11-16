@@ -45,6 +45,18 @@ pub enum Error {
     /// (ADR 0034): it is not opened, and nothing in it changed.
     #[error("a database of a newer version ({0})")]
     StoreNeedsUpdate(i64),
+    /// Sharing something Hidden from AI (#267, ADR 0049), as the Dart
+    /// core's `HiddenFromAiRefused`: filing a marked Note into a Shared
+    /// Area, sharing a hidden Area or one holding hidden Notes, sending a
+    /// hidden Note as a Sent Item, or putting one into a Pack. Holds the
+    /// Notes and Areas whose marks stand in the way, sorted; nothing
+    /// changed.
+    #[error("hidden from AI: {}", .0.join(", "))]
+    HiddenFromAi(Vec<String>),
+    /// A vault that was not rebuilt (#267, ADR 0050), and why: nothing
+    /// was written.
+    #[error("vault: {0:?}")]
+    Vault(crate::vault::VaultProblem),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

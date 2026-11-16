@@ -110,7 +110,14 @@ class _RoutineHistoryScreenState extends State<RoutineHistoryScreen> {
         itemCount: header.length + _log.length,
         itemBuilder: (context, i) => i < header.length
             ? header[i]
-            : _LogRow(entry: _log[i - header.length]),
+            : _LogRow(
+                entry: _log[i - header.length],
+                tomorrow:
+                    _routine?.tomorrow.contains(
+                      _log[i - header.length].occurrence.key,
+                    ) ??
+                    false,
+              ),
       ),
     );
   }
@@ -164,7 +171,7 @@ class _StreakPanel extends StatelessWidget {
 }
 
 /// One day as a dot under its weekday: all Done, partly, Missed, still
-/// due, or nothing due.
+/// due, all skipped, or nothing due.
 class _DayDot extends StatelessWidget {
   final DayTally tally;
   final String locale;
@@ -184,6 +191,9 @@ class _DayDot extends StatelessWidget {
               : (Icons.cancel, scheme.error, t.dayMissed(day))
         : tally.open > 0
         ? (Icons.radio_button_unchecked, scheme.primary, t.dayOpen(day))
+        // Skips leave the day as they leave the Adherence (#269).
+        : tally.done == 0
+        ? (Icons.remove_circle_outline, scheme.outline, t.daySkipped(day))
         : (Icons.check_circle, scheme.primary, t.dayAllDone(day));
     return Semantics(
       label: label,
@@ -215,25 +225,54 @@ class _AdherencePanel extends StatelessWidget {
       final share = adherence.share;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Expanded(child: Text(label)),
-            if (share == null)
-              Text(t.adherenceNone)
-            else ...[
-              Text(
-                t.adherenceOf(
-                  adherence.done,
-                  adherence.done + adherence.missed,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // On a narrow phone the share wraps rather than running off;
+            // it takes at most this much of the row, the percent stays
+            // whole.
+            final most = BoxConstraints(maxWidth: constraints.maxWidth * 0.45);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label),
+                      // Beside the share, never in it (#269); a line of
+                      // its own, so a narrow phone has room.
+                      if (adherence.skipped > 0)
+                        Text(
+                          t.adherenceSkipped(adherence.skipped),
+                          key: const ValueKey('adherence-skipped'),
+                          style: text.bodySmall,
+                        ),
+                    ],
+                  ),
                 ),
-                style: text.bodySmall,
-              ),
-              const SizedBox(width: 12),
-              Text(percent.format(share), style: text.titleMedium),
-            ],
-          ],
+                if (share == null)
+                  ConstrainedBox(
+                    constraints: most,
+                    child: Text(t.adherenceNone),
+                  )
+                else ...[
+                  ConstrainedBox(
+                    constraints: most,
+                    child: Text(
+                      t.adherenceOf(
+                        adherence.done,
+                        adherence.done + adherence.missed,
+                      ),
+                      style: text.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(percent.format(share), style: text.titleMedium),
+                ],
+              ],
+            );
+          },
         ),
       );
     }
@@ -255,7 +294,10 @@ class _AdherencePanel extends StatelessWidget {
 class _LogRow extends StatelessWidget {
   final HistoryEntry entry;
 
-  const _LogRow({required this.entry});
+  /// Whether Not today ▸ Tomorrow skipped it (#269).
+  final bool tomorrow;
+
+  const _LogRow({required this.entry, this.tomorrow = false});
 
   @override
   Widget build(BuildContext context) {
@@ -266,6 +308,7 @@ class _LogRow extends StatelessWidget {
     final (icon, colour) = switch (entry.status) {
       OccurrenceStatus.done => (Icons.check_circle, scheme.primary),
       OccurrenceStatus.missed => (Icons.cancel, scheme.error),
+      OccurrenceStatus.skipped => (Icons.remove_circle_outline, scheme.outline),
       OccurrenceStatus.open => (Icons.radio_button_unchecked, scheme.primary),
       OccurrenceStatus.coming => (Icons.schedule, scheme.outline),
     };
@@ -281,6 +324,7 @@ class _LogRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(_outcome(t, locale)),
+          if (entry.moved) Text(t.occurrenceFromDayBefore),
           if (snoozed != null)
             Text(t.logSnoozed(_when(locale, snoozed, occurrence.day))),
         ],
@@ -293,6 +337,8 @@ class _LogRow extends StatelessWidget {
     if (doneAt == null) {
       return switch (entry.status) {
         OccurrenceStatus.missed => t.logMissed,
+        OccurrenceStatus.skipped when tomorrow => t.logSkippedTomorrow,
+        OccurrenceStatus.skipped => t.logSkipped,
         OccurrenceStatus.coming => t.logComing,
         _ => t.logOpen,
       };

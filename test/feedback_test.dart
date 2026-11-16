@@ -332,6 +332,26 @@ void main() {
       expect(opened.pack.notes.map((n) => n.text), ['Drink water']);
     });
 
+    testWidgets("the tree lists the Areas in the person's own order, "
+        'by the names shown until one is moved (#280)', (tester) async {
+      Places(store).plantStarterSet({'household', 'work', 'car'});
+      for (final slug in ['household', 'work', 'car']) {
+        Notes(store).capture(
+          'About $slug',
+          place: Places.starterId(PlaceKeys.typeArea, slug),
+        );
+      }
+      await open(tester, locale: const Locale('de'));
+      await tap(tester, find.byKey(const ValueKey('feedback-notes')));
+      // A Pack carries the stored names; in German they stand as
+      // Arbeit, Auto, Haushalt do on the Areas list.
+      double top(String name) => tester.getTopLeft(find.text(name)).dy;
+      expect(
+        ['Household', 'Car', 'Work']..sort((a, b) => top(a).compareTo(top(b))),
+        ['Work', 'Car', 'Household'],
+      );
+    });
+
     testWidgets('the Pack is written on another isolate, Share… waiting '
         'meanwhile', (tester) async {
       Notes(store).capture('Drink water');

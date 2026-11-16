@@ -213,6 +213,15 @@ fn a_plain_note_keeps_its_one_text_field_and_shows_its_kind() -> TestResult {
     );
     assert!(!shows(&harness, "Show the whole description"));
     assert!(shows(&harness, "Kind: Plain Note"));
+    // The first badge, before the Importance (#310), as wide as its
+    // name in words with ▾ after it, wider than an icon's badge.
+    let kind = harness.get_by_label("Kind: Plain Note").rect();
+    let importance = harness.get_by_label("Importance: Normal").rect();
+    assert!(
+        kind.right() <= importance.left() && (kind.top() - importance.top()).abs() < 1.0,
+        "{kind:?} {importance:?}"
+    );
+    assert!(kind.width() > importance.width() + 40.0, "{kind:?}");
     // Its kind badge is no longer above a "Make it a Checklist".
     assert!(!shows(&harness, "Make it a Checklist"));
     assert!(!shows(&harness, "Make it a Shopping List"));
@@ -300,8 +309,9 @@ fn opening_and_leaving_a_note_of_a_kind_writes_nothing() -> TestResult {
 #[test]
 fn the_kind_badge_changes_the_kind_the_lines_carried_over() -> TestResult {
     let (store, elsewhere) = store()?;
+    // Under a heading, which stays its name (#309).
     let id = Notes::new(&store)
-        .capture("Packing\nPassport\nTicket", None, None)?
+        .capture("# Packing\nPassport\nTicket", None, None)?
         .id;
     let wall = |at: DateTime<Utc>| at.naive_utc();
     let mut harness = dialog(&store, &elsewhere, &id);

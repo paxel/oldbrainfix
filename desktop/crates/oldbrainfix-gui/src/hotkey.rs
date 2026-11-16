@@ -117,6 +117,22 @@ impl fmt::Display for Chord {
 }
 
 impl Chord {
+    /// The chord of `key` pressed with `modifiers` in the window, as the
+    /// Settings record it (#283): Ctrl, Alt, Shift and on macOS Cmd as
+    /// Super; `None` for a key no chord takes, or one without Ctrl, Alt
+    /// or Cmd. Off macOS the window hears no Super, so such a chord is
+    /// typed.
+    pub fn pressed(key: egui::Key, modifiers: egui::Modifiers) -> Option<Chord> {
+        let chord = Chord {
+            ctrl: modifiers.ctrl,
+            alt: modifiers.alt,
+            shift: modifiers.shift,
+            logo: modifiers.mac_cmd,
+            key: parse_key(key.name())?,
+        };
+        (chord.ctrl || chord.alt || chord.logo).then_some(chord)
+    }
+
     /// The chord as the XDG shortcuts specification writes a trigger,
     /// for the portal: "CTRL+ALT+n".
     pub fn portal_trigger(&self) -> String {
@@ -184,6 +200,10 @@ pub trait Control {
     fn status(&self) -> Status;
     /// Moves the hotkey to `chord`, where the app chooses the key.
     fn rebind(&mut self, chord: &Chord);
+    /// Lets the key go while the Settings record a new one, so that it
+    /// reaches the window, and with `false` takes it again (#283); the
+    /// desktop's key through the portal stays.
+    fn pause(&mut self, _paused: bool) {}
 }
 
 /// Which way to the hotkey this session offers.
@@ -305,6 +325,21 @@ impl Control for Hotkey {
         };
         set(&self.status, to);
     }
+
+    fn pause(&mut self, paused: bool) {
+        let Way::Grab {
+            manager,
+            held: Some(key),
+        } = &self.way
+        else {
+            return;
+        };
+        if paused {
+            drop(manager.unregister(*key));
+        } else if manager.register(*key).is_err() {
+            set(&self.status, Status::Taken);
+        }
+    }
 }
 
 impl Drop for Hotkey {
@@ -401,82 +436,4 @@ mod portal {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn chord(text: &str) -> Option<Chord> {
-        text.parse().ok()
-    }
-
-    #[test]
-    fn chords_read_as_typed_and_show_one_way() {
-        let c = chord("ctrl + alt + n");
-        assert_eq!(c.map(|c| c.to_string()).as_deref(), Some("Ctrl+Alt+N"));
-        let c = chord("Super+Shift+f5");
-        assert_eq!(c.map(|c| c.to_string()).as_deref(), Some("Shift+Super+F5"));
-        let c = chord("Control+Option+space");
-        assert_eq!(c.map(|c| c.to_string()).as_deref(), Some("Ctrl+Alt+Space"));
-        assert_eq!(
-            chord("Strg+Alt+7").map(|c| c.key),
-            Some(ChordKey::Digit('7'))
-        );
-        // A typing key is no hotkey, nor is half a chord.
-        for bad in [
-            "",
-            "N",
-            "Shift+N",
-            "Ctrl+",
-            "Ctrl+Alt",
-            "Ctrl+Ctrl+N",
-            "Ctrl+F13",
-            "Ctrl+Hyper+N",
-            "Ctrl+Ä",
-        ] {
-            assert_eq!(chord(bad), None, "{bad}");
-        }
-    }
-
-    #[test]
-    fn the_portal_hears_the_chord_in_the_shortcuts_spec() {
-        let trigger = |t: &str| chord(t).map(|c| c.portal_trigger());
-        assert_eq!(trigger("Ctrl+Alt+N").as_deref(), Some("CTRL+ALT+n"));
-        assert_eq!(trigger("Super+Shift+F5").as_deref(), Some("SHIFT+LOGO+F5"));
-        assert_eq!(trigger("Alt+Space").as_deref(), Some("ALT+space"));
-    }
-
-    #[test]
-    fn the_app_grabs_the_chord_it_shows() {
-        let key = chord("Ctrl+Alt+N").and_then(|c| c.hotkey());
-        let want = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyN);
-        assert_eq!(key, Some(want));
-        let key = chord("Super+1").and_then(|c| c.hotkey());
-        assert_eq!(key, Some(HotKey::new(Some(Modifiers::META), Code::Digit1)));
-        let key = chord("Alt+F12").and_then(|c| c.hotkey());
-        assert_eq!(key, Some(HotKey::new(Some(Modifiers::ALT), Code::F12)));
-    }
-
-    fn env<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
-        move |name| {
-            pairs
-                .iter()
-                .find(|(k, _)| *k == name)
-                .map(|(_, v)| v.to_string())
-        }
-    }
-
-    #[test]
-    fn wayland_asks_the_portal_and_x11_grabs() {
-        if cfg!(target_os = "linux") {
-            let both = [("WAYLAND_DISPLAY", "wayland-0"), ("DISPLAY", ":0")];
-            assert_eq!(session(env(&both)), Session::Portal);
-            assert_eq!(session(env(&[("DISPLAY", ":0")])), Session::Grab);
-            assert_eq!(
-                session(env(&[("WAYLAND_DISPLAY", ""), ("DISPLAY", ":1")])),
-                Session::Grab
-            );
-            assert_eq!(session(env(&[])), Session::None);
-        } else {
-            assert_eq!(session(env(&[])), Session::Grab);
-        }
-    }
-}
+mod tests;
