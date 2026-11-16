@@ -7,6 +7,7 @@ import 'l10n.dart';
 import 'line_editing.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
+import 'tick_saves.dart';
 
 /// A Line as it is drawn: its id, its text, whether it is in the group of
 /// the Line above it, whether it shows checked and what shows dimmed under
@@ -55,9 +56,11 @@ typedef NoteChecklist = ({Checklist? Function() read, Checklists lists});
 /// long press in the field selects. [compact] draws the rows close
 /// together, as one block of text in the editor (#184). What [trailing]
 /// gives for a Line sits at its end, before ⋮, such as a Shopping List
-/// Line's reappear time badge (#195).
+/// Line's reappear time badge (#195). A Line ticked on the Occurrence
+/// [on], or on none, shows its tap while its save waits (#338).
 class ChecklistLines extends StatelessWidget {
   final List<ShownLine> lines;
+  final RoutineOccurrence? on;
   final void Function(String id, bool checked)? onCheck;
   final void Function(String id, Offset at)? onMenu;
   final Set<String> editable;
@@ -68,6 +71,7 @@ class ChecklistLines extends StatelessWidget {
   const ChecklistLines({
     super.key,
     required this.lines,
+    this.on,
     this.onCheck,
     this.onMenu,
     this.editable = const {},
@@ -118,7 +122,7 @@ class ChecklistLines extends StatelessWidget {
       group = [];
     }
 
-    for (final line in lines) {
+    for (final line in lines.map(_tapped)) {
       final row = _LineRow(
         line: line,
         onCheck: onCheck,
@@ -140,6 +144,20 @@ class ChecklistLines extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: rows,
     );
+  }
+
+  /// [line] as its tap shows it while the save waits.
+  ShownLine _tapped(ShownLine line) {
+    return switch (TickSaves.instance.waiting<bool>(lineTickKey(line.id, on))) {
+      null => line,
+      final checked => (
+        id: line.id,
+        text: line.text,
+        inGroup: line.inGroup,
+        checked: checked,
+        below: line.below,
+      ),
+    };
   }
 }
 
@@ -265,7 +283,7 @@ class CardChecklist extends StatefulWidget {
   State<CardChecklist> createState() => _CardChecklistState();
 }
 
-class _CardChecklistState extends State<CardChecklist> {
+class _CardChecklistState extends State<CardChecklist> with TicksAtOnce {
   Checklist? _list;
   var _checks = false;
 
@@ -287,14 +305,18 @@ class _CardChecklistState extends State<CardChecklist> {
     _checks = list != null && mayCheckShown(widget.checklist.lists, list);
   }
 
+  /// Ticks the Line [id] at once and saves it after the frame (#338).
   void _check(String id, bool checked) {
     final lists = widget.checklist.lists;
     final on = _list?.on;
-    checked ? lists.check(id, on: on) : lists.uncheck(id, on: on);
-    // Read anew, not from the list of cards, which still holds the old.
-    setState(() {
-      final list = _list = lists.shownNow(widget.noteId, deviceWallClock);
-      _checks = list != null && mayCheckShown(lists, list);
+    tickAtOnce(lineTickKey(id, on), checked, () {
+      checked ? lists.check(id, on: on) : lists.uncheck(id, on: on);
+      if (!mounted) return;
+      // Read anew, not from the list of cards, which still holds the old.
+      setState(() {
+        final list = _list = lists.shownNow(widget.noteId, deviceWallClock);
+        _checks = list != null && mayCheckShown(lists, list);
+      });
     });
   }
 
@@ -317,6 +339,7 @@ class _CardChecklistState extends State<CardChecklist> {
       child: ChecklistLines(
         key: const ValueKey('checklist-card'),
         lines: shownLines(list),
+        on: list.on,
         onCheck: _checks ? _check : null,
       ),
     );
@@ -362,7 +385,11 @@ class ChecklistSection extends StatefulWidget {
 enum _LineStep { up, down, indent, outdent, delete }
 
 class _ChecklistSectionState extends State<ChecklistSection>
-    with ReloadsOnLogChange, TypedRows, AutomaticKeepAliveClientMixin {
+    with
+        ReloadsOnLogChange,
+        TypedRows,
+        AutomaticKeepAliveClientMixin,
+        TicksAtOnce {
   late final _lists = Checklists(widget.notes.store);
   late final _twoRows = widget.notes.store.twoRowEditorOn;
   Checklist? _list;
@@ -514,13 +541,16 @@ class _ChecklistSectionState extends State<ChecklistSection>
     }
   }
 
+  /// Ticks the Line [id] at once and saves it after the frame (#338).
   void _check(String id, bool checked) {
     // A new Line is stored first; an empty one has nothing to check.
     final line = storedId(id);
     if (line == null) return;
     final on = _list?.on;
-    checked ? _lists.check(line, on: on) : _lists.uncheck(line, on: on);
-    setState(_load);
+    tickAtOnce(lineTickKey(line, on), checked, () {
+      checked ? _lists.check(line, on: on) : _lists.uncheck(line, on: on);
+      if (mounted) setState(_load);
+    });
   }
 
   void _uncheckAll() {
@@ -724,6 +754,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
                     below: null,
                   ),
               ],
+              on: list.on,
               onCheck: _checks ? _check : null,
               onMenu: _menu,
               editable: withMenus(_editable),

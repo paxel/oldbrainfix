@@ -3353,6 +3353,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareAfarFailed => 'The Area could not be shared.';
 
   @override
+  String get tickFailed => 'A tick could not be saved.';
+
+  @override
+  String get tickFailedTitle => 'Tick not saved';
+
+  @override
+  String get tickRefusedCause =>
+      'A sync took the box away, or this Device\'s role in the Shared Area, while the tick waited.';
+
+  @override
+  String get tickRefusedFix =>
+      'Look at the Note again and tick once more, or ask a Manager of the Area for a role.';
+
+  @override
+  String get tickStorageCause => 'This Device could not write to its storage.';
+
+  @override
+  String get tickStorageFix => 'Free some storage, then tick again.';
+
+  @override
   String get areaOfferNotForUs =>
       'This shared Area is meant for another person or another of your Devices.';
 

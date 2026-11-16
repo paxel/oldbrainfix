@@ -434,6 +434,7 @@ pub fn section(
             };
             reappear_badge(ui, (t, tones), reappear, active)
         };
+        let rows = checklist_view::as_clicked(ui.ctx(), &rows, None);
         let asked = checklist_view::line_rows(
             ui,
             (t, tones),

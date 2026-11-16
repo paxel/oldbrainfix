@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'held_ticks.dart';
 import 'open_capture.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -138,6 +139,40 @@ void main() {
         'Release\n- ❌ v2 at the customer\n☐ Docs',
       );
       expect(notes.byId(id)!.text, stored);
+    });
+
+    testWidgets('a pick ticks the box in the frame after it, saved after that '
+        'frame (#338); a failed save shows it as stored again and says so', (
+      tester,
+    ) async {
+      final id = notes.capture('Release\n☐ v2\n☐ Docs').id;
+      final [first, second] = boxesOf(id);
+      await startAtNotes(tester);
+      String glyph(ShownBox box) => tester
+          .widget<Text>(
+            find.descendant(of: boxKey(box), matching: find.byType(Text)),
+          )
+          .data!;
+      final ticks = HeldTicks();
+
+      await tap(tester, boxKey(first));
+      await tester.tap(key('box-done'));
+      await tester.pump();
+      expect(glyph(first), '✅');
+      expect(boxesOf(id).first.state, BoxState.open);
+      await ticks.release(tester);
+      expect(boxesOf(id).first.state, BoxState.done);
+      expect(glyph(first), '✅');
+
+      ticks.failWith(Exception('disk full'));
+      await tap(tester, boxKey(second));
+      await tester.tap(key('box-failed'));
+      await tester.pump();
+      expect(glyph(second), '❌');
+      await ticks.release(tester);
+      expect(glyph(second), '☐');
+      expect(boxesOf(id).last.state, BoxState.open);
+      expect(find.text('A tick could not be saved.'), findsOneWidget);
     });
 
     testWidgets('a box in the middle of a word is one too, a Section\'s '
@@ -381,6 +416,66 @@ void main() {
       await tester.pumpAndSettle();
       expect(notes.byId(id)!.text, stored);
       expect(notes.byId(id)!.shownText, 'Plan\n✅ Book\nTalk ✅ later');
+    });
+
+    testWidgets('a pick ticks the box in the field in the frame after it, '
+        'saved after that frame (#338)', (tester) async {
+      final id = notes.capture('Plan\n☐ Book\nTalk ✅ later').id;
+      await startAtNotes(tester);
+      await openEditor(tester);
+      final [book, _] = TextBoxes.find(field(tester).text);
+      // The text the field paints, not what it would build now.
+      String painted() {
+        RenderEditable? found;
+        void visit(RenderObject object) {
+          if (object is RenderEditable) {
+            found ??= object;
+          } else {
+            object.visitChildren(visit);
+          }
+        }
+
+        visit(
+          find
+              .descendant(
+                of: key('note-text'),
+                matching: find.byType(EditableText),
+              )
+              .evaluate()
+              .single
+              .renderObject!,
+        );
+        return withoutIds(found!.text!.toPlainText());
+      }
+
+      final ticks = HeldTicks();
+      await tester.tapAt(charAt(tester, book.start, book.end));
+      await tester.pumpAndSettle();
+      await tester.tap(key('box-done'));
+      await tester.pump();
+      expect(painted(), 'Plan\n✅ Book\nTalk ✅ later');
+      expect(boxesOf(id).first.state, BoxState.open);
+      await ticks.release(tester);
+      expect(boxesOf(id).first.state, BoxState.done);
+      expect(painted(), 'Plan\n✅ Book\nTalk ✅ later');
+
+      // Two quick picks end as the second left it.
+      final talk = TextBoxes.find(field(tester).text).last;
+      await tester.tapAt(charAt(tester, talk.start, talk.end));
+      await tester.pumpAndSettle();
+      await tester.tap(key('box-failed'));
+      await tester.pump();
+      expect(painted(), 'Plan\n✅ Book\nTalk ❌ later');
+      await tester.pumpAndSettle();
+      await tester.tapAt(charAt(tester, talk.start, talk.end));
+      await tester.pumpAndSettle();
+      await tester.tap(key('box-open'));
+      await tester.pump();
+      expect(painted(), 'Plan\n✅ Book\nTalk ☐ later');
+      expect(boxesOf(id).last.state, BoxState.done);
+      await ticks.release(tester);
+      expect(boxesOf(id).last.state, BoxState.open);
+      expect(painted(), 'Plan\n✅ Book\nTalk ☐ later');
     });
 
     testWidgets('the row above the keyboard shows a box in its state too', (

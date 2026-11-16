@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'held_ticks.dart';
 import 'reveal.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -235,6 +236,67 @@ void main() {
       await tap(tester, key('checklist-check-$bath'));
       expect(shown(note), ['Bath', '  Soap', 'Tent']);
       expect(checkbox(tester, soap), isFalse);
+    });
+
+    testWidgets('a Line ticks and strikes in the frame after the tap, and is '
+        'saved after it (#338); a box tapped while one waits is saved too, '
+        'and two quick taps end as the second left it', (tester) async {
+      final note = notes.capture('Trip\nBath\nTent').id;
+      lists.make(note);
+      final bath = idOf(note, 'Bath');
+      final tent = idOf(note, 'Tent');
+      await startAtNotes(tester);
+      final ticks = HeldTicks();
+
+      await tester.tap(key('checklist-check-$bath'));
+      await tester.pump();
+      expect(checkbox(tester, bath), isTrue);
+      expect(struck(tester, bath), isTrue);
+      // Nothing is saved before that frame.
+      expect(shown(note), ['Bath', 'Tent']);
+
+      await tester.tap(key('checklist-check-$tent'));
+      await tester.pump();
+      await tester.tap(key('checklist-check-$bath'));
+      await tester.pump();
+      expect(checkbox(tester, bath), isFalse);
+      expect(struck(tester, bath), isFalse);
+      expect(checkbox(tester, tent), isTrue);
+      expect(shown(note), ['Bath', 'Tent']);
+
+      await ticks.release(tester);
+      expect(shown(note), ['Bath', '[x] Tent']);
+      expect(checkbox(tester, bath), isFalse);
+      expect(checkbox(tester, tent), isTrue);
+      expect(struck(tester, tent), isTrue);
+    });
+
+    testWidgets('a tick whose save fails shows the Line as stored again and '
+        'says so at the top, with the cause and the fix (#338)', (
+      tester,
+    ) async {
+      final note = notes.capture('Trip\nBath\nTent').id;
+      lists.make(note);
+      final bath = idOf(note, 'Bath');
+      await startAtNotes(tester);
+      final ticks = HeldTicks()..failWith(Exception('disk full'));
+
+      await tester.tap(key('checklist-check-$bath'));
+      await tester.pump();
+      expect(checkbox(tester, bath), isTrue);
+      await ticks.release(tester);
+      expect(checkbox(tester, bath), isFalse);
+      expect(struck(tester, bath), isFalse);
+      expect(shown(note), ['Bath', 'Tent']);
+      await tap(tester, find.text('A tick could not be saved.'));
+      expect(find.text('Tick not saved'), findsOneWidget);
+      expect(
+        find.text(
+          'This Device could not write to its storage. '
+          'Free some storage, then tick again.',
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a compact card shows how many are open (#189); "Uncheck all" '
@@ -665,6 +727,38 @@ void main() {
       await tap(tester, key('checklist-delete'));
       expect(shown(note), ['Milk', 'Tea', 'Eggs', '  Soap']);
       expect(key('checklist-field-new-3'), findsNothing);
+    });
+
+    testWidgets('a Line ticks and strikes in the frame after the tap, and is '
+        'saved after it (#338)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final ticks = HeldTicks();
+
+      await tester.tap(key('checklist-check-$milk'));
+      await tester.pump();
+      expect(checkbox(tester, milk), isTrue);
+      expect(struck(tester, milk), isTrue);
+      expect(shown(note), ['Milk', 'Eggs']);
+
+      await ticks.release(tester);
+      expect(shown(note), ['[x] Milk', 'Eggs']);
+      expect(checkbox(tester, milk), isTrue);
+      expect(struck(tester, milk), isTrue);
+
+      // A save that fails shows it as stored again and says so.
+      final eggs = idOf(note, 'Eggs');
+      ticks.failWith(Exception('disk full'));
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      expect(checkbox(tester, eggs), isTrue);
+      await ticks.release(tester);
+      expect(checkbox(tester, eggs), isFalse);
+      expect(struck(tester, eggs), isFalse);
+      expect(shown(note), ['[x] Milk', 'Eggs']);
+      expect(find.text('A tick could not be saved.'), findsOneWidget);
     });
 
     testWidgets('checks and "Uncheck all" there too, "Back to a plain Note" '

@@ -1547,3 +1547,24 @@ fn the_settings_have_no_shopping_lists_on_the_agenda_any_more() -> TestResult {
     assert!(!shows_part(&harness, "One row per Shopping List"));
     Ok(())
 }
+
+#[test]
+fn a_line_ticks_in_the_frame_of_its_click_and_is_saved_in_the_next() -> TestResult {
+    // A tick shows at once (#338): in its place until it is saved.
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    weekly(&store, &note)?;
+    let mut harness = window(&store, Some(&note));
+    boxes(&harness, "Milk").pop().ok_or("Milk")?.click();
+    harness.step();
+    assert!(checked(&harness, "Milk")?);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Bread", "Apples"],
+        "saved in the next frame"
+    );
+    harness.run();
+    assert!(checked(&harness, "Milk")?);
+    assert_eq!(texts(&harness, &note)?, ["Bread", "Apples", "✓ Milk"]);
+    Ok(())
+}

@@ -3389,6 +3389,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shareAfarFailed => 'Der Bereich konnte nicht geteilt werden.';
 
   @override
+  String get tickFailed => 'Ein Abhaken konnte nicht gespeichert werden.';
+
+  @override
+  String get tickFailedTitle => 'Abhaken nicht gespeichert';
+
+  @override
+  String get tickRefusedCause =>
+      'Eine Synchronisierung hat das Kästchen oder die Rolle dieses Geräts im geteilten Bereich entfernt, während das Abhaken wartete.';
+
+  @override
+  String get tickRefusedFix =>
+      'Sieh dir die Notiz noch einmal an und hake erneut ab, oder bitte einen Verwalter des Bereichs um eine Rolle.';
+
+  @override
+  String get tickStorageCause =>
+      'Dieses Gerät konnte nicht in seinen Speicher schreiben.';
+
+  @override
+  String get tickStorageFix =>
+      'Gib etwas Speicher frei und hake dann erneut ab.';
+
+  @override
   String get areaOfferNotForUs =>
       'Dieser geteilte Bereich ist für eine andere Person oder ein anderes deiner Geräte.';
 

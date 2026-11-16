@@ -1071,3 +1071,25 @@ fn a_line_is_dragged_by_its_handle_within_its_group_or_the_top_level() -> TestRe
     );
     Ok(())
 }
+
+#[test]
+fn a_line_ticks_and_strikes_in_the_frame_of_its_click_and_is_saved_in_the_next() -> TestResult {
+    // A tick shows at once (#338), in the editor and on the card alike.
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    boxes(&harness, "Ticket").pop().ok_or("Ticket")?.click();
+    harness.step();
+    for node in boxes(&harness, "Ticket") {
+        assert_eq!(node.accesskit_node().toggled(), Some(Toggled::True));
+    }
+    assert_eq!(
+        list(&harness, &note)?.checked_count(),
+        0,
+        "saved in the next frame"
+    );
+    harness.run();
+    assert_eq!(list(&harness, &note)?.checked_count(), 1);
+    assert!(checked(&harness, "Ticket")?);
+    Ok(())
+}

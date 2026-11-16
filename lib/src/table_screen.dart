@@ -166,7 +166,10 @@ class _TableScreenState extends State<TableScreen> {
   late String _text = widget.text;
   late int _at = widget.at;
   MarkdownTable? _table;
-  List<DrawnBox> _boxes = const [];
+
+  /// Read as each frame draws, so a tap shows while its save waits
+  /// (#338).
+  List<DrawnBox> get _boxes => storedBoxes(_text, _ticking);
   List<FoundTag> _tags = const [];
   List<(int, int)> _links = const [];
 
@@ -220,7 +223,6 @@ class _TableScreenState extends State<TableScreen> {
 
   void _read() {
     _table = MarkdownTables.at(_text, _at);
-    _boxes = storedBoxes(_text, _ticking);
     _tags = Markdown.tags(_text);
     _links = Markdown.autolinks(_text);
   }

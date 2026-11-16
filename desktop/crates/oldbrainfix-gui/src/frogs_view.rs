@@ -139,7 +139,12 @@ pub fn frog_row(
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let frog = &shown.frog;
-    let done = frog.is_done();
+    // As clicked while its save waits (#338).
+    let done = crate::tick_saves::done(
+        ui.ctx(),
+        &crate::tick_saves::frog_key(&frog.id),
+        frog.is_done(),
+    );
     let colour = shown
         .area
         .as_ref()

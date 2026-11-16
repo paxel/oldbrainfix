@@ -5396,6 +5396,42 @@ abstract class AppLocalizations {
   /// **'The Area could not be shared.'**
   String get shareAfarFailed;
 
+  /// Announced when a box or Line ticked at once could not be saved afterwards and shows as before again (#338); the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'A tick could not be saved.'**
+  String get tickFailed;
+
+  /// Title of the dialog opened from the tickFailed announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick not saved'**
+  String get tickFailedTitle;
+
+  /// Cause in the tickFailed dialog when the core refused the tick.
+  ///
+  /// In en, this message translates to:
+  /// **'A sync took the box away, or this Device\'s role in the Shared Area, while the tick waited.'**
+  String get tickRefusedCause;
+
+  /// Fix in the tickFailed dialog when the core refused the tick.
+  ///
+  /// In en, this message translates to:
+  /// **'Look at the Note again and tick once more, or ask a Manager of the Area for a role.'**
+  String get tickRefusedFix;
+
+  /// Cause in the tickFailed dialog when writing the tick failed.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device could not write to its storage.'**
+  String get tickStorageCause;
+
+  /// Fix in the tickFailed dialog when writing the tick failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Free some storage, then tick again.'**
+  String get tickStorageFix;
+
   /// The cause in the dialog behind 'areaOfferNotTaken' when a received Area file was sealed for other Devices.
   ///
   /// In en, this message translates to:

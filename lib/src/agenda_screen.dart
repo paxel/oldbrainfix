@@ -48,6 +48,7 @@ import 'setup_screen.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
 import 'text_marks_view.dart';
+import 'tick_saves.dart';
 import 'unit_system.dart';
 
 /// What the menu of an Occurrence's row does.
@@ -163,7 +164,7 @@ class AgendaScreen extends StatefulWidget {
   State<AgendaScreen> createState() => _AgendaScreenState();
 }
 
-class _AgendaScreenState extends State<AgendaScreen> {
+class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   late final _routines = Routines(widget.notes.store);
   late final _alarms = Alarms(widget.notes.store);
   late final _locks = AreaLocks(widget.notes.store);
@@ -383,7 +384,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
     Occurrence? occurrence,
     String? line,
     String? frog,
-  }) => [routine, occurrence?.key, line, frog].join('|');
+  }) =>
+      tickKey(routine: routine, occurrence: occurrence, line: line, frog: frog);
+
+  /// What the box [key] shows as tapped: while its save waits (#338),
+  /// then until the rows are read again (#207); null when untapped.
+  bool? _tap(String key) =>
+      TickSaves.instance.waiting<bool>(key) ?? _tapped[key];
 
   /// Reads the rows with the alarms' reader: at once on the store, or
   /// off the UI thread, the last rows showing meanwhile (#207).
@@ -754,25 +761,31 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// Occurrence only; the last Line checked makes it Done.
   void _checkLine(AgendaRow row, String lineId, bool checked) {
     final on = (routineId: row.routine.id, occurrence: row.occurrence);
-    checked
-        ? _checklists.check(lineId, on: on)
-        : _checklists.uncheck(lineId, on: on);
-    _tapped[_boxKey(
-          routine: row.routine.id,
-          occurrence: row.occurrence,
-          line: lineId,
-        )] =
-        checked;
-    _reload();
+    _tick(lineTickKey(lineId, on), checked, () {
+      checked
+          ? _checklists.check(lineId, on: on)
+          : _checklists.uncheck(lineId, on: on);
+    });
+  }
+
+  /// Shows [key] ticked to [to] at once and runs [save] after the frame
+  /// (#338); the rows are read again after it, and show the tap until
+  /// then. A save that fails shows the box as stored again.
+  void _tick(String key, bool to, VoidCallback save) {
+    _tapped[key] = to;
+    tickAtOnce(key, to, () {
+      save();
+      _reload();
+    }, failed: () => _tapped.remove(key));
   }
 
   /// Checks the Line [lineId] of a Checklist without a Routine from its
   /// group today, or unchecks it: checked, it stays struck for the day
   /// (#276), unless this Device hides what is checked.
   void _checkListLine(String lineId, bool checked) {
-    checked ? _checklists.check(lineId) : _checklists.uncheck(lineId);
-    _tapped[_boxKey(line: lineId)] = checked;
-    _reload();
+    _tick(_boxKey(line: lineId), checked, () {
+      checked ? _checklists.check(lineId) : _checklists.uncheck(lineId);
+    });
   }
 
   /// Checks the Line [lineId] of a Shopping List from its group today,
@@ -780,11 +793,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// unless this Device hides what is checked, and comes back when its
   /// reappear time says.
   void _checkShopping(String lineId, bool checked) {
-    checked
-        ? _shopping.check(lineId, deviceWallClock)
-        : _shopping.uncheck(lineId, deviceWallClock);
-    _tapped[_boxKey(line: lineId)] = checked;
-    _reload();
+    _tick(_boxKey(line: lineId), checked, () {
+      checked
+          ? _shopping.check(lineId, deviceWallClock)
+          : _shopping.uncheck(lineId, deviceWallClock);
+    });
   }
 
   /// Opens the Shopping List or Checklist of [note] in its editor, its
@@ -806,21 +819,22 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   void _toggle(AgendaRow row) {
     final key = _boxKey(routine: row.routine.id, occurrence: row.occurrence);
-    final done = _tapped[key] ?? row.done != null;
-    if (!done) {
-      // Its Note may go to the trash with it (#211).
-      _routines.checkOff(row.routine.id, row.occurrence);
-    } else {
-      _routines.unmarkDone(row.routine.id, row.occurrence);
-    }
-    _tapped[key] = !done;
-    _reload();
+    final done = _tap(key) ?? row.done != null;
+    _tick(key, !done, () {
+      if (!done) {
+        // Its Note may go to the trash with it (#211).
+        _routines.checkOff(row.routine.id, row.occurrence);
+      } else {
+        _routines.unmarkDone(row.routine.id, row.occurrence);
+      }
+    });
   }
 
   /// Checks off a Missed Occurrence: Done, late.
   void _checkMissed(Routine routine, Occurrence occurrence) {
-    _routines.checkOff(routine.id, occurrence);
-    _reload();
+    _tick(_boxKey(routine: routine.id, occurrence: occurrence), true, () {
+      _routines.checkOff(routine.id, occurrence);
+    });
   }
 
   void _seen() {
@@ -870,8 +884,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
     if (overlay == null) return;
     // As the log has it now, not as the Agenda read it.
     final routine = _routines.byId(row.routine.id) ?? row.routine;
-    final checked =
-        _tapped[_boxKey(routine: row.routine.id, occurrence: row.occurrence)];
+    final checked = _tap(
+      _boxKey(routine: row.routine.id, occurrence: row.occurrence),
+    );
     final (:snooze, :notToday, :tomorrow) = checked == true
         ? (snooze: false, notToday: false, tomorrow: false)
         : occurrenceAnswers(_routines.store, routine, row.occurrence);
@@ -965,8 +980,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final complete =
         (picks?.today.complete ?? false) || (lines?.list.allChecked ?? false);
     // As tapped here while the Agenda reads again (#207).
-    final tapped =
-        _tapped[_boxKey(routine: row.routine.id, occurrence: row.occurrence)];
+    final tapped = _tap(
+      _boxKey(routine: row.routine.id, occurrence: row.occurrence),
+    );
     final done = tapped ?? (row.done != null || complete);
     // A Session's box only shows Done: its picks make it (#208).
     final checks = !complete && session == null;
@@ -1100,11 +1116,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final line in agendaLines(list, hidesChecked: _hidesChecked))
-              if (_tapped[_boxKey(
-                        routine: row.routine.id,
-                        occurrence: row.occurrence,
-                        line: line.id,
-                      )] ??
+              if (_tap(
+                        _boxKey(
+                          routine: row.routine.id,
+                          occurrence: row.occurrence,
+                          line: line.id,
+                        ),
+                      ) ??
                       line.checked
                   case final checked)
                 _lineEntry(
@@ -1163,7 +1181,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       onTap: () => _openList(note, newLine: true),
       entries: [
         for (final line in lines)
-          if (_tapped[_boxKey(line: line.id)] ?? struck.contains(line.id)
+          if (_tap(_boxKey(line: line.id)) ?? struck.contains(line.id)
               case final checked)
             AgendaEntry(
               key: ValueKey('shopping-line-${line.id}'),
@@ -1200,8 +1218,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       onTap: () => _openList(note, newLine: true),
       entries: [
         for (final line in lines)
-          if (_tapped[_boxKey(line: line.id)] ?? line.checked
-              case final checked)
+          if (_tap(_boxKey(line: line.id)) ?? line.checked case final checked)
             _lineEntry(
               line,
               checked: checked,
@@ -1282,14 +1299,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   void _toggleFrog(Frog frog) {
     final key = _boxKey(frog: frog.id);
-    final done = _tapped[key] ?? frog.isDone;
-    if (done) {
-      _frogs.unmarkDone(frog.id);
-    } else {
-      _frogs.markDone(frog.id);
-    }
-    _tapped[key] = !done;
-    _reload();
+    final done = _tap(key) ?? frog.isDone;
+    _tick(key, !done, () {
+      done ? _frogs.unmarkDone(frog.id) : _frogs.markDone(frog.id);
+    });
   }
 
   void _anotherFrog(Frog frog) {
@@ -1445,6 +1458,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 summary: _missed,
                 masks: _locks.masks,
                 onCheck: _checkMissed,
+                ticked: (routine, occurrence) =>
+                    _tap(
+                      _boxKey(routine: routine.id, occurrence: occurrence),
+                    ) ??
+                    false,
                 onSeen: _seen,
               ),
             if (_unsorted > 0)
@@ -1536,7 +1554,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     // A Masked row tells nothing of its Area either.
                     area: masked ? null : placed.area,
                     title: masked ? t.maskedFrog : noteText(t, placed.note),
-                    done: _tapped[_boxKey(frog: placed.frog.id)],
+                    done: _tap(_boxKey(frog: placed.frog.id)),
                     onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
                         ? () => _toggleFrog(placed.frog)
                         : null,

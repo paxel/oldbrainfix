@@ -33,6 +33,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop öffnet die Strichliste einer Einheit nur ihr Eintragsformular, nicht auch ihre Notiz. ([obf-1013](https://github.com/paxel/oldbrainfix/issues/320))
 - Auf dem Handy setzt ein Tippen im Notiz-Editor den Cursor dorthin, wo der Finger ist. ([obf-1005](https://github.com/paxel/oldbrainfix/issues/312))
 - Das Linux-.deb, das AppImage und Homebrew starten auf älteren Systemen mit glibc 2.35, etwa Ubuntu 22.04 oder Debian 12. ([obf-1025](https://github.com/paxel/oldbrainfix/issues/332))
+- Ein angetipptes Kästchen ist sofort abgehakt und seine Zeile durchgestrichen, gespeichert wird danach; scheitert das Speichern, zeigt es sich wie vorher mit einer Meldung. ([obf-1031](https://github.com/paxel/oldbrainfix/issues/338))
 - Eine Frage vom Handy geht nicht mehr verloren, und „Fragen“ sagt auf Handy und Desktop, was es gerade tut und warum es scheiterte. ([obf-1010](https://github.com/paxel/oldbrainfix/issues/317))
 
 ## [0.6.0] - 2026-11-14

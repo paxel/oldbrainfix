@@ -13,6 +13,7 @@ import 'look.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'setting_badges.dart';
+import 'tick_saves.dart';
 
 /// What a Note's card knows of its Shopping List (#122): [read] gives it
 /// as it shows now, or null for a Note that is none, read when the card
@@ -76,7 +77,7 @@ class CardShoppingList extends StatefulWidget {
 }
 
 class _CardShoppingListState extends State<CardShoppingList>
-    with _ReadsAtDayStart {
+    with _ReadsAtDayStart, TicksAtOnce {
   ShoppingList? _list;
   var _checks = false;
 
@@ -125,12 +126,15 @@ class _CardShoppingListState extends State<CardShoppingList>
     watchDay(list != null && list.struckCount > 0);
   }
 
+  /// Ticks the Line [id] at once and saves it after the frame (#338).
   void _check(String id, bool checked) {
     final lists = widget.shopping.lists;
-    checked
-        ? lists.check(id, deviceWallClock)
-        : lists.uncheck(id, deviceWallClock);
-    setState(_readOwn);
+    tickAtOnce(lineTickKey(id, null), checked, () {
+      checked
+          ? lists.check(id, deviceWallClock)
+          : lists.uncheck(id, deviceWallClock);
+      if (mounted) setState(_readOwn);
+    });
   }
 
   @override
@@ -426,7 +430,8 @@ class _ShoppingSectionState extends State<ShoppingSection>
         ReloadsOnLogChange,
         _ReadsAtDayStart,
         TypedRows,
-        AutomaticKeepAliveClientMixin {
+        AutomaticKeepAliveClientMixin,
+        TicksAtOnce {
   late final _lists = ShoppingLists(widget.notes.store);
   late final _twoRows = widget.notes.store.twoRowEditorOn;
   ShoppingList? _list;
@@ -547,14 +552,17 @@ class _ShoppingSectionState extends State<ShoppingSection>
   @override
   void deleteLine(String id) => _lists.delete(id);
 
+  /// Ticks the Line [id] at once and saves it after the frame (#338).
   void _check(String id, bool checked) {
     // A new Line is stored first; an empty one has nothing to check.
     final line = storedId(id);
     if (line == null) return;
-    checked
-        ? _lists.check(line, deviceWallClock)
-        : _lists.uncheck(line, deviceWallClock);
-    setState(_load);
+    tickAtOnce(lineTickKey(line, null), checked, () {
+      checked
+          ? _lists.check(line, deviceWallClock)
+          : _lists.uncheck(line, deviceWallClock);
+      if (mounted) setState(_load);
+    });
   }
 
   /// The reappear time dialog of the Line [shown], each pick written at

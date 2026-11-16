@@ -190,6 +190,7 @@ use crate::tally_view::{
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::text_menu::{self, Clip, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
+use crate::tick_saves;
 use crate::undo::Undo;
 use crate::unsorted_steps::{self, MovedOn, Sorting};
 use crate::vault_view::{self, VaultDone, VaultJob};
@@ -2237,6 +2238,9 @@ pub struct App {
     /// (#287). What it was as this App read it last.
     writes: Arc<AtomicU64>,
     seen_writes: u64,
+    /// The ticks clicked and shown at once, saved at the start of the
+    /// next frame (#338), with the frame they were clicked in.
+    ticks_waiting: (Vec<Action>, u64),
     /// Whether a window can be kept on top here: not on Wayland (#287).
     pin_works: bool,
     /// How many Note windows were opened, each having its own viewport
@@ -2701,6 +2705,7 @@ impl App {
             alone: None,
             writes: Arc::new(AtomicU64::new(0)),
             seen_writes: 0,
+            ticks_waiting: (Vec::new(), 0),
             pin_works: note_window::pin_works_here(),
             windows_opened: 0,
             lines_base: 0,
@@ -6725,6 +6730,107 @@ impl App {
     }
 
     /// Does `action`, reads the log again and announces what went wrong.
+    /// What a tick shows at once (#338), under its key; none for an
+    /// action that is no tick.
+    fn tick_shown(
+        &self,
+        ctx: &egui::Context,
+        action: &Action,
+    ) -> Option<(String, tick_saves::Shown)> {
+        let ticked = match action {
+            Action::Toggle(routine, occurrence) => {
+                let key = tick_saves::occurrence_key(routine, occurrence);
+                let stored = Routines::new(&self.store)
+                    .by_id(routine)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|r| r.done_at(occurrence).is_some());
+                let done = tick_saves::done(ctx, &key, stored);
+                (key, tick_saves::Shown::Done(!done))
+            }
+            Action::CheckMissed(routine, occurrence) => (
+                tick_saves::occurrence_key(routine, occurrence),
+                tick_saves::Shown::Done(true),
+            ),
+            Action::Checklist(ChecklistAction::Check(line, checked, on)) => (
+                tick_saves::line_key(line, on.as_ref()),
+                tick_saves::Shown::Done(*checked),
+            ),
+            Action::Shopping(ShoppingAction::Check(line, checked)) => (
+                tick_saves::line_key(line, None),
+                tick_saves::Shown::Done(*checked),
+            ),
+            Action::Frog(FrogAction::Toggle(id)) => {
+                let key = tick_saves::frog_key(id);
+                let stored = Frogs::new(&self.store)
+                    .by_id(id)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|f| f.is_done());
+                let done = tick_saves::done(ctx, &key, stored);
+                (key, tick_saves::Shown::Done(!done))
+            }
+            Action::Tick { entity, id, to } => {
+                (tick_saves::box_key(entity, id), tick_saves::Shown::Box(*to))
+            }
+            _ => return None,
+        };
+        Some(ticked)
+    }
+
+    /// Holds a tick back, shown at once (#338): this frame is drawn again
+    /// right away with its box ticked, and it is saved at the start of
+    /// the next frame. Any other action comes back to be applied now.
+    fn tick_later(&mut self, ctx: &egui::Context, action: Action) -> Option<Action> {
+        // A box of the table shown full screen is a box of its text.
+        let action = match action {
+            Action::Table(table_view::Asked::Tick(id, to)) => {
+                match self.table.as_ref().and_then(TableView::boxes) {
+                    Some(entity) => Action::Tick {
+                        entity: entity.to_string(),
+                        id,
+                        to,
+                    },
+                    None => Action::Table(table_view::Asked::Tick(id, to)),
+                }
+            }
+            other => other,
+        };
+        let Some((key, shown)) = self.tick_shown(ctx, &action) else {
+            return Some(action);
+        };
+        tick_saves::wait(ctx, key, shown);
+        // A box in a text is drawn from the looks read: they show it.
+        if let Action::Tick { entity, id, to } = &action {
+            if let Some(look) = self.view.box_looks.get_mut(entity) {
+                look.states.insert(id.clone(), *to);
+            }
+            let in_table = self.table.as_ref().and_then(TableView::boxes) == Some(entity.as_str());
+            if let Some(ticking) = self.view.table_ticking.as_mut().filter(|_| in_table) {
+                ticking.look.states.insert(id.clone(), *to);
+            }
+        }
+        self.ticks_waiting.0.push(action);
+        self.ticks_waiting.1 = ctx.cumulative_frame_nr();
+        ctx.request_discard("a tick shows at once (#338)");
+        ctx.request_repaint();
+        None
+    }
+
+    /// Saves the ticks held back in an earlier frame, in the order they
+    /// were clicked; one that fails says so as any action does, and its
+    /// box shows what is stored again.
+    fn save_ticks(&mut self, ctx: &egui::Context) {
+        let (waiting, frame) = &mut self.ticks_waiting;
+        if waiting.is_empty() || ctx.cumulative_frame_nr() <= *frame {
+            return;
+        }
+        for action in std::mem::take(waiting) {
+            self.apply(action);
+        }
+        tick_saves::saved(ctx);
+    }
+
     fn apply(&mut self, action: Action) {
         let sorting = self.sorting_now();
         let done = self.act(action);
@@ -7736,11 +7842,15 @@ impl App {
             Action::Checklist(asked) => self.checklist_action(asked)?,
             Action::Shopping(asked) => self.shopping_action(asked)?,
             Action::Tick { entity, id, to } => {
-                // A sync may have taken the box or the role meanwhile.
+                // A sync may have taken the box or the role meanwhile:
+                // the tick shown fails then (#338).
                 let boxes = Boxes::new(&self.store);
-                if boxes.may_tick(&entity)? && boxes.of(&entity)?.iter().any(|b| b.id == id) {
-                    boxes.tick(&entity, &id, to)?;
+                if !(boxes.may_tick(&entity)? && boxes.of(&entity)?.iter().any(|b| b.id == id)) {
+                    return Err(oldbrainfix_core::Error::Invalid(format!(
+                        "box {id} of {entity} gone, or no role to tick it"
+                    )));
                 }
+                boxes.tick(&entity, &id, to)?;
             }
             Action::BoxHistory { entity, id } => {
                 let now = self.store.now();
@@ -8515,18 +8625,26 @@ impl App {
                 let Some(line) = self.lines.stored_id(&self.store, &*self.wall, &line)? else {
                     return Ok(());
                 };
-                // A sync meanwhile may have taken it.
-                if let Some((list, _)) = self.line_of(&line)? {
-                    let lists = Checklists::new(&self.store);
-                    let list = Checklist { on, ..list };
-                    if checklist_view::may_check_shown(&self.store, &list)? {
-                        match (&list.on, checked) {
-                            (Some(on), true) => lists.check_for(&line, on)?,
-                            (Some(on), false) => lists.uncheck_for(&line, on)?,
-                            (None, true) => lists.check(&line)?,
-                            (None, false) => lists.uncheck(&line)?,
-                        }
-                    }
+                // A sync meanwhile may have taken it, or the role: the
+                // tick shown fails then (#338).
+                let refused = || {
+                    oldbrainfix_core::Error::Invalid(format!(
+                        "Line {line} gone, or no role to check it"
+                    ))
+                };
+                let Some((list, _)) = self.line_of(&line)? else {
+                    return Err(refused());
+                };
+                let lists = Checklists::new(&self.store);
+                let list = Checklist { on, ..list };
+                if !checklist_view::may_check_shown(&self.store, &list)? {
+                    return Err(refused());
+                }
+                match (&list.on, checked) {
+                    (Some(on), true) => lists.check_for(&line, on)?,
+                    (Some(on), false) => lists.uncheck_for(&line, on)?,
+                    (None, true) => lists.check(&line)?,
+                    (None, false) => lists.uncheck(&line)?,
                 }
             }
             ChecklistAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
@@ -8638,16 +8756,23 @@ impl App {
                 let Some(line) = self.lines.stored_id(&self.store, &*self.wall, &line)? else {
                     return Ok(());
                 };
-                // A sync meanwhile may have taken it; one checked Once
-                // is brought back from gone, as from the Agenda (#276).
-                if let Some(shown) = self.shopping_line_of(&line, !checked)?
-                    && lists.may_check(&shown.note_id)?
-                {
-                    if checked {
-                        lists.check(&line, &*self.wall)?;
-                    } else {
-                        lists.uncheck(&line, &*self.wall)?;
-                    }
+                // A sync meanwhile may have taken it, or the role: the
+                // tick shown fails then (#338). One checked Once is
+                // brought back from gone, as from the Agenda (#276).
+                let Some(shown) = self.shopping_line_of(&line, !checked)? else {
+                    return Err(oldbrainfix_core::Error::Invalid(format!(
+                        "Line {line} gone"
+                    )));
+                };
+                if !lists.may_check(&shown.note_id)? {
+                    return Err(oldbrainfix_core::Error::Invalid(format!(
+                        "no role to check Line {line}"
+                    )));
+                }
+                if checked {
+                    lists.check(&line, &*self.wall)?;
+                } else {
+                    lists.uncheck(&line, &*self.wall)?;
                 }
             }
             ShoppingAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
@@ -10338,6 +10463,7 @@ impl App {
 
     /// Draws one frame into `ui` and does what was asked in it.
     pub fn show(&mut self, ui: &mut Ui) {
+        self.save_ticks(ui.ctx());
         self.agenda_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
         self.ask_arrived(ui.ctx());
@@ -10816,7 +10942,9 @@ impl App {
             actions.push(Action::FollowLink(link));
         }
         for action in actions {
-            self.apply(action);
+            if let Some(action) = self.tick_later(ui.ctx(), action) {
+                self.apply(action);
+            }
         }
         // The Notes in windows of their own, beside this one (#287).
         self.show_note_windows(ui.ctx());
@@ -10914,6 +11042,7 @@ impl App {
         let Some(note) = self.alone.as_ref().map(|a| a.note.clone()) else {
             return Shown::Closed;
         };
+        self.save_ticks(ui.ctx());
         // What the main window or another did, a notification's Done,
         // the clock.
         let changed = self
@@ -11086,7 +11215,11 @@ impl App {
                 | Action::OpenAsk
                 | Action::Back
                 | Action::Forward => self.for_main.push(action),
-                action => self.apply(action),
+                action => {
+                    if let Some(action) = self.tick_later(ui.ctx(), action) {
+                        self.apply(action);
+                    }
+                }
             }
         }
         // Whatever else moved the list or opened such a dialog here.
@@ -19143,7 +19276,12 @@ fn agenda_row(
     let weak = ui.visuals().weak_text_color();
     let routine = &row.row.routine;
     let occurrence = row.row.occurrence;
-    let done = row.row.done().is_some();
+    // As clicked while its save waits (#338).
+    let done = tick_saves::done(
+        ui.ctx(),
+        &tick_saves::occurrence_key(&routine.id, &occurrence),
+        row.row.done().is_some(),
+    );
     let skipped = row.row.skipped().is_some();
     let colour = row
         .area
@@ -19248,17 +19386,13 @@ fn agenda_row(
             for line in agenda_lines(list, hides_checked, None) {
                 let id = Id::new(("row line", &routine.id, occurrence.key(), &line.id));
                 let shown = (id, line.text.as_str(), usize::from(line.in_group));
-                let clicks = agenda_entry(
-                    ui,
-                    tones,
-                    shown,
-                    (line.checked, line.checked),
-                    (*checks, true),
-                );
+                let key = tick_saves::line_key(&line.id, list.on.as_ref());
+                let checked = tick_saves::done(ui.ctx(), &key, line.checked);
+                let clicks = agenda_entry(ui, tones, shown, (checked, checked), (*checks, true));
                 if clicks.boxed {
                     actions.push(Action::Checklist(ChecklistAction::Check(
                         line.id.clone(),
-                        !line.checked,
+                        !checked,
                         list.on.clone(),
                     )));
                 }
@@ -19377,7 +19511,8 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
         list_heading(ui, icon, (&row.note_id, &row.text, "shopping row"), actions);
         for line in &row.lines {
             let id = Id::new(("shopping line", line.id.as_str()));
-            let struck = row.struck.contains(&line.id);
+            let key = tick_saves::line_key(&line.id, None);
+            let struck = tick_saves::done(ui.ctx(), &key, row.struck.contains(&line.id));
             let clicks = agenda_entry(
                 ui,
                 tones,
@@ -19417,15 +19552,11 @@ fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Ve
         for line in &row.lines {
             let id = Id::new(("checklist line", line.id.as_str()));
             let shown = (id, line.text.as_str(), usize::from(line.in_group));
-            let clicks = agenda_entry(
-                ui,
-                tones,
-                shown,
-                (line.checked, line.checked),
-                (row.checks, true),
-            );
+            let key = tick_saves::line_key(&line.id, None);
+            let checked = tick_saves::done(ui.ctx(), &key, line.checked);
+            let clicks = agenda_entry(ui, tones, shown, (checked, checked), (row.checks, true));
             if clicks.boxed {
-                let check = ChecklistAction::Check(line.id.clone(), !line.checked, None);
+                let check = ChecklistAction::Check(line.id.clone(), !checked, None);
                 actions.push(Action::Checklist(check));
             }
             if clicks.words {
@@ -19551,7 +19682,9 @@ fn missed_card(
                         occurrence_time(t, &m.occurrence)
                     );
                     let label = format!("{}: {when} {first}", t.mark_done());
-                    if check(ui, tones, false, &label).clicked() {
+                    let key = tick_saves::occurrence_key(&routine.routine.id, &m.occurrence);
+                    let done = tick_saves::done(ui.ctx(), &key, false);
+                    if check(ui, tones, done, &label).clicked() && !done {
                         actions.push(Action::CheckMissed(
                             routine.routine.id.clone(),
                             m.occurrence,
@@ -21843,6 +21976,11 @@ fn note_card(
                                         .iter()
                                         .cloned()
                                         .partition(|l| look.shopping.is_none() || !l.checked);
+                                    // As clicked while the saves wait, where
+                                    // they lie (#338).
+                                    let on = look.checklist.and_then(|(l, _)| l.on.as_ref());
+                                    let open = checklist_view::as_clicked(ui.ctx(), &open, on);
+                                    let struck = checklist_view::as_clicked(ui.ctx(), &struck, on);
                                     boxes = checklist_view::card_lines(ui, tones, &open);
                                     if !struck.is_empty() {
                                         let said = t.shopping_struck_count(struck.len() as i64);

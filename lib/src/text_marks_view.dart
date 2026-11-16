@@ -13,6 +13,7 @@ import 'box_ids.dart';
 import 'l10n.dart';
 import 'profile.dart';
 import 'table_screen.dart';
+import 'tick_saves.dart';
 
 /// What a screen reader says for a box showing [state].
 String boxStateLabel(AppLocalizations t, BoxState state) => switch (state) {
@@ -87,22 +88,39 @@ class BoxTicking {
     changed: changed,
   );
 
-  /// The state the box [id] shows, written as [starting].
+  /// The state the box [id] shows, written as [starting]: as tapped
+  /// while its save waits (#338), else as ticked in the log.
   BoxState stateOf(String id, BoxState starting) =>
-      ticks[id]?.state ?? starting;
+      TickSaves.instance.waiting<BoxState>(_key(id)) ??
+      ticks[id]?.state ??
+      starting;
 
-  /// Ticks the box [id] to [to]; whether it was written. A sync may have
-  /// taken the box or the role meanwhile: then nothing is.
-  bool tick(String id, BoxState to) {
-    try {
-      Boxes(notes.store).tick(entity, id, to);
-    } on ArgumentError {
-      return false;
-    } on StateError {
-      return false;
-    }
-    changed?.call();
-    return true;
+  String _key(String id) => tickKey(entity: entity, box: id);
+
+  /// Ticks the box [id] to [to] at once, as [stateOf] shows it once
+  /// [redraw] drew it, and writes it after the frame, then runs
+  /// [changed] (#338). A sync may have taken the box or the role
+  /// meanwhile: then nothing is written, the box shows as stored again
+  /// and [failed] runs.
+  void tick(
+    String id,
+    BoxState to, {
+    required VoidCallback redraw,
+    required void Function(Object error) failed,
+  }) {
+    TickSaves.instance.tick(
+      _key(id),
+      to,
+      save: () {
+        Boxes(notes.store).tick(entity, id, to);
+        changed?.call();
+      },
+      failed: (error) {
+        redraw();
+        failed(error);
+      },
+    );
+    redraw();
   }
 
   /// Every tick of the box [id], the oldest first, with who wrote it.
@@ -239,7 +257,18 @@ Future<void> openBoxMenu(
   if (!context.mounted) return;
   switch (picked) {
     case _ToState(:final state):
-      ticking.tick(id, state);
+      // The page the box is on draws it ticked in the next frame.
+      void redraw() {
+        if (context.mounted) (context as Element).markNeedsBuild();
+      }
+      ticking.tick(
+        id,
+        state,
+        redraw: redraw,
+        failed: (error) {
+          if (context.mounted) announceTickFailed(context, error);
+        },
+      );
     case _History():
       await showBoxHistory(context, ticking, id);
     case null:
@@ -1709,8 +1738,10 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
     TextStyle? style,
   ) {
     final ticking = _ticking;
-    final glyph = box.state.glyph;
-    final label = boxStateLabel(t, box.state);
+    // As tapped while its save waits (#338).
+    final state = ticking?.stateOf(box.id, box.state) ?? box.state;
+    final glyph = state.glyph;
+    final label = boxStateLabel(t, state);
     final ticked = ticking?.labelOf(context, box.id);
     if (ticking == null || (!ticking.mayTick && ticked == null)) {
       return [
@@ -1731,7 +1762,7 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
               context,
               at,
               id: box.id,
-              state: box.state,
+              state: state,
               ticking: ticking,
             ),
           ),

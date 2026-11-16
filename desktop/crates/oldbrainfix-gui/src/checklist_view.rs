@@ -57,6 +57,26 @@ pub struct ShownLine {
     pub below: Option<String>,
 }
 
+/// `shown` as clicked while their saves wait (#338), checked on the
+/// Occurrence `on`, or on none.
+pub fn as_clicked(
+    ctx: &egui::Context,
+    shown: &[ShownLine],
+    on: Option<&RoutineOccurrence>,
+) -> Vec<ShownLine> {
+    shown
+        .iter()
+        .map(|line| ShownLine {
+            checked: crate::tick_saves::done(
+                ctx,
+                &crate::tick_saves::line_key(&line.id, on),
+                line.checked,
+            ),
+            ..line.clone()
+        })
+        .collect()
+}
+
 impl ShownLine {
     fn of_line(line: &Line) -> ShownLine {
         ShownLine {
@@ -753,6 +773,7 @@ pub fn lines(
             &menu as &dyn Fn(&mut Ui, &str) -> Option<LineStep>,
         )
     });
+    let shown = &as_clicked(ui.ctx(), shown, on);
     for asked in line_rows(ui, (t, tones), shown, checks, (menus, field, None), drags) {
         actions.push(match asked {
             LineAsk::Check(id, checked) => ChecklistAction::Check(id, checked, on.cloned()),

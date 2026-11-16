@@ -14,6 +14,7 @@ import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/shopping_list_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'held_ticks.dart';
 import 'reveal.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -318,6 +319,48 @@ void main() {
       }
       return true;
     }
+
+    testWidgets('a Line ticks and strikes in the frame after the tap, and is '
+        'saved after it (#338); a failed save shows it open again and says '
+        'so', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      bool? checked(String id) =>
+          tester.widget<Checkbox>(key('checklist-check-$id')).value;
+      final ticks = HeldTicks();
+
+      await tester.tap(key('checklist-check-$milk'));
+      await tester.pump();
+      expect(checked(milk), isTrue);
+      expect(struck(tester, milk), isTrue);
+      expect(shown(note), ['Milk', 'Eggs']);
+      await ticks.release(tester);
+      expect(shown(note), contains('[x] Milk'));
+
+      // Two quick taps end as the second left it.
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      expect(checked(eggs), isFalse);
+      await ticks.release(tester);
+      expect(checked(eggs), isFalse);
+      expect(shown(note), contains('Eggs'));
+
+      ticks.failWith(Exception('disk full'));
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      expect(checked(eggs), isTrue);
+      expect(struck(tester, eggs), isTrue);
+      await ticks.release(tester);
+      expect(checked(eggs), isFalse);
+      expect(struck(tester, eggs), isFalse);
+      expect(shown(note), contains('Eggs'));
+      expect(find.text('A tick could not be saved.'), findsOneWidget);
+    });
 
     testWidgets('Shopping List in the kind badge makes the text as typed '
         'one; the name keeps the title, also after leaving', (tester) async {

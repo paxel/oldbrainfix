@@ -65,6 +65,10 @@ replace a law of Both apps where they say so. A desktop law marked
 
 - A checkbox or switch is the only thing that toggles state; the row
   around it does not.
+- **A tick shows at once** (#338, Q752): a box ticks, and its Line
+  strikes through, in the frame of the tap or click; the save follows
+  after that frame. A save that fails shows the box as stored again and
+  says so at the top. On the phone, on the desktop, everywhere a box is.
 
 ### Announcements
 
