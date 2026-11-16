@@ -1,12 +1,19 @@
 # The iPhone app (#237): built for a device without signing, and the
-# Runner's XCTest target run on a simulator, on every push to summer and
-# a release branch. The release pipeline calls the same job before the
-# TestFlight upload, which is release.yml's.
+# Runner's XCTest target run on a simulator. The release pipeline calls the
+# same job before the TestFlight upload, which is release.yml's.
+#
+# On a push to any branch but summer, as CI (#234): the run on a pull
+# request's head commit is its required check "iOS build and XCTest", so a
+# bugfix/** pull request has its iPhone build before the merge too. summer
+# gets no run after a merge: its ruleset requires a branch up to date
+# before merging, so the merged tree is the tree built here. No pull request
+# trigger: a fork's pull request cannot pass the required Sonar check
+# either (no SQ_TOKEN), and macOS minutes are dear.
 name: iOS
 
 on:
   push:
-    branches: [summer, "release/**"]
+    branches-ignore: [summer]
   workflow_dispatch:
   workflow_call:
 
@@ -27,6 +34,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
       # RustO for Photo Texts is Rust (android/ocr), built for the device
       # and the simulator (#239).

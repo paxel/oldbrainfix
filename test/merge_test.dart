@@ -45,10 +45,11 @@ void main() {
     await tap(tester, find.byTooltip('All Notes'));
   }
 
-  /// The "merge into…" button on the card showing [text].
-  Finder mergeOn(String text) => find.descendant(
+  /// The "merge into…" button on the card showing [text], named "Add to
+  /// Note…" on an Unsorted Note's card (#308).
+  Finder mergeOn(String text, {bool unsorted = false}) => find.descendant(
     of: find.ancestor(of: find.text(text), matching: find.byType(NoteCard)),
-    matching: find.byTooltip('Merge into…'),
+    matching: find.byTooltip(unsorted ? 'Add to Note…' : 'Merge into…'),
   );
 
   List<String> cards() => [
@@ -98,7 +99,7 @@ void main() {
     tick();
     final merged = notes.capture('more sauce');
     await startAtNotes(tester);
-    await tap(tester, mergeOn('more sauce'));
+    await tap(tester, mergeOn('more sauce', unsorted: true));
     expect(cards(), ['pasta', 'sauce']);
     await tester.enterText(find.byType(TextField), 'sau');
     await tester.pumpAndSettle();
@@ -126,8 +127,8 @@ void main() {
   testWidgets('backing out of the picker merges nothing', (tester) async {
     notes.capture('sauce');
     await startAtNotes(tester);
-    await tap(tester, mergeOn('sauce'));
-    expect(find.text('There is no other Note to merge into.'), findsOneWidget);
+    await tap(tester, mergeOn('sauce', unsorted: true));
+    expect(find.text('There is no Note to add to.'), findsOneWidget);
     await tap(tester, find.byType(BackButton));
     expect(cards(), ['sauce']);
     expect(notes.all().single.isMerged, isFalse);

@@ -9,13 +9,17 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
+import 'attachment_views.dart';
 import 'box_ids.dart';
 import 'calendar_platform.dart';
 import 'checklist_view.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
+import 'file_platform.dart';
 import 'frogs_screen.dart';
+import 'hidden_from_ai_view.dart';
+import 'home_shortcuts.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
 import 'location.dart';
@@ -23,6 +27,7 @@ import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_history_screen.dart';
+import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
@@ -37,6 +42,7 @@ import 'session_note.dart';
 import 'setting_badges.dart';
 import 'share_note.dart';
 import 'shopping_list_view.dart';
+import 'sorting_unsorted.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 import 'tally_entry_screen.dart';
@@ -47,14 +53,16 @@ import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
-/// Opens the editor of [note]; returns once the user left it. With
-/// [typeLines] the cursor starts in the Lines of a new list (#161).
+/// Opens the editor of [note]; returns once the user left it, or once it
+/// moved on to the next of [sorting]. With [typeLines] the cursor starts
+/// in a new Line of a list after its open ones (#161, #276).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
   Places places,
   Note note, {
   bool typeLines = false,
+  UnsortedShown? sorting,
 }) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (_) => NoteEditorScreen(
@@ -63,6 +71,7 @@ Future<void> openNote(
       drafts: DraftsScope.of(context),
       noteId: note.id,
       typeLines: typeLines,
+      sorting: sorting,
     ),
   ),
 );
@@ -145,24 +154,34 @@ Future<bool> amendNote(
   return true;
 }
 
-/// Asks once whether the Note [noteId] goes to the trash, with the verb
-/// on the button in the error colour, and moves it there; whether it
-/// did. Its Routines and Reminders always go with it, and the question
-/// names them (#262).
-Future<bool> deleteNote(
-  BuildContext context,
-  Notes notes,
-  String noteId,
-) async {
+/// Moves the Note [noteId] to the trash without asking and offers to
+/// undo it at the top (#268); whether it went. Its Routines and Reminders
+/// always go with it (#262), and the undo brings them back with it.
+bool deleteNote(BuildContext context, Notes notes, String noteId) {
+  final note = notes.byId(noteId);
+  if (note == null || note.isTrashed || !notes.store.mayChange(noteId)) {
+    return false;
+  }
   final book = Routines(notes.store);
-  final linked = book.ofNote(noteId);
-  final delete = await showDialog<bool>(
-    context: context,
-    builder: (context) => _DeleteNoteDialog(linked: linked),
-  );
-  if (delete != true) return false;
   book.trashNote(noteId);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoNoteTrashed, () {
+    // The Trash, a purge or a sync may have got there first.
+    if (notes.byId(noteId)?.isTrashed != true) return;
+    if (!notes.store.mayChange(noteId)) return;
+    book.restoreNote(noteId);
+  });
   return true;
+}
+
+/// Removes the "From …" badge of the Note [noteId] (#164) without asking
+/// and offers to undo it at the top (#268), which brings it back.
+void removePackFrom(BuildContext context, Store store, String noteId) {
+  if (store.packFrom(noteId) == null || !store.mayChange(noteId)) return;
+  store.removePackFrom(noteId);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoPackFromRemoved, () {
+    if (store.packFrom(noteId) != null || !store.mayChange(noteId)) return;
+    store.restorePackFrom(noteId);
+  });
 }
 
 /// Asks once whether the photo ([photo]) or voice recording [hash] of
@@ -197,36 +216,100 @@ Future<bool> removeMedia(
   return true;
 }
 
-/// Asks once whether the Photo Text ([photo]) or Transcript of the photo
-/// or voice recording [hash] of the Note or Section [noteId] goes while
-/// the file stays, with the verb on the button in the error colour, and
-/// removes it; whether it did (ADR 0025).
-Future<bool> removeGeneratedText(
+/// Asks once whether the Attachment [hash] of the Note or Section
+/// [noteId] goes while its Attachment Text stays (ADR 0020, #267), and
+/// removes it; whether it did.
+Future<bool> removeAttachment(
+  BuildContext context,
+  Notes notes,
+  String noteId,
+  String hash,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => _RemoveDialog(
+      title: context.t.removeFileQuestion,
+      detail: context.t.removeMediaDetail,
+    ),
+  );
+  // A sync while the dialog was open may have taken it already.
+  if (confirmed != true || !notes.mayRemoveAttachment(noteId, hash)) {
+    return false;
+  }
+  notes.removeAttachment(noteId, hash);
+  return true;
+}
+
+/// Removes the Attachment Text of the file [hash] of the Note or Section
+/// [noteId] while the file stays, without asking, and offers to undo it
+/// at the top (#268); whether it did (ADR 0025). The undo writes the text
+/// back.
+bool removeAttachmentText(
+  BuildContext context,
+  Notes notes,
+  String noteId,
+  String hash,
+) {
+  final text = notes.byId(noteId)?.attachmentTexts[hash];
+  if (!notes.mayRemoveAttachmentText(noteId, hash) || text == null) {
+    return false;
+  }
+  notes.removeAttachmentText(noteId, hash);
+  AnnouncementsScope.of(context)
+      ?.offerUndo(context.t.undoAttachmentTextRemoved, () {
+        // Read again meanwhile, or the file gone: nothing to bring back.
+        final now = notes.byId(noteId);
+        final removed =
+            now != null &&
+            now.attachments.any((a) => a.hash == hash) &&
+            now.removedAttachmentTexts.contains(hash);
+        if (!removed || !notes.store.mayChange(noteId)) return;
+        notes.setAttachmentText(noteId, hash, text);
+      });
+  return true;
+}
+
+/// Removes the Photo Text ([photo]) or Transcript of the photo or voice
+/// recording [hash] of the Note or Section [noteId] while the file stays,
+/// without asking, and offers to undo it at the top (#268); whether it
+/// did (ADR 0025). The undo writes the text back.
+bool removeGeneratedText(
   BuildContext context,
   Notes notes,
   String noteId,
   String hash, {
   required bool photo,
-}) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => _RemoveDialog(
-      title: photo
-          ? context.t.removePhotoTextQuestion
-          : context.t.removeTranscriptQuestion,
-      detail: context.t.removeGeneratedTextDetail,
-    ),
-  );
-  // A sync while the dialog was open may have taken it already.
+}) {
   final allowed = photo
       ? notes.mayRemovePhotoText(noteId, hash)
       : notes.mayRemoveTranscript(noteId, hash);
-  if (confirmed != true || !allowed) return false;
+  final note = notes.byId(noteId);
+  final text = photo ? note?.photoTexts[hash] : note?.transcripts[hash];
+  if (!allowed || text == null) return false;
   if (photo) {
     notes.removePhotoText(noteId, hash);
   } else {
     notes.removeTranscript(noteId, hash);
   }
+  final t = context.t;
+  AnnouncementsScope.of(context)
+      ?.offerUndo(photo ? t.undoPhotoTextRemoved : t.undoTranscriptRemoved, () {
+        // Made again meanwhile, or the file gone: nothing to bring back.
+        final now = notes.byId(noteId);
+        final removed = photo
+            ? now != null &&
+                  now.photos.contains(hash) &&
+                  now.removedPhotoTexts.contains(hash)
+            : now != null &&
+                  now.recordings.contains(hash) &&
+                  now.removedTranscripts.contains(hash);
+        if (!removed || !notes.store.mayChange(noteId)) return;
+        if (photo) {
+          notes.setPhotoText(noteId, hash, text);
+        } else {
+          notes.setTranscript(noteId, hash, text);
+        }
+      });
   return true;
 }
 
@@ -242,7 +325,7 @@ List<MediaRemoval> mediaRemovals(
   final note = notes.byId(noteId);
   if (note == null) return const [];
   MediaRemoval removal(String hash, String? text, {required bool photo}) => (
-    photo: photo,
+    kind: photo ? RemovedMedia.photo : RemovedMedia.recording,
     hash: hash,
     text: text ?? '',
     run: () => then(removeMedia(context, notes, noteId, hash, photo: photo)),
@@ -254,17 +337,30 @@ List<MediaRemoval> mediaRemovals(
     for (final hash in note.recordings)
       if (notes.mayRemoveRecording(noteId, hash))
         removal(hash, note.transcripts[hash], photo: false),
+    // Its files too (#267), named by the file, not its text.
+    for (final file in note.attachments)
+      if (notes.mayRemoveAttachment(noteId, file.hash))
+        (
+          kind: RemovedMedia.file,
+          hash: file.hash,
+          text: file.name,
+          run: () => then(removeAttachment(context, notes, noteId, file.hash)),
+        ),
   ];
 }
 
 /// The text of the Note [noteId] and of each of its Sections, oldest
 /// first, as they show, the ids of their boxes left out, a blank line
-/// between them, for "Copy text" (#183); a text that is empty is left out.
+/// between them, for "Copy text" (#183); a Checklist's or Shopping List's
+/// Lines after its text as a task list (#323); a text that is empty is
+/// left out.
 String noteCopyText(Notes notes, String noteId) {
   final note = notes.byId(noteId);
   if (note == null) return '';
+  final lines = NoteShare.taskLines(notes.store, noteId, deviceWallClock);
   return [
     note.shownText,
+    if (lines != null) NoteShare.taskList(lines),
     for (final section in notes.sections(noteId)) section.shownText,
   ].map((text) => text.trim()).where((text) => text.isNotEmpty).join('\n\n');
 }
@@ -297,7 +393,7 @@ NoteActions noteActions(
     onRemovePackFrom: from == null || !placed.changes
         ? null
         : () {
-            notes.store.removePackFrom(id);
+            removePackFrom(context, notes.store, id);
             changed();
           },
     // Copied says nothing: the text is on the screen (UI laws).
@@ -334,6 +430,14 @@ NoteActions noteActions(
     onAddEntry: placed.amends
         ? () => then(addTallyEntry(context, notes, id))
         : null,
+    // Where the phone can have one, for a Tally entries may be added to
+    // (#284).
+    onAddToHome:
+        placed.amends &&
+            !placed.note.isTrashed &&
+            HomeShortcutsScope.of(context).available
+        ? () => unawaited(addTallyToHome(context, notes, id))
+        : null,
     checklist: () {
       final lists = Checklists(notes.store);
       final shopping = ShoppingLists(notes.store);
@@ -367,8 +471,11 @@ NoteActions noteActions(
       );
     },
     showTicks: () => showTicksEntry(notes, id, changed),
+    hideFromAi: () => hiddenFromAiEntry(notes.store, id, changed),
     onDelete: placed.changes
-        ? () => then(deleteNote(context, notes, id))
+        ? () {
+            if (deleteNote(context, notes, id)) changed();
+          }
         : null,
   );
 }
@@ -537,10 +644,17 @@ class NoteEditorScreen extends StatefulWidget {
   final Drafts drafts;
   final String noteId;
 
-  /// Whether the cursor starts in the Lines of a Checklist or Shopping
-  /// List just made from the browser's "+" (#161): a new empty Line of a
-  /// Checklist, the field at the top of a Shopping List.
+  /// Whether the cursor starts in a new empty Line of a Checklist or
+  /// Shopping List after its open Lines: one just made from the
+  /// browser's "+" (#161), or one opened from its group on the Agenda
+  /// (#276).
   final bool typeLines;
+
+  /// The Unsorted Notes of the list the Note was opened from (#313): once
+  /// a step here sorts it, the editor shows the next of them, and the
+  /// Agenda once none is left. Null where it was opened from anywhere
+  /// else.
+  final UnsortedShown? sorting;
 
   const NoteEditorScreen({
     super.key,
@@ -549,6 +663,7 @@ class NoteEditorScreen extends StatefulWidget {
     required this.drafts,
     required this.noteId,
     this.typeLines = false,
+    this.sorting,
   });
 
   @override
@@ -601,6 +716,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// that this Device may remove while their texts stay.
   Set<(String, String)> _removable = const {};
 
+  /// The files of the Note and of its Sections, as for [_removable], this
+  /// Device may remove while their texts stay, and whose texts it may
+  /// remove or read again (#267).
+  Set<(String, String)> _fileRemovable = const {};
+  Set<(String, String)> _fileTextRemovable = const {};
+  Set<(String, String)> _fileReadable = const {};
+
   /// The photos and recordings, as for [_removable], whose texts this
   /// Device may remove while they stay.
   Set<(String, String)> _textRemovable = const {};
@@ -632,6 +754,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// Whether the Note shows its ticks on this Device (ADR 0035).
   bool _showsTicks = false;
+
+  /// The Note's own mark Hidden from AI, and switching it, while it is
+  /// marked or may be (#267); and whether something else hides it, such
+  /// as its Area.
+  ({bool on, VoidCallback toggle})? _hiddenFromAi;
+  bool _hiddenByOther = false;
   late final _routineBook = Routines(widget.notes.store);
   late final _frogs = Frogs(widget.notes.store);
 
@@ -676,8 +804,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     unawaited(_restoreDraft());
   }
 
+  /// The app's announcements, whose undos this editor follows (#268).
+  Announcements? _announcements;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final announcements = AnnouncementsScope.of(context);
+    if (announcements == _announcements) return;
+    _announcements?.undone.removeListener(_undone);
+    _announcements = announcements?..undone.addListener(_undone);
+  }
+
+  /// An undo at the top may have brought back what this editor shows: a
+  /// Routine's or the Frog's badge, a Transcript, the "From …" badge.
+  void _undone() {
+    if (!mounted) return;
+    _saveText();
+    _reload();
+  }
+
   @override
   void dispose() {
+    _announcements?.undone.removeListener(_undone);
     _draftTimer?.cancel();
     _lifecycle.dispose();
     _text.dispose();
@@ -906,6 +1055,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             if (notes.recordingBytes(hash) != null) (id, hash),
         ],
     };
+    final attached = [
+      if (note != null) (note.id, note.attachments),
+      for (final section in _sections) (section.id, section.attachments),
+    ];
+    _fileRemovable = {
+      for (final (id, files) in attached)
+        for (final file in files)
+          if (notes.mayRemoveAttachment(id, file.hash)) (id, file.hash),
+    };
+    _fileTextRemovable = {
+      for (final (id, files) in attached)
+        for (final file in files)
+          if (notes.mayRemoveAttachmentText(id, file.hash)) (id, file.hash),
+    };
+    _fileReadable = {
+      for (final (id, files) in attached)
+        if (store.mayChange(id))
+          for (final file in files)
+            // Not one left to a computer (Q645).
+            if (file.kind.hasText && !file.computer) (id, file.hash),
+    };
     _capturedRemovable = {
       for (final id in [?note?.id, for (final section in _sections) section.id])
         for (final detail in CapturedDetail.values)
@@ -920,6 +1090,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // Ticks wherever this Device holds a role, unless in the trash.
     final ticks = note != null && !note.isTrashed;
     final shows = _showsTicks = showsTicks(store, widget.noteId);
+    _hiddenFromAi = hiddenFromAiEntry(store, widget.noteId, _reload);
+    _hiddenByOther = store
+        .hiddenFromAiBy(widget.noteId)
+        .any((mark) => mark != widget.noteId);
     BoxTicking ticking(String id, List<ShownBox> boxes) => BoxTicking(
       notes: notes,
       entity: id,
@@ -1418,6 +1592,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// the page of its first field.
   Future<void> _changeKind(NoteKind kind) async {
     _saveText();
+    final before = _sortingBefore();
     final notes = widget.notes;
     final id = widget.noteId;
     final changed = switch ((_kind, kind)) {
@@ -1431,7 +1606,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       (_, NoteKind.checklist || NoteKind.shoppingList) => _switchList(),
       _ => false,
     };
-    if (!mounted || !changed) return;
+    if (!mounted || !changed || _movedOn(before)) return;
     setState(_load);
     _show();
   }
@@ -1580,35 +1755,43 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
-  /// Asks to remove the Note's "From …" badge (#164), and removes it.
-  Future<void> _removePackFrom(String name) async {
-    final t = context.t;
-    final remove = await showDialog<bool>(
+  /// The "From …" badge's menu at the finger [at]: Remove “From [name]”,
+  /// which removes it (#164) without asking; the announcement at the top
+  /// undoes it (#268).
+  Future<void> _removePackFrom(String name, Offset at) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final remove = await showMenu<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        content: Text(t.removePackFrom(name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            key: const ValueKey('remove-pack-from'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.remove),
-          ),
-        ],
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
       ),
+      items: [
+        PopupMenuItem(
+          key: const ValueKey('remove-pack-from'),
+          value: true,
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline),
+              const SizedBox(width: 12),
+              Flexible(child: Text(context.t.removePackFrom(name))),
+            ],
+          ),
+        ),
+      ],
     );
     if (remove != true || !mounted) return;
-    widget.notes.store.removePackFrom(widget.noteId);
+    removePackFrom(context, widget.notes.store, widget.noteId);
     setState(() {});
   }
 
   /// The row of badges under the text (#160): each setting of the Note
   /// as its icon and its value, an icon for a fixed set of values, short
   /// text otherwise (#192), a tap opening its small editor; a setting
-  /// that does not apply has none. "+" ends it.
+  /// that does not apply has none. The kind comes first, in words (#310);
+  /// "+" ends it.
   Widget _badges(
     PlacedNote placed,
     DateFormat when,
@@ -1625,6 +1808,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       spacing: 8,
       runSpacing: 8,
       children: [
+        // Every Note has a kind (#188), first and in words (#310), with ▾
+        // while there is another to change it to; else it only shows it.
+        SettingBadge(
+          key: const ValueKey('badge-kind'),
+          setting: t.badgeKind,
+          icon: kindBadgeIcon,
+          value: kindName(t, _kind),
+          dropDown: true,
+          onTap: _kinds.isEmpty ? null : (_) => _editKind(),
+        ),
         SettingBadge(
           key: const ValueKey('badge-importance'),
           setting: t.importance,
@@ -1661,7 +1854,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             icon: Icons.inventory_2_outlined,
             value: t.packFrom(profileDisplayName(t, from.name)),
             onTap: changes
-                ? (_) => _removePackFrom(profileDisplayName(t, from.name))
+                ? (at) => _removePackFrom(profileDisplayName(t, from.name), at)
                 : null,
           ),
         for (final routine in _routines)
@@ -1683,16 +1876,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         // Its open Frog, or one eaten today or yesterday (#259).
         if (_frog case final frog?) _frogBadge(frog),
-        // Every Note has a kind (#188); with nothing to change it to,
-        // the badge only shows it.
-        SettingBadge(
-          key: const ValueKey('badge-kind'),
-          setting: t.badgeKind,
-          icon: kindBadgeIcon,
-          value: kindName(t, _kind),
-          valueIcon: kindIcon(_kind),
-          onTap: _kinds.isEmpty ? null : (_) => _editKind(),
-        ),
         // A Plain Note's text is plain, formatted or code (#213).
         if (_kind == NoteKind.plain && note.textEditable)
           SettingBadge(
@@ -1739,6 +1922,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               _toggleTicks,
             ),
           ),
+        // Off in a Shared Area, where it is not offered (#267).
+        if (_hiddenFromAi case (:final on, :final toggle))
+          SettingBadge(
+            key: const ValueKey('badge-hidden-from-ai'),
+            setting: t.hiddenFromAi,
+            icon: hiddenFromAiIcon,
+            value: on
+                ? t.settingOn
+                : _hiddenByOther
+                ? t.hiddenFromAiByArea
+                : t.settingOff,
+            valueIcon: switchIcon(on),
+            onTap: (_) =>
+                _editSwitch(t.hiddenFromAi, hiddenFromAiIcon, on, toggle),
+          ),
         // In a Shared Area only a Manager sets them up (ADR 0013).
         if (schedules)
           SettingBadge(
@@ -1778,7 +1976,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The Frog badge's menu at the finger [at]: Eat now while it is open
   /// and this Device may check it off, Remove the Frog for who may
-  /// manage it (ADR 0013), which asks once, as the Frog view does.
+  /// manage it (ADR 0013), which the announcement at the top undoes, as
+  /// in the Frog view (#268).
   Future<void> _frogMenu(
     Frog frog,
     Offset at, {
@@ -1826,7 +2025,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveText();
     if (picked) {
       _frogs.markDone(frog.id);
-    } else if (!await trashFrog(context, _frogs, frog) || !mounted) {
+    } else if (!trashFrog(context, _frogs, frog)) {
       return;
     }
     _reload();
@@ -1836,10 +2035,53 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
+    final before = _sortingBefore();
     if (await fileNote(context, widget.notes, widget.places, note)) {
-      if (!mounted) return;
+      if (!mounted || _movedOn(before)) return;
       _reload();
     }
+  }
+
+  /// The order of the Unsorted Notes [NoteEditorScreen.sorting] shows as
+  /// a step that may sort the Note begins (#313).
+  List<String> _sortingBefore() => [
+    for (final note in widget.sorting?.call() ?? const <Note>[]) note.id,
+  ];
+
+  /// After a step that may have sorted the Note (#313): opened from
+  /// Unsorted, Unsorted as the step began and no longer, nor in the
+  /// trash, the editor shows the next Unsorted Note of the list in its
+  /// place; with none left the Agenda, and with only some the list's
+  /// filter hides the list again. Whether it went.
+  bool _movedOn(List<String> before) {
+    final sorting = widget.sorting;
+    if (sorting == null || !mounted || !before.contains(widget.noteId)) {
+      return false;
+    }
+    final note = widget.notes.byId(widget.noteId);
+    if (note == null || note.isTrashed || note.isUnsorted) return false;
+    final navigator = Navigator.of(context);
+    final next = nextUnsorted(before, sorting(), widget.noteId);
+    if (next != null) {
+      unawaited(
+        navigator.pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => NoteEditorScreen(
+              notes: widget.notes,
+              places: widget.places,
+              drafts: widget.drafts,
+              noteId: next.id,
+              sorting: sorting,
+            ),
+          ),
+        ),
+      );
+    } else if (widget.notes.unsorted().isEmpty) {
+      showAgendaSorted(context);
+    } else {
+      navigator.pop();
+    }
+    return true;
   }
 
   Future<void> _amend() async {
@@ -1862,6 +2104,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
+    final before = _sortingBefore();
     await spawnFromNote(
       context,
       widget.notes,
@@ -1869,7 +2112,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       note,
       spawn: spawn,
     );
-    if (!mounted) return;
+    if (!mounted || _movedOn(before)) return;
     final named = _named;
     _reload();
     // Spawning a Session makes a plain Note one (#191).
@@ -1960,18 +2203,154 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Removes the Photo Text ([photo]) or Transcript of [hash] of the Note
-  /// or Section [id] after asking once; the file stays.
-  Future<void> _removeGenerated(String id, String hash, bool photo) async {
+  /// or Section [id] without asking; the file stays, and the announcement
+  /// at the top undoes it (#268).
+  void _removeGenerated(String id, String hash, bool photo) {
     _saveText();
-    final removed = await removeGeneratedText(
-      context,
-      widget.notes,
-      id,
-      hash,
-      photo: photo,
+    if (removeGeneratedText(context, widget.notes, id, hash, photo: photo)) {
+      _reload();
+    }
+  }
+
+  /// The files of the Note or Section [id] (#267): each with its
+  /// Attachment Text, Replace and Append for a text that says something,
+  /// Remove for the text and for the file where this Device may, and
+  /// Read the text again; then the texts of the files removed while their
+  /// texts stay, under their names.
+  List<Widget> _fileParts(
+    String id,
+    List<Attachment> files,
+    Map<String, String> texts,
+    List<Attachment> removed,
+  ) {
+    final t = context.t;
+    Widget button(
+      String key,
+      String hash,
+      IconData icon,
+      String label,
+      VoidCallback? run,
+    ) => Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: ValueKey('$key:$hash'),
+        onPressed: run,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
     );
-    if (!mounted || !removed) return;
-    _reload();
+    List<Widget> takeOver(String hash, String? text) => [
+      if (text != null &&
+          text.trim().isNotEmpty &&
+          _textChangeable.contains(id)) ...[
+        button(
+          'replace-text',
+          hash,
+          Icons.swap_horiz,
+          t.replaceNoteText,
+          () => _takeOver(id, text, append: false),
+        ),
+        button(
+          'append-text',
+          hash,
+          Icons.playlist_add,
+          t.appendToNoteText,
+          () => _takeOver(id, text, append: true),
+        ),
+      ],
+    ];
+    return [
+      for (final file in files) ...[
+        const SizedBox(height: 16),
+        AttachmentRow(
+          key: ValueKey('file:${file.hash}'),
+          file: file,
+          noteId: id,
+          text: texts[file.hash],
+        ),
+        AttachmentText(file: file, text: texts[file.hash]),
+        ...takeOver(file.hash, texts[file.hash]),
+        if (_fileTextRemovable.contains((id, file.hash)))
+          button(
+            'remove-text',
+            file.hash,
+            Icons.backspace_outlined,
+            t.removeGeneratedText,
+            () {
+              _saveText();
+              if (removeAttachmentText(context, widget.notes, id, file.hash)) {
+                _reload();
+              }
+            },
+          ),
+        if (_fileReadable.contains((id, file.hash)))
+          button(
+            'again',
+            file.hash,
+            Icons.refresh,
+            t.readTextAgain,
+            _remaking.contains((id, file.hash))
+                ? null
+                : () => _readFileAgain(id, file.hash),
+          ),
+        if (_fileRemovable.contains((id, file.hash)))
+          button(
+            'remove',
+            file.hash,
+            Icons.link_off,
+            t.removeFileKeepText,
+            () async {
+              _saveText();
+              final gone = await removeAttachment(
+                context,
+                widget.notes,
+                id,
+                file.hash,
+              );
+              if (mounted && gone) _reload();
+            },
+          ),
+      ],
+      // Removed, the file shows no more; its text stays.
+      for (final file in removed) ...[
+        const SizedBox(height: 16),
+        GeneratedTextLabel(
+          key: ValueKey('removed-file:${file.hash}'),
+          label: file.name.isEmpty ? t.attachmentTextLabel : file.name,
+          child: AttachmentText(file: file, text: texts[file.hash]),
+        ),
+        ...takeOver(file.hash, texts[file.hash]),
+      ],
+    ];
+  }
+
+  /// Reads the file [hash] of the Note or Section [id] again (#267).
+  Future<void> _readFileAgain(String id, String hash) async {
+    _saveText();
+    setState(() => _remaking.add((id, hash)));
+    await readAttachmentAgain(context, id, hash);
+    if (!mounted) return;
+    setState(() {
+      _remaking.remove((id, hash));
+      _load();
+    });
+  }
+
+  /// Picks files with the system's file picker and attaches them to the
+  /// Note (#267); one that cannot be is said at the top.
+  Future<void> _attachFile() async {
+    _saveText();
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final files = FileScope.of(context);
+    final picked = await files.pickFiles();
+    if (picked.isEmpty) return;
+    final read = await readPickedFiles(files, picked, widget.notes.store);
+    announceNotAttached(t, announcements, navigator, read);
+    // Written also when the editor was left meanwhile: nothing is lost.
+    attachFiles(widget.notes, widget.noteId, read.files);
+    if (mounted) _reload();
   }
 
   /// Reads the photo ([photo]) or transcribes the recording [hash] of the
@@ -2088,15 +2467,161 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Merges the Note, with its text as typed, into the one picked; it
-  /// then is a Section there and the editor closes.
+  /// then is a Section there and the editor closes, or opened from
+  /// Unsorted moves on (#313).
   Future<void> _merge() async {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
-    if (await mergeNote(context, widget.notes, widget.places, note)) {
-      if (!mounted) return;
+    final before = _sortingBefore();
+    // The editor names it Merge into… (#308).
+    if (await mergeNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      adding: false,
+    )) {
+      if (!mounted || _movedOn(before)) return;
       Navigator.of(context).pop();
     }
+  }
+
+  /// The Section [section], the [i]th of the Note [note], as the Note's
+  /// text reads on (#307): a tear line, its text, edited in place where
+  /// this Device may (#183), its photos, recordings and files, and its
+  /// meta line, in no box of its own.
+  List<Widget> _sectionPart(
+    int i,
+    Section section,
+    Note note,
+    DateFormat when,
+  ) {
+    return [
+      TearLine(key: ValueKey('tear:${section.id}')),
+      if (!section.textEditable) ...[
+        NewerFormatNote(key: ValueKey('newer:${section.id}')),
+        const SizedBox(height: 8),
+      ],
+      // Edited in place as the Note's text, by the same people (#183);
+      // otherwise selected and copied with a long press, a tap on a box
+      // or tag still going to it.
+      if (_sectionTexts[section.id] case final field?)
+        TwoRowTextField(
+          key: ValueKey('section-text:${section.id}'),
+          controller: field,
+          twoRows: _twoRows,
+          boxes: true,
+          bar: widget.notes.store.advanced,
+          onBox: (start, at) => _tapBox(start, at, section: section.id),
+          formats: true,
+          onFormatted: () => setState(_saveText),
+          style: Theme.of(context).textTheme.bodyLarge,
+          // It sits where its text was read before.
+          decoration: const InputDecoration(
+            filled: false,
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        )
+      else if (section.text.isNotEmpty)
+        SelectionArea(
+          child: MarkedText(
+            section.shownText,
+            format: section.textFormat,
+            style: Theme.of(context).textTheme.bodyLarge,
+            boxes: section.boxes,
+            source: section.text,
+            ticking: _sectionTicking[section.id],
+          ),
+        ),
+      for (final hash in section.photos) ...[
+        const SizedBox(height: 8),
+        NotePhoto(
+          key: ValueKey(hash),
+          hash: hash,
+          onTap: () => viewPhoto(context, hash),
+        ),
+        PhotoText(
+          key: ValueKey('ocr:$hash'),
+          noteId: section.id,
+          hash: hash,
+          photoText: section.photoTexts[hash],
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.photoTexts[hash],
+          photo: true,
+        ),
+        ..._removeButton(section.id, hash, photo: true),
+      ],
+      for (final hash in section.removedPhotos) ...[
+        PhotoText(
+          key: ValueKey('ocr:$hash'),
+          noteId: section.id,
+          hash: hash,
+          photoText: section.photoTexts[hash],
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.photoTexts[hash],
+          photo: true,
+        ),
+      ],
+      for (final hash in section.recordings) ...[
+        const SizedBox(height: 8),
+        RecordingButton(key: ValueKey(hash), hash: hash, compact: false),
+        TranscriptText(
+          key: ValueKey('transcript:$hash'),
+          noteId: section.id,
+          hash: hash,
+          transcript: section.transcripts[hash],
+          compact: false,
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.transcripts[hash],
+          photo: false,
+        ),
+        ..._removeButton(section.id, hash, photo: false),
+      ],
+      for (final hash in section.removedRecordings) ...[
+        TranscriptText(
+          key: ValueKey('transcript:$hash'),
+          noteId: section.id,
+          hash: hash,
+          transcript: section.transcripts[hash],
+          compact: false,
+        ),
+        ..._generatedButtons(
+          section.id,
+          hash,
+          section.transcripts[hash],
+          photo: false,
+        ),
+      ],
+      // A merged Note's files travel with it (ADR 0047).
+      ..._fileParts(
+        section.id,
+        section.attachments,
+        section.attachmentTexts,
+        section.removedAttachments,
+      ),
+      const SizedBox(height: 4),
+      // Its details, each removable on its own, in the same dialog as the
+      // Note's Captured badge (#170).
+      CaptureLine.ofSection(
+        section,
+        key: ValueKey('captured-line:${section.id}'),
+        when: when,
+        after: i == 0 ? note.captured : _sections[i - 1].context.captured,
+        onTap: () => _showCaptured(when, section: section.id),
+      ),
+    ];
   }
 
   /// The text of a Note of a kind (#188): its name as a heading, one line,
@@ -2206,11 +2731,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// Asks once whether the Note goes to the trash, with the same dialog
-  /// as the card's Delete, and closes the editor when it went.
-  Future<void> _trash() async {
-    if (!await deleteNote(context, widget.notes, widget.noteId)) return;
-    if (!mounted) return;
+  /// Moves the Note to the trash as the card's Delete does, without
+  /// asking, and closes the editor; the announcement at the top undoes it
+  /// (#268).
+  void _trash() {
+    if (!deleteNote(context, widget.notes, widget.noteId)) return;
     Navigator.of(context).pop();
   }
 
@@ -2228,9 +2753,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     Navigator.of(context).pop();
   }
 
+  /// Answers [open] from the line at the top with a snooze, Skip or
+  /// Tomorrow (#269); the latter two take it off the line.
+  void _answer(OpenOccurrence open, OccurrenceAnswer answer) {
+    answerOccurrence(
+      context,
+      _routineBook,
+      AlarmSyncScope.of(context),
+      open.routine.id,
+      open.occurrence,
+      answer,
+    );
+    _reload();
+  }
+
   /// The lines at the top of the editor, above the name (#215): of each
   /// Occurrence the Note asks to check off "Due 15:00" or "Missed" with
-  /// its day, and Done; for a one-time Reminder, the Note's only one, also
+  /// its day, and Done, Snooze while it is not Missed and Not today
+  /// (#269); for a one-time Reminder, the Note's only one, also
   /// "Done and move to trash" where this Device may move the Note.
   List<Widget> _openLines(AppLocalizations t, bool changes) {
     final locale = Localizations.localeOf(context).toString();
@@ -2262,6 +2802,33 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 key: const ValueKey('open-done'),
                 onPressed: () => _checkOff(open),
                 child: Text(t.markDone),
+              ),
+              // Snooze rings from now on: not for one Missed (#269).
+              if (!open.missed)
+                AnswerButton(
+                  key: const ValueKey('open-snooze'),
+                  label: t.snooze,
+                  items: () => occurrenceAnswerItems(
+                    t,
+                    (answer) => answer,
+                    snooze: true,
+                    notToday: false,
+                    tomorrow: false,
+                  ),
+                  onAnswer: (answer) => _answer(open, answer),
+                ),
+              AnswerButton(
+                key: const ValueKey('open-not-today'),
+                label: t.notToday,
+                items: () => occurrenceAnswerItems(
+                  t,
+                  (answer) => answer,
+                  snooze: false,
+                  notToday: true,
+                  // Tomorrow only for one of today or later.
+                  tomorrow: !(open.occurrence.day < today),
+                ),
+                onAnswer: (answer) => _answer(open, answer),
               ),
               if (changes && open.routine.isReminder && _routines.length == 1)
                 OutlinedButton(
@@ -2350,6 +2917,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               icon: Icons.history,
             ),
             if (changes) ...[
+              if (FileScope.of(context).pickable)
+                BarAction(
+                  key: const ValueKey('attach-file'),
+                  label: t.attachFile,
+                  onPressed: () => unawaited(_attachFile()),
+                  icon: Icons.attach_file,
+                ),
               BarAction(
                 label: t.mergeInto,
                 onPressed: _merge,
@@ -2371,13 +2945,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               const SizedBox(height: 8),
             ],
             ..._openLines(t, changes),
+            // The Note's text and its Sections read on as one text, each
+            // Section under a tear line, in no box of its own (#307).
             Embossed(
               strong: note.importance == Importance.important,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _named
-                    ? _nameAndDescription(note, editable: editable)
-                    : TwoRowTextField(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_named)
+                      _nameAndDescription(note, editable: editable)
+                    else
+                      TwoRowTextField(
                         key: const ValueKey('note-text'),
                         controller: _text,
                         twoRows: _twoRows,
@@ -2403,6 +2983,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           border: InputBorder.none,
                         ),
                       ),
+                    // A Note of a kind keeps them below, as its diary part
+                    // (#188).
+                    if (!_named) ...[
+                      for (final (i, section) in _sections.indexed)
+                        ..._sectionPart(i, section, note, when),
+                      if (_sections.isNotEmpty) const SizedBox(height: 16),
+                    ],
+                  ],
+                ),
               ),
             ),
             if (_offersCode && !_named) _codeOffer(t),
@@ -2518,138 +3107,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 photo: false,
               ),
             ],
-            const SizedBox(height: 16),
-            for (final (i, section) in _sections.indexed)
-              EditorPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!section.textEditable) ...[
-                      NewerFormatNote(key: ValueKey('newer:${section.id}')),
-                      const SizedBox(height: 8),
-                    ],
-                    // Edited in place as the Note's text, by the same
-                    // people (#183); otherwise selected and copied with a
-                    // long press, a tap on a box or tag still going to it.
-                    if (_sectionTexts[section.id] case final field?)
-                      TwoRowTextField(
-                        key: ValueKey('section-text:${section.id}'),
-                        controller: field,
-                        twoRows: _twoRows,
-                        boxes: true,
-                        bar: widget.notes.store.advanced,
-                        onBox: (start, at) =>
-                            _tapBox(start, at, section: section.id),
-                        formats: true,
-                        onFormatted: () => setState(_saveText),
-                        style: Theme.of(context).textTheme.bodyLarge,
-                        // It sits where its text was read before.
-                        decoration: const InputDecoration(
-                          filled: false,
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      )
-                    else if (section.text.isNotEmpty)
-                      SelectionArea(
-                        child: MarkedText(
-                          section.shownText,
-                          format: section.textFormat,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                          boxes: section.boxes,
-                          source: section.text,
-                          ticking: _sectionTicking[section.id],
-                        ),
-                      ),
-                    for (final hash in section.photos) ...[
-                      const SizedBox(height: 8),
-                      NotePhoto(
-                        key: ValueKey(hash),
-                        hash: hash,
-                        onTap: () => viewPhoto(context, hash),
-                      ),
-                      PhotoText(
-                        key: ValueKey('ocr:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        photoText: section.photoTexts[hash],
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.photoTexts[hash],
-                        photo: true,
-                      ),
-                      ..._removeButton(section.id, hash, photo: true),
-                    ],
-                    for (final hash in section.removedPhotos) ...[
-                      PhotoText(
-                        key: ValueKey('ocr:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        photoText: section.photoTexts[hash],
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.photoTexts[hash],
-                        photo: true,
-                      ),
-                    ],
-                    for (final hash in section.recordings) ...[
-                      const SizedBox(height: 8),
-                      RecordingButton(
-                        key: ValueKey(hash),
-                        hash: hash,
-                        compact: false,
-                      ),
-                      TranscriptText(
-                        key: ValueKey('transcript:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        transcript: section.transcripts[hash],
-                        compact: false,
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.transcripts[hash],
-                        photo: false,
-                      ),
-                      ..._removeButton(section.id, hash, photo: false),
-                    ],
-                    for (final hash in section.removedRecordings) ...[
-                      TranscriptText(
-                        key: ValueKey('transcript:$hash'),
-                        noteId: section.id,
-                        hash: hash,
-                        transcript: section.transcripts[hash],
-                        compact: false,
-                      ),
-                      ..._generatedButtons(
-                        section.id,
-                        hash,
-                        section.transcripts[hash],
-                        photo: false,
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    // Its details, each removable on its own, in the
-                    // same dialog as the Note's Captured badge (#170).
-                    CaptureLine.ofSection(
-                      section,
-                      key: ValueKey('captured-line:${section.id}'),
-                      when: when,
-                      after: i == 0
-                          ? note.captured
-                          : _sections[i - 1].context.captured,
-                      onTap: () => _showCaptured(when, section: section.id),
-                    ),
-                  ],
+            ..._fileParts(
+              note.id,
+              note.attachments,
+              note.attachmentTexts,
+              note.removedAttachments,
+            ),
+            // A Note of a kind's Sections, its diary part under all else
+            // (#188), each under a tear line in no box, its text where
+            // the text above begins (#307).
+            if (_named)
+              for (final (i, section) in _sections.indexed)
+                Padding(
+                  key: ValueKey('section:${section.id}'),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _sectionPart(i, section, note, when),
+                  ),
                 ),
-              ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             if (amends)
               Align(
                 alignment: Alignment.centerLeft,
@@ -2685,7 +3162,7 @@ String textFormatName(AppLocalizations t, String format) => switch (format) {
 };
 
 /// The icon of the kind badge (#192), the same for every kind; the
-/// badge shows the kind itself as [kindIcon].
+/// badge shows the kind itself in words, [kindName] (#310).
 const kindBadgeIcon = Icons.category_outlined;
 
 /// The value icon of the Importance [importance] in its badge (#192).
@@ -2703,7 +3180,7 @@ IconData listOnAgendaIcon(ListOnAgenda shows) => switch (shows) {
   ListOnAgenda.lines => Icons.format_list_bulleted,
 };
 
-/// The icon of the kind [kind] (#188), the value of its badge.
+/// The icon of the kind [kind] (#188), as a Pack's tree shows it.
 IconData kindIcon(NoteKind kind) => switch (kind) {
   NoteKind.plain => Icons.notes,
   NoteKind.checklist => Icons.checklist,
@@ -2771,42 +3248,6 @@ class EditorPanel extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// Asks once whether a Note goes to the trash with its [linked]
-/// Routines and Reminders: true to delete, null to cancel.
-class _DeleteNoteDialog extends StatelessWidget {
-  final List<Routine> linked;
-
-  const _DeleteNoteDialog({required this.linked});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    return AlertDialog(
-      title: Text(switch (linked) {
-        [] => t.deleteNoteQuestion,
-        [final one] when one.isReminder => t.deleteNoteReminderQuestion,
-        _ => t.deleteNoteLinkedQuestion(linked.length),
-      }),
-      content: Text(
-        linked.isEmpty ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(t.cancel),
-        ),
-        TextButton(
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(t.delete),
-        ),
-      ],
-    );
-  }
 }
 
 /// Asks once whether a photo or voice recording goes while its text

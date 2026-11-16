@@ -250,7 +250,6 @@ void main() {
       await startAtNotes(tester);
       await edit(tester, find.text('nees mor sauce'));
       await tap(tester, find.byTooltip('Move to trash'));
-      await tap(tester, find.text('Delete'));
 
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(find.text('nees mor sauce'), findsNothing);

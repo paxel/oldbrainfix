@@ -1,0 +1,592 @@
+{
+  "files": [
+    {
+      "name": "Letter.docx",
+      "type": "",
+      "bytes": "UEsDBBQAAAgIAAAAIVyeeUfWBgEAAM4BAAARAAAAd29yZC9kb2N1bWVudC54bWxlUU1vgzAM/StuKtHLGLCPaoKQCq3bTpN6qLRD1UMAa6oECUqykv37yZSWbru8xE/P9rPNV75t4IjGHrTKWXIbs5XgfVrr6qtF5cC3jbJpnzPPiC91/U1vR2AInFijNPBu4QNLNDc8Io7QDDgor+RUMbWdrDBnnUGL5ohMbLWTTQpjcp86WUan6skdBLLtMniMIZg/3S8fMgjmPnldxjH9CFRpu+xX4z6tsbl4rLHZonfiUysk2TmeXF6rSzO2VujdxVE1stG/2SLBZ2EIEoZtVLqlxZ3yIAzJxDT+QVlnBi+b4u2FRBND6SDzhVgIPts9r4ttsZO83O+Hjn92Gp1vQeOMxxI/UEsDBBQAAAgIAAAAIVxIhQU7GwAAAB4AAAAQAAAAd29yZC9oZWFkZXIxLnhtbLMptyqwsym3KrHzyy9RKEpNTLHRB/FAZIEdAFBLAQIUABQAAAgIAAAAIVyeeUfWBgEAAM4BAAARAAAAAAAAAAAAAACkAQAAAAB3b3JkL2RvY3VtZW50LnhtbFBLAQIUABQAAAgIAAAAIVxIhQU7GwAAAB4AAAAQAAAAAAAAAAAAAACkATUBAAB3b3JkL2hlYWRlcjEueG1sUEsFBgAAAAACAAIAfQAAAH4BAAAAAA==",
+      "kind": "docx",
+      "read": {
+        "text": "Dear Ms Weber,\nTotal: \t12 & 50 € 😀 &#0; &nbsp;\nnext\n\na<b"
+      }
+    },
+    {
+      "name": "stored.docx",
+      "type": "",
+      "bytes": "UEsDBBQAAAgAAAAAIVxPvroxKgAAACoAAAARAAAAd29yZC9kb2N1bWVudC54bWw8dzpwPjx3OnQ+U3RvcmVkLCBub3QgZGVmbGF0ZWQ8L3c6dD48L3c6cD5QSwECFAAUAAAIAAAAACFcT766MSoAAAAqAAAAEQAAAAAAAAAAAAAApAEAAAAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAEAAQA/AAAAWQAAAAAA",
+      "kind": "docx",
+      "read": {
+        "text": "Stored, not deflated"
+      }
+    },
+    {
+      "name": "latin.docx",
+      "type": "",
+      "bytes": "UEsDBBQAAAgIAAAAIVxDKslWFgAAABkAAAARAAAAd29yZC9kb2N1bWVudC54bWyzKbcqsLMptyqxcy/6Y6MPYoDIAjsAUEsBAhQAFAAACAgAAAAhXEMqyVYWAAAAGQAAABEAAAAAAAAAAAAAAKQBAAAAAHdvcmQvZG9jdW1lbnQueG1sUEsFBgAAAAABAAEAPwAAAEUAAAAAAA==",
+      "kind": "docx",
+      "read": {
+        "text": ""
+      }
+    },
+    {
+      "name": "Broken.docx",
+      "type": "",
+      "bytes": "UEsDBCBicm9rZW4=",
+      "kind": "docx",
+      "read": {
+        "text": ""
+      }
+    },
+    {
+      "name": "no-part.docx",
+      "type": "",
+      "bytes": "UEsDBBQAAAgIAAAAIVyIg75FCwAAAAwAAAAJAAAAb3RoZXIueG1ssym3KrGrsNEHUQBQSwECFAAUAAAICAAAACFciIO+RQsAAAAMAAAACQAAAAAAAAAAAAAApAEAAAAAb3RoZXIueG1sUEsFBgAAAAABAAEANwAAADIAAAAAAA==",
+      "kind": "docx",
+      "read": {
+        "text": ""
+      }
+    },
+    {
+      "name": "Costs.xlsx",
+      "type": "",
+      "bytes": "UEsDBBQAAAgIAAAAIVzHYdsvYwAAAK0AAAAPAAAAeGwvd29ya2Jvb2sueG1ssynPL8pOys/PVqjIzckrtiqyVSpSsrMpzkhNLSmG0gp5ibmptkrO+cUlxUoKYCnPFFslIyWFIqvMFFulIs8UIyV9VMWuuQUllUgKjNEV+OWXpCKbZoik2BCkWB/mBn2YE+0AUEsDBBQAAAgIAAAAIVzLewbfVwAAAM0AAAAaAAAAeGwvX3JlbHMvd29ya2Jvb2sueG1sLnJlbHOzCUrNSSzJzM8rzsgsKLazQeYqeKbYKhV5phgqKYQkFqWnltgqlecXZRdnpKaWFOuDKUO9itwcJX3s+owQ+vQrcvTR9Rrh02uM0KuHodMYplMf2bnFdgBQSwMEFAAACAgAAAAhXClGQrFAAAAAZwAAABQAAAB4bC9zaGFyZWRTdHJpbmdzLnhtbLMpLi6xsynOtLMpsQtKzSux0S+xs9EH8UG4CCQckF8OES2CCqQWIfgBGSAlmel5+UWpKVBhkBjUCH0Qq7jEDgBQSwMEFAAACAgAAAAhXD6bxXY6AAAAUAAAABgAAAB4bC93b3Jrc2hlZXRzL3NoZWV0MS54bWyzKc8vyi7OSE0tsbMBUy6JJYl2NkX55XY2yQoltkrFJUVKdjZldhU2+mV2NvrJdjb6YEl9JNX6CEMAUEsDBBQAAAgIAAAAIVz9FmLNmAAAACwBAAAYAAAAeGwvd29ya3NoZWV0cy9zaGVldDIueG1sVZDbCsIwDIbvfYqSW8Gs6i6ENDDxDXyCrgwcygpt6Hx86dR2u8rhT74caPbhGR/DIEyLuVmxTMHPKhjQwOSy02lQYiACU+KGMDGh+2nXXJX40jaHtigY/FwwxwVT+pVWpc5hpoiBfoHojbCBnP6QcXqN03CXAExjZBK2u55QmDCH373KsOa9YtYb9jW7mXIGZMLVJ7A+6ANQSwMEFAAACAgAAAAhXMuYaiQZAAAAIwAAABgAAAB4bC93b3Jrc2hlZXRzL3NoZWV0My54bWyzKc8vyi7OSE0tsbMBUy6JJYn6djb6CHEAUEsBAhQAFAAACAgAAAAhXMdh2y9jAAAArQAAAA8AAAAAAAAAAAAAAKQBAAAAAHhsL3dvcmtib29rLnhtbFBLAQIUABQAAAgIAAAAIVzLewbfVwAAAM0AAAAaAAAAAAAAAAAAAACkAZAAAAB4bC9fcmVscy93b3JrYm9vay54bWwucmVsc1BLAQIUABQAAAgIAAAAIVwpRkKxQAAAAGcAAAAUAAAAAAAAAAAAAACkAR8BAAB4bC9zaGFyZWRTdHJpbmdzLnhtbFBLAQIUABQAAAgIAAAAIVw+m8V2OgAAAFAAAAAYAAAAAAAAAAAAAACkAZEBAAB4bC93b3Jrc2hlZXRzL3NoZWV0MS54bWxQSwECFAAUAAAICAAAACFc/RZizZgAAAAsAQAAGAAAAAAAAAAAAAAApAEBAgAAeGwvd29ya3NoZWV0cy9zaGVldDIueG1sUEsBAhQAFAAACAgAAAAhXMuYaiQZAAAAIwAAABgAAAAAAAAAAAAAAKQBzwIAAHhsL3dvcmtzaGVldHMvc2hlZXQzLnhtbFBLBQYAAAAABgAGAJkBAAAeAwAAAAA=",
+      "kind": "xlsx",
+      "read": {
+        "text": "Costs\nRent\t950.5\nPower\t\tTRUE\na b\n\nNotes\nx"
+      }
+    },
+    {
+      "name": "Brief",
+      "type": "application/vnd.oasis.opendocument.text",
+      "bytes": "UEsDBBQAAAgIAAAAIVwVpmJvAgEAACECAAALAAAAY29udGVudC54bWx1UjtuwzAMvYqh3ZDboouhEOh/6SVkiYmNKJJh0UUCdGhv0S0X6BG65UDtEQpLSgS4zUKRj3yPJCjhlstOYa2dGjdoqVTOEloCkRJyJLeR1KnS086gBxHeOlgOgp+tS4nG6d1JjXBLICZb0yDVGnWpWmlXk25AY6TLAVedswnUaJBy2IMzWvBQ30Nyck1MzIUi+n/TtghabiTTWSwNvqBZsAsGzyg9pgZtGqaHmziqjyy1YFeMw23aSjYc7qIfxJoB5ZrDfZFIvbTwkCT9FMzFqu0l4/A4h6+rinF4zWvH9flpqqfh8HXYY/Gz/3hLZA7fn++ZcTzVxMyHi/c55v78g19QSwECFAAUAAAICAAAACFcFaZibwIBAAAhAgAACwAAAAAAAAAAAAAApAEAAAAAY29udGVudC54bWxQSwUGAAAAAAEAAQA5AAAAKwEAAAAA",
+      "kind": "odt",
+      "read": {
+        "text": "Lease\nA   B\tC\nD E F                                                                                                    |\n\nGrüße 😀 ﬁ"
+      }
+    },
+    {
+      "name": "Plan.ods",
+      "type": "",
+      "bytes": "UEsDBBQAAAgIAAAAIVzzWCB+AQEAAHMDAAALAAAAY29udGVudC54bWytk8GOwiAQhs++hemdQI2HTYO8gcaDL0DpmN2EMg1Fqz69KW0t2K4e9EJgBmb++WbgeDz+KchyLK6C94e6siCL+hfACe5kriHz67LbG1nCJtlraZLITSw2sUGB1oI7uLisEls0nPZ7ToOwpL82JvKWIdupzMEShfpUmppYqEA6KDbJqs3ehb4srl8NnTLGEipilZPqLDaxRotNKDBl65820JRJ/GxaWspW68/ze0BPUOlUzIOiHBn2XPMOcL30Z9Uyp0KN1/7tosIzWCiI77Lv5izN8H0kbADkJ22HBloawchE/kODT4zfdWauJw8Mt5f1hZK7gQ8tgtO5PzQY/S+7A1BLAQIUABQAAAgIAAAAIVzzWCB+AQEAAHMDAAALAAAAAAAAAAAAAACkAQAAAABjb250ZW50LnhtbFBLBQYAAAAAAQABADkAAAAqAQAAAAA=",
+      "kind": "ods",
+      "read": {
+        "text": "Plan\nMon\tx y\tx y\n\ta b  c\n\ta b  c\n\nTwo\nz"
+      }
+    },
+    {
+      "name": "notes.md",
+      "type": "",
+      "bytes": "77u/IyBUaXRsZQ0KDQoNCg0KbGluZSAgDQdlbmQK",
+      "kind": "text",
+      "read": {
+        "text": "# Title\n\nline\nend"
+      }
+    },
+    {
+      "name": "old.TXT",
+      "type": "",
+      "bytes": "R3L832UggA==",
+      "kind": "text",
+      "read": {
+        "text": "Grüße €"
+      }
+    },
+    {
+      "name": "zero.txt",
+      "type": "",
+      "bytes": "YQBi",
+      "kind": "text",
+      "read": {
+        "text": ""
+      }
+    },
+    {
+      "name": "list",
+      "type": "text/csv",
+      "bytes": "YTtiCgoKCmM7ZAkJIA==",
+      "kind": "text",
+      "read": {
+        "text": "a;b\n\nc;d"
+      }
+    },
+    {
+      "name": "Scan.pdf",
+      "type": "",
+      "bytes": "JVBERi0xLjQgc2Nhbg==",
+      "kind": "pdf",
+      "read": "pdf"
+    },
+    {
+      "name": "archive.zip",
+      "type": "application/zip",
+      "bytes": "UEsDBBQAAAgIAAAAIVxDvrfoAwAAAAEAAAAFAAAAYS50eHRLBABQSwECFAAUAAAICAAAACFcQ7636AMAAAABAAAABQAAAAAAAAAAAAAApAEAAAAAYS50eHRQSwUGAAAAAAEAAQAzAAAAJgAAAAAA",
+      "kind": "other",
+      "read": "nothing"
+    }
+  ],
+  "kinds": [
+    {
+      "name": "Brief.PDF",
+      "type": "",
+      "kind": "pdf",
+      "mediaType": "application/pdf"
+    },
+    {
+      "name": "a.docx",
+      "type": "application/zip",
+      "kind": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "name": "a.XLSX",
+      "type": "",
+      "kind": "xlsx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "name": "a.odt",
+      "type": "",
+      "kind": "odt",
+      "mediaType": "application/vnd.oasis.opendocument.text"
+    },
+    {
+      "name": "a.Ods",
+      "type": "",
+      "kind": "ods",
+      "mediaType": "application/vnd.oasis.opendocument.spreadsheet"
+    },
+    {
+      "name": "notes.markdown",
+      "type": "",
+      "kind": "text",
+      "mediaType": "text/markdown"
+    },
+    {
+      "name": "a.text",
+      "type": "",
+      "kind": "text",
+      "mediaType": "text/plain"
+    },
+    {
+      "name": "t.tsv",
+      "type": "",
+      "kind": "text",
+      "mediaType": "text/tab-separated-values"
+    },
+    {
+      "name": "scan",
+      "type": "application/pdf",
+      "kind": "pdf",
+      "mediaType": "application/octet-stream"
+    },
+    {
+      "name": "plan.dwg",
+      "type": "application/pdf",
+      "kind": "pdf",
+      "mediaType": "application/octet-stream"
+    },
+    {
+      "name": "plan.dwg",
+      "type": "",
+      "kind": "other",
+      "mediaType": "application/octet-stream"
+    },
+    {
+      "name": "README",
+      "type": "text/markdown",
+      "kind": "text",
+      "mediaType": "application/octet-stream"
+    },
+    {
+      "name": "noending.",
+      "type": "text/plain",
+      "kind": "text",
+      "mediaType": "application/octet-stream"
+    },
+    {
+      "name": "a.pdf.zip",
+      "type": "",
+      "kind": "other",
+      "mediaType": "application/zip"
+    }
+  ],
+  "values": [
+    {
+      "value": "{\"name\":\"Lease.pdf\",\"pages\":2,\"size\":14,\"type\":\"application/pdf\"}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "Lease.pdf",
+        "type": "application/pdf",
+        "size": 14,
+        "pages": 2,
+        "computer": false,
+        "kind": "pdf"
+      }
+    },
+    {
+      "value": "{\"computer\":true,\"name\":\"Scan.pdf\",\"pages\":40,\"size\":9,\"type\":\"application/pdf\"}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "Scan.pdf",
+        "type": "application/pdf",
+        "size": 9,
+        "pages": 40,
+        "computer": true,
+        "kind": "pdf"
+      }
+    },
+    {
+      "value": "{\"name\":\"../../.bashrc\",\"size\":5,\"type\":\"Text/Plain; charset=utf-8\"}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": ".bashrc",
+        "type": "text/plain",
+        "size": 5,
+        "pages": null,
+        "computer": false,
+        "kind": "text"
+      }
+    },
+    {
+      "value": "{\"computer\":\"yes\",\"name\":\"inv\\u202Efdp.exe\\u0007\",\"pages\":1.0,\"size\":-3,\"type\":\"<script>\"}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "invfdp.exe",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{\"name\":\"..\",\"pages\":9007199254740993,\"size\":9007199254740992}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 9007199254740992,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{\"name\":\" \",\"size\":18446744073709551615}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{\"name\":\"a\",\"size\":1e3,\"type\":\"a/b/c\"}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "a",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{\"computer\":false,\"name\":\"x\",\"type\":\"text/\"}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "x",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{\"name\":\"z\",\"pages\":-0.0,\"size\":-0.0}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "z",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{\"name\":\"y\",\"name\":\"twice\",\"pages\":3,\"pages\":\"4\"}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "twice",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "null",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "[1]",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "\"name\"",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{\"name\":3}",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "{",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    },
+    {
+      "value": "added",
+      "read": {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "",
+        "type": "application/octet-stream",
+        "size": 0,
+        "pages": null,
+        "computer": false,
+        "kind": "other"
+      }
+    }
+  ],
+  "names": [
+    {
+      "name": "Brief.pdf",
+      "kept": "Brief.pdf"
+    },
+    {
+      "name": "C:\\Users\\ann\\ Brief.pdf ",
+      "kept": "Brief.pdf"
+    },
+    {
+      "name": "/home/ann/.hidden",
+      "kept": ".hidden"
+    },
+    {
+      "name": ".",
+      "kept": ""
+    },
+    {
+      "name": "..",
+      "kept": ""
+    },
+    {
+      "name": "a‏b⁦c‎de",
+      "kept": "abcde"
+    },
+    {
+      "name": "  Grüße.odt ",
+      "kept": "Grüße.odt"
+    },
+    {
+      "name": "",
+      "kept": ""
+    }
+  ],
+  "types": [
+    {
+      "type": "application/pdf",
+      "kept": "application/pdf"
+    },
+    {
+      "type": "Application/PDF; q=1",
+      "kept": "application/pdf"
+    },
+    {
+      "type": "application/vnd.oasis.opendocument.text",
+      "kept": "application/vnd.oasis.opendocument.text"
+    },
+    {
+      "type": "text",
+      "kept": "application/octet-stream"
+    },
+    {
+      "type": "text/",
+      "kept": "application/octet-stream"
+    },
+    {
+      "type": "/plain",
+      "kept": "application/octet-stream"
+    },
+    {
+      "type": "tëxt/plain",
+      "kept": "application/octet-stream"
+    },
+    {
+      "type": "a b/c",
+      "kept": "application/octet-stream"
+    },
+    {
+      "type": "x/y+z.1-2_3",
+      "kept": "x/y+z.1-2_3"
+    },
+    {
+      "type": "",
+      "kept": "application/octet-stream"
+    }
+  ],
+  "computer": [
+    {
+      "kind": "pdf",
+      "size": 1073741824,
+      "pages": 10,
+      "reads": false
+    },
+    {
+      "kind": "pdf",
+      "size": 100,
+      "pages": 11,
+      "reads": true
+    },
+    {
+      "kind": "pdf",
+      "size": 100,
+      "pages": null,
+      "reads": true
+    },
+    {
+      "kind": "docx",
+      "size": 10485760,
+      "pages": null,
+      "reads": false
+    },
+    {
+      "kind": "ods",
+      "size": 10485761,
+      "pages": 1,
+      "reads": true
+    },
+    {
+      "kind": "text",
+      "size": 10485761,
+      "pages": null,
+      "reads": true
+    },
+    {
+      "kind": "other",
+      "size": 1073741824,
+      "pages": null,
+      "reads": false
+    }
+  ],
+  "tidy": [
+    {
+      "text": "  a \t\n\n\n\n b\u001bc \n",
+      "kept": "a\n\n bc"
+    },
+    {
+      "text": "\r\n\r\nTitle\r\rbody\u000b  ",
+      "kept": "Title\n\nbody "
+    },
+    {
+      "text": "\t\tindented\n\n\n",
+      "kept": "indented"
+    },
+    {
+      "text": "",
+      "kept": ""
+    },
+    {
+      "text": " \n \n\t",
+      "kept": ""
+    },
+    {
+      "text": "Grüße 😀 next",
+      "kept": "Grüße 😀 next"
+    }
+  ],
+  "pages": [
+    {
+      "pages": [
+        "Page 1 ",
+        " \n",
+        "\nPage 3"
+      ],
+      "joined": "Page 1\n\nPage 3"
+    },
+    {
+      "pages": [],
+      "joined": ""
+    },
+    {
+      "pages": [
+        "",
+        " "
+      ],
+      "joined": ""
+    },
+    {
+      "pages": [
+        "a\n\n\n\nb",
+        "c"
+      ],
+      "joined": "a\n\nb\n\nc"
+    }
+  ]
+}

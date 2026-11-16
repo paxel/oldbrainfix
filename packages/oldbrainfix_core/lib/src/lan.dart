@@ -124,7 +124,7 @@ const pinFailuresTotal = 20;
 /// The most a sync body or a blob may weigh; a peer with the PIN must not
 /// be able to fill the memory.
 const maxEntriesBytes = 64 << 20;
-const maxBlobBytes = 64 << 20;
+const maxBlobBytes = 256 << 20;
 
 /// What one side of a session brought in: from whom, what was new here,
 /// the Moment before it, what the signatures said, and the Conflicts
@@ -711,11 +711,14 @@ Future<SyncResult> lanSync(
 /// the PIN, as automatic sync does: only once the host's certificate is
 /// the very one pinned for it, and with this Device's proof over a fresh
 /// nonce from the host in every request. Afterwards the Device is
-/// remembered at this address. Throws a [SyncException]: `wrongHost`
-/// for another certificate or a Device that never hosted, `declined`
-/// when the host does not sync automatically with this Device. A Device
-/// that needs an update to sync is kept as an update notice
-/// ([UpdateNotices]) until a sync with it goes through.
+/// remembered at this address, unless it is the one typed for it by hand
+/// (#267), which may be outside the local network ([mayReachPaired]):
+/// the address it was found at stays. Throws a [SyncException]:
+/// `notPrivate` for an address outside the local network not typed for
+/// it, `wrongHost` for another certificate or a Device that never
+/// hosted, `declined` when the host does not sync automatically with
+/// this Device. A Device that needs an update to sync is kept as an
+/// update notice ([UpdateNotices]) until a sync with it goes through.
 Future<SyncResult> pairedSync(
   Store store,
   PairedDevice device, {
@@ -724,7 +727,7 @@ Future<SyncResult> pairedSync(
   required String name,
   Duration timeout = const Duration(seconds: 20),
 }) async {
-  if (!isPrivateHost(host)) {
+  if (!store.mayReachPaired(device, host)) {
     throw const SyncException(SyncFailure.notPrivate);
   }
   final pinned = fromHex(device.fingerprint);
@@ -738,6 +741,7 @@ Future<SyncResult> pairedSync(
       port: port,
       fingerprint: pinned,
       paired: device.id,
+      byHand: store.isHandAddress(device, host),
       name: name,
       timeout: timeout,
     );
@@ -760,7 +764,9 @@ const certificateFingerprintBytes = 32;
 
 /// One session with the host at [host] and [port] whose certificate
 /// matches [fingerprint]: with the [pin] of a pair code, or as the
-/// [paired] Device's partner with a proof over the host's nonce.
+/// [paired] Device's partner with a proof over the host's nonce, [byHand]
+/// at the address typed for it, which is not remembered as where it was
+/// found.
 Future<SyncResult> _sync(
   Store store, {
   required String host,
@@ -768,13 +774,17 @@ Future<SyncResult> _sync(
   required List<int> fingerprint,
   String pin = '',
   String? paired,
+  bool byHand = false,
   required String name,
   Invite? invite,
   Future<bool> Function(ProfileChoice other)? confirm,
   required Duration timeout,
 }) async {
   List<int>? seen;
-  final client = HttpClient()
+  // No root is trusted, so every certificate meets the fingerprint: a
+  // name typed by hand that a public certificate covers is no way past
+  // the pin (#267).
+  final client = HttpClient(context: SecurityContext(withTrustedRoots: false))
     ..connectionTimeout = timeout
     ..badCertificateCallback = (cert, _, _) {
       final actual = certificateFingerprint(cert.der);
@@ -806,9 +816,13 @@ Future<SyncResult> _sync(
         if (body != null) req.add(body);
         res = await req.close();
         final bytes = BytesBuilder(copy: false);
+        // A blob may weigh more than a sync body (ADR 0003, 0047).
+        final limit = path.startsWith('/blob/')
+            ? maxBlobBytes
+            : maxEntriesBytes;
         await for (final chunk in res) {
           bytes.add(chunk);
-          if (bytes.length > maxEntriesBytes) {
+          if (bytes.length > limit) {
             throw const SyncException(SyncFailure.failed);
           }
         }
@@ -955,8 +969,8 @@ Future<SyncResult> _sync(
           id: session.peer,
           name: session.name,
           fingerprint: hex(seen ?? fingerprint),
-          host: host,
-          port: port,
+          host: byHand ? null : host,
+          port: byHand ? null : port,
           lastSync: store.clock().toUtc(),
           shared: shared,
         ),

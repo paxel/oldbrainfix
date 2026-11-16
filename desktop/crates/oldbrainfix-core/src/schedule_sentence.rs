@@ -9,6 +9,8 @@
 use std::collections::BTreeSet;
 use std::ops::Range;
 
+use chrono::{NaiveDateTime, Timelike};
+
 use crate::schedule::{
     ClockTime, Day, RepeatKind, RepeatUnit, Schedule, SimpleRepeat, WeekdayRule,
 };
@@ -58,6 +60,100 @@ impl SimpleSchedule {
 pub struct SentenceRead {
     pub schedule: Option<SimpleSchedule>,
     pub unknown: Vec<Range<usize>>,
+}
+
+/// The moment a sentence is read at, for its relative words (#271): the
+/// day and the time on this Device's wall clock, and when its day starts
+/// (`DeviceSettings::day_start`), at which "tomorrow" rings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SentenceNow {
+    pub today: Day,
+    pub time: ClockTime,
+    pub day_start: ClockTime,
+}
+
+impl SentenceNow {
+    /// At `wall`, a time on the wall clock, to the minute.
+    pub fn at(wall: NaiveDateTime, day_start: ClockTime) -> SentenceNow {
+        SentenceNow {
+            today: Day::of(wall),
+            time: ClockTime {
+                hour: wall.hour(),
+                minute: wall.minute(),
+            },
+            day_start,
+        }
+    }
+}
+
+/// The chips over a new Reminder's schedule (#271), in their order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum QuickChip {
+    InAnHour,
+    Tonight,
+    Tomorrow,
+    InAWeek,
+}
+
+/// A chip with the day and time it sets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuickReminder {
+    pub chip: QuickChip,
+    pub day: Day,
+    pub time: ClockTime,
+}
+
+impl QuickReminder {
+    /// The Reminder the chip sets.
+    pub fn schedule(&self) -> SimpleSchedule {
+        SimpleSchedule::new(SimpleRepeat::once(), self.day, &[self.time])
+    }
+}
+
+/// "Tonight", and "this evening" after a day.
+const TONIGHT: ClockTime = ClockTime {
+    hour: 19,
+    minute: 0,
+};
+
+/// `minutes` after `now`, counted on the wall clock, the day carried.
+fn later(now: &SentenceNow, minutes: i64) -> (Day, ClockTime) {
+    let total = i64::from(now.time.hour) * 60 + i64::from(now.time.minute) + minutes;
+    let time = ClockTime {
+        hour: (total / 60 % 24) as u32,
+        minute: (total % 60) as u32,
+    };
+    (now.today.add_days(total / (24 * 60)), time)
+}
+
+/// The chips' Reminders at `now`, as the words read them: "in 1 hour",
+/// "tonight" while 19:00 is still to come, "tomorrow" and "in 1 week",
+/// these two at the day start.
+pub fn quick_reminders(now: &SentenceNow) -> Vec<QuickReminder> {
+    let (day, time) = later(now, 60);
+    let mut chips = vec![QuickReminder {
+        chip: QuickChip::InAnHour,
+        day,
+        time,
+    }];
+    if now.time < TONIGHT {
+        chips.push(QuickReminder {
+            chip: QuickChip::Tonight,
+            day: now.today,
+            time: TONIGHT,
+        });
+    }
+    chips.push(QuickReminder {
+        chip: QuickChip::Tomorrow,
+        day: now.today.add_days(1),
+        time: now.day_start,
+    });
+    chips.push(QuickReminder {
+        chip: QuickChip::InAWeek,
+        day: now.today.add_days(7),
+        time: now.day_start,
+    });
+    chips
 }
 
 /// A word to put in for the text in `range`.
@@ -131,10 +227,24 @@ pub fn sentence(schedule: &SimpleSchedule, locale: &str, today: Day) -> String {
 
 /// Reads `text` in `locale` on `today`: what is left out is all day,
 /// from `today`, never ending, and a day without its year lies in
-/// `today`'s. Parts not understood are skipped.
+/// `today`'s. Parts not understood are skipped. The relative words are
+/// not understood here; [`read_at`] reads them.
 pub fn read(text: &str, locale: &str, today: Day) -> SentenceRead {
-    let mut parser = Parser::new(Words::of(locale), today);
-    for token in tokens(text) {
+    read_with(text, locale, today, None)
+}
+
+/// Reads `text` in `locale` at `now` as [`read`] does on its day, and
+/// also a one-time Reminder in relative words (#271): "today",
+/// "tonight", "tomorrow", "in 2 hours" and in German "heute",
+/// "heute Abend", "morgen", "in 2 Stunden".
+pub fn read_at(text: &str, locale: &str, now: &SentenceNow) -> SentenceRead {
+    read_with(text, locale, now.today, Some(*now))
+}
+
+fn read_with(text: &str, locale: &str, today: Day, now: Option<SentenceNow>) -> SentenceRead {
+    let w = Words::of(locale);
+    let mut parser = Parser::new(w, today, now);
+    for token in tokens(text, w.german) {
         parser.take(&token);
     }
     parser.finish();
@@ -159,8 +269,21 @@ pub fn suggest(text: &str, cursor: usize, locale: &str) -> Vec<Suggestion> {
         .last()
         .map_or(before.len(), |(i, _)| i);
     let typed = &before[start..];
-    let mut parser = Parser::new(w, Day::new(2000, 1, 1));
-    for token in tokens(&before[..start]) {
+    let noon = ClockTime {
+        hour: 12,
+        minute: 0,
+    };
+    let day = Day::new(2000, 1, 1);
+    let mut parser = Parser::new(
+        w,
+        day,
+        Some(SentenceNow {
+            today: day,
+            time: noon,
+            day_start: noon,
+        }),
+    );
+    for token in tokens(&before[..start], w.german) {
         parser.take(&token);
     }
     // "8:3" is typed for "08:30".
@@ -200,7 +323,40 @@ fn is_letter(c: char) -> bool {
 
 /// Whitespace and the hyphen of "10-mal" part words.
 fn is_space(c: char) -> bool {
-    c <= ' ' || matches!(c, '\u{a0}' | '\u{2009}' | '\u{202f}' | '-')
+    is_blank(c) || c == '-'
+}
+
+fn is_blank(c: char) -> bool {
+    c <= ' ' || matches!(c, '\u{a0}' | '\u{2009}' | '\u{202f}')
+}
+
+/// The end, in chars, of the "am" or "pm" (English) or "Uhr" (German)
+/// that follows a time or an hour ending at `i`, blanks before it, with
+/// its dot; `None` when none does.
+fn suffix_end(chars: &[(usize, char)], i: usize, german: bool) -> Option<usize> {
+    let at = |j: usize| chars.get(j).map(|&(_, c)| c);
+    let mut j = i;
+    while at(j).is_some_and(is_blank) {
+        j += 1;
+    }
+    let from = j;
+    while at(j).is_some_and(is_letter) {
+        j += 1;
+    }
+    let word: String = (from..j).filter_map(at).collect();
+    let word = word.to_lowercase();
+    let fits = if german {
+        word == "uhr"
+    } else {
+        word == "am" || word == "pm"
+    };
+    if !fits {
+        return None;
+    }
+    if at(j) == Some('.') {
+        j += 1;
+    }
+    Some(j)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -220,8 +376,9 @@ struct Token {
     range: Range<usize>,
 }
 
-/// The tokens of `text`.
-fn tokens(text: &str) -> Vec<Token> {
+/// The tokens of `text`; an hour or a time with its "pm" or "Uhr" is one
+/// time.
+fn tokens(text: &str, german: bool) -> Vec<Token> {
     let chars: Vec<(usize, char)> = text.char_indices().collect();
     let at = |j: usize| chars.get(j).map(|&(_, c)| c);
     let offset = |j: usize| chars.get(j).map_or(text.len(), |&(i, _)| i);
@@ -230,7 +387,7 @@ fn tokens(text: &str) -> Vec<Token> {
     let mut i = 0;
     while let Some(c) = at(i) {
         let from = i;
-        let kind;
+        let mut kind;
         if is_space(c) {
             i += 1;
             continue;
@@ -277,6 +434,12 @@ fn tokens(text: &str) -> Vec<Token> {
                     i += 1;
                 }
                 kind = Kind::Number;
+            }
+            if (kind == Kind::Time || (kind == Kind::Number && sep != Some('.')))
+                && let Some(end) = suffix_end(&chars, i, german)
+            {
+                i = end;
+                kind = Kind::Time;
             }
         } else {
             // One code point that is no part of a sentence.
@@ -430,6 +593,73 @@ impl Words {
         heads
     }
 
+    /// The relative words a one-time Reminder starts with (#271).
+    fn today(self) -> &'static str {
+        self.pick("today", "heute")
+    }
+    fn tomorrow(self) -> &'static str {
+        self.pick("tomorrow", "morgen")
+    }
+    fn relative_heads(self) -> &'static [&'static str] {
+        if self.german {
+            &["Heute", "Morgen", "In"]
+        } else {
+            &["Today", "Tonight", "Tomorrow", "In"]
+        }
+    }
+
+    /// The words after a day for its evening, the first one suggested.
+    fn evenings(self) -> &'static [&'static str] {
+        if self.german {
+            &["Abend"]
+        } else {
+            &["evening", "night"]
+        }
+    }
+
+    /// The words for one after "in".
+    fn articles(self) -> &'static [&'static str] {
+        if self.german {
+            &["eine", "einer", "einem", "einen"]
+        } else {
+            &["a", "an"]
+        }
+    }
+
+    /// The units after "in N", for one, as suggested.
+    fn relative_units(self) -> &'static [&'static str; 4] {
+        if self.german {
+            &["Minute", "Stunde", "Tag", "Woche"]
+        } else {
+            &["minute", "hour", "day", "week"]
+        }
+    }
+
+    /// The units after "in N", for more, as suggested.
+    fn relative_units_many(self) -> &'static [&'static str; 4] {
+        if self.german {
+            &["Minuten", "Stunden", "Tagen", "Wochen"]
+        } else {
+            &["minutes", "hours", "days", "weeks"]
+        }
+    }
+
+    /// The unit after "in N" `word` names, 0 to 3 for minutes, hours,
+    /// days and weeks, in the singular, the plural or short.
+    fn relative_unit(self, word: &str) -> Option<u8> {
+        match (self.german, plain(word).as_str()) {
+            (false, "minute" | "minutes" | "min" | "mins") => Some(0),
+            (false, "hour" | "hours" | "h" | "hr" | "hrs") => Some(1),
+            (false, "day" | "days") => Some(2),
+            (false, "week" | "weeks") => Some(3),
+            (true, "minute" | "minuten" | "min") => Some(0),
+            (true, "stunde" | "stunden" | "std" | "h") => Some(1),
+            (true, "tag" | "tage" | "tagen") => Some(2),
+            (true, "woche" | "wochen") => Some(3),
+            _ => None,
+        }
+    }
+
     fn every(self, n: i64, unit: RepeatUnit) -> String {
         if !self.german {
             return if n == 1 {
@@ -577,6 +807,13 @@ enum State {
     MonthOnDay,
     MonthOnThe,
     MonthOrd,
+    /// After "today" or "tomorrow", "evening" or a time may follow;
+    /// after the other relative words a time (#271).
+    RelativeDay,
+    Relative,
+    /// After "in" and after its number: a number, then a unit.
+    InRelative,
+    InRelativeN,
     /// Weekdays, more of them may follow.
     Weekdays,
     WeekdayAnd,
@@ -604,6 +841,8 @@ impl State {
                 | State::MonthOnDay
                 | State::MonthOnThe
                 | State::MonthOrd
+                | State::InRelative
+                | State::InRelativeN
                 | State::WeekdayAnd
                 | State::Times0
                 | State::TimesAnd
@@ -616,7 +855,7 @@ impl State {
     /// Where a waiting state falls back to.
     fn fallback(self) -> State {
         match self {
-            State::Every | State::EveryN => State::Start,
+            State::Every | State::EveryN | State::InRelative | State::InRelativeN => State::Start,
             State::MonthOn | State::MonthOnDay | State::MonthOnThe | State::MonthOrd => {
                 State::Months
             }
@@ -633,6 +872,8 @@ impl State {
 struct Parser {
     w: Words,
     today: Day,
+    /// Now, for the relative words; without it they are not understood.
+    now: Option<SentenceNow>,
     state: State,
     /// Whether a repeat was read.
     head_done: bool,
@@ -646,6 +887,9 @@ struct Parser {
     until: Option<Day>,
     start: Option<Day>,
     times: Vec<ClockTime>,
+    /// The time of a relative day when none is typed: 19:00 "tonight",
+    /// the day start "tomorrow"; none for all day.
+    day_time: Option<ClockTime>,
     /// The number before "times", and the ordinal before its weekday.
     pending_number: i64,
     pending_ordinal: i64,
@@ -655,10 +899,11 @@ struct Parser {
 }
 
 impl Parser {
-    fn new(w: Words, today: Day) -> Parser {
+    fn new(w: Words, today: Day, now: Option<SentenceNow>) -> Parser {
         Parser {
             w,
             today,
+            now,
             state: State::Start,
             head_done: false,
             kind: RepeatKind::Once,
@@ -671,6 +916,7 @@ impl Parser {
             until: None,
             start: None,
             times: Vec::new(),
+            day_time: None,
             pending_number: 0,
             pending_ordinal: 0,
             pending: Vec::new(),
@@ -724,15 +970,39 @@ impl Parser {
         digits.parse().ok()
     }
 
+    /// `08:00`, `8:00`, and `7 pm`, `7:30pm` or `19 Uhr`.
     fn time(t: &Token) -> Option<ClockTime> {
         if t.kind != Kind::Time {
             return None;
         }
-        let (h, m) = t.text.split_once(':')?;
+        let text = t.text.as_str();
+        let digits = |s: &str| s.bytes().take_while(u8::is_ascii_digit).count();
+        let i = digits(text);
+        let h = &text[..i];
+        let (m, rest) = match text[i..].strip_prefix(':') {
+            Some(after) => after.split_at(digits(after)),
+            None => ("00", &text[i..]),
+        };
+        let suffix: String = rest
+            .chars()
+            .filter(char::is_ascii_alphabetic)
+            .collect::<String>()
+            .to_ascii_lowercase();
         if h.len() > 2 || m.len() != 2 {
             return None;
         }
-        ClockTime::new(h.parse().ok()?, m.parse().ok()?)
+        let mut hour: u32 = h.parse().ok()?;
+        let minute: u32 = m.parse().ok()?;
+        if minute > 59 {
+            return None;
+        }
+        if suffix == "am" || suffix == "pm" {
+            if !(1..=12).contains(&hour) {
+                return None;
+            }
+            hour = hour % 12 + if suffix == "pm" { 12 } else { 0 };
+        }
+        ClockTime::new(hour, minute)
     }
 
     fn date(&self, t: &Token) -> Option<Day> {
@@ -810,11 +1080,41 @@ impl Parser {
                     self.kind = RepeatKind::Weekdays;
                     return self.done(State::Weekdays);
                 }
-                false
+                self.relative_head(t)
+            }
+            State::RelativeDay => {
+                if self.any_word(t, w.evenings()) {
+                    self.day_time = Some(TONIGHT);
+                    return self.done(State::Relative);
+                }
+                self.relative(t)
+            }
+            State::Relative => self.relative(t),
+            State::InRelative => {
+                let n = Parser::number(t).or_else(|| self.any_word(t, w.articles()).then_some(1));
+                match n.filter(|&n| n >= 1) {
+                    Some(n) => {
+                        self.pending_number = n;
+                        self.wait(State::InRelativeN, t)
+                    }
+                    None => false,
+                }
+            }
+            State::InRelativeN => {
+                let unit = (t.kind == Kind::Word)
+                    .then(|| w.relative_unit(&t.text))
+                    .flatten();
+                match unit {
+                    Some(unit) => self.in_units(self.pending_number, unit),
+                    None => false,
+                }
             }
             State::Once => {
                 if self.is_word(t, w.on()) {
                     return self.wait(State::OnceOn, t);
+                }
+                if self.relative_day_word(t) {
+                    return true;
                 }
                 if let Some(day) = self.date(t) {
                     self.start = Some(day);
@@ -823,6 +1123,9 @@ impl Parser {
                 self.body(t)
             }
             State::OnceOn | State::FromDate => {
+                if self.state == State::OnceOn && self.relative_day_word(t) {
+                    return true;
+                }
                 if let Some(day) = self.date(t) {
                     self.start = Some(day);
                     return self.done(State::Body);
@@ -963,6 +1266,77 @@ impl Parser {
         }
     }
 
+    /// A relative word a Reminder starts with; false for none, and while
+    /// there is no now to read it at.
+    fn relative_head(&mut self, t: &Token) -> bool {
+        if self.relative_day_word(t) {
+            return true;
+        }
+        if self.now.is_some() && self.is_word(t, "in") {
+            return self.wait(State::InRelative, t);
+        }
+        false
+    }
+
+    /// "today", "tonight" or "tomorrow", at the start or as the day of
+    /// Once; false for none, and while there is no now.
+    fn relative_day_word(&mut self, t: &Token) -> bool {
+        let Some(now) = self.now else {
+            return false;
+        };
+        let w = self.w;
+        if self.is_word(t, w.today()) {
+            return self.relative_day(now.today, None, true);
+        }
+        if !w.german && self.is_word(t, "tonight") {
+            return self.relative_day(now.today, Some(TONIGHT), false);
+        }
+        if self.is_word(t, w.tomorrow()) {
+            return self.relative_day(now.today.add_days(1), Some(now.day_start), true);
+        }
+        false
+    }
+
+    /// Once on `day`, at `time` unless one is typed; "evening" may follow
+    /// when `evening`.
+    fn relative_day(&mut self, day: Day, time: Option<ClockTime>, evening: bool) -> bool {
+        self.head_done = true;
+        self.kind = RepeatKind::Once;
+        self.start = Some(day);
+        self.day_time = time;
+        self.done(if evening {
+            State::RelativeDay
+        } else {
+            State::Relative
+        })
+    }
+
+    /// Once in `n` of the `unit`th of minutes, hours, days and weeks: at
+    /// the moment for minutes and hours, at the day start for days and
+    /// weeks unless a time is typed.
+    fn in_units(&mut self, n: i64, unit: u8) -> bool {
+        let Some(now) = self.now else {
+            return false;
+        };
+        if unit < 2 {
+            let (day, time) = later(&now, if unit == 0 { n } else { n * 60 });
+            self.times.push(time);
+            return self.relative_day(day, None, false);
+        }
+        let days = if unit == 2 { n } else { n * 7 };
+        self.relative_day(now.today.add_days(days), Some(now.day_start), false)
+    }
+
+    /// After a relative word: a time without "at", or what follows a
+    /// repeat.
+    fn relative(&mut self, t: &Token) -> bool {
+        if let Some(time) = Parser::time(t) {
+            self.add_time(t, time);
+            return self.done(State::Times);
+        }
+        self.body(t)
+    }
+
     /// The repeat is every `n` `unit`s.
     fn unit(&mut self, n: i64, unit: RepeatUnit) -> bool {
         self.head_done = true;
@@ -1051,7 +1425,16 @@ impl Parser {
             .map(|d| weekday_word(w.weekdays(), d))
             .collect();
         let words: Vec<String> = match self.state {
-            State::Start => return strings(&w.heads()),
+            State::Start => return [strings(&w.heads()), strings(w.relative_heads())].concat(),
+            State::RelativeDay => [
+                strings(w.evenings().get(..1).unwrap_or(&[])),
+                strings(&body),
+            ]
+            .concat(),
+            State::Relative => strings(&body),
+            State::InRelative => Vec::new(),
+            State::InRelativeN if self.pending_number == 1 => strings(w.relative_units()),
+            State::InRelativeN => strings(w.relative_units_many()),
             State::Once => return strings(&[w.on(), w.at()]),
             State::OnceOn | State::FromDate | State::UntilDate | State::MonthOnDay => Vec::new(),
             State::Every => [w.units().as_slice(), w.weekdays().as_slice()]
@@ -1070,6 +1453,8 @@ impl Parser {
             State::Body | State::Times => strings(&body),
             State::Times0 | State::TimesAnd => times_for(typed),
             State::TimesComma => [times_for(typed), strings(&body)].concat(),
+            // Once has no end.
+            State::CountN if self.kind == RepeatKind::Once => Vec::new(),
             State::CountN => strings(&[w.times_word()]),
         };
         words
@@ -1100,10 +1485,14 @@ impl Parser {
         } else {
             repeat.ending(self.count, self.until)
         };
+        let times = match self.day_time {
+            Some(time) if self.times.is_empty() => vec![time],
+            _ => self.times.clone(),
+        };
         Some(SimpleSchedule::new(
             repeat,
             self.start.unwrap_or(self.today),
-            &self.times,
+            &times,
         ))
     }
 }
@@ -1136,105 +1525,4 @@ fn times_for(typed: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn at(hour: u32, minute: u32) -> ClockTime {
-        ClockTime::new(hour, minute).unwrap_or(ClockTime { hour: 0, minute: 0 })
-    }
-
-    const TODAY: Day = Day {
-        year: 2026,
-        month: 11,
-        day: 3,
-    };
-
-    fn unknown(text: &str, locale: &str) -> Vec<String> {
-        read(text, locale, TODAY)
-            .unknown
-            .into_iter()
-            .map(|r| text[r].to_string())
-            .collect()
-    }
-
-    fn suggested(text: &str, locale: &str) -> Vec<String> {
-        suggest(text, text.len(), locale)
-            .into_iter()
-            .map(|s| s.text)
-            .collect()
-    }
-
-    #[test]
-    fn a_weekday_out_of_range_reads_as_the_nearest() {
-        let schedule =
-            SimpleSchedule::new(SimpleRepeat::weekdays([0, 9].into()), TODAY, &[at(8, 0)]);
-        assert_eq!(
-            sentence(&schedule, "en", TODAY),
-            "Weekdays Mon, Sun at 08:00"
-        );
-    }
-
-    #[test]
-    fn the_issues_example_reads_both_ways() {
-        let schedule = SimpleSchedule::new(
-            SimpleRepeat::weekdays([1, 4].into()).ending(None, Some(Day::new(2026, 12, 31))),
-            TODAY,
-            &[at(15, 0), at(8, 0)],
-        );
-        let en = sentence(&schedule, "en", TODAY);
-        let de = sentence(&schedule, "de_DE", TODAY);
-        assert_eq!(en, "Weekdays Mon, Thu at 08:00, 15:00, until 12/31");
-        assert_eq!(de, "Wochentags Mo, Do um 08:00, 15:00, bis 31.12.");
-        for (text, locale) in [(en, "en"), (de, "de")] {
-            let back = read(&text, locale, TODAY);
-            assert_eq!(back.schedule.as_ref(), Some(&schedule), "{text}");
-            assert!(back.unknown.is_empty(), "{text}");
-        }
-    }
-
-    #[test]
-    fn the_start_and_the_year_show_only_when_not_today() {
-        let later = SimpleSchedule::new(
-            SimpleRepeat::every(2, RepeatUnit::Weeks),
-            Day::new(2027, 1, 5),
-            &[],
-        );
-        assert_eq!(
-            sentence(&later, "en", TODAY),
-            "Every 2 weeks, from 1/5/2027"
-        );
-        assert_eq!(sentence(&later, "de", TODAY), "Alle 2 Wochen, ab 5.1.2027");
-        let now = SimpleSchedule::new(SimpleRepeat::every(1, RepeatUnit::Days), TODAY, &[]);
-        assert_eq!(sentence(&now, "en", TODAY), "Every day");
-        assert_eq!(read("Every day", "en", TODAY).schedule, Some(now));
-    }
-
-    #[test]
-    fn unknown_parts_are_marked_and_change_nothing() {
-        assert_eq!(unknown("Every day at 08:00 please", "en"), ["please"]);
-        assert_eq!(unknown("Every 2 wekks", "en"), ["Every", "2", "wekks"]);
-        assert_eq!(read("Every 2 wekks", "en", TODAY).schedule, None);
-        assert_eq!(
-            unknown("Once at 08:00, 09:00, until 12/1", "en"),
-            ["09:00", "until", "12/1"]
-        );
-        assert_eq!(unknown("Jeden Tag ab 31.2.", "de"), ["ab", "31.2."]);
-        assert_eq!(unknown("Jeden Tag 🧠", "de"), ["🧠"]);
-    }
-
-    #[test]
-    fn suggestions_are_the_next_words() {
-        assert_eq!(suggested("Every 2 w", "en"), ["weeks"]);
-        assert_eq!(suggested("Weekdays Tue, T", "en"), ["Thu"]);
-        assert_eq!(suggested("Every day at 8", "en"), ["08:00", "08:30"]);
-        assert_eq!(suggested("Einmal ", "de"), ["am", "um"]);
-        let mid = suggest("Every 2 we at 08:00", 10, "en");
-        assert_eq!(
-            mid,
-            [Suggestion {
-                range: 8..10,
-                text: "weeks".into()
-            }]
-        );
-    }
-}
+mod tests;

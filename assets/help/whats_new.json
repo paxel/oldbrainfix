@@ -10,5 +10,9 @@
   "0.5.1": {
     "de": "Behoben\n• Das iPhone zeigt das eigene Symbol der App.",
     "en": "Fixed\n• The iPhone shows the app's own icon."
+  },
+  "0.6.0": {
+    "de": "Neu\n• Jede Datei an eine Notiz hängen; PDFs im Vollbild.\n• Später und Nicht heute an mehr Stellen.\n• Mehrere Notizen auswählen und gemeinsam bearbeiten.\n• Verschachtelte #Wörter wie #leben/gesundheit.\n• Den eigenen Desktop nach Notizen fragen.\n• Unter Android an Old Brain Fix drucken.\n• Notizen aus einer Sicherung zurückholen.\nGeändert\n• Löschen fragt nicht; Rückgängig holt es zurück.\n• Ein Tipp auf ein Vorkommen öffnet seine Notiz.\nBehoben\n• Senden wählt niemanden, bis du wählst.",
+    "en": "Added\n• Attach any file to a Note; a PDF opens full screen.\n• Snooze and Not today in more places.\n• Select several Notes and act on them at once.\n• Nested tags such as #life/health, with a tag tree.\n• Ask your own desktop about your Notes.\n• On Android, print to Old Brain Fix from any app.\n• Open a Backup and take Notes back from it.\nChanged\n• Deleting no longer asks; Undo brings it back.\n• A tap on an Occurrence opens its Note.\nFixed\n• Sending a Note picks nobody until you choose."
   }
 }

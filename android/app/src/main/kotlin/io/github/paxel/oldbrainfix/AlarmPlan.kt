@@ -29,13 +29,13 @@ data class Alarm(
     val escalate: Int = 0,
 )
 
-/** Done or a snooze tapped on a notification, kept until the app applied it. */
+/** Done, a snooze or Not today tapped on a notification, kept until the app applied it. */
 data class Action(
     /** Counts up; the app acknowledges everything up to one it applied. */
     val seq: Long,
     /**
-     * "done" or "snooze"; from the Agenda widget also "line", "frog",
-     * "shopping" or "checklist" ([EventQueue.KINDS]).
+     * "done", "snooze", "skip" or "tomorrow"; from the Agenda widget also
+     * "line", "frog", "shopping" or "checklist" ([EventQueue.KINDS]).
      */
     val kind: String,
     /** The Routine, or the Frog of a "frog". */
@@ -118,10 +118,12 @@ object AlarmPlan {
 
     /**
      * The plan with the taps the app has not applied yet: what was
-     * tapped Done is gone, snoozed Occurrences ring again at their snooze.
+     * tapped Done, Skip or Tomorrow is gone, snoozed Occurrences ring
+     * again at their snooze, and an Occurrence Tomorrow moved rings the
+     * day after at the same time ([moved]), as the app will plan it.
      */
     fun effective(plan: List<Alarm>, queued: List<Action>): List<Alarm> {
-        val done = queued.filter { it.kind == "done" }.map { it.routine to it.occurrence }.toSet()
+        val done = queued.filter { it.kind in ANSWERED }.map { it.routine to it.occurrence }.toSet()
         val snoozes = queued.filter { it.kind == "snooze" }.associateBy { it.routine to it.occurrence }
         val kept = plan.filter { (it.routine to it.occurrence) !in done && (it.routine to it.occurrence) !in snoozes }
         val added = snoozes.values
@@ -142,7 +144,89 @@ object AlarmPlan {
                     escalate = was?.escalate ?: 0,
                 )
             }
-        return kept + added
+        val planned = (kept + added).map { it.routine to it.occurrence }.toMutableSet()
+        val tomorrow = queued.filter { it.kind == EventQueue.KIND_TOMORROW }.mapNotNull { tap ->
+            val was = plan.firstOrNull { it.routine == tap.routine && it.occurrence == tap.occurrence }
+                ?: return@mapNotNull null
+            moved(was)?.takeIf { planned.add(it.routine to it.occurrence) }
+        }
+        return kept + added + tomorrow
+    }
+
+    /** The kinds of tap after which an Occurrence rings no more. */
+    private val ANSWERED = setOf("done", EventQueue.KIND_SKIP, EventQueue.KIND_TOMORROW)
+
+    /**
+     * The alarm of the one-time Occurrence Tomorrow adds for [alarm]'s:
+     * the day after at the same time, Re-nagging and escalating as it
+     * did, and Missed when it was, or a day later where that came before
+     * the moved one; null when its Occurrence or
+     * wall-clock moment does not read. A snooze's moment is the
+     * Occurrence's own time, an all-day one's the time it rang at.
+     */
+    fun moved(alarm: Alarm): Alarm? {
+        val occurrence = movedKey(alarm.occurrence) ?: return null
+        val time = alarm.occurrence.substringAfter('T', "")
+        val local = if (time.isEmpty()) {
+            alarm.local?.let { nextDay(it) } ?: return null
+        } else {
+            val (hour, minute) = time.split(':').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 } ?: return null
+            dayOf(occurrence)?.let { it + listOf(hour, minute) } ?: return null
+        }
+        return alarm.copy(
+            id = "occurrence:${alarm.routine}@$occurrence",
+            occurrence = occurrence,
+            local = local,
+            at = null,
+            // Missed when the Occurrence after it starts, as before; a day
+            // later only where that came before it, as a Reminder's midnight.
+            end = alarm.end?.let { end -> if (later(end, local)) end else nextDay(end) },
+        )
+    }
+
+    /** Whether the wall-clock moment [a] comes after [b]. */
+    private fun later(a: List<Int>, b: List<Int>): Boolean {
+        for (i in 0 until minOf(a.size, b.size)) if (a[i] != b[i]) return a[i] > b[i]
+        return false
+    }
+
+    /** The key of the Occurrence a day after [occurrence], at the same time; null when it does not read. */
+    fun movedKey(occurrence: String): String? {
+        val day = dayOf(occurrence.substringBefore('T')) ?: return null
+        val next = nextDay(day + listOf(0, 0))
+        val text = String.format(java.util.Locale.ROOT, "%04d-%02d-%02d", next[0], next[1], next[2])
+        val time = occurrence.substringAfter('T', "")
+        return if (time.isEmpty()) text else "${text}T$time"
+    }
+
+    /**
+     * Whether Not today offers Tomorrow for [occurrence] on [today]
+     * ("2026-10-24"): only for an Occurrence of today or later.
+     */
+    fun offersTomorrow(occurrence: String, today: String): Boolean =
+        occurrence.substringBefore('T') >= today
+
+    /** [year, month, day] of [key]'s day, or null. */
+    private fun dayOf(key: String): List<Int>? {
+        val parts = key.substringBefore('T').split('-')
+        if (parts.size != 3 || parts[0].length != 4) return null
+        val numbers = parts.mapNotNull { it.toIntOrNull() }
+        return numbers.takeIf { it.size == 3 }
+    }
+
+    /** [local] a calendar day later, at the same wall-clock time. */
+    private fun nextDay(local: List<Int>): List<Int> {
+        val calendar = java.util.Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        calendar.clear()
+        calendar.set(local[0], local[1] - 1, local[2], local[3], local[4], 0)
+        calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+        return listOf(
+            calendar.get(java.util.Calendar.YEAR),
+            calendar.get(java.util.Calendar.MONTH) + 1,
+            calendar.get(java.util.Calendar.DAY_OF_MONTH),
+            local[3],
+            local[4],
+        )
     }
 
     /**

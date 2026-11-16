@@ -6,6 +6,7 @@ import 'auto_sync.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'folder_platform.dart';
+import 'hidden_from_ai_view.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
 import 'page_bar.dart';
@@ -104,13 +105,29 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     );
   }
 
+  /// Shares the Area, under the id it goes on under; refused while it or
+  /// a Note in it is Hidden from AI, until the user shows it to the AI
+  /// (#267). Whether it is shared now.
+  Future<bool> _share() async {
+    final id = await unlessHiddenFromAi(
+      context,
+      widget.store,
+      () => widget.store.share(_areaId),
+      area: _areaId,
+    );
+    if (id == null) return false;
+    _areaId = id;
+    return true;
+  }
+
   /// Shows a code for their Device to join with, inviting it with the
   /// role chosen; once one joined, back to where sharing began.
   Future<void> _showCode() async {
     final t = context.t;
     final store = widget.store;
     final area = _area;
-    _areaId = store.share(_areaId);
+    if (!await _share()) return;
+    if (!mounted) return;
     widget.onShared?.call(_areaId);
     var joined = false;
     await Navigator.of(context).push(
@@ -170,6 +187,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     }
     final pairing = PairingScope.of(context);
     final area = _area;
+    if (!await _share() || !mounted) return;
     setState(() {
       _codeInvalid = false;
       _busy = true;
@@ -177,7 +195,6 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     ProfileChoice? confirmed;
     try {
       final store = widget.store;
-      _areaId = store.share(_areaId);
       widget.onShared?.call(_areaId);
       final name = await pairing.deviceName();
       await widget.join(
@@ -227,6 +244,17 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     final folders = FolderScope.of(context);
     final bundles = BundleScope.of(context);
     final area = _area;
+    // Nothing Hidden from AI goes to anyone (#267): asked before whom.
+    if (!store.isShared(_areaId) &&
+        !await showToAiFirst(
+          context,
+          store,
+          store.hiddenFromAiIn(_areaId),
+          area: _areaId,
+        )) {
+      return;
+    }
+    if (!mounted) return;
     final person = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(
         builder: (_) => SharePersonScreen(

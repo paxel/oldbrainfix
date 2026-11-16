@@ -635,6 +635,24 @@ extension People on Store {
     }
   }
 
+  /// The person who added the file [hash] to the Note or Section
+  /// [entity], as their Profile shows: the first of another person's
+  /// Devices that wrote its `file:` field, through the key of the Device,
+  /// in a Shared Area the person its grant names, as for [tickedBy]. Null
+  /// for a file the user's own Devices added, for a writer not known, and
+  /// for a blocked person (ADR 0021).
+  Profile? fileAddedBy(String entity, String hash) {
+    final field = NoteKeys.file(hash);
+    for (final e in history(entity)) {
+      if (e.field != field) continue;
+      if (_deviceWriter(e.device, entity) case _Theirs(:final author)) {
+        if (blockedIds.contains(resolvePerson(author.id))) return null;
+        return _withOverride(author);
+      }
+    }
+    return null;
+  }
+
   /// Whether the person filter of the browser keeps the Note or Section
   /// [entity] (#53): with [filter]'s `me`, the user's own, written on any
   /// of their Devices or under any of their Profile's ids; with its

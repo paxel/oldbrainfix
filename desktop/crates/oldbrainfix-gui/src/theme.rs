@@ -6,9 +6,10 @@
 
 use egui::epaint::{CornerRadius, Shadow};
 use egui::{
-    Button, Color32, Context, Rect, Response, Shape, Stroke, Theme, ThemePreference, Ui, Visuals,
+    Button, Color32, Context, Key, Modifiers, Rect, Response, Shape, Stroke, Theme,
+    ThemePreference, Ui, Visuals,
 };
-use oldbrainfix_core::ThemeChoice;
+use oldbrainfix_core::{TextSize, ThemeChoice};
 
 /// The colours of one brightness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,6 +193,25 @@ pub fn primary(ui: &mut Ui, enabled: bool, label: &str) -> Response {
     emphasised(ui, ButtonKind::Primary, enabled, label)
 }
 
+/// A dialog's main action as [`primary`] draws it, which Ctrl+Enter (Cmd
+/// on macOS) also runs while its dialog is the one on top (#277);
+/// whether it was asked for.
+pub fn main_action(ui: &mut Ui, enabled: bool, label: &str) -> bool {
+    let clicked = primary(ui, enabled, label).clicked();
+    clicked || (enabled && ctrl_enter(ui))
+}
+
+/// Whether `ui` is in the dialog on top: no modal dialog lies over it.
+pub fn on_top(ui: &Ui) -> bool {
+    let layer = ui.layer_id();
+    ui.ctx().memory(|m| m.is_above_modal_layer(layer))
+}
+
+/// Ctrl+Enter (Cmd on macOS) pressed in the dialog on top, taken (#277).
+pub fn ctrl_enter(ui: &Ui) -> bool {
+    on_top(ui) && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
+}
+
 /// An action that deletes or removes: a button on the error colour,
 /// greyed unless `enabled`.
 pub fn destructive(ui: &mut Ui, enabled: bool, label: &str) -> Response {
@@ -249,6 +269,17 @@ pub fn icon_button_back(ui: &Ui, resp: &Response, rect: Rect) {
 /// tinted with the accent.
 const SELECTION_TINT: f32 = 0.25;
 
+/// How strongly code is tinted with the text's colour behind it, as on
+/// the phone (#327).
+pub const CODE_TINT: f32 = 0.08;
+
+/// The ground of code: a light tint of the text's colour `text`, no
+/// frame, in light and dark alike.
+pub fn code_tint(text: Color32) -> Color32 {
+    let alpha = (CODE_TINT * 255.0).round() as u8;
+    Color32::from_rgba_unmultiplied(text.r(), text.g(), text.b(), alpha)
+}
+
 /// The visuals of one brightness: egui's own, on the phone's colours.
 pub fn visuals(dark: bool) -> Visuals {
     let (t, x) = if dark {
@@ -272,6 +303,7 @@ pub fn visuals(dark: bool) -> Visuals {
     v.window_fill = t.card;
     v.extreme_bg_color = t.card;
     v.text_edit_bg_color = Some(t.card);
+    v.code_bg_color = code_tint(x.text);
     v.selection.bg_fill = t.accent.gamma_multiply(SELECTION_TINT);
     v.selection.stroke = Stroke::new(1.0, t.accent);
     paint_buttons(&mut v, button_tones(dark, ButtonKind::Secondary));
@@ -286,6 +318,30 @@ pub fn install(ctx: &Context) {
     for theme in [Theme::Light, Theme::Dark] {
         ctx.style_mut_of(theme, |s| s.spacing.button_padding = BUTTON_PADDING);
     }
+}
+
+/// Where the context keeps the factor of this Device's text size.
+fn text_size_id() -> egui::Id {
+    egui::Id::new("oldbrainfix-text-size")
+}
+
+/// Shows the text of Notes, Lines, Sections, the Agenda's rows and Ask's
+/// answers at `size`'s factor (#326, obf-1019), on top of the zoom of
+/// "Bigger text and icons"; the context keeps it, for every window.
+pub fn set_text_size(ctx: &Context, size: TextSize) {
+    ctx.data_mut(|d| d.insert_temp(text_size_id(), size.factor()));
+}
+
+/// The factor of the text size shown around `ctx`; 1 until one is set.
+pub fn text_factor(ctx: &Context) -> f32 {
+    ctx.data(|d| d.get_temp(text_size_id())).unwrap_or(1.0)
+}
+
+/// `size`, a content text's usual size in points, at the text size of
+/// this Device (#326, obf-1019). Buttons, icons and labels around the
+/// text keep theirs.
+pub fn content(ui: &Ui, size: f32) -> f32 {
+    size * text_factor(ui.ctx())
 }
 
 /// Shows the theme this Device chose: the system's, light or dark.
@@ -354,222 +410,33 @@ pub fn area_band(rect: Rect, colour: Color32) -> Shape {
     Shape::convex_polygon(points, colour, Stroke::NONE)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// How long a dash of a tear line is, and the gap after it (#307), as
+/// on the phone.
+pub const TEAR_DASH: f32 = 4.0;
+pub const TEAR_GAP: f32 = 4.0;
 
-    #[test]
-    fn the_tones_are_the_phones() {
-        assert_eq!(LIGHT.background, Color32::from_rgb(0xCD, 0xE8, 0xE4));
-        assert_eq!(DARK.accent, Color32::from_rgb(0x4D, 0xB6, 0xAC));
-        assert_eq!(
-            LIGHT.shade,
-            Color32::from_rgba_unmultiplied(0x3E, 0x7A, 0x73, 0x66)
-        );
-        assert!(!visuals(false).dark_mode);
-        assert!(visuals(true).dark_mode);
-        assert_eq!(tones(&visuals(true)), DARK);
-    }
-
-    /// The WCAG contrast ratio of two opaque colours.
-    fn contrast(a: Color32, b: Color32) -> f32 {
-        fn channel(c: u8) -> f32 {
-            let c = f32::from(c) / 255.0;
-            if c <= 0.04045 {
-                c / 12.92
-            } else {
-                ((c + 0.055) / 1.055).powf(2.4)
-            }
-        }
-        let luminance = |c: Color32| {
-            0.2126 * channel(c.r()) + 0.7152 * channel(c.g()) + 0.0722 * channel(c.b())
-        };
-        let (a, b) = (luminance(a), luminance(b));
-        (a.max(b) + 0.05) / (a.min(b) + 0.05)
-    }
-
-    /// `tint` (premultiplied) laid over the opaque `ground`.
-    fn over(tint: Color32, ground: Color32) -> Color32 {
-        let a = f32::from(tint.a()) / 255.0;
-        let mix = |t: u8, g: u8| (f32::from(t) + f32::from(g) * (1.0 - a)).round() as u8;
-        Color32::from_rgb(
-            mix(tint.r(), ground.r()),
-            mix(tint.g(), ground.g()),
-            mix(tint.b(), ground.b()),
-        )
-    }
-
-    fn both() -> [(&'static str, Tones, TextTones, Visuals); 2] {
-        [
-            ("light", LIGHT, LIGHT_TEXT, visuals(false)),
-            ("dark", DARK, DARK_TEXT, visuals(true)),
-        ]
-    }
-
-    #[test]
-    fn every_text_is_readable_on_the_ground_the_marks_and_the_cards() {
-        for (name, t, x, _) in both() {
-            let texts = [
-                ("text", x.text),
-                ("weak", x.weak),
-                ("link", x.link),
-                ("error", x.error),
-                ("warn", x.warn),
-            ];
-            let grounds = [
-                ("ground", t.background),
-                ("marks", t.mark),
-                ("card", t.card),
-            ];
-            for (text, colour) in texts {
-                for (ground, under) in grounds {
-                    let ratio = contrast(colour, under);
-                    assert!(ratio >= 4.5, "{name} {text} on the {ground}: {ratio:.2}");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn plain_text_stays_readable_on_a_marked_row() {
-        for (name, t, x, v) in both() {
-            for (ground, under) in [("ground", t.background), ("card", t.card)] {
-                let marked = over(v.selection.bg_fill, under);
-                let ratio = contrast(x.text, marked);
-                assert!(
-                    ratio >= 4.5,
-                    "{name} text marked on the {ground}: {ratio:.2}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn the_visuals_draw_with_the_readable_tones() {
-        for (name, _, x, v) in both() {
-            assert_eq!(v.text_color(), x.text, "{name}");
-            assert_eq!(v.widgets.inactive.fg_stroke.color, x.text, "{name}");
-            assert_eq!(v.weak_text_color(), x.weak, "{name}");
-            assert_eq!(v.hyperlink_color, x.link, "{name}");
-            assert_eq!(v.error_fg_color, x.error, "{name}");
-            assert_eq!(v.warn_fg_color, x.warn, "{name}");
-            assert!(v.override_text_color.is_none(), "{name}");
-        }
-    }
-
-    #[test]
-    fn the_accent_stands_out_as_a_mark_and_cards_from_the_ground() {
-        for (name, t, _, _) in both() {
-            for (ground, under) in [
-                ("ground", t.background),
-                ("marks", t.mark),
-                ("card", t.card),
-            ] {
-                let ratio = contrast(t.accent, under);
-                assert!(ratio >= 3.0, "{name} accent on the {ground}: {ratio:.2}");
-            }
-            let on = on_accent(name == "dark");
-            let ratio = contrast(on, t.accent);
-            assert!(ratio >= 4.5, "{name} text on the accent: {ratio:.2}");
-            // As on the phone: a soft emboss, yet clearly a card.
-            assert!(contrast(t.card, t.background) >= 1.2, "{name}");
-            assert!(contrast(t.card, t.mark) >= 1.2, "{name}");
-            assert!(contrast(t.mark, t.background) < 1.2, "{name}");
-        }
-    }
-
-    const KINDS: [ButtonKind; 3] = [
-        ButtonKind::Secondary,
-        ButtonKind::Primary,
-        ButtonKind::Destructive,
-    ];
-
-    #[test]
-    fn the_text_of_every_button_is_readable_on_its_fill_in_every_state() {
-        for (name, _, _, _) in both() {
-            for kind in KINDS {
-                let b = button_tones(name == "dark", kind);
-                for (state, fill) in [
-                    ("idle", b.idle),
-                    ("hovered", b.hovered),
-                    ("pressed", b.pressed),
-                ] {
-                    assert_eq!(fill.a(), 255, "{name} {kind:?} {state} is opaque");
-                    let ratio = contrast(b.text, fill);
-                    assert!(ratio >= 4.5, "{name} {kind:?} text {state}: {ratio:.2}");
-                }
-                assert_ne!(b.idle, b.hovered, "{name} {kind:?} hover shows");
-                assert_ne!(b.hovered, b.pressed, "{name} {kind:?} press shows");
-            }
-        }
-    }
-
-    #[test]
-    fn a_button_stands_out_by_its_outline_and_its_focus_ring() {
-        for (name, t, _, _) in both() {
-            for kind in KINDS {
-                let b = button_tones(name == "dark", kind);
-                for (ground, under) in [
-                    ("ground", t.background),
-                    ("marks", t.mark),
-                    ("card", t.card),
-                ] {
-                    let outline = contrast(b.outline, under);
-                    let ring = contrast(b.ring, under);
-                    assert!(
-                        outline >= 3.0 || kind != ButtonKind::Secondary,
-                        "{name} {kind:?} outline on the {ground}: {outline:.2}"
-                    );
-                    assert!(
-                        ring >= 3.0,
-                        "{name} {kind:?} ring on the {ground}: {ring:.2}"
-                    );
-                }
-            }
-            // The primary and destructive ones differ from the rest.
-            let dark = name == "dark";
-            let fills = KINDS.map(|kind| button_tones(dark, kind).idle);
-            assert_ne!(fills[0], fills[1], "{name}");
-            assert_ne!(fills[1], fills[2], "{name}");
-            assert_ne!(fills[0], fills[2], "{name}");
-        }
-    }
-
-    #[test]
-    fn every_button_draws_rounded_filled_and_outlined_in_the_secondary_tones() {
-        for (name, _, x, v) in both() {
-            let b = button_tones(v.dark_mode, ButtonKind::Secondary);
-            assert_eq!(b.text, x.text, "{name}");
-            let w = &v.widgets;
-            for (state, fill, stroke) in [
-                ("idle", b.idle, Stroke::new(1.0, b.outline)),
-                ("hovered", b.hovered, Stroke::new(1.0, b.outline)),
-                ("pressed", b.pressed, Stroke::new(2.0, b.ring)),
-                ("open", b.hovered, Stroke::new(1.0, b.outline)),
-            ] {
-                let s = match state {
-                    "idle" => w.inactive,
-                    "hovered" => w.hovered,
-                    "pressed" => w.active,
-                    _ => w.open,
-                };
-                assert_eq!(s.weak_bg_fill, fill, "{name} {state}");
-                assert_eq!(s.bg_stroke, stroke, "{name} {state}");
-                assert_eq!(s.corner_radius, CornerRadius::same(BUTTON_RADIUS), "{name}");
-                assert_eq!(s.fg_stroke.color, x.text, "{name} {state} text");
-            }
-        }
-    }
-
-    #[test]
-    fn an_embossed_card_has_two_shadows_under_it_and_its_band_stays_left() {
-        let rect = Rect::from_min_size(egui::pos2(10.0, 10.0), egui::vec2(200.0, 80.0));
-        assert_eq!(embossed(rect, LIGHT, false).len(), 3);
-        let band = area_band(rect, Color32::RED);
-        let Shape::Path(path) = band else {
-            panic!("a path")
-        };
-        assert!(path.points.iter().all(|p| p.x >= 10.0 && p.x <= 16.01));
-        assert!(path.points.iter().all(|p| p.y >= 10.0 && p.y <= 90.0));
-    }
+/// The tear line from `left` to `right` at `y` (#307): a row of short
+/// dashes like the perforation of a roll of paper, parting a Note's
+/// text from each of its Sections, which read on as one text.
+pub fn tear_shapes(left: f32, right: f32, y: f32, stroke: Stroke) -> Vec<Shape> {
+    let ends = [egui::pos2(left, y), egui::pos2(right, y)];
+    Shape::dashed_line(&ends, stroke, TEAR_DASH, TEAR_GAP)
 }
+
+/// A tear line across `ui` (#307), in the weak text colour of the time
+/// stamp under it, wherever it is drawn, taking its room as a separator
+/// does.
+pub fn tear_line(ui: &mut Ui) -> Response {
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 8.0), egui::Sense::hover());
+    if ui.is_rect_visible(rect) {
+        let stroke = Stroke::new(1.0, ui.visuals().weak_text_color());
+        let y = rect.center().y;
+        let shapes = tear_shapes(rect.left(), rect.right(), y, stroke);
+        ui.painter().extend(shapes);
+    }
+    response
+}
+
+#[cfg(test)]
+mod tests;

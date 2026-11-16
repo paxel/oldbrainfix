@@ -103,7 +103,10 @@ class TableGridState extends State<TableGrid> {
   late String _text = widget.text;
   late int _at = widget.table.start;
   late MarkdownTable? _table = widget.table;
-  List<DrawnBox> _boxes = const [];
+
+  /// Read as each frame draws, so a tap shows while its save waits
+  /// (#338).
+  List<DrawnBox> get _boxes => storedBoxes(_text, widget.ticking);
   List<FoundTag> _tags = const [];
   List<(int, int)> _links = const [];
   List<double> _widths = const [];
@@ -206,7 +209,6 @@ class TableGridState extends State<TableGrid> {
   }
 
   void _read() {
-    _boxes = storedBoxes(_text, widget.ticking);
     _tags = Markdown.tags(_text);
     _links = Markdown.autolinks(_text);
   }

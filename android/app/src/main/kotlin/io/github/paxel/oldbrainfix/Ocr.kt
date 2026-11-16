@@ -14,7 +14,7 @@ import java.util.concurrent.Executors
 object OcrNative {
     val loaded: Boolean = runCatching {
         // RustO reads with one thread fewer than the Device has cores, at
-        // most four, like Whisper; set before its thread pool starts.
+        // most four; set before its thread pool starts.
         val threads = Speech.threadsFor(Runtime.getRuntime().availableProcessors())
         Os.setenv("RTEN_NUM_THREADS", threads.toString(), true)
         System.loadLibrary("oldbrainfix_ocr")

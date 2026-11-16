@@ -1,0 +1,237 @@
+{
+  "now": "2026-01-02T10:00:48.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [
+    {
+      "id": "area:0000000000000000000000000000000a",
+      "name": "Banana",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000002",
+      "name": "Bike",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:0000000000000000000000000000000c",
+      "name": "Car",
+      "starter": "car",
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:starter-health",
+      "name": "Health",
+      "starter": "health",
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:starter-household",
+      "name": "Household",
+      "starter": "household",
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:starter-work",
+      "name": "Work",
+      "starter": "work",
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000004",
+      "name": "Zoo",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:0000000000000000000000000000000b",
+      "name": "apple",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:0000000000000000000000000000000d",
+      "name": "avocado",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000001",
+      "name": "bike",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000003",
+      "name": "İnbox",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000005",
+      "name": "ΣΑΣ",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000006",
+      "name": "σας",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000008",
+      "name": "😀",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000007",
+      "name": "～",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    }
+  ],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000009",
+      "text": "Oil change",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:29.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:0000000000000000000000000000000c",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000009"
+  ],
+  "unsorted": [],
+  "trashed": [],
+  "inside": {
+    "area:0000000000000000000000000000000a": [],
+    "area:00000000000000000000000000000002": [],
+    "area:0000000000000000000000000000000c": [
+      "note:00000000000000000000000000000009"
+    ],
+    "area:starter-health": [],
+    "area:starter-household": [],
+    "area:starter-work": [],
+    "area:00000000000000000000000000000004": [],
+    "area:0000000000000000000000000000000b": [],
+    "area:0000000000000000000000000000000d": [],
+    "area:00000000000000000000000000000001": [],
+    "area:00000000000000000000000000000003": [],
+    "area:00000000000000000000000000000005": [],
+    "area:00000000000000000000000000000006": [],
+    "area:00000000000000000000000000000008": [],
+    "area:00000000000000000000000000000007": []
+  },
+  "sections": {
+    "note:00000000000000000000000000000009": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000009": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Oil change"
+    }
+  },
+  "search": {
+    "": [
+      "note:00000000000000000000000000000009"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000009"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {
+    "area:0000000000000000000000000000000a": [],
+    "area:00000000000000000000000000000002": [],
+    "area:0000000000000000000000000000000c": [
+      "note:00000000000000000000000000000009"
+    ],
+    "area:starter-health": [],
+    "area:starter-household": [],
+    "area:starter-work": [],
+    "area:00000000000000000000000000000004": [],
+    "area:0000000000000000000000000000000b": [],
+    "area:0000000000000000000000000000000d": [],
+    "area:00000000000000000000000000000001": [],
+    "area:00000000000000000000000000000003": [],
+    "area:00000000000000000000000000000005": [],
+    "area:00000000000000000000000000000006": [],
+    "area:00000000000000000000000000000008": [],
+    "area:00000000000000000000000000000007": []
+  },
+  "conflicts": []
+}

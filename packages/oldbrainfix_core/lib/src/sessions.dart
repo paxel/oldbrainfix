@@ -758,8 +758,7 @@ class Sessions {
     final routines = [for (final session in sessions) session.routine];
     final due = [
       for (final session in sessions)
-        for (final occurrence in session.routine.schedule.on(day))
-          (session, occurrence),
+        for (final occurrence in session.routine.on(day)) (session, occurrence),
     ];
     due.sort((a, b) {
       final byTime = a.$2.compareTo(b.$2);
@@ -1114,7 +1113,7 @@ class Sessions {
   /// The Session [id], due at [occurrence].
   Session _requireDue(String id, Occurrence occurrence) {
     final session = _require(id);
-    if (!session.routine.schedule.has(occurrence)) {
+    if (!session.routine.has(occurrence)) {
       throw ArgumentError.value(occurrence, 'occurrence', 'not due then');
     }
     return session;

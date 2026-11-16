@@ -92,6 +92,14 @@ enum ShareSheet {
     return true
   }
 
+  /// Puts [text] on the clipboard with [html] beside it, one item of both:
+  /// an app that takes formatted text takes the HTML, any other the text
+  /// (#324); whether it is there.
+  static func copyHtml(text: String, html: String) -> Bool {
+    UIPasteboard.general.setItems([["public.html": html, "public.utf8-plain-text": text]])
+    return true
+  }
+
   /// Shows [sheet] as a popover in the middle where the screen is wide
   /// enough for one, as on an iPad.
   static func anchor(_ sheet: UIViewController, over top: UIViewController) {

@@ -437,3 +437,27 @@ fn a_member_ticks_the_boxes_of_every_note_and_section() -> TestResult {
     assert_eq!(shown(&ben, &own)?, "✅ Buy filters");
     Ok(())
 }
+
+#[test]
+fn a_box_picked_ticks_in_the_frame_of_the_pick_and_is_saved_in_the_next() -> TestResult {
+    // A tick shows at once (#338).
+    let (store, note) = with_note("Release\n☐ v2")?;
+    let mut harness = window(&store, None);
+    click_box(&mut harness, "Open")?;
+    harness
+        .query_all_by_label("✅ Check")
+        .last()
+        .ok_or("✅ Check")?
+        .click_accesskit();
+    harness.step();
+    assert_eq!(buttons(&harness, "Checked"), 1);
+    assert_eq!(
+        shown(&store, &note)?,
+        "Release\n☐ v2",
+        "saved in the next frame"
+    );
+    harness.run();
+    assert_eq!(shown(&store, &note)?, "Release\n✅ v2");
+    assert_eq!(buttons(&harness, "Checked"), 1);
+    Ok(())
+}

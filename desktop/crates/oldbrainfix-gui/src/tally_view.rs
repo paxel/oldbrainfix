@@ -30,6 +30,7 @@ use crate::app::{chip_row, embossed, icon_button, when};
 use crate::capture_choices::TallyFieldChoice;
 use crate::icons;
 use crate::l10n::L10n;
+use crate::leave_saves::Leaving;
 use crate::profile_view;
 use crate::schedule_text::{day_text, month_short};
 use crate::setting_badges::BadgeValue::{self, Icon, Text};
@@ -238,8 +239,9 @@ pub enum TallyAction {
     AddEntry,
     /// Opens the entry page of the entry with this id.
     EditEntry(String),
-    /// Asks whether the entry with this id goes.
-    AskDelete(String),
+    /// Removes the entry with this id, without asking; Ctrl+Z and
+    /// "Removed entries" bring it back (#268).
+    Delete(String),
     Restore(String),
     /// Opens the field page of the field with this id, or of a new one.
     OpenField(Option<String>),
@@ -659,7 +661,7 @@ fn entry_row(
             ui.close();
         }
         if ui.button(RichText::new(t.delete()).color(text)).clicked() {
-            actions.push(TallyAction::AskDelete(entry.id.clone()));
+            actions.push(TallyAction::Delete(entry.id.clone()));
             ui.close();
         }
     });
@@ -788,7 +790,7 @@ pub enum FormIntent {
     Close,
     /// Hides the field, or shows it again.
     Hide(bool),
-    /// Deletes the entry, after asking.
+    /// Deletes the entry, without asking (#268).
     Delete,
 }
 
@@ -828,7 +830,7 @@ fn page_bar(ui: &mut Ui, t: &L10n, heading: &str, delete: bool) -> Option<FormIn
     let mut intent = None;
     ui.label(RichText::new(heading).size(18.0).strong().color(text));
     ui.horizontal_wrapped(|ui| {
-        if theme::primary(ui, true, t.save()).clicked() {
+        if theme::main_action(ui, true, t.save()) {
             intent = Some(FormIntent::Save);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
@@ -940,7 +942,8 @@ impl FieldForm {
             name_missing: false,
             target_invalid: false,
             unit_invalid: false,
-            focus: field.is_none().then_some(NAME_FIELD),
+            // The name takes the keyboard as it opens (#277).
+            focus: Some(NAME_FIELD),
             field,
         }
     }
@@ -1096,7 +1099,13 @@ impl FieldForm {
     fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<FormIntent> {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        let focus = self.focus.take();
+        // Asked again past the dialog's first, sizing pass, which drops
+        // it (#277).
+        let focus = if ui.is_sizing_pass() {
+            self.focus
+        } else {
+            self.focus.take()
+        };
         let heading = if self.field.is_none() {
             t.tally_new_field()
         } else {
@@ -1272,12 +1281,18 @@ impl FieldForm {
 /// One entry of a Tally: a box per Check field (#264), ticked once per
 /// entry above the sets; a value per number field shown, a new entry's
 /// prefilled with the field's target, so that saving the targets is one
-/// click. A Tally that counts in sets shows each set as a row of those
+/// click, or for a field without one with the value of the user's latest
+/// entry that has one, selected as the field takes the keyboard so typing
+/// replaces it (#276). A Tally that counts in sets shows each set as a row of those
 /// values with "Add set" under them, which adds one that starts with the
 /// values of the set before; a set after the first can be removed. Then
 /// the day it counts for, today for a new one, at the same time of day;
 /// and one line of text. A value left empty is none. An entry that exists
-/// has Delete, which asks once; it can be restored.
+/// has Delete, which asks nothing; Ctrl+Z restores it (#268). Leaving it
+/// by Esc, a click beside it or back saves a change as Save does (#275);
+/// one that can't be saved, a value that is no number or a new entry left
+/// empty, asks once whether to discard it. Left as it opened, targets and
+/// all, it writes nothing; Cancel writes nothing either.
 ///
 /// For a Session's pick (ADR 0029) a new entry is recorded for its
 /// Occurrence instead; it counts for now, so the day does not show.
@@ -1294,6 +1309,9 @@ pub struct EntryForm {
     opened: Vec<Vec<String>>,
     /// Each Check field shown, whether it is ticked.
     pub checks: Vec<(TallyField, bool)>,
+    /// The ticks as the page opened, to tell on leaving whether anything
+    /// changed (#275).
+    checks_opened: Vec<bool>,
     /// Whether the Tally counts in sets: "Add set" shows then.
     counts_in_sets: bool,
     pub line: String,
@@ -1307,8 +1325,48 @@ pub struct EntryForm {
     invalid: HashSet<String>,
     empty: bool,
     focus: Option<String>,
+    /// The fields of a new entry that start with the value of the user's
+    /// latest entry (#276), by id.
+    from_latest: HashSet<String>,
+    /// The value of one of them that took the keyboard holding that
+    /// value, by its key: selected while the pointer that gave the
+    /// keyboard is down, which would place the cursor.
+    selecting: Option<String>,
     /// The Session and its Occurrence a new entry is recorded for.
     pick: Option<(String, Occurrence)>,
+}
+
+/// What a new entry of `tally` starts with (#276): each number field's
+/// target, and for one of `fields` without, the value of the first set
+/// of the latest of `mine`, the user's entries newest first, that holds
+/// one; with the fields that start so.
+fn start_values(
+    tally: &Tally,
+    fields: &[TallyField],
+    mine: &[TallyEntry],
+) -> (BTreeMap<String, f64>, HashSet<String>) {
+    let mut values = tally.targets();
+    let mut wanted: HashSet<String> = fields
+        .iter()
+        .filter(|f| f.target.is_none())
+        .map(|f| f.id.clone())
+        .collect();
+    let mut latest = HashSet::new();
+    for entry in mine {
+        if wanted.is_empty() {
+            break;
+        }
+        let Some(first) = tally.sets_of(entry).into_iter().next() else {
+            continue;
+        };
+        for (id, value) in first {
+            if wanted.remove(&id) {
+                values.entry(id.clone()).or_insert(value);
+                latest.insert(id);
+            }
+        }
+    }
+    (values, latest)
 }
 
 /// The key of the value of `field` in the set `set` of the entry page.
@@ -1317,18 +1375,24 @@ fn value_key(set: usize, field: &str) -> String {
 }
 
 impl EntryForm {
-    /// The page of `entry` of `tally`, or of a new one, on `today`.
+    /// The page of `entry` of `tally`, or of a new one, on `today`,
+    /// starting from `mine`, the user's entries newest first.
     pub fn new(
         tally: &Tally,
-        entry: Option<(TallyEntry, bool)>,
+        (entry, mine): (Option<(TallyEntry, bool)>, &[TallyEntry]),
         (system, today): (UnitSystem, Day),
         wall: &WallClock,
         t: &L10n,
     ) -> EntryForm {
         let decimal = decimal_sign(t);
         let fields: Vec<TallyField> = tally.numbers().into_iter().cloned().collect();
+        let mut from_latest = HashSet::new();
         let rows = match &entry {
-            None => vec![tally.targets()],
+            None => {
+                let (values, latest) = start_values(tally, &fields, mine);
+                from_latest = latest;
+                vec![values]
+            }
             Some((entry, _)) => tally.sets_of(entry),
         };
         let rows = if rows.is_empty() {
@@ -1345,7 +1409,7 @@ impl EntryForm {
                     .collect()
             })
             .collect();
-        let checks = tally
+        let checks: Vec<(TallyField, bool)> = tally
             .checks()
             .into_iter()
             .map(|f| {
@@ -1370,6 +1434,7 @@ impl EntryForm {
             fields,
             opened: sets.clone(),
             sets,
+            checks_opened: checks.iter().map(|(_, on)| *on).collect(),
             checks,
             counts_in_sets: tally.counts_in_sets,
             day,
@@ -1378,6 +1443,8 @@ impl EntryForm {
             system,
             invalid: HashSet::new(),
             empty: false,
+            from_latest,
+            selecting: None,
             pick: None,
         }
     }
@@ -1404,8 +1471,9 @@ impl EntryForm {
         }
     }
 
-    /// Writes the entry when nothing needs fixing; whether it did.
-    pub fn save(&mut self, store: &Store, wall: &WallClock) -> oldbrainfix_core::Result<bool> {
+    /// The values of each set, `None` where empty or no number, and the
+    /// values that are no number, as `<set>:<field id>`.
+    fn parsed(&self) -> (Vec<BTreeMap<String, Option<f64>>>, HashSet<String>) {
         let mut parsed: Vec<BTreeMap<String, Option<f64>>> = Vec::new();
         let mut invalid = HashSet::new();
         for (i, set) in self.sets.iter().enumerate() {
@@ -1424,13 +1492,59 @@ impl EntryForm {
             }
             parsed.push(row);
         }
-        let line = self.line.trim().to_string();
-        self.empty = self.entry.is_none()
-            && invalid.is_empty()
-            && line.is_empty()
+        (parsed, invalid)
+    }
+
+    /// A new entry with nothing in it, its values `parsed`.
+    fn is_empty(&self, parsed: &[BTreeMap<String, Option<f64>>]) -> bool {
+        self.entry.is_none()
+            && self.line.trim().is_empty()
             && !self.checks.iter().any(|(_, on)| *on)
-            && parsed.iter().all(|row| row.values().all(Option::is_none));
-        let day_wrong = Day::parse(self.day_text.trim()) != Some(self.day);
+            && parsed.iter().all(|row| row.values().all(Option::is_none))
+    }
+
+    /// Whether the day typed is no day, or not the one shown.
+    fn day_wrong(&self) -> bool {
+        Day::parse(self.day_text.trim()) != Some(self.day)
+    }
+
+    /// Whether Save would save: every value a number or empty, the day a
+    /// day, and a new entry not empty.
+    pub fn valid(&self) -> bool {
+        let (parsed, invalid) = self.parsed();
+        invalid.is_empty() && !self.day_wrong() && !self.is_empty(&parsed)
+    }
+
+    /// Whether anything differs from the page as it opened (#275).
+    pub fn changed(&self) -> bool {
+        let typed = |sets: &[Vec<String>]| -> Vec<Vec<String>> {
+            sets.iter()
+                .map(|set| set.iter().map(|v| v.trim().to_string()).collect())
+                .collect()
+        };
+        let line_opened = self.entry.as_ref().map_or("", |e| e.line.as_str());
+        self.day != self.day_as_opened
+            || self.day_text.trim() != self.day_as_opened.to_string()
+            || self.line.trim() != line_opened.trim()
+            || self
+                .checks
+                .iter()
+                .map(|(_, on)| *on)
+                .ne(self.checks_opened.iter().copied())
+            || typed(&self.sets) != typed(&self.opened)
+    }
+
+    /// What leaving the page comes to (#275).
+    pub fn leaving(&self) -> Leaving {
+        Leaving::of(self.changed(), self.valid())
+    }
+
+    /// Says under each field what to fix, the first taking the keyboard,
+    /// as Save and Keep editing do; whether anything needs fixing.
+    pub fn show_what_to_fix(&mut self) -> bool {
+        let (parsed, invalid) = self.parsed();
+        self.empty = invalid.is_empty() && self.is_empty(&parsed);
+        let day_wrong = self.day_wrong();
         // The field to fix takes the keyboard.
         let first_invalid = (0..self.sets.len()).find_map(|i| {
             self.fields
@@ -1442,9 +1556,16 @@ impl EntryForm {
             .or_else(|| day_wrong.then(|| DAY_FIELD.to_string()))
             .or_else(|| self.empty.then(|| LINE_FIELD.to_string()));
         self.invalid = invalid;
-        if self.focus.is_some() {
+        self.focus.is_some()
+    }
+
+    /// Writes the entry when nothing needs fixing; whether it did.
+    pub fn save(&mut self, store: &Store, wall: &WallClock) -> oldbrainfix_core::Result<bool> {
+        if self.show_what_to_fix() {
             return Ok(false);
         }
+        let (parsed, _) = self.parsed();
+        let line = self.line.trim().to_string();
         let held = |row: &BTreeMap<String, Option<f64>>| -> BTreeMap<String, f64> {
             row.iter()
                 .filter_map(|(id, value)| Some((id.clone(), (*value)?)))
@@ -1512,7 +1633,13 @@ impl EntryForm {
 
     fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<FormIntent> {
         let text = ui.visuals().text_color();
-        let focus = self.focus.take();
+        // Asked again past the dialog's first, sizing pass, which drops
+        // it (#277).
+        let focus = if ui.is_sizing_pass() {
+            self.focus.clone()
+        } else {
+            self.focus.take()
+        };
         let heading = if self.entry.is_none() {
             t.tally_new_entry()
         } else {
@@ -1570,6 +1697,28 @@ impl EntryForm {
                                 crate::text_menu::show(ui, t, &edit, typed);
                                 if focus.as_deref() == Some(key.as_str()) {
                                     edit.request_focus();
+                                }
+                                // The latest value, as it opened, is
+                                // selected as it takes the keyboard
+                                // (#276), also against a click's cursor.
+                                let as_opened = self.opened.first().and_then(|s| {
+                                    let at = self.fields.iter().position(|f| f.id == field.id)?;
+                                    s.get(at)
+                                });
+                                if i == 0
+                                    && edit.gained_focus()
+                                    && self.from_latest.contains(&field.id)
+                                    && as_opened == Some(&*typed)
+                                {
+                                    self.selecting = Some(key.clone());
+                                }
+                                if self.selecting.as_deref() == Some(key.as_str()) {
+                                    if edit.has_focus() {
+                                        crate::format_bar::select(ui, id, typed, (0, typed.len()));
+                                    }
+                                    if !edit.has_focus() || !ui.input(|i| i.pointer.any_down()) {
+                                        self.selecting = None;
+                                    }
                                 }
                                 let unit = tally_units::shown_unit(&field.unit, system);
                                 ui.label(RichText::new(unit).color(text));

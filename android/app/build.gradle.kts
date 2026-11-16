@@ -110,7 +110,15 @@ androidComponents {
             "cargoNdk" + variant.name.replaceFirstChar { it.uppercase() },
         ) {
             crate.set(ocr)
-            sources.from(ocr.dir("src"), ocr.file("Cargo.toml"), ocr.file("Cargo.lock"))
+            // The desktop's PDF reader is built into the library (ADR 0047).
+            val pdf = rootProject.layout.projectDirectory.dir("../desktop/crates/oldbrainfix-pdf")
+            sources.from(
+                ocr.dir("src"),
+                ocr.file("Cargo.toml"),
+                ocr.file("Cargo.lock"),
+                pdf.dir("src"),
+                pdf.file("Cargo.toml"),
+            )
             abis.set(
                 if (variant.buildType == "debug") {
                     listOf("arm64-v8a")

@@ -256,23 +256,45 @@ fn a_click_on_a_pick_records_an_entry_prefilled_with_its_targets() -> TestResult
     let t = L10n::new("en");
     click_button(&mut harness, "Push-ups 20 times");
     assert!(shows(&harness, t.tally_new_entry()));
+    // Only the entry form opens, not the Tally's Note under it (#320).
+    assert!(!harness.state().note_open());
+    assert_eq!(harness.state().selected_note(), None);
     assert_eq!(holds(&harness, "Push-ups").as_deref(), Some("20"));
     // It counts for now: no date.
     assert!(!shows(&harness, t.tally_entry_date()));
     click_button(&mut harness, t.save());
-    assert_eq!(
-        harness.state().selected_note(),
-        Some(device.tallies[0].as_str())
-    );
+    assert!(!harness.state().note_open());
+    assert_eq!(harness.state().selected_note(), None);
     let today = Sessions::new(&device.store).on(&id, &occurrence())?;
     assert_eq!(today.picks[0].entries.len(), 1);
     assert!(!today.picks[1].done());
 
-    // Back on the Agenda the pick has no "Another one" any more.
-    harness.state_mut().select(Selection::Agenda);
-    harness.run();
+    // Back on the Agenda at once, the pick has no "Another one" any more.
     assert_eq!(harness.query_all_by_label(t.session_another()).count(), 1);
     assert!(!checked(&harness, Role::CheckBox, "Done: All day Sport"));
+    Ok(())
+}
+
+#[test]
+fn a_picks_field_without_a_target_starts_with_the_latest_own_value() -> TestResult {
+    let device = device()?;
+    let push_ups = &device.tallies[0];
+    let tallies = Tallies::new(&device.store);
+    let seconds = tallies.add_field(push_ups, "Seconds", "times", None, None)?;
+    tallies.add(push_ups, &BTreeMap::from([(seconds, 45.0)]), "", None)?;
+    spawn(&device)?;
+    let mut harness = window(&device.store, None);
+    let t = L10n::new("en");
+    harness
+        .query_all_by_label_contains("Push-ups 20 times")
+        .find(|n| n.accesskit_node().role() == Role::Button)
+        .ok_or("the pick")?
+        .click_accesskit();
+    harness.run();
+    assert!(shows(&harness, t.tally_new_entry()));
+    // Prefilled as any new entry (#276).
+    assert_eq!(holds(&harness, "Push-ups").as_deref(), Some("20"));
+    assert_eq!(holds(&harness, "Seconds").as_deref(), Some("45"));
     Ok(())
 }
 
@@ -327,10 +349,33 @@ fn the_headings_box_only_shows_done_and_each_pick_has_a_box_that_opens_it() -> T
     pick.click_accesskit();
     harness.run();
     assert!(shows(&harness, t.tally_new_entry()));
+    // Only the entry form opens, not the Tally's Note under it (#320).
+    assert!(!harness.state().note_open());
     click_button(&mut harness, t.save());
-    harness.state_mut().select(Selection::Agenda);
-    harness.run();
+    assert!(!harness.state().note_open());
     assert!(checked(&harness, Role::CheckBox, "Push-ups 20 times"));
+    Ok(())
+}
+
+#[test]
+fn a_pick_opened_on_the_sessions_own_note_leaves_that_note_open() -> TestResult {
+    let device = device()?;
+    spawn(&device)?;
+    let mut harness = window(&device.store, Some(&device.sport));
+    let t = L10n::new("en");
+    assert!(harness.state().note_open());
+    harness
+        .query_all_by_role_and_label(Role::Button, "Push-ups 20 times")
+        .last()
+        .ok_or("the pick")?
+        .click_accesskit();
+    harness.run();
+    assert!(shows(&harness, t.tally_new_entry()));
+    // The Session's Note stays under the form, not the Tally's (#320).
+    assert_eq!(harness.state().selected_note(), Some(device.sport.as_str()));
+    click_button(&mut harness, t.save());
+    assert_eq!(harness.state().selected_note(), Some(device.sport.as_str()));
+    assert!(harness.state().note_open());
     Ok(())
 }
 

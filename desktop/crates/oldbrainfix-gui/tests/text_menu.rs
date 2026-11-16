@@ -3,7 +3,7 @@
 //! with a selection in a formatted text the format bar's Bold, Italic,
 //! Code, Link and Code block. A right-click on the selection keeps it,
 //! the field keeps the keyboard through the menu, and Cut, Copy and
-//! Paste ask the window's clipboard as their keys do.
+//! Paste come to it in the next frame as their keys bring them (#319).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -16,11 +16,14 @@
 use std::sync::Arc;
 
 use egui::accesskit::Role;
-use egui::{Event, Modifiers, OutputCommand, PointerButton, ViewportCommand, ViewportId};
+use egui::{
+    Event, Id, Modifiers, OutputCommand, PointerButton, RawInput, ViewportCommand, ViewportId,
+};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::text_format::MARKDOWN;
 use oldbrainfix_core::{Notes, Places, SigningKey, Store};
+use oldbrainfix_gui::text_menu::{self, Clip};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -111,11 +114,9 @@ fn asked(harness: &Harness<'_, App>, asked: &ViewportCommand) -> bool {
         .contains(asked)
 }
 
-/// What the window does with Cut, Copy and Paste asked: the field gets
-/// them as its keys bring them.
-fn window_does(harness: &mut Harness<'_, App>, event: Event) {
-    harness.event(event);
-    harness.step();
+/// The system clipboard's text, for Paste.
+fn clipboard_milk() -> Option<String> {
+    Some(" milk".into())
 }
 
 fn copied(harness: &Harness<'_, App>) -> Vec<String> {
@@ -169,12 +170,14 @@ fn copy_from_the_menu_puts_the_selection_on_the_clipboard() -> TestResult {
     // The right-click on the selection keeps it.
     right_click(&mut harness, "buy milk now");
     pick(&mut harness, "Copy");
-    assert!(asked(&harness, &ViewportCommand::RequestCopy));
+    // The window is not asked: the field copies in the next frame, as
+    // Ctrl+C would have it (#319).
+    assert!(!asked(&harness, &ViewportCommand::RequestCopy));
+    harness.step();
+    assert_eq!(copied(&harness), ["buy milk now"]);
     harness.run();
     // The field kept the keyboard, its selection with it.
     assert_eq!(focused_value(&harness).as_deref(), Some("buy milk now"));
-    window_does(&mut harness, Event::Copy);
-    assert_eq!(copied(&harness), ["buy milk now"]);
     Ok(())
 }
 
@@ -182,6 +185,7 @@ fn copy_from_the_menu_puts_the_selection_on_the_clipboard() -> TestResult {
 fn cut_and_paste_from_the_menu_go_into_the_field() -> TestResult {
     let (store, _) = with_note("buy milk", "plain")?;
     let mut harness = window(&store, Selection::All, None);
+    text_menu::read_clipboard_by(&harness.ctx, clipboard_milk);
     let search = harness.get_by(|n| n.placeholder() == Some("Search all Notes"));
     search.click();
     harness.run();
@@ -192,9 +196,8 @@ fn cut_and_paste_from_the_menu_go_into_the_field() -> TestResult {
     harness.run();
     right_click(&mut harness, "oat milk");
     pick(&mut harness, "Cut");
-    assert!(asked(&harness, &ViewportCommand::RequestCut));
-    harness.run();
-    window_does(&mut harness, Event::Cut);
+    assert!(!asked(&harness, &ViewportCommand::RequestCut));
+    harness.step();
     assert_eq!(copied(&harness), ["oat milk"]);
     harness.run();
     assert_eq!(focused_value(&harness).as_deref(), Some(""));
@@ -203,12 +206,64 @@ fn cut_and_paste_from_the_menu_go_into_the_field() -> TestResult {
     harness.run();
     right_click(&mut harness, "rice");
     pick(&mut harness, "Paste");
-    assert!(asked(&harness, &ViewportCommand::RequestPaste));
-    harness.run();
-    window_does(&mut harness, Event::Paste(" milk".into()));
+    // The system clipboard's text, read at once.
+    assert!(!asked(&harness, &ViewportCommand::RequestPaste));
     harness.run();
     assert_eq!(focused_value(&harness).as_deref(), Some("rice milk"));
     Ok(())
+}
+
+#[test]
+fn paste_asks_the_window_where_the_clipboard_cannot_be_read() -> TestResult {
+    let (store, _) = with_note("buy milk", "plain")?;
+    let mut harness = window(&store, Selection::All, None);
+    let search = harness.get_by(|n| n.placeholder() == Some("Search all Notes"));
+    search.click();
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text("rice");
+    harness.run();
+    right_click(&mut harness, "rice");
+    pick(&mut harness, "Paste");
+    assert!(asked(&harness, &ViewportCommand::RequestPaste));
+    Ok(())
+}
+
+const NOTE_WINDOW: &str = "note window";
+
+/// A frame of the window `viewport`, beside the main window and a Note
+/// window.
+fn frame_of(viewport: ViewportId) -> RawInput {
+    let mut input = RawInput {
+        viewport_id: viewport,
+        ..RawInput::default()
+    };
+    for id in [ViewportId::ROOT, ViewportId::from_hash_of(NOTE_WINDOW)] {
+        input.viewports.insert(id, egui::ViewportInfo::default());
+    }
+    input
+}
+
+/// The events the frame of the window `viewport` brings.
+fn events_in(ctx: &egui::Context, viewport: ViewportId) -> Vec<Event> {
+    let mut events = Vec::new();
+    let _ = ctx.run_ui(frame_of(viewport), |ui| {
+        events = ui.input(|i| i.events.clone());
+    });
+    events
+}
+
+#[test]
+fn a_clip_comes_to_the_window_it_was_asked_in_once() {
+    let ctx = egui::Context::default();
+    let note_window = ViewportId::from_hash_of(NOTE_WINDOW);
+    let _ = ctx.run_ui(frame_of(note_window), |ui| {
+        text_menu::clip_into(ui.ctx(), Id::new("field"), Clip::Copy);
+        text_menu::clip_into(ui.ctx(), Id::new("field"), Clip::Cut);
+    });
+    // Not in the main window's frame; in the Note window's next, once.
+    assert!(!events_in(&ctx, ViewportId::ROOT).contains(&Event::Copy));
+    assert_eq!(events_in(&ctx, note_window), [Event::Copy, Event::Cut]);
+    assert!(events_in(&ctx, note_window).is_empty());
 }
 
 #[test]

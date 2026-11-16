@@ -1,0 +1,468 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+
+import '../l10n/app_localizations.dart';
+import 'announcements.dart';
+import 'attachment_reader.dart';
+import 'bundle_platform.dart';
+import 'failure_dialog.dart';
+import 'file_platform.dart';
+import 'l10n.dart';
+import 'ocr_platform.dart';
+import 'pack_screen.dart' show packSizeText;
+import 'pdf_viewer.dart';
+
+/// Keeps the bytes of the file at [path] on this Device among the attached
+/// [files] of the store ([Blobs.putFrom]), copied and hashed off the UI
+/// isolate, as a file may be 256 MiB; gives the hash. Tests keep them in
+/// place, where the file system's own futures do not run.
+@visibleForTesting
+Future<String> Function(Blobs files, String path) keepDeviceFile = (
+  files,
+  path,
+) => Isolate.run(() => files.putFrom(path));
+
+/// Writes [bytes] to [path] for another app to open; tests write in place.
+@visibleForTesting
+Future<void> Function(String path, Uint8List bytes) writeOpenedFile = (
+  path,
+  bytes,
+) => File(path).writeAsBytes(bytes, flush: true);
+
+/// The icon of a file of [kind] (#267): a PDF, a text document, a
+/// table, plain text or Markdown, anything else.
+IconData attachmentIcon(FileKind kind) => switch (kind) {
+  FileKind.pdf => Icons.picture_as_pdf_outlined,
+  FileKind.docx || FileKind.odt => Icons.description_outlined,
+  FileKind.xlsx || FileKind.ods => Icons.grid_on_outlined,
+  FileKind.text => Icons.article_outlined,
+  FileKind.other => Icons.insert_drive_file_outlined,
+};
+
+/// What a file's row says under its name: its size, and its pages when
+/// they were counted.
+String attachmentFacts(BuildContext context, Attachment file) {
+  final locale = Localizations.localeOf(context).toString();
+  return [
+    packSizeText(locale, file.size),
+    if (file.pages case final pages?) context.t.attachmentPages(pages),
+  ].join(' · ');
+}
+
+/// The words a Note made from a file alone goes by where only its words
+/// fit, as in a row or an alarm (#267): the file's name, else the word
+/// for a file.
+String aloneFileTitle(BuildContext context, Attachment file) =>
+    file.name.isEmpty ? context.t.attachment : file.name;
+
+/// An Attachment of a Note (#267, ADR 0047): the icon of its kind, its
+/// name and size; a tap opens it ([openAttachment]), a PDF full screen
+/// with its Attachment Text [text] one tap away (#286).
+/// [large] draws the name as a card's title, for a Note made from the
+/// file alone. [noteId] names the Note that holds it, so the question
+/// before an app opens says who added it; null for a file held for a
+/// Note not saved yet.
+class AttachmentRow extends StatelessWidget {
+  final Attachment file;
+  final bool large;
+  final String? noteId;
+  final String? text;
+
+  const AttachmentRow({
+    super.key,
+    required this.file,
+    this.large = false,
+    this.noteId,
+    this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final name = aloneFileTitle(context, file);
+    final notes = AttachmentScope.of(context);
+    return Semantics(
+      button: notes != null,
+      label: t.openFile(name),
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: notes == null
+            ? null
+            : () => unawaited(
+                openAttachment(
+                  context,
+                  notes,
+                  file,
+                  noteId: noteId,
+                  text: text,
+                ),
+              ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(
+              children: [
+                Icon(
+                  attachmentIcon(file.kind),
+                  size: large ? 36 : 28,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: large
+                            ? theme.textTheme.titleMedium
+                            : theme.textTheme.bodyLarge,
+                      ),
+                      Text(
+                        attachmentFacts(context, file),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The Attachment Text of [file], dimmed so it does not read as typed
+/// text: [text] as read with the Note; under the words "Attachment Text"
+/// when [labelled], its first three lines when [compact]. While a
+/// computer is to read it and has not ([Attachment.computer]), it says
+/// that the text follows from the computer; else nothing until it is
+/// read.
+class AttachmentText extends StatelessWidget {
+  final Attachment file;
+  final String? text;
+  final bool compact;
+  final bool labelled;
+
+  const AttachmentText({
+    super.key,
+    required this.file,
+    required this.text,
+    this.compact = false,
+    this.labelled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final dimmed = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final text = this.text;
+    if (text == null) {
+      if (!file.computer || !file.kind.hasText) return const SizedBox.shrink();
+      return Padding(
+        key: ValueKey('file-text-later:${file.hash}'),
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(
+          children: [
+            Icon(
+              Icons.computer_outlined,
+              size: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                t.attachmentTextFromComputer,
+                style: dimmed?.copyWith(fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (text.isEmpty) return const SizedBox.shrink();
+    final shown = Text(
+      text,
+      key: ValueKey('file-text:${file.hash}'),
+      maxLines: compact ? 3 : null,
+      overflow: compact ? TextOverflow.ellipsis : null,
+      style: dimmed,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: labelled
+          ? GeneratedTextLabel(label: t.attachmentTextLabel, child: shown)
+          : shown,
+    );
+  }
+}
+
+/// Hands the [Notes] whose files the rows below open down to them; a row
+/// without one only shows its file.
+class AttachmentScope extends InheritedWidget {
+  final Notes notes;
+
+  const AttachmentScope({super.key, required this.notes, required super.child});
+
+  static Notes? of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<AttachmentScope>()?.notes;
+
+  @override
+  bool updateShouldNotify(AttachmentScope oldWidget) =>
+      notes != oldWidget.notes;
+}
+
+/// The media type Android installs an app from.
+const apkMediaType = 'application/vnd.android.package-archive';
+
+/// Whether [file] is an Android app, which the phone would offer to
+/// install when it opens (#267): its name ends in `.apk`, `.apks`,
+/// `.apkm` or `.xapk`, or its media type is that of an app.
+bool mayInstall(Attachment file) {
+  final name = file.name.trim().toLowerCase();
+  const endings = ['.apk', '.apks', '.apkm', '.xapk'];
+  return endings.any(name.endsWith) ||
+      file.mediaType.trim().toLowerCase() == apkMediaType;
+}
+
+/// Opens [file] of [notes]: written where the app hands files to other
+/// apps first, a PDF the system's renderer can draw full screen in the
+/// app with its Attachment Text [text] (#286), any other file with the
+/// system's app for its type. On Android an app ([mayInstall]) asks
+/// first, once, naming the file and, for the Note [noteId] another
+/// person's Device added it to, that person. A file whose bytes are not
+/// on this Device yet, or one no app opens, is announced at the top.
+Future<void> openAttachment(
+  BuildContext context,
+  Notes notes,
+  Attachment file, {
+  String? noteId,
+  String? text,
+}) async {
+  final t = context.t;
+  if (defaultTargetPlatform == TargetPlatform.android && mayInstall(file)) {
+    final by = noteId == null
+        ? null
+        : notes.store.fileAddedBy(noteId, file.hash)?.name;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.fileRiskTitle),
+        content: Text(
+          [
+            t.fileRiskAppQuestion(file.name.isEmpty ? t.attachment : file.name),
+            if (by != null && by.isNotEmpty) t.fileRiskAddedBy(by),
+          ].join('\n'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            key: const ValueKey('fileRiskOpen'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.fileRiskOpen),
+          ),
+        ],
+      ),
+    );
+    if (yes != true || !context.mounted) return;
+  }
+  final announcements = AnnouncementsScope.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final pages = Navigator.of(context);
+  final bundles = BundleScope.of(context);
+  final files = FileScope.of(context);
+  void failed(String cause, String fix, String details) => announceFailureWith(
+    announcements,
+    navigator,
+    t.fileNotOpened,
+    title: t.fileNotOpenedTitle,
+    cause: cause,
+    fix: fix,
+    details: details,
+  );
+  final bytes = notes.fileBytes(file.hash);
+  if (bytes == null) {
+    return failed(
+      t.fileNotHereCause,
+      t.fileNotHereFix,
+      'file ${file.hash}: its bytes are not on this Device yet',
+    );
+  }
+  final path = await bundles.exportPath(file.name.isEmpty ? 'file' : file.name);
+  if (path == null) {
+    return failed(
+      t.fileNoAppCause,
+      t.fileNoAppFix,
+      'file ${file.hash}: no path to write it to',
+    );
+  }
+  try {
+    await writeOpenedFile(path, bytes);
+  } on FileSystemException catch (e) {
+    return failed(t.fileNoAppCause, t.fileNoAppFix, 'file ${file.hash}: $e');
+  }
+  // A PDF the system cannot draw, as one locked with a password, opens
+  // with its app as any other file.
+  if (file.kind == FileKind.pdf) {
+    final sizes = await files.pdfLayout(path);
+    if (sizes != null && sizes.isNotEmpty) {
+      await pages.push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              PdfViewerScreen(file: file, path: path, pages: sizes, text: text),
+        ),
+      );
+      return;
+    }
+  }
+  if (!await files.open(path, file.mediaType)) {
+    failed(
+      t.fileNoAppCause,
+      t.fileNoAppFix,
+      'file ${file.hash}: no app took ${file.mediaType}',
+    );
+  }
+}
+
+/// The files picked or shared on this Device, kept as the core attaches
+/// them, and those left out: each with its reason in [refused],
+/// [tooLarge] when one was larger than a file may be.
+typedef ReadFiles = ({
+  List<NewFile> files,
+  List<String> refused,
+  bool tooLarge,
+});
+
+/// The files [picked] on this Device as the core attaches them (#267):
+/// each kept among the attached files of [store] off the UI isolate
+/// ([keepDeviceFile]), a PDF's pages counted where this Device has a
+/// reader for them, so the core knows who reads its text (Q645). A file
+/// larger than the most a file can be ([maxFileBytes]) or one that cannot
+/// be read is left out ([announceNotAttached]); nothing of it is named in
+/// the log. The copies on this Device go either way.
+Future<ReadFiles> readPickedFiles(
+  FilePlatform files,
+  List<DeviceFile> picked,
+  Store store,
+) async {
+  final kept = <NewFile>[];
+  final refused = <String>[];
+  var tooLarge = false;
+  try {
+    for (final file in picked) {
+      final name = file.name.isEmpty ? file.path.split('/').last : file.name;
+      try {
+        final size = File(file.path).lengthSync();
+        if (size > maxFileBytes) {
+          tooLarge = true;
+          refused.add('$name: $size bytes');
+          continue;
+        }
+        final kind = FileTexts.kindOf(name, file.type);
+        final pages = kind == FileKind.pdf
+            ? await files.pdfPages(file.path)
+            : null;
+        final hash = await keepDeviceFile(store.blobs.files, file.path);
+        kept.add(
+          NewFile.kept(
+            name: name,
+            mediaType: file.type,
+            hash: hash,
+            size: size,
+            pages: pages,
+          ),
+        );
+      } on FileSystemException catch (e) {
+        refused.add('$name: $e');
+      }
+    }
+  } finally {
+    dropDeviceFiles(picked);
+  }
+  return (files: kept, refused: refused, tooLarge: tooLarge);
+}
+
+/// Says at the top that files of [read] were left out, when any were;
+/// its tap gives why.
+void announceNotAttached(
+  AppLocalizations t,
+  Announcements? announcements,
+  NavigatorState navigator,
+  ReadFiles read,
+) {
+  if (read.refused.isEmpty) return;
+  announceFailureWith(
+    announcements,
+    navigator,
+    t.fileNotAttached,
+    title: t.fileNotAttachedTitle,
+    cause: read.tooLarge ? t.fileTooLargeCause : t.fileUnreadableCause,
+    fix: t.fileNotAttachedFix,
+    details: read.refused.join('\n'),
+  );
+}
+
+/// Attaches [files] to the Note [noteId] of [notes]; how many it did. A
+/// file the core refuses is left out.
+int attachFiles(Notes notes, String noteId, List<NewFile> files) {
+  var attached = 0;
+  for (final file in files) {
+    try {
+      notes.attachFile(noteId, file);
+      attached++;
+    } on ArgumentError {
+      // Larger than a file may be, or its kept bytes gone: both checked
+      // as it was read in ([readPickedFiles]).
+    }
+  }
+  return attached;
+}
+
+/// Reads the file [hash] of the Note [noteId] again, its Attachment Text
+/// in place of the one before (ADR 0025); a failure is announced at the
+/// top. Whether it did.
+Future<bool> readAttachmentAgain(
+  BuildContext context,
+  String noteId,
+  String hash,
+) async {
+  final reader = AttachmentReaderScope.of(context);
+  if (reader == null) return false;
+  final t = context.t;
+  final announcements = AnnouncementsScope.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final read = await reader.readAgain(noteId, hash);
+  if (!read) {
+    announceFailureWith(
+      announcements,
+      navigator,
+      t.fileReadAgainFailed,
+      title: t.fileReadAgainFailedTitle,
+      cause: t.fileReadAgainCause,
+      fix: t.generatedTextAgainFix,
+      details: 'read again: no Attachment Text for $hash',
+    );
+  }
+  return read;
+}

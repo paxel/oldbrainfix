@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'chips.dart';
+import 'held_ticks.dart';
 import 'open_capture.dart';
 import 'reveal.dart';
 
@@ -45,6 +46,14 @@ void main() {
   Future<void> tap(WidgetTester tester, Finder finder) async {
     await tester.tap(finder);
     await tester.pumpAndSettle();
+  }
+
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tap(tester, find.byKey(const ValueKey('row-schedule')));
   }
 
   /// A phone-tall page at the test's width: the title's own line under
@@ -324,6 +333,61 @@ void main() {
       // Unchecking takes it back.
       await tap(tester, find.byType(Checkbox).first);
       expect(agendaRows(tester).first, '08:00 pills');
+    });
+
+    testWidgets('a box ticks and its row strikes in the frame after the tap, '
+        'saved after that frame (#338); a box tapped while one waits is '
+        'saved too, two quick taps end as the second left it, and a failed '
+        'save shows it open again and says so', (tester) async {
+      final pills = routines.create('pills', daily([at(8), at(14)]));
+      DateTime? doneAt(int hour) =>
+          routines.byId(pills.id)?.doneAt(Occurrence(today, at(hour)));
+      // Whether the row of the [i]th box draws a text struck through.
+      bool struck(int i) => tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find
+                  .ancestor(
+                    of: find.byType(Checkbox).at(i),
+                    matching: find.byType(Row),
+                  )
+                  .first,
+              matching: find.byType(Text),
+            ),
+          )
+          .any(
+            (t) =>
+                t.style?.decoration?.contains(TextDecoration.lineThrough) ??
+                false,
+          );
+      await start(tester);
+      final ticks = HeldTicks();
+
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+      expect(agendaRows(tester).first, '[x] 08:00 pills');
+      expect(struck(0), isTrue);
+      expect(doneAt(8), isNull);
+
+      await tester.tap(find.byType(Checkbox).at(1));
+      await tester.pump();
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+      expect(agendaRows(tester).take(2), ['08:00 pills', '[x] 14:00 pills']);
+      expect(struck(0), isFalse);
+      await ticks.release(tester);
+      expect(doneAt(8), isNull);
+      expect(doneAt(14), isNotNull);
+      expect(agendaRows(tester).take(2), ['08:00 pills', '[x] 14:00 pills']);
+
+      ticks.failWith(Exception('disk full'));
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+      expect(agendaRows(tester).first, '[x] 08:00 pills');
+      await ticks.release(tester);
+      expect(agendaRows(tester).first, '08:00 pills');
+      expect(doneAt(8), isNull);
+      expect(find.text('A tick could not be saved.'), findsOneWidget);
     });
 
     testWidgets('with checked items hidden, a Done Occurrence leaves the '
@@ -725,21 +789,14 @@ void main() {
       );
     });
 
-    testWidgets('a Routine is trashed after a confirm; its Note stays', (
+    testWidgets('a Routine is trashed without asking; its Note stays', (
       tester,
     ) async {
       final routine = routines.create('pills', daily([at(8)]));
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Delete'));
-      expect(
-        find.text(
-          'Delete this Routine? It stays in the trash for 30 days. '
-          'Its Note stays.',
-        ),
-        findsOneWidget,
-      );
-      await tap(tester, find.text('Delete').last);
+      expect(find.byType(AlertDialog), findsNothing);
       expect(routines.byId(routine.id)?.isTrashed, isTrue);
       expect(notes.all().single.isUnsorted, isFalse);
       expect(find.byType(Checkbox), findsNothing);

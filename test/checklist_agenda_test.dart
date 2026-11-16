@@ -98,7 +98,8 @@ void main() {
   ];
 
   testWidgets('a new Checklist shows today as a heading with its open Lines '
-      'indented, each with its box; a tap opens the list', (tester) async {
+      'indented, each with its box, a Line checked struck for the day; a '
+      'tap opens the list', (tester) async {
     final id = trip();
     await start(tester);
     expect(checklistRows(), ['checklist-row-$id']);
@@ -124,18 +125,56 @@ void main() {
       lists.byNote(id)!.lines.firstWhere((l) => l.id == tickets).checked,
       isTrue,
     );
-    expect(key('checklist-check-$tickets'), findsNothing);
+    // Struck for the day where it was (#276); its box unchecks it.
+    expect(
+      tester.widget<Checkbox>(key('checklist-check-$tickets')).value,
+      isTrue,
+    );
+    expect(inRow(find.text('Passport')), findsNothing, reason: 'days ago');
+    await tap(tester, key('checklist-check-$tickets'));
+    expect(
+      lists.byNote(id)!.lines.firstWhere((l) => l.id == tickets).checked,
+      isFalse,
+    );
+    expect(
+      tester.widget<Checkbox>(key('checklist-check-$tickets')).value,
+      isFalse,
+    );
     expect(key('checklist-check-$charger'), findsOneWidget);
     await tap(tester, key('checklist-line-$charger'));
     expect(find.byType(NoteEditorScreen), findsOneWidget);
     expect(key('checklist'), findsOneWidget);
   });
 
-  testWidgets('a tap on the heading opens the list', (tester) async {
-    trip();
+  testWidgets('a tap on the heading opens the list in a new Line after the '
+      'open ones, keyboard up; left unused, it writes nothing (#276)', (
+    tester,
+  ) async {
+    final id = trip();
+    final charger = lineId(id, 'Charger');
+    final map = lists.add(id, 'Map');
+    lists.check(map);
     await start(tester);
+    final count = store.allEntries().length;
     await tap(tester, find.text('Before the trip'));
     expect(find.byType(NoteEditorScreen), findsOneWidget);
+    final field = tester.widget<TextField>(
+      find.descendant(
+        of: key('checklist-field-new-1'),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+    double top(String value) => tester.getTopLeft(key(value)).dy;
+    expect(
+      top('checklist-field-$charger'),
+      lessThan(top('checklist-field-new-1')),
+    );
+    expect(top('checklist-field-new-1'), lessThan(top('checklist-field-$map')));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(store.allEntries(), hasLength(count));
   });
 
   testWidgets('oldest capture first, after the all-day Occurrences and the '
@@ -174,16 +213,33 @@ void main() {
     expect(find.text('Garage'), findsOneWidget);
   });
 
-  testWidgets('every Line checked, it is gone', (tester) async {
+  testWidgets('every Line checked, it stays for the day with those checked '
+      'today, then it is gone (#276)', (tester) async {
     final id = trip();
     lists.check(lineId(id, 'Tickets'));
     lists.check(lineId(id, 'Charger'));
+    await start(tester);
+    expect(checklistRows(), ['checklist-row-$id']);
+    expect(find.text('Tickets'), findsOneWidget);
+    expect(find.text('Passport'), findsNothing, reason: 'days ago');
+    now = DateTime(2026, 10, 25, 9);
+    await tester.pumpWidget(const SizedBox());
     await start(tester);
     expect(checklistRows(), isEmpty);
     expect(
       find.text('Nothing due today. Tap + to capture a thought.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('where this Device hides what is checked, a Line checked '
+      'leaves at once, the list with its last (#217, #276)', (tester) async {
+    store.agendaHidesChecked = true;
+    final id = trip();
+    lists.check(lineId(id, 'Tickets'));
+    await start(tester);
+    await tap(tester, key('checklist-check-${lineId(id, 'Charger')}'));
+    expect(checklistRows(), isEmpty);
   });
 
   testWidgets('switched off, it stays off the Agenda', (tester) async {

@@ -180,26 +180,22 @@ void main() {
       expect(key('badge-frog'), findsNothing);
     });
 
-    testWidgets('Remove the Frog asks once, as the Frog view does, and '
-        'moves it to the trash; its Note stays', (tester) async {
+    testWidgets('Remove the Frog moves it to the trash without asking, as '
+        'the Frog view does; its Note stays, and the announcement at the '
+        'top brings the badge back (#268)', (tester) async {
       final made = frog('wash the windows');
       await edit(tester, made.noteId);
       await tap(tester, key('badge-frog'));
       await tap(tester, key('frog-remove'));
-      expect(
-        find.text('Delete this Frog? It stays in the trash. Its Note stays.'),
-        findsOneWidget,
-      );
-      await tap(tester, find.text('Cancel'));
-      expect(frogs.byId(made.id)?.isTrashed, isFalse);
-
-      await tap(tester, key('badge-frog'));
-      await tap(tester, key('frog-remove'));
-      await tap(tester, find.text('Delete'));
+      expect(find.byType(AlertDialog), findsNothing);
       expect(frogs.byId(made.id)?.isTrashed, isTrue);
       expect(notes.byId(made.noteId)?.isTrashed, isFalse);
       expect(key('badge-frog'), findsNothing);
       expect(find.byType(NoteEditorScreen), findsOneWidget);
+
+      await tap(tester, find.text('Frog moved to the Trash'));
+      expect(frogs.byId(made.id)?.isTrashed, isFalse);
+      expect(key('badge-frog'), findsOneWidget);
     });
 
     testWidgets('in Simple an open Frog still shows and eats; "+" offers '
@@ -383,19 +379,23 @@ void main() {
       expect(find.text('book the scan'), findsNothing);
     });
 
-    testWidgets('a long press deletes a Frog after asking; the trash '
-        'restores it', (tester) async {
+    testWidgets('a long press deletes a Frog without asking; the '
+        'announcement undoes it, and the trash restores it', (tester) async {
       final mistake = frog('cupboard');
       await start(tester);
 
       await tester.longPress(row(mistake));
       await tester.pumpAndSettle();
       await tap(tester, find.text('Delete'));
-      expect(
-        find.text('Delete this Frog? It stays in the trash. Its Note stays.'),
-        findsOneWidget,
-      );
-      await tap(tester, find.text('Delete').last);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(frogs.byId(mistake.id)?.isTrashed, isTrue);
+      await tap(tester, find.text('Frog moved to the Trash'));
+      expect(frogs.byId(mistake.id)?.isTrashed, isFalse);
+      expect(row(mistake), findsOneWidget);
+
+      await tester.longPress(row(mistake));
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Delete'));
       expect(frogs.byId(mistake.id)?.isTrashed, isTrue);
       expect(notes.byId(mistake.noteId)?.isTrashed, isFalse);
       expect(find.text('Eat a frog'), findsNothing);

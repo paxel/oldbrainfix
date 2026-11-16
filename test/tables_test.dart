@@ -5,11 +5,14 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/table_grid.dart';
 import 'package:oldbrainfix/src/table_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+
+import 'fake_photos.dart';
 
 /// Tables in formatted text (#128, ADR 0033): drawn smaller to fit in
 /// the text, opened full screen with the header row, and the first
@@ -186,34 +189,39 @@ void main() {
       bool edits = false,
       BoxTicking? ticking,
       ({int row, int column})? cell,
+      PhotoPlatform photos = const NoPhotos(),
     }) async {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final written = <MarkdownChange>[];
       await tester.pumpWidget(
-        app(
-          Builder(
-            builder: (context) => Scaffold(
-              body: Center(
-                child: TextButton(
-                  onPressed: () => openTable(
-                    context,
-                    text: text,
-                    at: MarkdownTables.all(text).first.start,
-                    cell: cell,
-                    ticking: ticking,
-                    edit: edits
-                        ? TableEditing(
-                            write: (change) {
-                              written.add(change);
-                              return null;
-                            },
-                            twoRows: true,
-                          )
-                        : null,
+        PhotoScope(
+          photos: photos,
+          bytes: (_) => null,
+          child: app(
+            Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: TextButton(
+                    onPressed: () => openTable(
+                      context,
+                      text: text,
+                      at: MarkdownTables.all(text).first.start,
+                      cell: cell,
+                      ticking: ticking,
+                      edit: edits
+                          ? TableEditing(
+                              write: (change) {
+                                written.add(change);
+                                return null;
+                              },
+                              twoRows: true,
+                            )
+                          : null,
+                    ),
+                    child: const Text('open'),
                   ),
-                  child: const Text('open'),
                 ),
               ),
             ),
@@ -440,6 +448,82 @@ void main() {
       );
       expect(written.single.text, isNot(contains('|')));
       expect(find.byType(TableScreen), findsNothing);
+    });
+
+    /// What goes to Flutter's own clipboard, as plain text.
+    List<String?> plainClipboard(WidgetTester tester) {
+      final copied = <String?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied.add((call.arguments as Map)['text'] as String?);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      return copied;
+    }
+
+    testWidgets('Copy puts the table on the clipboard as HTML beside its '
+        'Markdown, each box as it shows (#324)', (tester) async {
+      final store = Store.inMemory();
+      addTearDown(store.close);
+      final notes = Notes(store);
+      final id = notes.capture(shop, format: TextFormats.markdown).id;
+      final box = notes.byId(id)!.boxes.single;
+      Boxes(store).tick(id, box.id, BoxState.done);
+      final photos = FakePhotos();
+      final plain = plainClipboard(tester);
+      await open(
+        tester,
+        notes.byId(id)!.text,
+        photos: photos,
+        ticking: BoxTicking.read(notes, id, mayTick: true),
+      );
+      expect(find.byTooltip('Copy'), findsOneWidget);
+      await tester.tap(key('table-copy'));
+      await tester.pumpAndSettle();
+      expect(photos.copiedHtml, [
+        (
+          text:
+              '| Item | Qty |\n| --- | --: |\n| ✅ **milk** #dairy | 2 |\n'
+              '| oat | 1 |',
+          html:
+              '<table><thead><tr><th>Item</th><th align="right">Qty</th>'
+              '</tr></thead><tbody><tr><td>✅ <strong>milk</strong> #dairy'
+              '</td><td align="right">2</td></tr><tr><td>oat</td>'
+              '<td align="right">1</td></tr></tbody></table>\n',
+        ),
+      ]);
+      expect(plain, isEmpty);
+      // Copied says nothing; the table stays open.
+      expect(find.byType(TableScreen), findsOneWidget);
+    });
+
+    testWidgets('Copy puts the Markdown alone where the clipboard takes no '
+        'HTML, the cell edited written first', (tester) async {
+      final photos = FakePhotos()..copiesHtml = false;
+      final plain = plainClipboard(tester);
+      final written = await open(tester, shop, edits: true, photos: photos);
+      await tester.tap(key('cell-2-1'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '3');
+      await tester.tap(key('table-copy'));
+      await tester.pumpAndSettle();
+      expect(written, hasLength(1));
+      final table =
+          '| Item | Qty |\n| --- | --: |\n| ☐ **milk** #dairy | 2 |\n'
+          '| oat | 3 |';
+      expect(written.single.text, '# Shop\n\n$table');
+      expect(photos.copiedHtml.single.text, table);
+      expect(plain, [table]);
     });
 
     testWidgets('a cell\'s box is ticked in place, the text unchanged', (

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -36,6 +38,26 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
     store.setLocalSetting('allDayFrom', 'noon');
     expect(store.allDayFrom, ClockTime(15, 0), reason: 'unreadable: default');
+  });
+
+  test('the day starts when the Quiet Hours end, at 09:00 without them', () {
+    final store = Store.inMemory(
+      clock: () => DateTime.utc(2026, 11, 3, 13, 20, 59),
+    );
+    addTearDown(store.close);
+    expect(store.dayStart, ClockTime(8, 0), reason: 'default 22:00-08:00');
+    store.quietHours = QuietHours(ClockTime(23, 30), ClockTime(6, 45));
+    expect(store.dayStart, ClockTime(6, 45));
+    // Now on the wall clock, an hour ahead of UTC here, to the minute.
+    expect(
+      store.sentenceNow((utc) => utc.add(const Duration(hours: 1))),
+      SentenceNow(Day(2026, 11, 3), ClockTime(14, 20), ClockTime(6, 45)),
+    );
+    store.quietHours = QuietHours(ClockTime(7, 0), ClockTime(7, 0));
+    expect(store.dayStart, ClockTime(9, 0), reason: 'empty');
+    store.quietHours = QuietHours(ClockTime(23, 30), ClockTime(6, 45));
+    store.quietHoursOn = false;
+    expect(store.dayStart, ClockTime(9, 0), reason: 'switched off');
   });
 
   test('the Starter Set is offered until this Device has offered it', () {
@@ -85,6 +107,53 @@ void main() {
     expect(store.agendaCalendars, {'3', '7'}, reason: 'kept while off');
     store.setLocalSetting('agendaCalendars', 'not json');
     expect(store.agendaCalendars, isEmpty);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('File into… keeps the last three places filed into, latest first', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.recentlyFiledInto, isEmpty);
+    store
+      ..filedInto('a')
+      ..filedInto('b')
+      ..filedInto('c');
+    expect(store.recentlyFiledInto, ['c', 'b', 'a']);
+    store.filedInto('a');
+    expect(store.recentlyFiledInto, ['a', 'c', 'b'], reason: 'once, moved up');
+    store.filedInto('d');
+    expect(store.recentlyFiledInto, ['d', 'a', 'c'], reason: 'b forgotten');
+    expect(store.localSetting('recentlyFiledInto'), '["d","a","c"]');
+    store.setLocalSetting('recentlyFiledInto', '["x",7,"x","y","z","w"]');
+    expect(store.recentlyFiledInto, ['x', 'y', 'z']);
+    store.setLocalSetting('recentlyFiledInto', 'not json');
+    expect(store.recentlyFiledInto, isEmpty);
+    store.filedInto('e');
+    expect(store.recentlyFiledInto, ['e']);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('Add to Note… keeps the last three Notes added to, latest first', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.recentlyAddedTo, isEmpty);
+    store
+      ..addedTo('a')
+      ..addedTo('b')
+      ..addedTo('c');
+    expect(store.recentlyAddedTo, ['c', 'b', 'a']);
+    store.addedTo('a');
+    expect(store.recentlyAddedTo, ['a', 'c', 'b'], reason: 'once, moved up');
+    store.addedTo('d');
+    expect(store.recentlyAddedTo, ['d', 'a', 'c'], reason: 'b forgotten');
+    expect(store.localSetting('recentlyAddedTo'), '["d","a","c"]');
+    expect(store.recentlyFiledInto, isEmpty, reason: 'a list of its own');
+    store.setLocalSetting('recentlyAddedTo', '["x",7,"x","y","z","w"]');
+    expect(store.recentlyAddedTo, ['x', 'y', 'z']);
+    store.setLocalSetting('recentlyAddedTo', 'not json');
+    expect(store.recentlyAddedTo, isEmpty);
+    store.addedTo('e');
+    expect(store.recentlyAddedTo, ['e']);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
@@ -179,6 +248,23 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the text shows normal until this Device picks a larger step, '
+      'apart from Fat fingers (#326, obf-1019)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.textSize, TextSize.normal);
+    for (final size in TextSize.values) {
+      store.textSize = size;
+      expect(store.textSize, size);
+      expect(store.localSetting('textSize'), size.name);
+    }
+    expect(store.fatFingers, isFalse, reason: 'a setting of its own');
+    expect([for (final s in TextSize.values) s.factor], [1.0, 1.15, 1.3]);
+    store.setLocalSetting('textSize', 'garbled');
+    expect(store.textSize, TextSize.normal);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the Agenda showed a row per Shopping List with Lines back unless '
       'this Device chose another way', () {
     final store = Store.inMemory();
@@ -191,6 +277,19 @@ void main() {
     }
     store.setLocalSetting('shoppingAgenda', 'sideways');
     expect(store.shoppingAgenda, ShoppingAgenda.back);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('Ask is off until this Device switches it on, and is never '
+      'synced', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.askOn, isFalse);
+    store.askOn = true;
+    expect(store.askOn, isTrue);
+    expect(store.localSetting('askOn'), 'true');
+    store.askOn = false;
+    expect(store.askOn, isFalse);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
@@ -238,6 +337,15 @@ void main() {
         'quickNoteFormatBar',
       ],
     );
+    // The Shopping List a capture went into last (#276).
+    expect(store.lastShoppingList, isNull);
+    store.lastShoppingList = 'note:weekly';
+    expect(store.lastShoppingList, 'note:weekly');
+    expect(store.localSetting('lastShoppingList'), 'note:weekly');
+    store.lastShoppingList = null;
+    expect(store.lastShoppingList, isNull);
+    store.setLocalSetting('lastShoppingList', '');
+    expect(store.lastShoppingList, isNull);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
@@ -268,5 +376,47 @@ void main() {
       expect(store.playbackSpeed, 1, reason: kept);
       expect(store.chosenPlaybackSpeed, isNull, reason: kept);
     }
+  });
+
+  test('asking through the desktop is allowed per provider, host and '
+      'model (#267)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    const claude = DesktopProvider(
+      protocol: AskProtocol.anthropic,
+      model: 'claude-opus-5-5',
+      host: 'api.anthropic.com',
+    );
+    const other = DesktopProvider(
+      protocol: AskProtocol.openai,
+      model: 'deepseek-chat',
+      host: 'api.deepseek.com',
+    );
+    const otherModel = DesktopProvider(
+      protocol: AskProtocol.anthropic,
+      model: 'claude-haiku',
+      host: 'api.anthropic.com',
+    );
+    expect(store.askAllowed(claude), isFalse);
+    store.allowAsking(claude);
+    expect(store.askAllowed(claude), isTrue);
+    expect(store.askAllowed(other), isFalse, reason: 'another provider');
+    expect(store.askAllowed(otherModel), isFalse, reason: 'another model');
+    store
+      ..allowAsking(other)
+      ..allowAsking(claude);
+    expect(store.askAllowed(claude), isTrue, reason: 'both kept');
+    expect(store.askAllowed(other), isTrue);
+    expect(
+      store.localSetting('askAllowed'),
+      jsonEncode([
+        jsonEncode(['anthropic', 'api.anthropic.com', 'claude-opus-5-5']),
+        jsonEncode(['openai', 'api.deepseek.com', 'deepseek-chat']),
+      ]),
+      reason: 'once each',
+    );
+    store.setLocalSetting('askAllowed', 'not json');
+    expect(store.askAllowed(claude), isFalse);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 }

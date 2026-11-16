@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/shopping_pick_screen.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
+import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
@@ -106,12 +107,15 @@ void main() {
   final nudge10 = find.byKey(const ValueKey('nudge10'));
   final chip = find.byKey(const ValueKey('choice-shopping'));
 
-  /// Picks the Shopping List [id] with "Add to a Shopping List" in ⋮.
+  /// Picks the Shopping List [id] with "Add to a Shopping List" in ⋮, on
+  /// its page where there are several, at once where it is the only one
+  /// (#276).
   Future<void> pick(WidgetTester tester, String id) async {
     await tap(tester, more);
     await tap(tester, addToShopping);
-    expect(find.byType(ShoppingPickScreen), findsOneWidget);
-    await tap(tester, find.byKey(ValueKey('shopping-pick-$id')));
+    if (find.byType(ShoppingPickScreen).evaluate().isNotEmpty) {
+      await tap(tester, find.byKey(ValueKey('shopping-pick-$id')));
+    }
     expect(find.byType(CaptureScreen), findsOneWidget);
   }
 
@@ -161,6 +165,56 @@ void main() {
     expect(store.entitiesOfType(ChecklistKeys.typeLine), hasLength(5));
     expect(notes.all().map((n) => n.id).toSet(), {groceries, hardware});
     expect(notes.trashed(), isEmpty);
+  });
+
+  testWidgets('with one list to add to, ⋮ names it and picks it without '
+      'the page; with several, the list used last is at the top (#276)', (
+    tester,
+  ) async {
+    final groceries = shopping('Groceries');
+    await start(tester);
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Coffee');
+    await tap(tester, more);
+    expect(
+      find.descendant(
+        of: addToShopping,
+        matching: find.text('Add to Groceries'),
+      ),
+      findsOneWidget,
+    );
+    await tap(tester, addToShopping);
+    expect(find.byType(ShoppingPickScreen), findsNothing);
+    expect(find.text('Shopping List: Groceries'), findsOneWidget);
+    await tap(tester, save);
+    expect(shown(groceries), ['Coffee']);
+    expect(store.lastShoppingList, groceries);
+
+    final hardware = shopping('Hardware');
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Nails');
+    await tap(tester, more);
+    expect(
+      find.descendant(
+        of: addToShopping,
+        matching: find.text('Add to a Shopping List'),
+      ),
+      findsOneWidget,
+    );
+    await tap(tester, addToShopping);
+    double top(String id) =>
+        tester.getTopLeft(find.byKey(ValueKey('shopping-pick-$id'))).dy;
+    // Groceries, captured first, is first anyway; Hardware once used.
+    expect(top(groceries), lessThan(top(hardware)));
+    await tap(tester, find.byKey(ValueKey('shopping-pick-$hardware')));
+    await tap(tester, save);
+    expect(shown(hardware), ['Nails']);
+    expect(store.lastShoppingList, hardware);
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Glue');
+    await tap(tester, more);
+    await tap(tester, addToShopping);
+    expect(top(hardware), lessThan(top(groceries)));
   });
 
   testWidgets('the other choices wait while a list is picked, and come '
@@ -330,38 +384,43 @@ void main() {
     expect(find.textContaining('The Note keeps all of it'), findsOneWidget);
   });
 
-  group('A voice capture', () {
+  group('A voice capture (#311)', () {
     Future<void> record(WidgetTester tester) async {
       await tap(tester, find.byKey(const ValueKey('captureVoice')));
       await tap(tester, find.byKey(const ValueKey('stopRecording')));
     }
 
-    testWidgets('puts the lines of its Transcript into the list', (
-      tester,
-    ) async {
-      speech.transcripts[1] = 'Butter\nflour';
+    /// The voice capture's Note, merged into a list or not.
+    Note voiceNote(String list) => [
+      for (final id in store.entitiesOfType(NoteKeys.typeNote)) ?notes.byId(id),
+    ].firstWhere((n) => n.recordings.isNotEmpty);
+
+    testWidgets('stays on the list as a Section, and the items said become '
+        'Lines', (tester) async {
+      speech.transcripts[1] = 'Butter, flour und Eier.';
       final groceries = shopping('Groceries\nFlour');
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'Sugar');
       await record(tester);
-      // Transcribed meanwhile.
-      expect(
-        notes.all().firstWhere((n) => n.id != groceries).transcripts.values,
-        ['Butter\nflour'],
-      );
       await pick(tester, groceries);
       await tap(tester, save);
 
-      expect(shown(groceries), ['Flour', 'Sugar', 'Butter']);
+      expect(find.byType(CaptureScreen), findsNothing);
+      // The typed line, then the items said; Flour once.
+      expect(shown(groceries), ['Flour', 'Sugar', 'Butter', 'Eier']);
+      final voice = voiceNote(groceries);
+      expect(voice.mergedInto, groceries);
+      expect(notes.sections(groceries).single.recordings, voice.recordings);
+      expect(lists.owedTo(voice.id), isNull);
       expect(notes.all().map((n) => n.id), [groceries]);
       expect(notes.trashed(), isEmpty);
     });
 
-    testWidgets('whose Transcript is not ready yet leaves at once and goes '
-        'into the list once it is', (tester) async {
+    testWidgets('whose Transcript is not ready yet leaves at once and gets '
+        'its Lines once it is', (tester) async {
       speech
-        ..transcripts[1] = 'Butter'
+        ..transcripts[1] = 'Butter and tea'
         ..transcribeGate = Completer<void>();
       final groceries = shopping('Groceries');
       await start(tester);
@@ -370,21 +429,75 @@ void main() {
       await record(tester);
       await tap(tester, save);
 
-      // Back on the Agenda; the Note holds it all while Whisper works.
       expect(find.byType(CaptureScreen), findsNothing);
       expect(shown(groceries), isEmpty);
-      final waiting = notes.all().firstWhere((n) => n.id != groceries);
-      expect(waiting.recordings, hasLength(1));
+      expect(voiceNote(groceries).mergedInto, groceries);
 
       speech.transcribeGate?.complete();
       await tester.pumpAndSettle();
-      expect(shown(groceries), ['Butter']);
-      expect(notes.byId(waiting.id), isNull);
-      expect(notes.trashed(), isEmpty);
+      expect(shown(groceries), ['Butter', 'tea']);
     });
 
-    testWidgets('whose recording cannot be transcribed stays a Note, '
-        'announced at the top', (tester) async {
+    testWidgets('is offered without a speech model: the recording goes on '
+        'the list, to be listened to, and the Lines follow once it is '
+        'transcribed, once', (tester) async {
+      speech
+        ..installed = null
+        ..transcripts[1] = 'Butter und Eier';
+      final groceries = shopping('Groceries\nFlour');
+      await start(tester);
+      await openTextCapture(tester);
+      await record(tester);
+      expect(await offered(tester), isTrue);
+      await pick(tester, groceries);
+      await tap(tester, save);
+
+      expect(shown(groceries), ['Flour']);
+      final voice = voiceNote(groceries);
+      expect(voice.mergedInto, groceries);
+      expect(lists.owedTo(voice.id), groceries);
+      // No announcement: nothing was kept back.
+      expect(find.textContaining('Kept as a Note'), findsNothing);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byTooltip('All Notes'));
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('section:${voice.id}')),
+          matching: find.byType(RecordingButton),
+        ),
+        findsOneWidget,
+      );
+
+      // The model comes later, and Whisper transcribes the recording.
+      speech.installed = WhisperModel.base.sha256;
+      final speechScope = SpeechScope.of(
+        tester.element(find.byType(Scaffold).first),
+      )!;
+      await speechScope.model.check();
+      await tester.pumpAndSettle();
+      expect(shown(groceries), ['Flour', 'Butter', 'Eier']);
+      expect(lists.owedTo(voice.id), isNull);
+
+      // Butter struck, and transcribed again: nothing comes back.
+      lists.check(
+        lists
+            .byNote(groceries, deviceWallClock)!
+            .lines
+            .firstWhere((l) => l.text == 'Butter')
+            .id,
+        deviceWallClock,
+      );
+      speech.transcripts[1] = 'Butter und Tee';
+      await speechScope.transcriber.transcribeAgain(
+        voice.id,
+        voice.recordings.single,
+      );
+      await tester.pumpAndSettle();
+      expect(shown(groceries), ['Flour', 'Eier', '~Butter']);
+    });
+
+    testWidgets('whose recording cannot be transcribed stays on the list, '
+        'still owing its Lines', (tester) async {
       // Nothing is heard in the recording: it cannot be transcribed.
       final groceries = shopping('Groceries');
       speech.transcribeGate = Completer<void>();
@@ -397,42 +510,11 @@ void main() {
       speech.transcribeGate?.complete();
       await tester.pumpAndSettle();
 
-      expect(shown(groceries), isEmpty);
-      final kept = notes.all().firstWhere((n) => n.id != groceries);
-      expect(kept.text, 'Sugar');
-      expect(kept.recordings, hasLength(1));
-      expect(
-        find.text(
-          'Kept as a Note: its recording could not be transcribed for the '
-          'Shopping List.',
-        ),
-        findsOneWidget,
-      );
-      // Its tap says why and what to do (UI laws, "Announcements").
-      await tester.tap(
-        find.text(
-          'Kept as a Note: its recording could not be transcribed for the '
-          'Shopping List.',
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Not added to the Shopping List'), findsOneWidget);
-      expect(
-        find.textContaining(
-          'Whisper could not write a Transcript of the recording.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.textContaining('The Note keeps all of it'), findsOneWidget);
-    });
-
-    testWidgets('is not offered a list without a speech model', (tester) async {
-      speech.installed = null;
-      shopping('Groceries');
-      await start(tester);
-      await openTextCapture(tester);
-      await record(tester);
-      expect(await offered(tester), isFalse);
+      expect(shown(groceries), ['Sugar']);
+      final voice = voiceNote(groceries);
+      expect(voice.mergedInto, groceries);
+      expect(lists.owedTo(voice.id), groceries);
+      expect(find.textContaining('Kept as a Note'), findsNothing);
     });
   });
 }

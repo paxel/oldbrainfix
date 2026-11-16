@@ -7,7 +7,10 @@
 //! edited and by whom, in the dialog and on its card. Another
 //! person's Amend and every text of a Note in the trash are only read,
 //! and select to be copied; "Copy as text" copies the Note and its
-//! Sections as they show.
+//! Sections as they show. A Plain Note's Sections read on in the box
+//! of its text, under it and above its badges; a Checklist's stay below
+//! the badges as its diary part (#188); neither in a box of its own
+//! (#307).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -22,8 +25,8 @@ use egui_kittest::{Harness, Node};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::{
-    AreaRole, BoxState, Boxes, Invite, Notes, OwnProfile, PairedDevice, Places, Section,
-    SigningKey, Store,
+    AreaRole, BoxState, Boxes, Checklists, Invite, Notes, OwnProfile, PairedDevice, Places,
+    Section, SigningKey, Store,
 };
 use oldbrainfix_gui::app::when;
 use oldbrainfix_gui::l10n::L10n;
@@ -423,5 +426,51 @@ fn a_sections_line_under_its_text_shows_its_time_alone_the_same_day() -> TestRes
         .ok_or("the Section's field")?
         .rect();
     assert!(field.bottom() <= line.top(), "{field:?} {line:?}");
+    Ok(())
+}
+
+/// The rect of the Note's own Captured badge, by `captured`'s date.
+fn captured_badge(harness: &Harness<'_, App>, captured: DateTime<Utc>) -> egui::Rect {
+    let date = when(&L10n::new("en"), captured);
+    harness
+        .get_by_role_and_label(Role::Button, &format!("Captured: {date}"))
+        .rect()
+}
+
+#[test]
+fn the_sections_read_on_under_the_notes_text_above_its_badges() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    let boiler = notes.capture("Boiler knocks", None, None)?;
+    notes.amend(&boiler.id, "Called the plumber")?;
+    notes.amend(&boiler.id, "Plumber was here")?;
+    let harness = opened(&store, &boiler.id);
+    let text = harness.get_by_label("Note text").rect();
+    let fields: Vec<egui::Rect> = section_fields(&harness).iter().map(Node::rect).collect();
+    let [first, second] = fields[..] else {
+        panic!("two Section fields, not {fields:?}");
+    };
+    // In the Note's text box, one after the other, the badges under all.
+    let badge = captured_badge(&harness, boiler.captured);
+    assert!(text.bottom() <= first.top(), "{text:?} {first:?}");
+    assert!(first.bottom() <= second.top(), "{first:?} {second:?}");
+    assert!(second.bottom() <= badge.top(), "{second:?} {badge:?}");
+    Ok(())
+}
+
+#[test]
+fn a_checklists_sections_stay_below_its_badges() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    let packing = notes.capture("Packing\nPassport\nTicket", None, None)?;
+    Checklists::new(&store).make(&packing.id)?;
+    notes.amend(&packing.id, "Also the charger")?;
+    let harness = opened(&store, &packing.id);
+    let field = section_fields(&harness)
+        .first()
+        .ok_or("the Section's field")?
+        .rect();
+    let badge = captured_badge(&harness, packing.captured);
+    assert!(badge.bottom() <= field.top(), "{badge:?} {field:?}");
     Ok(())
 }

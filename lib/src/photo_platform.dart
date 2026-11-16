@@ -4,23 +4,32 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'file_platform.dart';
+
 /// Something another app shared into Old Brain Fix: its text, links
-/// included, its photos, its sound files as voice recordings, and the app
-/// it came from when Android said.
+/// included, its photos, its sound files as voice recordings, its other
+/// files as Attachments (#267), and the app it came from when Android
+/// said.
 class SharedItem {
   final String text;
   final List<Uint8List> photos;
   final List<SharedRecording> recordings;
+  final List<DeviceFile> files;
   final SourceApp? sourceApp;
 
   const SharedItem({
     this.text = '',
     this.photos = const [],
     this.recordings = const [],
+    this.files = const [],
     this.sourceApp,
   });
 
-  bool get isEmpty =>
+  bool get isEmpty => holdsNoNote && files.isEmpty;
+
+  /// Whether it holds nothing a Note is written from at once: no text,
+  /// photo or recording. Its files are read in first.
+  bool get holdsNoNote =>
       text.trim().isEmpty && photos.isEmpty && recordings.isEmpty;
 }
 
@@ -115,6 +124,12 @@ abstract interface class PhotoPlatform {
   /// Puts the photo file at [path], written as for [savePhoto], of MIME
   /// [type] on the clipboard as a picture (#149); whether it is there.
   Future<bool> copyPhoto(String path, String type);
+
+  /// Puts [text] on the clipboard with [html] beside it, one item of
+  /// both, so an app that takes formatted text takes the HTML and any
+  /// other the text (#324); whether it is there. Flutter's own clipboard
+  /// carries plain text only.
+  Future<bool> copyHtml(String text, String html);
 }
 
 /// No camera and no shares: the default where none is handed in.
@@ -151,6 +166,9 @@ class NoPhotos implements PhotoPlatform {
 
   @override
   Future<bool> copyPhoto(String path, String type) async => false;
+
+  @override
+  Future<bool> copyHtml(String text, String html) async => false;
 }
 
 /// Android's own camera intent, picture picker and share target behind the
@@ -249,6 +267,7 @@ class AndroidPhotos implements PhotoPlatform {
               format: recording['format'] as String?,
             ),
       ],
+      files: deviceFiles(raw['files'] as List<Object?>?),
       sourceApp: package is String && package.isNotEmpty
           ? SourceApp(package, label: raw['sourceLabel'] as String?)
           : null,
@@ -286,6 +305,21 @@ class AndroidPhotos implements PhotoPlatform {
       return await _channel.invokeMethod<bool>('copy', {
             'path': path,
             'type': type,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> copyHtml(String text, String html) async {
+    try {
+      return await _channel.invokeMethod<bool>('copyHtml', {
+            'text': text,
+            'html': html,
           }) ??
           false;
     } on PlatformException {
