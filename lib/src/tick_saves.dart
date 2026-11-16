@@ -67,7 +67,8 @@ final class TickSaves {
     try {
       while (_waiting.isNotEmpty) {
         final key = _waiting.keys.first;
-        final waiting = _waiting.remove(key)!;
+        final waiting = _waiting.remove(key);
+        if (waiting == null) continue;
         try {
           run(waiting.save);
         } on Object catch (error) {
