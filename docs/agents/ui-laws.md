@@ -1534,7 +1534,28 @@ replace a law of Both apps where they say so. A desktop law marked
   kept while it is open: the window stays above all others. On Wayland,
   which lets no app ask for that, it is greyed with the reason under
   it. The last Note window closed gives the next one its size, a setting
-  of the Device (ADR 0008).
+  of the Device (ADR 0008), never a maximized one's. **A Note window is
+  maximized as the system's windows are** (#322), by its title bar.
+- **A Note window has a reading view** (#322, obf-1015, Q725): "Reading
+  view" at the end of the window's bar, and F9, which also works while
+  typing, show the Note to read: its text as it reads (a Note of a kind
+  its name as a heading over its description, a Checklist's or Shopping
+  List's Lines under them, the struck ones last), its photos, and each
+  Section's text under a tear line with its photos. It has no badge,
+  field, button, capture line or Keep on top; the button stays, pressed,
+  as the way back. Recordings, files, Transcripts, Photo Texts, the Due
+  lines and a Tally's or Session's content stay in the Note to edit. Boxes
+  and Lines tick as on a card; tags, links, tables and photos open as
+  there. What was typed is saved as it opens. The text stands in a column
+  in the middle, at most 35 sizes of its text wide (about 70 characters,
+  `note_window::measure`), so it grows with Text size. The wheel, Page Up
+  and Page Down, Home and End scroll it, and Space and Shift+Space, Up and
+  Down while no widget has the keyboard (a Line ticked by keyboard keeps
+  Space for itself). Esc, Alt+Left, the mouse's back button, F9 and the
+  button lead back, after closing a menu, photo, table or dialog that lies
+  over it. It opens off in every new window and stays as switched while
+  the window is open; nothing is stored, so the AI port has nothing to
+  read or set.
 - **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
   7", #279), as the one list that asks to be emptied; no other place
   shows a count, and an empty Unsorted shows none. **An Area with Topics
@@ -1729,7 +1750,8 @@ replace a law of Both apps where they say so. A desktop law marked
   and italic while the Note's text is edited.
 - **Esc closes what lies on top** (draft, #196): a menu, a photo or
   table full screen, the top dialog, the quick note keeping what was
-  typed, and over the list without a dialog the cards selected.
+  typed, a Note window's reading view (#322), and over the list without a
+  dialog the cards selected.
 - **The keyboard stays in the dialog on top** (draft, #196): while the
   Note dialog is open, Tab never walks onto the list or the sidebar
   beneath it, as the pointer does not.

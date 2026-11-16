@@ -1302,6 +1302,9 @@ enum Action {
     /// Keeps the Note window on top of the other windows, or no more
     /// (#287).
     KeepOnTop(bool),
+    /// Shows the Note window's reading view, or the Note to edit again
+    /// (#322), what was typed kept first.
+    ReadingView(bool),
     /// Opens the small editor of a badge of the Note dialog, or closes
     /// it (#160).
     Badge(Option<NoteBadge>),
@@ -2798,6 +2801,24 @@ impl App {
     /// it is one (#287).
     pub fn kept_on_top(&self) -> Option<bool> {
         self.alone.as_ref().map(Alone::kept_on_top)
+    }
+
+    /// Whether this App's Note window shows its reading view (#322),
+    /// while it is one.
+    pub fn reading(&self) -> Option<bool> {
+        self.alone.as_ref().map(|a| a.reading)
+    }
+
+    /// The size this App's Note window was drawn at last, kept for the
+    /// next one as it closes (#287); not while it is maximized (#322).
+    pub fn note_window_size(&self) -> Option<egui::Vec2> {
+        self.alone.as_ref().and_then(|a| a.size)
+    }
+
+    /// Where this App's Note window's reading view was scrolled as it was
+    /// drawn last (#322), while it is one.
+    pub fn reading_scrolled(&self) -> Option<note_window::Scrolled> {
+        self.alone.as_ref().map(|a| a.scrolled)
     }
 
     /// Closes the Note window of `note`, as its cross does (#287).
@@ -6990,6 +7011,15 @@ impl App {
                     alone.on_top = on;
                 }
             }
+            Action::ReadingView(on) => {
+                // What was typed is kept first, for the view to read it.
+                if on {
+                    self.save_text()?;
+                }
+                if let Some(alone) = &mut self.alone {
+                    alone.reading = on;
+                }
+            }
             Action::Badge(open) => self.badge = open,
             Action::Add(kind) => self.add(kind)?,
             Action::CreateNamed => self.create_named()?,
@@ -11171,6 +11201,38 @@ impl App {
         }
         let typing = ui.ctx().text_edit_focused();
         let top = self.top_dialog();
+        // The reading view (#322): F9 switches it, also while typing; Esc,
+        // Alt+Left and the mouse's back button leave it, and the keys of
+        // a page scroll it, Space and the arrows only while no widget has
+        // the keyboard. They rest while anything lies over the Note, which
+        // they close first.
+        let reading = self.alone.as_ref().is_some_and(|a| a.reading);
+        let bare = top == Some(TopDialog::Note)
+            && self.dialog.is_none()
+            && self.badge.is_none()
+            && self.viewer.is_none()
+            && self.table.is_none()
+            && !egui::Popup::is_any_open(ui.ctx());
+        if bare {
+            if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F9)) {
+                actions.push(Action::ReadingView(!reading));
+            } else if reading {
+                let back = ui.input_mut(|i| {
+                    i.pointer.button_pressed(PointerButton::Extra1)
+                        || i.consume_key(Modifiers::NONE, Key::Escape)
+                        || i.consume_key(Modifiers::ALT, Key::ArrowLeft)
+                });
+                let free = ui.memory(|m| m.focused().is_none());
+                if back {
+                    actions.push(Action::ReadingView(false));
+                } else if let Some(key) = ui.input_mut(|i| note_window::scroll_key(i, free))
+                    && let Some(alone) = &mut self.alone
+                {
+                    alone.scroll_to = Some(alone.scrolled.to(key));
+                    ui.ctx().request_repaint();
+                }
+            }
+        }
         if self.dialog.is_none() && self.badge.is_none() && self.viewer.is_none() {
             if self.table.is_some() {
                 // Back closes the table shown full screen.
@@ -11219,24 +11281,59 @@ impl App {
             if self.announces_in() == Announcer::Note {
                 self.announcements(ui, tones, &mut actions);
             }
-            // Over the others, where that can be asked (UI laws, "The
-            // window").
             let text = ui.visuals().text_color();
             let weak = ui.visuals().weak_text_color();
-            let mut kept = on_top && pin_works;
-            let label = RichText::new(t.note_window_keep_on_top()).color(text);
-            let pin = ui
-                .add_enabled_ui(pin_works, |ui| theme::checkbox(ui, &mut kept, label))
-                .inner;
-            if pin.clicked() && pin_works {
-                actions.push(Action::KeepOnTop(kept));
-            }
-            if !pin_works {
+            ui.horizontal(|ui| {
+                // Over the others, where that can be asked (UI laws, "The
+                // window"); not in the reading view, which shows only the
+                // way back.
+                if !reading {
+                    let mut kept = on_top && pin_works;
+                    let label = RichText::new(t.note_window_keep_on_top()).color(text);
+                    let pin = ui
+                        .add_enabled_ui(pin_works, |ui| theme::checkbox(ui, &mut kept, label))
+                        .inner;
+                    if pin.clicked() && pin_works {
+                        actions.push(Action::KeepOnTop(kept));
+                    }
+                }
+                // The reading view and back (#322), at the bar's end in
+                // both.
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let label = RichText::new(t.note_window_reading_view()).color(text);
+                    let button = ui
+                        .add(egui::Button::new(label).selected(reading))
+                        .on_hover_text("F9");
+                    if button.clicked() {
+                        actions.push(Action::ReadingView(!reading));
+                    }
+                });
+            });
+            if !pin_works && !reading {
                 let why = t.note_window_keep_on_top_wayland();
                 ui.label(RichText::new(why).small().color(weak));
             }
-            self.note_editor(ui, tones, &mut actions);
+            if reading {
+                self.reading_view(ui, tones, &mut actions);
+            } else {
+                self.note_editor(ui, tones, &mut actions);
+            }
         });
+        // Switched, the keyboard leaves the field it was in, and the view
+        // shows in the next frame.
+        if actions
+            .iter()
+            .any(|a| matches!(a, Action::ReadingView(true)))
+        {
+            ui.ctx().memory_mut(|m| {
+                if let Some(focused) = m.focused() {
+                    m.surrender_focus(focused);
+                }
+            });
+        }
+        if actions.iter().any(|a| matches!(a, Action::ReadingView(_))) {
+            ui.ctx().request_repaint();
+        }
         let ctx = ui.ctx().clone();
         self.badge_dialog(&ctx, tones, &mut actions);
         self.editor_dialog(&ctx, tones, &mut actions);
@@ -11308,7 +11405,16 @@ impl App {
             true => ctx.viewport_rect().size(),
             false => ui.min_rect().size(),
         };
-        if let Some(alone) = &mut self.alone {
+        // Maximized it is as large as the screen, which the next one is not
+        // to open at (#322).
+        let maximized = native
+            && ui.input(|i| {
+                let viewport = i.viewport();
+                viewport.maximized == Some(true) || viewport.fullscreen == Some(true)
+            });
+        if let Some(alone) = &mut self.alone
+            && !maximized
+        {
             alone.size = Some(size);
         }
         // Another Note opened from this one shows in the main window's
@@ -11345,6 +11451,144 @@ impl App {
             self.error = Some(e.to_string());
         }
         true
+    }
+
+    /// The reading view of this Note window (#322, obf-1015): only what
+    /// the Note holds, in a column no wider than [`note_window::measure`]
+    /// in the middle of the window. Its text as it reads, a Note of a kind
+    /// its name as a heading over its description and a Checklist's or
+    /// Shopping List's Lines under them; its photos; each Section's text
+    /// under a tear line, with its photos. Boxes and Lines tick as on a
+    /// card, tags and links work, a table and a photo open full screen; no
+    /// badge, field, button or capture line shows.
+    fn reading_view(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let Some((placed, sections)) = &self.view.detail else {
+            return;
+        };
+        let Some(alone) = self.alone.as_mut() else {
+            return;
+        };
+        let t = self.t;
+        let note = &placed.note;
+        let no_boxes = BoxLook::default();
+        let box_looks = &self.view.box_looks;
+        let box_ticks = &self.view.box_ticks;
+        let looks = |id: &str| box_looks.get(id).unwrap_or(&no_boxes);
+        let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
+        let checklist = self.view.checklist.as_ref();
+        let shopping = self.view.shopping.as_ref();
+        let shown = (&mut self.photos, &*self.store);
+        let (cache, store) = shown;
+        let column = note_window::measure(theme::content(ui, READ_SIZE));
+        let mut scroll = egui::ScrollArea::vertical()
+            .id_salt("reading")
+            .auto_shrink([false, false]);
+        if let Some(to) = alone.scroll_to.take() {
+            scroll = scroll.vertical_scroll_offset(to);
+        }
+        let output = scroll.show(ui, |ui| {
+            let room = ui.available_width();
+            let width = room.min(column);
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                ui.add_space(((room - width) / 2.0).max(0.0));
+                ui.vertical(|ui| {
+                    ui.set_width(width);
+                    ui.spacing_mut().item_spacing = egui::vec2(8.0, 16.0);
+                    ui.add_space(8.0);
+                    let ticked = ticked_in(&note.boxes);
+                    let ticks: (bool, &dyn Fn(&str) -> bool) =
+                        (box_ticks.contains(&note.id), &ticked);
+                    let part = (note.id.as_str(), note.text.as_str(), &*note.text_format);
+                    let all = (0, note.text.len());
+                    if kinded {
+                        // Its name as a heading, by its kind while it has
+                        // none (#309), its description under it (#188).
+                        let named = note_kinds::name(&note.text).len();
+                        let heading = READ_SIZE * text_marks_view::HEADING1;
+                        match l10n::untitled_list(&t, note)
+                            .filter(|_| note_kinds::name(&note.text).trim().is_empty())
+                        {
+                            Some(kind) => {
+                                let size = theme::content(ui, heading);
+                                let colour = ui.visuals().text_color();
+                                ui.label(RichText::new(kind).size(size).color(colour));
+                            }
+                            None => {
+                                let shown = ((0, named), heading);
+                                read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
+                            }
+                        }
+                        let rest = (named, note.text.len());
+                        if !note_kinds::description(&note.text).trim().is_empty() {
+                            let shown = (rest, READ_SIZE);
+                            read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
+                        }
+                    } else if !note.text.trim().is_empty() {
+                        let shown = (all, READ_SIZE);
+                        read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
+                    }
+                    if let Some(shown) = checklist {
+                        let on = shown.list.on.as_ref();
+                        let lines = checklist_view::shown_lines(&shown.list);
+                        let lines = checklist_view::as_clicked(ui.ctx(), &lines, on);
+                        let boxes = checklist_view::card_lines(ui, tones, &lines);
+                        let of = format!("reading {}", note.id);
+                        if let Some((line, checked)) =
+                            checklist_view::card_checks(ui, tones, &of, &boxes, shown.checks)
+                        {
+                            let check = ChecklistAction::Check(line, checked, on.cloned());
+                            actions.push(Action::Checklist(check));
+                        }
+                    }
+                    if let Some(shown) = shopping {
+                        // Its open Lines, the struck ones under them.
+                        let lines = shopping_view::shown_lines(&t, &shown.list);
+                        let (open, struck): (Vec<_>, Vec<_>) =
+                            lines.into_iter().partition(|l| !l.checked);
+                        let open = checklist_view::as_clicked(ui.ctx(), &open, None);
+                        let struck = checklist_view::as_clicked(ui.ctx(), &struck, None);
+                        let mut boxes = checklist_view::card_lines(ui, tones, &open);
+                        if !struck.is_empty() {
+                            let said = t.shopping_struck_count(struck.len() as i64);
+                            let weak = ui.visuals().weak_text_color();
+                            ui.label(RichText::new(said).color(weak));
+                            boxes.extend(checklist_view::card_lines(ui, tones, &struck));
+                        }
+                        let of = format!("reading {}", note.id);
+                        if let Some((line, checked)) =
+                            checklist_view::card_checks(ui, tones, &of, &boxes, shown.checks)
+                        {
+                            actions.push(Action::Shopping(ShoppingAction::Check(line, checked)));
+                        }
+                    }
+                    read_photos(ui, &t, (cache, store), &note.id, &note.photos, actions);
+                    for section in sections {
+                        theme::tear_line(ui);
+                        let ticked = ticked_in(&section.boxes);
+                        let ticks: (bool, &dyn Fn(&str) -> bool) =
+                            (box_ticks.contains(&section.id), &ticked);
+                        let part = (
+                            section.id.as_str(),
+                            section.text.as_str(),
+                            &*section.text_format,
+                        );
+                        if !section.text.trim().is_empty() {
+                            let shown = ((0, section.text.len()), READ_SIZE);
+                            read_part(ui, &t, part, shown, (looks(&section.id), ticks), actions);
+                        }
+                        let (of, photos) = (&section.id, &section.photos);
+                        read_photos(ui, &t, (cache, store), of, photos, actions);
+                    }
+                    ui.add_space(24.0);
+                });
+            });
+        });
+        alone.scrolled = note_window::Scrolled {
+            offset: output.state.offset.y,
+            page: output.inner_rect.height(),
+            height: output.content_size.y,
+        };
     }
 
     fn places_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
@@ -21812,6 +22056,86 @@ fn box_action(entity: String, asked: BoxAsk) -> Action {
 /// Whether a box of `look` has been ticked: it offers its History then.
 fn ticked_in(boxes: &[ShownBox]) -> impl Fn(&str) -> bool + '_ {
     move |id| boxes.iter().any(|b| b.id == id && b.last.is_some())
+}
+
+/// The size of a Note's text as the Note dialog and the reading view show
+/// it, before the Device's text size (#326).
+const READ_SIZE: f32 = 18.0;
+
+/// What [`read_part`] draws, the text of a Note or Section: its id, its
+/// text and its format.
+type ReadPart<'a> = (&'a str, &'a str, &'a str);
+
+/// How the boxes of a [`ReadPart`] show and whether this Device may tick
+/// them, with which have been ticked.
+type PartBoxes<'a> = (&'a BoxLook, (bool, &'a dyn Fn(&str) -> bool));
+
+/// Draws the bytes `range` of a Note's or Section's text in the reading
+/// view (#322) at `size` points, as a text only read reads in the Note
+/// dialog: selectable to be copied, its boxes ticking where this Device
+/// may, its tags opening their search, its links their pages and its
+/// tables full screen to read; a Code text as code.
+fn read_part(
+    ui: &mut Ui,
+    t: &L10n,
+    (of, text, format): ReadPart<'_>,
+    (range, size): ((usize, usize), f32),
+    (boxes, ticks): PartBoxes<'_>,
+    actions: &mut Vec<Action>,
+) {
+    ui.scope(|ui| {
+        ui.style_mut().interaction.selectable_labels = true;
+        let look = (Some(size), ui.visuals().text_color());
+        if format == text_format::CODE {
+            read_text::shown(ui, |ui| {
+                text_marks_view::code_text_label(ui, text, range, look, (false, true))
+            });
+            return;
+        }
+        let spots = read_text::shown(ui, |ui| {
+            text_marks_view::formatted_label(ui, (text, format, boxes), range, look, false)
+        });
+        let id = Id::new(("reading", of));
+        if let Some(at) = text_marks_view::table_clicks(ui, t, id, &spots.tables) {
+            actions.push(Action::OpenTable(Opening {
+                note: None,
+                text: text.to_string(),
+                at,
+                cell: None,
+                tags: true,
+                boxes: Some(of.to_string()),
+            }));
+        }
+        if let Some(asked) = text_marks_view::box_clicks(ui, t, id, &spots.boxes, ticks) {
+            actions.push(box_action(of.to_string(), asked));
+        }
+        if let Some(tag) = text_marks_view::tag_clicks(ui, t, id, &spots.tags) {
+            actions.push(Action::SearchFor(tag));
+        }
+        text_marks_view::link_clicks(ui, id, &spots.links);
+    });
+}
+
+/// The photos `hashes` of the Note or Section `of` in the reading view
+/// (#322), each as wide as the column as on a full card, a click showing
+/// it full screen.
+fn read_photos(
+    ui: &mut Ui,
+    t: &L10n,
+    (cache, store): (&mut PhotoCache, &Store),
+    of: &str,
+    hashes: &[String],
+    actions: &mut Vec<Action>,
+) {
+    for (at, hash) in hashes.iter().enumerate() {
+        let Some(rect) = media_view::card_photo(ui, t, (&mut *cache, store), hash) else {
+            continue;
+        };
+        let id = Id::new(("reading photo", of, at));
+        if media_view::photo_click(ui, t, rect, id).clicked() {
+            actions.push(Action::ViewPhoto(hash.clone()));
+        }
+    }
 }
 
 /// A Section's text being edited in the Note dialog (#183), as the

@@ -276,10 +276,11 @@
 <box-tab device="phone" alt="Die Notiz zur Therme im Notiz-Editor auf dem Handy, das eine Notiz zur Zeit zeigt">
 <li>Nutze die Desktop-App; das Handy zeigt eine Notiz zur Zeit.</li>
 </box-tab>
-<box-tab device="desktop" alt="Die Notiz zum Küchenhahn in einem eigenen Fenster: Im Vordergrund halten über ihrem Text mit einem Abschnitt darunter, ihre Plaketten und Zur Notiz hinzufügen">
+<box-tab device="desktop" alt="Die Notiz zum Küchenhahn in einem eigenen Fenster: Im Vordergrund halten und Leseansicht über ihrem Text mit einem Abschnitt darunter, ihre Plaketten und Zur Notiz hinzufügen">
 <li>Klicke mit rechts auf eine Karte.</li>
 <li>Klicke <strong>In eigenem Fenster öffnen</strong>.</li>
 <li>Hake <strong>Im Vordergrund halten</strong> an, wenn du willst.</li>
+<li>Klicke <strong>Leseansicht</strong> oder drücke F9.</li>
 <li>Schließe das Fenster, wenn du fertig bist.</li>
 </box-tab>
 <box-more>
@@ -299,7 +300,22 @@
   Checkliste über einem Spiel; beim Öffnen eines Fensters ist es aus. Wayland kennt keinen
   einheitlichen Weg, auf dem eine App ihr Fenster im Vordergrund halten kann, deshalb ist es dort mit
   dem Grund ausgegraut; KDEs eigenes „Im Vordergrund halten“ im Fenstermenü funktioniert weiterhin.
-  Ein neues Notiz-Fenster öffnet sich so groß wie das zuletzt geschlossene, auf diesem Computer.
+  Ein neues Notiz-Fenster öffnet sich so groß wie das zuletzt geschlossene, auf diesem Computer,
+  aber nicht so groß wie ein maximiertes; ein Notiz-Fenster wird über seine Titelleiste maximiert,
+  wie jedes andere Fenster.
+</p>
+<p>
+  <strong>Leseansicht</strong> am Ende der Leiste des Fensters, oder F9, zeigt die Notiz zum Lesen:
+  ihren Text, wie er sich liest, den Namen einer Liste über ihrer Beschreibung und ihre Zeilen, ihre
+  Fotos und ihre Abschnitte, ohne Plaketten, Felder und Schaltflächen. Aufnahmen, Dateien,
+  Transkripte, Fototexte und die Einträge einer Strichliste oder Einheit bleiben in der Notiz zum
+  Bearbeiten. Der Text steht in
+  einer Spalte in der Mitte, etwa 70 Zeichen breit in der gewählten Textgröße, sodass ein maximiertes
+  Fenster seine Zeilen kurz hält. Statuskästchen und Zeilen lassen sich abhaken, und #Wörter, Links,
+  Tabellen und Fotos öffnen sich wie auf einer Karte. Mausrad, Bild auf, Bild ab, Leertaste, die
+  Pfeiltasten, Pos1 und Ende scrollen sie. Esc, F9, Alt+Links, die Zurück-Taste der Maus oder noch
+  einmal <strong>Leseansicht</strong> führen zurück zur Notiz zum Bearbeiten, mit dem Getippten
+  gespeichert. Jedes neue Fenster öffnet sich zum Bearbeiten.
 </p>
 </box-more>
 </guide-box>

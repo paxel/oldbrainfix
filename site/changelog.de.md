@@ -14,6 +14,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Eine kopierte Checkliste oder Einkaufsliste legt ihre Zeilen als Markdown-Aufgaben in die Zwischenablage, die beim Einfügen wieder Statuskästchen werden. ([obf-1016](https://github.com/paxel/oldbrainfix/issues/323))
 - Eine im Vollbild geöffnete Tabelle bietet „Kopieren“, das sich in formatierten Text als Tabelle und anderswo als Markdown einfügt. ([obf-1017](https://github.com/paxel/oldbrainfix/issues/324))
 - „Textgröße“ vergrößert den Text von Notizen, Zeilen, der Agenda und den Antworten von Fragen in Stufen; auf dem Desktop ändern Strg+Plus und Strg+Minus sie. ([obf-1019](https://github.com/paxel/oldbrainfix/issues/326))
+- Auf dem Desktop hat das eigene Fenster einer Notiz eine Leseansicht, auch mit F9, die nur ihren Inhalt in einer ruhigen Spalte zeigt. ([obf-1015](https://github.com/paxel/oldbrainfix/issues/322))
 
 ### Geändert
 

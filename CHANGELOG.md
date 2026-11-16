@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Copying a Checklist or Shopping List puts its Lines on the clipboard as a Markdown task list, which pastes back as boxes. ([obf-1016](https://github.com/paxel/oldbrainfix/issues/323))
 - A table opened full screen offers Copy, which pastes as a table into formatted text and as Markdown elsewhere. ([obf-1017](https://github.com/paxel/oldbrainfix/issues/324))
 - Text size makes the text of Notes, Lines, the Agenda and Ask's answers larger in steps; on the desktop Ctrl+Plus and Ctrl+Minus change it. ([obf-1019](https://github.com/paxel/oldbrainfix/issues/326))
+- On the desktop, a Note's own window has a Reading view, also F9, showing only its content in a calm column. ([obf-1015](https://github.com/paxel/oldbrainfix/issues/322))
 
 ### Changed
 

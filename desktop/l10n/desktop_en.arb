@@ -653,6 +653,8 @@
   "@noteWindowKeepOnTop": {"description": "Checkbox at the top of a Note's own window on the desktop (#287): the window stays above all other windows while it is open; off as it opens."},
   "noteWindowKeepOnTopWayland": "Wayland lets no app keep its window on top. Your desktop's own window menu may offer it, as KDE's \"Keep above others\" does.",
   "@noteWindowKeepOnTopWayland": {"description": "Under the greyed Keep on top of a Note's own window on Wayland (#287): why it cannot be ticked, and where the desktop may offer the same."},
+  "noteWindowReadingView": "Reading view",
+  "@noteWindowReadingView": {"description": "Button at the end of the bar of a Note's own window on the desktop (#322, obf-1015), F9 too: shows only the Note's content to read, in a column in the middle; pressed in the reading view, the same button and Esc lead back to the Note to edit."},
   "attachFileMenu": "Attach a file…",
   "@attachFileMenu": {"description": "In the desktop's File menu and the Note dialog (#267): picks files of any kind; with the Note dialog open they go onto its Note (a picture as its photo, a sound file as its voice recording, any other file as an Attachment), else they wait in the quick note for a new Note, as a drop does."},
   "attachFileTitle": "Choose files to attach",

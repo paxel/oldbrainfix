@@ -350,6 +350,7 @@
   "noteWindowOpen": "In eigenem Fenster öffnen",
   "noteWindowKeepOnTop": "Im Vordergrund halten",
   "noteWindowKeepOnTopWayland": "Unter Wayland kann keine App ihr Fenster im Vordergrund halten. Das Fenstermenü deiner Arbeitsumgebung kann es anbieten, wie KDEs „Im Vordergrund halten“.",
+  "noteWindowReadingView": "Leseansicht",
   "attachFileMenu": "Datei anhängen …",
   "attachFileTitle": "Dateien zum Anhängen wählen",
   "fileNoProgramCause": "Auf diesem Computer ließ sich kein Programm für Dateien dieser Art starten.",

@@ -57,3 +57,54 @@ fn each_window_has_a_viewport_of_its_own() {
     assert_ne!(viewport_id(1), viewport_id(2));
     assert_ne!(viewport_id(1), ViewportId::ROOT);
 }
+
+#[test]
+fn the_window_can_be_maximized_and_resized() {
+    let shown = viewport("Recipe", Vec2::new(500.0, 600.0), false);
+    assert_eq!(shown.maximize_button, Some(true));
+    assert_eq!(shown.resizable, Some(true));
+}
+
+#[test]
+fn the_reading_column_is_about_seventy_characters_at_its_size() {
+    assert_eq!(measure(18.0), MEASURE * 18.0);
+    // It grows with the text: Largest's column is 1.3 times Normal's.
+    assert!((measure(18.0 * 1.3) - 1.3 * measure(18.0)).abs() < 0.01);
+    assert!((600.0..=700.0).contains(&measure(18.0)));
+}
+
+#[test]
+fn a_reading_view_opens_off_and_switches() {
+    let alone = Alone::of("n1", true);
+    assert!(!alone.reading);
+}
+
+#[test]
+fn the_keys_scroll_a_page_a_line_or_to_an_end_and_stop_there() {
+    // 300 high of 1000, 100 down.
+    let at = Scrolled {
+        offset: 100.0,
+        page: 300.0,
+        height: 1000.0,
+    };
+    let page = 300.0 - PAGE_OVERLAP;
+    assert_eq!(at.to(Scroll::PageDown), 100.0 + page);
+    assert_eq!(at.to(Scroll::PageUp), 0.0);
+    assert_eq!(at.to(Scroll::LineDown), 100.0 + LINE_STEP);
+    assert_eq!(at.to(Scroll::LineUp), 100.0 - LINE_STEP);
+    assert_eq!(at.to(Scroll::Top), 0.0);
+    assert_eq!(at.to(Scroll::End), 700.0);
+    let near_end = Scrolled {
+        offset: 650.0,
+        ..at
+    };
+    assert_eq!(near_end.to(Scroll::PageDown), 700.0);
+    // Shorter than the window: nowhere to go.
+    let short = Scrolled {
+        offset: 0.0,
+        page: 300.0,
+        height: 200.0,
+    };
+    assert_eq!(short.to(Scroll::End), 0.0);
+    assert_eq!(short.to(Scroll::PageDown), 0.0);
+}
