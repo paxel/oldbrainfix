@@ -624,7 +624,7 @@ class _AreasScreenState extends State<AreasScreen>
 Widget _lifted(Widget row, int _, Animation<double> lift) => AnimatedBuilder(
   animation: lift,
   builder: (_, row) => Material(
-    elevation: lerpDouble(0, 6, Curves.easeInOut.transform(lift.value))!,
+    elevation: lerpDouble(0, 6, Curves.easeInOut.transform(lift.value)) ?? 0,
     child: row,
   ),
   child: row,
