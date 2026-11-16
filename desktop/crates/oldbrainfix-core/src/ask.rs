@@ -73,10 +73,22 @@ pub const SYSTEM: &str = "You answer questions about the user's own Notes in Old
 Example: the question is \"When is the dentist?\". You call find_notes with words [\"dentist\", \"doctor\"]. It finds the Note note:3f2a titled \"Dentist\". You call read_note with id \"note:3f2a\". It says \"Dentist on Friday at 9:00\". You answer: \"On Friday at 9:00, see [Dentist](oldbrainfix://note/note:3f2a).\"
 Answer in the language of the question. Change something only when the user asks for it, such as filing what is new into Areas and Topics or adding tags to a text. Every change waits for the user's review in the app, so say what you changed and that it waits for review, linking only the Notes you read. Notes the user hid from the AI do not exist for you.";
 
-/// What the model hears, once, when it answers having called no tool at
-/// all (#314): a small model otherwise says "That's not in your Notes"
-/// without having searched.
-pub const SEARCH_FIRST: &str = "Search the Notes first: call find_notes with the main words of my question, such as {\"words\": [\"...\"]}.";
+/// What the model hears, once per question, when it answers having
+/// called no tool at all (#314): a small model otherwise says "That's not
+/// in your Notes" without having searched. It quotes `question` (#315):
+/// after earlier exchanges a small model otherwise searched the words of
+/// an earlier question.
+pub fn search_first(question: &str) -> String {
+    format!(
+        "Search the Notes first for my question \"{question}\": call find_notes with its main words, such as {{\"words\": [\"...\"]}}."
+    )
+}
+
+/// What the model hears, once per question, when it answered without
+/// words having read Notes (#315).
+fn answer_now(question: &str) -> String {
+    format!("Answer my question \"{question}\" from the Notes you read.")
+}
 
 /// What the model hears, once, when it answers having read none of the
 /// Notes find_notes or list_new showed it (#314), with the calls to make
@@ -99,6 +111,14 @@ const READ_NAMED: usize = 3;
 
 /// The line before the question in the user's turn, the time after it.
 const NOW: &str = "Now on this computer: ";
+
+/// The line before the earlier questions and answers of the session,
+/// each as `Q: …` and `A: …`, in the user's turn (#315).
+const EARLIER: &str = "Earlier in this session, for context only:";
+
+/// The words before the question in a user's turn with earlier exchanges
+/// (#315).
+const QUESTION_NOW: &str = "My question now: ";
 
 /// How the desktop talks to the provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -452,7 +472,7 @@ pub fn also_read(linked: &[String], read: &[String]) -> Vec<String> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Step {
     /// It paused a long turn, or answered before it searched or read and
-    /// was told to ([`SEARCH_FIRST`], #314): ask again as it stands.
+    /// was told to ([`search_first`], #314): ask again as it stands.
     Again,
     /// It calls these tools; their outputs go to [`Conversation::answer`].
     Tools(Vec<ToolCall>),
@@ -510,22 +530,37 @@ pub struct Conversation {
     /// The Notes `find_notes` and `list_new` showed in this question, in
     /// the order shown.
     shown: Vec<String>,
-    /// Whether the model was told [`SEARCH_FIRST`], or to read the Notes
+    /// Whether the model was told [`search_first`], or to read the Notes
     /// shown ([`read_first`]): each once per question (#314).
     told_search: bool,
     told_read: bool,
+    /// Whether an answer without words was sent back, once per question
+    /// (#315).
+    told_empty: bool,
+    /// The question asked, which [`search_first`] quotes (#315).
+    question: String,
 }
 
 impl Conversation {
     /// The question `question` asked at `now` (this computer's time, as
-    /// it reads), after the panel's `earlier` exchanges.
+    /// it reads), after the panel's `earlier` exchanges. Those go in the
+    /// same one user turn, as a block for context before the question
+    /// ([`EARLIER`], [`QUESTION_NOW`], #315): as turns of their own, a
+    /// small model answered an earlier question again.
     pub fn new(provider: Provider, earlier: &[Exchange], question: &str, now: &str) -> Self {
-        let mut messages = Vec::new();
-        for exchange in earlier {
-            messages.push(json!({"role": "user", "content": exchange.question}));
-            messages.push(json!({"role": "assistant", "content": exchange.answer}));
-        }
-        messages.push(json!({"role": "user", "content": format!("{NOW}{now}\n\n{question}")}));
+        let content = if earlier.is_empty() {
+            format!("{NOW}{now}\n\n{question}")
+        } else {
+            let before: Vec<String> = earlier
+                .iter()
+                .map(|e| format!("Q: {}\nA: {}", e.question, e.answer))
+                .collect();
+            format!(
+                "{NOW}{now}\n\n{EARLIER}\n{}\n\n{QUESTION_NOW}{question}",
+                before.join("\n")
+            )
+        };
+        let messages = vec![json!({"role": "user", "content": content})];
         Conversation {
             provider,
             messages,
@@ -536,6 +571,8 @@ impl Conversation {
             shown: Vec::new(),
             told_search: false,
             told_read: false,
+            told_empty: false,
+            question: question.to_string(),
         }
     }
 
@@ -672,7 +709,10 @@ impl Conversation {
                     .map(|b| ToolCall {
                         id: b["id"].as_str().unwrap_or_default().to_string(),
                         name: b["name"].as_str().unwrap_or_default().to_string(),
-                        args: b.get("input").cloned().unwrap_or_else(|| json!({})),
+                        args: mended(
+                            b["name"].as_str().unwrap_or_default(),
+                            b.get("input").cloned().unwrap_or_else(|| json!({})),
+                        ),
                     })
                     .collect();
                 if calls.is_empty() {
@@ -726,7 +766,10 @@ impl Conversation {
                 _ => Ok(json!({})),
             };
             match args {
-                Ok(args) => calls.push(ToolCall { id, name, args }),
+                Ok(args) => {
+                    let args = mended(&name, args);
+                    calls.push(ToolCall { id, name, args })
+                }
                 Err(e) => self
                     .unreadable
                     .push((id, format!("the arguments are no JSON object: {e}"))),
@@ -749,21 +792,32 @@ impl Conversation {
     /// length. It is told to search when it called no tool at all, since
     /// an answer from the Areas, tags or Routines the other tools list
     /// counts, and to read when `find_notes` or `list_new` showed Notes.
+    /// An answer without words is none (#315): once per question it hears
+    /// again what fits, to read, to search, or to answer.
     fn answered(&mut self, text: String, cut: bool) -> Step {
+        let mut told = None;
         if !cut && self.read.is_empty() {
-            let told = if !self.called && !self.told_search {
+            if !self.called && !self.told_search {
                 self.told_search = true;
-                Some(SEARCH_FIRST.to_string())
+                told = Some(search_first(&self.question));
             } else if !self.shown.is_empty() && !self.told_read {
                 self.told_read = true;
-                Some(read_first(&self.shown))
-            } else {
-                None
-            };
-            if let Some(told) = told {
-                self.messages.push(json!({"role": "user", "content": told}));
-                return Step::Again;
+                told = Some(read_first(&self.shown));
             }
+        }
+        if told.is_none() && !cut && text.trim().is_empty() && !self.told_empty {
+            self.told_empty = true;
+            told = Some(if !self.shown.is_empty() && self.read.is_empty() {
+                read_first(&self.shown)
+            } else if !self.called {
+                search_first(&self.question)
+            } else {
+                answer_now(&self.question)
+            });
+        }
+        if let Some(told) = told {
+            self.messages.push(json!({"role": "user", "content": told}));
+            return Step::Again;
         }
         let (text, unchecked) = checked(&text, &self.read);
         Step::Answered(Answer {
@@ -925,6 +979,24 @@ pub fn checked(text: &str, read: &[String]) -> (String, bool) {
         }
         unchecked = true;
     }
+}
+
+/// The arguments of a call as the tool takes them: a `read_note` that
+/// names its Note as `note`, the key of `read_attachment_text`, and gives
+/// no `id`, reads it by `id`; an `id` given wins (#315). A small model
+/// passed it so even after [`read_first`] spelt the call out. The one
+/// argument rule, which the end to end check's record of the Notes asked
+/// for follows too.
+pub fn mended(name: &str, mut args: Value) -> Value {
+    if name != "read_note" || args.get("id").is_some() {
+        return args;
+    }
+    if let Some(all) = args.as_object_mut()
+        && let Some(id) = all.remove("note")
+    {
+        all.insert("id".into(), id);
+    }
+    args
 }
 
 /// The Note `call` read in full, as `output` handed it out: the id that

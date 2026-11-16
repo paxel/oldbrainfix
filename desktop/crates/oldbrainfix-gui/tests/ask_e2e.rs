@@ -45,7 +45,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::ask::{
-    AskError, Asked, Conversation, Exchange, Protocol, Reply, Request, Transport, Web,
+    AskError, Asked, Conversation, Exchange, Protocol, Reply, Request, Transport, Web, mended,
 };
 use oldbrainfix_core::lan::{
     DEVICE_HEADER, NONCE_HEADER, PROOF_HEADER, paired_proof_bytes, sync_request,
@@ -216,13 +216,15 @@ impl Recorded {
         self.rounds.lock().unwrap().clone()
     }
 
-    /// The ids the model asked `read_note` for, in order, each once.
+    /// The ids the model asked `read_note` for, in order, each once, by
+    /// the argument rule the core reads them with (`ask::mended`, #315).
     fn read_asked(&self) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         for round in self.rounds() {
             for (name, args) in round.calls {
                 let id = serde_json::from_str::<Value>(&args)
                     .ok()
+                    .map(|a| mended(&name, a))
                     .and_then(|a| a.get("id").and_then(Value::as_str).map(str::to_string));
                 if name == "read_note"
                     && let Some(id) = id

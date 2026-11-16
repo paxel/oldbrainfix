@@ -395,9 +395,41 @@ fn a_follow_up_is_asked_after_the_earlier_exchanges() -> TestResult {
     let request = Conversation::new(anthropic(), &earlier, "And the ID card?", "now").request();
     let body: Value = serde_json::from_str(&request.body)?;
     let messages = body["messages"].as_array().ok_or("messages")?;
-    assert_eq!(messages.len(), 3);
-    assert_eq!(messages[1]["role"], "assistant");
-    assert_eq!(messages[1]["content"], "In the blue folder.");
+    // One user turn: the earlier exchange as a block for context, then
+    // the question (#315).
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["role"], "user");
+    assert_eq!(
+        messages[0]["content"],
+        "Now on this computer: now\n\nEarlier in this session, for context only:\nQ: Where is the passport?\nA: In the blue folder.\n\nMy question now: And the ID card?"
+    );
+    // Two earlier exchanges, one line after the other, the oldest first.
+    let two = [
+        Exchange {
+            question: "Where is the passport?".into(),
+            answer: "In the blue folder.".into(),
+        },
+        Exchange {
+            question: "And the ID card?".into(),
+            answer: "In the drawer.".into(),
+        },
+    ];
+    let request = Conversation::new(openai(""), &two, "And the keys?", "now").request();
+    let body: Value = serde_json::from_str(&request.body)?;
+    let messages = body["messages"].as_array().ok_or("messages")?;
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0]["role"], "system");
+    assert_eq!(
+        messages[1],
+        json!({"role": "user", "content": "Now on this computer: now\n\nEarlier in this session, for context only:\nQ: Where is the passport?\nA: In the blue folder.\nQ: And the ID card?\nA: In the drawer.\n\nMy question now: And the keys?"})
+    );
+    // Without earlier exchanges the turn is the question alone.
+    let request = Conversation::new(anthropic(), &[], "And the keys?", "now").request();
+    let body: Value = serde_json::from_str(&request.body)?;
+    assert_eq!(
+        body["messages"],
+        json!([{"role": "user", "content": "Now on this computer: now\n\nAnd the keys?"}])
+    );
     Ok(())
 }
 
@@ -740,7 +772,12 @@ fn a_model_that_answers_before_any_tool_is_told_once_to_search_first() -> TestRe
     // The first answer stays in the conversation, the word after it.
     let second = bodies[1]["messages"].as_array().ok_or("messages")?;
     assert_eq!(second.len(), 3);
-    assert_eq!(second[2], json!({"role": "user", "content": SEARCH_FIRST}));
+    // It names the question asked (#315).
+    assert_eq!(
+        second[2],
+        json!({"role": "user", "content": search_first("Wifi?")})
+    );
+    assert!(search_first("Wifi?").contains("\"Wifi?\""));
 
     // Told once only: the next answer stands, however it reads.
     let stubborn = Fake::new(vec![
@@ -750,6 +787,139 @@ fn a_model_that_answers_before_any_tool_is_told_once_to_search_first() -> TestRe
     let asked = ask(&store, &stubborn, anthropic(), "Wifi?")?;
     assert_eq!(asked.answer.text, "Still not.");
     assert_eq!(stubborn.bodies().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_follow_up_told_to_search_hears_its_own_question_not_an_earlier_one() -> TestResult {
+    // With an earlier exchange before it, a small model answered the
+    // next question from it, and searched for its words (#315).
+    let store = store();
+    let note = Notes::new(&store).capture("Wifi password: kiwi-42", None, None)?;
+    let fake = Fake::new(vec![
+        end_turn("That's not in your Notes"),
+        tool_use("find_notes", json!({"words": ["wifi"]})),
+        tool_use("read_note", json!({"id": note.id})),
+        end_turn("kiwi-42."),
+    ]);
+    let earlier = [Exchange {
+        question: "Where is my passport?".into(),
+        answer: "In the blue folder.".into(),
+    }];
+    let mut conversation = Conversation::new(
+        anthropic(),
+        &earlier,
+        "What is the wifi password?",
+        "2026-01-01 10:00",
+    );
+    let asked = store
+        .ask(&mut conversation, &fake, &utc)
+        .map_err(|e| crate::Error::Invalid(e.to_string()))?;
+    assert_eq!(asked.answer.read, std::slice::from_ref(&note.id));
+    let bodies = fake.bodies();
+    let second = bodies[1]["messages"].as_array().ok_or("messages")?;
+    let told = second.last().ok_or("a message")?;
+    assert_eq!(told["role"], "user");
+    let words = told["content"].as_str().ok_or("words")?;
+    assert!(words.contains("\"What is the wifi password?\""), "{words}");
+    assert!(!words.contains("passport"), "{words}");
+    // The earlier exchange goes before the question, in its turn.
+    assert_eq!(second[0]["role"], "user");
+    assert_eq!(
+        second[0]["content"],
+        "Now on this computer: 2026-01-01 10:00\n\nEarlier in this session, for context only:\nQ: Where is my passport?\nA: In the blue folder.\n\nMy question now: What is the wifi password?"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_read_note_that_names_its_note_as_note_reads_it_by_its_id() -> TestResult {
+    // Told to read, a small model passed the id as `note`, the key of
+    // read_attachment_text, and the read failed (#315).
+    let store = store();
+    let note = Notes::new(&store).capture("Wifi password: kiwi-42", None, None)?;
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"note": note.id})),
+        end_turn("kiwi-42."),
+    ]);
+    let asked = ask(&store, &fake, anthropic(), "What is the wifi password?")?;
+    assert_eq!(asked.answer.read, std::slice::from_ref(&note.id));
+    let call = |args: Value| {
+        json!({"choices": [{"finish_reason": "tool_calls", "message": {
+            "content": null,
+            "role": "assistant",
+            "tool_calls": [{"function": {"arguments": args.to_string(), "name": "read_note"}, "id": "c1", "type": "function"}],
+        }}]})
+    };
+    let say = json!({"choices": [{"finish_reason": "stop", "message": {
+        "content": "kiwi-42.", "role": "assistant",
+    }}]});
+    let fake = Fake::new(vec![call(json!({"note": note.id})), say.clone()]);
+    let asked = ask(&store, &fake, openai(""), "What is the wifi password?")?;
+    assert_eq!(asked.answer.read, std::slice::from_ref(&note.id));
+    // Not a Note's id: nothing read. Never over an `id` given.
+    let fake = Fake::new(vec![call(json!({"note": "kiwi"})), say.clone()]);
+    let asked = ask(&store, &fake, openai(""), "What is the wifi password?")?;
+    assert!(asked.answer.read.is_empty());
+    let fake = Fake::new(vec![
+        call(json!({"id": "note:0a1b2c3d", "note": note.id})),
+        say,
+    ]);
+    let asked = ask(&store, &fake, openai(""), "What is the wifi password?")?;
+    assert!(asked.answer.read.is_empty());
+    Ok(())
+}
+
+#[test]
+fn an_answer_without_words_is_sent_back_once_more_with_what_fits() -> TestResult {
+    let store = store();
+    let note = Notes::new(&store).capture("Wifi password: kiwi-42", None, None)?;
+    let say = |text: &str| {
+        json!({"choices": [{"finish_reason": "stop", "message": {
+            "content": text, "role": "assistant",
+        }}]})
+    };
+    let call = |id: &str, name: &str, args: Value| {
+        json!({"choices": [{"finish_reason": "tool_calls", "message": {
+            "content": null,
+            "role": "assistant",
+            "tool_calls": [{"function": {"arguments": args.to_string(), "name": name}, "id": id, "type": "function"}],
+        }}]})
+    };
+    // Shown the Note, told to read it, it says nothing: told again.
+    let fake = Fake::new(vec![
+        call("c1", "find_notes", json!({"words": ["wifi"]})),
+        say("kiwi"),
+        say(""),
+        call("c2", "read_note", json!({"id": note.id})),
+        say("kiwi-42."),
+    ]);
+    let asked = ask(&store, &fake, openai(""), "What is the wifi password?")?;
+    assert_eq!(asked.answer.text, "kiwi-42.");
+    let bodies = fake.bodies();
+    assert_eq!(bodies.len(), 5);
+    let told = |at: usize| -> std::result::Result<String, Box<dyn std::error::Error>> {
+        let messages = bodies[at]["messages"].as_array().ok_or("messages")?;
+        let last = messages.last().ok_or("a message")?;
+        Ok(last["content"].as_str().ok_or("words")?.to_string())
+    };
+    assert_eq!(told(2)?, read_first(std::slice::from_ref(&note.id)));
+    assert_eq!(told(3)?, read_first(std::slice::from_ref(&note.id)));
+
+    // Read, then nothing said: told to answer, once only.
+    let quiet = Fake::new(vec![
+        call("c1", "read_note", json!({"id": note.id})),
+        say(" "),
+        say(""),
+    ]);
+    let asked = ask(&store, &quiet, openai(""), "What is the wifi password?")?;
+    assert!(asked.answer.text.trim().is_empty());
+    let bodies = quiet.bodies();
+    assert_eq!(bodies.len(), 3);
+    let messages = bodies[2]["messages"].as_array().ok_or("messages")?;
+    let last = messages.last().ok_or("a message")?;
+    assert_eq!(last["content"], answer_now("What is the wifi password?"));
+    assert!(answer_now("Wifi?").contains("\"Wifi?\""));
     Ok(())
 }
 
