@@ -264,7 +264,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Send to a person",
         "Export as Pack…",
         "History",
-        "Delete Delete",
+        "Move to trash Delete",
     ] {
         assert!(!enabled(&mut harness, "Note", entry), "{entry}");
     }
@@ -287,7 +287,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Copy as text",
         "Export as Pack…",
         "History",
-        "Delete",
+        "Move to trash",
     ] {
         assert!(enabled(&mut harness, "Note", entry), "{entry}");
     }
@@ -316,8 +316,8 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     harness.key_press(Key::Escape);
     harness.run();
 
-    // Delete asks nothing (#268); Edit ▸ Undo brings it back.
-    pick(&mut harness, "Note", "Delete");
+    // Move to trash asks nothing (#268); Edit ▸ Undo brings it back.
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     assert!(!shows(&harness, "Delete this Note?"));
     let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
@@ -330,6 +330,37 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     pick(&mut harness, "Edit", "Undo Ctrl+Z");
     harness.run();
     assert!(!trashed(&harness)?);
+    Ok(())
+}
+
+#[test]
+fn the_note_menu_names_move_to_trash_as_the_phone_does_and_moves_the_open_note() -> TestResult {
+    // #329: the phone's words in both languages, no Delete.
+    for (language, menu, entry, delete) in [
+        ("en", "Note", "Move to trash", "Delete"),
+        ("de", "Notiz", "In den Papierkorb", "Löschen"),
+    ] {
+        let (store, _, tap) = store()?;
+        let mut harness = window(App::new(store, language));
+        harness.state_mut().select_note(&tap);
+        harness.run();
+        // The Note dialog has its own button of that name; the menu adds
+        // its entry to it.
+        let buttons = harness.query_all_by_label(entry).count();
+        open(&mut harness, menu);
+        assert_eq!(
+            harness.query_all_by_label(entry).count(),
+            buttons + 1,
+            "{language}"
+        );
+        assert!(harness.query_by_label(delete).is_none(), "{language}");
+        last(&harness, entry).click();
+        harness.run();
+        let note = Notes::new(harness.state().store())
+            .by_id(&tap)?
+            .ok_or("the Note")?;
+        assert!(note.is_trashed(), "{language}");
+    }
     Ok(())
 }
 
@@ -546,7 +577,7 @@ fn ctrl_z_in_a_field_is_the_fields_and_outside_one_undoes_the_last_delete() -> T
     };
     harness.state_mut().select_note(&tap);
     harness.run();
-    pick(&mut harness, "Note", "Delete");
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     assert!(trashed(&harness)?);
     // Typing in another Note, Ctrl+Z takes back what was typed.
@@ -594,7 +625,7 @@ fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_goes_back() -
     // Restored from its dialog first, the undo finds nothing to bring back.
     harness.state_mut().select_note(&tap);
     harness.run();
-    pick(&mut harness, "Note", "Delete");
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     harness.get_by_label("Restore").click();
     harness.run();
@@ -607,7 +638,7 @@ fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_goes_back() -
 
     // A Note filed from Unsorted goes back to Unsorted; the delete before
     // it is not undone with it.
-    pick(&mut harness, "Note", "Delete");
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     assert!(trashed(&harness)?);
     harness.state_mut().select_note(&bank);

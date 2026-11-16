@@ -605,7 +605,7 @@ fn the_note_menu_shows_the_keys_beside_its_entries() -> TestResult {
     for entry in [
         "File into… Ctrl+M",
         "Merge into… Ctrl+Shift+M",
-        "Delete Delete",
+        "Move to trash Delete",
     ] {
         assert!(harness.query_by_label(entry).is_some(), "{entry}");
     }

@@ -23,6 +23,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy ist das Fragen experimentell und aus, bis „Fragen (experimentell)“ in den Einstellungen eingeschaltet ist. ([obf-1026](https://github.com/paxel/oldbrainfix/issues/333))
 - Unter jeder Antwort beim Fragen nennt „Auch gelesen“ die anderen gelesenen Notizen, und ein kleines lokales Modell sucht und liest jetzt vor dem Antworten. ([obf-1007](https://github.com/paxel/oldbrainfix/issues/314))
 - Beim Fragen stehen die Fragen untereinander, die älteste zuerst, jede mit „Bearbeiten“, um sie neu zu stellen; am Desktop holt Pfeil nach oben die letzte. ([obf-1008](https://github.com/paxel/oldbrainfix/issues/315))
+- Auf dem Desktop heißt der Eintrag im Menü Notiz „In den Papierkorb“ statt „Löschen“, wie auf dem Handy und im Rechtsklick-Menü einer Karte. ([obf-1022](https://github.com/paxel/oldbrainfix/issues/329))
 
 ### Behoben
 

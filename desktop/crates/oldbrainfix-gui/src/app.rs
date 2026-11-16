@@ -12150,7 +12150,7 @@ impl App {
         let note = self.note_menu();
         let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
         // File into… also files the cards selected in the list (#148),
-        // and Merge into…, Importance and Delete, or Restore in the
+        // and Merge into…, Importance and Move to trash, or Restore in the
         // trash, act on them (#273).
         let filing = self.file_into_notes();
         let chosen = self.menu_cards();
@@ -12493,11 +12493,13 @@ impl App {
                         Action::RestoreNotes(chosen.clone()),
                     )
                 } else if open {
-                    (t.delete(), None, true, Action::Trash)
+                    (t.move_to_trash(), None, true, Action::Trash)
                 } else {
+                    // Named as on the phone and in the card's menu (#329);
+                    // the Delete key does the same.
                     let delete = keys_with(Modifiers::NONE, Key::Delete);
                     (
-                        t.delete(),
+                        t.move_to_trash(),
                         delete,
                         listed,
                         Action::TrashNotes(chosen.clone()),
