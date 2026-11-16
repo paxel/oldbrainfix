@@ -46,8 +46,10 @@ use crate::shopping_view;
 use crate::theme::{self, Tones};
 
 /// A Line as it is drawn: its id, its text, whether it is in the group
-/// of the Line above it, whether it shows checked and what shows dimmed
-/// under it, as the day a Shopping List's struck Line comes back (#122).
+/// of the Line above it, whether it shows checked, what shows dimmed
+/// under it, as a Sent Item's reappear time, and what shows dimmed beside
+/// it at the end of its row, as when a Shopping List's struck Line comes
+/// back, "in 3 days" (#328).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShownLine {
     pub id: String,
@@ -55,6 +57,7 @@ pub struct ShownLine {
     pub in_group: bool,
     pub checked: bool,
     pub below: Option<String>,
+    pub beside: Option<String>,
 }
 
 /// `shown` as clicked while their saves wait (#338), checked on the
@@ -85,6 +88,7 @@ impl ShownLine {
             in_group: line.in_group(),
             checked: line.checked,
             below: None,
+            beside: None,
         }
     }
 
@@ -99,6 +103,7 @@ impl ShownLine {
             below: line
                 .reappear
                 .map(|r| t.sent_item_line_reappear(&shopping_view::reappear_label(t, r))),
+            beside: None,
         }
     }
 }
@@ -833,7 +838,8 @@ pub fn line_rows<P>(
                         TRAILING_ROOM
                     } else {
                         0.0
-                    };
+                    }
+                    + beside_width(ui, line);
                 let room = (ui.available_width() - reserved).max(40.0);
                 // Its words take the right-click where it has a menu.
                 let sense = if editable.is_some() {
@@ -849,11 +855,14 @@ pub fn line_rows<P>(
                     })
                     .inner;
                 let Some((_, menu)) = editable else {
-                    // The badge at the right edge, where no ⋮ is.
-                    if let Some(trailing) = trailing {
+                    // The badge at the right edge, where no ⋮ is, and
+                    // what shows beside the Line before it.
+                    if trailing.is_some() || line.beside.is_some() {
                         let asked_here = ui
                             .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                trailing(ui, line)
+                                let asked = trailing.and_then(|trailing| trailing(ui, line));
+                                beside(ui, line);
+                                asked
                             })
                             .inner;
                         if let Some(step) = asked_here {
@@ -887,7 +896,9 @@ pub fn line_rows<P>(
                             // Its room kept, so the badges stay in line.
                             ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover());
                         }
-                        (more, trailing.and_then(|trailing| trailing(ui, line)))
+                        let asked = trailing.and_then(|trailing| trailing(ui, line));
+                        beside(ui, line);
+                        (more, asked)
                     })
                     .inner;
                 if let Some(step) = asked_here {
@@ -909,6 +920,28 @@ pub fn line_rows<P>(
     });
     asked
 }
+
+/// How wide what shows beside `line` is, with the gap before it; 0 for
+/// none.
+fn beside_width(ui: &Ui, line: &ShownLine) -> f32 {
+    line.beside.as_ref().map_or(0.0, |beside| {
+        let font = egui::FontId::proportional(BESIDE_SIZE);
+        let galley = ui.fonts_mut(|f| f.layout_no_wrap(beside.clone(), font, egui::Color32::GRAY));
+        galley.size().x + ui.spacing().item_spacing.x
+    })
+}
+
+/// What shows dimmed beside `line` at the end of its row (#328), in a
+/// layout from right to left.
+fn beside(ui: &mut Ui, line: &ShownLine) {
+    if let Some(beside) = &line.beside {
+        let weak = ui.visuals().weak_text_color();
+        ui.label(RichText::new(beside).size(BESIDE_SIZE).color(weak));
+    }
+}
+
+/// The size of what shows dimmed under or beside a Line.
+const BESIDE_SIZE: f32 = 13.0;
 
 /// A Line's words, sensing as `sense` says, and under them, dimmed, what
 /// shows below it: the response of the words.
@@ -932,7 +965,7 @@ fn words_or_field<'f>(
         let words = (!typed).then(|| ui.add(egui::Label::new(line_text(ui, line)).sense(sense)));
         if let Some(below) = &line.below {
             let weak = ui.visuals().weak_text_color();
-            ui.label(RichText::new(below).size(13.0).color(weak));
+            ui.label(RichText::new(below).size(BESIDE_SIZE).color(weak));
         }
         words
     })
@@ -957,7 +990,21 @@ pub fn card_lines(ui: &mut Ui, tones: Tones, shown: &[ShownLine]) -> Vec<CardBox
             ui.horizontal(|ui| {
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
                 paint_box(ui, tones, rect, line.checked, false);
-                words(ui, line, Sense::hover());
+                if line.beside.is_some() {
+                    // Its words beside the box's middle, what shows beside
+                    // the Line at the right edge.
+                    let room = (ui.available_width() - beside_width(ui, line)).max(40.0);
+                    let top_down = egui::Layout::top_down(egui::Align::Min);
+                    ui.allocate_ui_with_layout(egui::vec2(room, BOX), top_down, |ui| {
+                        ui.add_space(TO_MIDDLE);
+                        words(ui, line, Sense::hover());
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        beside(ui, line);
+                    });
+                } else {
+                    words(ui, line, Sense::hover());
+                }
                 boxes.push(CardBox {
                     rect,
                     line: line.clone(),
@@ -1056,6 +1103,7 @@ pub fn section(
                     .and_then(|id| list.line(id))
                     .is_some_and(|l| l.checked),
                 below: None,
+                beside: None,
             })
             .collect();
         // A new Line, and one this Device may change, by anyone who may add.

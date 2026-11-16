@@ -214,6 +214,37 @@ typedef ShoppingAgendaRow = ({
   List<ShoppingLine> lines,
 });
 
+/// How far off the day a struck Line comes back lies (#328), as the apps
+/// show it faint beside the Line: a number of days, weeks, months or
+/// years.
+final class BackIn {
+  final int count;
+  final ReappearUnit unit;
+
+  const BackIn(this.count, this.unit);
+
+  /// [days] from 1 on as they read: up to 13 days as days, 1 being
+  /// tomorrow; then up to 59 as weeks, under a year as months of 30 days
+  /// and from 365 on as years, each the nearest whole number, half up.
+  factory BackIn.days(int days) => switch (days) {
+    < 14 => BackIn(days, ReappearUnit.day),
+    < 60 => BackIn((days + 3) ~/ 7, ReappearUnit.week),
+    < 365 => BackIn((days + 15) ~/ 30, ReappearUnit.month),
+    _ => BackIn((days + 182) ~/ 365, ReappearUnit.year),
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is BackIn && other.count == count && other.unit == unit;
+
+  @override
+  int get hashCode => Object.hash(count, unit);
+
+  /// The number and the unit's letter, as a reappear time's code: `3w`.
+  @override
+  String toString() => '$count${unit.letter}';
+}
+
 /// One line of a Shopping List (CONTEXT.md): a Line with its reappear
 /// time, struck through for a while once checked.
 class ShoppingLine {
@@ -235,6 +266,10 @@ class ShoppingLine {
   /// while it is open, and while it is struck without a reappear time.
   final Day? backOn;
 
+  /// How far off [backOn] lies from the day it was read on (#328); null
+  /// where [backOn] is.
+  final BackIn? backIn;
+
   /// The day it came back by itself, at its start, while it is open
   /// since then: on that day it "came back today". Null while it is
   /// struck, and for a Line never checked or brought back by hand or by
@@ -252,6 +287,7 @@ class ShoppingLine {
     required this.struck,
     required this.checkedAt,
     required this.backOn,
+    required this.backIn,
     required this.cameBackOn,
     required this.order,
   });
@@ -273,7 +309,9 @@ class ShoppingList {
   final String making;
 
   /// Every Line that shows: the open ones first, in the order they were
-  /// placed in, then the struck ones, the one checked last at the end.
+  /// placed in, then the struck ones, the soonest back first (#328), the
+  /// same day the one checked first first, those without a reappear time
+  /// last, by their checks too.
   final List<ShoppingLine> lines;
 
   /// The Lines checked Once: gone, but a name added again brings them
@@ -1099,7 +1137,18 @@ class ShoppingLists {
       return byAt != 0 ? byAt : byOrder(a, b);
     }
 
-    struck.sort(byCheck);
+    // The soonest back first, those that never come back by themselves
+    // after them (#328).
+    struck.sort((a, b) {
+      final (ab, bb) = (a.line.backOn, b.line.backOn);
+      final byBack = switch ((ab, bb)) {
+        (final ab?, final bb?) => ab.compareTo(bb),
+        (null, null) => 0,
+        (null, _) => 1,
+        (_, null) => -1,
+      };
+      return byBack != 0 ? byBack : byCheck(a, b);
+    });
     gone.sort(byCheck);
     return ShoppingList(
       noteId,
@@ -1193,7 +1242,8 @@ class ShoppingLists {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one
+/// moment it sorts by: a struck one, after its day back (#328), and a
+/// gone one by its check, an open one
 /// without a valid key by when it came back or was added, on the wall
 /// clock.
 class _Read {
@@ -1241,6 +1291,7 @@ class _Read {
         struck: struck,
         checkedAt: DateTime.tryParse(value ?? '')?.toUtc(),
         backOn: back,
+        backIn: back == null ? null : BackIn.days(today.daysUntil(back)),
         cameBackOn: came,
         order: latest[ChecklistKeys.order]?.value,
       ),

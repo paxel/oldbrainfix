@@ -10,14 +10,17 @@ import 'routine_editor_screen.dart';
 import 'tick_saves.dart';
 
 /// A Line as it is drawn: its id, its text, whether it is in the group of
-/// the Line above it, whether it shows checked and what shows dimmed under
-/// its text, such as the day a Shopping List's Line comes back (#122).
+/// the Line above it, whether it shows checked, what shows dimmed under
+/// its text, such as a Sent Item's reappear time, and what shows dimmed
+/// beside it at the end of its row, such as when a Shopping List's struck
+/// Line comes back, "in 3 days" (#328).
 typedef ShownLine = ({
   String id,
   String text,
   bool inGroup,
   bool checked,
   String? below,
+  String? beside,
 });
 
 /// The Lines of [list] as they are drawn.
@@ -29,6 +32,7 @@ List<ShownLine> shownLines(Checklist list) => [
       inGroup: line.inGroup,
       checked: line.checked,
       below: null,
+      beside: null,
     ),
 ];
 
@@ -156,6 +160,7 @@ class ChecklistLines extends StatelessWidget {
         inGroup: line.inGroup,
         checked: checked,
         below: line.below,
+        beside: line.beside,
       ),
     };
   }
@@ -229,14 +234,28 @@ class _LineRow extends StatelessWidget {
         ),
       ),
     );
-    // The checkbox reads with its text; ⋮ stays a button of its own, and
-    // so does a field.
+    // At the end of the row, after the text, which wraps; it does not.
+    final beside = switch (line.beside) {
+      final beside? => Padding(
+        padding: const EdgeInsetsDirectional.only(start: 8),
+        child: Text(
+          beside,
+          key: ValueKey('checklist-beside-${line.id}'),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+      null => null,
+    };
+    // The checkbox reads with its text and what is beside it; ⋮ stays a
+    // button of its own, and so does a field.
     final row = Row(
       children: [
         Expanded(
           child: field == null
-              ? MergeSemantics(child: Row(children: [box, text]))
-              : Row(children: [box, text]),
+              ? MergeSemantics(child: Row(children: [box, text, ?beside]))
+              : Row(children: [box, text, ?beside]),
         ),
         ?trailing,
         if (menu != null)
@@ -753,6 +772,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
                       null => false,
                     },
                     below: null,
+                    beside: null,
                   ),
               ],
               on: list.on,

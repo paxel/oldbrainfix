@@ -5864,11 +5864,29 @@ abstract class AppLocalizations {
   /// **'{count} open'**
   String shoppingOpenCount(int count);
 
-  /// Under a struck Line of a Shopping List: the day it is open again, as a short weekday and date such as 'Tue, Nov 12'.
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again this many days from today, 1 to 13; the struck Lines show the soonest back first.
   ///
   /// In en, this message translates to:
-  /// **'back {day}'**
-  String shoppingBack(String day);
+  /// **'{count, plural, =1{tomorrow} other{in {count} days}}'**
+  String shoppingBackDays(int count);
+
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again in about this many weeks, from 14 to 59 days from today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{in 1 week} other{in {count} weeks}}'**
+  String shoppingBackWeeks(int count);
+
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again in about this many months, from 60 days to under a year from today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{in 1 month} other{in {count} months}}'**
+  String shoppingBackMonths(int count);
+
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again in about this many years, a year or more from today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{in 1 year} other{in {count} years}}'**
+  String shoppingBackYears(int count);
 
   /// The setting a Shopping List Line's badge shows and the title of its dialog (#195): how long the Line stays struck once checked (CONTEXT.md: Shopping List).
   ///

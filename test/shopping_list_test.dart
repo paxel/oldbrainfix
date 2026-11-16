@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
@@ -182,9 +181,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// "back Sat, Oct 31" as the card shows it for [line].
-  String back(ShoppingLine line) =>
-      'back ${DateFormat.MMMEd('en').format(line.backOn!.wall)}';
+  /// What shows faint beside the Line [lineId] (#328), or null.
+  String? beside(WidgetTester tester, String lineId) {
+    final found = key('checklist-beside-$lineId');
+    return found.evaluate().isEmpty ? null : tester.widget<Text>(found).data;
+  }
 
   group('on the card', () {
     testWidgets('"Make it a Shopping List" in the ⋮ makes its lines Lines; '
@@ -221,8 +222,8 @@ void main() {
     });
 
     testWidgets('a full card checks a Line: struck through, folded at the '
-        'end (#189), with the day it comes back; on that day it is open at '
-        'the top', (tester) async {
+        'end (#189), with when it comes back beside it (#328); on that day '
+        'it is open at the top', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs\nTea').id;
       lists.make(note);
       weekly(note);
@@ -241,12 +242,21 @@ void main() {
       expect(top(tester, milk), greaterThan(top(tester, tea)));
       final line = lineOf(note, 'Milk');
       expect(line.backOn, Day.of(deviceWallClock(now)).addDays(7));
-      expect(find.text(back(line)), findsOneWidget);
+      expect(beside(tester, milk), 'in 7 days');
+      // Beside its text, on the same row.
+      expect(
+        tester.getCenter(key('checklist-beside-$milk')).dy,
+        moreOrLessEquals(tester.getCenter(drawn(milk)).dy, epsilon: 4),
+      );
+      expect(
+        tester.getTopLeft(key('checklist-beside-$milk')).dx,
+        greaterThan(tester.getTopRight(drawn(milk)).dx),
+      );
 
       // Unchecking brings it back now, at the top.
       await tap(tester, key('checklist-check-$milk'));
       expect(shown(note), ['Milk', 'Eggs', 'Tea']);
-      expect(find.textContaining('back '), findsNothing);
+      expect(beside(tester, milk), isNull);
 
       // Checked again, it comes back by itself when that day begins.
       await tap(tester, key('checklist-check-$milk'));
@@ -255,7 +265,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(struck(tester, milk), isFalse);
       expect(top(tester, milk), lessThan(top(tester, tea)));
-      expect(find.textContaining('back '), findsNothing);
+      expect(beside(tester, milk), isNull);
+    });
+
+    testWidgets('the struck Lines show the soonest back first, those '
+        'without a time last (#328); a Line ticked stays in its row until '
+        'its save, then goes to its place among them', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs\nTea\nSalt').id;
+      lists.make(note);
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      final tea = idOf(note, 'Tea');
+      final salt = idOf(note, 'Salt');
+      lists.setReappear(milk, Reappear.after(3, ReappearUnit.week));
+      lists.setReappear(eggs, Reappear.after(1, ReappearUnit.week));
+      lists.setReappear(tea, Reappear.after(1, ReappearUnit.day));
+      for (final id in [milk, salt, tea]) {
+        lists.check(id, deviceWallClock);
+      }
+      await startAtNotes(tester);
+      await tap(tester, key('shopping-struck'));
+      expect(top(tester, tea), lessThan(top(tester, milk)));
+      expect(top(tester, milk), lessThan(top(tester, salt)));
+      expect(beside(tester, tea), 'tomorrow');
+      expect(beside(tester, milk), 'in 3 weeks');
+      expect(beside(tester, salt), isNull);
+
+      final ticks = HeldTicks();
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      // Ticked and struck at once, in its row above the fold.
+      expect(struck(tester, eggs), isTrue);
+      expect(
+        top(tester, eggs),
+        lessThan(tester.getTopLeft(key('shopping-struck')).dy),
+      );
+      expect(beside(tester, eggs), isNull);
+      await ticks.release(tester);
+      expect(top(tester, tea), lessThan(top(tester, eggs)));
+      expect(top(tester, eggs), lessThan(top(tester, milk)));
+      expect(beside(tester, eggs), 'in 7 days');
     });
 
     testWidgets('a compact card shows how many are open', (tester) async {
@@ -936,8 +985,8 @@ void main() {
       expect(find.text('New Line: Nails'), findsOneWidget);
     });
 
-    testWidgets('in German the day it comes back reads "wieder" with the '
-        'short weekday and date', (tester) async {
+    testWidgets('in German when it comes back reads "in 7 Tagen" beside '
+        'it', (tester) async {
       final note = notes.capture('Einkauf\nMilch').id;
       lists.make(note);
       weekly(note);
@@ -954,7 +1003,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Einkaufsliste'), findsOneWidget);
-      expect(find.text('wieder Sa., 31. Okt.'), findsOneWidget);
+      expect(beside(tester, idOf(note, 'Milch')), 'in 7 Tagen');
       expect(badgeText(tester, idOf(note, 'Milch')), '1W');
       expect(find.bySemanticsLabel('Wiederkehr: 1 Woche'), findsOneWidget);
     });

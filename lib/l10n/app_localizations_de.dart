@@ -3690,8 +3690,47 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String shoppingBack(String day) {
-    return 'wieder $day';
+  String shoppingBackDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count Tagen',
+      one: 'morgen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingBackWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count Wochen',
+      one: 'in 1 Woche',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingBackMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count Monaten',
+      one: 'in 1 Monat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingBackYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count Jahren',
+      one: 'in 1 Jahr',
+    );
+    return '$_temp0';
   }
 
   @override

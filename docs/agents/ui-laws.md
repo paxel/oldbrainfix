@@ -756,6 +756,13 @@ replace a law of Both apps where they say so. A desktop law marked
   shows below the open ones the next time. A struck Line does not move;
   it comes back where it was among the open ones. A name the list
   has already brings its Line back instead of a second.
+- **A Shopping List's struck Lines show the soonest back first** (#328,
+  Q731 (a)), the same day in the order of their checks, those without a
+  reappear time last; each with a day back has it faint beside it at the
+  end of its row, before the badge: "tomorrow", "in 3 days", "in 3
+  weeks", "in 2 months". A Line ticked shows struck in its row until its
+  save, then goes to its place among them (#338); in the editor it stays
+  in its row while the editor is open.
 - ⋮ of a Line holds the rest (moving it, Delete); a long press in a
   Line's text selects, as in any field.
 - **"Removed Lines"** (#268) folds under a list's Lines in the Note

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
@@ -57,7 +56,8 @@ String struckShownSetting(String noteId) => 'shoppingStruckShown:$noteId';
 
 /// A Shopping List on a Note's card (#122): on a [full] card the open
 /// Lines with their checkboxes, then the struck ones folded under how many
-/// they are, a tap showing them with the day they come back (#189),
+/// they are, a tap showing them, the soonest back first, each with when
+/// it comes back beside it (#189, #328),
 /// checkable where this Device may; else how many are open. Nothing for a Note that is none. It reads the list whenever
 /// the card is built anew, after a check and when a new day begins.
 class CardShoppingList extends StatefulWidget {
@@ -212,25 +212,34 @@ class _CardShoppingListState extends State<CardShoppingList>
 }
 
 /// The Lines of [list] as they are drawn: open ones first, struck ones
-/// at the end with the day they come back under them, as a short weekday
-/// and date ("back Tue, Nov 12").
+/// at the end, the soonest back first, each with when it comes back
+/// beside it ("in 3 days", #328).
 List<ShownLine> _shown(BuildContext context, ShoppingList list) {
   final t = context.t;
-  final day = DateFormat.MMMEd(Localizations.localeOf(context).toString());
-  return [for (final line in list.lines) _shownLine(t, day, line)];
+  return [for (final line in list.lines) _shownLine(t, line)];
 }
 
-/// [line] as it is drawn, a struck one with the [day] it comes back.
-ShownLine _shownLine(AppLocalizations t, DateFormat day, ShoppingLine line) => (
+/// [line] as it is drawn, a struck one with when it comes back.
+ShownLine _shownLine(AppLocalizations t, ShoppingLine line) => (
   id: line.id,
   text: line.text,
   inGroup: false,
   checked: line.struck,
-  below: switch (line.backOn) {
-    final back? when line.struck => t.shoppingBack(day.format(back.wall)),
+  below: null,
+  beside: switch (line.backIn) {
+    final back? when line.struck => backInWords(t, back),
     _ => null,
   },
 );
+
+/// How far off a struck Line's day back is, in words (#328): "tomorrow",
+/// "in 3 days", "in 3 weeks", "in 2 months", "in 1 year".
+String backInWords(AppLocalizations t, BackIn back) => switch (back.unit) {
+  ReappearUnit.day => t.shoppingBackDays(back.count),
+  ReappearUnit.week => t.shoppingBackWeeks(back.count),
+  ReappearUnit.month => t.shoppingBackMonths(back.count),
+  ReappearUnit.year => t.shoppingBackYears(back.count),
+};
 
 /// A reappear time in words: "None", "Once", "3 months" (#195).
 String reappearWords(AppLocalizations t, Reappear reappear) =>
@@ -709,10 +718,9 @@ class _ShoppingSectionState extends State<ShoppingSection>
     final list = _list;
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
-    final day = DateFormat.MMMEd(Localizations.localeOf(context).toString());
     ShownLine shownRow(TypedLine row) {
       if (row.id case final id?) {
-        if (list.line(id) case final line?) return _shownLine(t, day, line);
+        if (list.line(id) case final line?) return _shownLine(t, line);
       }
       // New, or gone from the list a moment ago and read anew soon.
       return (
@@ -721,6 +729,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
         inGroup: false,
         checked: false,
         below: null,
+        beside: null,
       );
     }
 

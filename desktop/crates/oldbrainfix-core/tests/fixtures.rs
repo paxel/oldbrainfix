@@ -4823,6 +4823,7 @@ fn shopping_list_json(list: &ShoppingList) -> Value {
             "struck": l.struck,
             "checkedAt": l.checked_at.map(dart_iso),
             "backOn": l.back_on.map(|d| d.to_string()),
+            "backIn": l.back_in.map(|b| b.to_string()),
             "cameBackOn": l.came_back_on.map(|d| d.to_string()),
             "order": l.order,
         })).collect::<Vec<_>>(),

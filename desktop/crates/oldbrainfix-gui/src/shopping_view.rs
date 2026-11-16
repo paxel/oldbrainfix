@@ -1,7 +1,8 @@
 //! Shopping Lists on the desktop's screen (#122, ADR 0030), as the
 //! phone's `shopping_list_view.dart` draws them: the Lines of a Shopping
 //! List as a Checklist's are drawn, without groups, the open ones first
-//! and the struck ones at the end with the day each comes back under it;
+//! and the struck ones at the end, the soonest back first, each with when
+//! it comes back beside it (#328);
 //! on a full card checkable, on a compact one "N open"; and the Shopping
 //! List part of a Note's editor.
 //!
@@ -31,7 +32,8 @@ use std::collections::HashSet;
 
 use egui::{RichText, Ui};
 use oldbrainfix_core::{
-    Note, Reappear, ReappearUnit, ShoppingList, ShoppingLists, ShoppingOnAgenda, Store, WallClock,
+    BackIn, Note, Reappear, ReappearUnit, ShoppingList, ShoppingLists, ShoppingOnAgenda, Store,
+    WallClock,
 };
 
 use crate::app::embossed;
@@ -40,7 +42,6 @@ use crate::checklist_view::{
 };
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
-use crate::schedule_text::short_day_text;
 use crate::setting_badges::{BadgeValue, badge};
 use crate::theme::{self, Tones};
 use crate::{icons, routine_editor};
@@ -176,8 +177,8 @@ pub fn on_agenda_icon(shows: ShoppingOnAgenda) -> char {
 }
 
 /// The Lines of `list` as they are drawn: open ones first, struck ones at
-/// the end with the day they come back under them, as a short weekday
-/// and date ("back Sat, Oct 31").
+/// the end, the soonest back first, each with when it comes back beside
+/// it ("in 3 days", #328).
 pub fn shown_lines(t: &L10n, list: &ShoppingList) -> Vec<ShownLine> {
     list.lines
         .iter()
@@ -186,12 +187,25 @@ pub fn shown_lines(t: &L10n, list: &ShoppingList) -> Vec<ShownLine> {
             text: line.text.clone(),
             in_group: false,
             checked: line.struck,
-            below: line
-                .back_on
+            below: None,
+            beside: line
+                .back_in
                 .filter(|_| line.struck)
-                .map(|day| t.shopping_back(&short_day_text(t, day))),
+                .map(|back| back_in_words(t, back)),
         })
         .collect()
+}
+
+/// How far off a struck Line's day back is, in words (#328): "tomorrow",
+/// "in 3 days", "in 3 weeks", "in 2 months", "in 1 year", as the phone's
+/// `backInWords`.
+pub fn back_in_words(t: &L10n, back: BackIn) -> String {
+    match back.unit {
+        ReappearUnit::Day => t.shopping_back_days(back.count),
+        ReappearUnit::Week => t.shopping_back_weeks(back.count),
+        ReappearUnit::Month => t.shopping_back_months(back.count),
+        ReappearUnit::Year => t.shopping_back_years(back.count),
+    }
 }
 
 /// The words of a reappear time: "None", "Once", "2 weeks", "3 months".
@@ -366,6 +380,7 @@ pub fn section(
                         in_group: false,
                         checked: false,
                         below: None,
+                        beside: None,
                     },
                 }
             })

@@ -431,6 +431,113 @@ fn after(count: u32, unit: ReappearUnit) -> Made<Reappear> {
 }
 
 #[test]
+fn struck_lines_show_the_soonest_back_first_and_those_without_a_time_last() -> TestResult {
+    let clock = Clock::new()?;
+    let ann = clock.device(1, "Ann")?;
+    let note = shopping(&ann, "Shop\nA\nB\nC\nD\nE\nF\nG", None)?;
+    let lists = ShoppingLists::new(&ann);
+    for (text, time) in [
+        ("A", after(3, ReappearUnit::Week)?),
+        ("B", after(1, ReappearUnit::Week)?),
+        ("C", Reappear::Unset),
+        ("D", after(7, ReappearUnit::Day)?),
+        ("E", after(2, ReappearUnit::Day)?),
+        ("F", Reappear::Unset),
+    ] {
+        lists.set_reappear(&id_of(&ann, &note, text)?, time)?;
+    }
+    // F checked before C; each a second after the one before.
+    for text in ["A", "B", "F", "C", "D", "E"] {
+        lists.check(&id_of(&ann, &note, text)?, &wall)?;
+    }
+    let sorted = ["G", "~E", "~B", "~D", "~A", "~F", "~C"];
+    assert_eq!(shown(&ann, &note)?, sorted);
+    // A day on, E checked later stays the soonest.
+    clock.set(at(2026, 3, 6, 10)?);
+    assert_eq!(shown(&ann, &note)?, sorted);
+    // E back, checked again: two days on, still before B.
+    clock.set(at(2026, 3, 7, 10)?);
+    assert_eq!(shown(&ann, &note)?.first().map(String::as_str), Some("E"));
+    lists.check(&id_of(&ann, &note, "E")?, &wall)?;
+    assert_eq!(shown(&ann, &note)?, sorted);
+    // B, D and E back; B checked last comes back before A.
+    clock.set(at(2026, 3, 12, 10)?);
+    lists.check(&id_of(&ann, &note, "B")?, &wall)?;
+    assert_eq!(shown(&ann, &note)?, ["D", "E", "G", "~B", "~A", "~F", "~C"]);
+    Ok(())
+}
+
+#[test]
+fn each_struck_line_says_how_far_off_its_day_back_is() -> TestResult {
+    let clock = Clock::new()?;
+    let ann = clock.device(1, "Ann")?;
+    let note = shopping(&ann, "Shop\nA\nB\nC\nD\nE\nF\nG", None)?;
+    let lists = ShoppingLists::new(&ann);
+    for (text, time) in [
+        ("A", after(1, ReappearUnit::Day)?),
+        ("B", after(1, ReappearUnit::Week)?),
+        ("C", after(3, ReappearUnit::Week)?),
+        ("D", after(3, ReappearUnit::Month)?),
+        ("E", after(1, ReappearUnit::Year)?),
+        ("F", Reappear::Unset),
+    ] {
+        lists.set_reappear(&id_of(&ann, &note, text)?, time)?;
+        lists.check(&id_of(&ann, &note, text)?, &wall)?;
+    }
+    let back = |count, unit| Some(BackIn { count, unit });
+    for (text, expected) in [
+        ("A", back(1, ReappearUnit::Day)),
+        ("B", back(7, ReappearUnit::Day)),
+        ("C", back(3, ReappearUnit::Week)),
+        ("D", back(3, ReappearUnit::Month)),
+        ("E", back(1, ReappearUnit::Year)),
+        ("F", None),
+        ("G", None),
+    ] {
+        assert_eq!(line_of(&ann, &note, text)?.back_in, expected, "{text}");
+    }
+    // By the wall clock: late on the 5th in UTC is the 6th an hour on.
+    clock.set(utc(5, 23, 30, 0)?);
+    assert!(!line_of(&ann, &note, "A")?.struck);
+    assert_eq!(line_of(&ann, &note, "A")?.back_in, None);
+    assert_eq!(
+        line_of(&ann, &note, "B")?.back_in,
+        back(6, ReappearUnit::Day)
+    );
+    Ok(())
+}
+
+#[test]
+fn how_far_off_a_number_of_days_is() {
+    for (days, count, unit) in [
+        (1, 1, ReappearUnit::Day),
+        (2, 2, ReappearUnit::Day),
+        (13, 13, ReappearUnit::Day),
+        (14, 2, ReappearUnit::Week),
+        (17, 2, ReappearUnit::Week),
+        (18, 3, ReappearUnit::Week),
+        (59, 8, ReappearUnit::Week),
+        (60, 2, ReappearUnit::Month),
+        (92, 3, ReappearUnit::Month),
+        (364, 12, ReappearUnit::Month),
+        (365, 1, ReappearUnit::Year),
+        (547, 1, ReappearUnit::Year),
+        (548, 2, ReappearUnit::Year),
+        (36159, 99, ReappearUnit::Year),
+    ] {
+        assert_eq!(BackIn::days(days), BackIn { count, unit }, "{days} days");
+    }
+    assert_eq!(
+        BackIn {
+            count: 3,
+            unit: ReappearUnit::Week
+        }
+        .to_string(),
+        "3w"
+    );
+}
+
+#[test]
 fn a_new_line_stays_struck_until_a_time_is_set_which_counts_from_its_check() -> TestResult {
     let clock = Clock::new()?;
     let ann = clock.device(1, "Ann")?;

@@ -9,6 +9,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
@@ -287,6 +288,38 @@ pub struct ShoppingAgendaRow {
     pub lines: Vec<ShoppingLine>,
 }
 
+/// How far off the day a struck Line comes back lies (#328), as the apps
+/// show it faint beside the Line: a number of days, weeks, months or
+/// years.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackIn {
+    pub count: i64,
+    pub unit: ReappearUnit,
+}
+
+impl BackIn {
+    /// `days` from 1 on as they read: up to 13 days as days, 1 being
+    /// tomorrow; then up to 59 as weeks, under a year as months of 30
+    /// days and from 365 on as years, each the nearest whole number, half
+    /// up.
+    pub fn days(days: i64) -> BackIn {
+        let (count, unit) = match days {
+            ..14 => (days, ReappearUnit::Day),
+            14..60 => ((days + 3) / 7, ReappearUnit::Week),
+            60..365 => ((days + 15) / 30, ReappearUnit::Month),
+            _ => ((days + 182) / 365, ReappearUnit::Year),
+        };
+        BackIn { count, unit }
+    }
+}
+
+impl fmt::Display for BackIn {
+    /// The number and the unit's letter, as a reappear time's code: `3w`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", self.count, self.unit.letter())
+    }
+}
+
 /// One line of a Shopping List (CONTEXT.md): a Line with its reappear
 /// time, struck through for a while once checked.
 #[derive(Debug, Clone, PartialEq)]
@@ -305,6 +338,9 @@ pub struct ShoppingLine {
     /// The day it comes back, at its start, while it is struck; `None`
     /// while it is open, and while it is struck without a reappear time.
     pub back_on: Option<Day>,
+    /// How far off `back_on` lies from the day it was read on (#328);
+    /// `None` where `back_on` is.
+    pub back_in: Option<BackIn>,
     /// The day it came back by itself, at its start, while it is open
     /// since then: on that day it "came back today". `None` while it is
     /// struck, and for a Line never checked or brought back by hand or by
@@ -330,8 +366,9 @@ pub struct ShoppingList {
     /// The id of its making, as the Note's `kind` names it.
     pub making: String,
     /// Every Line that shows: the open ones first, in the order they were
-    /// placed in, then the struck ones, the one
-    /// checked last at the end.
+    /// placed in, then the struck ones, the soonest back first (#328), the
+    /// same day the one checked first first, those without a reappear
+    /// time last, by their checks too.
     pub lines: Vec<ShoppingLine>,
     /// The Lines checked Once: gone, but a name added again brings them
     /// back.
@@ -397,7 +434,8 @@ impl ShoppingList {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one
+/// moment it sorts by: a struck one, after its day back (#328), and a
+/// gone one by its check, an open one
 /// without a valid key by when it came back or was added, on the wall
 /// clock.
 struct Read {
@@ -456,6 +494,7 @@ impl Read {
                 struck,
                 checked_at: value.and_then(|v| parse_time(v).ok()),
                 back_on: back,
+                back_in: back.map(|back| BackIn::days(today.days_until(back))),
                 came_back_on: came_back,
                 order: value_of(checklist_keys::ORDER).map(str::to_string),
             },
@@ -578,7 +617,12 @@ fn list_of(note_id: &str, making: &str, lines: Vec<Read>) -> ShoppingList {
             .cmp(&b.checked)
             .then_with(|| by_order(&a.line, &b.line))
     };
-    struck.sort_by(by_check);
+    // The soonest back first, those that never come back by themselves
+    // after them (#328).
+    struck.sort_by(|a, b| {
+        let back = |r: &Read| (r.line.back_on.is_none(), r.line.back_on);
+        back(a).cmp(&back(b)).then_with(|| by_check(a, b))
+    });
     gone.sort_by(by_check);
     ShoppingList {
         note_id: note_id.to_string(),

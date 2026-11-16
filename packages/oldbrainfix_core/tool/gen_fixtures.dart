@@ -3437,6 +3437,7 @@ Map<String, Object?> _shoppingList(ShoppingList list) => {
         'struck': l.struck,
         'checkedAt': l.checkedAt?.toIso8601String(),
         'backOn': l.backOn?.toString(),
+        'backIn': l.backIn?.toString(),
         'cameBackOn': l.cameBackOn?.toString(),
         'order': l.order,
       },
@@ -11047,8 +11048,10 @@ Future<void> main(List<String> args) async {
     '`list-switch` log, with the name and description its text shows as; '
     'its `checklists.json` and `shopping.json` as for the logs above.\n'
     '- `shopping-lists/shopping.json`: each Shopping List of the '
-    '`shopping-lists` log with its Lines in the order they show, their '
-    'reappear times, which are struck, the day each comes back and the day '
+    '`shopping-lists` log with its Lines in the order they show, the '
+    'struck ones by the day they come back (#328), their '
+    'reappear times, which are struck, the day each comes back, how far '
+    'off it is, and the day '
     'an open one came back, the text each goes back to as a plain Note, and '
     'the lists on the Agenda with how each shows there and its open Lines '
     'by each value of the Device setting before #186, read at moments '

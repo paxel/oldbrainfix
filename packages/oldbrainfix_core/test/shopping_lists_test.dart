@@ -701,6 +701,105 @@ void main() {
     });
   });
 
+  group('struck in the order they come back (#328)', () {
+    Reappear after(int count, ReappearUnit unit) => Reappear.after(count, unit);
+
+    test('the soonest back first, the same day by the check, those without '
+        'a time last, the open ones before them as placed', () {
+      final note = shopping(ann, 'Shop\nA\nB\nC\nD\nE\nF\nG');
+      final lists = ShoppingLists(ann);
+      final times = {
+        'A': after(3, ReappearUnit.week),
+        'B': after(1, ReappearUnit.week),
+        'C': Reappear.unset,
+        'D': after(7, ReappearUnit.day),
+        'E': after(2, ReappearUnit.day),
+        'F': Reappear.unset,
+      };
+      for (final MapEntry(key: text, value: time) in times.entries) {
+        lists.setReappear(idOf(ann, note, text), time);
+      }
+      // F checked before C; each a second after the one before.
+      for (final text in ['A', 'B', 'F', 'C', 'D', 'E']) {
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      expect(shown(ann, note), ['G', '~E', '~B', '~D', '~A', '~F', '~C']);
+      // A day on, E checked again later stays the soonest.
+      clock.set(DateTime.utc(2026, 3, 6, 10));
+      expect(shown(ann, note), ['G', '~E', '~B', '~D', '~A', '~F', '~C']);
+      // E back, checked again: two days on, still before B.
+      clock.set(DateTime.utc(2026, 3, 7, 10));
+      expect(shown(ann, note).first, 'E');
+      lists.check(idOf(ann, note, 'E'), _wall);
+      expect(shown(ann, note), ['G', '~E', '~B', '~D', '~A', '~F', '~C']);
+      // B, D and E back; B checked last comes back before A.
+      clock.set(DateTime.utc(2026, 3, 12, 10));
+      lists.check(idOf(ann, note, 'B'), _wall);
+      expect(shown(ann, note), ['D', 'E', 'G', '~B', '~A', '~F', '~C']);
+    });
+
+    test('each struck Line says how far off its day back is: tomorrow and '
+        'days, then weeks, months and years', () {
+      final note = shopping(ann, 'Shop\nA\nB\nC\nD\nE\nF\nG');
+      final lists = ShoppingLists(ann);
+      final times = {
+        'A': after(1, ReappearUnit.day),
+        'B': after(1, ReappearUnit.week),
+        'C': after(3, ReappearUnit.week),
+        'D': after(3, ReappearUnit.month),
+        'E': after(1, ReappearUnit.year),
+        'F': Reappear.unset,
+      };
+      for (final MapEntry(key: text, value: time) in times.entries) {
+        lists.setReappear(idOf(ann, note, text), time);
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      expect(
+        {
+          for (final t in ['A', 'B', 'C', 'D', 'E', 'F', 'G'])
+            t: lineOf(ann, note, t).backIn,
+        },
+        {
+          'A': const BackIn(1, ReappearUnit.day),
+          'B': const BackIn(7, ReappearUnit.day),
+          'C': const BackIn(3, ReappearUnit.week),
+          'D': const BackIn(3, ReappearUnit.month),
+          'E': const BackIn(1, ReappearUnit.year),
+          'F': null,
+          'G': null,
+        },
+      );
+      // By the wall clock: late on the 5th in UTC is the 6th an hour on.
+      clock.set(DateTime.utc(2026, 3, 5, 23, 30));
+      expect(lineOf(ann, note, 'A').struck, isFalse);
+      expect(lineOf(ann, note, 'A').backIn, isNull);
+      expect(lineOf(ann, note, 'B').backIn, const BackIn(6, ReappearUnit.day));
+    });
+
+    test('how far off a number of days is', () {
+      final cases = {
+        1: const BackIn(1, ReappearUnit.day),
+        2: const BackIn(2, ReappearUnit.day),
+        13: const BackIn(13, ReappearUnit.day),
+        14: const BackIn(2, ReappearUnit.week),
+        17: const BackIn(2, ReappearUnit.week),
+        18: const BackIn(3, ReappearUnit.week),
+        59: const BackIn(8, ReappearUnit.week),
+        60: const BackIn(2, ReappearUnit.month),
+        92: const BackIn(3, ReappearUnit.month),
+        364: const BackIn(12, ReappearUnit.month),
+        365: const BackIn(1, ReappearUnit.year),
+        547: const BackIn(1, ReappearUnit.year),
+        548: const BackIn(2, ReappearUnit.year),
+        36159: const BackIn(99, ReappearUnit.year),
+      };
+      for (final MapEntry(key: days, value: back) in cases.entries) {
+        expect(BackIn.days(days), back, reason: '$days days');
+      }
+      expect(const BackIn(3, ReappearUnit.week).toString(), '3w');
+    });
+  });
+
   group('editing', () {
     test('Lines are renamed, deleted and restored, and their reappear time '
         'set', () {

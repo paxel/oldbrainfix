@@ -324,12 +324,75 @@ fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_into_its_place
     tick(&mut harness, "Milk")?;
     assert!(checked(&harness, "Milk")?);
     assert_eq!(texts(&harness, &note)?, ["Bread", "Apples", "✓ Milk"]);
-    // A week on, the same weekday, in the locale's short date.
-    assert!(shows(&harness, "back Sat, Oct 31"));
+    // A week on, beside it (#328).
+    assert!(shows(&harness, "in 7 days"));
     tick(&mut harness, "Milk")?;
     assert!(!checked(&harness, "Milk")?);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
-    assert!(!shows_part(&harness, "back Sat"));
+    assert!(!shows_part(&harness, "in 7 days"));
+    Ok(())
+}
+
+/// The rectangle of the last checkbox of the Line `text`.
+fn box_rect(
+    harness: &Harness<'_, App>,
+    text: &str,
+) -> Result<egui::Rect, Box<dyn std::error::Error>> {
+    Ok(boxes(harness, text)
+        .pop()
+        .ok_or(format!("{text:?}"))?
+        .rect())
+}
+
+#[test]
+fn struck_lines_show_the_soonest_back_first_with_when_beside_and_a_tick_waits_in_its_row()
+-> TestResult {
+    let (store, note, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    lists.make(&note)?;
+    lists.add(&note, "Tea", &utc)?;
+    for (text, time) in [
+        ("Milk", Reappear::After(3, ReappearUnit::Week)),
+        ("Bread", Reappear::After(1, ReappearUnit::Week)),
+        ("Apples", Reappear::After(1, ReappearUnit::Day)),
+    ] {
+        lists.set_reappear(&line_id(&store, &note, text)?, time)?;
+    }
+    for text in ["Milk", "Tea", "Apples"] {
+        lists.check(&line_id(&store, &note, text)?, &utc)?;
+    }
+    let mut harness = window(&store, None);
+    click(&mut harness, "3 struck through")?;
+    // The soonest back first, Tea without a time last (#328).
+    let top = |harness: &Harness<'_, App>, text: &str| box_rect(harness, text).map(|r| r.top());
+    assert!(top(&harness, "Apples")? < top(&harness, "Milk")?);
+    assert!(top(&harness, "Milk")? < top(&harness, "Tea")?);
+    assert!(shows(&harness, "in 3 weeks"));
+    // Beside the Line, on its row at the right.
+    let tomorrow = harness.get_by_label("tomorrow").rect();
+    let apples = box_rect(&harness, "Apples")?;
+    assert!((tomorrow.center().y - apples.center().y).abs() < 4.0);
+    assert!(tomorrow.left() > apples.right() + 200.0);
+
+    // Clicked, Bread shows struck in its row until its save, then among
+    // the struck ones by its day back.
+    let fold = harness
+        .query_all_by_label("3 struck through")
+        .map(|n| n.rect().top())
+        .fold(f32::INFINITY, f32::min);
+    boxes(&harness, "Bread")
+        .pop()
+        .ok_or("Bread")?
+        .click_accesskit();
+    harness.step();
+    assert!(checked(&harness, "Bread")?);
+    assert!(top(&harness, "Bread")? < fold);
+    assert!(!shows(&harness, "in 7 days"));
+    harness.run();
+    assert!(shows(&harness, "4 struck through"));
+    assert!(top(&harness, "Apples")? < top(&harness, "Bread")?);
+    assert!(top(&harness, "Bread")? < top(&harness, "Milk")?);
+    assert!(shows(&harness, "in 7 days"));
     Ok(())
 }
 
@@ -346,18 +409,19 @@ fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestR
     assert!(boxes(&harness, "Bread").is_empty());
     click(&mut harness, "1 struck through")?;
     assert!(checked(&harness, "Bread")?);
-    assert!(shows(&harness, "back Sat, Oct 31"));
-    // Late on the day before: still struck.
+    assert!(shows(&harness, "in 7 days"));
+    // Late on the day before: still struck, back tomorrow.
     let eve = DateTime::parse_from_rfc3339("2026-10-30T23:50:00Z")?.timestamp();
     moment.store(eve, Ordering::SeqCst);
     harness.run();
     assert!(checked(&harness, "Bread")?);
+    assert!(shows(&harness, "tomorrow"));
     // Its day has begun: the window reads it again by itself.
     let midnight = DateTime::parse_from_rfc3339("2026-10-31T00:00:01Z")?.timestamp();
     moment.store(midnight, Ordering::SeqCst);
     harness.run();
     assert!(!checked(&harness, "Bread")?);
-    assert!(!shows_part(&harness, "back Sat"));
+    assert!(!shows_part(&harness, "tomorrow"));
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
     Ok(())
 }
@@ -767,14 +831,14 @@ fn the_line_badge_sets_the_reappear_time_and_the_menu_deletes_for_good() -> Test
     assert!(!shows(&harness, "After"));
     assert_eq!(badges(&harness)[0], "Reappear time: 3 months");
     tick(&mut harness, "Milk")?;
-    assert!(shows(&harness, "back Sun, Jan 24"));
+    assert!(shows(&harness, "in 3 months"));
     // Back to none: struck until a time is set.
     click_badge(&mut harness, 0)?;
     click(&mut harness, "None")?;
     assert_eq!(reappear(&harness)?, Reappear::Unset);
     click(&mut harness, "Close")?;
     assert!(list(&harness, &note)?.line(&milk).ok_or("Milk")?.struck);
-    assert!(!shows_part(&harness, "back "));
+    assert!(!shows_part(&harness, "in 3 months"));
 
     // Once: gone when checked.
     click_badge(&mut harness, 2)?;
@@ -909,7 +973,7 @@ fn full_cards_check_lines_and_compact_cards_count_the_open_ones() -> TestResult 
     assert!(boxes(&harness, "Bread").is_empty());
     click(&mut harness, "1 struck through")?;
     assert!(checked(&harness, "Bread")?);
-    assert!(shows(&harness, "back Sat, Oct 31"));
+    assert!(shows(&harness, "in 7 days"));
     // The card's checkbox writes a check, never the Note's text.
     assert_eq!(
         Notes::new(harness.state().store())
