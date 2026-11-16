@@ -36,6 +36,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - The Linux .deb, AppImage and Homebrew build start on older systems with glibc 2.35, such as Ubuntu 22.04 or Debian 12. ([obf-1025](https://github.com/paxel/oldbrainfix/issues/332))
 - A tapped box ticks and its Line strikes through at once, the save following; a failed save shows it as before with a message. ([obf-1031](https://github.com/paxel/oldbrainfix/issues/338))
 - A phone's question no longer goes missing, and Ask on the phone and desktop says what it is doing and why it failed. ([obf-1010](https://github.com/paxel/oldbrainfix/issues/317))
+- On the phone, the app stays quick while a recording is transcribed; a Transcript may take about twice as long. ([obf-1030](https://github.com/paxel/oldbrainfix/issues/337))
 
 ---
 
