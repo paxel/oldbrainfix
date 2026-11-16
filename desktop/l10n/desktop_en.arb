@@ -197,7 +197,7 @@
   "sendSaveTitle": "Save the Note to send",
   "sentSaved": "Saved. Send the file to them through any messenger or mail.",
   "copyAsText": "Copy as text",
-  "@copyAsText": {"description": "In a card's menu and the editor: puts the Note's text and its Sections on the clipboard, with HTML beside formatted text (#129)."},
+  "@copyAsText": {"description": "In a card's menu and the editor: puts the Note's text and its Sections on the clipboard, a Checklist's or Shopping List's Lines as a Markdown task list (#323), with HTML beside formatted text (#129)."},
   "saveAsMarkdown": "Save as Markdown…",
   "@saveAsMarkdown": {"description": "In a card's menu and the editor: saves the Note as a Markdown file with its photos and recordings beside it (#129)."},
   "saveMarkdownTitle": "Save the Note as Markdown",

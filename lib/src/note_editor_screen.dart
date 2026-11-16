@@ -351,12 +351,16 @@ List<MediaRemoval> mediaRemovals(
 
 /// The text of the Note [noteId] and of each of its Sections, oldest
 /// first, as they show, the ids of their boxes left out, a blank line
-/// between them, for "Copy text" (#183); a text that is empty is left out.
+/// between them, for "Copy text" (#183); a Checklist's or Shopping List's
+/// Lines after its text as a task list (#323); a text that is empty is
+/// left out.
 String noteCopyText(Notes notes, String noteId) {
   final note = notes.byId(noteId);
   if (note == null) return '';
+  final lines = NoteShare.taskLines(notes.store, noteId, deviceWallClock);
   return [
     note.shownText,
+    if (lines != null) NoteShare.taskList(lines),
     for (final section in notes.sections(noteId)) section.shownText,
   ].map((text) => text.trim()).where((text) => text.isNotEmpty).join('\n\n');
 }

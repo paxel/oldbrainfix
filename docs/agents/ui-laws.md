@@ -394,7 +394,8 @@ replace a law of Both apps where they say so. A desktop law marked
   under the other buttons, at the right, so no button is cut.
 - **Copy text** in a card's ⋮ (under Share… on the phone) puts the text
   of the Note and of each Section on the clipboard as they show, oldest first, a blank line
-  between them, and says nothing (#183).
+  between them, and says nothing (#183); a Checklist's or Shopping List's Lines come after its
+  text as a Markdown task list, `- [ ] Milk`, `- [x] Eggs`, a group indented (#323).
 - **A Section's text is edited in place in the Note editor** (#183), in
   the same field and with the same format bar as the Note's text, by the
   same people (the Section's author, in a Shared Area also the
@@ -1772,7 +1773,8 @@ replace a law of Both apps where they say so. A desktop law marked
   the list stay click-to-select. A Section this Device may edit has its
   own field and format bar there. "Copy as text" in a card's right-click menu, the
   Note menu and the dialog is the desktop's "Copy text": the Note and
-  its Sections as they show.
+  its Sections as they show, a list's Lines as a Markdown task list
+  (#323), with HTML beside it, the boxes as glyphs.
 - **Cards move into an Area or Topic together** (#148): dragged onto it
   in the sidebar, which outlines the row under the pointer, or with
   File into… from the card's right-click, the Note menu or Ctrl+M,

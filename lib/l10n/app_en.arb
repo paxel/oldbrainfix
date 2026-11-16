@@ -701,7 +701,7 @@
   },
   "copyText": "Copy text",
   "@copyText": {
-    "description": "In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard."
+    "description": "In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard, a Checklist's or Shopping List's Lines as a Markdown task list (#323)."
   },
   "sectionEdited": "Edited {when}",
   "@sectionEdited": {

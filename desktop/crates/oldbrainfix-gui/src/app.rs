@@ -3357,12 +3357,29 @@ impl App {
         Ok(Some(share::note_share(&note, &sections, |at| when(&t, at))))
     }
 
-    /// Puts the Note `id`'s text on the clipboard, with its HTML when it
-    /// is formatted; through the window's clipboard, as plain text, when
-    /// the system's cannot be reached. Copied says nothing (UI laws); a
-    /// Note without words is announced.
+    /// What the Note `id` copies: what it hands to another app, a
+    /// Checklist's or Shopping List's Lines after its text as a task list
+    /// (#323); `None` when it is gone.
+    fn copy_of(&self, id: &str) -> oldbrainfix_core::Result<Option<NoteShare>> {
+        let notes = Notes::new(&self.store);
+        let Some(note) = notes.by_id(id)? else {
+            return Ok(None);
+        };
+        let t = self.t;
+        let sections = notes.sections(id)?;
+        let lines = share::task_lines(&self.store, id, &*self.wall)?.unwrap_or_default();
+        Ok(Some(share::list_share(&note, &lines, &sections, |at| {
+            when(&t, at)
+        })))
+    }
+
+    /// Puts the Note `id`'s text on the clipboard, a list's Lines as a
+    /// task list (#323), with its HTML when it is formatted; through the
+    /// window's clipboard, as plain text, when the system's cannot be
+    /// reached. Copied says nothing (UI laws); a Note without words is
+    /// announced.
     fn copy_as_text(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
-        let Some(share) = self.note_share(id)? else {
+        let Some(share) = self.copy_of(id)? else {
             return Ok(());
         };
         let t = self.t;

@@ -1874,7 +1874,7 @@ abstract class AppLocalizations {
   /// **'Connected: {devices}'**
   String contextBluetooth(String devices);
 
-  /// In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard.
+  /// In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard, a Checklist's or Shopping List's Lines as a Markdown task list (#323).
   ///
   /// In en, this message translates to:
   /// **'Copy text'**

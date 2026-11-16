@@ -11,6 +11,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Eine gesprochene Einkaufsliste kommt als Zeilen in eine Einkaufsliste, mit ihrer Aufnahme, auch ohne Sprachmodell. ([obf-1004](https://github.com/paxel/oldbrainfix/issues/311))
 - Eine Antwort beim Fragen lässt sich auch kopieren, einer vorhandenen Notiz hinzufügen und teilen, am Desktop als Markdown speichern. ([obf-1009](https://github.com/paxel/oldbrainfix/issues/316))
 - Auf dem Desktop bittet Fragen ein OpenAI-kompatibles Modell, nicht nachzudenken, außer „Das Modell nachdenken lassen“ ist an, und die KI-Einstellungen nennen ausprobierte Modelle. ([obf-1011](https://github.com/paxel/oldbrainfix/issues/318))
+- Eine kopierte Checkliste oder Einkaufsliste legt ihre Zeilen als Markdown-Aufgaben in die Zwischenablage, die beim Einfügen wieder Statuskästchen werden. ([obf-1016](https://github.com/paxel/oldbrainfix/issues/323))
 
 ### Geändert
 
