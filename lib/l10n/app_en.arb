@@ -2641,6 +2641,8 @@
   "@formatTable": {"description": "Format bar button: puts a new table at the cursor, or opens the table the cursor is in full screen."},
   "tableTitle": "Table",
   "@tableTitle": {"description": "Title of the page that shows a table of a Note's text full screen."},
+  "tableCopy": "Copy",
+  "@tableCopy": {"description": "Button in the bar of a table full screen: puts the table on the clipboard as an HTML table and, as plain text, as Markdown (#324)."},
   "tableOpen": "Open the table",
   "@tableOpen": {"description": "Screen reader hint of a table in a text: a tap opens it full screen."},
   "tableSideways": "Move the table sideways",

@@ -3,12 +3,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'page_bar.dart';
+import 'photo_platform.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
@@ -116,6 +118,9 @@ Future<bool> confirmTableDelete(
 ///
 /// A tap on a box of a cell opens its menu at the finger while there is
 /// [ticking], also where the table is only read (ADR 0035).
+///
+/// Copy in the bar puts the table on the clipboard as an HTML table and,
+/// as the plain text, as Markdown (#324).
 class TableScreen extends StatefulWidget {
   /// How wide a column may get at most and at least, and how wide the
   /// empty column that adds one is.
@@ -511,6 +516,22 @@ class _TableScreenState extends State<TableScreen> {
     );
   }
 
+  /// Puts the table on the clipboard as an HTML table and, as the plain
+  /// text, as Markdown (#324), each box in the state it shows; the cell
+  /// edited is written first. Where the platform takes no HTML, the
+  /// Markdown alone. Copied says nothing (UI laws).
+  Future<void> _copy() async {
+    _commit();
+    final copy = MarkdownTables.copy(_text, _at, {
+      for (final b in _boxes) b.id: b.state,
+    });
+    if (copy == null) return;
+    if (await PhotoScope.of(context).copyHtml(copy.markdown, copy.html)) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: copy.markdown));
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -520,7 +541,19 @@ class _TableScreenState extends State<TableScreen> {
         if (didPop) _commit();
       },
       child: Scaffold(
-        appBar: pageBar(context, title: t.tableTitle),
+        appBar: pageBar(
+          context,
+          title: t.tableTitle,
+          actions: [
+            if (table != null)
+              IconButton(
+                key: const ValueKey('table-copy'),
+                tooltip: t.tableCopy,
+                onPressed: _copy,
+                icon: const Icon(Icons.copy),
+              ),
+          ],
+        ),
         body: table == null
             ? const SizedBox.shrink()
             : LayoutBuilder(

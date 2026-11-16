@@ -7946,6 +7946,12 @@ abstract class AppLocalizations {
   /// **'Table'**
   String get tableTitle;
 
+  /// Button in the bar of a table full screen: puts the table on the clipboard as an HTML table and, as plain text, as Markdown (#324).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get tableCopy;
+
   /// Screen reader hint of a table in a text: a tap opens it full screen.
   ///
   /// In en, this message translates to:

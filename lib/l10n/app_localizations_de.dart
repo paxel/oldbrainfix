@@ -4955,6 +4955,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tableTitle => 'Tabelle';
 
   @override
+  String get tableCopy => 'Kopieren';
+
+  @override
   String get tableOpen => 'Tabelle öffnen';
 
   @override

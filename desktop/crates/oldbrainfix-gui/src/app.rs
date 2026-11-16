@@ -3400,12 +3400,19 @@ impl App {
     /// window's clipboard, as plain text, when the system's cannot be
     /// reached.
     fn copy_share(&mut self, share: NoteShare) {
+        self.put_copy(share.text, share.html.as_deref());
+    }
+
+    /// Puts `text` on the clipboard, with `html` beside it; through the
+    /// window's clipboard, as `text` alone, when the system's cannot be
+    /// reached.
+    fn put_copy(&mut self, text: String, html: Option<&str>) {
         let put = self
             .clipboard
             .as_mut()
-            .is_some_and(|c| c.put_text(&share.text, share.html.as_deref()));
+            .is_some_and(|c| c.put_text(&text, html));
         if !put {
-            self.copy = Some(share.text);
+            self.copy = Some(text);
         }
     }
 
@@ -9081,6 +9088,8 @@ impl App {
                     self.act(Action::BoxHistory { entity, id })?;
                 }
             }
+            // Copied says nothing (UI laws).
+            table_view::Asked::Copy(copy) => self.put_copy(copy.markdown, Some(&copy.html)),
         }
         Ok(())
     }

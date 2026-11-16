@@ -13,6 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - An Ask answer can also be copied, added to an existing Note and shared, on the desktop saved as Markdown. ([obf-1009](https://github.com/paxel/oldbrainfix/issues/316))
 - On the desktop, Ask asks an OpenAI-compatible model not to think unless "Let the model think" is ticked, and the AI settings name models tried. ([obf-1011](https://github.com/paxel/oldbrainfix/issues/318))
 - Copying a Checklist or Shopping List puts its Lines on the clipboard as a Markdown task list, which pastes back as boxes. ([obf-1016](https://github.com/paxel/oldbrainfix/issues/323))
+- A table opened full screen offers Copy, which pastes as a table into formatted text and as Markdown elsewhere. ([obf-1017](https://github.com/paxel/oldbrainfix/issues/324))
 
 ### Changed
 

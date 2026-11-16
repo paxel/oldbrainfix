@@ -4890,6 +4890,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tableTitle => 'Table';
 
   @override
+  String get tableCopy => 'Copy';
+
+  @override
   String get tableOpen => 'Open the table';
 
   @override

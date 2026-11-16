@@ -122,3 +122,63 @@ fn the_last_row_or_column_going_takes_the_table_with_it() {
     assert_eq!(insert_row("ü | b\n-|-", 1, 9).text, "ü | b\n-|-");
     assert_eq!(insert("ü", 2).text, "ü\n\n|  |  |\n| --- | --- |\n|  |  |");
 }
+
+#[test]
+fn a_table_is_copied_as_its_markdown_and_as_an_html_table() {
+    // #324: the header row in <thead>, the rows in <tbody>, each cell
+    // escaped and formatted; the Markdown as the editor writes it, the
+    // cells beyond the columns left out; each box in the glyph of its
+    // state and without its id.
+    let eggs = format!("☐{}", crate::text_boxes::encode_id("a1b2"));
+    let fail = format!("❌{}", crate::text_boxes::encode_id("c3d4"));
+    let text = format!(
+        "Before\n\n{HEADING_COLUMN_LINE}\n|Item|  Count | Note|\n|:--|--:|:-:|\n\
+         | **Milk** | 2 | a \\| b <i> & |\n| {eggs} Eggs | `x` | {fail}| beyond |\n\nAfter"
+    );
+    let states = BTreeMap::from([("a1b2".to_string(), BoxState::Done)]);
+    let row = text.find("| **Milk**").unwrap();
+    let copied = copy(&text, row, &states).unwrap();
+    assert_eq!(
+        copied.markdown,
+        "<!-- first column headings -->\n| Item | Count | Note |\n| :-- | --: | :-: |\n\
+         | **Milk** | 2 | a \\| b <i> & |\n| ✅ Eggs | `x` | ❌ |"
+    );
+    assert_eq!(
+        copied.html,
+        "<table><thead><tr><th align=\"left\">Item</th><th align=\"right\">Count</th>\
+         <th align=\"center\">Note</th></tr></thead><tbody><tr><th align=\"left\">\
+         <strong>Milk</strong></th><td align=\"right\">2</td><td align=\"center\">\
+         a | b &lt;i&gt; &amp;</td></tr><tr><th align=\"left\">✅ Eggs</th>\
+         <td align=\"right\"><code>x</code></td><td align=\"center\">❌</td></tr>\
+         </tbody></table>\n"
+    );
+    let tags = |s: &str| s.chars().any(|c| ('\u{E0000}'..='\u{E007F}').contains(&c));
+    assert!(!tags(&copied.markdown) && !tags(&copied.html));
+    // The same from the line before its header row, and none outside it.
+    let first = text.find(HEADING_COLUMN_LINE).unwrap();
+    assert_eq!(copy(&text, first, &states).as_ref(), Some(&copied));
+    assert_eq!(copy(&text, 0, &states), None);
+    assert_eq!(copy(&text, text.len(), &states), None);
+}
+
+#[test]
+fn a_table_without_rows_or_alignment_copies_its_header_alone() {
+    let copied = copy("| a | b |\n| --- | --- |", 0, &BTreeMap::new()).unwrap();
+    assert_eq!(copied.markdown, "| a | b |\n| --- | --- |");
+    assert_eq!(
+        copied.html,
+        "<table><thead><tr><th>a</th><th>b</th></tr></thead></table>\n"
+    );
+}
+
+#[test]
+fn a_copied_table_reads_as_the_same_table_when_pasted() {
+    // #324: the Markdown pasted into a new Note is the table again.
+    let text = "| x | y |\n|--:|:-:|\n| 1 \\| 2 | **b** |\n| | c |";
+    let copied = copy(text, 0, &BTreeMap::new()).unwrap();
+    let again = at(&copied.markdown, 0).unwrap();
+    let before = at(text, 0).unwrap();
+    assert_eq!(again.aligns, before.aligns);
+    assert_eq!(rows(&copied.markdown), rows(text));
+    assert_eq!(copy(&copied.markdown, 0, &BTreeMap::new()).unwrap(), copied);
+}

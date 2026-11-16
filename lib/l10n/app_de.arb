@@ -1317,6 +1317,7 @@
   "fileLinkOpen": "Öffnen",
   "formatTable": "Tabelle",
   "tableTitle": "Tabelle",
+  "tableCopy": "Kopieren",
   "tableOpen": "Tabelle öffnen",
   "tableSideways": "Tabelle seitlich verschieben",
   "tableRow": "Zeile {number}",

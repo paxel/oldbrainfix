@@ -690,7 +690,11 @@ replace a law of Both apps where they say so. A desktop law marked
   lines as text until the cursor leaves them, the field loses focus or
   Show as table is pressed. Column widths are the view's only, never
   stored. Cards and texts that are only read show the grid and open the
-  table full screen.
+  table full screen. **Copy in the bar of the table full screen**
+  (#324) puts the table on the clipboard as an HTML table and, as the
+  plain text, as Markdown, each box in the state it shows, the cell
+  being edited written first; on the phone the HTML goes through the
+  app's own channel, else the Markdown alone. Copied says nothing.
 - **A Code text has no format bar and no ☐** (#213): the field shows it
   in the fixed-width font on the grey ground of code, unwrapped, and it
   moves sideways. **A paste that looks like code** into a Plain Note's
