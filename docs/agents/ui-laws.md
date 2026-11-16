@@ -787,6 +787,11 @@ replace a law of Both apps where they say so. A desktop law marked
 
 - The UI speaks in the terms of `CONTEXT.md`: Notes, Areas, Topics,
   Routines, Reminders, People; never of entries, entities or hashes.
+- **One action has one name everywhere** (#321, Q724): in a menu, on a
+  badge, in the editor and on a button, on the phone and the desktop
+  alike.
+- **A menu shows at most seven entries** (#321, Q724); the rest go under
+  "More…".
 - Errors name the cause and the fix in one sentence each.
 
 ### Look
