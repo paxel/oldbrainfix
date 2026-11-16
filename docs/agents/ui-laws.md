@@ -1501,12 +1501,12 @@ replace a law of Both apps where they say so. A desktop law marked
   when picked by keyboard or screen reader; the Note menu acts on the
   Note in the Note dialog and is greyed while none is open, each entry
   as far as the dialog offers it, but File into…, Merge into…,
-  Importance and Delete, in the Trash Restore in Delete's place, act on
+  Importance and Move to trash, in the Trash Restore in its place, act on
   the cards selected in the list while no Note is open (#148, #273). Its keys (Ctrl+N,
   Ctrl+F, Ctrl+M, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on macOS)
   stand beside the entries and work while typing, over the Note dialog
   too, not while another dialog is open; Delete and 1 to 3 stand beside
-  Delete and Importance's entries while those act on the cards selected
+  Move to trash and Importance's entries while those act on the cards selected
   (#274). Ctrl+F searches the list shown where it has a search field
   (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
   finds its Routines, Reminders and Frogs by their Note), else All
