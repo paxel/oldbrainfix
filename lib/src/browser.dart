@@ -823,10 +823,10 @@ class _TagSuggestionsState extends State<TagSuggestions> {
 /// view; a tap on a card runs [onSwitch] (#189). A long press or Edit in
 /// ⋮ opens the editor (#114).
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
-/// [showPlace] says which cards name where they are filed: those the
-/// screen does not name already. While [selected] is given the list
-/// selects (#273): each card this Device may change has a box, ticked
-/// for those in it, whose tap runs [onSelect].
+/// [showPlace] says which cards name where they are filed: all but those
+/// in the Area or Topic the list is of (#330). While [selected] is given
+/// the list selects (#273): each card this Device may change has a box,
+/// ticked for those in it, whose tap runs [onSelect].
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,

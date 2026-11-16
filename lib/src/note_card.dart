@@ -252,8 +252,9 @@ List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
 /// own, ADR 0017); "From …" when a Pack brought it unclaimed (#164);
-/// with [showPlace] where it is filed; a separator under
-/// them; then the Note in its compact or its detailed view ([full], #189).
+/// with [showPlace] where it is filed; then, with no divider, the Note in
+/// its compact or its detailed view ([full], #189), its text in the
+/// second row (#330).
 /// Its Area's colour runs down the left edge and its icon leads the place
 /// line. An important Note gets an accent marker and a stronger emboss, an
 /// unimportant one is dimmed (UI laws, "Cards").
@@ -282,8 +283,8 @@ class NoteCard extends StatelessWidget {
   /// user's own, which shows no Profile line.
   final Profile? author;
 
-  /// Whether the card says its Area and Topic, or Unsorted: only where
-  /// the screen around it does not say it already.
+  /// Whether the card says its Area and Topic, or Unsorted: not in the
+  /// list of the Area or Topic it is in (#330).
   final bool showPlace;
 
   /// Opens "file into…"; no button when null.
@@ -603,7 +604,8 @@ class NoteCard extends StatelessWidget {
             )
           else
             header,
-          const Divider(height: 24),
+          // No divider: the text follows in the second row (#330).
+          const SizedBox(height: 4),
         ],
         // Under where it is filed, over its text (#215).
         if (occurrences case final occurrences?)

@@ -257,6 +257,23 @@ replace a law of Both apps where they say so. A desktop law marked
 
 - A Note is drawn as a card with a soft embossed look, visibly above the
   background.
+- **A card starts with its text** (#330, Q733): one top row holds, on
+  the left, another person's picture and where the Note is filed (its
+  Area's icon and "Household / Kitchen", or "Unsorted"), and on the
+  right the card's buttons; no divider follows, and the text starts in
+  the second row. On the desktop the buttons (Hidden from AI, the view
+  button, ⋮, the pencil) stand in a column of their own on the right,
+  the check mark of a card selected along at its head, its place kept
+  while the card is not selected, so selecting moves nothing; on the
+  phone the compact view's ⋮ and the Important and Hidden from AI marks
+  stand there, the box of a list that selects leads the row, and the
+  detailed view's pencil and ⋮ stay in its action row. With nothing on
+  the left the text starts in the top row, beside the buttons. "From
+  Ann" (#164) and today's boxes (#215) follow the top row, over the
+  text. **The place is left out in the list of the Area or Topic the
+  Note is in**: All Notes, Unsorted, the trash, a search across Areas,
+  Merge into… and the Agenda's just captured card name it, and an
+  Area's search names the Topic of a hit in one of its Topics.
 - **A Note is read on its card; the editor is the last step.** Every
   kind has a **compact view** and a **detailed view** (#189). The
   detailed view shows the whole Note: every Section oldest first, the original
@@ -478,7 +495,7 @@ replace a law of Both apps where they say so. A desktop law marked
   placeholder, on its card; one's own Notes show none. Tapping another
   person's picture, anywhere it shows, opens their Profile.
 - **A Note a Pack brought unclaimed says who it came from** (#164):
-  "From Ann" on a weak line with `inventory_2` at the top of its card,
+  "From Ann" on a weak line with `inventory_2` under the card's top row (#330),
   in either view, until "Remove “From Ann”" in the card's ⋮ or its badge
   in the Note editor takes it away.
 - **"Export as Pack…"** (#164) is in the menu of every Area and Topic,

@@ -13716,6 +13716,13 @@ impl App {
                     },
                     today: self.view.card_today.get(id).map_or(&[], Vec::as_slice),
                     hidden: self.view.hidden_notes.contains(id),
+                    // A card names its place unless the list is of it: in
+                    // an Area's search its Topics' hits name the Topic
+                    // (#330).
+                    place: match &self.selection {
+                        Selection::Place(place) => placed.note.place.as_ref() != Some(place),
+                        _ => true,
+                    },
                 };
                 let clicks = note_card(
                     ui,
@@ -20510,6 +20517,9 @@ struct CardLook<'a> {
     /// Whether it is Hidden from AI, by its own mark or another's, which
     /// a shield in its top row shows (#267).
     hidden: bool,
+    /// Whether its top row names where it is filed, or Unsorted: not in
+    /// the list of the Area or Topic it is in (#330).
+    place: bool,
 }
 
 /// What a card's menu offers of the Note's Routines (#281): Routine…
@@ -21747,262 +21757,312 @@ fn note_card(
                 // Room for the marker on the right.
                 ui.set_max_width(ui.available_width() - 36.0);
             }
-            // Another person's Note shows their picture (ADR 0017); the
-            // user's own none.
-            ui.horizontal(|ui| {
-                if chosen {
-                    icons::show(ui, icons::STATUS_DONE, 18.0, tones.accent);
-                }
-                if let Some(author) = &placed.author {
-                    let name = profile_view::display_name(t, &author.name);
-                    let picture = profile_view::person_picture(
-                        ui,
-                        pictures,
-                        author,
-                        20.0,
-                        &t.author_picture(name),
-                    );
-                    author_rect = Some(picture.rect);
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    edit_rect = ui
-                        .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
-                        .0;
-                    // A Note in the trash is restored, not changed.
-                    if !note.is_trashed() {
-                        more_rect = Some(
-                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
-                                .0,
-                        );
-                    }
-                    // Its view shows under the Note's text, its time and
-                    // place in the detailed view (#170, #189).
-                    if look.switches {
-                        view_rect = Some(
-                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
-                                .0,
-                        );
-                    }
-                    // Hidden from AI, by its own mark or another's (#267).
-                    if look.hidden {
-                        hidden_rect = Some(
-                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
-                                .0,
-                        );
-                    }
-                });
-            });
-            // Who the Pack it came from unclaimed is from, until
-            // removed (#165).
-            if let Some(from) = &placed.pack_from {
-                ui.horizontal(|ui| {
-                    icons::show(ui, pack_view::PACK_ICON, 16.0, weak);
-                    let said = t.pack_from(profile_view::display_name(t, &from.name));
-                    ui.label(RichText::new(said).size(13.0).color(weak));
-                });
-            }
-            // A Note that spawned a Routine is not Unsorted, though not
-            // filed.
-            let place = match place_line(t, placed) {
-                Some(line) => Some(line),
-                None if note.spawned => None,
-                None => Some(t.unsorted().to_string()),
-            };
-            if let Some(place) = place {
-                ui.horizontal(|ui| {
-                    if let Some(icon) = placed
-                        .area
-                        .as_ref()
-                        .and_then(|a| icons::area_icon(a.icon.as_deref()))
-                    {
-                        icons::show(ui, icon, 16.0, colour.unwrap_or(weak));
-                    }
-                    ui.label(RichText::new(place).size(13.0).color(text));
-                });
-            }
-            ui.separator();
-            // Under where it is filed, over its text (#215).
-            today_rects = card_occurrences::card_rows(ui, t, tones, look.today);
-            if look.full {
+            // The card's buttons stand in a column of their own on the
+            // right, its first row (#330): in front of them a place for
+            // the check mark of a card selected along, kept while it is
+            // not, so selecting one moves nothing.
+            let gap = ui.spacing().item_spacing.x;
+            let count = 2 + [!note.is_trashed(), look.switches, look.hidden]
+                .into_iter()
+                .filter(|b| *b)
+                .count();
+            let buttons = count as f32 * 24.0 + (count - 1) as f32 * gap;
+            ui.horizontal_top(|ui| {
+                let width = (ui.available_width() - buttons - gap).max(0.0);
                 ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 8.0;
-                    let part = Part::of_note(note);
-                    let lines = match (look.checklist, look.shopping) {
-                        (Some((list, _)), _) => Some(checklist_view::shown_lines(list)),
-                        (None, Some((list, _))) => Some(shopping_view::shown_lines(t, list)),
-                        (None, None) => None,
+                    ui.set_width(width);
+                    // Another person's Note shows their picture (ADR
+                    // 0017), the user's own none, then where it is filed
+                    // where the list is not of it (#330). A Note that
+                    // spawned a Routine is not Unsorted, though not filed.
+                    let place = match place_line(t, placed) {
+                        _ if !look.place => None,
+                        Some(line) => Some(line),
+                        None if note.spawned => None,
+                        None => Some(t.unsorted().to_string()),
                     };
-                    if lines.is_some() || look.tally || look.session {
-                        // Its name as its title, its description folded
-                        // under it (#188), its Lines right under them.
-                        let text = (part.text, part.format, look.boxes.look(part.id));
-                        let untitled = l10n::untitled_list(t, note);
-                        description_rect =
-                            card_kinded_text(ui, text, (unfolded, untitled), &mut marks);
-                        if let Some(lines) = &lines {
-                            // A Shopping List's struck Lines fold under its
-                            // open ones (#189).
-                            let (open, struck): (Vec<_>, Vec<_>) = lines
-                                .iter()
-                                .cloned()
-                                .partition(|l| look.shopping.is_none() || !l.checked);
-                            boxes = checklist_view::card_lines(ui, tones, &open);
-                            if !struck.is_empty() {
-                                let said = t.shopping_struck_count(struck.len() as i64);
-                                let row = folded_row(ui, struck_open, |ui| {
-                                    ui.label(RichText::new(&said).size(13.0).color(weak));
-                                });
-                                struck_rect = Some((row.response.rect, said));
-                                if struck_open {
-                                    boxes.extend(checklist_view::card_lines(ui, tones, &struck));
-                                }
+                    if place.is_some() || placed.author.is_some() {
+                        ui.horizontal(|ui| {
+                            ui.set_min_height(24.0);
+                            if let Some(author) = &placed.author {
+                                let name = profile_view::display_name(t, &author.name);
+                                let picture = profile_view::person_picture(
+                                    ui,
+                                    pictures,
+                                    author,
+                                    20.0,
+                                    &t.author_picture(name),
+                                );
+                                author_rect = Some(picture.rect);
                             }
-                        }
-                        if let Some(shown) = look.tally_shown {
-                            let drawn =
-                                ui.scope(|ui| tally_view::card(ui, t, shown, &mut tally_asked));
-                            tally_rect = Some(drawn.response.rect);
-                        }
-                        if let Some(shown) = look.session_shown {
-                            let drawn =
-                                ui.scope(|ui| session_view::card(ui, t, shown, &mut session_asked));
-                            tally_rect = Some(drawn.response.rect);
-                        }
-                        shown.extend(media_view::whole_media(
-                            ui,
-                            t,
-                            (&mut *photos, store),
-                            part.photos,
-                            part.recordings,
-                            transcribing,
-                        ));
-                    } else {
-                        let media = (&mut *photos, store, transcribing);
-                        let boxes = look.boxes.look(part.id);
-                        shown.extend(whole(ui, t, part, media, (boxes, &mut marks)));
+                            if let Some(place) = place {
+                                if let Some(icon) = placed
+                                    .area
+                                    .as_ref()
+                                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
+                                {
+                                    icons::show(ui, icon, 16.0, colour.unwrap_or(weak));
+                                }
+                                ui.label(RichText::new(place).size(13.0).color(text));
+                            }
+                        });
                     }
+                    // Who the Pack it came from unclaimed is from, until
+                    // removed (#165).
+                    if let Some(from) = &placed.pack_from {
+                        ui.horizontal(|ui| {
+                            icons::show(ui, pack_view::PACK_ICON, 16.0, weak);
+                            let said = t.pack_from(profile_view::display_name(t, &from.name));
+                            ui.label(RichText::new(said).size(13.0).color(weak));
+                        });
+                    }
+                    // Under where it is filed, over its text (#215).
+                    today_rects = card_occurrences::card_rows(ui, t, tones, look.today);
+                    if look.full {
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 8.0;
+                            let part = Part::of_note(note);
+                            let lines = match (look.checklist, look.shopping) {
+                                (Some((list, _)), _) => Some(checklist_view::shown_lines(list)),
+                                (None, Some((list, _))) => {
+                                    Some(shopping_view::shown_lines(t, list))
+                                }
+                                (None, None) => None,
+                            };
+                            if lines.is_some() || look.tally || look.session {
+                                // Its name as its title, its description folded
+                                // under it (#188), its Lines right under them.
+                                let text = (part.text, part.format, look.boxes.look(part.id));
+                                let untitled = l10n::untitled_list(t, note);
+                                description_rect =
+                                    card_kinded_text(ui, text, (unfolded, untitled), &mut marks);
+                                if let Some(lines) = &lines {
+                                    // A Shopping List's struck Lines fold under its
+                                    // open ones (#189).
+                                    let (open, struck): (Vec<_>, Vec<_>) = lines
+                                        .iter()
+                                        .cloned()
+                                        .partition(|l| look.shopping.is_none() || !l.checked);
+                                    boxes = checklist_view::card_lines(ui, tones, &open);
+                                    if !struck.is_empty() {
+                                        let said = t.shopping_struck_count(struck.len() as i64);
+                                        let row = folded_row(ui, struck_open, |ui| {
+                                            ui.label(RichText::new(&said).size(13.0).color(weak));
+                                        });
+                                        struck_rect = Some((row.response.rect, said));
+                                        if struck_open {
+                                            boxes.extend(checklist_view::card_lines(
+                                                ui, tones, &struck,
+                                            ));
+                                        }
+                                    }
+                                }
+                                if let Some(shown) = look.tally_shown {
+                                    let drawn = ui.scope(|ui| {
+                                        tally_view::card(ui, t, shown, &mut tally_asked)
+                                    });
+                                    tally_rect = Some(drawn.response.rect);
+                                }
+                                if let Some(shown) = look.session_shown {
+                                    let drawn = ui.scope(|ui| {
+                                        session_view::card(ui, t, shown, &mut session_asked)
+                                    });
+                                    tally_rect = Some(drawn.response.rect);
+                                }
+                                shown.extend(media_view::whole_media(
+                                    ui,
+                                    t,
+                                    (&mut *photos, store),
+                                    part.photos,
+                                    part.recordings,
+                                    transcribing,
+                                ));
+                            } else {
+                                let media = (&mut *photos, store, transcribing);
+                                let boxes = look.boxes.look(part.id);
+                                shown.extend(whole(ui, t, part, media, (boxes, &mut marks)));
+                            }
+                            let files = (
+                                note.attachments.as_slice(),
+                                note.removed_attachments.as_slice(),
+                                &note.attachment_texts,
+                            );
+                            let drawn = attachment_view::card_files(ui, t, files, false, alone);
+                            files_shown
+                                .extend(drawn.into_iter().map(|(f, r)| (note.id.clone(), f, r)));
+                            // Each part's Capture Context under its text (#170).
+                            let line = capture_line(t, (note.captured, &note.context), None);
+                            capture_meta(ui, t, &line, None, false);
+                            let mut before = note.captured;
+                            // Each Section reads on under a tear line (#307).
+                            for section in look.sections {
+                                theme::tear_line(ui);
+                                let part = Part::of_section(section);
+                                let mut spots = Spots::default();
+                                let media = (&mut *photos, store, transcribing);
+                                let boxes = look.boxes.look(part.id);
+                                shown.extend(whole(ui, t, part, media, (boxes, &mut spots)));
+                                let files = (
+                                    section.attachments.as_slice(),
+                                    section.removed_attachments.as_slice(),
+                                    &section.attachment_texts,
+                                );
+                                let drawn = attachment_view::card_files(ui, t, files, false, false);
+                                files_shown.extend(
+                                    drawn.into_iter().map(|(f, r)| (section.id.clone(), f, r)),
+                                );
+                                section_marks.push((section, spots));
+                                let line = capture_line(
+                                    t,
+                                    (section.captured, &section.context),
+                                    Some(before),
+                                );
+                                let edited = section_edited(t, section);
+                                capture_meta(ui, t, &line, edited.as_deref(), false);
+                                before = section.captured;
+                            }
+                        });
+                        return;
+                    }
+                    // The compact view, by the Note's kind (#189).
+                    let text_of = (
+                        note.text.as_str(),
+                        note.text_format.as_str(),
+                        look.boxes.look(&note.id),
+                    );
+                    if look.checklist.is_some()
+                        || look.shopping.is_some()
+                        || look.tally
+                        || look.session
+                    {
+                        // Its name, then how many Lines are open, or the Tally's
+                        // totals today, or the Session's next run and week (#191).
+                        let named = note_kinds::name(&note.text).len();
+                        let untitled = l10n::untitled_list(t, note)
+                            .filter(|_| note_kinds::name(&note.text).trim().is_empty());
+                        if let Some(kind) = untitled {
+                            // A list without a name by its kind (#309).
+                            ui.label(RichText::new(kind).size(20.0).color(text));
+                        } else if named > 0 {
+                            marks = text_marks_view::formatted_label(
+                                ui,
+                                text_of,
+                                (0, named),
+                                (Some(20.0), text),
+                                true,
+                            );
+                        }
+                        if let Some((list, _)) = look.checklist {
+                            checklist_view::card_count(ui, t, list);
+                        } else if let Some((list, _)) = look.shopping {
+                            shopping_view::card_count(ui, t, list);
+                        }
+                        card_glance_lines(ui, look.glance);
+                        return;
+                    }
+                    // A plain Note: its first line and the two after it, or, running
+                    // a Session, its next run and this week (#189).
+                    if let Some(line) =
+                        card_first_line(&note.text, note.text_format == text_format::MARKDOWN)
+                    {
+                        marks = text_marks_view::formatted_label(
+                            ui,
+                            text_of,
+                            line,
+                            (Some(16.0), text),
+                            true,
+                        );
+                        if look.glance.is_empty() {
+                            if let Some(next) = next_lines(&note.text, line.1) {
+                                let more = text_marks_view::formatted_label(
+                                    ui,
+                                    text_of,
+                                    next,
+                                    (Some(14.0), text),
+                                    false,
+                                );
+                                marks.extend(more);
+                            }
+                        } else {
+                            card_glance_lines(ui, look.glance);
+                        }
+                        return;
+                    }
+                    card_glance_lines(ui, look.glance);
+                    // Without words it shows what it holds instead.
+                    if !note.photos.is_empty() {
+                        media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
+                    }
+                    media_view::recordings(
+                        ui,
+                        t,
+                        &note.recordings,
+                        &note.transcripts,
+                        (None, transcribing, 1.0),
+                        (false, false),
+                        &|_| Offers::default(),
+                    );
+                    media_view::removed_texts(
+                        ui,
+                        t,
+                        (&note.removed_photos, &note.photo_texts),
+                        (&note.removed_recordings, &note.transcripts),
+                        &|_, _| Offers::default(),
+                        false,
+                    );
+                    // Its files (#267): one alone is the card, titled by its name.
                     let files = (
                         note.attachments.as_slice(),
                         note.removed_attachments.as_slice(),
                         &note.attachment_texts,
                     );
-                    let drawn = attachment_view::card_files(ui, t, files, false, alone);
+                    let drawn = attachment_view::card_files(ui, t, files, true, alone);
                     files_shown.extend(drawn.into_iter().map(|(f, r)| (note.id.clone(), f, r)));
-                    // Each part's Capture Context under its text (#170).
-                    let line = capture_line(t, (note.captured, &note.context), None);
-                    capture_meta(ui, t, &line, None, false);
-                    let mut before = note.captured;
-                    // Each Section reads on under a tear line (#307).
-                    for section in look.sections {
-                        theme::tear_line(ui);
-                        let part = Part::of_section(section);
-                        let mut spots = Spots::default();
-                        let media = (&mut *photos, store, transcribing);
-                        let boxes = look.boxes.look(part.id);
-                        shown.extend(whole(ui, t, part, media, (boxes, &mut spots)));
-                        let files = (
-                            section.attachments.as_slice(),
-                            section.removed_attachments.as_slice(),
-                            &section.attachment_texts,
-                        );
-                        let drawn = attachment_view::card_files(ui, t, files, false, false);
-                        files_shown
-                            .extend(drawn.into_iter().map(|(f, r)| (section.id.clone(), f, r)));
-                        section_marks.push((section, spots));
-                        let line =
-                            capture_line(t, (section.captured, &section.context), Some(before));
-                        let edited = section_edited(t, section);
-                        capture_meta(ui, t, &line, edited.as_deref(), false);
-                        before = section.captured;
-                    }
                 });
-                return;
-            }
-            // The compact view, by the Note's kind (#189).
-            let text_of = (
-                note.text.as_str(),
-                note.text_format.as_str(),
-                look.boxes.look(&note.id),
-            );
-            if look.checklist.is_some() || look.shopping.is_some() || look.tally || look.session {
-                // Its name, then how many Lines are open, or the Tally's
-                // totals today, or the Session's next run and week (#191).
-                let named = note_kinds::name(&note.text).len();
-                let untitled = l10n::untitled_list(t, note)
-                    .filter(|_| note_kinds::name(&note.text).trim().is_empty());
-                if let Some(kind) = untitled {
-                    // A list without a name by its kind (#309).
-                    ui.label(RichText::new(kind).size(20.0).color(text));
-                } else if named > 0 {
-                    marks = text_marks_view::formatted_label(
-                        ui,
-                        text_of,
-                        (0, named),
-                        (Some(20.0), text),
-                        true,
-                    );
-                }
-                if let Some((list, _)) = look.checklist {
-                    checklist_view::card_count(ui, t, list);
-                } else if let Some((list, _)) = look.shopping {
-                    shopping_view::card_count(ui, t, list);
-                }
-                card_glance_lines(ui, look.glance);
-                return;
-            }
-            // A plain Note: its first line and the two after it, or, running
-            // a Session, its next run and this week (#189).
-            if let Some(line) =
-                card_first_line(&note.text, note.text_format == text_format::MARKDOWN)
-            {
-                marks =
-                    text_marks_view::formatted_label(ui, text_of, line, (Some(16.0), text), true);
-                if look.glance.is_empty() {
-                    if let Some(next) = next_lines(&note.text, line.1) {
-                        let more = text_marks_view::formatted_label(
-                            ui,
-                            text_of,
-                            next,
-                            (Some(14.0), text),
-                            false,
-                        );
-                        marks.extend(more);
-                    }
-                } else {
-                    card_glance_lines(ui, look.glance);
-                }
-                return;
-            }
-            card_glance_lines(ui, look.glance);
-            // Without words it shows what it holds instead.
-            if !note.photos.is_empty() {
-                media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
-            }
-            media_view::recordings(
-                ui,
-                t,
-                &note.recordings,
-                &note.transcripts,
-                (None, transcribing, 1.0),
-                (false, false),
-                &|_| Offers::default(),
-            );
-            media_view::removed_texts(
-                ui,
-                t,
-                (&note.removed_photos, &note.photo_texts),
-                (&note.removed_recordings, &note.transcripts),
-                &|_, _| Offers::default(),
-                false,
-            );
-            // Its files (#267): one alone is the card, titled by its name.
-            let files = (
-                note.attachments.as_slice(),
-                note.removed_attachments.as_slice(),
-                &note.attachment_texts,
-            );
-            let drawn = attachment_view::card_files(ui, t, files, true, alone);
-            files_shown.extend(drawn.into_iter().map(|(f, r)| (note.id.clone(), f, r)));
+                ui.allocate_ui_with_layout(
+                    egui::vec2(buttons, 24.0),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| {
+                        edit_rect = ui
+                            .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                            .0;
+                        // A Note in the trash is restored, not changed.
+                        if !note.is_trashed() {
+                            more_rect = Some(
+                                ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                                    .0,
+                            );
+                        }
+                        // Its view shows under the Note's text, its time
+                        // and place in the detailed view (#170, #189).
+                        if look.switches {
+                            view_rect = Some(
+                                ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                                    .0,
+                            );
+                        }
+                        // Hidden from AI, by its own mark or another's
+                        // (#267).
+                        if look.hidden {
+                            hidden_rect = Some(
+                                ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                                    .0,
+                            );
+                        }
+                        let mark = ui
+                            .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                            .0;
+                        if chosen {
+                            icons::paint(
+                                ui.painter(),
+                                mark.shrink(3.0),
+                                icons::STATUS_DONE,
+                                tones.accent,
+                            );
+                        }
+                    },
+                );
+            });
         });
         let rect = card.rect;
         if important {

@@ -312,8 +312,8 @@ List<Widget> _sortingCards(
         then(openNote(context, notes, places, note, sorting: sorting), changed),
     notes: notes,
     onChanged: sorted,
-    // The screen is Unsorted.
-    showPlace: (_) => false,
+    // Unsorted is a mixed list: its cards say Unsorted too (#330).
+    showPlace: (_) => true,
     onSchedule: (note, spawn) =>
         then(spawnFromNote(context, notes, places, note, spawn: spawn), sorted),
     compact: compact,
