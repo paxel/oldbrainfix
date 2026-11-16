@@ -823,11 +823,13 @@ struct UpdateNotice {
 }
 
 /// What File into… files (#272): these Notes, or the Note being
-/// captured; and what Add to Note… adds (#308).
+/// captured; and what Add to Note… adds (#308), also the question and
+/// answer at this place of the Ask panel (#316).
 #[derive(Debug, Clone, PartialEq)]
 enum Filing {
     Notes(Vec<String>),
     Capture,
+    Answer(usize),
 }
 
 /// A dialog over the window.
@@ -3368,6 +3370,14 @@ impl App {
             );
             return Ok(());
         }
+        self.copy_share(share);
+        Ok(())
+    }
+
+    /// Puts `share`'s text on the clipboard, with its HTML; through the
+    /// window's clipboard, as plain text, when the system's cannot be
+    /// reached.
+    fn copy_share(&mut self, share: NoteShare) {
         let put = self
             .clipboard
             .as_mut()
@@ -3375,7 +3385,6 @@ impl App {
         if !put {
             self.copy = Some(share.text);
         }
-        Ok(())
     }
 
     /// Saves the Note `id` as a Markdown file where the user says, with
@@ -3401,17 +3410,26 @@ impl App {
             return Ok(());
         }
         let title = row_title(&t, Notes::new(&self.store).by_id(id)?.as_ref());
-        let Some(mut path) =
-            (self.markdown_saver)(t.save_markdown_title(), &share_note::file_name(&title))
-        else {
-            return Ok(());
+        if !self.save_share(&share, &share_note::file_name(&title))? {
+            nothing(self);
+        }
+        Ok(())
+    }
+
+    /// Saves `share` as a Markdown file where the user says, proposed as
+    /// `name`, with its photos and recordings beside it; false when there
+    /// was nothing to write. A failure is announced; backing out of the
+    /// dialog writes nothing.
+    fn save_share(&mut self, share: &NoteShare, name: &str) -> oldbrainfix_core::Result<bool> {
+        let t = self.t;
+        let Some(mut path) = (self.markdown_saver)(t.save_markdown_title(), name) else {
+            return Ok(true);
         };
         if path.extension().is_none_or(|e| e != MARKDOWN_EXTENSION) {
             path.set_extension(MARKDOWN_EXTENSION);
         }
-        match share_note::save_markdown(&path, &share, &Notes::new(&self.store)) {
-            Ok(true) => {}
-            Ok(false) => nothing(self),
+        match share_note::save_markdown(&path, share, &Notes::new(&self.store)) {
+            Ok(written) => return Ok(written),
             Err(e) => self.announce_failure(
                 t.note_not_shared(),
                 t.note_not_shared_title(),
@@ -3419,7 +3437,7 @@ impl App {
                 format!("markdown: {e}"),
             ),
         }
-        Ok(())
+        Ok(true)
     }
 
     /// Saves `list` as one calendar file where the user says, made at the
@@ -5218,13 +5236,10 @@ impl App {
                 let Some(asked) = self.ask.exchanges.get(at) else {
                     return Ok(());
                 };
-                let answer = &asked.answer;
                 if asked.kept.is_some() {
                     return Ok(());
                 }
-                // The question its first line, the answer with its links
-                // after it, as Markdown.
-                let text = format!("{}\n\n{}", asked.question.trim(), answer.text.trim());
+                let text = ask_view::kept_text(asked);
                 let note = Notes::new(&self.store).capture_as(
                     &text,
                     oldbrainfix_core::text_format::MARKDOWN,
@@ -5233,6 +5248,28 @@ impl App {
                 )?;
                 if let Some(asked) = self.ask.exchanges.get_mut(at) {
                     asked.kept = Some(note.id);
+                }
+            }
+            AskAsked::Copy(at) => {
+                if let Some(asked) = self.ask.exchanges.get(at) {
+                    let share = ask_view::answer_share(&asked.answer.text);
+                    self.copy_share(share);
+                }
+            }
+            AskAsked::AddToNote(at) => {
+                if self.ask.exchanges.get(at).is_some() {
+                    let picker = NotePicker::read(&self.store, &self.t, &[])?;
+                    self.dialog = Some(Dialog::AddToNote {
+                        adding: Filing::Answer(at),
+                        picker: Box::new(picker),
+                    });
+                }
+            }
+            AskAsked::Save(at) => {
+                if let Some(asked) = self.ask.exchanges.get(at) {
+                    let share = ask_view::answer_share(&asked.answer.text);
+                    let name = share_note::file_name(&asked.question);
+                    self.save_share(&share, &name)?;
                 }
             }
             // The question goes into the field to be asked again; its
@@ -5442,6 +5479,7 @@ impl App {
             sources,
             also_read,
             kept: None,
+            added: None,
         });
     }
 
@@ -11662,7 +11700,42 @@ impl App {
                 add_to_note::picked(&self.store, &into)?;
                 self.capture_into_note(&into)?;
             }
+            Some(Dialog::AddToNote {
+                adding: Filing::Answer(at),
+                ..
+            }) => {
+                add_to_note::picked(&self.store, &into)?;
+                self.answer_into_note(at, &into)?;
+            }
             other => self.dialog = other,
+        }
+        Ok(())
+    }
+
+    /// Adds the question and answer at `at` of the Ask panel to the Note
+    /// `into` as a Section (#316), as Keep as Note would keep them: written
+    /// where that Note lies, so for the same people, with no Nudge, and
+    /// merged into it in one batch. The panel then names the Note.
+    fn answer_into_note(&mut self, at: usize, into: &str) -> oldbrainfix_core::Result<()> {
+        let Some(asked) = self.ask.exchanges.get(at) else {
+            return Ok(());
+        };
+        let text = ask_view::kept_text(asked);
+        let notes = Notes::new(&self.store);
+        let place = notes.by_id(into)?.and_then(|n| n.place);
+        self.store.batch(|| {
+            let note = notes.capture_as(
+                &text,
+                oldbrainfix_core::text_format::MARKDOWN,
+                place.as_deref(),
+                None,
+            )?;
+            notes.merge(&note.id, into)
+        })?;
+        let title = row_title(&self.t, notes.by_id(into)?.as_ref());
+        let first = title.lines().next().unwrap_or_default().to_string();
+        if let Some(asked) = self.ask.exchanges.get_mut(at) {
+            asked.added = Some((into.to_string(), first));
         }
         Ok(())
     }

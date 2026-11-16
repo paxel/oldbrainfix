@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Capture offers "Add to Note…", which adds the text, recording, photos or files to a chosen Note at once. ([obf-1001](https://github.com/paxel/oldbrainfix/issues/308))
 - Capture offers Text, Checklist and Shopping List above the field, and a list keeps each typed line as a Line. ([obf-1003](https://github.com/paxel/oldbrainfix/issues/310))
 - A spoken shopping list goes into a Shopping List as Lines, its recording kept, also without the speech model. ([obf-1004](https://github.com/paxel/oldbrainfix/issues/311))
+- An Ask answer can also be copied, added to an existing Note and shared, on the desktop saved as Markdown. ([obf-1009](https://github.com/paxel/oldbrainfix/issues/316))
 
 ### Changed
 

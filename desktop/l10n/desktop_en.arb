@@ -761,6 +761,8 @@
   "@askKeep": {"description": "Button under an answer: saves the question and the answer, with its links, as a Note."},
   "askKept": "Kept as a Note",
   "@askKept": {"description": "Link under an answer once it was kept; opens that Note."},
+  "askAddedTo": "Added to “{title}”",
+  "@askAddedTo": {"description": "Link under an answer once Add to Note… added the question and answer to a Note (#316); opens that Note.", "placeholders": {"title": {"type": "String", "example": "Passport"}}},
   "askCut": "The answer was cut off at its length limit.",
   "@askCut": {"description": "Under an answer that reached the provider's length limit."},
   "askUnchecked": "A source could not be checked.",

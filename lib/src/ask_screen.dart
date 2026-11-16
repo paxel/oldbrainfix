@@ -1,14 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'announcements.dart';
 import 'app_links.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
+import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
+import 'merge_into_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
@@ -253,6 +257,10 @@ class _Asked {
   /// The Note it was kept as.
   String? kept;
 
+  /// The Note it was added to last with Add to Note… (#316), by id with
+  /// its first line.
+  (String, String)? added;
+
   _Asked(this.question, this.answer, this.sources, this.alsoRead);
 }
 
@@ -271,7 +279,9 @@ enum _Phase { looking, unreachable, consent, ready }
 /// under it (#315); each has Edit, which puts it into the field to ask
 /// again. A follow-up is asked after the earlier answers; Start over drops
 /// them, as leaving the page does. Keep as Note saves a question and its answer
-/// as a Markdown Note in Unsorted, with no Nudge. While the computer's
+/// as a Markdown Note in Unsorted, with no Nudge; Add to Note… adds the same
+/// to a Note picked as a Section, and Copy text and Share to an app hand
+/// the answer on as Markdown (#316). While the computer's
 /// provider cannot be asked, the field says why and what to do, and Ask
 /// waits. While a question runs, a status line under it says whom it asks
 /// and how many Notes were read, with Stop (#317). A question not
@@ -611,11 +621,78 @@ class _AskScreenState extends State<AskScreen> {
   /// the question its first line, with no Nudge, as the desktop does.
   void _keep(_Asked asked) {
     if (asked.kept != null) return;
-    final note = Notes(widget.store).capture(
-      '${asked.question.trim()}\n\n${asked.answer.text.trim()}',
-      format: TextFormats.markdown,
-    );
+    final note = Notes(widget.store)
+        .capture(_keptText(asked), format: TextFormats.markdown);
     setState(() => asked.kept = note.id);
+  }
+
+  /// What Keep as Note keeps and Add to Note… adds: the question its
+  /// first line, the answer with its links after it.
+  static String _keptText(_Asked asked) =>
+      '${asked.question.trim()}\n\n${asked.answer.text.trim()}';
+
+  /// The answer as it goes to another app, as a Note's formatted text goes
+  /// (#129): its Markdown as written, each item that starts with a box as
+  /// a task list item; its app links stay, in the HTML only their labels
+  /// (ADR 0046).
+  static String _shareText(_Asked asked) =>
+      Markdown.taskLists(asked.answer.text.trim());
+
+  /// Puts the answer on the clipboard as Copy text does, saying nothing
+  /// (#183, #316).
+  void _copy(_Asked asked) =>
+      unawaited(Clipboard.setData(ClipboardData(text: _shareText(asked))));
+
+  /// Hands the answer to the app picked on the share sheet, with its HTML
+  /// beside it (#316); no app taking it is announced, a sheet left
+  /// without one says nothing.
+  Future<void> _share(_Asked asked) async {
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final outcome = await BundleScope.of(context).shareText(
+      _shareText(asked),
+      html: Markdown.html(asked.answer.text.trim()),
+    );
+    if (outcome != ShareOutcome.noApp) return;
+    announceFailureWith(
+      announcements,
+      navigator,
+      t.phoneAskNotShared,
+      title: t.phoneAskNotSharedTitle,
+      cause: t.phoneAskShareNoApp,
+      fix: t.shareNoAppFix,
+      details: 'share: no app took the answer',
+    );
+  }
+
+  /// Add to Note… (#308, #316): the Note picked gets the question and its
+  /// answer, as Keep as Note keeps them, as a Section at once, written
+  /// where that Note lies, so for the same people, with no Nudge; the page
+  /// stays and names the Note. Nothing picked, nothing changes.
+  Future<void> _addTo(_Asked asked) async {
+    final store = widget.store;
+    final notes = Notes(store);
+    final intoId = await Navigator.of(context).push(
+      MaterialPageRoute<String>(
+        builder: (_) =>
+            MergeIntoScreen(notes: notes, places: Places(store), adding: true),
+      ),
+    );
+    if (intoId == null || !mounted) return;
+    final place = notes.byId(intoId)?.place;
+    store.batch(() {
+      final note = notes.capture(
+        _keptText(asked),
+        format: TextFormats.markdown,
+        place: place,
+      );
+      notes.merge(note.id, intoId);
+    });
+    final into = notes.byId(intoId);
+    setState(
+      () => asked.added = (intoId, into == null ? intoId : _title(into)),
+    );
   }
 
   void _open(String id) =>
@@ -959,6 +1036,8 @@ class _AskScreenState extends State<AskScreen> {
       color: theme.colorScheme.onSurfaceVariant,
     );
     final kept = asked.kept;
+    final added = asked.added;
+    final words = asked.answer.text.trim().isNotEmpty;
     return Column(
       key: newest ? _newest : ValueKey('ask-entry-$i'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1019,22 +1098,58 @@ class _AskScreenState extends State<AskScreen> {
               ),
           ],
         const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: kept == null
-              ? OutlinedButton.icon(
-                  key: ValueKey('ask-keep-$i'),
-                  onPressed: () => _keep(asked),
-                  icon: const Icon(Icons.note_add_outlined),
-                  label: Text(t.phoneAskKeep),
-                )
-              : TextButton.icon(
-                  key: ValueKey('ask-kept-$i'),
-                  onPressed: () => _open(kept),
-                  icon: const Icon(Icons.check),
-                  label: Text(t.phoneAskKept),
-                ),
+        // Copy text, Keep as Note, Add to Note… and Share to an app
+        // (#316), Copy and Share only for an answer with words.
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (words)
+              TextButton.icon(
+                key: ValueKey('ask-copy-$i'),
+                onPressed: () => _copy(asked),
+                icon: const Icon(Icons.copy_outlined),
+                label: Text(t.copyText),
+              ),
+            kept == null
+                ? OutlinedButton.icon(
+                    key: ValueKey('ask-keep-$i'),
+                    onPressed: () => _keep(asked),
+                    icon: const Icon(Icons.note_add_outlined),
+                    label: Text(t.phoneAskKeep),
+                  )
+                : TextButton.icon(
+                    key: ValueKey('ask-kept-$i'),
+                    onPressed: () => _open(kept),
+                    icon: const Icon(Icons.check),
+                    label: Text(t.phoneAskKept),
+                  ),
+            TextButton.icon(
+              key: ValueKey('ask-add-to-note-$i'),
+              onPressed: () => unawaited(_addTo(asked)),
+              icon: const Icon(Icons.call_merge),
+              label: Text(t.addToNote),
+            ),
+            if (words)
+              TextButton.icon(
+                key: ValueKey('ask-share-$i'),
+                onPressed: () => unawaited(_share(asked)),
+                icon: const Icon(Icons.share_outlined),
+                label: Text(t.shareToApp),
+              ),
+          ],
         ),
+        if (added case (final id, final title))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: ValueKey('ask-added-$i'),
+              onPressed: () => _open(id),
+              icon: const Icon(Icons.check),
+              label: Text(t.phoneAskAddedTo(title)),
+            ),
+          ),
       ],
     );
   }

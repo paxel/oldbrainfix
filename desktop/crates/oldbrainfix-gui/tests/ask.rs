@@ -1,7 +1,8 @@
 //! The Ask panel on the desktop (#267, ADR 0051): AI ▸ Ask… and Ctrl+K
 //! show it; it names the provider and what is sent, asks a fake provider
 //! whose tools are answered as the AI sees the store, shows the answer
-//! with links that open the Notes it came from, keeps it as a Note, and
+//! with links that open the Notes it came from, keeps it as a Note,
+//! copies it, adds it to a Note and saves it as Markdown (#316), and
 //! leaves a change the model made waiting for its review; the provider's
 //! card in the Settings keeps it all on this computer. The questions
 //! stand as a thread, the oldest first, each with Edit, and Up in the
@@ -17,6 +18,8 @@
     clippy::indexing_slicing
 )]
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use egui::accesskit::{Role, Toggled};
@@ -24,8 +27,9 @@ use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::ask::{Protocol, Reply, Request, Transport};
-use oldbrainfix_core::{Notes, Places, SigningKey, Store, parse_time};
+use oldbrainfix_core::{DeviceSettings, Notes, Places, SigningKey, Store, parse_time};
 use oldbrainfix_gui::l10n::L10n;
+use oldbrainfix_gui::media::Clipboard;
 use oldbrainfix_gui::{App, Page, Selection};
 use serde_json::{Value, json};
 
@@ -646,6 +650,19 @@ fn a_question_not_answered_stays_under_it_with_its_cause_and_fix_until_asked_aga
         assert!(labelled(&harness, "Tell me something"), "{cause}");
         assert_eq!(harness.state().ask_panel().question, "Tell me something");
         assert!(harness.state().ask_panel().exchanges.is_empty());
+        // Nothing to copy, keep, add or save under a failure (#316).
+        for action in [
+            t.copy_as_text(),
+            t.ask_keep(),
+            t.add_to_note(),
+            t.save_as_markdown(),
+        ] {
+            let offered = harness
+                .query_all_by_role_and_label(Role::Button, action)
+                .next()
+                .is_some();
+            assert!(!offered, "{cause}: {action}");
+        }
         assert!(!shows(&harness, "sk-ant-test-key"));
         // It stays while the user does something else.
         harness.run_steps(5);
@@ -1173,5 +1190,156 @@ fn a_question_asked_scrolls_the_thread_to_it() -> TestResult {
     let newest = top("Fourth?");
     assert!(0.0 < newest && newest < field_top, "{newest} {field_top}");
     assert!(top("First?") < 0.0, "{}", top("First?"));
+    Ok(())
+}
+
+/// What went to the fake clipboard: each text with its HTML.
+type Copied = Rc<RefCell<Vec<(String, Option<String>)>>>;
+
+struct FakeClipboard(Copied);
+
+impl Clipboard for FakeClipboard {
+    fn photo(&mut self) -> Option<Vec<u8>> {
+        None
+    }
+
+    fn put_text(&mut self, text: &str, html: Option<&str>) -> bool {
+        self.0
+            .borrow_mut()
+            .push((text.to_string(), html.map(str::to_string)));
+        true
+    }
+}
+
+/// Clicks the button `label` of the answer, the first in the thread.
+fn press(harness: &mut Harness<'_, App>, label: &str) {
+    harness
+        .get_all_by_role_and_label(Role::Button, label)
+        .next()
+        .unwrap()
+        .click();
+    harness.run();
+}
+
+#[test]
+fn copy_as_text_puts_the_answer_with_its_links_on_the_clipboard_and_html_beside() -> TestResult {
+    let (store, passport) = store()?;
+    let answer = format!("In the **blue folder**, see [Passport](oldbrainfix://note/{passport}).");
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"id": passport})),
+        end_turn(&answer),
+    ]);
+    let t = L10n::new("en");
+    let mut harness = harness(store, &fake);
+    let copied = Copied::default();
+    harness
+        .state_mut()
+        .set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    ask(&mut harness, "Where is my passport?");
+    press(&mut harness, t.copy_as_text());
+    let copied = copied.borrow();
+    let [(text, html)] = copied.as_slice() else {
+        panic!("copied once: {copied:?}");
+    };
+    // The answer alone, its Markdown as written, its app link kept.
+    assert_eq!(text, &answer);
+    // Beside it the HTML, the app link only its label (ADR 0046).
+    let html = html.as_deref().ok_or("no HTML")?;
+    assert!(html.contains("<strong>blue folder</strong>"), "{html}");
+    assert!(html.contains("Passport"), "{html}");
+    assert!(!html.contains("oldbrainfix://"), "{html}");
+    // Copied says nothing, and keeps nothing.
+    assert_eq!(harness.state().notice(), None);
+    assert!(!shows(&harness, t.ask_kept()));
+    Ok(())
+}
+
+#[test]
+fn save_as_markdown_writes_the_answer_into_the_file_named_after_the_question() -> TestResult {
+    let (store, passport) = store()?;
+    let answer = format!("In the [blue folder](oldbrainfix://note/{passport}).");
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"id": passport})),
+        end_turn(&answer),
+    ]);
+    let t = L10n::new("en");
+    let mut harness = harness(store, &fake);
+    let dir = tempfile::tempdir()?;
+    let at = dir.path().to_path_buf();
+    let proposed = Rc::new(RefCell::new(Vec::new()));
+    let named = proposed.clone();
+    harness
+        .state_mut()
+        .set_markdown_saver(Box::new(move |_, name| {
+            named.borrow_mut().push(name.to_string());
+            Some(at.join(name))
+        }));
+    ask(&mut harness, "Where is my passport?");
+    press(&mut harness, t.save_as_markdown());
+    assert_eq!(*proposed.borrow(), ["Where is my passport.md"]);
+    let saved = std::fs::read_to_string(dir.path().join("Where is my passport.md"))?;
+    assert_eq!(saved.trim_end(), answer);
+    assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn add_to_note_adds_the_question_and_answer_to_the_note_picked_as_a_section() -> TestResult {
+    let (store, passport) = store()?;
+    let travel = Places::new(&store).add_area("Travel")?;
+    let papers = Notes::new(&store).capture("Travel papers", Some(&travel.id), None)?;
+    let answer = format!("In the [blue folder](oldbrainfix://note/{passport}).");
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"id": passport})),
+        end_turn(&answer),
+    ]);
+    let t = L10n::new("en");
+    let mut harness = harness(store, &fake);
+    ask(&mut harness, "Where is my passport?");
+    press(&mut harness, t.add_to_note());
+    // The picker of Add to Note… (#308) offers the Notes; one is picked.
+    harness
+        .query_all_by_label("Travel papers")
+        .next_back()
+        .ok_or("Travel papers not offered")?
+        .click();
+    harness.run();
+    let store = harness.state().store();
+    let notes = Notes::new(store);
+    let sections = notes.sections(&papers.id)?;
+    let [section] = sections.as_slice() else {
+        panic!("one Section: {sections:?}");
+    };
+    // What Keep as Note keeps, as Markdown, in the Note picked.
+    assert_eq!(section.text, format!("Where is my passport?\n\n{answer}"));
+    assert_eq!(section.text_format, "markdown");
+    let note = notes.by_id(&papers.id)?.ok_or("the Note")?;
+    assert_eq!(note.place.as_deref(), Some(travel.id.as_str()));
+    assert_eq!(note.text, "Travel papers");
+    // Nothing waits in Unsorted, and nothing was kept as a Note.
+    let left: Vec<_> = notes
+        .all()?
+        .into_iter()
+        .filter(|n| n.text.starts_with("Where is my passport?"))
+        .collect();
+    assert!(left.is_empty(), "{left:?}");
+    // The pick is kept as added to last, as from Capture.
+    assert_eq!(
+        DeviceSettings::new(store).recently_added_to()?.first(),
+        Some(&papers.id)
+    );
+    // The panel stays, names the Note and opens it.
+    assert_eq!(harness.state().ask_panel().exchanges.len(), 1);
+    let added = t.ask_added_to("Travel papers");
+    assert!(shows(&harness, &added));
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::Button, t.ask_keep())
+            .next()
+            .is_some()
+    );
+    harness.get_all_by_label(&added).next().unwrap().click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(papers.id.as_str()));
     Ok(())
 }

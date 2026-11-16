@@ -10,7 +10,8 @@
 //! ask again, and Up in the empty field fetches the last one. Each
 //! answer shows with links to the Notes it came from, then to the other
 //! Notes the model read for it under "Also read" (#314), which open them,
-//! and "Keep as Note". What the model changed waits as an AI Task for its
+//! and "Copy as text", "Keep as Note", "Add to Note…" and "Save as
+//! Markdown…" (#316). What the model changed waits as an AI Task for its
 //! review. The thread is gone once the list shows another place.
 //!
 //! The AI settings' card where the provider is entered is here too: the
@@ -20,7 +21,8 @@
 use egui::text::{CCursor, CCursorRange};
 use egui::{Align, Id, Key, Layout, RichText, TextEdit, Ui};
 use oldbrainfix_core::ask::{Answer, AskError, Exchange, Protocol, Provider, Unready};
-use oldbrainfix_core::text_format;
+use oldbrainfix_core::share::NoteShare;
+use oldbrainfix_core::{markdown, text_format};
 
 use crate::app::{embossed, name_field};
 use crate::l10n::L10n;
@@ -114,6 +116,9 @@ pub struct Asked {
     pub also_read: Vec<(String, String)>,
     /// The Note it was kept as.
     pub kept: Option<String>,
+    /// The Note it was added to last with Add to Note… (#316), by id with
+    /// its title.
+    pub added: Option<(String, String)>,
 }
 
 /// What was asked of the panel.
@@ -127,6 +132,14 @@ pub enum AskAsked {
     StartOver,
     /// Keeps the question and answer at this place as a Note.
     Keep(usize),
+    /// Puts the answer at this place on the clipboard (#316).
+    Copy(usize),
+    /// Adds the question and answer at this place to a Note picked in Add
+    /// to Note… (#316).
+    AddToNote(usize),
+    /// Saves the answer at this place as a Markdown file, the desktop's
+    /// Share to an app (#316).
+    Save(usize),
     /// Puts the question at this place into the field (#315).
     Edit(usize),
     /// Opens a Note an answer came from, or the one it was kept as.
@@ -202,8 +215,9 @@ pub fn unready_line(t: &L10n, unready: Unready) -> &'static str {
 /// The panel: its heading, whom the questions go to and what is sent,
 /// the review an AI Task waits for, the questions asked as a thread, the
 /// oldest first (#315): each answered with "Edit", its answer, the Notes
-/// it came from and "Keep as Note", then the one asked with its status
-/// line, or the last one not answered with its cause and fix (#317);
+/// it came from and what can be done with it (#316), then the one asked
+/// with its status line, or the last one not answered with its cause and
+/// fix (#317);
 /// under the thread the question field with Ask (Stop while asking,
 /// Start over once something was asked), and under it what the provider
 /// lacks while it cannot be asked.
@@ -410,7 +424,9 @@ fn thread(
 /// An answer as Markdown, its links opening the Notes they name, whether
 /// it was cut off, whether a link to a Note not read was removed from it
 /// (#294), the Notes it came from, then those the model also read
-/// (#314), and "Keep as Note", or that it was kept.
+/// (#314), and in one row "Copy as text", "Keep as Note" or that it was
+/// kept, "Add to Note…" and "Save as Markdown…" (#316), Copy and Save only
+/// for an answer with words, then the Note it was added to last.
 fn answer_rows(
     ui: &mut Ui,
     t: &L10n,
@@ -451,21 +467,75 @@ fn answer_rows(
             }
         }
     }
-    match &exchange.kept {
-        None => {
-            if ui.button(RichText::new(t.ask_keep()).color(text)).clicked() {
-                asked.push(AskAsked::Keep(at));
-            }
-        }
-        Some(note) => {
-            if ui
-                .link(RichText::new(t.ask_kept()).color(ui.visuals().hyperlink_color))
+    // An answer without words has nothing to copy or save.
+    let words = !answer.text.trim().is_empty();
+    ui.horizontal_wrapped(|ui| {
+        if words
+            && ui
+                .button(RichText::new(t.copy_as_text()).color(text))
                 .clicked()
-            {
-                asked.push(AskAsked::OpenNote(note.clone()));
+        {
+            asked.push(AskAsked::Copy(at));
+        }
+        match &exchange.kept {
+            None => {
+                if ui.button(RichText::new(t.ask_keep()).color(text)).clicked() {
+                    asked.push(AskAsked::Keep(at));
+                }
+            }
+            Some(note) => {
+                if ui
+                    .link(RichText::new(t.ask_kept()).color(ui.visuals().hyperlink_color))
+                    .clicked()
+                {
+                    asked.push(AskAsked::OpenNote(note.clone()));
+                }
             }
         }
+        if ui
+            .button(RichText::new(t.add_to_note()).color(text))
+            .clicked()
+        {
+            asked.push(AskAsked::AddToNote(at));
+        }
+        if words
+            && ui
+                .button(RichText::new(t.save_as_markdown()).color(text))
+                .clicked()
+        {
+            asked.push(AskAsked::Save(at));
+        }
+    });
+    if let Some((note, title)) = &exchange.added
+        && ui
+            .link(RichText::new(t.ask_added_to(title)).color(ui.visuals().hyperlink_color))
+            .clicked()
+    {
+        asked.push(AskAsked::OpenNote(note.clone()));
     }
+}
+
+/// What the answer `text` hands to another app (#316), as a Note's
+/// formatted text goes (#129): its Markdown source with each item that
+/// starts with a box as a task list item, its links as written, and
+/// beside it the HTML, whose app links are their labels (ADR 0046).
+pub fn answer_share(text: &str) -> NoteShare {
+    let text = text.trim();
+    let tasks = markdown::task_lists(text);
+    NoteShare {
+        text: tasks.clone(),
+        html: Some(markdown::html(text)),
+        markdown: tasks,
+        photos: Vec::new(),
+        recordings: Vec::new(),
+    }
+}
+
+/// What Keep as Note keeps and Add to Note… adds of a question and its
+/// answer (#316): the question its first line, the answer with its links
+/// after it, as Markdown.
+pub fn kept_text(asked: &Asked) -> String {
+    format!("{}\n\n{}", asked.question.trim(), asked.answer.text.trim())
 }
 
 /// What the provider's card edits: the protocol, and the base URL, model

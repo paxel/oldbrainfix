@@ -122,3 +122,20 @@ Amended by #315 (Q720): the answers stood the newest first under the field, and 
 - Up walking further back through the questions, as a shell does (left out: #315 asks for the last question; Edit reaches every other).
 - The earlier exchanges as turns of their own, each earlier question marked "Earlier question:" and the current one "Answer this question now:" (rejected: with the quoted nudge 5, 5 and 4 of 5 for passport then wifi, the thread and the follow-up, measured in five replays only; with the unquoted nudge 4, 3 and 3 of 5).
 - The search nudge without the question quoted (rejected: passport then wifi 2 of 5 as turns of their own).
+
+## What an answer offers (#316)
+
+Amended by #316 (Q721): Keep as Note was the only thing that could be done with an answer.
+
+- **Four actions in one row** under each answer of the thread, on the panel and the phone's page alike: Copy, Keep as Note, Add to Note… and Share, each under the name the app already gives it. A question not answered has none of them, and an answer without words has no Copy and no Share.
+- **Copy and Share hand on the answer alone**, as a Note's formatted text goes to another app (#129): its Markdown source as the model wrote it, its app links kept, each item that starts with a box written as a task list item, and HTML beside it, where an app link is only its label (ADR 0046). The question stays behind, since the reader typed it.
+- **Add to Note… adds what Keep as Note keeps**, the question as its first line and the answer after it in Markdown, to an existing Note picked in Add to Note… (#308, the same picker and its "Added to recently"). It goes in as a Section at once, as a capture does: written where that Note lies, so it is sealed for the same people, with no Nudge, and merged into it in one batch. The thread stays, and "Added to “…”" under the answer opens that Note.
+- **On the desktop, Share is "Save as Markdown…"**: the desktop has no share sheet, and its Share to an app is "Copy as text" and "Save as Markdown…" (CONTEXT.md), so Copy is "Copy as text" and Share writes the answer into a Markdown file, the name proposed from the question. On the phone, Copy is "Copy text" and Share is "Share to an app", which opens the share sheet with the text and its HTML.
+- Nothing goes over the wire: the phone keeps, adds, copies and shares on its own. The AI port gains no tool, since nothing new is stored.
+
+### Considered Options
+
+- Keep as Note as the only button and the other three in a ⋮ menu (rejected: complaint 6 was that nothing else could be done with an answer, and four buttons fit a row that wraps).
+- Copy and Share with the question as the first line, as Keep as Note keeps it (rejected: what is pasted or sent is the answer, and the question was typed by the reader).
+- On the desktop, Share as a file the system hands on, as an Occurrence's Share saves a calendar file (rejected: that file is what a calendar app imports; an answer's text goes as a Note's does, and "Save as Markdown…" is the desktop's name for that).
+- Share left out on the desktop, as Copy as text already hands the text on (rejected: a file keeps the answer outside the app, which the clipboard does not).

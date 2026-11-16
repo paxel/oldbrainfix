@@ -2,24 +2,28 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/app_links.dart';
 import 'package:oldbrainfix/src/ask_screen.dart';
+import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../packages/oldbrainfix_core/test/test_host.dart';
+import 'bundle_test.dart' show FakeBundles;
 import 'fake_alarms.dart';
 import 'fake_ask.dart';
 import 'open_settings.dart';
 
 /// Asking from the phone (#267, ADR 0051): the phone asks the user's own
 /// desktop, only once the user allowed the provider it names; answers
-/// link their Notes, which open here, and can be kept as a Note; a
-/// question not answered says why at the top. The questions stand as a
-/// thread, the oldest first, each with Edit (#315).
+/// link their Notes, which open here, and can be kept as a Note, copied,
+/// added to a Note and shared (#316); a question not answered says why at
+/// the top. The questions stand as a thread, the oldest first, each with
+/// Edit (#315).
 void main() {
   late Store store;
   late Announcements announcements;
@@ -46,6 +50,7 @@ void main() {
     DesktopAsking asking, {
     bool settle = true,
     Size size = const Size(1200, 3600),
+    BundlePlatform bundles = const NoBundles(),
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -59,7 +64,10 @@ void main() {
           announcements: announcements,
           child: AppLinkScope(
             onOpen: (_, link) async => opened.add(link),
-            child: child ?? const SizedBox.shrink(),
+            child: BundleScope(
+              bundles: bundles,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         ),
         home: Builder(
@@ -436,6 +444,134 @@ void main() {
     });
   });
 
+  group('an answer (#316)', () {
+    const answer = '**Tuesday** at 9, see [Dentist](oldbrainfix://note/n1).';
+    FakeAsking desk() => FakeAsking(
+      answer: (_) =>
+          const AskReply.answered(DesktopAnswer(text: answer, notes: [])),
+    );
+
+    testWidgets('offers Copy text, Keep as Note, Add to Note… and Share to '
+        'an app in a row, in that order', (tester) async {
+      store.allowAsking(fakeClaude);
+      await pumpAsk(tester, desk());
+      await ask(tester, 'When is the dentist?');
+      final xs = [
+        'ask-copy-0',
+        'ask-keep-0',
+        'ask-add-to-note-0',
+        'ask-share-0',
+      ].map((k) => tester.getTopLeft(key(k)).dx).toList();
+      expect(xs, orderedEquals([...xs]..sort()));
+      expect(find.text('Copy text'), findsOneWidget);
+      expect(find.text('Add to Note…'), findsOneWidget);
+      expect(find.text('Share to an app'), findsOneWidget);
+    });
+
+    testWidgets('Copy text puts the answer on the clipboard as Markdown, its '
+        'links kept, and says nothing', (tester) async {
+      store.allowAsking(fakeClaude);
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied.add((call.arguments as Map)['text'] as String);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await pumpAsk(tester, desk());
+      await ask(tester, 'When is the dentist?');
+      await tester.tap(key('ask-copy-0'));
+      await tester.pumpAndSettle();
+      expect(copied, [answer]);
+      expect(announcements.visible, isNull);
+    });
+
+    testWidgets('Share to an app hands the answer with its HTML to the share '
+        'sheet; no app taking it is announced', (tester) async {
+      store.allowAsking(fakeClaude);
+      final dir = Directory.systemTemp.createTempSync('ask-share');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final bundles = FakeBundles(dir);
+      await pumpAsk(tester, desk(), bundles: bundles);
+      await ask(tester, 'When is the dentist?');
+      await tester.tap(key('ask-share-0'));
+      await tester.pumpAndSettle();
+      final shared = bundles.texts.single;
+      expect(shared.text, answer);
+      expect(shared.files, isEmpty);
+      expect(shared.html, contains('<strong>Tuesday</strong>'));
+      expect(shared.html, contains('Dentist'));
+      expect(shared.html, isNot(contains('oldbrainfix://')));
+      expect(announcements.visible, isNull);
+
+      bundles.shares = false;
+      await tester.tap(key('ask-share-0'));
+      await tester.pumpAndSettle();
+      expect(announcements.visible, 'The answer was not shared.');
+    });
+
+    testWidgets('Add to Note… adds the question and the answer to the Note '
+        'picked as a Section, where that Note lies, and names it', (
+      tester,
+    ) async {
+      store.allowAsking(fakeClaude);
+      final places = Places(store);
+      final health = places.addArea('Health');
+      final notes = Notes(store);
+      final dentist = notes.capture('Dentist visits', place: health.id);
+      await pumpAsk(tester, desk());
+      await ask(tester, 'When is the dentist?');
+      final before = notes.all().length;
+      await tester.tap(key('ask-add-to-note-0'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add to Note…'), findsWidgets);
+      await tester.tap(find.text('Dentist visits').last);
+      await tester.pumpAndSettle();
+      final sections = notes.sections(dentist.id);
+      expect(sections, hasLength(1));
+      expect(
+        sections.single.text,
+        'When is the dentist?\n\n$answer',
+        reason: 'what Keep as Note keeps',
+      );
+      expect(sections.single.textFormat, TextFormats.markdown);
+      expect(notes.byId(dentist.id)!.place, health.id);
+      expect(notes.all(), hasLength(before), reason: 'nothing in Unsorted');
+      expect(store.recentlyAddedTo.first, dentist.id);
+      // The page stays, names the Note and opens it; Keep as Note stays.
+      expect(key('ask-keep-0'), findsOneWidget);
+      expect(find.text('Added to “Dentist visits”'), findsOneWidget);
+      await tester.tap(key('ask-added-0'));
+      await tester.pumpAndSettle();
+      expect(opened, [AppLink(AppLinkKind.note, dentist.id)]);
+    });
+
+    testWidgets('Add to Note… left without a pick changes nothing', (
+      tester,
+    ) async {
+      store.allowAsking(fakeClaude);
+      Notes(store).capture('Dentist visits');
+      await pumpAsk(tester, desk());
+      await ask(tester, 'When is the dentist?');
+      final before = Notes(store).all().map((n) => n.text).toList();
+      await tester.tap(key('ask-add-to-note-0'));
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(Notes(store).all().map((n) => n.text).toList(), before);
+      expect(key('ask-added-0'), findsNothing);
+    });
+  });
+
   group('the thread (#315)', () {
     String field(WidgetTester tester) =>
         tester.widget<TextField>(key('ask-question')).controller!.text;
@@ -686,6 +822,11 @@ void main() {
           reason: 'under its question: $cause',
         );
         expect(announcements.visible, isNull, reason: 'not at the top: $cause');
+        // Nothing to copy, keep, add or share under a failure (#316).
+        for (final action in ['Copy text', 'Keep as Note', 'Add to Note…']) {
+          expect(find.text(action), findsNothing, reason: '$cause: $action');
+        }
+        expect(find.text('Share to an app'), findsNothing, reason: cause);
         // It stays while the user does something else.
         await tester.enterText(key('ask-question'), 'Where now?');
         await tester.pump(const Duration(minutes: 1));

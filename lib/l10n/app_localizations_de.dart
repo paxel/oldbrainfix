@@ -6311,6 +6311,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get phoneAskKept => 'Als Notiz gespeichert';
 
   @override
+  String phoneAskAddedTo(String title) {
+    return 'Zu „$title“ hinzugefügt';
+  }
+
+  @override
+  String get phoneAskNotShared => 'Die Antwort wurde nicht geteilt.';
+
+  @override
+  String get phoneAskNotSharedTitle => 'Antwort nicht geteilt';
+
+  @override
+  String get phoneAskShareNoApp => 'Keine App hier kann die Antwort annehmen.';
+
+  @override
   String get phoneAskCut =>
       'Die Antwort wurde an ihrer Längengrenze abgeschnitten.';
 

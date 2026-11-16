@@ -10154,6 +10154,30 @@ abstract class AppLocalizations {
   /// **'Kept as a Note'**
   String get phoneAskKept;
 
+  /// Shown under an answer once Add to Note… added the question and answer to a Note (#316); a tap opens that Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to “{title}”'**
+  String phoneAskAddedTo(String title);
+
+  /// Announced when Share to an app under an answer could not hand it to another app (#316); the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer was not shared.'**
+  String get phoneAskNotShared;
+
+  /// Title of the dialog behind 'phoneAskNotShared'.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer not shared'**
+  String get phoneAskNotSharedTitle;
+
+  /// Why an answer was not shared: no app takes text (#316). Its fix is 'shareNoAppFix'.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the answer.'**
+  String get phoneAskShareNoApp;
+
   /// Line under an answer the provider cut off.
   ///
   /// In en, this message translates to:

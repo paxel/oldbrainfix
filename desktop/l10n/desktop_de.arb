@@ -404,6 +404,7 @@
   "askAlsoRead": "Auch gelesen",
   "askKeep": "Als Notiz behalten",
   "askKept": "Als Notiz behalten",
+  "askAddedTo": "Zu „{title}“ hinzugefügt",
   "askCut": "Die Antwort wurde an ihrer Längengrenze abgeschnitten.",
   "askUnchecked": "Eine Quelle konnte nicht geprüft werden.",
   "askRefused": "Das Modell hat diese Frage nicht beantwortet.",

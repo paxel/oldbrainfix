@@ -6238,6 +6238,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneAskKept => 'Kept as a Note';
 
   @override
+  String phoneAskAddedTo(String title) {
+    return 'Added to “$title”';
+  }
+
+  @override
+  String get phoneAskNotShared => 'The answer was not shared.';
+
+  @override
+  String get phoneAskNotSharedTitle => 'Answer not shared';
+
+  @override
+  String get phoneAskShareNoApp => 'No app here can take the answer.';
+
+  @override
   String get phoneAskCut => 'The answer was cut off at its length limit.';
 
   @override

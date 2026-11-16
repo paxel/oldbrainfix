@@ -8,7 +8,8 @@
 //! Dart core's `askDesktop` does. The panel itself is drawn with a real
 //! answer into PNG files for the report. Two questions in one session
 //! stand in the panel's thread, and reach the desktop from the phone the
-//! second after the first (#315).
+//! second after the first (#315). A real answer is copied as text and
+//! added to a Note with Add to Note… (#316).
 //!
 //! Every test is ignored: neither `cargo test` nor CI runs them. The
 //! script does, one at a time:
@@ -35,9 +36,11 @@
     clippy::indexing_slicing
 )]
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, TcpListener};
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -58,6 +61,7 @@ use oldbrainfix_core::{Notes, PairedDevice, SigningKey, Store};
 use oldbrainfix_gui::App;
 use oldbrainfix_gui::auto_sync::{PairedHosting, Syncing};
 use oldbrainfix_gui::l10n::L10n;
+use oldbrainfix_gui::media::Clipboard;
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -1132,6 +1136,143 @@ fn the_panel_holds_two_questions_of_a_session_in_its_thread() -> TestResult {
     harness.run();
     assert_eq!(harness.state().ask_panel().question, FIRST);
     let file = shots_dir().join("ask-thread-edit.png");
+    harness.render()?.save(&file)?;
+    println!("  drawn: {}", file.display());
+    Ok(())
+}
+
+/// What went to the fake clipboard: each text with its HTML.
+type Copied = Rc<RefCell<Vec<(String, Option<String>)>>>;
+
+struct FakeClipboard(Copied);
+
+impl Clipboard for FakeClipboard {
+    fn photo(&mut self) -> Option<Vec<u8>> {
+        None
+    }
+
+    fn put_text(&mut self, text: &str, html: Option<&str>) -> bool {
+        self.0
+            .borrow_mut()
+            .push((text.to_string(), html.map(str::to_string)));
+        true
+    }
+}
+
+#[test]
+#[ignore = "needs Ollama with a model and a GPU or lavapipe: tool/ask-e2e.sh run"]
+fn the_panel_copies_a_real_answer_and_adds_it_to_a_note() -> TestResult {
+    const QUESTION: &str = "Where is my passport?";
+    const INTO: &str = "Insurance papers in the green box on the wardrobe";
+    let t = L10n::new("en");
+    let (store, ids) = seeded(1, &url(), &model())?;
+    let transport = Recorded::new();
+    let mut app = App::new(store, "en");
+    app.set_wall_clock(Arc::new(wall));
+    app.set_ask_transport(Arc::new(transport.clone()));
+    let copied = Copied::default();
+    app.set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .with_theme(egui::Theme::Light)
+        .wgpu()
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.input_mut().system_theme = Some(egui::Theme::Light);
+    harness.run_steps(4);
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::K);
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text(QUESTION);
+    harness.run();
+    let started = Instant::now();
+    // Without a way to wake the window the panel asks at once, here.
+    harness.key_press(egui::Key::Enter);
+    harness.run();
+    let took = started.elapsed();
+    harness.run_steps(4);
+    println!("=== panel actions, {} at {}: {QUESTION}", model(), url());
+    print_rounds(&transport.rounds());
+    let asked = harness
+        .state()
+        .ask_panel()
+        .exchanges
+        .last()
+        .cloned()
+        .ok_or_else(|| {
+            format!(
+                "no answer after {:.1}s: {:?}",
+                took.as_secs_f64(),
+                harness.state().ask_panel().failed
+            )
+        })?;
+    let answer = asked.answer.text.trim().to_string();
+    println!("  answer after {:.1}s: {answer:?}", took.as_secs_f64());
+    println!(
+        "  read: {:?}",
+        asked
+            .answer
+            .read
+            .iter()
+            .map(|id| titled(&ids, id))
+            .collect::<Vec<_>>()
+    );
+    let file = shots_dir().join("ask-actions.png");
+    harness.render()?.save(&file)?;
+    println!("  drawn: {}", file.display());
+    assert!(took <= limit(), "answered after {:.1}s", took.as_secs_f64());
+    assert!(!answer.is_empty(), "an empty answer");
+
+    // Copy as text: the answer's Markdown, the HTML beside it.
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::Button, t.copy_as_text())
+        .click();
+    harness.run();
+    {
+        let copied = copied.borrow();
+        println!("  copied: {copied:?}");
+        let [(text, html)] = copied.as_slice() else {
+            panic!("copied once: {copied:?}");
+        };
+        assert_eq!(text, &oldbrainfix_core::markdown::task_lists(&answer));
+        let html = html.as_deref().ok_or("no HTML beside it")?;
+        assert!(!html.trim().is_empty(), "empty HTML");
+        assert!(!html.contains("oldbrainfix://"), "an app link in {html}");
+    }
+
+    // Add to Note…: the picker, the Note found and taken with Enter.
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::Button, t.add_to_note())
+        .click();
+    harness.run_steps(4);
+    harness.get_by(|n| n.is_focused()).type_text("Insurance");
+    harness.run_steps(4);
+    let file = shots_dir().join("ask-add-to-note.png");
+    harness.render()?.save(&file)?;
+    println!("  drawn: {}", file.display());
+    harness.key_press(egui::Key::Enter);
+    harness.run_steps(4);
+    let into = &ids[INTO];
+    let sections = Notes::new(harness.state().store()).sections(into)?;
+    println!(
+        "  sections of {INTO:?}: {:?}",
+        sections.iter().map(|s| &s.text).collect::<Vec<_>>()
+    );
+    let [section] = sections.as_slice() else {
+        panic!("one Section: {sections:?}");
+    };
+    assert_eq!(section.text, format!("{QUESTION}\n\n{answer}"));
+    assert_eq!(section.text_format, "markdown");
+    let added = t.ask_added_to(INTO);
+    assert!(
+        harness.query_all_by_label(&added).next().is_some(),
+        "no {added:?}"
+    );
+    let file = shots_dir().join("ask-added.png");
     harness.render()?.save(&file)?;
     println!("  drawn: {}", file.display());
     Ok(())

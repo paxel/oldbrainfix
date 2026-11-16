@@ -534,7 +534,8 @@ replace a law of Both apps where they say so. A desktop law marked
   place File into… does not list (deleted, a Topic of a closed locked
   Area, a Shared Area the Device left) is not offered among the recent
   ones either.
-- **Add to Note…** (#308), from capture or an Unsorted Note's card, is
+- **Add to Note…** (#308), from capture, an Unsorted Note's card or an
+  answer of Ask (#316), is
   a filter over the Notes, the core's search (focused on the desktop,
   not on the phone), then "Added to recently" with the last three Notes
   this Device added to, the latest first, while nothing is typed, then
@@ -896,7 +897,13 @@ replace a law of Both apps where they say so. A desktop law marked
   oldest first** (#315), each with Edit, greyed while a question runs,
   which puts it into the field with the cursor at its end to be asked
   again after the whole thread, and under it its answer with "From
-  these Notes", "Also read" and Keep as Note; the question asked, or
+  these Notes", "Also read" and a row of Copy text, Keep as Note, Add to
+  Note… and Share to an app (#316): Copy text and Share to an app hand
+  on the answer alone as Markdown, its links kept, Share with its HTML;
+  Add to Note… adds the question and answer, as Keep as Note keeps them,
+  to the Note picked as a Section, then "Added to “…”" opens that Note;
+  Copy text and Share only for an answer with words, none of them under
+  a question not answered; the question asked, or
   the last one not answered, ends the thread, which scrolls to it once
   it is asked and once it comes back. Start over in the bar drops
   them, and so does leaving the page. **An address by hand** sits under each such
@@ -1553,8 +1560,15 @@ replace a law of Both apps where they say so. A desktop law marked
   Edit, greyed while a question runs, which puts it into the field with
   the cursor at its end to be asked again after the whole thread, then
   its answer as a formatted text whose links open their Notes, "From
-  these Notes" and "Also read" with each Note's title as a link, and
-  Keep as Note, then "Kept as a Note" opening it; the question asked,
+  these Notes" and "Also read" with each Note's title as a link, and a
+  row of Copy as text, Keep as Note, then "Kept as a Note" opening it,
+  Add to Note… and Save as Markdown…, the desktop's Share to an app
+  (#316): Copy as text and Save as Markdown… hand on the answer alone as
+  Markdown with HTML beside, the file named after the question; Add to
+  Note… adds the question and answer, as Keep as Note keeps them, to the
+  Note picked as a Section, then "Added to “…”" opens that Note; Copy
+  and Save only for an answer with words, none of them under a question
+  not answered; the question asked,
   or the last one not answered, ends the thread, which scrolls to it
   once it is asked and once it comes back. Up in the empty field
   fetches the last question. A question not answered goes back into the field, and
