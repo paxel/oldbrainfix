@@ -124,6 +124,12 @@ abstract interface class PhotoPlatform {
   /// Puts the photo file at [path], written as for [savePhoto], of MIME
   /// [type] on the clipboard as a picture (#149); whether it is there.
   Future<bool> copyPhoto(String path, String type);
+
+  /// Puts [text] on the clipboard with [html] beside it, one item of
+  /// both, so an app that takes formatted text takes the HTML and any
+  /// other the text (#324); whether it is there. Flutter's own clipboard
+  /// carries plain text only.
+  Future<bool> copyHtml(String text, String html);
 }
 
 /// No camera and no shares: the default where none is handed in.
@@ -160,6 +166,9 @@ class NoPhotos implements PhotoPlatform {
 
   @override
   Future<bool> copyPhoto(String path, String type) async => false;
+
+  @override
+  Future<bool> copyHtml(String text, String html) async => false;
 }
 
 /// Android's own camera intent, picture picker and share target behind the
@@ -296,6 +305,21 @@ class AndroidPhotos implements PhotoPlatform {
       return await _channel.invokeMethod<bool>('copy', {
             'path': path,
             'type': type,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> copyHtml(String text, String html) async {
+    try {
+      return await _channel.invokeMethod<bool>('copyHtml', {
+            'text': text,
+            'html': html,
           }) ??
           false;
     } on PlatformException {

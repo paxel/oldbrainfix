@@ -246,7 +246,7 @@ fn tokens(text: &str) -> impl Iterator<Item = &str> {
 }
 
 /// Unicode's White_Space and the byte order mark.
-fn is_space(c: char) -> bool {
+pub(crate) fn is_space(c: char) -> bool {
     c.is_whitespace() || c == '\u{feff}'
 }
 

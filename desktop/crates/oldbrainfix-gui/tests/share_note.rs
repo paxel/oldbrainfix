@@ -1,7 +1,8 @@
 //! A Note handed to another app from the window (#129): the card's ⋮
 //! and the editor offer "Send to a person", "Copy as text" and "Save as
 //! Markdown…". Copying puts the Note's text and its Sections on the
-//! clipboard, with HTML beside formatted text, or plain text through the
+//! clipboard, a Checklist's or Shopping List's Lines after its text as a
+//! task list (#323) that pastes back as boxes, with HTML beside formatted text, or plain text through the
 //! window's clipboard when the system's cannot be reached; saving writes
 //! the Markdown file, plain text escaped, with its photos and recordings
 //! in a folder of its own beside it, under the phone's names. Copied and saved say nothing; a Note without words
@@ -15,7 +16,7 @@ use std::sync::Arc;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::text_format;
-use oldbrainfix_core::{Notes, OwnProfile, SigningKey, Store};
+use oldbrainfix_core::{Checklists, Notes, OwnProfile, ShoppingLists, SigningKey, Store};
 use oldbrainfix_gui::media::{self, Clipboard};
 use oldbrainfix_gui::{App, Selection};
 
@@ -36,6 +37,11 @@ impl Clipboard for FakeClipboard {
             .borrow_mut()
             .push((text.to_string(), html.map(str::to_string)));
         true
+    }
+
+    /// The text put on it last.
+    fn text(&mut self) -> Option<String> {
+        self.0.borrow().last().map(|(text, _)| text.clone())
     }
 }
 
@@ -282,5 +288,97 @@ fn the_card_still_sends_to_a_person() -> TestResult {
     pick(&mut harness, "Milk", "Send to a person")?;
     let title = harness.state().t().send_title().to_string();
     assert!(shows(&harness, &title));
+    Ok(())
+}
+
+/// Opens the ⋮ of the only card and picks "Copy as text".
+fn copy_from_the_card(harness: &mut Harness<'_, App>) -> TestResult {
+    harness
+        .query_all_by_label_contains("More: ")
+        .last()
+        .ok_or("no ⋮")?
+        .click_accesskit();
+    harness.run();
+    click(harness, "Copy as text")
+}
+
+#[test]
+fn the_card_copies_a_checklist_as_a_task_list_with_html_beside_it() -> TestResult {
+    let store = store()?;
+    let note = Notes::new(&store).capture("Trip\nTent\n ✓ Pegs\n Poles\n✓ Map", None, None)?;
+    Checklists::new(&store).make(&note.id)?;
+    let copied = Copied::default();
+    let mut app = App::new(store, "en");
+    app.set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    app.select(Selection::All);
+    let mut harness = window(app);
+    copy_from_the_card(&mut harness)?;
+    let copied = copied.borrow();
+    let [(text, html)] = copied.as_slice() else {
+        return Err(format!("{copied:?}").into());
+    };
+    assert_eq!(
+        text,
+        "Trip\n\n- [ ] Tent\n  - [x] Pegs\n  - [ ] Poles\n- [x] Map"
+    );
+    assert_eq!(
+        html.as_deref(),
+        Some(
+            "<p>Trip</p>\n<ul><li>☐ Tent<ul><li>✅ Pegs</li><li>☐ Poles</li></ul></li><li>✅ Map</li></ul>\n"
+        )
+    );
+    assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn the_editor_copies_a_shopping_list_its_struck_lines_checked_at_the_end() -> TestResult {
+    let store = store()?;
+    let note = Notes::new(&store).capture("Shop\n✓ Eggs\nMilk", None, None)?;
+    ShoppingLists::new(&store).make(&note.id)?;
+    let copied = Copied::default();
+    let mut app = App::new(store, "en");
+    app.set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    app.select(Selection::All);
+    app.select_note(&note.id);
+    let mut harness = window(app);
+    click(&mut harness, "Copy as text")?;
+    let copied = copied.borrow();
+    let [(text, _)] = copied.as_slice() else {
+        return Err(format!("{copied:?}").into());
+    };
+    assert_eq!(text, "Shop\n\n- [ ] Milk\n- [x] Eggs");
+    Ok(())
+}
+
+#[test]
+fn a_copied_checklist_pasted_into_a_new_note_gives_the_same_boxes() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    let list = notes.capture("Trip\nTent\n ✓ Pegs\n Poles\n✓ Map", None, None)?;
+    Checklists::new(&store).make(&list.id)?;
+    let copied = Copied::default();
+    let mut app = App::new(store.clone(), "en");
+    app.set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    app.select(Selection::All);
+    let mut harness = window(app);
+    copy_from_the_card(&mut harness)?;
+    // File ▸ New Note, its Paste and Save.
+    harness.state_mut().new_note();
+    harness.run();
+    click(&mut harness, "Paste")?;
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Enter);
+    harness.run();
+    let pasted = notes
+        .all()?
+        .into_iter()
+        .find(|n| n.id != list.id)
+        .ok_or("the pasted Note")?;
+    assert_eq!(pasted.text_format, text_format::MARKDOWN);
+    assert_eq!(
+        pasted.shown_text(),
+        "Trip\n\n- ☐ Tent\n  - ✅ Pegs\n  - ☐ Poles\n- ✅ Map"
+    );
+    assert_eq!(pasted.boxes.len(), 4);
     Ok(())
 }

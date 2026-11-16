@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'boxes.dart';
+import 'checklists.dart';
 import 'entry.dart';
 import 'file_text.dart';
 import 'hidden_from_ai.dart';
@@ -9,6 +10,7 @@ import 'named_places.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'shared_areas.dart';
+import 'shopping_lists.dart';
 import 'store.dart';
 import 'sync.dart';
 import 'text_boxes.dart';
@@ -144,8 +146,9 @@ enum Importance { unimportant, normal, important }
 
 /// What a Note without words is titled as where only its words fit, as
 /// in a row or an alarm: a photo, a voice recording, or a file, which
-/// goes by its name ([Note.wordlessName]).
-enum Wordless { photo, voiceRecording, file }
+/// goes by its name ([Note.wordlessName]); a list without a Name and
+/// any of them by the list it is (#309).
+enum Wordless { photo, voiceRecording, file, checklist, shoppingList }
 
 /// The largest file that can be attached: the most a bundle, a Backup and
 /// the local network carry of one (ADR 0003, 0047).
@@ -533,6 +536,11 @@ class Note {
   /// (ADR 0035); none in a text this version may not change.
   final List<ShownBox> boxes;
 
+  /// The list its `kind` names ([parseListKind]), [ChecklistKeys.checklist]
+  /// or [ShoppingKeys.shopping] and any other an app may write, or null:
+  /// what a list without a Name is titled as ([wordless], #309).
+  final String? listKind;
+
   const Note({
     required this.id,
     required this.text,
@@ -559,6 +567,7 @@ class Note {
     this.removedAttachments = const [],
     this.removedAttachmentTexts = const [],
     this.boxes = const [],
+    this.listKind,
   });
 
   /// When the Note was captured.
@@ -602,7 +611,8 @@ class Note {
   /// What the Note is titled as while its text is blank, removed photos,
   /// recordings and files whose texts stay included: a photo when it has
   /// one; else a voice recording when it has one; else a file when it has
-  /// one, by [wordlessName]; a photo otherwise.
+  /// one, by [wordlessName]; else a Checklist or a Shopping List by the
+  /// list it is (#309); a photo otherwise.
   Wordless get wordless {
     if (photos.isNotEmpty || removedPhotos.isNotEmpty) return Wordless.photo;
     if (recordings.isNotEmpty || removedRecordings.isNotEmpty) {
@@ -611,7 +621,11 @@ class Note {
     if (attachments.isNotEmpty || removedAttachments.isNotEmpty) {
       return Wordless.file;
     }
-    return Wordless.photo;
+    return switch (listKind) {
+      ChecklistKeys.checklist => Wordless.checklist,
+      ShoppingKeys.shopping => Wordless.shoppingList,
+      _ => Wordless.photo,
+    };
   }
 
   /// The name a Note titled [Wordless.file] goes by (#267): its first
@@ -953,9 +967,8 @@ class Notes {
         !note.attachmentTexts.containsKey(file.hash) &&
         !note.removedAttachmentTexts.contains(file.hash);
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.attachments.any((a) => waits(note, a))) note,
+      for (final note in _holding(NoteKeys.filePrefix))
+        if (note.attachments.any((a) => waits(note, a))) note,
     ];
     // By id within one capture time, so both cores list them alike.
     notes.sort((a, b) {
@@ -1035,9 +1048,8 @@ class Notes {
   /// whose Transcript was removed is not among them.
   List<({String noteId, String hash})> untranscribed() {
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.recordings.any((h) => _untranscribed(note, h))) note,
+      for (final note in _holding(NoteKeys.audioPrefix))
+        if (note.recordings.any((h) => _untranscribed(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
@@ -1064,15 +1076,28 @@ class Notes {
   /// Text was removed is not among them.
   List<({String noteId, String hash})> unreadPhotos() {
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.photos.any((h) => _unread(note, h))) note,
+      for (final note in _holding(NoteKeys.photoPrefix))
+        if (note.photos.any((h) => _unread(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
       for (final note in notes)
         for (final hash in note.photos)
           if (_unread(note, hash)) (noteId: note.id, hash: hash),
+    ];
+  }
+
+  /// The Notes not in the trash, merged ones included, that hold a
+  /// field starting with [prefix], a photo, a recording or a file, in
+  /// the order [Store.entitiesOfType] lists Notes: only they can hold one
+  /// waiting to be read, and finding them reads no other Note, which
+  /// each change of the log made wait on all of them (#339).
+  List<Note> _holding(String prefix) {
+    final holding = {for (final (id, _) in store.fieldsWithPrefix(prefix)) id};
+    return [
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (holding.contains(id))
+          if (byId(id) case final note? when !note.isTrashed) note,
     ];
   }
 
@@ -1510,16 +1535,27 @@ class Notes {
   /// The Sections of the Note [noteId], oldest first: its Amends, the
   /// Notes merged into it, and their Amends.
   List<Section> sections(String noteId) {
+    // Only a Note that was merged can be merged into this one, and only
+    // a Section that once named one of them can belong to it: the others
+    // are not read, which made opening a Note wait on all of them
+    // (#339). In the order every Note and Section is listed in.
+    final wasMerged = {
+      for (final (id, _) in store.fieldsWithPrefix(NoteKeys.merged)) id,
+    };
     final merged = {
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (_mergedInto(id) == noteId) id,
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (wasMerged.contains(id) && _mergedInto(id) == noteId) id,
     };
     final owners = {noteId, ...merged};
+    final named = {
+      for (final owner in owners) ...store.everWith(SectionKeys.note, owner),
+    };
     final sections = [
       for (final id in merged)
         if (byId(id) case final note?) _merged(note, noteId),
-      for (final id in store.entitiesOfType(SectionKeys.typeSection))
-        if (owners.contains(store.current(id, SectionKeys.note)))
+      for (final id in store.everOfType(SectionKeys.typeSection))
+        if (named.contains(id) &&
+            owners.contains(store.current(id, SectionKeys.note)))
           ?_section(id, noteId: noteId),
     ];
     sections.sort((a, b) => a.context.captured.compareTo(b.context.captured));
@@ -1773,8 +1809,10 @@ class Notes {
   }
 
   /// The Note [id], trashed or not, or null when there is none.
-  Note? byId(String id) {
-    final fields = store.currentFields(id);
+  Note? byId(String id) => _note(id, store.currentFields(id));
+
+  /// The Note [id] made of its current [fields], as [byId] reads it.
+  Note? _note(String id, Map<String, String?> fields) {
     if (fields[NoteKeys.type] != NoteKeys.typeNote) return null;
     final captured = fields[NoteKeys.captured];
     if (captured == null) return null;
@@ -1846,6 +1884,7 @@ class Notes {
           if (_removedText(fields, NoteKeys.fileText(file.hash))) file.hash,
       ],
       boxes: _boxes(id, text, fields),
+      listKind: parseListKind(fields[ChecklistKeys.kind])?.list,
     );
   }
 
@@ -1910,10 +1949,15 @@ class Notes {
 
   /// Every Note neither in the trash nor merged, newest capture first.
   List<Note> all() {
+    // Every Note's fields in one read, not two per Note (#339), in the
+    // order [Store.entitiesOfType] lists them.
+    final fields = store.currentFieldsOfType(NoteKeys.typeNote);
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed && !note.isMerged)
-          note,
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (fields[id] case final held?)
+          if (_note(id, held) case final note?
+              when !note.isTrashed && !note.isMerged)
+            note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return notes;

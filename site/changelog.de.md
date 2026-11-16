@@ -2,7 +2,50 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.6.0]
+## [0.6.1]
+
+### Neu
+
+- Die Schnellnotiz bietet „Zu einer Notiz hinzufügen …“, das Text, Aufnahme, Fotos oder Dateien sofort einer gewählten Notiz hinzufügt. ([obf-1001](https://github.com/paxel/oldbrainfix/issues/308))
+- Die Schnellnotiz bietet Text, Checkliste und Einkaufsliste über dem Feld, und eine Liste behält jede getippte Zeile als Zeile. ([obf-1003](https://github.com/paxel/oldbrainfix/issues/310))
+- Eine gesprochene Einkaufsliste kommt als Zeilen in eine Einkaufsliste, mit ihrer Aufnahme, auch ohne Sprachmodell. ([obf-1004](https://github.com/paxel/oldbrainfix/issues/311))
+- Eine Antwort beim Fragen lässt sich auch kopieren, einer vorhandenen Notiz hinzufügen und teilen, am Desktop als Markdown speichern. ([obf-1009](https://github.com/paxel/oldbrainfix/issues/316))
+- Auf dem Desktop bittet Fragen ein OpenAI-kompatibles Modell, nicht nachzudenken, außer „Das Modell nachdenken lassen“ ist an, und die KI-Einstellungen nennen ausprobierte Modelle. ([obf-1011](https://github.com/paxel/oldbrainfix/issues/318))
+- Eine kopierte Checkliste oder Einkaufsliste legt ihre Zeilen als Markdown-Aufgaben in die Zwischenablage, die beim Einfügen wieder Statuskästchen werden. ([obf-1016](https://github.com/paxel/oldbrainfix/issues/323))
+- Eine im Vollbild geöffnete Tabelle bietet „Kopieren“, das sich in formatierten Text als Tabelle und anderswo als Markdown einfügt. ([obf-1017](https://github.com/paxel/oldbrainfix/issues/324))
+- „Textgröße“ vergrößert den Text von Notizen, Zeilen, der Agenda und den Antworten von Fragen in Stufen; auf dem Desktop ändern Strg+Plus und Strg+Minus sie. ([obf-1019](https://github.com/paxel/oldbrainfix/issues/326))
+- Auf dem Desktop hat das eigene Fenster einer Notiz eine Leseansicht, auch mit F9, die nur ihren Inhalt in einer ruhigen Spalte zeigt. ([obf-1015](https://github.com/paxel/oldbrainfix/issues/322))
+
+### Geändert
+
+- Die Plakette „Art“ steht vorn und nennt die Art in Worten, etwa „Einfache Notiz ▾“. ([obf-1003](https://github.com/paxel/oldbrainfix/issues/310))
+- Text, der zur Liste wird, behält seine erste Zeile als Zeile, außer sie ist eine Überschrift. ([obf-1002](https://github.com/paxel/oldbrainfix/issues/309))
+- Die Abschnitte einer Notiz setzen ihren Text unter einer gestrichelten Abrisslinie fort statt in eigenen Kästen. ([obf-1000](https://github.com/paxel/oldbrainfix/issues/307))
+- Ist eine Notiz aus „Unsortiert“ einsortiert, öffnet sich die nächste unsortierte Notiz und, wenn keine mehr übrig ist, die Agenda. ([obf-1006](https://github.com/paxel/oldbrainfix/issues/313))
+- Auf dem Desktop ist das Fragen experimentell und aus, bis „KI (experimentell)“ angehakt ist; der KI-Port arbeitet so oder so. ([obf-1027](https://github.com/paxel/oldbrainfix/issues/334))
+- Auf dem Desktop öffnet KI ▸ KI-Einstellungen … eine Seite mit allen Einstellungen der KI. ([obf-1028](https://github.com/paxel/oldbrainfix/issues/335))
+- Auf dem Handy ist das Fragen experimentell und aus, bis „Fragen (experimentell)“ in den Einstellungen eingeschaltet ist. ([obf-1026](https://github.com/paxel/oldbrainfix/issues/333))
+- Unter jeder Antwort beim Fragen nennt „Auch gelesen“ die anderen gelesenen Notizen, und ein kleines lokales Modell sucht und liest jetzt vor dem Antworten. ([obf-1007](https://github.com/paxel/oldbrainfix/issues/314))
+- Beim Fragen stehen die Fragen untereinander, die älteste zuerst, jede mit „Bearbeiten“, um sie neu zu stellen; am Desktop holt Pfeil nach oben die letzte. ([obf-1008](https://github.com/paxel/oldbrainfix/issues/315))
+- Auf dem Desktop heißt der Eintrag im Menü Notiz „In den Papierkorb“ statt „Löschen“, wie auf dem Handy und im Rechtsklick-Menü einer Karte. ([obf-1022](https://github.com/paxel/oldbrainfix/issues/329))
+- Eine Karte beginnt mit ihrem Text: der Ort steht ohne Trennlinie neben den Schaltflächen, und die Listen eines Bereichs oder Themas lassen ihn weg. ([obf-1023](https://github.com/paxel/oldbrainfix/issues/330))
+- Auf dem Handy scrollt das Suchfeld der Bereichsliste, eines Bereichs und eines Themas mit der Liste weg und kommt beim Zurückscrollen wieder. ([obf-1029](https://github.com/paxel/oldbrainfix/issues/336))
+- „Über Old Brain Fix“ steht nicht mehr in den Einstellungen: auf dem Handy hinter dem Profilbild, auf dem Desktop unter Hilfe. ([obf-1018](https://github.com/paxel/oldbrainfix/issues/325))
+- Die durchgestrichenen Zeilen einer Einkaufsliste zeigen die am frühesten wiederkommende zuerst, jede mit „in 3 Tagen“ oder ähnlich daneben. ([obf-1021](https://github.com/paxel/oldbrainfix/issues/328))
+- Formatierter Text liest sich ruhiger, mit mehr Abstand zwischen Zeilen und Absätzen, leichteren Überschriften und Code auf einer hellen Tönung statt in einem grauen Kasten. ([obf-1020](https://github.com/paxel/oldbrainfix/issues/327))
+
+### Behoben
+
+- Auf dem Desktop erreichen Ausschneiden, Kopieren und Einfügen im Rechtsklick-Menü und im Menü Bearbeiten die Zwischenablage. ([obf-1012](https://github.com/paxel/oldbrainfix/issues/319))
+- Auf dem Desktop öffnet die Strichliste einer Einheit nur ihr Eintragsformular, nicht auch ihre Notiz. ([obf-1013](https://github.com/paxel/oldbrainfix/issues/320))
+- Auf dem Handy setzt ein Tippen im Notiz-Editor den Cursor dorthin, wo der Finger ist. ([obf-1005](https://github.com/paxel/oldbrainfix/issues/312))
+- Das Linux-.deb, das AppImage und Homebrew starten auf älteren Systemen mit glibc 2.35, etwa Ubuntu 22.04 oder Debian 12. ([obf-1025](https://github.com/paxel/oldbrainfix/issues/332))
+- Ein angetipptes Kästchen ist sofort abgehakt und seine Zeile durchgestrichen, gespeichert wird danach; scheitert das Speichern, zeigt es sich wie vorher mit einer Meldung. ([obf-1031](https://github.com/paxel/oldbrainfix/issues/338))
+- Eine Frage vom Handy geht nicht mehr verloren, und „Fragen“ sagt auf Handy und Desktop, was es gerade tut und warum es scheiterte. ([obf-1010](https://github.com/paxel/oldbrainfix/issues/317))
+- Auf dem Handy bleibt die App flüssig, während eine Aufnahme transkribiert wird; ein Transkript kann dafür etwa doppelt so lange dauern. ([obf-1030](https://github.com/paxel/oldbrainfix/issues/337))
+- Die Benachrichtigung einer Erinnerung öffnet ihre Notiz sofort, Abhaken, Erfassen und Listen gehen schneller, und das Handy reagiert auch beim Abgleich mit dem Computer. ([obf-1032](https://github.com/paxel/oldbrainfix/issues/339))
+
+## [0.6.0] - 2026-11-14
 
 ### Neu
 

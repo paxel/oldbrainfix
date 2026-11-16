@@ -14,6 +14,7 @@
 //! newer version.
 
 pub mod about_view;
+pub mod add_to_note;
 pub mod ai_view;
 pub mod alerts;
 pub mod all_routines_view;
@@ -92,8 +93,10 @@ pub mod tally_view;
 pub mod text_marks_view;
 pub mod text_menu;
 pub mod theme;
+pub mod tick_saves;
 pub mod tray;
 pub mod undo;
+pub mod unsorted_steps;
 pub mod vault_view;
 pub mod window_sizes;
 

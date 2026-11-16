@@ -32,6 +32,12 @@
 </box-tab>
 <box-more>
 <p>
+  Eine Checkliste oder Einkaufsliste lässt sich auch gleich erfassen: Wähle <strong>Checkliste</strong>
+  oder <strong>Einkaufsliste</strong> über dem Feld des Erfassungsbildschirms, und jede getippte
+  Zeile wird eine Zeile der Liste (siehe <a href="capture-and-sort.html#einen-gedanken-erfassen">Einen
+  Gedanken erfassen</a>).
+</p>
+<p>
   Strichlisten, Einheiten, Frösche und Themen werden in Erweitert angelegt, gewählt beim ersten
   Start oder in den Einstellungen unter „Was Old Brain Fix anbietet“. In Einfach bietet das „+“
   Notiz, Checkliste und Einkaufsliste an, und die vorher angelegten Strichlisten, Einheiten und
@@ -136,12 +142,13 @@
   Zeile der Notiz ihr Name, als Überschrift oben auf ihrer Karte und im Editor; der Rest ihres
   Textes ist ihre Beschreibung, klein unter dem Namen und auf eine Zeile eingeklappt, bis ein Tippen
   sie aufklappt. Gleich danach kommen die Zeilen, die Strichliste oder die Einheit, dann die
-  Plaketten, Fotos und Aufnahmen und zuletzt die Ergänzungen. Im Editor sind Name und Beschreibung
+  Plaketten, Fotos und Aufnahmen und zuletzt die Ergänzungen, jede unter
+  einer gestrichelten Abrisslinie. Im Editor sind Name und Beschreibung
   zwei Felder; Speichern schreibt sie wieder als einen Text, und eine Notiz, die unverändert
   geöffnet und verlassen wird, wird nicht geschrieben.
 </p>
 <ul>
-  <li>Die Plakette „Art“ im Notiz-Editor zeigt die Art. Ein Tippen bietet die Arten an, die die Notiz werden kann: Eine einfache Notiz wird eine Checkliste, eine Einkaufsliste, eine Strichliste oder eine Einheit, die beiden letzten nur in Erweitert; eine Checkliste wird eine Einkaufsliste oder eine einfache Notiz; eine Einkaufsliste wird eine Checkliste oder eine einfache Notiz; eine Einheit wird eine einfache Notiz. Eine Strichliste bleibt eine Strichliste.</li>
+  <li>Die Plakette „Art“, die erste im Notiz-Editor, zeigt die Art in Worten, etwa „Einfache Notiz ▾“. Ein Tippen bietet die Arten an, die die Notiz werden kann: Eine einfache Notiz wird eine Checkliste, eine Einkaufsliste, eine Strichliste oder eine Einheit, die beiden letzten nur in Erweitert; eine Checkliste wird eine Einkaufsliste oder eine einfache Notiz; eine Einkaufsliste wird eine Checkliste oder eine einfache Notiz; eine Einheit wird eine einfache Notiz. Eine Strichliste bleibt eine Strichliste.</li>
   <li>Mit der Plakette „Art“ zur Einheit gemacht, bekommt eine Notiz Vorrat, Anzahl und Regel, aber noch keine Routine: Sie läuft, sobald eine Routine hinzukommt, und bis dahin zeigt ihre Kompaktansicht, wie viele sie wählt, etwa „Wählt 3 Strichlisten“.</li>
   <li>Eine Notiz, deren Text Code ist, wird zu keiner anderen Art; ihre Plakette zeigt sie nur, bis das Textformat wieder geändert wird (siehe <a href="formatted-text-transcripts-photo-texts.html">Formatierter Text, Transkripte und Fototexte</a>).</li>
   <li>Eine Checkliste, die eine Einkaufsliste wird, behält ihre Zeilen in ihrer Reihenfolge, die abgehakten durchgestrichen, ohne Gruppen; eine Einkaufsliste, die eine Checkliste wird, behält die Zeilen, die sie zeigt, die durchgestrichenen abgehakt. Der Text bleibt, wie er ist. Die alten Zeilen bleiben im Protokoll und werden nicht mehr gezeigt.</li>
@@ -178,8 +185,11 @@
 <p>
   Eine Checkliste ist eine Notiz, deren Zeilen abgehakt werden. <strong>Zur Checkliste
   machen</strong> steht im ⋮ der Karte der Notiz, und die Plakette „Art“ im Editor der Notiz bietet
-  es an. Die erste Zeile der Notiz bleibt ihr Text, als ihr Name; jede andere Zeile, die nicht leer
-  ist, wird eine Zeile der Liste. Eine Zeile, die mit einem Leerzeichen oder Tabulator beginnt,
+  es an. Jede Zeile, die nicht leer ist, wird eine Zeile der Liste. Nur eine erste Zeile, die wie
+  eine Überschrift aussieht, bleibt der Name: eine Markdown-Überschrift wie „# Packen“, ohne ihr
+  „#“, oder eine Zeile, die mit „:“ endet, wie „Packen:“. Sonst hat die Liste keinen Namen, bis
+  einer in ihr Namensfeld getippt wird, und ihre Karte zeigt an seiner Stelle „Checkliste“. Eine
+  Zeile, die mit einem Leerzeichen oder Tabulator beginnt,
   kommt unter die Zeile darüber, und eine, die mit „✓ “ beginnt, ist abgehakt. Eine Notiz, die zur
   Checkliste wird, ist nicht mehr unsortiert.
 </p>
@@ -189,6 +199,7 @@
   <li>Im Editor werden die Zeilen wie ein zusammenhängender Text bearbeitet, jede Zeile beginnt mit ihrem Kästchen; eine neue Liste beginnt mit einer leeren Zeile. Die Eingabetaste fügt unter der Zeile mit dem Cursor eine neue Zeile mit leerem Kästchen ein; mitten in einer Zeile nimmt die neue Zeile den Rest der Zeile mit. Die Rücktaste am Anfang einer Zeile hängt sie an die Zeile darüber an, die ihr Kästchen behält und abgehakt bleibt oder nicht; die Haken der angehängten Zeile bleiben im Protokoll. Eine leere Zeile verschwindet einfach. <strong>Unter die Zeile darüber</strong> und <strong>Zurück auf die oberste Ebene</strong> in der Leiste über der Tastatur nehmen die Zeile mit dem Cursor in eine Gruppe auf und wieder heraus.</li>
   <li>Alles Getippte bleibt beim Verlassen des Editors erhalten; leer gebliebene Zeilen fallen weg. ⋮ an einer Zeile bietet <strong>Nach oben</strong>, <strong>Nach unten</strong>, <strong>Unter die Zeile darüber</strong> oder <strong>Zurück auf die oberste Ebene</strong> und <strong>Löschen</strong>. Auf dem Handy fragt Löschen nichts: Die Meldung oben, „Zeile gelöscht“, holt die Zeile mit einem Tippen zurück, und das eingeklappte „Entfernte Zeilen“ unter den Zeilen stellt jede gelöschte Zeile mit <strong>Wiederherstellen</strong> wieder her. Der Desktop fragt auch nichts: Strg+Z oder Bearbeiten ▸ Rückgängig holt die Zeile zurück, und der Notiz-Dialog hat dasselbe „Entfernte Zeilen“.</li>
   <li><strong>Alle Haken entfernen</strong> erscheint, solange eine Zeile abgehakt ist, um die Liste wieder zu benutzen. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte, und <strong>Einfache Notiz</strong> hinter der Plakette „Checkliste“ im Editor machen sie zurück: Jede Zeile wird eine Zeile des Notiztexts, eine abgehakte mit „✓ “ davor.</li>
+  <li><strong>Text kopieren</strong>, unter <strong>Teilen …</strong> im ⋮ der Karte, und am Desktop <strong>Als Text kopieren</strong> legen den Namen und dann die Zeilen als Markdown-Aufgaben in die Zwischenablage, etwa <code>- [ ] Zelt</code> und <code>- [x] Heringe</code>, eine Zeile einer Gruppe um zwei Leerzeichen eingerückt. Andere Markdown-Apps zeigen sie als Kästchen, und in eine Notiz eingefügt werden sie wieder Statuskästchen.</li>
   <li>In einem geteilten Bereich fügt jeder mit einer Rolle Zeilen hinzu und hakt sie ab; Umbenennen, Verschieben und Löschen einer Zeile bleiben beim Verfasser der Notiz oder der Zeile und bei den Verwaltern.</li>
 </ul>
 <p>
@@ -293,24 +304,26 @@
 <p>
   Eine Einkaufsliste ist eine Notiz, deren Zeilen eine Weile nach dem Abhaken wiederkommen, etwa der
   Wocheneinkauf. <strong>Zur Einkaufsliste machen</strong> steht im ⋮ der Karte der Notiz, und die
-  Plakette „Art“ im Editor der Notiz bietet es an. Wie bei einer Checkliste bleibt die erste Zeile
-  der Name, und jede andere wird eine Zeile der Liste; Einkaufslisten haben keine Gruppen, und eine
-  Zeile mit „✓ “ ist durchgestrichen.
+  Plakette „Art“ im Editor der Notiz bietet es an. Wie bei einer Checkliste wird jede Zeile eine
+  Zeile der Liste, und nur eine erste Zeile, die wie eine Überschrift aussieht, bleibt der Name;
+  ohne sie zeigt die Karte „Einkaufsliste“. Einkaufslisten haben keine Gruppen, und eine Zeile mit
+  „✓ “ ist durchgestrichen.
 </p>
 <ul>
-  <li>Eine abgehakte Zeile wird durchgestrichen und rückt ans Ende, mit dem Tag, an dem sie wiederkommt, etwa „wieder Sa., 31. Okt.“. Zu Beginn dieses Tages ist sie wieder offen, an ihrem Platz.</li>
+  <li>Eine abgehakte Zeile wird durchgestrichen und rückt zu den durchgestrichenen ans Ende, die am frühesten wiederkommende zuerst, daneben blass, wann sie wiederkommt, etwa „morgen“, „in 3 Tagen“ oder „in 2 Monaten“; Zeilen ohne Wiederkehr stehen zuletzt. Zu Beginn dieses Tages ist sie wieder offen, an ihrem Platz.</li>
   <li>Jede Zeile hat ihre <strong>Wiederkehr</strong> auf einer Plakette an ihrem Ende: „—“ für keine, „Einmal“ oder eine Zahl mit Einheit, etwa „4W“ oder „3M“. Die Plakette steht an den Zeilen im Notiz-Editor, nicht auf der Karte. Ein Tippen darauf öffnet sie: <strong>Keine</strong>, <strong>Einmal</strong> oder <strong>Nach</strong>, mit einer Zahl von 1 bis 99 und Tag, Woche, Monat oder Jahr, anfangs 1 Woche; jede Wahl gilt sofort. Eine neue Zeile hat keine: abgehakt bleibt sie durchgestrichen, bis eine Wiederkehr eingestellt ist, die dann ab ihrem Abhaken zählt. Eine Zeile kommt so viele Tage oder Wochen später wieder, oder am selben Tag des Monats so viele Monate oder Jahre später (am letzten Tag eines kürzeren Monats), nach der Uhr des Geräts. Eine Zeile mit Einmal ist nach dem Abhaken weg.</li>
   <li>Im Editor werden die Zeilen wie bei einer Checkliste bearbeitet: ein zusammenhängender Text, jede Zeile beginnt mit ihrem Kästchen, die Eingabetaste für eine neue Zeile, die Rücktaste am Anfang, um eine Zeile an die darüber anzuhängen. Die Zeilen bleiben in der Reihenfolge, in der sie getippt oder verschoben wurden, auch beim nächsten Mal: <strong>Nach oben</strong> und <strong>Nach unten</strong> im ⋮ einer offenen Zeile verschieben sie um einen Platz innerhalb der offenen Zeilen. Solange der Editor offen ist, bleibt eine dort abgehakte Zeile an ihrer Stelle; beim nächsten Mal steht sie unter den offenen, und wieder offen steht sie wieder an ihrem Platz.</li>
   <li>Ein Name, den die Liste schon hat, fügt nichts hinzu, gleich in welcher Schreibung und mit Leerzeichen drumherum: Eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, und eine offene bleibt.</li>
   <li>Eine leer gelassene Zeile fällt beim Verlassen weg. ⋮ an einer Zeile bietet <strong>Löschen</strong>; auf dem Handy fragt es nichts und lässt sich wie bei einer Checkliste rückgängig machen, mit „Entfernte Zeilen“ unter den Zeilen; auf dem Desktop holt Strg+Z oder Bearbeiten ▸ Rückgängig sie zurück.</li>
   <li>In der Detailansicht stehen die offenen Zeilen mit ihren Kästchen; die durchgestrichenen sind darunter als „2 durchgestrichen“ eingeklappt, was ein Tippen zeigt und wieder verbirgt; das Handy zeigt sie weiter, bis sie wieder eingeklappt werden. Die Kompaktansicht zeigt „3 offen“. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte, und <strong>Einfache Notiz</strong> hinter der Plakette „Einkaufsliste“ im Editor schreiben die Zeilen in den Text, die durchgestrichenen mit „✓ “ davor.</li>
+  <li><strong>Text kopieren</strong> (am Desktop <strong>Als Text kopieren</strong>) kopiert eine Einkaufsliste wie eine Checkliste: die offenen Zeilen als <code>- [ ] Milch</code>, dann die durchgestrichenen als <code>- [x] Eier</code>. Wiederkehr, die Tage, an denen die Zeilen wiederkommen, und die mit Einmal weggegangenen Zeilen bleiben weg.</li>
 </ul>
 <p>
   <strong>In eine Einkaufsliste erfassen</strong>: <strong>Zu einer Einkaufsliste
   hinzufügen</strong> im ⋮ des Erfassungsbildschirms macht jede Zeile der Erfassung zu einer Zeile
   der gewählten Liste und behält keine Notiz. Gibt es eine Liste zum Hinzufügen, heißt es
   <strong>Zu „Wocheneinkauf“ hinzufügen</strong> und wählt diese Liste gleich; bei mehreren steht
-  die zuletzt benutzte oben. Eine Aufnahme gibt die Zeilen ihres Transkripts. Wann
+  die zuletzt benutzte oben. Eine Sprachnotiz bleibt als Abschnitt an der Liste, und die gesprochenen Dinge werden zu Zeilen, sobald sie transkribiert ist. Wann
   es angeboten wird, steht in <a href="capture-and-sort.html">Erfassen und sortieren</a>. Auf dem
   Desktop steht es im Menü <strong>Mehr</strong> der Aktionszeile der Schnellnotiz, mit den Listen
   zur Wahl, die zuletzt benutzte oben, oder bei einer Liste mit dem Eintrag, der sie nennt, sobald die Einstellungen unter „Schnellnotiz“ „Zu einer Einkaufsliste hinzufügen“

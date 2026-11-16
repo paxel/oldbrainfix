@@ -18,6 +18,41 @@
         ]
       ],
       "body": "{\"earlier\":[{\"answer\":\"Yes: [Passport](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\\nIt says \\\"valid until 2031\\\".\",\"question\":\"Do I have a passport?\"},{\"answer\":\"In the blue folder.\",\"question\":\"Where?\"}],\"question\":\"Und jetzt? „Pass“ im Ordner 📁\"}"
+    },
+    {
+      "question": "Where is my passport?",
+      "earlier": [],
+      "id": "ask:0a1b2c",
+      "body": "{\"earlier\":[],\"id\":\"ask:0a1b2c\",\"question\":\"Where is my passport?\"}"
+    }
+  ],
+  "progress": [
+    {
+      "asking": true,
+      "read": 3,
+      "body": "{\"asking\":true,\"read\":3}"
+    },
+    {
+      "asking": false,
+      "read": 0,
+      "body": "{\"asking\":false,\"read\":0}"
+    }
+  ],
+  "laterProgress": [
+    {
+      "asking": true,
+      "read": 0,
+      "body": "{\"asking\":true,\"read\":-1}"
+    },
+    {
+      "asking": true,
+      "read": 0,
+      "body": "{\"asking\":true,\"read\":2.5}"
+    },
+    {
+      "asking": true,
+      "read": 0,
+      "body": "{\"asking\":true}"
     }
   ],
   "providers": [
@@ -48,14 +83,70 @@
       "host": "api.anthropic.com",
       "unready": "noKey",
       "body": "{\"host\":\"api.anthropic.com\",\"model\":\"claude-opus-5-5\",\"protocol\":\"anthropic\",\"ready\":false,\"unready\":\"noKey\"}"
+    },
+    {
+      "protocol": "anthropic",
+      "model": "claude-opus-5-5",
+      "host": "api.anthropic.com",
+      "unready": "aiOff",
+      "body": "{\"host\":\"api.anthropic.com\",\"model\":\"claude-opus-5-5\",\"protocol\":\"anthropic\",\"ready\":false,\"unready\":\"aiOff\"}"
     }
   ],
   "replies": [
     {
-      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\",\"unchecked\":false},\"review\":false}",
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"read\":[],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\",\"unchecked\":false},\"review\":false}",
       "answer": {
         "text": "In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).",
         "notes": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "read": [],
+        "alsoRead": [],
+        "cut": false,
+        "unchecked": false
+      },
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"cut\":true,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\",\"note:ffff\"],\"read\":[],\"text\":\"Filed into Health; it waits for your review. Ärzte: …\",\"unchecked\":false},\"review\":true}",
+      "answer": {
+        "text": "Filed into Health; it waits for your review. Ärzte: …",
+        "notes": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9",
+          "note:ffff"
+        ],
+        "read": [],
+        "alsoRead": [],
+        "cut": true,
+        "unchecked": false
+      },
+      "review": true
+    },
+    {
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"read\":[],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9), a scan.\",\"unchecked\":true},\"review\":false}",
+      "answer": {
+        "text": "In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9), a scan.",
+        "notes": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "read": [],
+        "alsoRead": [],
+        "cut": false,
+        "unchecked": true
+      },
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[],\"read\":[\"note:ffff\",\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"Your passport is in the blue folder.\",\"unchecked\":false},\"review\":false}",
+      "answer": {
+        "text": "Your passport is in the blue folder.",
+        "notes": [],
+        "read": [
+          "note:ffff",
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "alsoRead": [
+          "note:ffff",
           "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
         ],
         "cut": false,
@@ -64,27 +155,23 @@
       "review": false
     },
     {
-      "body": "{\"answer\":{\"cut\":true,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\",\"note:ffff\"],\"text\":\"Filed into Health; it waits for your review. Ärzte: …\",\"unchecked\":false},\"review\":true}",
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"read\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\",\"note:ffff\",\"note:eeee\"],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).\",\"unchecked\":false},\"review\":false}",
       "answer": {
-        "text": "Filed into Health; it waits for your review. Ärzte: …",
-        "notes": [
-          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9",
-          "note:ffff"
-        ],
-        "cut": true,
-        "unchecked": false
-      },
-      "review": true
-    },
-    {
-      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9), a scan.\",\"unchecked\":true},\"review\":false}",
-      "answer": {
-        "text": "In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9), a scan.",
+        "text": "In the [blue folder](oldbrainfix://note/note:0a1b2c3d4e5f60718293a4b5c6d7e8f9).",
         "notes": [
           "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
         ],
+        "read": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9",
+          "note:ffff",
+          "note:eeee"
+        ],
+        "alsoRead": [
+          "note:ffff",
+          "note:eeee"
+        ],
         "cut": false,
-        "unchecked": true
+        "unchecked": false
       },
       "review": false
     },
@@ -102,6 +189,14 @@
       "message": "",
       "status": 0,
       "unready": "badUrl",
+      "review": false
+    },
+    {
+      "body": "{\"failure\":\"unready\",\"review\":false,\"unready\":\"aiOff\"}",
+      "failure": "unready",
+      "message": "",
+      "status": 0,
+      "unready": "aiOff",
       "review": false
     },
     {
@@ -217,6 +312,8 @@
         "notes": [
           "note:1"
         ],
+        "read": [],
+        "alsoRead": [],
         "cut": false,
         "unchecked": false
       },
@@ -227,6 +324,52 @@
       "answer": {
         "text": "T",
         "notes": [],
+        "read": [],
+        "alsoRead": [],
+        "cut": false,
+        "unchecked": false
+      },
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"cut\":false,\"notes\":[\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"T\",\"unchecked\":false},\"review\":false}",
+      "answer": {
+        "text": "T",
+        "notes": [
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "read": [],
+        "alsoRead": [],
+        "cut": false,
+        "unchecked": false
+      },
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"notes\":[],\"read\":[\"note:1\",2,null,\"note:0a1b2c3d4e5f60718293a4b5c6d7e8f9\"],\"text\":\"T\"},\"review\":false}",
+      "answer": {
+        "text": "T",
+        "notes": [],
+        "read": [
+          "note:1",
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "alsoRead": [
+          "note:1",
+          "note:0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+        ],
+        "cut": false,
+        "unchecked": false
+      },
+      "review": false
+    },
+    {
+      "body": "{\"answer\":{\"notes\":[],\"read\":\"note:1\",\"text\":\"T\"},\"review\":false}",
+      "answer": {
+        "text": "T",
+        "notes": [],
+        "read": [],
+        "alsoRead": [],
         "cut": false,
         "unchecked": false
       },

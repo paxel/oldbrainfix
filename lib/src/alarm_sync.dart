@@ -44,6 +44,9 @@ class AlarmSync extends ChangeNotifier {
   StreamSubscription<void>? _arrivals;
   Future<void> _tail = Future.value();
   var _changeQueued = false;
+
+  /// Whether an arming for a change waits behind the jobs before it.
+  var _armWaiting = false;
   var _disposed = false;
 
   /// What was handed to the platform last, to skip handing it again.
@@ -232,6 +235,17 @@ class AlarmSync extends ChangeNotifier {
     final ringingChanged = ringing != _ringing;
     _granted = granted;
     _ringing = ringing;
+    // What a tap opened, and the ringing, show at once, before the plan
+    // is read and armed anew, which waits on every alarm (#339).
+    if (permissionsChanged ||
+        ringingChanged ||
+        nudgeOpened ||
+        changesOpened ||
+        unsortedOpened ||
+        pickOpened != null ||
+        occurrenceOpened != null) {
+      notifyListeners();
+    }
     await _arm(force: true);
     // Acknowledged only once applied and armed: a crash in between
     // applies them again, which changes nothing.
@@ -240,17 +254,7 @@ class AlarmSync extends ChangeNotifier {
         actions.map((a) => a.seq).reduce((a, b) => a > b ? a : b),
       );
     }
-    if (!_disposed &&
-        (actions.isNotEmpty ||
-            permissionsChanged ||
-            ringingChanged ||
-            nudgeOpened ||
-            changesOpened ||
-            unsortedOpened ||
-            pickOpened != null ||
-            occurrenceOpened != null)) {
-      notifyListeners();
-    }
+    if (!_disposed && actions.isNotEmpty) notifyListeners();
   });
 
   /// Checks the Line [lineId] for the Occurrence [occurrenceKey] of the
@@ -339,7 +343,16 @@ class AlarmSync extends ChangeNotifier {
     _changeQueued = true;
     scheduleMicrotask(() {
       _changeQueued = false;
-      if (!_disposed) unawaited(_serial(_arm));
+      // One arming waiting is enough: it reads the plan as it starts,
+      // with every change before it (#339).
+      if (_disposed || _armWaiting) return;
+      _armWaiting = true;
+      unawaited(
+        _serial(() {
+          _armWaiting = false;
+          return _arm();
+        }),
+      );
     });
   }
 

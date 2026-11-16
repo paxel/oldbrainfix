@@ -252,8 +252,9 @@ List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
 /// own, ADR 0017); "From …" when a Pack brought it unclaimed (#164);
-/// with [showPlace] where it is filed; a separator under
-/// them; then the Note in its compact or its detailed view ([full], #189).
+/// with [showPlace] where it is filed; then, with no divider, the Note in
+/// its compact or its detailed view ([full], #189), its text in the
+/// second row (#330).
 /// Its Area's colour runs down the left edge and its icon leads the place
 /// line. An important Note gets an accent marker and a stronger emboss, an
 /// unimportant one is dimmed (UI laws, "Cards").
@@ -282,14 +283,15 @@ class NoteCard extends StatelessWidget {
   /// user's own, which shows no Profile line.
   final Profile? author;
 
-  /// Whether the card says its Area and Topic, or Unsorted: only where
-  /// the screen around it does not say it already.
+  /// Whether the card says its Area and Topic, or Unsorted: not in the
+  /// list of the Area or Topic it is in (#330).
   final bool showPlace;
 
   /// Opens "file into…"; no button when null.
   final VoidCallback? onFile;
 
-  /// Opens "merge into…"; no button when null.
+  /// Opens "merge into…", on an Unsorted Note's card named "Add to
+  /// Note…" (#308); no button when null.
   final VoidCallback? onMerge;
 
   /// Spawns a Routine, Reminder, Frog or Session from the Note, picked
@@ -583,6 +585,7 @@ class NoteCard extends StatelessWidget {
             onSchedule: onSchedule,
             spawnsNow: spawnsNow,
             onMerge: onMerge,
+            adding: note.isUnsorted,
           )
         : null;
     final bottom = full && acts;
@@ -601,7 +604,8 @@ class NoteCard extends StatelessWidget {
             )
           else
             header,
-          const Divider(height: 24),
+          // No divider: the text follows in the second row (#330).
+          const SizedBox(height: 4),
         ],
         // Under where it is filed, over its text (#215).
         if (occurrences case final occurrences?)
@@ -706,6 +710,7 @@ class NoteCard extends StatelessWidget {
                         onFile: onFile,
                         onSchedule: onSchedule,
                         onMerge: onMerge,
+                        adding: note.isUnsorted,
                         actions: actions,
                         spawnsNow: spawnsNow,
                       ),
@@ -738,6 +743,10 @@ class NoteActionRow extends StatelessWidget {
   final VoidCallback? onFile;
   final ValueChanged<Spawn>? onSchedule;
   final VoidCallback? onMerge;
+
+  /// Whether [onMerge] is named "Add to Note…", as on an Unsorted Note's
+  /// card (#308), not "Merge into…".
+  final bool adding;
   final NoteActions? actions;
 
   /// What the spawn menu offers, in this order.
@@ -752,6 +761,7 @@ class NoteActionRow extends StatelessWidget {
     this.onFile,
     this.onSchedule,
     this.onMerge,
+    this.adding = false,
     this.actions,
     this.spawns = Spawn.values,
     this.spawnsNow,
@@ -797,7 +807,7 @@ class NoteActionRow extends StatelessWidget {
               ),
             if (onMerge != null)
               IconButton(
-                tooltip: t.mergeInto,
+                tooltip: adding ? t.addToNote : t.mergeInto,
                 onPressed: onMerge,
                 icon: const Icon(Icons.call_merge),
               ),
@@ -856,6 +866,9 @@ class _MoreButton extends StatelessWidget {
   final List<Spawn> Function()? spawnsNow;
   final VoidCallback? onMerge;
 
+  /// Whether [onMerge] is named "Add to Note…" (#308).
+  final bool adding;
+
   const _MoreButton({
     required this.importance,
     required this.actions,
@@ -863,6 +876,7 @@ class _MoreButton extends StatelessWidget {
     this.onSchedule,
     this.spawnsNow,
     this.onMerge,
+    this.adding = false,
   });
 
   @override
@@ -949,7 +963,12 @@ class _MoreButton extends StatelessWidget {
                 () => schedule(spawn),
               ),
           if (onMerge case final merge?)
-            item('note-merge', Icons.call_merge, t.mergeInto, merge),
+            item(
+              'note-merge',
+              Icons.call_merge,
+              adding ? t.addToNote : t.mergeInto,
+              merge,
+            ),
           if (onFile != null || spawns.isNotEmpty || onMerge != null)
             const PopupMenuDivider(),
           if (actions.onImportance case final set?) ...[
@@ -1599,13 +1618,21 @@ class _CompactNoteState extends State<_CompactNote> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (NoteKinds.name(shown).length case final end when end > 0)
+          if (NoteKinds.name(shown) case final name when name.trim().isNotEmpty)
             marked(
               0,
-              end,
+              name.length,
               key: const ValueKey('card-name'),
               style: text.titleMedium,
               lines: 1,
+            )
+          else if (untitledList(t, _kind) case final untitled?)
+            Text(
+              untitled,
+              key: const ValueKey('card-name'),
+              style: text.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ?widget.list,
           ...glance,
@@ -1724,9 +1751,10 @@ class _CompactNoteState extends State<_CompactNote> {
 String descriptionUnfoldedSetting(String noteId) =>
     'descriptionUnfolded:$noteId';
 
-/// The whole of a Note in the detailed view: its text, photos and recordings,
-/// then each Section under a separator and its own Capture Context. The
-/// Sections are read when the Note is, not while building.
+/// The whole of a Note in the detailed view: its text, photos and
+/// recordings, then each Section under a tear line (#307) and its own
+/// Capture Context. The Sections are read when the Note is, not while
+/// building.
 class _FullNote extends StatefulWidget {
   final Note note;
   final DateFormat when;
@@ -1814,6 +1842,7 @@ class _FullNoteState extends State<_FullNote> {
           list: widget.list,
           onTable: widget.onTable,
           named: _kind != NoteKind.plain,
+          untitled: untitledList(context.t, _kind),
         ),
         const SizedBox(height: 8),
         CaptureLine(
@@ -1826,7 +1855,7 @@ class _FullNoteState extends State<_FullNote> {
             key: ValueKey('section:${section.id}'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Divider(height: 24),
+              const TearLine(),
               _Whole(
                 id: section.id,
                 text: section.shownText,
@@ -1902,6 +1931,9 @@ class _Whole extends StatelessWidget {
   /// (#188).
   final bool named;
 
+  /// What a list without a name shows as its name ([untitledList]).
+  final String? untitled;
+
   const _Whole({
     required this.id,
     required this.text,
@@ -1922,14 +1954,16 @@ class _Whole extends StatelessWidget {
     this.ticking,
     this.onTable,
     this.named = false,
+    this.untitled,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge;
     final list = this.list;
-    // A photo Note may have no words.
-    final Widget? words = text.isEmpty
+    // A photo Note may have no words; a list without a name shows its
+    // kind.
+    final Widget? words = text.isEmpty && untitled == null
         ? null
         : named
         ? _NameAndDescription(
@@ -1940,6 +1974,7 @@ class _Whole extends StatelessWidget {
             format: format,
             ticking: ticking,
             onTable: onTable,
+            untitled: untitled,
           )
         : MarkedText(
             text,
@@ -2063,6 +2098,9 @@ class _NameAndDescription extends StatefulWidget {
   final BoxTicking? ticking;
   final TableEditing? onTable;
 
+  /// What shows as the name while it is blank ([untitledList]).
+  final String? untitled;
+
   const _NameAndDescription({
     required this.noteId,
     required this.text,
@@ -2071,6 +2109,7 @@ class _NameAndDescription extends StatefulWidget {
     required this.format,
     this.ticking,
     this.onTable,
+    this.untitled,
   });
 
   @override
@@ -2132,11 +2171,15 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
       children: [
         KeyedSubtree(
           key: const ValueKey('card-name'),
-          child: part(
-            start: 0,
-            end: nameEnd,
-            style: theme.textTheme.titleMedium,
-          ),
+          child: switch (widget.untitled) {
+            final untitled? when text.substring(0, nameEnd).trim().isEmpty =>
+              Text(untitled, style: theme.textTheme.titleMedium),
+            _ => part(
+              start: 0,
+              end: nameEnd,
+              style: theme.textTheme.titleMedium,
+            ),
+          },
         ),
         if (description.trim().isNotEmpty)
           Semantics(

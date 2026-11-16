@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -144,12 +145,16 @@ class _AreasScreenState extends State<AreasScreen>
       for (final people in _people.values)
         for (final p in people) p.id: store.personShown(p.id).name,
     };
-    _hits = _search(
-      widget.places,
-      _query.text,
-      lock: LockScope.of(context),
-      people: _filter,
-    );
+    // Only a search shows Notes on this level; without one, reading
+    // every Note for nothing made each change wait on all of them.
+    _hits = _query.text.trim().isEmpty
+        ? const []
+        : _search(
+            widget.places,
+            _query.text,
+            lock: LockScope.of(context),
+            people: _filter,
+          );
     keepShown(_hits);
   }
 
@@ -475,6 +480,11 @@ class _AreasScreenState extends State<AreasScreen>
       for (final area in _areas)
         if (lock?.isAreaClosed(area.id) ?? false) area.id,
     };
+    final rows = searching ? const <Widget>[] : _areaRows(t);
+    final padding = clearOfFloatingButtons(
+      context,
+      const EdgeInsets.symmetric(vertical: 8),
+    );
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       onForward: _forward,
@@ -530,61 +540,71 @@ class _AreasScreenState extends State<AreasScreen>
                       if (searching && mayTick(_hits)) selectButton(context),
                     ],
             ),
-            body: Column(
-              children: [
-                BrowserSearchField(
+            body: CustomScrollView(
+              slivers: [
+                SearchHeaderSliver(
                   controller: _query,
-                  hint: t.searchAllHint,
-                  onChanged: _searched,
-                  tags: widget.places.store,
-                  closedTags: closed,
-                ),
-                if (searching)
-                  PersonFilterChips(
-                    store: widget.places.store,
-                    filter: _filter,
-                    onChanged: _filtered,
-                  ),
-                Expanded(
-                  child: searching || _areas.isEmpty
-                      ? ListView(
-                          padding: clearOfFloatingButtons(
-                            context,
-                            const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          children: searching
-                              ? _hitCards(
-                                  context,
-                                  _hits,
-                                  _file,
-                                  _merge,
-                                  _openNote,
-                                  _schedule,
-                                  widget.notes,
-                                  _reload,
-                                  // Hits from every Area.
-                                  (_) => true,
-                                  compact: compact,
-                                  switched: switched,
-                                  onSwitch: switchView,
-                                  selected: selecting ? selected : null,
-                                  onSelect: setSelected,
-                                )
-                              : [..._areaRows(t), _tagsRow(t)],
-                        )
-                      // The Areas move by their handles only: a long
-                      // press never changes data (#280).
-                      : ReorderableListView(
-                          padding: clearOfFloatingButtons(
-                            context,
-                            const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          buildDefaultDragHandles: false,
-                          onReorderItem: _moved,
-                          footer: _tagsRow(t),
-                          children: _areaRows(t),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      BrowserSearchField(
+                        controller: _query,
+                        hint: t.searchAllHint,
+                        onChanged: _searched,
+                        tags: widget.places.store,
+                        closedTags: closed,
+                      ),
+                      if (searching)
+                        PersonFilterChips(
+                          store: widget.places.store,
+                          filter: _filter,
+                          onChanged: _filtered,
                         ),
+                    ],
+                  ),
                 ),
+                if (searching || _areas.isEmpty)
+                  SliverPadding(
+                    padding: padding,
+                    sliver: SliverList.list(
+                      children: searching
+                          ? _hitCards(
+                              context,
+                              _hits,
+                              _file,
+                              _merge,
+                              _openNote,
+                              _schedule,
+                              widget.notes,
+                              _reload,
+                              // Hits from every Area.
+                              (_) => true,
+                              compact: compact,
+                              switched: switched,
+                              onSwitch: switchView,
+                              selected: selecting ? selected : null,
+                              onSelect: setSelected,
+                            )
+                          : [...rows, _tagsRow(t)],
+                    ),
+                  )
+                else ...[
+                  // The Areas move by their handles only: a long press
+                  // never changes data (#280).
+                  SliverPadding(
+                    padding: padding.copyWith(bottom: 0),
+                    sliver: SliverReorderableList(
+                      itemCount: rows.length,
+                      itemBuilder: (_, index) => rows[index],
+                      onReorderItem: _moved,
+                      proxyDecorator: _lifted,
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: padding.copyWith(top: 0),
+                    sliver: SliverToBoxAdapter(child: _tagsRow(t)),
+                  ),
+                ],
               ],
             ),
             floatingActionButton: FloatingActionButton(
@@ -598,6 +618,17 @@ class _AreasScreenState extends State<AreasScreen>
     );
   }
 }
+
+/// An Area row while it is dragged: lifted, as a reorderable list lifts
+/// it (#280).
+Widget _lifted(Widget row, int _, Animation<double> lift) => AnimatedBuilder(
+  animation: lift,
+  builder: (_, row) => Material(
+    elevation: lerpDouble(0, 6, Curves.easeInOut.transform(lift.value)) ?? 0,
+    child: row,
+  ),
+  child: row,
+);
 
 enum _AreaAction { rename, look, share, pack, people, hideFromAi, delete }
 
@@ -926,30 +957,38 @@ class _AreaScreenState extends State<AreaScreen>
                     if (mayTick(_diary)) selectButton(context),
                   ],
           ),
-          body: Column(
-            children: [
-              BrowserSearchField(
+          body: CustomScrollView(
+            slivers: [
+              SearchHeaderSliver(
                 controller: _query,
-                hint: t.searchAreaHint,
-                onChanged: (_) => _reload(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    BrowserSearchField(
+                      controller: _query,
+                      hint: t.searchAreaHint,
+                      onChanged: (_) => _reload(),
+                    ),
+                    PersonFilterChips(
+                      store: widget.places.store,
+                      filter: _filter,
+                      onChanged: _filtered,
+                    ),
+                  ],
+                ),
               ),
-              PersonFilterChips(
-                store: widget.places.store,
-                filter: _filter,
-                onChanged: _filtered,
-              ),
-              Expanded(
-                child: ListView(
-                  // Where this Device may not write, no "+" floats to clear.
-                  padding: _writes
-                      ? clearOfFloatingButtons(
-                          context,
-                          const EdgeInsets.symmetric(vertical: 8),
-                        )
-                      : clearOfSystemBars(
-                          context,
-                          const EdgeInsets.symmetric(vertical: 8),
-                        ),
+              SliverPadding(
+                // Where this Device may not write, no "+" floats to clear.
+                padding: _writes
+                    ? clearOfFloatingButtons(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      )
+                    : clearOfSystemBars(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                sliver: SliverList.list(
                   children: searching
                       ? _hitCards(
                           context,
@@ -1162,30 +1201,38 @@ class _TopicScreenState extends State<TopicScreen>
                     if (mayTick(_diary)) selectButton(context),
                   ],
           ),
-          body: Column(
-            children: [
-              BrowserSearchField(
+          body: CustomScrollView(
+            slivers: [
+              SearchHeaderSliver(
                 controller: _query,
-                hint: t.searchTopicHint,
-                onChanged: (_) => _reload(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    BrowserSearchField(
+                      controller: _query,
+                      hint: t.searchTopicHint,
+                      onChanged: (_) => _reload(),
+                    ),
+                    PersonFilterChips(
+                      store: widget.places.store,
+                      filter: _filter,
+                      onChanged: _filtered,
+                    ),
+                  ],
+                ),
               ),
-              PersonFilterChips(
-                store: widget.places.store,
-                filter: _filter,
-                onChanged: _filtered,
-              ),
-              Expanded(
-                child: ListView(
-                  // Where this Device may not write, no "+" floats to clear.
-                  padding: _writes
-                      ? clearOfFloatingButtons(
-                          context,
-                          const EdgeInsets.symmetric(vertical: 8),
-                        )
-                      : clearOfSystemBars(
-                          context,
-                          const EdgeInsets.symmetric(vertical: 8),
-                        ),
+              SliverPadding(
+                // Where this Device may not write, no "+" floats to clear.
+                padding: _writes
+                    ? clearOfFloatingButtons(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      )
+                    : clearOfSystemBars(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                sliver: SliverList.list(
                   children: searching
                       ? _hitCards(
                           context,

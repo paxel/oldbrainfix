@@ -1,4 +1,4 @@
-//! The AI port on the desktop's screen (#112, ADR 0026): the Settings
+//! The AI port on the desktop's screen (#112, ADR 0026): the AI settings
 //! card that opens it for one AI Task, for this computer only or for its
 //! Docker containers (#167), shows where a client reaches it
 //! and copies the client's config, and "Done, review", which closes it;
@@ -588,7 +588,8 @@ fn tally_change(
 /// What the AI port's card shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PortShown<'a> {
-    /// Whether the Settings opened at the card, by AI ▸ AI port… (#279).
+    /// Whether the AI settings opened at the card, by the port's
+    /// announcement (#279, #335).
     pub at: bool,
     /// Where a client reaches the port while it is open.
     pub url: Option<&'a str>,
@@ -603,10 +604,10 @@ pub struct PortShown<'a> {
     pub no_bridge: bool,
 }
 
-/// The AI port's card in the Settings: closed, who may connect, "Open
-/// the AI port", and the review when an AI Task waits for one; open, the
-/// address, the three ways to copy what a client needs, the copied one
-/// marked, and "Done, review".
+/// The AI port's card in the AI settings (#335): closed, who may
+/// connect, "Open the AI port", and the review when an AI Task waits for
+/// one; open, the address, the three ways to copy what a client needs,
+/// the copied one marked, and "Done, review".
 pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> Option<AiAction> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();

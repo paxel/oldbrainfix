@@ -133,6 +133,30 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('Add to Note… keeps the last three Notes added to, latest first', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.recentlyAddedTo, isEmpty);
+    store
+      ..addedTo('a')
+      ..addedTo('b')
+      ..addedTo('c');
+    expect(store.recentlyAddedTo, ['c', 'b', 'a']);
+    store.addedTo('a');
+    expect(store.recentlyAddedTo, ['a', 'c', 'b'], reason: 'once, moved up');
+    store.addedTo('d');
+    expect(store.recentlyAddedTo, ['d', 'a', 'c'], reason: 'b forgotten');
+    expect(store.localSetting('recentlyAddedTo'), '["d","a","c"]');
+    expect(store.recentlyFiledInto, isEmpty, reason: 'a list of its own');
+    store.setLocalSetting('recentlyAddedTo', '["x",7,"x","y","z","w"]');
+    expect(store.recentlyAddedTo, ['x', 'y', 'z']);
+    store.setLocalSetting('recentlyAddedTo', 'not json');
+    expect(store.recentlyAddedTo, isEmpty);
+    store.addedTo('e');
+    expect(store.recentlyAddedTo, ['e']);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the alarm setup is offered until this Device has walked it', () {
     final store = Store.inMemory();
     addTearDown(store.close);
@@ -224,6 +248,23 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the text shows normal until this Device picks a larger step, '
+      'apart from Fat fingers (#326, obf-1019)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.textSize, TextSize.normal);
+    for (final size in TextSize.values) {
+      store.textSize = size;
+      expect(store.textSize, size);
+      expect(store.localSetting('textSize'), size.name);
+    }
+    expect(store.fatFingers, isFalse, reason: 'a setting of its own');
+    expect([for (final s in TextSize.values) s.factor], [1.0, 1.15, 1.3]);
+    store.setLocalSetting('textSize', 'garbled');
+    expect(store.textSize, TextSize.normal);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the Agenda showed a row per Shopping List with Lines back unless '
       'this Device chose another way', () {
     final store = Store.inMemory();
@@ -236,6 +277,19 @@ void main() {
     }
     store.setLocalSetting('shoppingAgenda', 'sideways');
     expect(store.shoppingAgenda, ShoppingAgenda.back);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('Ask is off until this Device switches it on, and is never '
+      'synced', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.askOn, isFalse);
+    store.askOn = true;
+    expect(store.askOn, isTrue);
+    expect(store.localSetting('askOn'), 'true');
+    store.askOn = false;
+    expect(store.askOn, isFalse);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 

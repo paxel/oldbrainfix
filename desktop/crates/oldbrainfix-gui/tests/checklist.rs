@@ -163,19 +163,23 @@ fn make_it_a_checklist_in_the_editor_turns_the_lines_into_lines() -> TestResult 
     assert!(!shows(&harness, "Checklist"));
     click(&mut harness, "Kind: Plain Note")?;
     pick(&mut harness, "Checklist");
-    assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
+    // Every line a Line, the first one too (#309).
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Packing", "Passport", "  Charger", "Ticket"]
+    );
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
-    assert_eq!(now.text, "Packing");
-    // The name holds the title now, so leaving it writes nothing old
-    // (#188).
+    assert_eq!(now.text, "");
+    // The name is empty, to be typed later, so leaving it writes nothing
+    // old (#188).
     assert_eq!(
         harness
             .get_by_role_and_label(Role::TextInput, "Name")
             .value()
-            .as_deref(),
-        Some("Packing")
+            .unwrap_or_default(),
+        ""
     );
     assert!(shows(&harness, "Checklist"));
     assert!(!shows(&harness, "Make it a Checklist"));
@@ -188,6 +192,17 @@ fn make_it_a_checklist_in_the_editor_turns_the_lines_into_lines() -> TestResult 
     };
     assert!(x("Charger")? > x("Passport")? + 10.0);
     assert!(x("Passport")? > x("Ticket")?);
+    // Leaving keeps the name empty and the first line a Line (#309).
+    harness.state_mut().close_note();
+    harness.run();
+    let left = Notes::new(harness.state().store())
+        .by_id(&note)?
+        .ok_or("note")?;
+    assert_eq!(left.text, "");
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Packing", "Passport", "  Charger", "Ticket"]
+    );
     Ok(())
 }
 
@@ -608,18 +623,24 @@ fn the_cards_menu_makes_a_checklist_unchecks_all_and_goes_back() -> TestResult {
     click(&mut harness, "More: Packing")?;
     assert!(shows(&harness, "Edit"));
     click(&mut harness, "Make it a Checklist")?;
-    assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
+    // Every line a Line (#309): the list has no name, and its card shows
+    // its kind instead.
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Packing", "Passport", "  Charger", "Ticket"]
+    );
+    assert!(shows(&harness, "Checklist"));
     // Nothing checked: nothing to uncheck.
-    click(&mut harness, "More: Packing")?;
+    click(&mut harness, "More: Checklist")?;
     assert!(!shows(&harness, "Uncheck all"));
     assert!(!shows(&harness, "Make it a Checklist"));
     harness.key_press(egui::Key::Escape);
     harness.run();
     tick(&mut harness, "Ticket")?;
-    click(&mut harness, "More: Packing")?;
+    click(&mut harness, "More: Checklist")?;
     click(&mut harness, "Uncheck all")?;
     assert_eq!(list(&harness, &note)?.checked_count(), 0);
-    click(&mut harness, "More: Packing")?;
+    click(&mut harness, "More: Checklist")?;
     click(&mut harness, "Back to a plain Note")?;
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
@@ -1048,5 +1069,27 @@ fn a_line_is_dragged_by_its_handle_within_its_group_or_the_top_level() -> TestRe
         texts(&harness, &note)?,
         ["Map", "Ticket", "Passport", "  Charger", "  Adapter"]
     );
+    Ok(())
+}
+
+#[test]
+fn a_line_ticks_and_strikes_in_the_frame_of_its_click_and_is_saved_in_the_next() -> TestResult {
+    // A tick shows at once (#338), in the editor and on the card alike.
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    boxes(&harness, "Ticket").pop().ok_or("Ticket")?.click();
+    harness.step();
+    for node in boxes(&harness, "Ticket") {
+        assert_eq!(node.accesskit_node().toggled(), Some(Toggled::True));
+    }
+    assert_eq!(
+        list(&harness, &note)?.checked_count(),
+        0,
+        "saved in the next frame"
+    );
+    harness.run();
+    assert_eq!(list(&harness, &note)?.checked_count(), 1);
+    assert!(checked(&harness, "Ticket")?);
     Ok(())
 }

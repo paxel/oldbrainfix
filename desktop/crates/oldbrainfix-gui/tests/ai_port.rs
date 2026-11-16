@@ -1,5 +1,6 @@
 //! The AI port in the window (#112, ADR 0026): off by default, opened
-//! from the Settings with the client config to copy; while it is open,
+//! from the AI settings (#335) with the client config to copy, its token
+//! kept from one opening to the next; while it is open,
 //! a tool call is answered as the window idles, and the top says "AI
 //! port open, sync paused". "Done, review" closes it and shows the
 //! review: a section per kind of change, before and after, the user's
@@ -69,9 +70,11 @@ fn window(app: App) -> Harness<'static, App> {
     harness
 }
 
+/// The window with the AI settings open (#335), where the AI port's
+/// card is.
 fn settings(store: &Arc<Store>) -> Harness<'static, App> {
     let mut app = App::new(store.clone(), "en");
-    app.open(Page::Settings);
+    app.open(Page::AiSettings);
     window(app)
 }
 
@@ -107,6 +110,8 @@ fn the_port_is_off_by_default_and_opens_from_the_settings() -> TestResult {
     let mut harness = settings(&store);
     assert!(harness.state().ai_port().is_none());
     assert!(!store.sync_paused()?);
+    // It works without "AI (experimental)", which is off (#334).
+    assert!(!store.ai_on()?);
     assert!(!shows(&harness, t.ai_port_open_banner()));
 
     click(&mut harness, t.ai_port_open());
@@ -117,9 +122,46 @@ fn the_port_is_off_by_default_and_opens_from_the_settings() -> TestResult {
     assert!(shows(&harness, t.ai_port_open_banner()));
     assert!(!shows(&harness, t.ai_port_open()));
 
-    click(&mut harness, t.ai_port_copy_claude_code());
+    let token = harness
+        .state()
+        .ai_port()
+        .ok_or("the port is open")?
+        .token()
+        .to_string();
+    let copied = copying(&mut harness, t.ai_port_copy_claude_code());
+    assert!(copied.contains(&token), "{copied}");
+    assert!(copied.contains(&url), "{copied}");
     assert!(shows(&harness, t.ai_port_copied()));
+
+    // Opened again, the token is the same, so a client set up once
+    // stays set up.
+    click(&mut harness, t.ai_port_done());
+    harness.state_mut().open(Page::AiSettings);
+    harness.run_steps(4);
+    click(&mut harness, t.ai_port_open());
+    let again = harness.state().ai_port().ok_or("the port is open")?;
+    assert_eq!(again.token(), token);
+    let copied = copying(&mut harness, t.ai_port_copy_config());
+    assert!(copied.contains(&token), "{copied}");
     Ok(())
+}
+
+/// Clicks `label` and gives what the frames after it copy.
+fn copying(harness: &mut Harness<'_, App>, label: &str) -> String {
+    match harness.get_all_by_label(label).last() {
+        Some(node) => node.click_accesskit(),
+        None => panic!("no {label}"),
+    }
+    let mut copied = String::new();
+    for _ in 0..4 {
+        harness.step();
+        for command in &harness.output().platform_output.commands {
+            if let egui::OutputCommand::CopyText(text) = command {
+                copied.clone_from(text);
+            }
+        }
+    }
+    copied
 }
 
 #[test]
@@ -198,7 +240,7 @@ fn with_a_wake_the_open_port_is_not_polled_and_a_call_wakes_the_window() -> Test
             woken.fetch_add(1, Ordering::SeqCst);
         }));
     }
-    app.open(Page::Settings);
+    app.open(Page::AiSettings);
     let mut harness = window(app);
     click(&mut harness, t.ai_port_open());
     // Idle with the port open: no frame asks for the next within a second.
@@ -394,7 +436,7 @@ fn a_task_that_changed_nothing_is_declined_without_a_review() -> TestResult {
     click(&mut harness, t.ai_port_done());
     assert!(store.ai_task()?.is_none());
     assert!(!store.sync_paused()?);
-    assert_eq!(harness.state().page(), Some(Page::Settings));
+    assert_eq!(harness.state().page(), Some(Page::AiSettings));
     assert!(!shows(&harness, t.ai_review_title()));
     Ok(())
 }
@@ -516,12 +558,73 @@ fn ai_entry_enabled(harness: &mut Harness<'_, App>, entry: &str) -> bool {
 }
 
 #[test]
-fn the_ai_menu_opens_the_settings_at_the_port_card() -> TestResult {
+fn the_ai_menu_opens_the_ai_settings_with_the_switch_the_provider_and_the_port() -> TestResult {
     let store = device()?;
     let t = L10n::new("en");
-    // Low enough that the card lies under the Settings' first one.
+    let mut harness = window(App::new(store.clone(), "en"));
+    assert!(ai_entry_enabled(&mut harness, t.menu_ai_settings()));
+    click(&mut harness, t.menu_ai_settings());
+    assert_eq!(harness.state().page(), Some(Page::AiSettings));
+    assert!(shows(&harness, t.ai_settings_title()));
+    assert!(shows(&harness, t.ai_switch()));
+    assert!(shows(&harness, t.ai_port_title()));
+    assert!(shows(&harness, t.ai_port_open()));
+    // The provider's card only while the AI is on (#334).
+    let provider = |harness: &Harness<'_, App>| {
+        harness
+            .query_all_by_label(t.ask_settings_title())
+            .next()
+            .is_some()
+    };
+    assert!(!provider(&harness));
+    click(&mut harness, t.ai_switch());
+    assert!(store.ai_on()?);
+    assert!(provider(&harness));
+    assert!(shows(&harness, t.ask_key()));
+    assert!(shows(&harness, t.ai_port_open()));
+    Ok(())
+}
+
+#[test]
+fn the_settings_keep_one_row_for_the_ai_that_opens_its_page() -> TestResult {
+    let store = device()?;
+    store.set_ai_on(true)?;
+    let t = L10n::new("en");
+    let mut app = App::new(store.clone(), "en");
+    app.open(Page::Settings);
+    let mut harness = window(app);
+    // None of the AI's cards, the row in their place.
+    for gone in [
+        t.ai_switch(),
+        t.ai_port_title(),
+        t.ai_port_open(),
+        t.ask_settings_title(),
+        t.ask_key(),
+    ] {
+        let shown = harness.query_all_by_label(gone).next().is_some();
+        assert!(!shown, "{gone} in the Settings");
+    }
+    assert!(shows(&harness, t.ai_settings_detail()));
+    click(&mut harness, t.ai_settings_open());
+    assert_eq!(harness.state().page(), Some(Page::AiSettings));
+    assert!(shows(&harness, t.ask_settings_title()));
+    assert!(shows(&harness, t.ai_port_title()));
+    // The arrow leads back to the Settings.
+    click(&mut harness, &t.page_back(t.settings_title()));
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    Ok(())
+}
+
+#[test]
+fn the_open_ports_announcement_opens_the_ai_settings_at_its_card() -> TestResult {
+    let store = device()?;
+    // The provider's card above the port's, OpenAI-compatible with its
+    // base URL, pushes it low.
+    store.set_ai_on(true)?;
+    store.set_ask_protocol(oldbrainfix_core::ask::Protocol::OpenAi)?;
+    let t = L10n::new("en");
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 420.0))
+        .with_size(egui::vec2(1280.0, 520.0))
         .build_ui_state(
             |ui, app: &mut App| {
                 App::install(ui.ctx());
@@ -529,29 +632,27 @@ fn the_ai_menu_opens_the_settings_at_the_port_card() -> TestResult {
             },
             App::new(store.clone(), "en"),
         );
-    harness.run();
+    harness.run_steps(4);
     let card_top =
         |harness: &Harness<'_, App>| match harness.get_all_by_label(t.ai_port_title()).last() {
             Some(node) => node.rect().top(),
             None => panic!("no {}", t.ai_port_title()),
         };
-    harness.state_mut().open(Page::Settings);
-    harness.run();
-    // Low in the dialog, at its bottom edge.
+    harness.state_mut().open(Page::AiSettings);
+    harness.run_steps(4);
     let low = card_top(&harness);
+    click(&mut harness, t.ai_port_open());
     harness.state_mut().close_page();
-    harness.run();
+    harness.run_steps(4);
 
-    assert!(ai_entry_enabled(&mut harness, "AI port…"));
-    click(&mut harness, "AI port…");
-    harness.run();
-    assert_eq!(harness.state().page(), Some(Page::Settings));
+    click(&mut harness, t.ai_port_open_banner());
+    assert_eq!(harness.state().page(), Some(Page::AiSettings));
     let top = card_top(&harness);
     assert!(
         top + 100.0 < low,
         "scrolled up to the top: {top}, from {low}"
     );
-    assert!(shows(&harness, t.ai_port_open()));
+    assert!(shows(&harness, t.ai_port_done()));
     Ok(())
 }
 
@@ -565,8 +666,8 @@ fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestRe
     bar(&harness, "AI").click();
     harness.run_steps(4);
 
-    // The menu bar is under the Settings dialog: they close for it.
-    harness.state_mut().open(Page::Settings);
+    // The menu bar is under the AI settings: they close for it.
+    harness.state_mut().open(Page::AiSettings);
     harness.run_steps(4);
     click(&mut harness, t.ai_port_open());
     harness.state_mut().close_page();
@@ -577,7 +678,7 @@ fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestRe
     harness.run_steps(4);
     let task = task(&harness)?;
     store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
-    harness.state_mut().open(Page::Settings);
+    harness.state_mut().open(Page::AiSettings);
     harness.run_steps(4);
     click(&mut harness, t.ai_port_done());
     assert_eq!(harness.state().selection(), &Selection::AiReview);
@@ -589,6 +690,6 @@ fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestRe
     assert_eq!(harness.state().selection(), &Selection::AiReview);
     assert!(shows(&harness, &t.ai_after("Milk and eggs")));
     // The menu closed with the pick.
-    assert!(!shows(&harness, "AI port…"));
+    assert!(!shows(&harness, t.menu_ai_settings()));
     Ok(())
 }

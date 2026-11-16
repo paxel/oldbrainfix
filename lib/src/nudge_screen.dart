@@ -12,6 +12,7 @@ import 'note_editor_screen.dart';
 import 'note_selection.dart';
 import 'page_bar.dart';
 import 'routine_editor_screen.dart';
+import 'sorting_unsorted.dart';
 import 'system_bars.dart';
 
 /// How many of the oldest Unsorted Notes the Nudge screen shows.
@@ -87,7 +88,7 @@ class _NudgeScreenState extends State<NudgeScreen>
                   widget.notes,
                   widget.places,
                   _shown,
-                  _reload,
+                  sortedFrom(context, widget.notes, _shown, _reload),
                 )
               : [
                   CompactNotesButton(compact: compact, onChanged: setCompact),
@@ -109,6 +110,7 @@ class _NudgeScreenState extends State<NudgeScreen>
                 widget.places,
                 _shown,
                 _reload,
+                sorting: widget.notes.unsorted,
                 compact: compact,
                 switched: switched,
                 onSwitch: switchView,
@@ -174,12 +176,13 @@ class _UnsortedScreenState extends State<UnsortedScreen>
 
   /// The Unsorted Notes of the people the filter keeps (#53).
   List<PlacedNote> _load() => [
-    for (final note in widget.notes.store.notesBy(
-      widget.notes.unsorted(),
-      _filter,
-    ))
-      placeNote(widget.places, note),
+    for (final note in _kept()) placeNote(widget.places, note),
   ];
+
+  /// Those Notes themselves, as the filter keeps them now; the editor opened
+  /// from here moves on through them (#313).
+  List<Note> _kept() =>
+      widget.notes.store.notesBy(widget.notes.unsorted(), _filter);
 
   void _reload() {
     if (!mounted) return;
@@ -209,7 +212,7 @@ class _UnsortedScreenState extends State<UnsortedScreen>
                   widget.notes,
                   widget.places,
                   _unsorted,
-                  _reload,
+                  sortedFrom(context, widget.notes, _unsorted, _reload),
                 )
               : [
                   PersonFilterButton(
@@ -243,6 +246,7 @@ class _UnsortedScreenState extends State<UnsortedScreen>
                 widget.places,
                 _unsorted,
                 _reload,
+                sorting: _kept,
                 compact: compact,
                 switched: switched,
                 onSwitch: switchView,
@@ -256,9 +260,28 @@ class _UnsortedScreenState extends State<UnsortedScreen>
   }
 }
 
+/// What runs once a step on the cards [shown] is done: [changed], and once
+/// it sorted the last Unsorted Note the Agenda (#313).
+VoidCallback sortedFrom(
+  BuildContext context,
+  Notes notes,
+  List<PlacedNote> shown,
+  VoidCallback changed,
+) {
+  final ids = [for (final placed in shown) placed.note.id];
+  return () {
+    changed();
+    if (context.mounted && sortedTheLast(notes, ids)) {
+      showAgendaSorted(context);
+    }
+  };
+}
+
 /// [unsorted] as cards, detailed unless [compact] (#189), that open their
 /// Note and offer to file, merge or schedule it; [changed] runs once the
-/// user is back from any of them. With [selected] they have their boxes
+/// user is back from any of them, and once one sorted the last Unsorted
+/// Note the Agenda shows (#313). The editor opened from a card moves on
+/// through [sorting] itself. With [selected] they have their boxes
 /// (#273).
 List<Widget> _sortingCards(
   BuildContext context,
@@ -266,29 +289,33 @@ List<Widget> _sortingCards(
   Places places,
   List<PlacedNote> unsorted,
   VoidCallback changed, {
+  required UnsortedShown sorting,
   required bool compact,
   required Set<String> switched,
   required void Function(Note note) onSwitch,
   Set<String>? selected,
   void Function(Note note, bool on)? onSelect,
 }) {
-  Future<void> then(Future<Object?> step) async {
+  final sorted = sortedFrom(context, notes, unsorted, changed);
+  Future<void> then(Future<Object?> step, VoidCallback done) async {
     await step;
-    changed();
+    done();
   }
 
   return diaryCards(
     context,
     unsorted,
-    (note) => then(fileNote(context, notes, places, note)),
-    (note) => then(mergeNote(context, notes, places, note)),
-    (note) => then(openNote(context, notes, places, note)),
+    (note) => then(fileNote(context, notes, places, note), sorted),
+    (note) => then(mergeNote(context, notes, places, note), sorted),
+    // The editor shows the Agenda itself once it sorted the last one.
+    (note) =>
+        then(openNote(context, notes, places, note, sorting: sorting), changed),
     notes: notes,
-    onChanged: changed,
-    // The screen is Unsorted.
-    showPlace: (_) => false,
+    onChanged: sorted,
+    // Unsorted is a mixed list: its cards say Unsorted too (#330).
+    showPlace: (_) => true,
     onSchedule: (note, spawn) =>
-        then(spawnFromNote(context, notes, places, note, spawn: spawn)),
+        then(spawnFromNote(context, notes, places, note, spawn: spawn), sorted),
     compact: compact,
     switched: switched,
     onSwitch: onSwitch,

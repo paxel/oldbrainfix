@@ -205,6 +205,78 @@ fn from_a_formatted_text_the_marks_of_items_and_quotes_go() -> TestResult {
     Ok(())
 }
 
+/// A Checklist made from the typed `text` of a new Note in `format`
+/// (#309).
+fn typed(store: &Store, text: &str, format: &str) -> Made<String> {
+    let id = Notes::new(store).capture_as(text, format, None, None)?.id;
+    Checklists::new(store).make_from_text(&id)?;
+    Ok(id)
+}
+
+fn name(store: &Store, note: &str) -> Made<String> {
+    Ok(Notes::new(store).by_id(note)?.ok_or("the Note")?.text)
+}
+
+#[test]
+fn typed_text_becomes_lines_every_one_and_the_list_has_no_name() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let note = typed(&ann, "Socks\nTent\n\nTorch", text_format::PLAIN)?;
+    assert_eq!(shown(&ann, &note)?, ["Socks", "Tent", "Torch"]);
+    assert_eq!(name(&ann, &note)?, "");
+    assert!(
+        !Notes::new(&ann)
+            .by_id(&note)?
+            .ok_or("the Note")?
+            .is_unsorted()
+    );
+    assert!(Checklists::new(&ann).is_checklist(&note)?);
+    // Indented lines go under the line above and "✓ " checks, the first
+    // line among them.
+    let marked = typed(
+        &ann,
+        "✓ Socks\nTent\n  Blue\n\tRed\n  ✓ Pegs",
+        text_format::PLAIN,
+    )?;
+    assert_eq!(name(&ann, &marked)?, "");
+    assert_eq!(
+        shown(&ann, &marked)?,
+        ["[x] Socks", "Tent", "  Blue", "  Red", "  [x] Pegs"]
+    );
+    // A first Line indented stays at the top.
+    let top = typed(&ann, "  Socks\n  Blue", text_format::PLAIN)?;
+    assert_eq!(shown(&ann, &top)?, ["Socks", "  Blue"]);
+    // A blank first line leaves the Name empty, a heading after it a Line.
+    let blank = typed(&ann, "\n# Weekly\nSocks", text_format::PLAIN)?;
+    assert_eq!(name(&ann, &blank)?, "");
+    assert_eq!(shown(&ann, &blank)?, ["# Weekly", "Socks"]);
+    assert!(Checklists::new(&ann).make_from_text(&note).is_err());
+    Ok(())
+}
+
+#[test]
+fn typed_text_keeps_a_first_line_that_looks_like_a_heading_as_its_name() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let weekly = typed(&ann, "# Weekly\nSocks\nTent", text_format::PLAIN)?;
+    assert_eq!(name(&ann, &weekly)?, "Weekly");
+    assert_eq!(shown(&ann, &weekly)?, ["Socks", "Tent"]);
+    let deep = typed(&ann, "  ###### Trip  \nMap", text_format::MARKDOWN)?;
+    assert_eq!(name(&ann, &deep)?, "Trip");
+    assert_eq!(shown(&ann, &deep)?, ["Map"]);
+    // Seven marks, no space after them or a tag: no heading.
+    let tag = typed(&ann, "#packing\n####### Seven\nMap", text_format::PLAIN)?;
+    assert_eq!(name(&ann, &tag)?, "");
+    assert_eq!(shown(&ann, &tag)?, ["#packing", "####### Seven", "Map"]);
+    // A line ending in ":" as it is.
+    let colon = typed(&ann, "Packing:\nSocks", text_format::PLAIN)?;
+    assert_eq!(name(&ann, &colon)?, "Packing:");
+    assert_eq!(shown(&ann, &colon)?, ["Socks"]);
+    // The name typed for a new list stays its Name.
+    let named = checklist(&ann, "Packing", None)?;
+    assert_eq!(name(&ann, &named)?, "Packing");
+    assert!(shown(&ann, &named)?.is_empty());
+    Ok(())
+}
+
 #[test]
 fn a_note_is_at_most_one_of_a_tally_and_a_checklist() -> TestResult {
     let ann = device(1, "Ann")?;

@@ -15,7 +15,7 @@
 use std::sync::{Arc, Mutex};
 
 use egui::accesskit::Toggled;
-use egui::{Key, Modifiers, ViewportCommand, ViewportId};
+use egui::{Key, Modifiers};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::{Notes, Places, SigningKey, Store};
@@ -98,6 +98,20 @@ fn enabled(harness: &mut Harness<'_, App>, menu: &str, entry: &str) -> bool {
     on
 }
 
+/// What the frame just drawn put on the clipboard.
+fn copied(harness: &Harness<'_, App>) -> Vec<String> {
+    harness
+        .output()
+        .platform_output
+        .commands
+        .iter()
+        .filter_map(|c| match c {
+            egui::OutputCommand::CopyText(text) => Some(text.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The label of the widget with the keyboard.
 fn focused(harness: &Harness<'_, App>) -> Option<String> {
     let node = harness.query_by(|n| n.is_focused())?.accesskit_node();
@@ -162,12 +176,22 @@ fn the_edit_menu_finds_opens_the_settings_and_hands_the_clipboard_to_the_field()
     harness.run();
     harness.get_by(|n| n.is_focused()).type_text(" now");
     harness.run();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    harness.run();
+    // The field copies what is selected in the next frame, as Ctrl+C
+    // would have it (#319).
     pick(&mut harness, "Edit", "Copy");
-    let asked = &harness.output().viewport_output[&ViewportId::ROOT].commands;
-    assert!(asked.contains(&ViewportCommand::RequestCopy), "{asked:?}");
+    harness.step();
+    assert_eq!(copied(&harness), ["Fix the tap now"]);
     harness.run();
     // The cursor is back in the field.
     assert_eq!(focused(&harness).as_deref(), Some("Note text"));
+    pick(&mut harness, "Edit", "Cut");
+    harness.step();
+    assert_eq!(copied(&harness), ["Fix the tap now"]);
+    harness.run();
+    let value = harness.query_by(|n| n.is_focused()).and_then(|n| n.value());
+    assert_eq!(value.as_deref(), Some(""));
 
     // Find: All Notes' search on the Agenda, which has none.
     pick(&mut harness, "Edit", "Find Ctrl+F");
@@ -240,7 +264,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Send to a person",
         "Export as Pack…",
         "History",
-        "Delete Delete",
+        "Move to trash Delete",
     ] {
         assert!(!enabled(&mut harness, "Note", entry), "{entry}");
     }
@@ -263,7 +287,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Copy as text",
         "Export as Pack…",
         "History",
-        "Delete",
+        "Move to trash",
     ] {
         assert!(enabled(&mut harness, "Note", entry), "{entry}");
     }
@@ -292,8 +316,8 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     harness.key_press(Key::Escape);
     harness.run();
 
-    // Delete asks nothing (#268); Edit ▸ Undo brings it back.
-    pick(&mut harness, "Note", "Delete");
+    // Move to trash asks nothing (#268); Edit ▸ Undo brings it back.
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     assert!(!shows(&harness, "Delete this Note?"));
     let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
@@ -306,6 +330,37 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     pick(&mut harness, "Edit", "Undo Ctrl+Z");
     harness.run();
     assert!(!trashed(&harness)?);
+    Ok(())
+}
+
+#[test]
+fn the_note_menu_names_move_to_trash_as_the_phone_does_and_moves_the_open_note() -> TestResult {
+    // #329: the phone's words in both languages, no Delete.
+    for (language, menu, entry, delete) in [
+        ("en", "Note", "Move to trash", "Delete"),
+        ("de", "Notiz", "In den Papierkorb", "Löschen"),
+    ] {
+        let (store, _, tap) = store()?;
+        let mut harness = window(App::new(store, language));
+        harness.state_mut().select_note(&tap);
+        harness.run();
+        // The Note dialog has its own button of that name; the menu adds
+        // its entry to it.
+        let buttons = harness.query_all_by_label(entry).count();
+        open(&mut harness, menu);
+        assert_eq!(
+            harness.query_all_by_label(entry).count(),
+            buttons + 1,
+            "{language}"
+        );
+        assert!(harness.query_by_label(delete).is_none(), "{language}");
+        last(&harness, entry).click();
+        harness.run();
+        let note = Notes::new(harness.state().store())
+            .by_id(&tap)?
+            .ok_or("the Note")?;
+        assert!(note.is_trashed(), "{language}");
+    }
     Ok(())
 }
 
@@ -435,26 +490,31 @@ fn a_dialog_closes_by_its_button_esc_and_back_and_leads_back_to_the_one_it_came_
     harness.run();
     assert_eq!(harness.state().page(), None);
 
-    // About from the Settings, the licences from About; back leads
-    // through them, by the button and by Alt+Left.
+    // Send feedback from the Settings, the licences from About under
+    // Help (#325); back leads through them, by the button and by Alt+Left.
     harness.state_mut().open(Page::Settings);
     harness.run();
     assert!(harness.query_by_label("Back to Settings").is_none());
     // Below the AI cards, out of the dialog's view.
-    harness
-        .get_by_label("About Old Brain Fix")
-        .click_accesskit();
+    harness.get_by_label("Send feedback").click_accesskit();
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Feedback));
+    harness.get_by_label("Back to Settings").click();
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().page(), None);
+    pick(&mut harness, "Help", "About Old Brain Fix");
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::About));
+    assert!(harness.query_by_label("Back to Settings").is_none());
     harness.get_by_label("Open-source licenses").click();
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::Licences));
     harness.get_by_label("Back to About Old Brain Fix").click();
     harness.run();
     assert_eq!(harness.state().page(), Some(Page::About));
-    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
-    harness.run();
-    assert_eq!(harness.state().page(), Some(Page::Settings));
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert_eq!(harness.state().page(), None);
@@ -522,7 +582,7 @@ fn ctrl_z_in_a_field_is_the_fields_and_outside_one_undoes_the_last_delete() -> T
     };
     harness.state_mut().select_note(&tap);
     harness.run();
-    pick(&mut harness, "Note", "Delete");
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     assert!(trashed(&harness)?);
     // Typing in another Note, Ctrl+Z takes back what was typed.
@@ -570,7 +630,7 @@ fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_goes_back() -
     // Restored from its dialog first, the undo finds nothing to bring back.
     harness.state_mut().select_note(&tap);
     harness.run();
-    pick(&mut harness, "Note", "Delete");
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     harness.get_by_label("Restore").click();
     harness.run();
@@ -583,7 +643,7 @@ fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_goes_back() -
 
     // A Note filed from Unsorted goes back to Unsorted; the delete before
     // it is not undone with it.
-    pick(&mut harness, "Note", "Delete");
+    pick(&mut harness, "Note", "Move to trash");
     harness.run();
     assert!(trashed(&harness)?);
     harness.state_mut().select_note(&bank);

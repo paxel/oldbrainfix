@@ -744,6 +744,7 @@ class _SentItemScreenState extends State<SentItemScreen> {
                               ),
                             },
                             checked: l.checked,
+                            beside: null,
                           ),
                       ],
                     ),

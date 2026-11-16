@@ -5,8 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+
+import 'open_capture.dart';
 
 void main() {
   final bar = find.byKey(const ValueKey('two-row-bar'));
@@ -379,21 +382,90 @@ void main() {
   });
 
   group('the top row', () {
-    testWidgets('a tap puts the cursor at the nearest word boundary', (
+    testWidgets('a tap puts the cursor where the finger is (#312)', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester, text: 'hello wonderful world');
+
+      // Also the tap that opens the keyboard.
+      await tester.tapAt(caretAt(tester, 8));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, const TextSelection.collapsed(offset: 8));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(bar, findsOneWidget);
+
+      await tester.tapAt(caretAt(tester, 13));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, const TextSelection.collapsed(offset: 13));
+      await tester.tapAt(caretAt(tester, 2));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, const TextSelection.collapsed(offset: 2));
+    });
+
+    testWidgets('a tap next to a box puts the cursor out of its id', (
+      tester,
+    ) async {
+      final id = TextBoxes.encodeId('a7k2');
+      final controller = TagTextController(text: 'Buy ☐${id}milk');
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ListView(
+              children: [
+                TwoRowTextField(controller: controller, twoRows: true),
+              ],
+            ),
+          ),
+        ),
+      );
+      await openKeyboard(tester);
+      final end = 'Buy ☐'.length + id.length;
+
+      await tester.tapAt(caretAt(tester, end + 1));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, TextSelection.collapsed(offset: end + 1));
+      // Right after the box's glyph, where its id is: out of the id, on
+      // the side the cursor came from.
+      await tester.tapAt(caretAt(tester, 'Buy ☐'.length));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection.isCollapsed, isTrue);
+      expect(controller.selection.baseOffset, anyOf('Buy '.length, end));
+      controller.selection = const TextSelection.collapsed(offset: 0);
+      await tester.tapAt(caretAt(tester, 'Buy ☐'.length));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection.isCollapsed, isTrue);
+      expect(controller.selection.baseOffset, end);
+    });
+
+    testWidgets('the handles of a selection drag its ends (#312)', (
       tester,
     ) async {
       final controller = await pumpField(tester, text: 'hello wonderful world');
       await openKeyboard(tester);
+      await tester.longPressAt(caretAt(tester, 9));
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 6, extentOffset: 15),
+      );
 
-      // Two letters into "wonderful": its start is nearer.
-      await tester.tapAt(caretAt(tester, 8));
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(controller.selection, const TextSelection.collapsed(offset: 6));
-
-      // Two letters before its end: its end is nearer.
-      await tester.tapAt(caretAt(tester, 13));
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(controller.selection, const TextSelection.collapsed(offset: 15));
+      final editable = tester
+          .state<EditableTextState>(find.byType(EditableText))
+          .renderEditable;
+      final ends = editable.getEndpointsForSelection(controller.selection);
+      // The end handle hangs right below the end of the selection.
+      final handle =
+          editable.localToGlobal(ends.last.point) + const Offset(1, 1);
+      await slide(tester, handle, caretAt(tester, 19) - caretAt(tester, 15));
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 6, extentOffset: 19),
+      );
     });
 
     testWidgets('has no magnifier and no handle under the cursor', (
@@ -755,16 +827,94 @@ void main() {
     });
   });
 
-  test('grapheme and word boundaries', () {
+  group('a tap in the text (#312)', () {
+    late Store store;
+    setUp(() => store = Store.inMemory()..starterSetOffered = true);
+    tearDown(() => store.close());
+
+    /// Where the caret before [offset] sits in the field holding [text].
+    Offset caretIn(WidgetTester tester, String text, int offset) {
+      final editable = tester
+          .stateList<EditableTextState>(find.byType(EditableText))
+          .firstWhere((state) => state.textEditingValue.text == text)
+          .renderEditable;
+      final rect = editable.getLocalRectForCaret(TextPosition(offset: offset));
+      return editable.localToGlobal(rect.center);
+    }
+
+    TextEditingController fieldOf(WidgetTester tester, String text) => tester
+        .widgetList<TextField>(find.byType(TextField))
+        .map((field) => field.controller!)
+        .firstWhere((controller) => controller.text == text);
+
+    testWidgets('puts the cursor there in the Note editor', (tester) async {
+      Notes(store).capture('hello wonderful world');
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('All Notes'));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('hello wonderful world'));
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      const text = 'hello wonderful world';
+      final controller = fieldOf(tester, text);
+
+      await tester.tapAt(caretIn(tester, text, 8));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, const TextSelection.collapsed(offset: 8));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(bar, findsOneWidget);
+      await tester.tapAt(caretIn(tester, text, 13));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, const TextSelection.collapsed(offset: 13));
+
+      await tester.longPressAt(caretIn(tester, text, 3));
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 5),
+      );
+    });
+
+    for (final formatBar in [false, true]) {
+      testWidgets('puts the cursor there in Capture'
+          '${formatBar ? ', with the format bar' : ''}', (tester) async {
+        store.setQuickNoteShows(QuickNoteControl.formatBar, formatBar);
+        await tester.pumpWidget(OldBrainFixApp(store: store));
+        await tester.pumpAndSettle();
+        await openTextCapture(tester);
+        const text = 'hello wonderful world';
+        await tester.enterText(find.byType(TextField).first, text);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+        final controller = fieldOf(tester, text);
+
+        await tester.tapAt(caretIn(tester, text, 8));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(controller.selection, const TextSelection.collapsed(offset: 8));
+        await tester.tapAt(caretIn(tester, text, 13));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(controller.selection, const TextSelection.collapsed(offset: 13));
+
+        await tester.longPressAt(caretIn(tester, text, 9));
+        await tester.pumpAndSettle();
+        expect(
+          controller.selection,
+          const TextSelection(baseOffset: 6, extentOffset: 15),
+        );
+      });
+    }
+  });
+
+  test('grapheme boundaries', () {
     expect(graphemeAfter('a👍🏽b', 1), 5);
     expect(graphemeBefore('a👍🏽b', 5), 1);
     expect(graphemeBefore('a👍🏽b', 0), 0);
     expect(graphemeAfter('ab', 2), 2);
-    expect(wordEdgeNear('hello world', 2), 0);
-    expect(wordEdgeNear('hello world', 4), 5);
-    expect(wordEdgeNear('hello world', 7), 6);
-    expect(wordEdgeNear('hello world', 10), 11);
-    expect(wordEdgeNear('hello', 0), 0);
-    expect(wordEdgeNear('', 0), 0);
   });
 }

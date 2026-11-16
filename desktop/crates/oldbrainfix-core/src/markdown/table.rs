@@ -11,7 +11,10 @@
 //! again; an edit that cannot be made gives the text as it was and its
 //! cursor where it was asked for.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
+
+use crate::text_boxes::{self, BoxState};
 
 use super::{Block, BlockKind, Change, Inline, Span, blank, floor, line_at, skip_blank, slice};
 
@@ -124,6 +127,65 @@ pub fn all(text: &str) -> Vec<Arc<Table>> {
 pub fn at(text: &str, offset: usize) -> Option<Arc<Table>> {
     let blocks = super::parse(text);
     blocks.get(line_at(text, offset))?.table.clone()
+}
+
+/// A table as Copy puts it on the clipboard (#324): its lines as GFM for
+/// a target that takes plain text, and an HTML table for one that takes
+/// formatted text, as a table copied from a browser goes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableCopy {
+    pub markdown: String,
+    pub html: String,
+}
+
+/// The table at `at` of `text`, as stored, as Copy puts it on the
+/// clipboard (#324); `None` where there is none. Each box shows the glyph
+/// of its state in `states`, by its id, else the glyph it is written
+/// with, and no id (ADR 0035). The Markdown is the table as its editor
+/// writes it: each row between pipes, `| a | b |`, the delimiter row with
+/// each column's alignment, [`HEADING_COLUMN_LINE`] first while the first
+/// column holds headings, each cell as written, a `|` in it as `\|`, the
+/// cells beyond the columns left out, `\n` between the lines. The HTML is
+/// the table as [`super::html`] writes it.
+pub fn copy(text: &str, at: usize, states: &BTreeMap<String, BoxState>) -> Option<TableCopy> {
+    let stored = self::at(text, floor(text, at))?;
+    let lines = shown(slice(text, stored.start, stored.end), states);
+    let table = self::at(&lines, 0)?;
+    let grid = Grid {
+        rows: table
+            .rows
+            .iter()
+            .map(|row| {
+                row.cells
+                    .iter()
+                    .map(|c| slice(&lines, c.start, c.end).to_string())
+                    .collect()
+            })
+            .collect(),
+        aligns: table.aligns.clone(),
+        headings: table.heading_column,
+    };
+    let mut html = String::new();
+    super::html_table(&mut html, &table);
+    Some(TableCopy {
+        markdown: grid.write("\n"),
+        html,
+    })
+}
+
+/// `text` with each box in the glyph of its state in `states`, else the
+/// one it is written with, and no id.
+fn shown(text: &str, states: &BTreeMap<String, BoxState>) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut from = 0;
+    for b in text_boxes::find(text) {
+        out.push_str(slice(text, from, b.start));
+        out.push(states.get(&b.id).copied().unwrap_or(b.state).glyph());
+        from = b.end;
+    }
+    out.push_str(slice(text, from, text.len()));
+    // A second box of an id keeps its own glyph.
+    text_boxes::strip(&out)
 }
 
 /// What the table editor edits of the cell in `row` and `column` of the

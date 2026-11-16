@@ -138,10 +138,10 @@ pub use search::Search;
 pub use sessions::{
     Session, SessionMarks, SessionOccurrence, SessionPick, SessionRule, SessionSetup, Sessions,
 };
-pub use settings::{DeviceSettings, QuickNoteControl, ThemeChoice};
+pub use settings::{DeviceSettings, QuickNoteControl, TextSize, ThemeChoice};
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use shopping_lists::{
-    ListOnAgenda, Reappear, ReappearUnit, ShoppingAgenda, ShoppingAgendaRow, ShoppingLine,
+    BackIn, ListOnAgenda, Reappear, ReappearUnit, ShoppingAgenda, ShoppingAgendaRow, ShoppingLine,
     ShoppingList, ShoppingLists, ShoppingOnAgenda,
 };
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};

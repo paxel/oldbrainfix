@@ -172,6 +172,30 @@ void main() {
       expect(json.keys, ['pack', 'sig', 'type']);
     });
 
+    testWidgets('a list without a name shows its kind in the tree (#309)', (
+      tester,
+    ) async {
+      final socks = Notes(ann).capture('Socks\nTent', place: health.id).id;
+      Checklists(ann).makeFromText(socks);
+      store.close();
+      store = ann
+        ..starterSetOffered = true
+        ..alarmSetupDone = true;
+      ann = Store.inMemory();
+      await start(tester, store);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byKey(ValueKey('area-menu-${health.id}')));
+      await tap(tester, find.byKey(ValueKey('area-pack-${health.id}')));
+      final pack = store.packOf(health.id);
+      final list = PackItemKeys.note(
+        pack.notes.indexWhere((n) => n.lines != null),
+      );
+      expect(
+        find.descendant(of: item(list), matching: find.text('Checklist')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('from a Topic and a Note; unticking the last Tally of a '
         'Session unticks it', (tester) async {
       store.close();

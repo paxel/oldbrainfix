@@ -56,7 +56,7 @@ use oldbrainfix_gui::hotkey::{self, Hotkey};
 use oldbrainfix_gui::instance::Way;
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
 use oldbrainfix_gui::login;
-use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
+use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard, system_clipboard_text};
 use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::older_app::OlderAppView;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
@@ -65,6 +65,7 @@ use oldbrainfix_gui::speech::SpeechModel;
 use oldbrainfix_gui::store_needs_update::StoreNeedsUpdateView;
 use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
 use oldbrainfix_gui::system_theme::SystemTheme;
+use oldbrainfix_gui::text_menu;
 use oldbrainfix_gui::theme;
 use oldbrainfix_gui::tray::{self, Command, OnClose, Tray};
 use oldbrainfix_gui::window_sizes::{self, WindowPlace};
@@ -146,6 +147,7 @@ impl eframe::App for Native {
     /// Runs while the window is hidden too, which `ui` does not.
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         App::install(ctx);
+        text_menu::read_clipboard_by(ctx, system_clipboard_text);
         self.system_theme.hand_to(ctx);
         for command in waiting(&self.commands) {
             match command {
@@ -254,6 +256,7 @@ struct PopupWindow {
 impl eframe::App for PopupWindow {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         App::install(ui.ctx());
+        text_menu::read_clipboard_by(ui.ctx(), system_clipboard_text);
         self.system_theme.hand_to(ui.ctx());
         if let Some(choice) = self.theme.take() {
             theme::prefer(ui.ctx(), choice);
@@ -955,12 +958,10 @@ fn run() -> Result<i32, String> {
     };
     let new_popup: NewPopup = {
         let (store, saved) = (store.clone(), saved.clone());
-        let (transcriber, speech) = (transcriber.clone(), speech.clone());
         Rc::new(move || {
             let mut popup = CapturePopup::new(store.clone(), locale);
             popup.set_recorder(Box::new(MicRecorder::default()));
             popup.set_clipboard(Box::new(SystemClipboard::default()));
-            popup.set_transcriber(transcriber.clone(), Some(speech.clone()));
             let saved = saved.clone();
             popup.on_saved(Box::new(move || saved()));
             popup

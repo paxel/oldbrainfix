@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
-import 'about_screen.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
@@ -44,19 +43,19 @@ enum _UnitChoice { region, metric, imperial }
 enum _Importing { folder, keep }
 
 /// This Device's settings (ADR 0008), reached only through the Profile
-/// page: the theme and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
+/// page: the theme, the text size (#326, obf-1019) and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; Send feedback (#214); and About. Each is a local setting, never synced,
+/// Google Keep export; in Advanced, Ask (#333); and Send feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
 
-  /// Called after the theme or "Fat fingers" was changed, to show it at
-  /// once.
+  /// Called after the theme, the text size or "Fat fingers" was changed,
+  /// to show it at once.
   final VoidCallback? onThemeChanged;
 
   /// The notes browser's way back in, which the Area an Import made
@@ -127,12 +126,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   late ThemeChoice _theme = widget.store.themeChoice;
   late bool _fatFingers = widget.store.fatFingers;
+  late TextSize _textSize = widget.store.textSize;
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
   late bool _hidesChecked = widget.store.agendaHidesChecked;
   late bool _trashesDone = widget.store.trashesDoneReminder;
   late bool _advanced = widget.store.advanced;
   late bool _twoRows = widget.store.twoRowEditorOn;
+  late bool _askOn = widget.store.askOn;
   late String? _sound = widget.store.alarmSound;
   late ClockTime _allDayFrom = widget.store.allDayFrom;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
@@ -158,6 +159,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.onThemeChanged?.call();
     // The widget's text grows with it.
     unawaited(widget.alarms.refresh());
+  }
+
+  /// The text's own step (#326, obf-1019), shown at once; the Agenda's
+  /// widget keeps "Fat fingers" alone.
+  void _setTextSize(TextSize size) {
+    widget.store.textSize = size;
+    setState(() => _textSize = size);
+    widget.onThemeChanged?.call();
   }
 
   void _setRenag(Duration interval) {
@@ -224,6 +233,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setStreaks(bool on) {
     widget.store.streaksOn = on;
     setState(() => _streaksOn = on);
+  }
+
+  /// Ask, experimental (#333): the Agenda reads it again on the way
+  /// back.
+  void _setAsk(bool on) {
+    widget.store.askOn = on;
+    setState(() => _askOn = on);
   }
 
   void _setTwoRows(bool on) {
@@ -627,6 +643,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         SettingsSection(
                           children: [
                             SettingsRow(
+                              words: [
+                                t.textSize,
+                                t.textSizeDetail,
+                                t.textSizeNormal,
+                                t.textSizeLarger,
+                                t.textSizeLargest,
+                              ],
+                              child: ControlBelow(
+                                leading: const Icon(Icons.format_size),
+                                title: Text(t.textSize),
+                                subtitle: Text(t.textSizeDetail),
+                                control: ChoiceChips<TextSize>(
+                                  key: const ValueKey('textSize'),
+                                  value: _textSize,
+                                  options: [
+                                    RadioOption(
+                                      key: const ValueKey('textSize-normal'),
+                                      value: TextSize.normal,
+                                      title: Text(t.textSizeNormal),
+                                    ),
+                                    RadioOption(
+                                      key: const ValueKey('textSize-larger'),
+                                      value: TextSize.larger,
+                                      title: Text(t.textSizeLarger),
+                                    ),
+                                    RadioOption(
+                                      key: const ValueKey('textSize-largest'),
+                                      value: TextSize.largest,
+                                      title: Text(t.textSizeLargest),
+                                    ),
+                                  ],
+                                  onChanged: _setTextSize,
+                                ),
+                              ),
+                            ),
+                            SettingsRow(
                               words: [t.fatFingers, t.fatFingersDetail],
                               child: SwitchBelow(
                                 switchKey: const ValueKey('fatFingers'),
@@ -1014,9 +1066,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
+                    // Asking the computer is experimental and offered
+                    // in Advanced only (#333); switched on, it stays on
+                    // in Simple, where what exists still works.
+                    if (_advanced)
+                      SettingsGroup(
+                        heading: t.phoneAskTitle,
+                        children: [
+                          SettingsSection(
+                            children: [
+                              SettingsRow(
+                                words: [
+                                  t.phoneAskSwitch,
+                                  t.phoneAskSwitchDetail,
+                                ],
+                                child: SwitchBelow(
+                                  switchKey: const ValueKey('askOn'),
+                                  leading: const Icon(
+                                    Icons.question_answer_outlined,
+                                  ),
+                                  value: _askOn,
+                                  onChanged: _setAsk,
+                                  title: Text(t.phoneAskSwitch),
+                                  subtitle: Text(t.phoneAskSwitchDetail),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     // The person's own, on all of their own Devices
                     // (#197): after the settings of this phone, before
-                    // About.
+                    // Send feedback.
                     SettingsGroup(
                       heading: t.features,
                       headingKey: _heading('features'),
@@ -1053,14 +1134,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 subtitle: Text(t.feedbackSettingsDetail),
                                 onTap: () =>
                                     _push(FeedbackScreen(store: widget.store)),
-                              ),
-                            ),
-                            SettingsRow(
-                              words: [t.aboutTitle],
-                              child: ListTile(
-                                leading: const Icon(Icons.info_outline),
-                                title: Text(t.aboutTitle),
-                                onTap: () => _push(const AboutScreen()),
                               ),
                             ),
                           ],

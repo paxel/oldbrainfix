@@ -71,6 +71,10 @@ class _SyncScreenState extends State<SyncScreen> {
   var _codeInvalid = false;
   var _busy = false;
   late var _paired = widget.store.pairedDevices();
+
+  /// Whether Ask is switched on (#333), which alone shows the addresses
+  /// by hand; one kept is tried by sync either way.
+  late final _askOn = widget.store.askOn;
   var _conflicts = 0;
 
   /// The shared folder's name for people, once known.
@@ -620,9 +624,10 @@ class _SyncScreenState extends State<SyncScreen> {
           value: widget.store.autoSyncOn(device.id),
           onChanged: (on) => _setAuto(device, on),
         ),
-      // Where a VPN reaches one's own Device (#267); another person's is
-      // reached on the local network only.
-      if (device.fingerprint.isNotEmpty && !device.shared)
+      // Where a VPN reaches one's own Device (#267), while Ask is
+      // switched on (#333); another person's is reached on the local
+      // network only.
+      if (_askOn && device.fingerprint.isNotEmpty && !device.shared)
         Padding(
           padding: const EdgeInsetsDirectional.fromSTEB(40, 0, 0, 8),
           child: HandAddressField(

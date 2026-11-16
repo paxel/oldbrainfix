@@ -75,7 +75,7 @@ pub fn card_rows(ui: &mut Ui, t: &L10n, tones: Tones, shown: &[CardOccurrence]) 
     for o in shown {
         ui.horizontal(|ui| {
             let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
-            let done = o.row.done().is_some();
+            let done = shown_done(ui, o);
             let skipped = !done && o.row.skipped().is_some();
             paint_box(ui, tones, rect, done, false);
             let mut words = occurrence_time(t, &o.row.occurrence);
@@ -93,6 +93,13 @@ pub fn card_rows(ui: &mut Ui, t: &L10n, tones: Tones, shown: &[CardOccurrence]) 
         });
     }
     rects
+}
+
+/// Whether `o` shows Done: as clicked while its save waits (#338), else
+/// as stored.
+fn shown_done(ui: &Ui, o: &CardOccurrence) -> bool {
+    let key = crate::tick_saves::occurrence_key(&o.row.routine.id, &o.row.occurrence);
+    crate::tick_saves::done(ui.ctx(), &key, o.row.done().is_some())
 }
 
 /// Takes the clicks on the boxes of `shown` on the card of the Note
@@ -115,7 +122,7 @@ pub fn card_clicks(
             Sense::hover()
         };
         let resp = ui.interact(*rect, id, sense);
-        let done = o.row.done().is_some();
+        let done = shown_done(ui, o);
         let label = format!(
             "{}: {}",
             t.mark_done(),

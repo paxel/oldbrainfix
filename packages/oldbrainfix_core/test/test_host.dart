@@ -68,6 +68,14 @@ class TestHost {
   final asked = <Map<String, Object?>>[];
   final askers = <String>[];
 
+  /// How far it is with a question, by its id, for `POST /ask/status`
+  /// and `POST /ask/stop` (#317); without it it answers neither, as a
+  /// desktop of 0.6.0.
+  AskProgress Function(String id)? progress;
+
+  /// The ids of the questions it was asked to stop.
+  final stopped = <String>[];
+
   TestHost(this.store, {this.pin = '246810', this.name = 'Desk'});
 
   int get port => _server.port;
@@ -122,6 +130,22 @@ class TestHost {
           );
       if (!paired && req.headers.value(pinHeader) != pin) {
         res.statusCode = HttpStatus.forbidden;
+        return;
+      }
+      if (path == askStatusPath || path == askStopPath) {
+        final how = progress;
+        if (how == null || answering == null) {
+          res.statusCode = HttpStatus.notFound;
+          return;
+        }
+        if (!paired || !store.isOwnDevice(joiner)) {
+          res.statusCode = HttpStatus.forbidden;
+          return;
+        }
+        final id = (jsonDecode(utf8.decode(body)) as Map)['id'] as String;
+        if (path == askStopPath) stopped.add(id);
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode(how(id).toJson()));
         return;
       }
       if (path == askPath || path == providerPath) {

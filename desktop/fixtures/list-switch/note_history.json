@@ -404,6 +404,126 @@
           "mayUse": false
         }
       ]
+    },
+    {
+      "id": "note:0000000000000000000000000000001f",
+      "history": [
+        {
+          "at": "2026-01-01T10:02:51.000Z",
+          "entity": "line:00000000000000000000000000000022",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Sugar",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:51.000Z",
+          "entity": "line:00000000000000000000000000000021",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Flour",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:48.000Z",
+          "entity": "note:0000000000000000000000000000001f",
+          "kind": "text",
+          "before": "Shopping:\nFlour\nSugar",
+          "after": "Shopping:",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:47.000Z",
+          "entity": "note:0000000000000000000000000000001f",
+          "kind": "kind",
+          "before": null,
+          "after": "shopping",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:43.000Z",
+          "entity": "note:0000000000000000000000000000001f",
+          "kind": "captured",
+          "before": null,
+          "after": "Shopping:\nFlour\nSugar",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000023",
+      "history": [
+        {
+          "at": "2026-01-01T10:03:12.000Z",
+          "entity": "line:00000000000000000000000000000026",
+          "kind": "lineChecked",
+          "before": null,
+          "after": "Sponge",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:12.000Z",
+          "entity": "line:00000000000000000000000000000026",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Sponge",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:12.000Z",
+          "entity": "line:00000000000000000000000000000025",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Soap",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:09.000Z",
+          "entity": "note:00000000000000000000000000000023",
+          "kind": "text",
+          "before": "Soap\n✓ Sponge",
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:08.000Z",
+          "entity": "note:00000000000000000000000000000023",
+          "kind": "kind",
+          "before": null,
+          "after": "shopping",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:04.000Z",
+          "entity": "note:00000000000000000000000000000023",
+          "kind": "captured",
+          "before": null,
+          "after": "Soap\n✓ Sponge",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
     }
   ]
 }

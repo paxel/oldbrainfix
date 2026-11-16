@@ -933,3 +933,69 @@ fn with_checked_items_hidden_a_done_occurrence_leaves_the_agenda() -> TestResult
     assert_eq!(harness.query_all_by_label("Nothing planned").count(), 6);
     Ok(())
 }
+
+/// Whether the box labelled `label` shows ticked.
+fn ticked(harness: &Harness<'_, App>, label: &str) -> bool {
+    harness.get_by_label(label).accesskit_node().toggled() == Some(Toggled::True)
+}
+
+#[test]
+fn a_box_ticks_in_the_frame_of_its_click_and_is_saved_in_the_next() -> TestResult {
+    // A tick shows at once (#338): drawn ticked in the frame clicked, the
+    // save at the start of the next one.
+    let mut harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "en");
+    let dentist = "Done: 09:00 Dentist";
+    let done = |harness: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
+        let routines = Routines::new(harness.state().store());
+        let reminder = routines.all()?.into_iter().next().ok_or("the Reminder")?;
+        Ok(reminder.done_at(&at(Day::new(2026, 11, 2), 9)).is_some())
+    };
+    assert!(!ticked(&harness, dentist));
+    harness.get_by_label(dentist).click();
+    harness.step();
+    assert!(ticked(&harness, dentist));
+    assert!(!done(&harness)?, "saved only in the next frame");
+    harness.run();
+    assert!(done(&harness)?);
+    assert!(ticked(&harness, dentist));
+    Ok(())
+}
+
+#[test]
+fn a_tick_whose_save_fails_shows_as_stored_again_and_says_so() -> TestResult {
+    let mut harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "en");
+    let dentist = "Done: 09:00 Dentist";
+    harness.get_by_label(dentist).click();
+    harness.step();
+    assert!(ticked(&harness, dentist));
+    // The Reminder goes meanwhile, as a sync can take it.
+    let id = {
+        let routines = Routines::new(harness.state().store());
+        let reminder = routines.all()?.into_iter().next().ok_or("the Reminder")?;
+        routines.trash(&reminder.id)?;
+        reminder.id
+    };
+    harness.run();
+    let key = oldbrainfix_gui::tick_saves::occurrence_key(&id, &at(Day::new(2026, 11, 2), 9));
+    assert!(oldbrainfix_gui::tick_saves::waiting(&harness.ctx, &key).is_none());
+    assert!(shows(&harness, "That did not work."));
+    Ok(())
+}
+
+#[test]
+fn two_quick_clicks_on_a_box_end_as_the_second_left_it() -> TestResult {
+    let mut harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "en");
+    let dentist = "Done: 09:00 Dentist";
+    harness.get_by_label(dentist).click();
+    harness.step();
+    assert!(ticked(&harness, dentist));
+    harness.get_by_label(dentist).click();
+    harness.step();
+    assert!(!ticked(&harness, dentist));
+    harness.run();
+    assert!(!ticked(&harness, dentist));
+    let routines = Routines::new(harness.state().store());
+    let reminder = routines.all()?.into_iter().next().ok_or("the Reminder")?;
+    assert!(reminder.done_at(&at(Day::new(2026, 11, 2), 9)).is_none());
+    Ok(())
+}

@@ -30,12 +30,15 @@ const SHOPPING_AGENDA: &str = "shoppingAgenda";
 const STREAKS_OFF: &str = "streaksOff";
 const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
+const TEXT_SIZE: &str = "textSize";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
 const RECENTLY_FILED_INTO: &str = "recentlyFiledInto";
+const RECENTLY_ADDED_TO: &str = "recentlyAddedTo";
 
-/// How many places filed into File into… shows at its top (#272).
+/// How many places filed into File into… shows at its top (#272), and
+/// how many Notes added to Add to Note… shows at its top (#308).
 pub const RECENT_PLACES_KEPT: usize = 3;
 
 /// Which theme this Device shows: the system's, or a fixed one, as the
@@ -67,6 +70,59 @@ impl ThemeChoice {
             .into_iter()
             .find(|c| Some(c.name()) == name)
             .unwrap_or_default()
+    }
+}
+
+/// How large this Device shows the text of Notes, Lines, Sections, the
+/// Agenda's rows and Ask's answers (#326, obf-1019): its own step, apart
+/// from "Bigger text and icons", as the Dart core's `TextSize`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextSize {
+    #[default]
+    Normal,
+    Larger,
+    Largest,
+}
+
+impl TextSize {
+    /// All of them, smallest first.
+    pub const ALL: [TextSize; 3] = [TextSize::Normal, TextSize::Larger, TextSize::Largest];
+
+    /// How it is stored, as the Dart core's enum names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            TextSize::Normal => "normal",
+            TextSize::Larger => "larger",
+            TextSize::Largest => "largest",
+        }
+    }
+
+    /// The step `name` names; anything unknown is normal.
+    pub fn read(name: Option<&str>) -> TextSize {
+        TextSize::ALL
+            .into_iter()
+            .find(|s| Some(s.name()) == name)
+            .unwrap_or_default()
+    }
+
+    /// How many times the normal size the text shows.
+    pub fn factor(self) -> f32 {
+        match self {
+            TextSize::Normal => 1.0,
+            TextSize::Larger => 1.15,
+            TextSize::Largest => 1.3,
+        }
+    }
+
+    /// The step one larger, or one smaller; `None` at the end.
+    pub fn step(self, larger: bool) -> Option<TextSize> {
+        let at = TextSize::ALL.iter().position(|s| *s == self)?;
+        let to = if larger {
+            at.checked_add(1)?
+        } else {
+            at.checked_sub(1)?
+        };
+        TextSize::ALL.get(to).copied()
     }
 }
 
@@ -334,6 +390,18 @@ impl<'a> DeviceSettings<'a> {
         self.store.set_local_setting(FAT_FINGERS, &on.to_string())
     }
 
+    /// The step of this Device's text (#326, obf-1019); normal unless
+    /// one was picked.
+    pub fn text_size(&self) -> Result<TextSize> {
+        Ok(TextSize::read(
+            self.store.local_setting(TEXT_SIZE)?.as_deref(),
+        ))
+    }
+
+    pub fn set_text_size(&self, size: TextSize) -> Result<()> {
+        self.store.set_local_setting(TEXT_SIZE, size.name())
+    }
+
     /// Whether the quick note on this Device shows `control`; off until
     /// switched on.
     pub fn quick_note_shows(&self, control: QuickNoteControl) -> Result<bool> {
@@ -500,7 +568,33 @@ impl<'a> DeviceSettings<'a> {
     /// latest first, at most [`RECENT_PLACES_KEPT`] (#272). They may name
     /// a place deleted since; File into… shows only those it lists.
     pub fn recently_filed_into(&self) -> Result<Vec<String>> {
-        let kept = self.store.local_setting(RECENTLY_FILED_INTO)?;
+        self.recent(RECENTLY_FILED_INTO)
+    }
+
+    /// Puts `place_id` first among [`Self::recently_filed_into`], once,
+    /// and forgets the oldest beyond [`RECENT_PLACES_KEPT`].
+    pub fn filed_into(&self, place_id: &str) -> Result<()> {
+        self.used(RECENTLY_FILED_INTO, place_id)
+    }
+
+    /// The ids of the Notes this Device last added a capture or an
+    /// Unsorted Note to with Add to Note…, the latest first, at most
+    /// [`RECENT_PLACES_KEPT`] (#308). They may name a Note gone since;
+    /// Add to Note… shows only those it lists.
+    pub fn recently_added_to(&self) -> Result<Vec<String>> {
+        self.recent(RECENTLY_ADDED_TO)
+    }
+
+    /// Puts `note_id` first among [`Self::recently_added_to`], once, and
+    /// forgets the oldest beyond [`RECENT_PLACES_KEPT`].
+    pub fn added_to(&self, note_id: &str) -> Result<()> {
+        self.used(RECENTLY_ADDED_TO, note_id)
+    }
+
+    /// The ids kept under `key`, the latest first, each once, at most
+    /// [`RECENT_PLACES_KEPT`]; none for a broken setting.
+    fn recent(&self, key: &str) -> Result<Vec<String>> {
+        let kept = self.store.local_setting(key)?;
         let ids = match kept.as_deref().map(serde_json::from_str) {
             Some(Ok(serde_json::Value::Array(ids))) => ids,
             _ => return Ok(Vec::new()),
@@ -514,18 +608,14 @@ impl<'a> DeviceSettings<'a> {
         Ok(recent)
     }
 
-    /// Puts `place_id` first among [`Self::recently_filed_into`], once,
-    /// and forgets the oldest beyond [`RECENT_PLACES_KEPT`].
-    pub fn filed_into(&self, place_id: &str) -> Result<()> {
-        let mut recent = vec![place_id.to_owned()];
-        recent.extend(
-            self.recently_filed_into()?
-                .into_iter()
-                .filter(|id| id != place_id),
-        );
+    /// Puts `id` first among the ids kept under `key`, as [`Self::recent`]
+    /// reads them.
+    fn used(&self, key: &str, id: &str) -> Result<()> {
+        let mut recent = vec![id.to_owned()];
+        recent.extend(self.recent(key)?.into_iter().filter(|r| r != id));
         recent.truncate(RECENT_PLACES_KEPT);
         let json = serde_json::to_string(&recent).map_err(|e| Error::Invalid(e.to_string()))?;
-        self.store.set_local_setting(RECENTLY_FILED_INTO, &json)
+        self.store.set_local_setting(key, &json)
     }
 }
 

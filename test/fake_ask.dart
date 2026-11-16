@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:oldbrainfix/src/ask_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -19,6 +21,16 @@ class FakeAsking implements DesktopAsking {
   AskReply Function(String question) answer;
   final asked = <(String, List<AskExchange>)>[];
 
+  /// The ids the questions came with, and those stopped (#317).
+  final ids = <String>[];
+  final stopped = <String>[];
+
+  /// How far it is with a question; null for none, as 0.6.0 tells.
+  AskProgress? Function(String id)? progressOf;
+
+  /// While set, a question waits for it before its answer.
+  Completer<void>? hold;
+
   @override
   String? computer = 'Desk';
 
@@ -39,9 +51,21 @@ class FakeAsking implements DesktopAsking {
   }
 
   @override
-  Future<AskReply> ask(String question, List<AskExchange> earlier) async {
+  Future<AskReply> ask(
+    String question,
+    List<AskExchange> earlier, {
+    required String id,
+  }) async {
     asked.add((question, earlier));
+    ids.add(id);
+    if (hold case final hold?) await hold.future;
     if (askTrouble case final trouble?) throw AskException(trouble);
     return answer(question);
   }
+
+  @override
+  Future<AskProgress?> progress(String id) async => progressOf?.call(id);
+
+  @override
+  Future<void> stop(String id) async => stopped.add(id);
 }

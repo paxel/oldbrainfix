@@ -9,6 +9,7 @@ import 'app_lock.dart';
 import 'announcements.dart';
 import 'attachment_views.dart';
 import 'capture_choices.dart';
+import 'checklist_view.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
@@ -16,6 +17,8 @@ import 'file_into_screen.dart';
 import 'file_platform.dart';
 import 'l10n.dart';
 import 'location.dart';
+import 'look.dart';
+import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'photo_platform.dart';
@@ -23,8 +26,8 @@ import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'shopping_list_view.dart';
 import 'shopping_pick_screen.dart';
-import 'speech_platform.dart';
 import 'sync_line.dart';
 import 'tally_field_screen.dart';
 import 'text_marks_view.dart';
@@ -127,25 +130,23 @@ Future<void> captureNote(
   }
 }
 
-/// Makes each line of the text of the Note [noteId] and of its
-/// recordings' Transcripts a Line of the Shopping List [listId], a name
-/// the list has bringing its Line back, and discards the Note, all in one
-/// batch (#124). True when it did; false when the list can no longer be
-/// added to, and null when the Note may no longer go: deleted, merged or
-/// with something spawned from it meanwhile. Either way the Note stays.
+/// Makes each line of the text of the Note [noteId] a Line of the
+/// Shopping List [listId], a name the list has bringing its Line back,
+/// and discards the Note, all in one batch (#124): a capture without a
+/// recording, which [ShoppingLists.addVoiceCapture] keeps on the list.
+/// True when it did; false when the list can no longer be added to, and
+/// null when the Note may no longer go: deleted, merged or with something
+/// spawned from it meanwhile. Either way the Note stays.
 bool? pourIntoShopping(Notes notes, String noteId, String listId) {
   final note = notes.byId(noteId);
   if (note == null || note.isTrashed || note.isMerged || note.spawned) {
     return null;
   }
-  final text = [
-    // Its boxes as they show, without their ids (ADR 0035).
-    note.shownText,
-    for (final hash in note.recordings) ?note.transcripts[hash],
-  ].join('\n');
   try {
     notes.store.batch(() {
-      ShoppingLists(notes.store).addLines(listId, text, deviceWallClock);
+      // Its boxes as they show, without their ids (ADR 0035).
+      ShoppingLists(notes.store)
+          .addLines(listId, note.shownText, deviceWallClock);
       notes.discard(noteId);
     });
     return true;
@@ -154,33 +155,6 @@ bool? pourIntoShopping(Notes notes, String noteId, String listId) {
   } on ArgumentError {
     return false;
   }
-}
-
-/// Waits for the Transcripts of the recordings [hashes] of the Note
-/// [noteId], then pours it into the Shopping List [listId] as
-/// [pourIntoShopping] does; whether it did. Until then the Note holds
-/// all of it, so nothing is lost when the app ends meanwhile. Without a
-/// Transcript, or when the list can no longer be added to, the Note
-/// stays and [announce] tells why at the top.
-Future<bool> intoShoppingLater(
-  Notes notes,
-  Transcriber? transcriber,
-  String noteId,
-  String listId,
-  List<String> hashes, {
-  required void Function({required bool untranscribed}) announce,
-}) async {
-  for (final hash in hashes) {
-    if (transcriber == null || !await transcriber.transcribed(noteId, hash)) {
-      if (notes.byId(noteId) case final note? when !note.isTrashed) {
-        announce(untranscribed: true);
-      }
-      return false;
-    }
-  }
-  final poured = pourIntoShopping(notes, noteId, listId);
-  if (poured == false) announce(untranscribed: false);
-  return poured ?? false;
 }
 
 /// Announces at the top that some of the shared [recordings] cannot be
@@ -247,10 +221,35 @@ void announceUntranscribable(
 /// switched off. The App Lock keeps the Areas and Tallies out of reach
 /// here, so "File into…" and the Session are not offered behind it.
 ///
-/// "Add to a Shopping List" (#124) makes each line typed, and of
-/// each recording's Transcript, a Line of the list picked, and keeps no
-/// Note; the other choices wait unshown meanwhile. It is not offered
-/// with a photo, which no Line holds, nor behind the App Lock.
+/// "Add to Note…" beside it (#308) picks another Note and adds the
+/// capture to it at once, as a Section of it, and leaves: written in no
+/// Area but the Note's, with no Nudge, and merged into it, so nothing
+/// waits in Unsorted. It waits while there is nothing to save, and is not
+/// offered behind the App Lock, while a Shopping List is picked, nor once
+/// a Routine, Reminder, Session, Frog or Tally is set up, which need the
+/// Note itself.
+///
+/// The Kind choice above the field (#310, Q715) makes the Note a
+/// Checklist or a Shopping List as it is saved, each typed line a Line
+/// unless the first is a heading (#309); Text, the default, keeps it a
+/// Plain Note. It applies to the typed text only: a recording, photo or
+/// file stays on the Note as its own, and with nothing typed the Note
+/// stays a Plain Note. A list made so leaves Unsorted, so one Save takes
+/// the Nudge buttons' place; it needs the Note itself, so Add to Note…,
+/// "Make it a Tally" and the Session are not offered meanwhile, and a
+/// Tally or Session set up hides the choice. While an existing Shopping
+/// List is picked with "Add to a Shopping List" it waits unshown, as the
+/// other choices do. The app going to the background writes the text as
+/// a Plain Note, nudged; the Kind is made only on leaving, so typing on
+/// meanwhile is not lost into the list's Name.
+///
+/// "Add to a Shopping List" (#124) makes each line typed a Line of the
+/// list picked, and keeps no Note; the other choices wait unshown
+/// meanwhile. It is not offered with a photo, which no Line holds, nor
+/// behind the App Lock. A voice capture (#311) stays on the list as a
+/// Section, its recording to be listened to, and the items said in its
+/// Transcript become Lines, at once or once it is transcribed, the
+/// speech model downloaded later too ([ShoppingLists.addVoiceCapture]).
 ///
 /// The Photo button takes a photo into the Note, and the Gallery button
 /// picks pictures from the Device into it, several at once; the text is
@@ -450,6 +449,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// meanwhile holds only the text and recordings.
   ({String id, String title})? _shopping;
 
+  /// The Kind the Note is made as it is saved (#310): a Checklist or a
+  /// Shopping List of its typed lines; a Plain Note while [NoteKind.plain].
+  var _kind = NoteKind.plain;
+
   AppLock? _lock;
 
   @override
@@ -537,8 +540,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// Whether the Note leaves Unsorted: filed, with something spawned
-  /// from it, or going into a Shopping List. It needs no Nudge then.
-  bool get _sorted =>
+  /// from it, made a list (#310), or going into a Shopping List. It needs
+  /// no Nudge then.
+  bool get _sorted => _sortedByChoices || _listKind;
+
+  /// Whether a Checklist or Shopping List is chosen as the Kind (#310).
+  bool get _listKind => _kind != NoteKind.plain;
+
+  /// [_sorted] but for the Kind, which is made only on leaving: a Note
+  /// written before, as the app went to the background, keeps its Nudge
+  /// while it is still Unsorted.
+  bool get _sortedByChoices =>
       _shopping != null ||
       _place != null ||
       _schedules.isNotEmpty ||
@@ -561,16 +573,24 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// [nudgeIn] is given. A photo Note keeps its text when it is emptied.
   /// All of it is one batch: when a write on the way fails, none of it
   /// is written, and the screen still holds all of it (#113).
-  void _write(Duration? nudgeIn) {
+  ///
+  /// Only when [leaving] is the Note made the Kind chosen (#310), and
+  /// only with something typed; written before, as the app went to the
+  /// background, it stays a Plain Note, so what is typed on is not lost
+  /// into the list's Name.
+  void _write(Duration? nudgeIn, {bool leaving = false}) {
     final text = _text.text.trim();
     final captured = _captured;
     if (captured == null && text.isEmpty) return;
     final notes = widget.notes;
+    // Going into a Shopping List, the Note waits without the rest.
+    final choose = _shopping == null;
+    final makes = leaving && choose && _listKind && text.isNotEmpty;
+    final sorted = _sortedByChoices || makes;
     final (created, choices) = notes.store.batch(() {
-      // Going into a Shopping List, the Note waits without the rest.
-      final choose = _shopping == null;
       if (captured == null) {
-        final note = _captureNote(text, nudgeIn: nudgeIn);
+        final note = _captureNote(text, nudgeIn: nudgeIn, sorted: sorted);
+        if (makes) _makeKind(note.id);
         return (note, choose ? _writeChoices(note.id) : null);
       }
       final note = notes.byId(captured.noteId);
@@ -581,9 +601,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
           TextBoxes.strip(note.text) != text) {
         notes.edit(captured.noteId, text, format: _formatOf(text));
       }
-      if (nudgeIn != null && !_sorted) {
+      if (nudgeIn != null && !sorted) {
         notes.setNudge(captured.noteId, nudgeIn);
       }
+      if (makes) _makeKind(captured.noteId);
       return (null, choose ? _writeChoices(captured.noteId) : null);
     });
     if (created != null) _adopt(created);
@@ -646,6 +667,20 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
     if (_frog && !_frogWritten) Frogs(store).spawn(noteId);
     return (filed: filed);
+  }
+
+  /// Makes the Note [noteId] the Kind chosen (#310), each typed line a
+  /// Line unless the first is a heading (#309), where this Device may;
+  /// otherwise it stays a Plain Note, as Capture asks nothing.
+  void _makeKind(String noteId) {
+    switch (_kind) {
+      case NoteKind.checklist:
+        makeChecklist(widget.notes, noteId);
+      case NoteKind.shoppingList:
+        makeShoppingList(widget.notes, noteId);
+      case NoteKind.plain || NoteKind.tally || NoteKind.session:
+        break;
+    }
   }
 
   /// Marks what [_writeChoices] wrote as written, the Note in [filed].
@@ -721,10 +756,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// "Add to a Shopping List" in ⋮, read as it opens: offered while the
-  /// capture holds no photo, which no Line can hold, nothing written
-  /// that hangs on the Note, and a recording only where a speech model
-  /// can give its Transcript; never behind the App Lock, which keeps the
-  /// lists out of reach, nor without a list to add to. With one list to
+  /// capture holds no photo, which no Line can hold, and nothing written
+  /// that hangs on the Note; a recording, with a speech model or without
+  /// (#311); never behind the App Lock, which keeps the lists out of
+  /// reach, nor without a list to add to. With one list to
   /// add to it names it, "Add to Weekly", and picks it without the page
   /// (#276).
   ({String label, VoidCallback run})? _shoppingOffer() {
@@ -732,10 +767,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
       return null;
     }
     if (_writtenSchedules.isNotEmpty || _frogWritten || _tallyWritten) {
-      return null;
-    }
-    if (_recordings.isNotEmpty &&
-        SpeechScope.of(context)?.model.current == null) {
       return null;
     }
     final t = context.t;
@@ -789,10 +820,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
   );
 
   /// Writes the new Note with [text], [photos], [recordings] and [files],
-  /// nudged [nudgeIn] from now, 1 h when null, unless it is sorted.
+  /// nudged [nudgeIn] from now, 1 h when null, unless it is [sorted], by
+  /// default by what is set up for it but the Kind, made only on leaving.
   Note _captureNote(
     String text, {
     Duration? nudgeIn,
+    bool? sorted,
     List<Uint8List> photos = const [],
     List<Uint8List> recordings = const [],
     List<NewFile> files = const [],
@@ -801,7 +834,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
     format: _formatOf(text) ?? TextFormats.plain,
     place: _shopping == null ? _place : null,
     // A sorted Note needs no Nudge (#113).
-    nudgeIn: _sorted ? null : nudgeIn ?? Notes.defaultNudge,
+    nudgeIn: (sorted ?? _sortedByChoices)
+        ? null
+        : nudgeIn ?? Notes.defaultNudge,
     photos: photos,
     recordings: recordings,
     files: files,
@@ -1057,7 +1092,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         Navigator.of(context).pop(_intoShopping(shopping.id));
         return;
       }
-      _write(nudgeIn);
+      _write(nudgeIn, leaving: true);
     } catch (_) {
       // Nothing of it was written: the screen stays, to change and leave
       // again.
@@ -1080,7 +1115,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     await _picking;
     if (!mounted) return;
     try {
-      _write(null);
+      _write(null, leaving: true);
     } catch (_) {
       _leaving = false;
       rethrow;
@@ -1114,30 +1149,112 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
+  /// "Add to Note…" (#308): a recording running is ended and kept, and
+  /// pictures and files still coming are written first; then the Note is
+  /// picked, and the capture goes into it at once as a Section and the
+  /// screen leaves, back where Capture was opened from; what is captured
+  /// is the Note added, so its Capture Context, the location asked after
+  /// the first capture too, lands on the Section. Nothing picked, the
+  /// screen stays as it was.
+  Future<void> _addToNote() async {
+    if (_leaving) return;
+    await _stopRecording();
+    await _picking;
+    await _filing;
+    if (!mounted || _leaving) return;
+    final store = widget.notes.store;
+    final captured = _captured;
+    final intoId = await Navigator.of(context).push(
+      MaterialPageRoute<String>(
+        builder: (_) => MergeIntoScreen(
+          notes: widget.notes,
+          places: Places(store),
+          noteId: captured?.noteId,
+          adding: true,
+          // A Note hidden from AI goes into no Shared Area (#267).
+          hidden:
+              captured != null &&
+              store.hiddenFromAiBy(captured.noteId).isNotEmpty,
+        ),
+      ),
+    );
+    if (!mounted || intoId == null || _leaving) return;
+    _leaving = true;
+    try {
+      _intoNote(intoId);
+    } catch (_) {
+      // Nothing of it was written: the screen stays.
+      _leaving = false;
+      rethrow;
+    }
+    Navigator.of(context).pop(_captured);
+  }
+
+  /// Adds the capture to the Note [intoId] as a Section (#308), in one
+  /// batch: the Note written now, or the one written already with what
+  /// was typed since, goes where [intoId] lies, so it is sealed for the
+  /// same people, with no Nudge, and is merged into it. Nothing is written
+  /// while there is nothing to save.
+  void _intoNote(String intoId) {
+    final notes = widget.notes;
+    final place = notes.byId(intoId)?.place;
+    final text = _text.text.trim();
+    final captured = _captured;
+    if (captured == null && text.isEmpty) return;
+    final written = notes.store.batch(() {
+      if (captured == null) {
+        final note = notes.capture(
+          text,
+          format: _formatOf(text) ?? TextFormats.plain,
+          place: place,
+          sourceApp: widget.shared?.sourceApp,
+        );
+        notes.merge(note.id, intoId);
+        return note;
+      }
+      final id = captured.noteId;
+      final note = notes.byId(id);
+      if (text.isNotEmpty &&
+          note != null &&
+          note.textEditable &&
+          TextBoxes.strip(note.text) != text) {
+        notes.edit(id, text, format: _formatOf(text));
+      }
+      if (note?.place != place) {
+        if (place == null) {
+          notes.unfile(id);
+        } else {
+          notes.file(id, place);
+        }
+      }
+      notes.merge(id, intoId);
+      return null;
+    });
+    if (written != null) _adopt(written);
+  }
+
   /// Makes each line of the text a Line of the Shopping List [listId],
-  /// and the Note written meanwhile goes, with the lines of its
-  /// recordings' Transcripts (#124). While a recording has no Transcript
-  /// yet, the Note stays with all of it and goes once it has one
-  /// ([intoShoppingLater]). What cannot go stays a Note, announced at the
-  /// top. Returns the Note left to show; null when none is.
+  /// and the Note written meanwhile goes (#124). A voice capture stays on
+  /// the list as a Section with its recording, the items said in its
+  /// Transcript added as Lines at once or once it is there (#311), and
+  /// it is the Note left to show, as Add to Note… leaves it. What cannot
+  /// go stays a Note, announced at the top. Returns the Note left to
+  /// show; null when none is.
   Captured? _intoShopping(String listId) {
     final notes = widget.notes;
     final t = context.t;
     final announcements = AnnouncementsScope.of(context);
     // Taken now: the announcement may come once this page has closed.
     final navigator = Navigator.of(context, rootNavigator: true);
-    void announce({required bool untranscribed}) => announceFailureWith(
+    void announce() => announceFailureWith(
       announcements,
       navigator,
-      untranscribed ? t.captureShoppingUntranscribed : t.captureShoppingGone,
+      t.captureShoppingGone,
       title: t.captureShoppingNotAddedTitle,
-      cause: untranscribed
-          ? t.captureShoppingUntranscribedCause
-          : t.captureShoppingGoneCause,
+      cause: t.captureShoppingGoneCause,
       fix: t.captureShoppingKeptFix,
-      details: untranscribed
-          ? 'capture into a Shopping List: a recording got no Transcript'
-          : 'capture into a Shopping List: the list can no longer be added to',
+      details:
+          'capture into a Shopping List: the list can no longer be added to',
     );
     // The list used last goes to the top of the pick (#276).
     void used() => notes.store.lastShoppingList = listId;
@@ -1153,46 +1270,36 @@ class _CaptureScreenState extends State<CaptureScreen> {
         // The same.
       }
       _shopping = null;
-      _write(null);
-      announce(untranscribed: false);
+      _write(null, leaving: true);
+      announce();
       return _captured;
     }
     // The Note holds what was typed last, in case it stays.
     _write(null);
     final captured = _captured;
     if (captured == null) return null;
-    final note = notes.byId(captured.noteId);
-    final waiting = [
-      if (note != null)
-        for (final hash in note.recordings)
-          if (!note.transcripts.containsKey(hash) &&
-              !note.removedTranscripts.contains(hash))
-            hash,
-    ];
-    if (waiting.isEmpty) {
-      if (pourIntoShopping(notes, captured.noteId, listId) == true) {
+    if (notes.byId(captured.noteId)?.recordings.isNotEmpty ?? false) {
+      try {
+        ShoppingLists(notes.store)
+            .addVoiceCapture(listId, captured.noteId, deviceWallClock);
         used();
-        return null;
+        return captured;
+      } on StateError {
+        // The list can no longer be added to: the Note stays.
+      } on ArgumentError {
+        // The same.
+      } on HiddenFromAiRefused {
+        // Hidden from AI, it goes into no Shared Area (#267).
       }
-      announce(untranscribed: false);
+      announce();
       return captured;
     }
-    used();
-    return (
-      noteId: captured.noteId,
-      editing: null,
-      attached: [
-        ...captured.attached,
-        intoShoppingLater(
-          notes,
-          SpeechScope.of(context)?.transcriber,
-          captured.noteId,
-          listId,
-          waiting,
-          announce: announce,
-        ),
-      ],
-    );
+    if (pourIntoShopping(notes, captured.noteId, listId) == true) {
+      used();
+      return null;
+    }
+    announce();
+    return captured;
   }
 
   @override
@@ -1215,6 +1322,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   SliverToBoxAdapter(child: choices),
                 for (final attachment in _attachments(context))
                   SliverToBoxAdapter(child: attachment),
+                if (_kindChoice(context) case final kinds?)
+                  SliverToBoxAdapter(child: kinds),
                 if (_pasteEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -1301,6 +1410,42 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
+  /// The Kind choice above the field (#310): Text, Checklist or Shopping
+  /// List as choice chips, Text at first. None while an existing Shopping
+  /// List is picked, where the other choices wait unshown too, nor while
+  /// a Tally or Session is set up, which makes the Note that kind.
+  Widget? _kindChoice(BuildContext context) {
+    if (_shopping != null || _tally != null) return null;
+    if ([..._schedules, ..._writtenSchedules].any((c) => c.session != null)) {
+      return null;
+    }
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: ChoiceChips<NoteKind>(
+          value: _kind,
+          options: [
+            for (final kind in const [
+              NoteKind.plain,
+              NoteKind.checklist,
+              NoteKind.shoppingList,
+            ])
+              RadioOption(
+                key: ValueKey('capture-kind-${kind.name}'),
+                value: kind,
+                title: Text(
+                  kind == NoteKind.plain ? t.text : kindName(t, kind),
+                ),
+              ),
+          ],
+          onChanged: (picked) => setState(() => _kind = picked),
+        ),
+      ),
+    );
+  }
+
   /// The text field; with the format bar where it is switched on.
   Widget _field(BuildContext context) {
     final t = context.t;
@@ -1331,17 +1476,26 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
-  /// The line above the Nudge buttons or Save: "To full editor", then
-  /// the action row with what Settings ▸ Quick note switched on; null
-  /// while neither shows.
+  /// The line above the Nudge buttons or Save: "To full editor" and "Add
+  /// to Note…", then the action row with what Settings ▸ Quick note
+  /// switched on; null while none of them shows.
   Widget? _actionLine(BuildContext context) {
-    final editor = _toEditorButton(context);
+    final words = [?_toEditorButton(context), ?_addToNoteButton(context)];
     final actions = _actions(context);
-    if (editor == null) return actions;
+    if (words.isEmpty) return actions;
     return Row(
       children: [
         Expanded(
-          child: Align(alignment: Alignment.centerLeft, child: editor),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            // Where both do not fit, as the German words on a small
+            // phone, they shrink together rather than one alone.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(mainAxisSize: MainAxisSize.min, children: words),
+            ),
+          ),
         ),
         // The row's icons side by side, at the end.
         if (actions != null) IntrinsicWidth(child: actions),
@@ -1371,6 +1525,38 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
+  /// "Add to Note…" (#308): none behind the App Lock, which keeps the
+  /// Notes out of reach, while the lines go into a Shopping List, or once
+  /// a Routine, Reminder, Session, Frog or Tally is set up for the Note
+  /// itself, or a Checklist or Shopping List is chosen as its Kind (#310),
+  /// which needs the Note too; it waits while there is nothing to save.
+  Widget? _addToNoteButton(BuildContext context) {
+    if ((_lock?.locked ?? false) || _shopping != null) return null;
+    if (_listKind ||
+        _schedules.isNotEmpty ||
+        _writtenSchedules.isNotEmpty ||
+        _frog ||
+        _tally != null) {
+      return null;
+    }
+    return ListenableBuilder(
+      listenable: _text,
+      builder: (context, _) => TextButton.icon(
+        key: const ValueKey('captureAddToNote'),
+        onPressed: _captured != null || _text.text.trim().isNotEmpty
+            ? _addToNote
+            : null,
+        icon: const Icon(Icons.post_add),
+        // Beside To full editor and the row's icons: a long word shrinks
+        // rather than being cut.
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(context.t.addToNote, maxLines: 1, softWrap: false),
+        ),
+      ),
+    );
+  }
+
   /// The Note card's action row, after "To full editor": the alarm clock
   /// for a Routine or Reminder (#223), and what Settings ▸ Quick note
   /// switched on; null while that is nothing, as while the lines go into
@@ -1391,8 +1577,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final schedule = _shows.contains(QuickNoteControl.schedule);
     final onSchedule = _mayManage && !shopping ? _spawn : null;
     // "Make it a Tally" goes with the Frog and Session (Q481), only in
-    // Advanced (#197).
-    final onMakeTally = schedule && !shopping && _advanced ? _makeTally : null;
+    // Advanced (#197); a Note of a list Kind becomes neither (#310).
+    final onMakeTally = schedule && !shopping && _advanced && !_listKind
+        ? _makeTally
+        : null;
     if (onFile == null &&
         onSchedule == null &&
         onMakeTally == null &&
@@ -1410,7 +1598,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
               spawn == Spawn.reminder ||
               // Frogs and Sessions are made only in Advanced (#197), and
               // only once switched on.
-              (schedule && _advanced && (!locked || spawn != Spawn.session)))
+              (schedule &&
+                  _advanced &&
+                  (spawn != Spawn.session || (!locked && !_listKind))))
             spawn,
       ],
       actions: importance || toShopping || onMakeTally != null

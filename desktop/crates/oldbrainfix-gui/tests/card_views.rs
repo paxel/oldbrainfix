@@ -196,6 +196,32 @@ fn a_compact_list_or_tally_shows_its_name_and_its_counts() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn a_list_without_a_name_shows_its_kind_where_its_name_would_be() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    // Typed text made lists, every line a Line, no name (#309).
+    let socks = notes.capture("Socks\nTent", None, None)?.id;
+    Checklists::new(&store).make_from_text(&socks)?;
+    let milk = notes.capture("Milk\nBread", None, None)?.id;
+    ShoppingLists::new(&store).make_from_text(&milk)?;
+    let named = |harness: &Harness<'_, App>, kind: &str| {
+        harness
+            .query_all_by_role_and_label(Role::Label, kind)
+            .count()
+    };
+    let harness = window(&store);
+    assert_eq!(named(&harness, "Checklist"), 1);
+    assert_eq!(named(&harness, "Shopping List"), 1);
+    assert!(shows(&harness, "More: Checklist"));
+    assert!(shows(&harness, "More: Shopping List"));
+    let harness = compact(&store)?;
+    assert_eq!(named(&harness, "Checklist"), 1);
+    assert_eq!(named(&harness, "Shopping List"), 1);
+    assert!(shows(&harness, "2 of 2 open"));
+    Ok(())
+}
+
 /// Every day at `hour`:00 from `from`.
 fn daily_at(from: Day, hour: u32) -> Result<Schedule, Box<dyn std::error::Error>> {
     let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;

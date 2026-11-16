@@ -18,6 +18,10 @@ Navigation, capture, Agenda, cards, look and notifications. See `docs/agents/ui-
 
 The user guide's short boxes with Phone and Desktop tabs. See `docs/agents/guide-writing.md`. Check every guide change against it.
 
+### Ask end to end
+
+Every Ask change is checked against a real local model with `tool/ask-e2e.sh`. See `docs/agents/ask-e2e.md`.
+
 ### Domain docs
 
 Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.

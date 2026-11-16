@@ -161,18 +161,18 @@ void main() {
       await edit(tester, into.id);
 
       final editor = find.byType(NoteEditorScreen);
-      expect(
-        find.descendant(of: editor, matching: find.text('Room 12')),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.text('Bring your insurance card'),
-        100,
-        scrollable: find
-            .descendant(of: editor, matching: find.byType(Scrollable))
-            .first,
-      );
-      expect(find.text('Bring your insurance card'), findsOneWidget);
+      final page = find
+          .descendant(of: editor, matching: find.byType(Scrollable))
+          .first;
+      // The merged Note's reads on in the Note's text (#307), the Note's
+      // own under the badges.
+      for (final text in ['Bring your insurance card', 'Room 12']) {
+        await tester.scrollUntilVisible(find.text(text), 100, scrollable: page);
+        expect(
+          find.descendant(of: editor, matching: find.text(text)),
+          findsOneWidget,
+        );
+      }
     });
 
     testWidgets('the editor shows text found while it is open', (tester) async {

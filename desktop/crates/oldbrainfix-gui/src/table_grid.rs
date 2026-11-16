@@ -227,7 +227,7 @@ impl Grids {
     fn lay(&mut self, ui: &Ui, text: &str, boxes: &BoxLook) {
         let look = Look::of(ui, (Some(self.size), self.colour));
         let found = Found::of(text, text_format::MARKDOWN, boxes);
-        let lowest = ui.fonts_mut(|f| f.row_height(&FontId::proportional(self.size))) + PAD.y * 2.0;
+        let lowest = ui.fonts_mut(|f| f.row_height(&look.font())) + PAD.y * 2.0;
         self.shown = table::all(text)
             .into_iter()
             .enumerate()
@@ -1022,7 +1022,8 @@ impl Grids {
         }
         let colour = self.colour;
         let accent = ui.visuals().hyperlink_color;
-        let size = self.size;
+        // Typed at the Device's text size, as the cells read (#326, obf-1019).
+        let size = crate::theme::content(ui, self.size);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(size);

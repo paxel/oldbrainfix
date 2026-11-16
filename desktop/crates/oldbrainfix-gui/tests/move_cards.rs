@@ -286,7 +286,8 @@ fn the_cards_selected_are_dragged_together() -> TestResult {
     assert_eq!(place_of(&harness, MILK)?, Some(garden.clone()));
     assert_eq!(place_of(&harness, ROSES)?, Some(garden));
     assert_eq!(place_of(&harness, PLUMBER)?, None);
-    assert!(harness.state().selected_cards().is_empty());
+    // The first card left is selected for the next step (#313).
+    assert_eq!(harness.state().selected_cards(), [id(&harness, PLUMBER)?]);
 
     // A card outside the selection is dragged alone.
     let mut harness = self::harness(store()?, Selection::Unsorted);

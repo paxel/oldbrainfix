@@ -72,6 +72,9 @@ class Store {
   final _listeners = <void Function()>[];
   var _inBatch = false;
 
+  /// Whether the log or a pending set changed in the batch running.
+  var _changedInBatch = false;
+
   /// Calls [listener] after every change to the log: after each append,
   /// or once a [batch] is committed. Local settings do not count.
   void addListener(void Function() listener) => _listeners.add(listener);
@@ -115,14 +118,22 @@ class Store {
   }
 
   void _changed() {
+    _forget();
+    if (_inBatch) {
+      _changedInBatch = true;
+      return;
+    }
+    for (final listener in List.of(_listeners)) {
+      listener();
+    }
+  }
+
+  /// Forgets what was worked out or read of the log.
+  void _forget() {
     _judged = null;
     _overlay = null;
     _shownJudged = null;
     _forgetWorkedOut();
-    if (_inBatch) return;
-    for (final listener in List.of(_listeners)) {
-      listener();
-    }
   }
 
   /// Opens an on-disk store, creating it if needed. [newKey] makes the
@@ -386,6 +397,9 @@ class Store {
     final blobs = _blobsOf(kind);
     if (blobs == null) return false;
     blobs.put(hash, bytes);
+    // What reads a file, a photo or a recording hears its bytes came,
+    // as it did when every batch of a sync told the listeners (#339).
+    _changed();
     return true;
   }
 
@@ -631,6 +645,7 @@ class Store {
     if (!_db.autocommit) return body();
     _db.execute('BEGIN IMMEDIATE');
     _inBatch = true;
+    _changedInBatch = false;
     final T result;
     try {
       result = body();
@@ -643,7 +658,14 @@ class Store {
     } finally {
       _inBatch = false;
     }
-    _changed();
+    // The listeners hear of it only when the log or a pending set
+    // changed: a sync that brought nothing made every page, the Agenda
+    // and the alarms read again, on the app's thread (#339).
+    if (_changedInBatch) {
+      _changed();
+    } else {
+      _forget();
+    }
     return result;
   }
 
@@ -1198,15 +1220,21 @@ class Store {
 
   /// Entities whose `$type` was [type] at some time, the shown pending
   /// sets included.
-  Set<String> _everOfType(String type) => {
+  Set<String> _everOfType(String type) => everWith(r'$type', type);
+
+  /// Entities whose [field] held [value] at some time, the shown pending
+  /// sets included, in the order [entitiesOfType] keeps: those that may
+  /// hold it now, found without reading every entity (#339).
+  @internal
+  Set<String> everWith(String field, String value) => {
     for (final r in _db.select(
       'SELECT DISTINCT entity FROM entries WHERE $_applied '
-      r"AND field = '$type' AND value = ?",
-      [type],
+      'AND field = ? AND value = ?',
+      [field, value],
     ))
       r['entity'] as String,
     for (final e in _shown)
-      if (e.field == r'$type' && e.value == type) e.entity,
+      if (e.field == field && e.value == value) e.entity,
   };
 
   /// Latest-wins order: date, then recording time, then device, then

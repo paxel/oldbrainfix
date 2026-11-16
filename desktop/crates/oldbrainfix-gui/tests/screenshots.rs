@@ -2225,10 +2225,11 @@ fn desktop_frames(
             Ok(())
         }),
         ("dialogs", |harness, _| {
-            harness.state_mut().open(Page::Settings);
+            // About under Help (#325), then the licences opened from it.
+            harness.state_mut().open(Page::About);
             harness.run();
-            let about = harness.state().t().about_title().to_string();
-            click_first(harness, &about)
+            let licences = harness.state().t().open_source_licenses().to_string();
+            click_first(harness, &licences)
         }),
         ("keys", |harness, texts| {
             let places = Places::new(harness.state().store());
@@ -2355,6 +2356,7 @@ fn ask_frame(
     path: &str,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let mut harness = Box::new(window_with(texts, language, theme, |store, _| {
+        store.set_ai_on(true)?;
         store.set_ask_key("sk-ant-frames")
     })?);
     let tyres = Notes::new(harness.state().store())

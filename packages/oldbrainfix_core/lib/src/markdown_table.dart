@@ -87,6 +87,10 @@ class MarkdownTable {
   int get columns => aligns.length;
 }
 
+/// A table as Copy puts it on the clipboard (#324): its lines as GFM and
+/// as an HTML table ([MarkdownTables.copy]).
+typedef MarkdownTableCopy = ({String markdown, String html});
+
 /// Reading the tables of a formatted text and the edits the table editor
 /// makes. Every edit writes the whole table anew in one form, every other
 /// character of the text kept: each row on a line of its own between
@@ -113,6 +117,57 @@ abstract final class MarkdownTables {
   /// null.
   static MarkdownTable? at(String text, int offset) =>
       Markdown.parse(text)[Markdown.lineAt(text, offset)].table;
+
+  /// The table at [at] of [text], as stored, as Copy puts it on the
+  /// clipboard (#324), the same in both cores (`table.rs`): its lines as
+  /// GFM for a target that takes plain text, and an HTML table for one
+  /// that takes formatted text, as a table copied from a browser goes;
+  /// null where there is none. Each box shows the glyph of its state in
+  /// [states], by its id, else the glyph it is written with, and no id
+  /// (ADR 0035). The Markdown is the table as its editor writes it: each
+  /// row between pipes, `| a | b |`, the delimiter row with each column's
+  /// alignment, [headingColumnLine] first while the first column holds
+  /// headings, each cell as written, a `|` in it as `\|`, the cells
+  /// beyond the columns left out, `\n` between the lines. The HTML is the
+  /// table as [Markdown.html] writes it.
+  static MarkdownTableCopy? copy(
+    String text,
+    int at, [
+    Map<String, BoxState> states = const {},
+  ]) {
+    final stored = MarkdownTables.at(text, at);
+    if (stored == null) return null;
+    final lines = _shown(text.substring(stored.start, stored.end), states);
+    final table = MarkdownTables.at(lines, 0);
+    if (table == null) return null;
+    final grid = _Grid(
+      [
+        for (final row in table.rows)
+          [for (final c in row.cells) lines.substring(c.start, c.end)],
+      ],
+      [...table.aligns],
+      headings: table.headingColumn,
+    );
+    final html = StringBuffer();
+    Markdown._htmlTable(html, table);
+    return (markdown: grid.write('\n'), html: html.toString());
+  }
+
+  /// [text] with each box in the glyph of its state in [states], else the
+  /// one it is written with, and no id.
+  static String _shown(String text, Map<String, BoxState> states) {
+    final out = StringBuffer();
+    var from = 0;
+    for (final b in TextBoxes.find(text)) {
+      out
+        ..write(text.substring(from, b.start))
+        ..write((states[b.id] ?? b.state).glyph);
+      from = b.end;
+    }
+    out.write(text.substring(from));
+    // A second box of an id keeps its own glyph.
+    return TextBoxes.strip(out.toString());
+  }
 
   /// What the table editor edits of the cell in [row] and [column] of the
   /// table at [at]: its content as written, `\|` read as `|`. Null when

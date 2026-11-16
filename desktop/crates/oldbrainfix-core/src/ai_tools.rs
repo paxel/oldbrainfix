@@ -24,7 +24,7 @@ use serde_json::{Value, json};
 
 use crate::boxes::Boxes;
 use crate::checklists::{
-    Checklists, LineChecks, keys as checklist_keys, parse_line_in, parse_list_kind, split_lines,
+    Checklists, LineChecks, keys as checklist_keys, list_of_text, parse_list_kind,
 };
 use crate::entry::{dart_iso, parse_time};
 use crate::frogs::Frogs;
@@ -259,7 +259,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows, on top of that (textSize: normal, larger at 1.15 or largest at 1.3 times), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer), whether the user switched on AI (experimental) on this computer (aiOn: the Ask panel and the phone's questions; this port works either way), and whether the Ask panel lets an OpenAI-compatible provider's model think before it answers (askThinks: off asks it not to). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -582,7 +582,7 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "make_list",
-            "Makes a Note a Checklist or a Shopping List: its first line stays its text and every other line not blank becomes a Line, on a Checklist under the line above when it starts with a space. A text with a line marked \"✓ \" is refused, as that Line would be checked.",
+            "Makes a Note a Checklist or a Shopping List: every line not blank becomes a Line, on a Checklist under the line above when it starts with a space, but a first line that looks like a heading, a Markdown heading (\"# Weekly\", any level) or a line ending in \":\", stays as the list's name, a heading without its \"#\"; without one the list has no name. A text with a line marked \"✓ \" is refused, as that Line would be checked.",
             false,
             json!({"id": id("Note"), "list": {"enum": ["checklist", "shoppingList"], "type": "string"}}),
             &["id", "list"],
@@ -1778,10 +1778,13 @@ impl Store {
                     } else {
                         "simple"
                     },
+                    "aiOn": self.ai_on()?,
                     "aiReach": self.ai_reach()?.name(),
                     "alertsOn": settings.alerts_on()?,
+                    "askThinks": self.ask_thinks()?,
                     "allDayFrom": settings.all_day_from()?.to_string(),
                     "fatFingers": settings.fat_fingers()?,
+                    "textSize": settings.text_size()?.name(),
                     "nudgeRepeatMinutes": settings.nudge_repeat()?.num_minutes(),
                     "quickNote": {
                         "fileInto": shows(QuickNoteControl::FileInto)?,
@@ -2420,13 +2423,11 @@ impl Store {
             }
             "make_list" => {
                 let note = id()?;
+                // The Lines the typed text becomes (#309), its first line
+                // among them unless it is a heading.
                 let text = Notes::new(self).by_id(note)?.map(|n| {
                     let markdown = n.text_format == text_format::MARKDOWN;
-                    split_lines(&n.text)
-                        .iter()
-                        .skip(1)
-                        .filter_map(|r| parse_line_in(r, markdown))
-                        .any(|l| l.checked)
+                    list_of_text(&n.text, markdown).1.iter().any(|l| l.checked)
                 });
                 if text == Some(true) {
                     return Err(Error::Invalid(format!(
@@ -2434,8 +2435,8 @@ impl Store {
                     )));
                 }
                 match text_arg(args, "list")? {
-                    CHECKLIST => checklists.make(note)?,
-                    SHOPPING_LIST => shopping.make(note)?,
+                    CHECKLIST => checklists.make_from_text(note)?,
+                    SHOPPING_LIST => shopping.make_from_text(note)?,
                     other => return Err(Error::Invalid(format!("no list {other}"))),
                 }
                 done(note)

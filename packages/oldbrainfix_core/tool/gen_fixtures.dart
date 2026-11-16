@@ -1349,7 +1349,8 @@ final _scenarios = <Scenario>[
         'indented and back, a parent deleted with its group brought up, '
         'one deleted and restored, and one placed by a key no app writes; '
         '"Uncheck all", back to a plain Note and made again; an Unsorted '
-        'Note beside them.',
+        'Note beside them; then typed text made a Checklist, every line a '
+        'Line, and one under a Markdown heading, its Name (#309).',
     build: (store) {
       final notes = Notes(store);
       final lists = Checklists(store);
@@ -1393,6 +1394,12 @@ final _scenarios = <Scenario>[
       lists.toPlain(shop);
       lists.make(shop);
       notes.capture('Unsorted thought\nwith a second line');
+      // Typed text made a Checklist (#309): every line a Line, unless the
+      // first looks like a heading.
+      final typed = notes.capture('Socks\n  Blue\n✓ Passport').id;
+      lists.makeFromText(typed);
+      final weekly = notes.capture('# Weekly\nTowel').id;
+      lists.makeFromText(weekly);
     },
   ),
   (
@@ -1573,7 +1580,9 @@ final _scenarios = <Scenario>[
         'its box and one checked again last (#276); last, open Lines moved '
         'by hand before another, past the keys of two struck ones that come '
         'back a week on, and after the open ones, a move before itself and '
-        'one to where it is writing nothing (#283).',
+        'one to where it is writing nothing (#283); then a voice capture with '
+        'a typed line said into a list, still owing the items of its '
+        'Transcript, and one transcribed since (#311).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1750,6 +1759,21 @@ final _scenarios = <Scenario>[
         ..move(line(errands, 'Milk'), wall)
         ..move(line(errands, 'Eggs'), wall, before: line(errands, 'Eggs'))
         ..move(line(errands, 'Milk'), wall);
+      // Said into a list (#311): a voice capture with a typed line still
+      // owing the items of its Transcript, and one transcribed since,
+      // which added them once.
+      final market = notes.capture('Market\nFlour').id;
+      lists.make(market);
+      final waiting = notes.capture('Sugar', recordings: [_recording(31)]);
+      lists.addVoiceCapture(market, waiting.id, wall);
+      final said = notes.capture('', recordings: [_recording(32)]);
+      lists.addVoiceCapture(market, said.id, wall);
+      notes.setTranscript(
+        said.id,
+        said.recordings.single,
+        'Butter, flour und 1,5 Liter Milch.',
+      );
+      lists.addOwedLines(said.id, wall);
     },
   ),
   (
@@ -1759,7 +1783,9 @@ final _scenarios = <Scenario>[
         'a checked Line and a description typed after it was made becoming a '
         'Shopping List, a Shopping List with a struck Line and one gone Once '
         'becoming a Checklist, and one switched there and back; a Tally with '
-        'a description and a plain Note beside them.',
+        'a description and a plain Note beside them; then typed text made a '
+        'Shopping List, one under a line ending in ":", its Name, and one of '
+        'every line (#309).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1784,6 +1810,12 @@ final _scenarios = <Scenario>[
       final gym = notes.capture('Gym\nMondays and Thursdays').id;
       Tallies(store).addField(gym, name: 'Reps', unit: 'reps');
       notes.capture('Call Ben\nabout the car');
+      // Typed text made a Shopping List (#309): under a line ending in ":",
+      // its Name, and every line a Line.
+      final shopping = notes.capture('Shopping:\nFlour\nSugar').id;
+      lists.makeFromText(shopping);
+      final typed = notes.capture('Soap\n✓ Sponge').id;
+      lists.makeFromText(typed);
     },
   ),
   (
@@ -3158,6 +3190,46 @@ const _markdownRows = [
   '-\tTab',
 ];
 
+/// First lines of a typed text as they name a list made of it (#309),
+/// beside [_rows] and [_markdownRows]: headings of each level and none,
+/// and lines ending in ":".
+const _headingRows = [
+  '#',
+  '# Weekly',
+  '#\tTab',
+  '## Two',
+  '###### Six',
+  '####### Seven',
+  '#tag',
+  '#\u00a0Nbsp',
+  '  # Indented',
+  '    # Four spaces',
+  '# Title #',
+  '#  \u3000Wide ',
+  '# Weekly:',
+  'Shopping:',
+  ':',
+  'Milk: 2',
+  '✓ Done:',
+  '- Fruit:',
+  'Fruit :\u00a0',
+];
+
+/// Typed texts as they become a list (#309), each read plain and
+/// formatted.
+const _listTexts = [
+  '',
+  'Socks',
+  'Socks\nTent',
+  '# Weekly\nSocks\n  Blue',
+  'Shopping:\r\nMilk\r✓ Eggs',
+  '\n# Weekly\nSocks',
+  '  \nSocks',
+  '- Socks\n- ✓ Tent',
+  '## Trip\n- Map\n  - Pen',
+  '✓ Socks\n  Blue',
+];
+
 /// Each Checklist of [store] with its Lines, the one-pass read of them
 /// all, which Notes may become one, what each goes back to as a plain
 /// Note, and how lines of text and keys are read and made.
@@ -3234,6 +3306,23 @@ Map<String, Object?> _checklists(Store store) {
           null => null,
           final l => {'text': l.text, 'indent': l.indent, 'checked': l.checked},
         },
+    ],
+    'headingNames': [
+      for (final row in [..._rows, ..._markdownRows, ..._headingRows])
+        headingName(row),
+    ],
+    'listsOfText': [
+      for (final text in _listTexts)
+        for (final markdown in [false, true])
+          switch (listOfText(text, markdown: markdown)) {
+            (:final name, :final lines) => {
+              'name': name,
+              'lines': [
+                for (final l in lines)
+                  {'text': l.text, 'indent': l.indent, 'checked': l.checked},
+              ],
+            },
+          },
     ],
     'split': splitLines('a\r\nb\rc\n\nd\r\r\n'),
     'after': {for (final k in keys) k: LineOrder.after(k)},
@@ -3348,6 +3437,7 @@ Map<String, Object?> _shoppingList(ShoppingList list) => {
         'struck': l.struck,
         'checkedAt': l.checkedAt?.toIso8601String(),
         'backOn': l.backOn?.toString(),
+        'backIn': l.backIn?.toString(),
         'cameBackOn': l.cameBackOn?.toString(),
         'order': l.order,
       },
@@ -3491,6 +3581,28 @@ Map<String, Object?> _shoppingLists(Store store) {
         '﻿Bom',
       ])
         text: ShoppingLists.nameKey(text),
+    },
+    // The voice captures that still owe a list the items said (#311).
+    'owing': {for (final id in ids) id: ?lists.owedTo(id)},
+    'spoken': {
+      for (final text in [
+        'Milch, Eier und Brot.',
+        'milk, eggs, and bread',
+        'Butter UND Käse And tea',
+        'Hundefutter und Brandsalbe',
+        'sand and candy',
+        'Milch. Eier? Brot! Käse; Wurst… Senf\nTee\r\nZucker',
+        '1,5 Liter Milch, 2.5 kg Mehl, 3, 4',
+        '1.5.2026, 7,',
+        '  Oat\tmilk ,, and , und\n\n',
+        '\u3000Tee\u00a0und\ufeffKaffee\u2028Reis',
+        ' . , und ',
+        '',
+        'Milch und Milch',
+        'und',
+        'Und so weiter',
+      ])
+        text: ShoppingLists.spokenItems(text),
     },
   };
 }
@@ -7453,6 +7565,8 @@ Map<String, Object?> _ask() {
       'answer': {
         'text': answer.text,
         'notes': answer.notes,
+        'read': answer.read,
+        'alsoRead': answer.alsoRead,
         'cut': answer.cut,
         'unchecked': answer.unchecked,
       }
@@ -7467,8 +7581,8 @@ Map<String, Object?> _ask() {
   const passport = 'note:0a1b2c3d4e5f60718293a4b5c6d7e8f9';
   return {
     'questions': [
-      for (final (question, earlier) in [
-        ('Where is my passport?', <AskExchange>[]),
+      for (final (question, earlier, id) in [
+        ('Where is my passport?', <AskExchange>[], null),
         (
           'Und jetzt? „Pass“ im Ordner 📁',
           [
@@ -7479,15 +7593,40 @@ Map<String, Object?> _ask() {
             ),
             const AskExchange('Where?', 'In the blue folder.'),
           ],
+          null,
         ),
+        // With the id its status and stop name (#317).
+        ('Where is my passport?', <AskExchange>[], 'ask:0a1b2c'),
       ])
         {
           'question': question,
           'earlier': [
             for (final e in earlier) [e.question, e.answer],
           ],
-          'body': jsonEncode(askBody(question, earlier)),
+          'id': ?id,
+          'body': jsonEncode(askBody(question, earlier, id: id)),
         },
+    ],
+    // How far the desktop is with a question (#317), and bodies of it
+    // whose count is none, read as 0.
+    'progress': [
+      for (final progress in const [
+        AskProgress(asking: true, read: 3),
+        AskProgress(asking: false),
+      ])
+        {
+          'asking': progress.asking,
+          'read': progress.read,
+          'body': jsonEncode(progress.toJson()),
+        },
+    ],
+    'laterProgress': [
+      for (final body in [
+        {'asking': true, 'read': -1},
+        {'asking': true, 'read': 2.5},
+        {'asking': true},
+      ])
+        {'asking': true, 'read': 0, 'body': jsonEncode(body)},
     ],
     'providers': [
       for (final provider in const [
@@ -7512,6 +7651,12 @@ Map<String, Object?> _ask() {
           model: 'claude-opus-5-5',
           host: 'api.anthropic.com',
           unready: AskUnready.noKey,
+        ),
+        DesktopProvider(
+          protocol: AskProtocol.anthropic,
+          model: 'claude-opus-5-5',
+          host: 'api.anthropic.com',
+          unready: AskUnready.aiOff,
         ),
       ])
         {
@@ -7545,8 +7690,24 @@ Map<String, Object?> _ask() {
             unchecked: true,
           ),
         ),
+        // The Notes read, linked or not, in the order read (#314).
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'Your passport is in the blue folder.',
+            notes: [],
+            read: ['note:ffff', passport],
+          ),
+        ),
+        AskReply.answered(
+          DesktopAnswer(
+            text: 'In the [blue folder](oldbrainfix://note/$passport).',
+            notes: [passport],
+            read: [passport, 'note:ffff', 'note:eeee'],
+          ),
+        ),
         AskReply.failed(AskFailure.unready, unready: AskUnready.noKey),
         AskReply.failed(AskFailure.unready, unready: AskUnready.badUrl),
+        AskReply.failed(AskFailure.unready, unready: AskUnready.aiOff),
         AskReply.failed(AskFailure.unready),
         AskReply.failed(AskFailure.key, message: 'invalid x-api-key: …'),
         AskReply.failed(
@@ -7582,6 +7743,28 @@ Map<String, Object?> _ask() {
         },
         {
           'answer': {'notes': <String>[], 'text': 'T', 'unchecked': 'yes'},
+          'review': false,
+        },
+        // A desktop before #314 names no Note read; junk in it is none.
+        {
+          'answer': {
+            'cut': false,
+            'notes': [passport],
+            'text': 'T',
+            'unchecked': false,
+          },
+          'review': false,
+        },
+        {
+          'answer': {
+            'notes': <String>[],
+            'read': ['note:1', 2, null, passport],
+            'text': 'T',
+          },
+          'review': false,
+        },
+        {
+          'answer': {'notes': <String>[], 'read': 'note:1', 'text': 'T'},
           'review': false,
         },
       ])
@@ -10865,8 +11048,10 @@ Future<void> main(List<String> args) async {
     '`list-switch` log, with the name and description its text shows as; '
     'its `checklists.json` and `shopping.json` as for the logs above.\n'
     '- `shopping-lists/shopping.json`: each Shopping List of the '
-    '`shopping-lists` log with its Lines in the order they show, their '
-    'reappear times, which are struck, the day each comes back and the day '
+    '`shopping-lists` log with its Lines in the order they show, the '
+    'struck ones by the day they come back (#328), their '
+    'reappear times, which are struck, the day each comes back, how far '
+    'off it is, and the day '
     'an open one came back, the text each goes back to as a plain Note, and '
     'the lists on the Agenda with how each shows there and its open Lines '
     'by each value of the Device setting before #186, read at moments '
@@ -10875,7 +11060,9 @@ Future<void> main(List<String> args) async {
     'one and may become one, how each list shows on the Agenda by each '
     'value of that setting and whether the choice applies to each Note, '
     'the Routines with what is Done, reappear '
-    'times read, and names as an added one is compared.\n'
+    'times read, names as an added one is compared, the voice captures '
+    'that still owe a list the items said and Transcripts split into the '
+    'items said (#311).\n'
     '- `sent-checklist/`: Ada sends a Checklist to Ben (ADR 0030): her log '
     '(`sender.jsonl`) and Profile settings (`settings.json`), what sending '
     'wrote (`sent.jsonl`, ids counted from 0xa01, at held clocks), the '
@@ -10925,10 +11112,14 @@ Future<void> main(List<String> args) async {
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, what is no code and codes of a later version (ADR 0034).\n'
     '- `ask.json`: the phone\'s question through the desktop (#267, ADR '
-    '0051): question bodies with their earlier exchanges, the provider as '
+    '0051): question bodies with their earlier exchanges and the id the '
+    'phone gives one (#317), how far the desktop is with a question, the '
+    'provider as '
     'the phone learns it, answers (one whose unread Note links were '
-    'removed, #294) and every kind of failure as bodies with what they '
-    'hold, replies of a later desktop, and addresses typed by '
+    'removed, #294, and ones with the Notes read in the order read and '
+    'those of them shown as "Also read", #314) and every kind of failure '
+    'as bodies with what they hold, replies of a later desktop and of one '
+    'before #314, which names no Note read, and addresses typed by '
     'hand for a paired Device as read or refused.\n'
     '- `later_formats.json`: what files and values of a later version '
     '(ADR 0034) come to: Sent Items, Backup header lines, the opened keys '

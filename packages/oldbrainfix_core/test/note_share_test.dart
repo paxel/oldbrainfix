@@ -125,4 +125,78 @@ void main() {
       expect(share.photos, ['p1']);
     },
   );
+
+  group('a Checklist or Shopping List copies its Lines (#323)', () {
+    late Store store;
+    DateTime wall(DateTime utc) => utc;
+    setUp(() => store = Store.inMemory());
+    tearDown(() => store.close());
+
+    test('a Checklist as a task list, a group indented', () {
+      final note = Notes(store)
+          .capture('Groceries\nMilk\n ✓ Eggs\n Butter\nBread *fresh*');
+      Checklists(store).make(note.id);
+      final lines = NoteShare.taskLines(store, note.id, wall);
+      expect(
+        NoteShare.taskList(lines!),
+        '- [ ] Milk\n  - [x] Eggs\n  - [ ] Butter\n- [ ] Bread *fresh*',
+      );
+    });
+
+    test('a Shopping List its struck Lines checked after the open ones, '
+        'those gone left out', () {
+      final note = Notes(store).capture('Shop\nMilk\n✓ Eggs\nTea\nCake');
+      final lists = ShoppingLists(store)..make(note.id);
+      final cake = lists
+          .byNote(note.id, wall)!
+          .lines
+          .firstWhere((l) => l.text == 'Cake')
+          .id;
+      lists
+        ..setReappear(cake, Reappear.once)
+        ..check(cake, wall);
+      final lines = NoteShare.taskLines(store, note.id, wall);
+      expect(NoteShare.taskList(lines!), '- [ ] Milk\n- [ ] Tea\n- [x] Eggs');
+    });
+
+    test('a Checklist with a Routine as checked for the Occurrence now', () {
+      final note = Notes(store).capture('Pills\nBlue\n✓ Red');
+      Checklists(store).make(note.id);
+      expect(
+        NoteShare.taskList(NoteShare.taskLines(store, note.id, wall)!),
+        '- [ ] Blue\n- [x] Red',
+      );
+      Routines(store).spawn(
+        note.id,
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: const [],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+      );
+      // Every Occurrence starts with no Line checked, as its card shows.
+      expect(
+        NoteShare.taskList(NoteShare.taskLines(store, note.id, wall)!),
+        '- [ ] Blue\n- [ ] Red',
+      );
+    });
+
+    test('a plain Note has none', () {
+      final note = Notes(store).capture('Milk\nEggs');
+      expect(NoteShare.taskLines(store, note.id, wall), isNull);
+    });
+
+    test('pasted into a formatted text it gives the same boxes', () {
+      final notes = Notes(store);
+      final note = notes.capture('Trip\nTent\n ✓ Pegs\n Poles\n✓ Map');
+      Checklists(store).make(note.id);
+      final copied = NoteShare.taskList(
+        NoteShare.taskLines(store, note.id, wall)!,
+      );
+      expect(
+        Markdown.taskBoxes(copied, 0, copied.length).text,
+        '- ☐ Tent\n  - ✅ Pegs\n  - ☐ Poles\n- ✅ Map',
+      );
+    });
+  });
 }

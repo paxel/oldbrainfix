@@ -3987,6 +3987,12 @@ fn write_checklists(store: &Store) -> Built {
     lists.to_plain(&shop)?;
     lists.make(&shop)?;
     notes.capture("Unsorted thought\nwith a second line", None, None)?;
+    // Typed text made a Checklist (#309): every line a Line, unless the
+    // first looks like a heading.
+    let typed = notes.capture("Socks\n  Blue\n✓ Passport", None, None)?.id;
+    lists.make_from_text(&typed)?;
+    let weekly = notes.capture("# Weekly\nTowel", None, None)?.id;
+    lists.make_from_text(&weekly)?;
     Ok(())
 }
 
@@ -4180,6 +4186,45 @@ const ROWS: [&str; 17] = [
     "✓ ✓ Twice",
 ];
 
+/// First lines of a typed text as they name a list, as the Dart
+/// generator's `_headingRows` (#309).
+const HEADING_ROWS: [&str; 19] = [
+    "#",
+    "# Weekly",
+    "#\tTab",
+    "## Two",
+    "###### Six",
+    "####### Seven",
+    "#tag",
+    "#\u{a0}Nbsp",
+    "  # Indented",
+    "    # Four spaces",
+    "# Title #",
+    "#  \u{3000}Wide ",
+    "# Weekly:",
+    "Shopping:",
+    ":",
+    "Milk: 2",
+    "✓ Done:",
+    "- Fruit:",
+    "Fruit :\u{a0}",
+];
+
+/// Typed texts as they become a list, as the Dart generator's
+/// `_listTexts` (#309).
+const LIST_TEXTS: [&str; 10] = [
+    "",
+    "Socks",
+    "Socks\nTent",
+    "# Weekly\nSocks\n  Blue",
+    "Shopping:\r\nMilk\r✓ Eggs",
+    "\n# Weekly\nSocks",
+    "  \nSocks",
+    "- Socks\n- ✓ Tent",
+    "## Trip\n- Map\n  - Pen",
+    "✓ Socks\n  Blue",
+];
+
 /// Lines of a formatted text, as the Dart generator's `_markdownRows`.
 const MARKDOWN_ROWS: [&str; 23] = [
     "- Socks",
@@ -4224,7 +4269,9 @@ fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
 }
 
 fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
-    use oldbrainfix_core::checklists::{order, parse_line, parse_line_in, split_lines};
+    use oldbrainfix_core::checklists::{
+        heading_name, list_of_text, order, parse_line, parse_line_in, split_lines,
+    };
     let dir = fixtures().join(scenario);
     let expected = read_json(&dir.join("checklists.json"))?;
     let read_at = read_json(&dir.join("expected.json"))?;
@@ -4316,6 +4363,25 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         })
         .collect();
     assert_eq!(json!(markdown_rows), expected["markdownRows"]);
+    let names: Vec<Option<String>> = ROWS
+        .iter()
+        .chain(MARKDOWN_ROWS.iter())
+        .chain(HEADING_ROWS.iter())
+        .map(|row| heading_name(row))
+        .collect();
+    assert_eq!(json!(names), expected["headingNames"]);
+    let mut of_text = Vec::new();
+    for text in LIST_TEXTS {
+        for markdown in [false, true] {
+            let (name, lines) = list_of_text(text, markdown);
+            let lines: Vec<Value> = lines
+                .iter()
+                .map(|l| json!({"text": l.text, "indent": l.indent, "checked": l.checked}))
+                .collect();
+            of_text.push(json!({"name": name, "lines": lines}));
+        }
+    }
+    assert_eq!(json!(of_text), expected["listsOfText"]);
     assert_eq!(
         json!(split_lines("a\r\nb\rc\n\nd\r\r\n")),
         expected["split"]
@@ -4430,6 +4496,12 @@ fn write_list_switch(store: &Store) -> Built {
     let gym = notes.capture("Gym\nMondays and Thursdays", None, None)?.id;
     Tallies::new(store).add_field(&gym, "Reps", "reps", None, None)?;
     notes.capture("Call Ben\nabout the car", None, None)?;
+    // Typed text made a Shopping List (#309): under a line ending in ":",
+    // its Name, and every line a Line.
+    let shopping = notes.capture("Shopping:\nFlour\nSugar", None, None)?.id;
+    lists.make_from_text(&shopping)?;
+    let typed = notes.capture("Soap\n✓ Sponge", None, None)?.id;
+    lists.make_from_text(&typed)?;
     Ok(())
 }
 
@@ -4679,6 +4751,21 @@ fn write_shopping_lists(store: &Store) -> Built {
         Some(&line(&errands, "Eggs")?),
     )?;
     lists.move_line(&line(&errands, "Milk")?, &wall, None)?;
+    // Said into a list (#311): a voice capture with a typed line still
+    // owing the items of its Transcript, and one transcribed since, which
+    // added them once.
+    let market = notes.capture("Market\nFlour", None, None)?.id;
+    lists.make(&market)?;
+    let waiting = notes.capture_with("Sugar", None, None, &[], &[recording(31)])?;
+    lists.add_voice_capture(&market, &waiting.id, &wall)?;
+    let said = notes.capture_with("", None, None, &[], &[recording(32)])?;
+    lists.add_voice_capture(&market, &said.id, &wall)?;
+    notes.set_transcript(
+        &said.id,
+        &said.recordings[0],
+        "Butter, flour und 1,5 Liter Milch.",
+    )?;
+    lists.add_owed_lines(&said.id, &wall)?;
     Ok(())
 }
 
@@ -4736,6 +4823,7 @@ fn shopping_list_json(list: &ShoppingList) -> Value {
             "struck": l.struck,
             "checkedAt": l.checked_at.map(dart_iso),
             "backOn": l.back_on.map(|d| d.to_string()),
+            "backIn": l.back_in.map(|b| b.to_string()),
             "cameBackOn": l.came_back_on.map(|d| d.to_string()),
             "order": l.order,
         })).collect::<Vec<_>>(),
@@ -4841,6 +4929,17 @@ fn shopping_lists_of_come_to_what_the_dart_core_says(scenario: &str) -> TestResu
     }
     for (text, key) in expected["names"].as_object().ok_or("names")? {
         assert_eq!(json!(ShoppingLists::name_key(text)), *key, "{text:?}");
+    }
+    // The voice captures that still owe a list the items said (#311).
+    let mut owing = serde_json::Map::new();
+    for id in &ids {
+        if let Some(list) = lists.owed_to(id)? {
+            owing.insert(id.clone(), json!(list));
+        }
+    }
+    assert_eq!(Value::Object(owing), expected["owing"]);
+    for (text, items) in expected["spoken"].as_object().ok_or("spoken")? {
+        assert_eq!(json!(ShoppingLists::spoken_items(text)), *items, "{text:?}");
     }
     Ok(())
 }
@@ -5507,19 +5606,25 @@ fn ask_reply_of(
     use oldbrainfix_core::lan_ask::{Answered, AskFailure, AskReply};
     let review = item["review"].as_bool().ok_or("review")?;
     if let Some(answer) = item.get("answer") {
-        let notes = answer["notes"]
-            .as_array()
-            .ok_or("notes")?
-            .iter()
-            .map(|n| n.as_str().map(str::to_string).ok_or("a note"))
-            .collect::<Result<Vec<_>, _>>()?;
+        let ids = |key: &str| -> Result<Vec<String>, Box<dyn std::error::Error>> {
+            Ok(answer[key]
+                .as_array()
+                .ok_or(format!("{key} is a list"))?
+                .iter()
+                .map(|n| n.as_str().map(str::to_string).ok_or("a note"))
+                .collect::<Result<Vec<_>, _>>()?)
+        };
+        let answered = Answered {
+            text: answer["text"].as_str().ok_or("text")?.to_string(),
+            notes: ids("notes")?,
+            read: ids("read")?,
+            cut: answer["cut"].as_bool().ok_or("cut")?,
+            unchecked: answer["unchecked"].as_bool().ok_or("unchecked")?,
+        };
+        // "Also read" as the Dart core shows it (#314).
+        assert_eq!(answered.also_read(), ids("alsoRead")?, "{item}");
         return Ok(AskReply {
-            outcome: Ok(Answered {
-                text: answer["text"].as_str().ok_or("text")?.to_string(),
-                notes,
-                cut: answer["cut"].as_bool().ok_or("cut")?,
-                unchecked: answer["unchecked"].as_bool().ok_or("unchecked")?,
-            }),
+            outcome: Ok(answered),
             review,
         });
     }
@@ -5529,6 +5634,7 @@ fn ask_reply_of(
         Some("noModel") => Some(Unready::NoModel),
         Some("noKey") => Some(Unready::NoKey),
         Some("badUrl") => Some(Unready::BadUrl),
+        Some("aiOff") => Some(Unready::AiOff),
         Some(other) => return Err(format!("unready {other}").into()),
     };
     let failure = match item["failure"].as_str().ok_or("failure")? {
@@ -5556,7 +5662,7 @@ fn ask_reply_of(
 #[test]
 fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::ask::{Exchange, Protocol, Unready};
-    use oldbrainfix_core::lan_ask::{AskReply, ProviderShown, Question};
+    use oldbrainfix_core::lan_ask::{AskProgress, AskReply, ProviderShown, Question};
     use oldbrainfix_core::pairing::HandAddress;
     let fixture = read_json(&fixtures().join("ask.json"))?;
     let text = |v: &Value, k: &str| -> Result<String, Box<dyn std::error::Error>> {
@@ -5578,12 +5684,36 @@ fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult
         let question = Question {
             question: text(item, "question")?,
             earlier,
+            id: item["id"].as_str().map(str::to_string),
         };
         let body = text(item, "body")?;
         assert_eq!(question.to_json().to_string(), body);
         assert_eq!(
             Question::from_json(&serde_json::from_str(&body)?),
             Some(question)
+        );
+    }
+    for item in fixture["progress"].as_array().ok_or("progress")? {
+        let progress = AskProgress {
+            asking: item["asking"].as_bool().ok_or("asking")?,
+            read: usize::try_from(item["read"].as_u64().ok_or("read")?)?,
+        };
+        let body = text(item, "body")?;
+        assert_eq!(progress.to_json().to_string(), body);
+        assert_eq!(
+            AskProgress::from_json(&serde_json::from_str(&body)?),
+            Some(progress)
+        );
+    }
+    for item in fixture["laterProgress"].as_array().ok_or("laterProgress")? {
+        let body = text(item, "body")?;
+        assert_eq!(
+            AskProgress::from_json(&serde_json::from_str(&body)?),
+            Some(AskProgress {
+                asking: item["asking"].as_bool().ok_or("asking")?,
+                read: usize::try_from(item["read"].as_u64().ok_or("read")?)?,
+            }),
+            "{body}"
         );
     }
     for item in fixture["providers"].as_array().ok_or("providers")? {
@@ -5598,6 +5728,7 @@ fn the_phones_question_is_written_and_read_as_the_dart_core_does() -> TestResult
                 None => None,
                 Some("noModel") => Some(Unready::NoModel),
                 Some("noKey") => Some(Unready::NoKey),
+                Some("aiOff") => Some(Unready::AiOff),
                 Some(_) => Some(Unready::BadUrl),
             },
         };

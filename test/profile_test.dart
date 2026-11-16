@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
+import 'package:oldbrainfix/src/about_screen.dart';
 import 'package:oldbrainfix/src/alarm_sync.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
@@ -94,7 +95,7 @@ void main() {
 
   group('the Profile page', () {
     testWidgets('shows picture, name and code, then Backups, Devices, '
-        'People and Settings, in that order', (tester) async {
+        'People, Settings and About, in that order', (tester) async {
       tester.view.physicalSize = const Size(1080, 2600);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
@@ -112,6 +113,7 @@ void main() {
         find.text('Your Devices'),
         find.text('People'),
         find.text('Settings of this Device'),
+        find.byKey(const ValueKey('about')),
       ];
       final tops = [for (final f in order) tester.getTopLeft(f).dy];
       expect(tops, [...tops]..sort());
@@ -119,7 +121,7 @@ void main() {
       expect(find.text('Ada Pixel'), findsOneWidget);
     });
 
-    testWidgets('leads to Backups, Sync and this Device\'s settings', (
+    testWidgets('leads to Backups, Sync, this Device\'s settings and About', (
       tester,
     ) async {
       await start(tester);
@@ -127,6 +129,7 @@ void main() {
         ('backups', BackupScreen),
         ('sync', SyncScreen),
         ('deviceSettings', SettingsScreen),
+        ('about', AboutScreen),
       ]) {
         await openProfilePage(tester);
         await tap(tester, find.byKey(ValueKey(key)));
@@ -136,10 +139,21 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
       }
-      // Settings no longer hold Sync and Backups.
+      // Settings no longer hold Sync, Backups and About (#325).
       await openDeviceSettings(tester);
       expect(find.byKey(const ValueKey('sync')), findsNothing);
       expect(find.byKey(const ValueKey('backups')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('sendFeedback'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.text('About Old Brain Fix', skipOffstage: false),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('keeps a typed name, sanitised, and the Agenda shows it', (
@@ -200,6 +214,9 @@ void main() {
       expect(find.text('Dein Code'), findsOneWidget);
       await tester.ensureVisible(find.text('Einstellungen dieses Geräts'));
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tap(tester, find.text('Über Old Brain Fix'));
+      expect(find.byType(AboutScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

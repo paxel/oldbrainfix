@@ -91,6 +91,34 @@ fn a_note_of_files_without_words_is_titled_by_its_first_files_name() -> Result<(
 }
 
 #[test]
+fn a_list_without_a_name_is_titled_by_its_kind() -> Result<()> {
+    use crate::{Checklists, ShoppingLists};
+    let store = crate::store::tests::store();
+    let notes = Notes::new(&store);
+    let wordless =
+        |id: &str| -> Result<Option<Wordless>> { Ok(notes.by_id(id)?.map(|n| n.wordless())) };
+    let socks = notes.capture("Socks\nTent", None, None)?.id;
+    Checklists::new(&store).make_from_text(&socks)?;
+    assert_eq!(wordless(&socks)?, Some(Wordless::Checklist));
+    let milk = notes.capture("Milk", None, None)?.id;
+    ShoppingLists::new(&store).make_from_text(&milk)?;
+    assert_eq!(wordless(&milk)?, Some(Wordless::ShoppingList));
+    assert_eq!(Wordless::ShoppingList.name(), "shoppingList");
+    // What it holds wins.
+    let receipt = notes
+        .capture_with("Bread", None, None, &[photo(1)], &[])?
+        .id;
+    ShoppingLists::new(&store).make_from_text(&receipt)?;
+    assert_eq!(wordless(&receipt)?, Some(Wordless::Photo));
+    // Back to a plain Note, and a kind no app writes, nothing but a photo.
+    Checklists::new(&store).to_plain(&socks)?;
+    assert_eq!(wordless(&socks)?, Some(Wordless::Photo));
+    store.append(&milk, crate::checklists::keys::KIND, Some("tally:x"), None)?;
+    assert_eq!(wordless(&milk)?, Some(Wordless::Photo));
+    Ok(())
+}
+
+#[test]
 fn writes_check_what_they_write_to() -> Result<()> {
     let store = crate::store::tests::store();
     let notes = Notes::new(&store);

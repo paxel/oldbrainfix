@@ -185,7 +185,7 @@ void main() {
 
     expect(nothing, findsOneWidget);
     expect(shown(en.settingsLook), findsNothing);
-    expect(shown(en.aboutTitle), findsNothing);
+    expect(shown(en.feedbackTitle), findsNothing);
 
     await tester.tap(find.byTooltip(en.clearSearch));
     await tester.pumpAndSettle();
@@ -194,7 +194,21 @@ void main() {
     expect(shown(en.settingsIntro), findsOneWidget);
     expect(shown(en.settingsLook), findsOneWidget);
     expect(keyed('fatFingers'), findsOneWidget);
-    expect(shown(en.aboutTitle), findsOneWidget);
+    expect(shown(en.feedbackTitle), findsOneWidget);
+  });
+
+  testWidgets('finds no About, which is behind the Profile picture', (
+    tester,
+  ) async {
+    await start(tester);
+    final about = find.descendant(
+      of: find.byType(SettingsScreen),
+      matching: shown(en.aboutTitle),
+    );
+    expect(about, findsNothing);
+    await search(tester, 'about old brain fix');
+    expect(nothing, findsOneWidget);
+    expect(about, findsNothing);
   });
 
   testWidgets('speaks German and finds the German words', (tester) async {

@@ -360,6 +360,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noOtherNotes => 'There is no other Note to merge into.';
 
   @override
+  String get addToNote => 'Add to Note…';
+
+  @override
+  String get addToNoteRecent => 'Added to recently';
+
+  @override
+  String get noNoteToAddTo => 'There is no Note to add to.';
+
+  @override
   String get locationExplainTitle => 'Remember where you were?';
 
   @override
@@ -1598,6 +1607,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get fatFingersDetail =>
       'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.';
+
+  @override
+  String get textSize => 'Text size';
+
+  @override
+  String get textSizeDetail =>
+      'How large the text of Notes, Lines, the Agenda and Ask\'s answers shows, on top of the system\'s font size and “Fat fingers”.';
+
+  @override
+  String get textSizeNormal => 'Normal';
+
+  @override
+  String get textSizeLarger => 'Larger';
+
+  @override
+  String get textSizeLargest => 'Largest';
 
   @override
   String get settingsAlarms => 'Alarms';
@@ -3344,6 +3369,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareAfarFailed => 'The Area could not be shared.';
 
   @override
+  String get tickFailed => 'A tick could not be saved.';
+
+  @override
+  String get tickFailedTitle => 'Tick not saved';
+
+  @override
+  String get tickRefusedCause =>
+      'A sync took the box away, or this Device\'s role in the Shared Area, while the tick waited.';
+
+  @override
+  String get tickRefusedFix =>
+      'Look at the Note again and tick once more, or ask a Manager of the Area for a role.';
+
+  @override
+  String get tickStorageCause => 'This Device could not write to its storage.';
+
+  @override
+  String get tickStorageFix => 'Free some storage, then tick again.';
+
+  @override
   String get areaOfferNotForUs =>
       'This shared Area is meant for another person or another of your Devices.';
 
@@ -3620,8 +3665,47 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String shoppingBack(String day) {
-    return 'back $day';
+  String shoppingBackDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count days',
+      one: 'tomorrow',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingBackWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count weeks',
+      one: 'in 1 week',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingBackMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count months',
+      one: 'in 1 month',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingBackYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'in $count years',
+      one: 'in 1 year',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -4163,19 +4247,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get captureShoppingUntranscribed =>
-      'Kept as a Note: its recording could not be transcribed for the Shopping List.';
-
-  @override
   String get captureShoppingGone =>
       'Kept as a Note: that Shopping List can no longer be added to.';
 
   @override
   String get captureShoppingNotAddedTitle => 'Not added to the Shopping List';
-
-  @override
-  String get captureShoppingUntranscribedCause =>
-      'Whisper could not write a Transcript of the recording.';
 
   @override
   String get captureShoppingGoneCause =>
@@ -4869,6 +4945,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tableTitle => 'Table';
 
   @override
+  String get tableCopy => 'Copy';
+
+  @override
   String get tableOpen => 'Open the table';
 
   @override
@@ -4991,7 +5070,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
+      'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -6174,8 +6253,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneAskStartOver => 'Start over';
 
   @override
-  String phoneAskAsking(String provider) {
-    return 'Waiting for the answer from $provider…';
+  String phoneAskAsking(String computer) {
+    return 'Asking $computer…';
+  }
+
+  @override
+  String phoneAskAskingReading(String computer, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes',
+      one: '1 Note',
+    );
+    return 'Asking $computer… reading $_temp0';
+  }
+
+  @override
+  String get phoneAskStop => 'Stop';
+
+  @override
+  String get phoneAskFailureDetails => 'Details';
+
+  @override
+  String phoneAskUnreadyAiOffCause(String computer) {
+    return 'The AI is switched off on $computer.';
+  }
+
+  @override
+  String phoneAskUnreadyModelCause(String computer) {
+    return 'No model is named on $computer.';
+  }
+
+  @override
+  String phoneAskUnreadyKeyCause(String provider, String computer) {
+    return '$provider has no API key on $computer.';
+  }
+
+  @override
+  String phoneAskUnreadyUrlCause(String provider, String computer) {
+    return '$computer may not ask $provider at its address.';
   }
 
   @override
@@ -6191,10 +6307,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneAskFromNotes => 'From these Notes';
 
   @override
+  String get phoneAskAlsoRead => 'Also read';
+
+  @override
   String get phoneAskKeep => 'Keep as Note';
 
   @override
   String get phoneAskKept => 'Kept as a Note';
+
+  @override
+  String phoneAskAddedTo(String title) {
+    return 'Added to “$title”';
+  }
+
+  @override
+  String get phoneAskNotShared => 'The answer was not shared.';
+
+  @override
+  String get phoneAskNotSharedTitle => 'Answer not shared';
+
+  @override
+  String get phoneAskShareNoApp => 'No app here can take the answer.';
 
   @override
   String get phoneAskCut => 'The answer was cut off at its length limit.';
@@ -6209,19 +6342,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskUnreadyFix =>
-      'Set up the provider under Ask panel in the computer\'s Settings.';
+      'Set up the provider under Ask panel in the computer\'s AI settings.';
 
   @override
   String get phoneAskUnreadyModel =>
-      'Name a model under Ask panel in the computer\'s Settings.';
+      'Name a model under Ask panel in the computer\'s AI settings.';
 
   @override
   String get phoneAskUnreadyKey =>
-      'Enter the API key under Ask panel in the computer\'s Settings.';
+      'Enter the API key under Ask panel in the computer\'s AI settings.';
 
   @override
   String get phoneAskUnreadyUrl =>
-      'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.';
+      'Give the provider an https:// address under Ask panel in the computer\'s AI settings; http:// only on the computer or the home network.';
+
+  @override
+  String get phoneAskUnreadyAiOff =>
+      'Switch on AI (experimental) in the computer\'s AI menu.';
+
+  @override
+  String get phoneAskSwitch => 'Ask (experimental)';
+
+  @override
+  String get phoneAskSwitchDetail =>
+      'Ask in the Agenda\'s bar, which asks your computer about your Notes, and Address by hand on the Sync page. An address typed before stays, and sync still tries it.';
 
   @override
   String get phoneAskConsentTitle => 'Before your first question';
@@ -6274,9 +6418,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneAskAllow => 'Allow';
 
   @override
-  String get phoneAskFailed => 'The question was not answered.';
-
-  @override
   String get phoneAskFailedTitle => 'Not answered';
 
   @override
@@ -6286,7 +6427,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskKeyFix =>
-      'Check the API key under Ask panel in the computer\'s Settings.';
+      'Check the API key under Ask panel in the computer\'s AI settings.';
 
   @override
   String phoneAskProviderFailed(String provider) {
@@ -6295,7 +6436,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskProviderFix =>
-      'Check the model\'s name in the computer\'s Settings, or ask again later.';
+      'Check the model\'s name in the computer\'s AI settings, or ask again later.';
 
   @override
   String phoneAskNoReply(String provider) {
@@ -6304,7 +6445,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskNoReplyFix =>
-      'Check the computer\'s network and the provider\'s address in its Settings, then ask again.';
+      'Check the computer\'s network and the provider\'s address in its AI settings, then ask again.';
 
   @override
   String phoneAskUnreadable(String provider) {
@@ -6313,7 +6454,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneAskUnreadableFix =>
-      'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.';
+      'Check that the base URL in the computer\'s AI settings leads to an OpenAI-compatible API.';
 
   @override
   String get phoneAskTooManyRounds =>
