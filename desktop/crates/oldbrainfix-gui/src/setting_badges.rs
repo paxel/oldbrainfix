@@ -2,7 +2,7 @@
 //! `setting_badges.dart` draws them: like a shield, the setting's icon on
 //! a tinted part, the same for every value, then its current value
 //! (#192), an icon where the setting has a fixed set of values, short text
-//! otherwise, never both. A screen reader reads one as "setting: value"
+//! otherwise, never both; the kind in words with ▾ (#310). A screen reader reads one as "setting: value"
 //! in words. A click opens its small editor, a dialog with the
 //! same icon and the setting's name as its title, the editor itself and
 //! Close; a badge this Device may not change only shows its value. The
@@ -28,15 +28,20 @@ pub enum BadgeValue<'a> {
     /// An icon, for a setting with a fixed set of values, and the value
     /// in words for the screen reader.
     Icon(char, &'a str),
+    /// The value in words with ▾ after it, for a badge whose click picks
+    /// among values, such as the kind (#310); the screen reader reads the
+    /// words alone.
+    Choice(&'a str),
 }
 
 impl<'a> BadgeValue<'a> {
     /// The value in words.
     pub fn words(self) -> &'a str {
         match self {
-            BadgeValue::Text(words) | BadgeValue::Short(_, words) | BadgeValue::Icon(_, words) => {
-                words
-            }
+            BadgeValue::Text(words)
+            | BadgeValue::Short(_, words)
+            | BadgeValue::Icon(_, words)
+            | BadgeValue::Choice(words) => words,
         }
     }
 }
@@ -65,19 +70,23 @@ pub fn badge(
     let text = ui.visuals().text_color();
     let font = FontId::proportional(14.0);
     let galley = match value {
-        Some(BadgeValue::Text(v) | BadgeValue::Short(v, _)) => Some(ui.painter().layout_no_wrap(
-            v.to_string(),
-            font.clone(),
-            text,
-        )),
+        Some(BadgeValue::Text(v) | BadgeValue::Short(v, _) | BadgeValue::Choice(v)) => Some(
+            ui.painter()
+                .layout_no_wrap(v.to_string(), font.clone(), text),
+        ),
         _ => None,
     };
     let height = 32.0;
     let icon_part = 38.0;
     let pad = 10.0;
     let value_icon = 18.0;
+    let arrow = if matches!(value, Some(BadgeValue::Choice(_))) {
+        value_icon
+    } else {
+        0.0
+    };
     let value_width = match (&galley, value) {
-        (Some(g), _) => g.size().x + 2.0 * pad,
+        (Some(g), _) => g.size().x + arrow + 2.0 * pad,
         (None, Some(BadgeValue::Icon(..))) => value_icon + 2.0 * pad,
         (None, _) => 0.0,
     };
@@ -120,7 +129,13 @@ pub fn badge(
         icons::paint(painter, square, icon, colour.unwrap_or(tones.accent));
         if let Some(galley) = galley {
             let at = egui::pos2(left.right() + pad, rect.center().y - galley.size().y / 2.0);
+            let end = at.x + galley.size().x;
             painter.galley(at, galley, text);
+            if arrow > 0.0 {
+                let at = egui::pos2(end + arrow / 2.0, rect.center().y);
+                let square = egui::Rect::from_center_size(at, egui::vec2(arrow, arrow));
+                icons::paint(painter, square, icons::ARROW_DROP_DOWN, text);
+            }
         } else if let Some(BadgeValue::Icon(value, _)) = value {
             let at = egui::pos2(left.right() + pad + value_icon / 2.0, rect.center().y);
             let square = egui::Rect::from_center_size(at, egui::vec2(value_icon, value_icon));

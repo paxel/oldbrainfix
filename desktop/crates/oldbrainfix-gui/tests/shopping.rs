@@ -7,16 +7,21 @@
 //! a Line where it was typed, a name already there bringing its Line
 //! back, Backspace at the start joins, the rows stay where they are while
 //! the editor is open, and the typed order is kept the next time; the
-//! Line menu sets the reappear time and deletes for good after asking
-//! once; full cards check, compact cards count the open Lines; a Member
+//! Line menu sets the reappear time and deletes without asking, "Removed
+//! Lines" and Ctrl+Z bringing it back (#268); Alt+Up and Alt+Down, the
+//! menu's Move up and Move down and the handle move an open Line among
+//! the open ones, a struck one staying (#283); full cards check, compact cards count the open Lines; a Member
 //! checks and adds but changes only their own Lines; and a Line Conflict
 //! is named as a Shopping List's. Today's
 //! Agenda shows each Shopping List with open Lines as chosen for it
 //! (#186), in the card's ⋮ and with the Note dialog's badge: one row with
 //! the number of open Lines, the default, each open Line with its box, or
-//! none; a list nobody chose for shows as this Device showed Shopping
-//! Lists before, the Settings no longer choose it, and a click on a row
-//! opens the Note.
+//! none; a Line checked there stays struck under the open ones for the
+//! day, also one checked Once, and its box brings it back, unless this
+//! Device hides what is checked (#276); a list nobody chose for shows as
+//! this Device showed Shopping Lists before, the Settings no longer
+//! choose it, and a click on a Line's row opens the Note, on the heading
+//! with the keyboard in a new Line after the open ones (#276).
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -283,19 +288,23 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
     assert!(!shows(&harness, "Shopping List"));
     click(&mut harness, "Kind: Plain Note")?;
     pick(&mut harness, "Shopping List")?;
-    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
+    // Every line a Line, the first one too (#309).
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Weekly", "Milk", "Bread", "Apples"]
+    );
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
-    assert_eq!(now.text, "Weekly");
-    // The name holds the title now, so leaving it writes nothing old
-    // (#188).
+    assert_eq!(now.text, "");
+    // The name is empty, to be typed later, so leaving it writes nothing
+    // old (#188).
     assert_eq!(
         harness
             .get_by_role_and_label(Role::TextInput, "Name")
             .value()
-            .as_deref(),
-        Some("Weekly")
+            .unwrap_or_default(),
+        ""
     );
     assert!(shows(&harness, "Shopping List"));
     assert!(!shows(&harness, "Make it a Shopping List"));
@@ -315,12 +324,75 @@ fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_into_its_place
     tick(&mut harness, "Milk")?;
     assert!(checked(&harness, "Milk")?);
     assert_eq!(texts(&harness, &note)?, ["Bread", "Apples", "✓ Milk"]);
-    // A week on, the same weekday, in the locale's short date.
-    assert!(shows(&harness, "back Sat, Oct 31"));
+    // A week on, beside it (#328).
+    assert!(shows(&harness, "in 7 days"));
     tick(&mut harness, "Milk")?;
     assert!(!checked(&harness, "Milk")?);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
-    assert!(!shows_part(&harness, "back Sat"));
+    assert!(!shows_part(&harness, "in 7 days"));
+    Ok(())
+}
+
+/// The rectangle of the last checkbox of the Line `text`.
+fn box_rect(
+    harness: &Harness<'_, App>,
+    text: &str,
+) -> Result<egui::Rect, Box<dyn std::error::Error>> {
+    Ok(boxes(harness, text)
+        .pop()
+        .ok_or(format!("{text:?}"))?
+        .rect())
+}
+
+#[test]
+fn struck_lines_show_the_soonest_back_first_with_when_beside_and_a_tick_waits_in_its_row()
+-> TestResult {
+    let (store, note, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    lists.make(&note)?;
+    lists.add(&note, "Tea", &utc)?;
+    for (text, time) in [
+        ("Milk", Reappear::After(3, ReappearUnit::Week)),
+        ("Bread", Reappear::After(1, ReappearUnit::Week)),
+        ("Apples", Reappear::After(1, ReappearUnit::Day)),
+    ] {
+        lists.set_reappear(&line_id(&store, &note, text)?, time)?;
+    }
+    for text in ["Milk", "Tea", "Apples"] {
+        lists.check(&line_id(&store, &note, text)?, &utc)?;
+    }
+    let mut harness = window(&store, None);
+    click(&mut harness, "3 struck through")?;
+    // The soonest back first, Tea without a time last (#328).
+    let top = |harness: &Harness<'_, App>, text: &str| box_rect(harness, text).map(|r| r.top());
+    assert!(top(&harness, "Apples")? < top(&harness, "Milk")?);
+    assert!(top(&harness, "Milk")? < top(&harness, "Tea")?);
+    assert!(shows(&harness, "in 3 weeks"));
+    // Beside the Line, on its row at the right.
+    let tomorrow = harness.get_by_label("tomorrow").rect();
+    let apples = box_rect(&harness, "Apples")?;
+    assert!((tomorrow.center().y - apples.center().y).abs() < 4.0);
+    assert!(tomorrow.left() > apples.right() + 200.0);
+
+    // Clicked, Bread shows struck in its row until its save, then among
+    // the struck ones by its day back.
+    let fold = harness
+        .query_all_by_label("3 struck through")
+        .map(|n| n.rect().top())
+        .fold(f32::INFINITY, f32::min);
+    boxes(&harness, "Bread")
+        .pop()
+        .ok_or("Bread")?
+        .click_accesskit();
+    harness.step();
+    assert!(checked(&harness, "Bread")?);
+    assert!(top(&harness, "Bread")? < fold);
+    assert!(!shows(&harness, "in 7 days"));
+    harness.run();
+    assert!(shows(&harness, "4 struck through"));
+    assert!(top(&harness, "Apples")? < top(&harness, "Bread")?);
+    assert!(top(&harness, "Bread")? < top(&harness, "Milk")?);
+    assert!(shows(&harness, "in 7 days"));
     Ok(())
 }
 
@@ -337,18 +409,19 @@ fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestR
     assert!(boxes(&harness, "Bread").is_empty());
     click(&mut harness, "1 struck through")?;
     assert!(checked(&harness, "Bread")?);
-    assert!(shows(&harness, "back Sat, Oct 31"));
-    // Late on the day before: still struck.
+    assert!(shows(&harness, "in 7 days"));
+    // Late on the day before: still struck, back tomorrow.
     let eve = DateTime::parse_from_rfc3339("2026-10-30T23:50:00Z")?.timestamp();
     moment.store(eve, Ordering::SeqCst);
     harness.run();
     assert!(checked(&harness, "Bread")?);
+    assert!(shows(&harness, "tomorrow"));
     // Its day has begun: the window reads it again by itself.
     let midnight = DateTime::parse_from_rfc3339("2026-10-31T00:00:01Z")?.timestamp();
     moment.store(midnight, Ordering::SeqCst);
     harness.run();
     assert!(!checked(&harness, "Bread")?);
-    assert!(!shows_part(&harness, "back Sat"));
+    assert!(!shows_part(&harness, "tomorrow"));
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
     Ok(())
 }
@@ -502,6 +575,200 @@ fn lines_are_renamed_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
 }
 
 /// Gives each Line of the Shopping List of `note` a week (#195).
+/// Presses Alt with `key`.
+fn alt(harness: &mut Harness<'_, App>, key: egui::Key) {
+    harness.key_press_modifiers(egui::Modifiers::ALT, key);
+    harness.run();
+}
+
+/// A store, a Note of it and the window open on that Note.
+type Opened = (Arc<Store>, String, Harness<'static, App>);
+
+/// The Shopping List of [`SHOPPING`] with "Tea" after it and "Bread"
+/// struck, its window open on it.
+fn with_struck_bread() -> Result<Opened, Box<dyn std::error::Error>> {
+    let (store, note, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    lists.make(&note)?;
+    lists.add(&note, "Tea", &utc)?;
+    lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
+    let harness = window(&store, Some(&note));
+    Ok((store, note, harness))
+}
+
+#[test]
+fn alt_up_alt_down_and_the_menu_move_an_open_line_among_the_open_ones() -> TestResult {
+    let (_store, note, mut harness) = with_struck_bread()?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    // One place up, the cursor staying in it (#283).
+    into_line(&mut harness, "Tea")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Tea", "Apples", "✓ Bread"]
+    );
+    assert_eq!(rows(&harness), ["Milk", "Tea", "Apples", "Bread"]);
+    assert_eq!(focused(&harness).as_deref(), Some("Tea"));
+    alt(&mut harness, egui::Key::ArrowUp);
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Milk", "Apples", "✓ Bread"]
+    );
+    // Down to the last open one, never among the struck ones.
+    into_line(&mut harness, "Milk")?;
+    alt(&mut harness, egui::Key::ArrowDown);
+    alt(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Apples", "Milk", "✓ Bread"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Milk"));
+    // A struck Line stays, and so does the cursor.
+    into_line(&mut harness, "Bread")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Apples", "Milk", "✓ Bread"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Bread"));
+    // ⋮ names the keys, as far as the Line can go; a struck one has
+    // neither.
+    click(&mut harness, "More: Tea")?;
+    assert!(!shows(&harness, "Move up Alt+Up"));
+    assert!(shows(&harness, "Move down Alt+Down"));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    click(&mut harness, "More: Bread")?;
+    assert!(!shows(&harness, "Move up Alt+Up"));
+    assert!(!shows(&harness, "Move down Alt+Down"));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    click(&mut harness, "More: Milk")?;
+    click(&mut harness, "Move up Alt+Up")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Milk", "Apples", "✓ Bread"]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_line_checked_in_the_editor_stays_in_its_row_as_others_move_past_it() -> TestResult {
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    tick(&mut harness, "Bread")?;
+    assert_eq!(rows(&harness), ["Milk", "Bread", "Apples"]);
+    // Past Bread to just before Milk, the open one above it (#283).
+    into_line(&mut harness, "Apples")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(rows(&harness), ["Apples", "Milk", "Bread"]);
+    assert_eq!(texts(&harness, &note)?, ["Apples", "Milk", "✓ Bread"]);
+    // To the end of the open ones, after Milk's row.
+    alt(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Bread"]);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
+    // A new Line moves once it holds text, stored first.
+    to_end_of(&mut harness, "Apples")?;
+    press(&mut harness, egui::Key::Enter);
+    type_line(&mut harness, "Salt");
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Salt", "Apples", "✓ Bread"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Salt"));
+    Ok(())
+}
+
+/// Presses at `from`, moves a little, then to `to`, and lets go there,
+/// as a hand drags.
+fn drag(harness: &mut Harness<'_, App>, from: egui::Pos2, to: egui::Pos2) {
+    harness.run_steps(50);
+    harness.drag_at(from);
+    harness.run();
+    harness.hover_at(from + egui::vec2(0.0, 8.0));
+    harness.run();
+    harness.hover_at(to);
+    harness.run();
+    harness.event(egui::Event::PointerButton {
+        pos: to,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.run();
+}
+
+/// The middle of the handle of the Line `text`.
+fn handle(
+    harness: &Harness<'_, App>,
+    text: &str,
+) -> Result<egui::Pos2, Box<dyn std::error::Error>> {
+    let label = format!("Drag to move: {text}");
+    let node = harness
+        .query_all_by_label(&label)
+        .last()
+        .ok_or(format!("{label:?}"))?;
+    Ok(node.rect().center())
+}
+
+/// Just inside the top of the editor's row of the Line `text`, or with
+/// `under` just inside its bottom.
+fn edge(
+    harness: &Harness<'_, App>,
+    text: &str,
+    under: bool,
+) -> Result<egui::Pos2, Box<dyn std::error::Error>> {
+    let node = boxes(harness, text).pop().ok_or(format!("{text:?}"))?;
+    let rect = node.rect();
+    let y = if under {
+        rect.bottom() - 3.0
+    } else {
+        rect.top() + 3.0
+    };
+    Ok(egui::pos2(rect.right() + 40.0, y))
+}
+
+#[test]
+fn an_open_line_is_dragged_by_its_handle_among_the_open_ones() -> TestResult {
+    let (_store, note, mut harness) = with_struck_bread()?;
+    // A struck Line has no handle (#283).
+    assert!(shows(&harness, "Drag to move: Tea"));
+    assert!(!shows(&harness, "Drag to move: Bread"));
+    let (from, to) = (handle(&harness, "Tea")?, edge(&harness, "Milk", false)?);
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Milk", "Apples", "✓ Bread"]
+    );
+    assert_eq!(rows(&harness), ["Tea", "Milk", "Apples", "Bread"]);
+    // After the last open one, not among the struck ones.
+    let (from, to) = (handle(&harness, "Tea")?, edge(&harness, "Apples", true)?);
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    // Where it stands, onto the struck one and away from the Lines, it
+    // stays.
+    let (from, to) = (handle(&harness, "Apples")?, edge(&harness, "Apples", true)?);
+    drag(&mut harness, from, to);
+    let (from, to) = (handle(&harness, "Milk")?, edge(&harness, "Bread", true)?);
+    drag(&mut harness, from, to);
+    let from = handle(&harness, "Milk")?;
+    drag(&mut harness, from, egui::pos2(from.x, 2300.0));
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    Ok(())
+}
+
 fn weekly(store: &Store, note: &str) -> TestResult {
     let lists = ShoppingLists::new(store);
     for line in list_of(store, note)?.lines {
@@ -564,14 +831,14 @@ fn the_line_badge_sets_the_reappear_time_and_the_menu_deletes_for_good() -> Test
     assert!(!shows(&harness, "After"));
     assert_eq!(badges(&harness)[0], "Reappear time: 3 months");
     tick(&mut harness, "Milk")?;
-    assert!(shows(&harness, "back Sun, Jan 24"));
+    assert!(shows(&harness, "in 3 months"));
     // Back to none: struck until a time is set.
     click_badge(&mut harness, 0)?;
     click(&mut harness, "None")?;
     assert_eq!(reappear(&harness)?, Reappear::Unset);
     click(&mut harness, "Close")?;
     assert!(list(&harness, &note)?.line(&milk).ok_or("Milk")?.struck);
-    assert!(!shows_part(&harness, "back "));
+    assert!(!shows_part(&harness, "in 3 months"));
 
     // Once: gone when checked.
     click_badge(&mut harness, 2)?;
@@ -588,16 +855,22 @@ fn the_line_badge_sets_the_reappear_time_and_the_menu_deletes_for_good() -> Test
     harness.key_press(egui::Key::Escape);
     harness.run();
 
-    // Deleting asks once, with the menu's words; Cancel keeps it.
+    // Deleting asks nothing (#268): the Line folds under "Removed
+    // Lines", whose Restore brings it back, and so does Ctrl+Z.
     click(&mut harness, "More: Bread")?;
     click(&mut harness, "Delete")?;
-    assert!(shows(&harness, "Delete this Line?"));
-    click(&mut harness, "Cancel")?;
-    assert_eq!(list(&harness, &note)?.count(), 2);
+    assert!(!shows(&harness, "Delete this Line?"));
+    assert_eq!(texts(&harness, &note)?, ["✓ Milk"]);
+    click(&mut harness, "Removed Lines")?;
+    assert!(shows(&harness, "Bread"));
+    click(&mut harness, "Restore")?;
+    assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
     click(&mut harness, "More: Bread")?;
-    click(&mut harness, "Delete")?;
     click(&mut harness, "Delete")?;
     assert_eq!(texts(&harness, &note)?, ["✓ Milk"]);
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
     Ok(())
 }
 
@@ -627,7 +900,6 @@ fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_entry_stores_it_fi
     press(&mut harness, egui::Key::Enter);
     type_line(&mut harness, "Salt");
     click(&mut harness, "More: Salt")?;
-    click(&mut harness, "Delete")?;
     click(&mut harness, "Delete")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Tea"]);
     assert!(!shows(&harness, "More: Salt"));
@@ -670,8 +942,13 @@ fn the_cards_menu_makes_a_shopping_list_and_turns_it_back() -> TestResult {
     click(&mut harness, "More: Weekly")?;
     assert!(shows(&harness, "Make it a Checklist"));
     click(&mut harness, "Make it a Shopping List")?;
-    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
-    click(&mut harness, "More: Weekly")?;
+    // Every line a Line (#309): the list has no name, and its card shows
+    // its kind instead.
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Weekly", "Milk", "Bread", "Apples"]
+    );
+    click(&mut harness, "More: Shopping List")?;
     assert!(!shows(&harness, "Make it a Shopping List"));
     assert!(!shows(&harness, "Make it a Checklist"));
     assert!(!shows(&harness, "Uncheck all"));
@@ -696,7 +973,7 @@ fn full_cards_check_lines_and_compact_cards_count_the_open_ones() -> TestResult 
     assert!(boxes(&harness, "Bread").is_empty());
     click(&mut harness, "1 struck through")?;
     assert!(checked(&harness, "Bread")?);
-    assert!(shows(&harness, "back Sat, Oct 31"));
+    assert!(shows(&harness, "in 7 days"));
     // The card's checkbox writes a check, never the Note's text.
     assert_eq!(
         Notes::new(harness.state().store())
@@ -999,7 +1276,7 @@ fn by_default_the_agenda_has_one_row_with_the_open_lines_of_the_list() -> TestRe
 }
 
 #[test]
-fn the_lines_choice_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
+fn the_lines_choice_checks_a_line_on_the_agenda_and_it_stays_struck_for_the_day() -> TestResult {
     let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
     // The list's name as the heading, its open Lines under it (#208).
     let heading = harness.get_by_role_and_label(Role::Button, "Weekly").rect();
@@ -1013,8 +1290,103 @@ fn the_lines_choice_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
+    // Struck under the open ones (#276); its box brings it back.
+    assert!(checked(&harness, "Bread")?);
+    assert!(!checked(&harness, "Milk")?);
+    let bread = harness.get_by_role_and_label(Role::Button, "Bread").rect();
+    let apples = harness.get_by_role_and_label(Role::Button, "Apples").rect();
+    assert!(apples.top() < bread.top());
+    tick(&mut harness, "Bread")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
+    assert!(!checked(&harness, "Bread")?);
+    Ok(())
+}
+
+#[test]
+fn a_line_checked_once_on_the_agenda_stays_struck_and_its_box_brings_it_back() -> TestResult {
+    let (mut harness, note) = agenda_with(|store, note| {
+        let lists = ShoppingLists::new(store);
+        lists.set_on_agenda(note, ShoppingOnAgenda::Lines)?;
+        lists.set_reappear(&line_id(store, note, "Milk")?, Reappear::Once)?;
+        Ok(())
+    })?;
+    tick(&mut harness, "Milk")?;
+    // Gone from the list, still struck on the Agenda for the day.
+    assert_eq!(texts(&harness, &note)?, ["Bread", "Apples"]);
+    assert!(checked(&harness, "Milk")?);
+    tick(&mut harness, "Milk")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
+    assert!(!checked(&harness, "Milk")?);
+    Ok(())
+}
+
+#[test]
+fn every_line_checked_today_stays_struck_but_its_count_does_not_show() -> TestResult {
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    for line in ["Milk", "Bread", "Apples"] {
+        tick(&mut harness, line)?;
+    }
+    assert!(shows_weekly(&harness));
+    for line in ["Milk", "Bread", "Apples"] {
+        assert!(checked(&harness, line)?, "{line}");
+    }
+    assert!(!shows(&harness, NOTHING_TODAY));
+    // As its count, with none open, the list does not show.
+    ShoppingLists::new(harness.state().store()).set_on_agenda(&note, ShoppingOnAgenda::Count)?;
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert!(!shows_weekly(&harness));
+    assert!(shows(&harness, NOTHING_TODAY));
+    Ok(())
+}
+
+#[test]
+fn hiding_whats_checked_takes_a_checked_line_off_the_agenda_at_once() -> TestResult {
+    let (mut harness, note) = agenda_with(|store, note| {
+        ShoppingLists::new(store).set_on_agenda(note, ShoppingOnAgenda::Lines)?;
+        oldbrainfix_core::DeviceSettings::new(store).set_agenda_hides_checked(true)?;
+        Ok(())
+    })?;
+    tick(&mut harness, "Bread")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
     assert!(boxes(&harness, "Bread").is_empty());
     assert!(!boxes(&harness, "Milk").is_empty());
+    Ok(())
+}
+
+#[test]
+fn the_heading_opens_the_list_in_a_new_line_before_the_struck_ones() -> TestResult {
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    tick(&mut harness, "Bread")?;
+    harness
+        .get_by_role_and_label(Role::Button, "Weekly")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert_eq!(rows(&harness), ["Milk", "Apples", "", "Bread"]);
+    harness.get_by(|n| n.is_focused()).type_text("Tea");
+    harness.run();
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    // Left unused, the new Line is dropped.
+    harness
+        .get_by_role_and_label(Role::Button, "Weekly")
+        .click();
+    harness.run();
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
     Ok(())
 }
 
@@ -1048,20 +1420,33 @@ fn the_off_choice_shows_no_shopping_list() -> TestResult {
 }
 
 #[test]
-fn a_list_without_open_lines_never_shows() -> TestResult {
-    for shows_as in [None, Some(ShoppingOnAgenda::Lines)] {
+fn a_list_without_open_lines_shows_only_its_lines_checked_today_one_by_one() -> TestResult {
+    let ways = [
+        (None, false),
+        (Some(ShoppingOnAgenda::Lines), false),
+        (Some(ShoppingOnAgenda::Lines), true),
+    ];
+    for (shows_as, hides) in ways {
         let (harness, _) = agenda_with(|store, note| {
             let lists = ShoppingLists::new(store);
             if let Some(shows) = shows_as {
                 lists.set_on_agenda(note, shows)?;
             }
+            oldbrainfix_core::DeviceSettings::new(store).set_agenda_hides_checked(hides)?;
             for line in ["Milk", "Bread", "Apples"] {
                 lists.check(&line_id(store, note, line)?, &utc)?;
             }
             Ok(())
         })?;
-        assert!(!shows_weekly(&harness), "{shows_as:?}");
-        assert!(shows(&harness, NOTHING_TODAY), "{shows_as:?}");
+        // Struck for the day where each Line shows and nothing checked
+        // is hidden (#276); never as a count of none open.
+        let shown = shows_as.is_some() && !hides;
+        let way = format!("{shows_as:?}, hiding {hides}");
+        assert_eq!(shows_weekly(&harness), shown, "{way}");
+        assert_eq!(shows(&harness, NOTHING_TODAY), !shown, "{way}");
+        if shown {
+            assert!(checked(&harness, "Milk")?, "{way}");
+        }
     }
     Ok(())
 }
@@ -1224,5 +1609,26 @@ fn the_settings_have_no_shopping_lists_on_the_agenda_any_more() -> TestResult {
     harness.run();
     assert!(!shows(&harness, "Shopping Lists on the Agenda"));
     assert!(!shows_part(&harness, "One row per Shopping List"));
+    Ok(())
+}
+
+#[test]
+fn a_line_ticks_in_the_frame_of_its_click_and_is_saved_in_the_next() -> TestResult {
+    // A tick shows at once (#338): in its place until it is saved.
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    weekly(&store, &note)?;
+    let mut harness = window(&store, Some(&note));
+    boxes(&harness, "Milk").pop().ok_or("Milk")?.click();
+    harness.step();
+    assert!(checked(&harness, "Milk")?);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Bread", "Apples"],
+        "saved in the next frame"
+    );
+    harness.run();
+    assert!(checked(&harness, "Milk")?);
+    assert_eq!(texts(&harness, &note)?, ["Bread", "Apples", "✓ Milk"]);
     Ok(())
 }

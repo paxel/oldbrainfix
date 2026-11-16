@@ -431,6 +431,15 @@ pub fn whole_media(
     shown
 }
 
+/// What a generated text was made from: a photo's Photo Text, a voice
+/// recording's Transcript or an attached file's Attachment Text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Made {
+    Photo,
+    Recording,
+    File,
+}
+
 /// What the editor offers under a photo or voice recording and its
 /// text, by its hash; nothing on a card.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -464,7 +473,7 @@ pub enum Generated {
 /// `hash`, one per line, in the phone's order: Replace and Append for a
 /// text that says something, Remove, and "again". Only "again" shows for
 /// a removed text, which has none.
-fn generated_buttons(
+pub fn generated_buttons(
     ui: &mut Ui,
     t: &L10n,
     hash: &str,

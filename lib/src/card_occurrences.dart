@@ -5,6 +5,7 @@ import 'agenda_group.dart';
 import 'l10n.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'tick_saves.dart';
 
 /// What a Note's card knows of its Occurrences today (#215): [read] gives
 /// them as [Routines.todayByNote] has them for the Note, read when the
@@ -15,8 +16,9 @@ typedef NoteOccurrences = ({
 });
 
 /// The boxes of a Note's card, in either view, for today's Occurrences of
-/// its Routines and Reminders (#215): of each its first one today not
-/// Done, else its last one, Done and struck through. A box ticks it as
+/// its Routines and Reminders (#215): of each its first one today
+/// neither Done nor skipped, else its last one, Done or skipped (#269)
+/// and struck through. A box ticks it as
 /// the Agenda row's does and opens nothing: it checks off and unchecks
 /// again, a Session's only shows Done, and one Done from every Line
 /// checked stays checked. Where this Device may not check it off, the box
@@ -35,7 +37,7 @@ class CardOccurrences extends StatefulWidget {
   State<CardOccurrences> createState() => _CardOccurrencesState();
 }
 
-class _CardOccurrencesState extends State<CardOccurrences> {
+class _CardOccurrencesState extends State<CardOccurrences> with TicksAtOnce {
   List<AgendaRow> _rows = const [];
 
   /// Whether the box of each of [_rows] ticks, read with them.
@@ -72,17 +74,30 @@ class _CardOccurrencesState extends State<CardOccurrences> {
     return !(lines != null && lines.count > 0 && lines.allChecked);
   }
 
+  /// Whether [row] shows Done: as its tap left it while the save waits
+  /// (#338), else as stored.
+  bool _done(AgendaRow row) =>
+      TickSaves.instance.waiting<bool>(_key(row)) ?? row.done != null;
+
+  String _key(AgendaRow row) =>
+      tickKey(routine: row.routine.id, occurrence: row.occurrence);
+
+  /// Ticks [row] at once and saves it after the frame (#338).
   void _toggle(AgendaRow row) {
     final routines = widget.occurrences.routines;
-    if (row.done == null) {
-      // Its Note may go to the trash with it (#211).
-      routines.checkOff(row.routine.id, row.occurrence);
-    } else {
-      routines.unmarkDone(row.routine.id, row.occurrence);
-    }
-    // Read anew, not from the list of cards, which still holds the old.
-    final rows = routines.todayByNote(deviceWallClock)[widget.noteId];
-    setState(() => _show(rows ?? const []));
+    final done = _done(row);
+    tickAtOnce(_key(row), !done, () {
+      if (!done) {
+        // Its Note may go to the trash with it (#211).
+        routines.checkOff(row.routine.id, row.occurrence);
+      } else {
+        routines.unmarkDone(row.routine.id, row.occurrence);
+      }
+      if (!mounted) return;
+      // Read anew, not from the list of cards, which still holds the old.
+      final rows = routines.todayByNote(deviceWallClock)[widget.noteId];
+      setState(() => _show(rows ?? const []));
+    });
   }
 
   @override
@@ -97,31 +112,36 @@ class _CardOccurrencesState extends State<CardOccurrences> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (final (i, row) in _rows.indexed)
-            Row(
-              key: ValueKey(
-                'card-occurrence-${row.routine.id}@${row.occurrence.key}',
-              ),
-              children: [
-                AgendaBox(
-                  value: row.done != null,
-                  label:
-                      '${t.markDone}: '
-                      '${occurrenceTime(t, locale, row.occurrence)}',
-                  onChanged: _ticks[i] ? (_) => _toggle(row) : null,
+            if (_done(row) case final done)
+              Row(
+                key: ValueKey(
+                  'card-occurrence-${row.routine.id}@${row.occurrence.key}',
                 ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    occurrenceTime(t, locale, row.occurrence),
-                    style: row.done == null
-                        ? text
-                        : text?.copyWith(
-                            decoration: TextDecoration.lineThrough,
-                          ),
+                children: [
+                  AgendaBox(
+                    value: done,
+                    label:
+                        '${t.markDone}: '
+                        '${occurrenceTime(t, locale, row.occurrence)}',
+                    onChanged: _ticks[i] ? (_) => _toggle(row) : null,
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      // A skipped one says so, struck as a Done one (#269).
+                      !done && row.skipped != null
+                          ? '${occurrenceTime(t, locale, row.occurrence)} · '
+                                '${t.occurrenceSkipped}'
+                          : occurrenceTime(t, locale, row.occurrence),
+                      style: !done && row.skipped == null
+                          ? text
+                          : text?.copyWith(
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
         ],
       ),
     );

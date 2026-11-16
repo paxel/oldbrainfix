@@ -3,7 +3,8 @@
 //! is typed, the known units it may mean suggested under it in this
 //! Device's system (#159); the Note dialog holds only the setup, each
 //! field's settings as badges (#190); the detailed card has "Add entry",
-//! which opens the entry page prefilled with the targets, charts each
+//! which opens the entry page prefilled with the targets, a field
+//! without one with the latest own value, selected (#276), charts each
 //! field, lists the entries newest first, the older folded, and edits,
 //! deletes and restores entries; a hidden field comes back with its
 //! values; the unit setting follows the region until chosen; in a Shared
@@ -396,6 +397,63 @@ fn add_entry_prefills_the_targets_and_one_click_saves_them() -> TestResult {
 }
 
 #[test]
+fn a_field_without_a_target_starts_with_the_latest_own_value_selected() -> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    let weight = tallies.add_field(&note, "Weight", "kg", None, None)?;
+    let push = tallies.add_field(&note, "Push-ups", "times", Some(20.0), None)?;
+    tallies.add_field(&note, "Pages", "pages", None, None)?;
+    tallies.add(&note, &BTreeMap::from([(weight.clone(), 80.0)]), "", None)?;
+    // A newer entry without a weight: the latest that holds one counts.
+    tallies.add(&note, &BTreeMap::from([(push.clone(), 15.0)]), "", None)?;
+    let mut harness = window(&store, Some(&note));
+    click_button(&mut harness, "Add entry");
+    assert_eq!(holds(&harness, "Weight").as_deref(), Some("80"));
+    assert_eq!(holds(&harness, "Push-ups").as_deref(), Some("20"));
+    assert_eq!(holds(&harness, "Pages").as_deref(), Some(""));
+    // The first field has the keyboard, its value selected: typing
+    // replaces it.
+    assert!(field(&harness, "Weight").is_focused());
+    field(&harness, "Weight").type_text("79");
+    harness.run();
+    assert_eq!(holds(&harness, "Weight").as_deref(), Some("79"));
+    click_button(&mut harness, "Save");
+    let entries = tallies.entries(&note, &Default::default())?;
+    assert_eq!(entries.len(), 3);
+    assert_eq!(
+        entries[0].values,
+        BTreeMap::from([(weight.clone(), 79.0), (push.clone(), 20.0)])
+    );
+    // Left as it opened, it writes nothing.
+    click_button(&mut harness, "Add entry");
+    assert_eq!(holds(&harness, "Weight").as_deref(), Some("79"));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(!shows(&harness, "New entry"));
+    assert_eq!(tallies.entries(&note, &Default::default())?.len(), 3);
+    // Clicked into, the value is selected as well.
+    click_button(&mut harness, "Add entry");
+    field(&harness, "Push-ups").click();
+    harness.run();
+    field(&harness, "Weight").click();
+    harness.run();
+    field(&harness, "Weight").type_text("81");
+    harness.run();
+    assert_eq!(holds(&harness, "Weight").as_deref(), Some("81"));
+    // Once changed, it is a value as any other.
+    field(&harness, "Push-ups").click();
+    harness.run();
+    field(&harness, "Weight").click();
+    harness.run();
+    harness.key_press(egui::Key::End);
+    harness.run();
+    field(&harness, "Weight").type_text("5");
+    harness.run();
+    assert_eq!(holds(&harness, "Weight").as_deref(), Some("815"));
+    Ok(())
+}
+
+#[test]
 fn an_entry_with_nothing_in_it_asks_for_a_value_or_a_line() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
@@ -460,7 +518,7 @@ fn a_day_moved_across_a_change_of_the_clocks_keeps_its_time_of_day() -> TestResu
 }
 
 #[test]
-fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult {
+fn deleting_an_entry_asks_nothing_and_removed_entries_bring_it_back() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     let pages = tallies.add_field(&note, "Pages", "pages", None, None)?;
@@ -476,17 +534,7 @@ fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult
     // Picked as a screen reader does, the menu closes all the same.
     click(&mut harness, "Delete")?;
     assert_eq!(edits(&harness), before);
-    assert!(shows(
-        &harness,
-        "Delete this entry? It can be restored under \"Removed entries\"."
-    ));
-    assert!(
-        !tallies
-            .entry_by_id(&entry.id)?
-            .ok_or("the entry")?
-            .is_trashed()
-    );
-    click(&mut harness, "Delete")?;
+    assert!(!shows_part(&harness, "Delete this entry?"));
     assert!(
         tallies
             .entry_by_id(&entry.id)?
@@ -514,7 +562,7 @@ fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult
 }
 
 #[test]
-fn the_entry_page_deletes_after_asking_too() -> TestResult {
+fn the_entry_page_deletes_without_asking_and_ctrl_z_brings_it_back() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     tallies.add_field(&note, "Pages", "pages", None, None)?;
@@ -523,7 +571,6 @@ fn the_entry_page_deletes_after_asking_too() -> TestResult {
     entry_row(&harness, "Skimmed").click_accesskit();
     harness.run();
     click_button(&mut harness, "Delete");
-    click(&mut harness, "Delete")?;
     assert!(
         tallies
             .entry_by_id(&entry.id)?
@@ -531,6 +578,14 @@ fn the_entry_page_deletes_after_asking_too() -> TestResult {
             .is_trashed()
     );
     assert!(!shows(&harness, "Entry"), "the page closes");
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert!(
+        !tallies
+            .entry_by_id(&entry.id)?
+            .ok_or("the entry")?
+            .is_trashed()
+    );
     Ok(())
 }
 

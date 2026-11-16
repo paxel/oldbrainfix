@@ -47,7 +47,40 @@ void main() {
       '#garten',
       '#garten',
     ]);
-    expect(_written('#a#b #c/d #e\'s'), ['#a', '#c', '#e']);
+    expect(_written('#a#b #c/d #e\'s'), ['#a', '#c/d', '#e']);
+  });
+
+  test('a / parts a nested tag, each part starting as a tag does', () {
+    expect(_tags('#life/health/back #Life/Work'), [
+      ('#life/health/back', '#life/health/back'),
+      ('#Life/Work', '#life/work'),
+    ]);
+    expect(_written('#a/ #a-/ #a/- #a/-b #a//b #a/b#c #a/b/ (#a/b). #a-/b'), [
+      '#a',
+      '#a',
+      '#a',
+      '#a',
+      '#a',
+      '#a/b',
+      '#a/b',
+      '#a/b',
+      '#a-/b',
+    ]);
+    expect(_written('#q1/2026 #2026/q1 #to-do/x_y'), [
+      '#q1/2026',
+      '#2026/q1',
+      '#to-do/x_y',
+    ]);
+  });
+
+  test('a / before the first letter, or numbers alone, make no tag', () {
+    expect(_written('#/a #1/2 #2024/05 # /a #-/a'), isEmpty);
+  });
+
+  test('a # after a / stays no tag, in a web address too', () {
+    expect(_written('x/#a https://example.org/#top/a page.html#a/b #a/#b'), [
+      '#a',
+    ]);
   });
 
   test('a - inside counts, at its end it does not', () {

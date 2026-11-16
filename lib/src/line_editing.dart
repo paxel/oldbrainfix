@@ -683,6 +683,21 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
     });
   }
 
+  /// Puts the cursor into a new empty row at [at] of [rows], as a list
+  /// opened from its group on the Agenda starts (#276), or into the
+  /// empty new row there is already, as a new list starts with one.
+  /// Nothing where this Device may not add Lines. Left unused, the row
+  /// goes as the editor is left.
+  void startRowAt(int at) {
+    if (!mayAddLine || !linesWritable) return;
+    for (final row in rows) {
+      if (row.id == null && row.typed.isEmpty) return focusOn(row, 0);
+    }
+    final row = newRow();
+    setState(() => rows = [...rows]..insert(at.clamp(0, rows.length), row));
+    focusOn(row, 0);
+  }
+
   /// Puts the cursor into the empty row of a list without Lines, as a
   /// new list starts.
   void focusEmptyRow() {

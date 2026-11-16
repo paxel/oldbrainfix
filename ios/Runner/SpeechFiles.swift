@@ -14,10 +14,16 @@ enum SpeechFiles {
   /// Whisper's own rate.
   static let whisperRate = 16_000
 
-  /// How many threads Whisper (and RustO) get on [cores] cores: one is
-  /// left for the app, at most four.
+  /// How many threads RustO gets on [cores] cores: one is left for the
+  /// app, at most four.
   static func threads(cores: Int) -> Int {
     min(max(cores - 1, 1), 4)
+  }
+
+  /// How many threads Whisper gets on [cores] cores: at most two, so the
+  /// app stays quick while it transcribes (obf-1030).
+  static func whisperThreads(cores: Int) -> Int {
+    min(max(cores, 1), 2)
   }
 
   /// [bytes] as lowercase hex.

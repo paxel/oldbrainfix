@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:02:42.000Z",
+  "now": "2026-01-02T10:03:25.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -31,7 +31,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:0000000000000000000000000000000a",
@@ -61,7 +61,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "checklist"
     },
     {
       "id": "note:00000000000000000000000000000012",
@@ -91,7 +91,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:0000000000000000000000000000001c",
@@ -152,9 +152,71 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000001f",
+      "text": "Shopping:",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:43.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "shoppingList"
+    },
+    {
+      "id": "note:00000000000000000000000000000023",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:03:04.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "shoppingList"
     }
   ],
   "all": [
+    "note:00000000000000000000000000000023",
+    "note:0000000000000000000000000000001f",
     "note:0000000000000000000000000000001e",
     "note:0000000000000000000000000000001c",
     "note:00000000000000000000000000000012",
@@ -167,6 +229,8 @@
   "trashed": [],
   "inside": {},
   "sections": {
+    "note:00000000000000000000000000000023": [],
+    "note:0000000000000000000000000000001f": [],
     "note:0000000000000000000000000000001e": [],
     "note:0000000000000000000000000000001c": [],
     "note:00000000000000000000000000000012": [],
@@ -177,6 +241,18 @@
   "unreadPhotos": [],
   "removable": {},
   "shares": {
+    "note:00000000000000000000000000000023": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": ""
+    },
+    "note:0000000000000000000000000000001f": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Shopping:"
+    },
     "note:0000000000000000000000000000001e": {
       "html": null,
       "photos": [],
@@ -210,6 +286,8 @@
   },
   "search": {
     "": [
+      "note:00000000000000000000000000000023",
+      "note:0000000000000000000000000000001f",
       "note:0000000000000000000000000000001e",
       "note:0000000000000000000000000000001c",
       "note:00000000000000000000000000000012",
@@ -227,6 +305,7 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:00000000000000000000000000000023",
       "note:0000000000000000000000000000001e",
       "note:00000000000000000000000000000012",
       "note:0000000000000000000000000000000a",

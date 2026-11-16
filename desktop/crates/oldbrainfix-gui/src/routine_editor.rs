@@ -11,7 +11,9 @@
 //! A Routine of a Session Note only says when it runs it: the setup lies
 //! on the Note, on its page (#191), and making a plain Note a Session
 //! shows the setup alone ([`RoutineEditor::make_session`]). Save
-//! writes it; leaving without saving drops the edit. Opened from a
+//! writes it, and so does leaving it by Esc, a click beside it or back
+//! with a change that can be saved (#275, [`crate::leave_saves`]); Cancel
+//! drops the edit. Opened from a
 //! capture for the Note not written yet (#113), Save hands back what was
 //! set up instead ([`RoutineEditor::choice`]), as the phone's
 //! `chooseSchedule`. A saved Routine has History beside its heading, as
@@ -22,17 +24,22 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
+use oldbrainfix_core::schedule::WallClock;
 use oldbrainfix_core::schedule::WeekdayRule;
-use oldbrainfix_core::schedule_sentence::{self, SimpleSchedule};
+use oldbrainfix_core::schedule_sentence::{
+    self, QuickChip, QuickReminder, SentenceNow, SimpleSchedule,
+};
+use oldbrainfix_core::settings::{DEFAULT_DAY_START, DeviceSettings};
 use oldbrainfix_core::{
     ClockTime, Day, Note, Notes, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit,
     Routine, Routines, Schedule, SimpleRepeat, Store,
 };
 
 use crate::app::{chip_row, embossed, icon_button, pill};
-use crate::capture_choices::ScheduleChoice;
+use crate::capture_choices::{ScheduleChoice, SessionChoice};
 use crate::icons;
 use crate::l10n::L10n;
+use crate::leave_saves::Leaving;
 use crate::schedule_text::{
     clock_text, day_text, occurrence_time, schedule_text, weekday_long, weekday_text,
 };
@@ -51,11 +58,32 @@ const PREVIEW: usize = 3;
 /// The most times a repeat can end after, as on the phone.
 const MAX_COUNT: i64 = 99_999;
 
+/// Now by the store's clock on `wall`, with this Device's day start: what
+/// the sentence's relative words and a new Reminder's chips are read at
+/// (#271). Asked anew each frame; while the day start cannot be read, at
+/// 09:00.
+pub fn sentence_now(store: &Store, wall: &WallClock) -> SentenceNow {
+    DeviceSettings::new(store)
+        .sentence_now(wall)
+        .unwrap_or_else(|_| SentenceNow::at(wall(store.now()), DEFAULT_DAY_START))
+}
+
+/// The label of a new Reminder's chip, with its time (#271).
+pub fn quick_label(t: &L10n, quick: &QuickReminder) -> String {
+    let time = clock_text(quick.time);
+    match quick.chip {
+        QuickChip::InAnHour => t.quick_in_an_hour(&time),
+        QuickChip::Tonight => t.quick_tonight(&time),
+        QuickChip::Tomorrow => t.quick_tomorrow(&time),
+        QuickChip::InAWeek => t.quick_in_a_week(&time),
+    }
+}
+
 /// What the user asked of the editor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Intent {
     Save,
-    /// Delete, after asking.
+    /// Delete, without asking; Ctrl+Z brings it back (#268).
     Delete,
     Close,
     /// Show the Note it comes from.
@@ -131,6 +159,12 @@ pub struct RoutineEditor {
     /// Whether the sentence is being typed: its line has the keyboard,
     /// or had it when a click began, which may be on a suggestion.
     sentence_typing: bool,
+    /// Whether its first field still waits for the keyboard it takes as
+    /// it opens (#277): the text, else the sentence.
+    focus_first: bool,
+    /// A new Reminder's chips as last shown (#271): drawn a frame on, so
+    /// a click lands on the chip it was aimed at though one went since.
+    quick_shown: Vec<QuickReminder>,
     /// A new Session's part.
     session: Option<SessionDraft>,
     /// Whether it makes its plain Note a Session, its setup alone,
@@ -147,6 +181,23 @@ pub struct RoutineEditor {
     /// and said when missing, which `name_missing` holds.
     named: bool,
     name_missing: bool,
+    /// What Save writes, as the editor opened, to tell on leaving whether
+    /// anything changed (#275).
+    opened: Edited,
+}
+
+/// What Save writes of the editor, to compare with how it opened: the
+/// schedule, or while there is none the rule typed, Re-nag, Escalation,
+/// the text and a Session's part; not the view, such as the sentence,
+/// the time being typed or the pool's filter.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct Edited {
+    schedule: Option<Schedule>,
+    rule: Option<(bool, String)>,
+    renag: Option<i64>,
+    escalation: Option<i64>,
+    text: String,
+    session: Option<SessionChoice>,
 }
 
 impl RoutineEditor {
@@ -211,15 +262,18 @@ impl RoutineEditor {
             sentence_unknown: Vec::new(),
             sentence_shown: None,
             sentence_typing: false,
+            focus_first: true,
+            quick_shown: Vec::new(),
             session: None,
             makes: false,
             history: false,
             place: None,
             named: false,
             name_missing: false,
+            opened: Edited::default(),
         };
         editor.update();
-        editor
+        editor.opened_now()
     }
 
     /// The New Session page (#161): its name, its pool of `draft` with
@@ -240,7 +294,7 @@ impl RoutineEditor {
         draft.new_tally = true;
         editor.session = Some(draft);
         editor.update();
-        editor
+        editor.opened_now()
     }
 
     /// The setup's page of a Session made of the plain Note `note` from
@@ -262,7 +316,7 @@ impl RoutineEditor {
         let mut draft = draft;
         draft.new_tally = true;
         editor.session = Some(draft);
-        editor
+        editor.opened_now()
     }
 
     /// Whether it makes its plain Note a Session (#191).
@@ -302,7 +356,7 @@ impl RoutineEditor {
     /// Makes it a new Session, `draft` for its part.
     pub fn with_session(mut self, draft: SessionDraft) -> RoutineEditor {
         self.session = Some(draft);
-        self
+        self.opened_now()
     }
 
     /// The Session's part, when it is one.
@@ -358,19 +412,80 @@ impl RoutineEditor {
             sentence_unknown: Vec::new(),
             sentence_shown: None,
             sentence_typing: false,
+            focus_first: true,
+            quick_shown: Vec::new(),
             session: None,
             makes: false,
             history: !routine.is_reminder(),
             place: None,
             named: false,
             name_missing: false,
+            opened: Edited::default(),
         };
         match SimpleRepeat::of(schedule.rule.as_ref()) {
             Some(simple) => editor.take_simple(&simple),
             None => editor.advanced = true,
         }
         editor.update();
-        editor
+        editor.opened_now()
+    }
+
+    /// What Save writes of it now.
+    fn edited(&self) -> Edited {
+        Edited {
+            schedule: self.schedule.clone(),
+            rule: self
+                .schedule
+                .is_none()
+                .then(|| (self.advanced, self.rule.trim().to_string())),
+            renag: self.renag,
+            escalation: self.escalation,
+            text: self.text.trim().to_string(),
+            session: self.session.as_ref().map(SessionDraft::choice),
+        }
+    }
+
+    /// Gives `field`, the first field shown, the keyboard as the editor
+    /// opens; asked again past the dialog's first, sizing pass, which
+    /// drops it.
+    fn take_first_focus(&mut self, ui: &Ui, field: &egui::Response) {
+        if self.focus_first {
+            field.request_focus();
+            self.focus_first = ui.is_sizing_pass() || !field.has_focus();
+        }
+    }
+
+    /// Takes what it holds now as how it opened.
+    fn opened_now(mut self) -> RoutineEditor {
+        self.opened = self.edited();
+        self
+    }
+
+    /// Whether anything Save writes differs from how it opened (#275).
+    pub fn changed(&self) -> bool {
+        self.edited() != self.opened
+    }
+
+    /// Whether leaving may save (#275): what Save takes, a Session's part
+    /// and name that need no fixing, and a schedule that still happens,
+    /// unless it is the one it opened with, such as a past Reminder's.
+    pub fn leave_valid(&self) -> bool {
+        self.can_save()
+            && self.session.as_ref().is_none_or(SessionDraft::valid)
+            && !(self.named && self.text.trim().is_empty())
+            && (self.makes || !self.next.is_empty() || self.schedule == self.opened.schedule)
+    }
+
+    /// What leaving it comes to (#275).
+    pub fn leaving(&self) -> Leaving {
+        Leaving::of(self.changed(), self.leave_valid())
+    }
+
+    /// Keep editing after "Discard changes?": a missing name and a
+    /// Session's part to fix say so under their fields, as Save does.
+    pub fn show_what_to_fix(&mut self) {
+        self.name_missing = self.named && self.text.trim().is_empty();
+        self.session_to_fix();
     }
 
     fn take_simple(&mut self, simple: &SimpleRepeat) {
@@ -457,19 +572,47 @@ impl RoutineEditor {
     }
 
     /// Reads `text` typed into the schedule's sentence in the language
-    /// of `t`: a schedule it reads fills the chips and times, the parts
-    /// not understood are marked and change nothing (#227).
-    pub fn type_sentence(&mut self, t: &L10n, text: &str) {
+    /// of `t`, its relative words at `now` (#271): a schedule it reads
+    /// fills the chips and times, the parts not understood are marked and
+    /// change nothing (#227).
+    pub fn type_sentence(&mut self, t: &L10n, text: &str, now: &SentenceNow) {
         self.sentence = text.to_string();
-        let read = schedule_sentence::read(text, t.locale(), self.today);
+        let read = schedule_sentence::read_at(text, t.locale(), now);
         self.sentence_unknown = read.unknown;
         if let Some(schedule) = read.schedule {
-            self.start = schedule.start;
-            self.start_text = schedule.start.to_string();
-            self.times.clone_from(&schedule.times);
-            self.take_simple(&schedule.repeat);
+            self.take_schedule(&schedule);
             self.sentence_shown = Some(schedule);
-            self.update();
+        }
+    }
+
+    /// Fills the chips and times with `schedule`.
+    fn take_schedule(&mut self, schedule: &SimpleSchedule) {
+        self.start = schedule.start;
+        self.start_text = schedule.start.to_string();
+        self.times.clone_from(&schedule.times);
+        self.take_simple(&schedule.repeat);
+        self.update();
+    }
+
+    /// Whether it offers the chips In 1 h, Tonight, Tomorrow and In a
+    /// week (#271): a new Reminder, or a new Routine set to Once, in the
+    /// simple mode; not a Session or its setup.
+    pub fn offers_quick(&self) -> bool {
+        self.routine.is_none()
+            && self.session.is_none()
+            && !self.makes
+            && !self.advanced
+            && self.kind == RepeatKind::Once
+    }
+
+    /// Sets the Reminder of `chip`, read again at `now`; a chip gone
+    /// since, as Tonight from 19:00 on, sets nothing.
+    pub fn take_quick(&mut self, chip: QuickChip, now: &SentenceNow) {
+        if let Some(quick) = schedule_sentence::quick_reminders(now)
+            .into_iter()
+            .find(|q| q.chip == chip)
+        {
+            self.take_schedule(&quick.schedule());
         }
     }
 
@@ -647,14 +790,16 @@ impl RoutineEditor {
         Ok(Some(id))
     }
 
-    /// Draws the editor, `shown_now` being the time on the wall clock;
-    /// what was asked of it.
+    /// Draws the editor, `shown_now` being the time on the wall clock and
+    /// `now` what the sentence and the chips are read at
+    /// ([`sentence_now`]); what was asked of it.
     pub fn show(
         &mut self,
         ui: &mut Ui,
         t: &L10n,
         tones: Tones,
         shown_now: NaiveDateTime,
+        now: &SentenceNow,
     ) -> Option<Intent> {
         let mut intent = None;
         let mut changed = false;
@@ -697,6 +842,7 @@ impl RoutineEditor {
                             )
                             .labelled_by(label.id);
                         crate::text_menu::show(ui, t, &field, &self.text);
+                        self.take_first_focus(ui, &field);
                         if self.name_missing {
                             let error = ui.visuals().error_fg_color;
                             ui.label(RichText::new(t.kind_name_missing()).color(error));
@@ -717,6 +863,7 @@ impl RoutineEditor {
                                 .frame(egui::Frame::NONE),
                         );
                         crate::text_menu::show(ui, t, &field, &self.text);
+                        self.take_first_focus(ui, &field);
                         return;
                     }
                     ui.label(RichText::new(t.from_note()).strong().color(text));
@@ -765,7 +912,7 @@ impl RoutineEditor {
                 }
                 // Making a Note a Session sets it up alone (#191).
                 if !self.makes {
-                    changed |= self.schedule_panels(ui, t, tones, (once, shown_now));
+                    changed |= self.schedule_panels(ui, t, tones, (once, shown_now, now));
                 }
                 ui.horizontal(|ui| {
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
@@ -775,13 +922,18 @@ impl RoutineEditor {
                     {
                         intent = Some(Intent::Delete);
                     }
-                    if theme::primary(ui, self.can_save(), t.save()).clicked() {
+                    if theme::main_action(ui, self.can_save(), t.save()) {
                         intent = Some(Intent::Save);
                     }
                 });
             });
         if changed {
             self.update();
+        }
+        // Asked as it opens only: with no field to take it, a field
+        // shown later does not pull the keyboard in.
+        if !ui.is_sizing_pass() {
+            self.focus_first = false;
         }
         intent
     }
@@ -794,12 +946,13 @@ impl RoutineEditor {
         ui: &mut Ui,
         t: &L10n,
         tones: Tones,
-        (once, shown_now): (bool, NaiveDateTime),
+        (once, shown_now, now): (bool, NaiveDateTime, &SentenceNow),
     ) -> bool {
         let text = ui.visuals().text_color();
         let mut changed = false;
         embossed(ui, tones, false, None, |ui| {
-            changed |= self.sentence_line(ui, t);
+            changed |= self.sentence_line(ui, t, now);
+            changed |= self.quick_line(ui, t, now);
             let mut advanced = self.advanced;
             let modes = [
                 (false, t.schedule_simple().to_string()),
@@ -842,7 +995,7 @@ impl RoutineEditor {
     /// as suggestions under it and the words not understood marked; on
     /// an Advanced schedule a summary, read-only. Whether it changed the
     /// schedule.
-    fn sentence_line(&mut self, ui: &mut Ui, t: &L10n) -> bool {
+    fn sentence_line(&mut self, ui: &mut Ui, t: &L10n, now: &SentenceNow) -> bool {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let error = ui.visuals().error_fg_color;
@@ -899,9 +1052,12 @@ impl RoutineEditor {
             )
             .labelled_by(label.id);
         crate::text_menu::show(ui, t, &field, &typed);
+        if simple {
+            self.take_first_focus(ui, &field);
+        }
         let mut changed = false;
         if simple && field.changed() {
-            self.type_sentence(t, &typed);
+            self.type_sentence(t, &typed, now);
             changed = true;
         }
         if !simple {
@@ -954,12 +1110,48 @@ impl RoutineEditor {
                     &format!("{}{space}", suggestion.text),
                 );
                 let at = suggestion.range.start + suggestion.text.len() + 1;
-                self.type_sentence(t, &typed);
+                self.type_sentence(t, &typed, now);
                 crate::format_bar::select(ui, id, &self.sentence, (at, at));
                 changed = true;
             }
         }
         changed
+    }
+
+    /// A new Reminder's chips under the When line (#271), each with its
+    /// time: shortcuts that set the schedule, then Save, not a choice, so
+    /// none shows as picked. Whether one changed the schedule.
+    fn quick_line(&mut self, ui: &mut Ui, t: &L10n, now: &SentenceNow) -> bool {
+        if !self.offers_quick() {
+            return false;
+        }
+        let text = ui.visuals().text_color();
+        let fresh = schedule_sentence::quick_reminders(now);
+        if self.quick_shown.is_empty() {
+            self.quick_shown.clone_from(&fresh);
+        }
+        let mut picked = None;
+        ui.horizontal_wrapped(|ui| {
+            for quick in &self.quick_shown {
+                // Its own id, so a key meant for Tonight never lands on
+                // Tomorrow once Tonight is gone.
+                let button = ui.push_id(quick.chip, |ui| {
+                    ui.button(RichText::new(quick_label(t, quick)).color(text))
+                });
+                if button.inner.clicked() {
+                    picked = Some(quick.chip);
+                }
+            }
+        });
+        if self.quick_shown != fresh {
+            self.quick_shown = fresh;
+            ui.ctx().request_repaint();
+        }
+        let Some(chip) = picked else {
+            return false;
+        };
+        self.take_quick(chip, now);
+        true
     }
 
     fn switch_mode(&mut self, advanced: bool) {
@@ -1368,108 +1560,4 @@ fn day_stepper(ui: &mut Ui, t: &L10n, day: &mut Day, text: &mut String, id: &str
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn utc_wall(utc: DateTime<Utc>) -> NaiveDateTime {
-        utc.naive_utc()
-    }
-
-    fn now() -> DateTime<Utc> {
-        oldbrainfix_core::parse_time("2026-10-24T07:30:00.000Z").unwrap_or_default()
-    }
-
-    #[test]
-    fn a_new_reminder_starts_at_the_next_full_hour() {
-        let editor = RoutineEditor::new(None, true, now(), &utc_wall, Duration::minutes(10));
-        assert!(editor.once());
-        assert_eq!(
-            editor.times,
-            ClockTime::new(8, 0).into_iter().collect::<Vec<_>>()
-        );
-        assert_eq!(editor.start, Day::new(2026, 10, 24));
-        // No Note and no text: nothing to save yet.
-        assert!(!editor.can_save());
-    }
-
-    #[test]
-    fn a_new_routine_starts_every_day_all_day() {
-        let editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10));
-        assert!(!editor.once());
-        assert!(editor.times.is_empty());
-        assert_eq!(editor.start, Day::new(2026, 10, 24));
-    }
-
-    #[test]
-    fn modes_carry_the_rule_across() {
-        let mut editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10));
-        editor.kind = RepeatKind::Weekdays;
-        editor.weekdays = [1, 6].into_iter().collect();
-        editor.switch_mode(true);
-        editor.update();
-        assert_eq!(editor.rule, "FREQ=WEEKLY;BYDAY=MO,SA");
-        editor.rule = "FREQ=MONTHLY;BYDAY=1MO".into();
-        editor.update();
-        assert!(editor.schedule().is_some());
-        editor.rule = "FREQ=HOURLY".into();
-        editor.update();
-        assert_eq!(editor.rule_error.as_deref(), Some("HOURLY"));
-        assert!(editor.schedule().is_none());
-        editor.rule = "FREQ=DAILY;INTERVAL=3".into();
-        editor.switch_mode(false);
-        editor.update();
-        assert_eq!(
-            (editor.kind, editor.every, editor.unit),
-            (RepeatKind::Every, 3, RepeatUnit::Days)
-        );
-    }
-
-    #[test]
-    fn the_monthly_kinds_and_ends_stay_in_the_simple_mode() {
-        let mut editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10));
-        for rule in [
-            "FREQ=MONTHLY;INTERVAL=2;COUNT=5;BYDAY=-1FR",
-            "FREQ=MONTHLY;UNTIL=20270131;BYMONTHDAY=31",
-            "FREQ=WEEKLY;COUNT=8;BYDAY=MO,TH",
-        ] {
-            editor.advanced = true;
-            editor.rule = rule.into();
-            editor.update();
-            editor.switch_mode(false);
-            editor.update();
-            assert!(!editor.advanced, "{rule}");
-            let Some(rule_back) = editor.simple_rule() else {
-                panic!("a rule for {rule}")
-            };
-            assert_eq!(rule_back.format(), rule);
-        }
-        assert_eq!(editor.end, RepeatEnd::Count);
-        assert_eq!(editor.count, 8);
-        // The last-Friday kind kept its choices while another was shown.
-        editor.kind = RepeatKind::MonthWeekday;
-        assert_eq!((editor.ordinal, editor.nth_weekday), (Some(-1), Some(5)));
-    }
-
-    #[test]
-    fn a_new_monthly_repeat_starts_from_the_start_day() {
-        // Saturday, 24 October 2026: the fourth Saturday of its month.
-        let mut editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10));
-        editor.kind = RepeatKind::MonthWeekday;
-        editor.update();
-        assert_eq!(
-            editor.simple_rule().map(|r| r.format()).as_deref(),
-            Some("FREQ=MONTHLY;BYDAY=4SA")
-        );
-        editor.kind = RepeatKind::MonthDay;
-        editor.end = RepeatEnd::Until;
-        editor.update();
-        // A month after the start while no end day is chosen.
-        assert_eq!(
-            editor.simple_rule().map(|r| r.format()).as_deref(),
-            Some("FREQ=MONTHLY;UNTIL=20261124;BYMONTHDAY=24")
-        );
-        // The 31st of October is a fifth weekday: the last.
-        assert_eq!(RoutineEditor::ordinal_of(Day::new(2026, 10, 31)), -1);
-        assert_eq!(RoutineEditor::ordinal_of(Day::new(2026, 10, 28)), 4);
-    }
-}
+mod tests;

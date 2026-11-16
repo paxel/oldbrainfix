@@ -1,0 +1,134 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000002",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:03.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:03.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "captured",
+          "before": null,
+          "after": "Lease",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:16.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:22.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:22.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "captured",
+          "before": null,
+          "after": "Bills",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:42.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:33.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "captured",
+          "before": null,
+          "after": "Moving",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:37.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "captured",
+          "before": null,
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:50.000Z",
+          "entity": "note:00000000000000000000000000000007",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:44.000Z",
+          "entity": "note:00000000000000000000000000000007",
+          "kind": "captured",
+          "before": null,
+          "after": "Old",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

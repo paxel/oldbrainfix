@@ -65,3 +65,21 @@ class WidgetLinksTests: XCTestCase {
     XCTAssertEqual(Set(WidgetLink.modes), ["text", "voice", "photo"])
   }
 }
+
+/// A Tally's quick actions on the app icon (#284): the one added comes
+/// first and once, and no more show than iOS lists.
+class TallyQuickActionsTests: XCTestCase {
+  func testTheTallyAddedComesFirstAndOnce() {
+    let tallies = [(note: "a", label: "Water"), (note: "b", label: "Weight")]
+    let merged = TallyQuickActions.merged(tallies, adding: "b", label: "Body weight")
+    XCTAssertEqual(merged.map { $0.note }, ["b", "a"])
+    XCTAssertEqual(merged.map { $0.label }, ["Body weight", "Water"])
+  }
+
+  func testNoMoreThanIosShows() {
+    let tallies = (1...4).map { (note: "n\($0)", label: "T\($0)") }
+    let merged = TallyQuickActions.merged(tallies, adding: "new", label: "New")
+    XCTAssertEqual(merged.count, TallyQuickActions.limit)
+    XCTAssertEqual(merged.map { $0.note }, ["new", "n1", "n2", "n3"])
+  }
+}

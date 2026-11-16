@@ -74,6 +74,13 @@ void main() {
       paragraph.text.toPlainText(includeSemanticsLabels: false),
   ].join('|');
 
+  /// The line drawn that shows exactly [shown].
+  Finder lineOf(WidgetTester tester, String shown) => find.byWidgetPredicate(
+    (w) =>
+        w is RichText &&
+        w.text.toPlainText(includeSemanticsLabels: false) == shown,
+  );
+
   group('drawn formatted', () {
     final opened = <Uri>[];
 
@@ -127,9 +134,9 @@ void main() {
         tester,
         '# Big\n## Small\n**bold** *italic* ~~gone~~ `x*y`\n> said\n\nend',
       );
-      expect(styleOf(tester, text, 'Big')?.fontSize, 24);
-      expect(styleOf(tester, text, 'Big')?.fontWeight, FontWeight.bold);
-      expect(styleOf(tester, text, 'Small')?.fontSize, 20);
+      expect(styleOf(tester, text, 'Big')?.fontSize, 16 * heading1Scale);
+      expect(styleOf(tester, text, 'Big')?.fontWeight, headingWeight);
+      expect(styleOf(tester, text, 'Small')?.fontSize, 16 * heading2Scale);
       expect(styleOf(tester, text, 'bold')?.fontWeight, FontWeight.bold);
       expect(styleOf(tester, text, 'italic')?.fontStyle, FontStyle.italic);
       expect(
@@ -145,15 +152,16 @@ void main() {
       expect(shown, isNot(contains('#')));
       expect(shown, isNot(contains('~~')));
       expect(shown, isNot(contains('>')));
-      // A blank line keeps its height.
+      // A blank line reads as room, not as a line (#327).
       final lines = tester.widgetList<RichText>(
         find.descendant(of: text, matching: find.byType(RichText)),
       );
-      expect(lines.length, 6);
-      final blank = find
-          .descendant(of: text, matching: find.byType(RichText))
-          .at(4);
-      expect(tester.getSize(blank).height, greaterThan(10));
+      expect(lines.length, 5);
+      expect(
+        tester.getTopLeft(lineOf(tester, 'end')).dy -
+            tester.getBottomLeft(lineOf(tester, 'said')).dy,
+        blankGap * 16,
+      );
       // A heading is read as one.
       expect(
         tester.getSemantics(find.text('Big', findRichText: true)),
@@ -197,7 +205,44 @@ void main() {
       await pump(tester, source, start: start, end: end, maxLines: 1);
       expect(shownUnder(tester, text), 'Big title');
       expect(styleOf(tester, text, 'Big title')?.fontSize, 16);
-      expect(styleOf(tester, text, 'Big title')?.fontWeight, FontWeight.bold);
+      expect(styleOf(tester, text, 'Big title')?.fontWeight, headingWeight);
+    });
+
+    testWidgets('a formatted text reads calm: its lines 1.5 high, room '
+        'between them by their kinds, code on a light tint just behind its '
+        'words (#327)', (tester) async {
+      await pump(
+        tester,
+        '# Head\nfirst\nsecond\n- one\n- two\n\nafter `F28` it',
+      );
+      double gap(String above, String below) =>
+          tester.getTopLeft(lineOf(tester, below)).dy -
+          tester.getBottomLeft(lineOf(tester, above)).dy;
+      // Every line at least 1.5 times its font's size high.
+      final first = tester.widget<RichText>(lineOf(tester, 'first'));
+      expect(first.strutStyle?.height, formattedLineHeight);
+      expect(tester.getSize(lineOf(tester, 'first')).height, 16 * 1.5);
+      // Less after a heading, half the size between paragraphs, little
+      // between items, a blank line's size for a blank line.
+      expect(gap('Head', 'first'), closeTo(0.3 * 16, 0.01));
+      expect(gap('first', 'second'), 0.5 * 16);
+      expect(gap('second', 'one'), 0.5 * 16);
+      expect(gap('one', 'two'), closeTo(0.2 * 16, 0.01));
+      expect(gap('two', 'after F28 it'), blankGap * 16);
+      // Code: fixed width, a little smaller, on a light tint of the
+      // text's colour, its tint only as high as its words, not the line.
+      final code = styleOf(tester, text, 'F28');
+      final scheme = Theme.of(tester.element(text)).colorScheme;
+      expect(code?.fontFamily, 'monospace');
+      expect(code?.fontSize, 16 * codeScale);
+      expect(code?.height, codeLineHeight);
+      expect(code?.backgroundColor, codeTint(scheme));
+      expect(code?.backgroundColor?.a, closeTo(codeTintAlpha, 0.001));
+      final paragraph = tester.renderObject<RenderParagraph>(
+        lineOf(tester, 'after F28 it'),
+      );
+      // Its line no higher than the others.
+      expect(paragraph.size.height, 16 * 1.5);
     });
 
     testWidgets('a link to the web or e-mail opens; any other stays text', (
@@ -828,6 +873,37 @@ void main() {
       );
       expect(before.text.toPlainText(), 'buy **');
       expect(after.text.toPlainText(), 'milk** today');
+    });
+
+    testWidgets('the field spaces a formatted text as it reads: lines 1.5 '
+        'high, calmer headings, code on a light tint, and a tap finds its '
+        'character (#327)', (tester) async {
+      await pumpField(
+        tester,
+        text: '## Head\nsome `F28` here\nnext line',
+        markdown: true,
+      );
+      final field = find.byType(EditableText);
+      final editable = tester.widget<EditableText>(field);
+      expect(editable.strutStyle.height, formattedLineHeight);
+      final size = editable.style.fontSize ?? 16;
+      final head = fieldStyleOf(tester, field, 'Head');
+      expect(head?.fontSize, size * heading2Scale);
+      expect(head?.fontWeight, headingWeight);
+      final code = fieldStyleOf(tester, field, 'F28');
+      final scheme = Theme.of(tester.element(field)).colorScheme;
+      expect(code?.backgroundColor, codeTint(scheme));
+      expect(code?.height, codeLineHeight);
+      expect(code?.fontSize, size * codeScale);
+      // Each character's place leads back to it, on every line.
+      final render = tester.state<EditableTextState>(field).renderEditable;
+      for (final offset in [9, 18, 26]) {
+        final caret = render.getLocalRectForCaret(TextPosition(offset: offset));
+        final point = render.localToGlobal(
+          caret.centerLeft + const Offset(1, 0),
+        );
+        expect(render.getPositionForPoint(point).offset, offset);
+      }
     });
 
     testWidgets('the bottom row reads the formatted line from its start, '

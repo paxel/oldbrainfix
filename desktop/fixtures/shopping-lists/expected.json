@@ -1,5 +1,5 @@
 {
-  "now": "2026-02-01T11:36:25.000Z",
+  "now": "2026-02-01T11:38:57.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -31,7 +31,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:0000000000000000000000000000000f",
@@ -61,7 +61,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:00000000000000000000000000000016",
@@ -91,7 +91,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:00000000000000000000000000000019",
@@ -121,7 +121,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:0000000000000000000000000000001d",
@@ -151,7 +151,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:00000000000000000000000000000020",
@@ -211,7 +211,7 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "shoppingList"
     },
     {
       "id": "note:0000000000000000000000000000002a",
@@ -242,9 +242,137 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000002c",
+      "text": "Errands",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-31T11:36:47.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "shoppingList"
+    },
+    {
+      "id": "note:00000000000000000000000000000034",
+      "text": "Market",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-31T11:38:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "shoppingList"
+    },
+    {
+      "id": "note:00000000000000000000000000000037",
+      "text": "Sugar",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-31T11:38:15.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000034",
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "a49955dd65e686efb989db9c45ca0a8a7954dbd740a2600de1d81960a679264e"
+      ],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "voiceRecording"
+    },
+    {
+      "id": "note:00000000000000000000000000000039",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-31T11:38:31.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000034",
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c"
+      ],
+      "transcripts": {
+        "c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c": "Butter, flour und 1,5 Liter Milch."
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "voiceRecording"
     }
   ],
   "all": [
+    "note:00000000000000000000000000000034",
+    "note:0000000000000000000000000000002c",
     "note:0000000000000000000000000000002a",
     "note:00000000000000000000000000000021",
     "note:00000000000000000000000000000020",
@@ -261,6 +389,69 @@
   "trashed": [],
   "inside": {},
   "sections": {
+    "note:00000000000000000000000000000034": [
+      {
+        "id": "note:00000000000000000000000000000037",
+        "noteId": "note:00000000000000000000000000000034",
+        "text": "Sugar",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-31T11:38:15.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [
+          "a49955dd65e686efb989db9c45ca0a8a7954dbd740a2600de1d81960a679264e"
+        ],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
+      },
+      {
+        "id": "note:00000000000000000000000000000039",
+        "noteId": "note:00000000000000000000000000000034",
+        "text": "",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-31T11:38:31.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [
+          "c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c"
+        ],
+        "transcripts": {
+          "c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c": "Butter, flour und 1,5 Liter Milch."
+        },
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
+      }
+    ],
+    "note:0000000000000000000000000000002c": [],
     "note:0000000000000000000000000000002a": [],
     "note:00000000000000000000000000000021": [],
     "note:00000000000000000000000000000020": [],
@@ -270,10 +461,35 @@
     "note:0000000000000000000000000000000f": [],
     "note:00000000000000000000000000000001": []
   },
-  "untranscribed": [],
+  "untranscribed": [
+    {
+      "noteId": "note:00000000000000000000000000000037",
+      "hash": "a49955dd65e686efb989db9c45ca0a8a7954dbd740a2600de1d81960a679264e"
+    }
+  ],
   "unreadPhotos": [],
-  "removable": {},
+  "removable": {
+    "note:00000000000000000000000000000039": [
+      "audio/c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c",
+      "transcript/c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c"
+    ]
+  },
   "shares": {
+    "note:00000000000000000000000000000034": {
+      "html": null,
+      "photos": [],
+      "recordings": [
+        "a49955dd65e686efb989db9c45ca0a8a7954dbd740a2600de1d81960a679264e",
+        "c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c"
+      ],
+      "text": "Market\n\n2026-01-31T11:38:15.000Z\nSugar\n\n2026-01-31T11:38:31.000Z\nButter, flour und 1,5 Liter Milch."
+    },
+    "note:0000000000000000000000000000002c": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Errands"
+    },
     "note:0000000000000000000000000000002a": {
       "html": null,
       "photos": [],
@@ -325,6 +541,8 @@
   },
   "search": {
     "": [
+      "note:00000000000000000000000000000034",
+      "note:0000000000000000000000000000002c",
       "note:0000000000000000000000000000002a",
       "note:00000000000000000000000000000021",
       "note:00000000000000000000000000000020",
@@ -336,6 +554,7 @@
     ],
     "sauce": [],
     "MILK": [
+      "note:0000000000000000000000000000002c",
       "note:00000000000000000000000000000001"
     ],
     "receipt": [],
@@ -345,6 +564,8 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:00000000000000000000000000000034",
+      "note:0000000000000000000000000000002c",
       "note:0000000000000000000000000000002a",
       "note:00000000000000000000000000000021",
       "note:00000000000000000000000000000020",

@@ -2,11 +2,15 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'boxes.dart';
+import 'checklists.dart';
 import 'entry.dart';
+import 'file_text.dart';
+import 'hidden_from_ai.dart';
 import 'named_places.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'shared_areas.dart';
+import 'shopping_lists.dart';
 import 'store.dart';
 import 'sync.dart';
 import 'text_boxes.dart';
@@ -34,7 +38,8 @@ abstract final class NoteKeys {
   /// When the Note was moved to the trash; absent while it is not there.
   static const trashed = 'trashed';
 
-  /// The Note this one was merged into; absent while it stands alone.
+  /// The Note this one was merged into; absent while it stands alone,
+  /// null once its Merge was undone.
   static const merged = 'merged';
 
   /// When the Note first spawned a Routine or Reminder; absent before.
@@ -83,6 +88,23 @@ abstract final class NoteKeys {
 
   static String ocr(String hash) => '$ocrPrefix$hash';
 
+  /// One field per attached file (ADR 0047), `file:<hash>` = its name,
+  /// media type and size as JSON ([Attachment.value]), so files attached
+  /// on two Devices at once are both kept. The bytes are in the store's
+  /// files, under the hash ([Store.file]). Null once the file was removed
+  /// and its Attachment Text kept, as for photos (ADR 0020).
+  static const filePrefix = 'file:';
+
+  static String file(String hash) => '$filePrefix$hash';
+
+  /// The Attachment Text of an attached file, `fileText:<hash>` = the
+  /// text read out of it, on the Note holding `file:<hash>`. An empty
+  /// text means no text was found; absent means not read (yet); null
+  /// means removed while the file stays (ADR 0025).
+  static const fileTextPrefix = 'fileText:';
+
+  static String fileText(String hash) => '$fileTextPrefix$hash';
+
   /// The app something was shared in from, as [SourceApp.package] and
   /// [SourceApp.label]; absent for anything not shared in, or when the
   /// platform did not say.
@@ -123,8 +145,207 @@ abstract final class SectionKeys {
 enum Importance { unimportant, normal, important }
 
 /// What a Note without words is titled as where only its words fit, as
-/// in a row or an alarm.
-enum Wordless { photo, voiceRecording }
+/// in a row or an alarm: a photo, a voice recording, or a file, which
+/// goes by its name ([Note.wordlessName]); a list without a Name and
+/// any of them by the list it is (#309).
+enum Wordless { photo, voiceRecording, file, checklist, shoppingList }
+
+/// The largest file that can be attached: the most a bundle, a Backup and
+/// the local network carry of one (ADR 0003, 0047).
+const maxFileBytes = 256 << 20;
+
+/// The largest whole number a size or a page count is read as: what a
+/// double holds exactly, so both cores read the same.
+const _maxCount = 1 << 53;
+
+/// The most characters of a file's name kept.
+const _maxNameChars = 255;
+
+/// The media type of a file no app named one for.
+const unknownType = 'application/octet-stream';
+
+/// A file attached to a Note (ADR 0047): its bytes are a blob, kept by its
+/// hash; the rest is what the attaching Device wrote down. Another
+/// person's Device may have written it, so it is read as data only: a
+/// name without folders or control characters, a media type of the usual
+/// shape, numbers that are whole.
+class Attachment {
+  final String hash;
+
+  /// Its file name, without any folder; empty when none was given.
+  final String name;
+
+  /// Its media type in lower case, such as `application/pdf`;
+  /// [unknownType] when none was given.
+  final String mediaType;
+
+  /// Its size in bytes.
+  final int size;
+
+  /// How many pages it has, when the attaching Device counted them.
+  final int? pages;
+
+  /// Whether only a computer reads its text (Q645,
+  /// [FileTexts.computerReads]); until one has, a phone shows that the
+  /// text follows from the computer.
+  final bool computer;
+
+  const Attachment({
+    required this.hash,
+    required this.name,
+    required this.mediaType,
+    required this.size,
+    this.pages,
+    this.computer = false,
+  });
+
+  /// What the file is, as far as its text goes.
+  FileKind get kind => FileTexts.kindOf(name, mediaType);
+
+  /// The attachment [hash] from the [value] of its field: whatever does
+  /// not read is left empty, never an error.
+  factory Attachment.read(String hash, String value) {
+    Object? json;
+    try {
+      json = jsonDecode(value);
+    } on FormatException {
+      json = null;
+    }
+    final object = json is Map<String, Object?>
+        ? json
+        : const <String, Object?>{};
+    int? count(String key) => switch (object[key]) {
+      final int n when n >= 0 && n <= _maxCount => n,
+      _ => null,
+    };
+    return Attachment(
+      hash: hash,
+      name: cleanName(switch (object['name']) {
+        final String n => n,
+        _ => '',
+      }),
+      mediaType: cleanType(switch (object['type']) {
+        final String t => t,
+        _ => '',
+      }),
+      size: count('size') ?? 0,
+      pages: count('pages'),
+      computer: object['computer'] == true,
+    );
+  }
+
+  /// The value of its field: JSON, keys sorted, `computer` only when true
+  /// and `pages` only when counted.
+  String get value => jsonEncode({
+    if (computer) 'computer': true,
+    'name': name,
+    'pages': ?pages,
+    'size': size,
+    'type': mediaType,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is Attachment &&
+      other.hash == hash &&
+      other.name == name &&
+      other.mediaType == mediaType &&
+      other.size == size &&
+      other.pages == pages &&
+      other.computer == computer;
+
+  @override
+  int get hashCode => Object.hash(hash, name, mediaType, size, pages, computer);
+
+  @override
+  String toString() => 'Attachment($name, $mediaType, $size, $hash)';
+}
+
+/// A file to attach: its [name], the media type the app was told (empty,
+/// or `application/octet-stream`, for the one its name's ending says,
+/// [FileTexts.mediaTypeOf]), its [bytes] and, for a PDF, how many [pages]
+/// it has when the app counted them. A file kept already ([NewFile.kept])
+/// comes by its [hash] and [size] instead of its bytes.
+class NewFile {
+  final String name;
+  final String mediaType;
+  final Uint8List bytes;
+  final int? pages;
+
+  /// The SHA-256 its bytes are kept under already, by [Blobs.putFrom] into
+  /// the store's files; null while they are in [bytes].
+  final String? hash;
+
+  /// Its size in bytes.
+  final int size;
+
+  NewFile({
+    required this.name,
+    required this.bytes,
+    this.mediaType = '',
+    this.pages,
+  }) : hash = null,
+       size = bytes.length;
+
+  /// A file whose bytes were kept already under [hash], [size] bytes
+  /// long, off the UI isolate: attaching it only names it in the log.
+  NewFile.kept({
+    required this.name,
+    required String this.hash,
+    required this.size,
+    this.mediaType = '',
+    this.pages,
+  }) : bytes = Uint8List(0);
+}
+
+/// [name] as a file's name is kept: the part after its last `/` or `\`,
+/// without control characters and the marks that turn the direction of
+/// text (which could make `exe.pdf` of `fdp.exe`), its blanks at the ends
+/// trimmed, at most 255 characters; `.` and `..` are no name.
+String cleanName(String name) {
+  final base = name.substring(
+    [
+          name.lastIndexOf('/'),
+          name.lastIndexOf(r'\'),
+        ].reduce((a, b) => a > b ? a : b) +
+        1,
+  );
+  final kept = String.fromCharCodes([
+    for (final c in base.runes)
+      if (!(c < 0x20 ||
+          (c >= 0x7f && c <= 0x9f) ||
+          (c >= 0x202a && c <= 0x202e) ||
+          (c >= 0x2066 && c <= 0x2069) ||
+          c == 0x200e ||
+          c == 0x200f))
+        c,
+  ]);
+  final trimmed = String.fromCharCodes(kept.trim().runes.take(_maxNameChars))
+      .trim();
+  return trimmed == '.' || trimmed == '..' ? '' : trimmed;
+}
+
+/// [mediaType] as a file's media type is kept: in lower case, without its
+/// parameters, when it has the shape `type/subtype` of letters, digits and
+/// `!#$&^_.+-`, at most 127 characters; [unknownType] otherwise.
+String cleanType(String mediaType) {
+  final bare = mediaType.split(';').first.trim();
+  final lower = String.fromCharCodes([
+    for (final c in bare.codeUnits) c >= 0x41 && c <= 0x5a ? c + 0x20 : c,
+  ]);
+  bool part(String p) =>
+      p.isNotEmpty &&
+      p.codeUnits.every(
+        (c) =>
+            (c >= 0x61 && c <= 0x7a) ||
+            (c >= 0x30 && c <= 0x39) ||
+            '!#\$&^_.+-'.codeUnits.contains(c),
+      );
+  final slash = lower.indexOf('/');
+  if (slash < 0 || lower.length > 127) return unknownType;
+  final (top, sub) = (lower.substring(0, slash), lower.substring(slash + 1));
+  return part(top) && part(sub) ? lower : unknownType;
+}
 
 /// The app something was shared in from (CONTEXT.md, Capture Context).
 class SourceApp {
@@ -294,9 +515,31 @@ class Note {
   /// photo stays, as for [removedTranscripts].
   final List<String> removedPhotoTexts;
 
+  /// The files attached to it (ADR 0047), in the order they were
+  /// attached.
+  final List<Attachment> attachments;
+
+  /// The Attachment Texts of its files, by file hash; a file not read
+  /// yet, or of a kind without text, has none.
+  final Map<String, String> attachmentTexts;
+
+  /// Its files that were removed while their Attachment Text stays, in
+  /// the order they were attached, as they were before; the text is in
+  /// [attachmentTexts].
+  final List<Attachment> removedAttachments;
+
+  /// The hashes of its files whose Attachment Text was removed while the
+  /// file stays, as for [removedPhotoTexts].
+  final List<String> removedAttachmentTexts;
+
   /// The boxes of [text] as they show now, in the order they come
   /// (ADR 0035); none in a text this version may not change.
   final List<ShownBox> boxes;
+
+  /// The list its `kind` names ([parseListKind]), [ChecklistKeys.checklist]
+  /// or [ShoppingKeys.shopping] and any other an app may write, or null:
+  /// what a list without a Name is titled as ([wordless], #309).
+  final String? listKind;
 
   const Note({
     required this.id,
@@ -319,7 +562,12 @@ class Note {
     this.removedRecordings = const [],
     this.removedTranscripts = const [],
     this.removedPhotoTexts = const [],
+    this.attachments = const [],
+    this.attachmentTexts = const {},
+    this.removedAttachments = const [],
+    this.removedAttachmentTexts = const [],
     this.boxes = const [],
+    this.listKind,
   });
 
   /// When the Note was captured.
@@ -346,15 +594,46 @@ class Note {
   /// at Capture, else [Notes.defaultNudge] after it was captured.
   DateTime get nudgeAt => nudge ?? captured.add(Notes.defaultNudge);
 
-  /// What the Note is titled as while its text is blank: a voice
-  /// recording when it has one and no photo, removed ones whose texts
-  /// stay included; a photo otherwise.
-  Wordless get wordless =>
-      photos.isEmpty &&
+  /// The file a Note made from a file alone shows as its card (ADR 0047):
+  /// its one attached file, while its text is blank and it has no photo,
+  /// recording or other file, removed ones included.
+  Attachment? get aloneFile =>
+      attachments.length == 1 &&
+          shownText.trim().isEmpty &&
+          photos.isEmpty &&
           removedPhotos.isEmpty &&
-          (recordings.isNotEmpty || removedRecordings.isNotEmpty)
-      ? Wordless.voiceRecording
-      : Wordless.photo;
+          recordings.isEmpty &&
+          removedRecordings.isEmpty &&
+          removedAttachments.isEmpty
+      ? attachments.first
+      : null;
+
+  /// What the Note is titled as while its text is blank, removed photos,
+  /// recordings and files whose texts stay included: a photo when it has
+  /// one; else a voice recording when it has one; else a file when it has
+  /// one, by [wordlessName]; else a Checklist or a Shopping List by the
+  /// list it is (#309); a photo otherwise.
+  Wordless get wordless {
+    if (photos.isNotEmpty || removedPhotos.isNotEmpty) return Wordless.photo;
+    if (recordings.isNotEmpty || removedRecordings.isNotEmpty) {
+      return Wordless.voiceRecording;
+    }
+    if (attachments.isNotEmpty || removedAttachments.isNotEmpty) {
+      return Wordless.file;
+    }
+    return switch (listKind) {
+      ChecklistKeys.checklist => Wordless.checklist,
+      ShoppingKeys.shopping => Wordless.shoppingList,
+      _ => Wordless.photo,
+    };
+  }
+
+  /// The name a Note titled [Wordless.file] goes by (#267): its first
+  /// attached file's, else its first removed one's; empty when that file
+  /// has no name, or for any other Note.
+  String get wordlessName => wordless == Wordless.file
+      ? (attachments.firstOrNull ?? removedAttachments.first).name
+      : '';
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).
@@ -400,6 +679,14 @@ class Section {
   final List<String> removedTranscripts;
   final List<String> removedPhotoTexts;
 
+  /// A merged Note's attached files with their Attachment Texts, those
+  /// removed and those whose texts were removed, as for
+  /// [Note.attachments]; an Amend has none.
+  final List<Attachment> attachments;
+  final Map<String, String> attachmentTexts;
+  final List<Attachment> removedAttachments;
+  final List<String> removedAttachmentTexts;
+
   /// The boxes of [text] as they show now, as for [Note.boxes].
   final List<ShownBox> boxes;
 
@@ -432,6 +719,10 @@ class Section {
     this.removedRecordings = const [],
     this.removedTranscripts = const [],
     this.removedPhotoTexts = const [],
+    this.attachments = const [],
+    this.attachmentTexts = const {},
+    this.removedAttachments = const [],
+    this.removedAttachmentTexts = const [],
     this.boxes = const [],
   });
 
@@ -501,8 +792,11 @@ class Notes {
   /// Captures a new Note at the store's now with [text], [photos] and
   /// voice [recordings], filed into the Area or Topic [place] when one is
   /// given, nudged [nudgeIn] from now while it is Unsorted. The text may
-  /// be empty for a photo or voice Note, and is in [format]. The photos
-  /// are kept without their metadata. A Note shared in from another app
+  /// be empty for a photo or voice Note, and for a Note made from a file
+  /// alone, which shows the file as its card ([Note.aloneFile]); it is in
+  /// [format]. The photos are kept without their metadata, the attached
+  /// [files] as they are (ADR 0047); one larger than [maxFileBytes] is
+  /// refused and nothing is written. A Note shared in from another app
   /// records it as [sourceApp].
   Note capture(
     String text, {
@@ -511,9 +805,11 @@ class Notes {
     Duration? nudgeIn,
     List<Uint8List> photos = const [],
     List<Uint8List> recordings = const [],
+    List<NewFile> files = const [],
     SourceApp? sourceApp,
   }) {
     _requireFormat(format);
+    files.forEach(_requireSize);
     if (place != null && !Places(store).isPlace(place)) {
       throw ArgumentError.value(place, 'place', 'not an Area or Topic');
     }
@@ -525,6 +821,7 @@ class Notes {
     // The bytes are kept before the log names them.
     final hashes = [for (final bytes in photos) store.putPhoto(bytes)];
     final audio = [for (final bytes in recordings) store.putAudio(bytes)];
+    final attached = [for (final file in files) _keepFile(file)];
     store.batch(() {
       store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
       store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
@@ -544,6 +841,9 @@ class Notes {
       }
       for (final hash in audio) {
         store.append(id, NoteKeys.audio(hash), NoteKeys.audioAdded, date: now);
+      }
+      for (final file in attached) {
+        store.append(id, NoteKeys.file(file.hash), file.value, date: now);
       }
       if (sourceApp != null) {
         final app = sourceApp;
@@ -583,6 +883,153 @@ class Notes {
   /// on this Device (yet).
   Uint8List? recordingBytes(String hash) => store.audio(hash);
 
+  /// Attaches [file] to the Note [noteId] (ADR 0047), its bytes kept as
+  /// they are; returns the hash they are kept under. A file larger than
+  /// [maxFileBytes] is refused. The same file attached again keeps one
+  /// field, written anew.
+  String attachFile(String noteId, NewFile file) {
+    _requireNote(noteId);
+    _requireSize(file);
+    final attachment = _keepFile(file);
+    store.append(noteId, NoteKeys.file(attachment.hash), attachment.value);
+    return attachment.hash;
+  }
+
+  static void _requireSize(NewFile file) {
+    if (file.size > maxFileBytes) {
+      throw ArgumentError.value(
+        file.name,
+        'file',
+        'larger than $maxFileBytes bytes',
+      );
+    }
+  }
+
+  /// Keeps the bytes of [file], unless they are kept already, and gives
+  /// what its field holds. A file said to be kept whose bytes are not
+  /// here is refused: the log never names a file that is not there.
+  Attachment _keepFile(NewFile file) {
+    final kept = file.hash;
+    if (kept != null && !store.hasFile(kept)) {
+      throw ArgumentError.value(file.name, 'file', 'its bytes are not kept');
+    }
+    final hash = kept ?? store.putFile(file.bytes);
+    final name = cleanName(file.name);
+    // A type not named is the one its name's ending says.
+    final named = cleanType(file.mediaType);
+    final mediaType = named == unknownType
+        ? FileTexts.mediaTypeOf(name)
+        : named;
+    final size = file.size;
+    final pages = switch (file.pages) {
+      final int p when p >= 0 && p <= _maxCount => p,
+      _ => null,
+    };
+    return Attachment(
+      hash: hash,
+      name: name,
+      mediaType: mediaType,
+      size: size,
+      pages: pages,
+      computer: FileTexts.computerReads(
+        FileTexts.kindOf(name, mediaType),
+        size,
+        pages,
+      ),
+    );
+  }
+
+  /// The bytes of the attached file [hash], or null when they are not on
+  /// this Device (yet).
+  Uint8List? fileBytes(String hash) => store.file(hash);
+
+  /// Keeps [text], tidied ([FileTexts.tidy]), as the Attachment Text of
+  /// the file [hash] of the Note [noteId], a merged one included, next to
+  /// the file. An empty text records that no text was found, so the file
+  /// is not read again. Given again, as when reading the file again, it
+  /// replaces the Attachment Text, a removed one included.
+  void setAttachmentText(String noteId, String hash, String text) {
+    _requireAttached(noteId, hash);
+    store.append(noteId, NoteKeys.fileText(hash), FileTexts.tidy(text));
+  }
+
+  /// The attached files whose text is still to be read, newest capture
+  /// first: those of a kind with text ([FileKind.hasText]) without an
+  /// Attachment Text, nor one that was removed, on every Note not in the
+  /// trash, merged ones included. On a phone ([computer] false) those only
+  /// a computer reads are left out (Q645).
+  List<({String noteId, String hash})> unreadAttachments({
+    required bool computer,
+  }) {
+    bool waits(Note note, Attachment file) =>
+        file.kind.hasText &&
+        (computer || !file.computer) &&
+        !note.attachmentTexts.containsKey(file.hash) &&
+        !note.removedAttachmentTexts.contains(file.hash);
+    final notes = [
+      for (final note in _holding(NoteKeys.filePrefix))
+        if (note.attachments.any((a) => waits(note, a))) note,
+    ];
+    // By id within one capture time, so both cores list them alike.
+    notes.sort((a, b) {
+      final byTime = b.captured.compareTo(a.captured);
+      return byTime != 0 ? byTime : a.id.compareTo(b.id);
+    });
+    return [
+      for (final note in notes)
+        for (final file in note.attachments)
+          if (waits(note, file)) (noteId: note.id, hash: file.hash),
+    ];
+  }
+
+  /// Whether this Device may remove the attached file [hash] of the Note
+  /// [noteId], a merged one included, and keep its Attachment Text, as for
+  /// [mayRemovePhoto]: the file has one that is not empty, and the Note is
+  /// this Device's to change.
+  bool mayRemoveAttachment(String noteId, String hash) {
+    final note = byId(noteId);
+    return note != null &&
+        note.attachments.any((a) => a.hash == hash) &&
+        _hasText(note.attachmentTexts[hash]) &&
+        store.mayChange(noteId);
+  }
+
+  /// Removes the attached file [hash] from the Note [noteId] and keeps its
+  /// Attachment Text, which search still finds, as [removePhoto] does
+  /// (ADR 0020). Refused unless [mayRemoveAttachment].
+  void removeAttachment(String noteId, String hash) {
+    _requireAttached(noteId, hash);
+    if (!mayRemoveAttachment(noteId, hash)) {
+      throw StateError('the file $hash of $noteId may not be removed here');
+    }
+    store.append(noteId, NoteKeys.file(hash), null);
+    store.dropRemovedBlobs();
+  }
+
+  /// Whether this Device may remove the Attachment Text of the file
+  /// [hash] of the Note [noteId] and keep the file, as for
+  /// [mayRemovePhotoText].
+  bool mayRemoveAttachmentText(String noteId, String hash) =>
+      mayRemoveAttachment(noteId, hash);
+
+  /// Removes the Attachment Text of the file [hash] from the Note
+  /// [noteId]; the file stays (ADR 0025). Search no longer finds the text,
+  /// and the file is not read again until [setAttachmentText] is given a
+  /// new one. Refused unless [mayRemoveAttachmentText].
+  void removeAttachmentText(String noteId, String hash) {
+    _requireAttached(noteId, hash);
+    if (!mayRemoveAttachmentText(noteId, hash)) {
+      throw StateError('the Attachment Text of $hash may not be removed here');
+    }
+    store.append(noteId, NoteKeys.fileText(hash), null);
+  }
+
+  void _requireAttached(String noteId, String hash) {
+    if (byId(noteId)?.attachments.any((a) => a.hash == hash) != true) {
+      throw ArgumentError.value(hash, 'hash', 'not a file of $noteId');
+    }
+  }
+
   /// Keeps [text] as the Transcript of the voice recording [hash] of the
   /// Note [noteId], a merged one included, next to the recording; the
   /// recording stays as it is. An empty [text] records that no words
@@ -601,9 +1048,8 @@ class Notes {
   /// whose Transcript was removed is not among them.
   List<({String noteId, String hash})> untranscribed() {
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.recordings.any((h) => _untranscribed(note, h))) note,
+      for (final note in _holding(NoteKeys.audioPrefix))
+        if (note.recordings.any((h) => _untranscribed(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
@@ -630,15 +1076,28 @@ class Notes {
   /// Text was removed is not among them.
   List<({String noteId, String hash})> unreadPhotos() {
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed)
-          if (note.photos.any((h) => _unread(note, h))) note,
+      for (final note in _holding(NoteKeys.photoPrefix))
+        if (note.photos.any((h) => _unread(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
       for (final note in notes)
         for (final hash in note.photos)
           if (_unread(note, hash)) (noteId: note.id, hash: hash),
+    ];
+  }
+
+  /// The Notes not in the trash, merged ones included, that hold a
+  /// field starting with [prefix], a photo, a recording or a file, in
+  /// the order [Store.entitiesOfType] lists Notes: only they can hold one
+  /// waiting to be read, and finding them reads no other Note, which
+  /// each change of the log made wait on all of them (#339).
+  List<Note> _holding(String prefix) {
+    final holding = {for (final (id, _) in store.fieldsWithPrefix(prefix)) id};
+    return [
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (holding.contains(id))
+          if (byId(id) case final note? when !note.isTrashed) note,
     ];
   }
 
@@ -759,13 +1218,40 @@ class Notes {
   static bool _hasText(String? text) => text != null && text.trim().isNotEmpty;
 
   /// Files the Note [noteId] into the Area or Topic [placeId], out of
-  /// wherever it was before.
+  /// wherever it was before. A Note Hidden from AI, by its own mark or
+  /// its Area's, does not go into a Shared Area ([HiddenFromAiRefused],
+  /// #267).
   void file(String noteId, String placeId) {
     _requireNote(noteId);
     if (!Places(store).isPlace(placeId)) {
       throw ArgumentError.value(placeId, 'placeId', 'not an Area or Topic');
     }
+    final area = store.areaOf(placeId);
+    if (area != null && store.isShared(area)) {
+      store.refuseHiddenFromAi(store.hiddenFromAiBy(noteId));
+    }
     store.append(noteId, NoteKeys.place, placeId);
+  }
+
+  /// Whether this Device may take the Note [noteId] out of its Area or
+  /// Topic (#268): it shows filed in one that exists, and it is this
+  /// Device's to change ([SharedAreas.mayChange]), as filing it was.
+  bool mayUnfile(String noteId) =>
+      byId(noteId)?.place != null && store.mayChange(noteId);
+
+  /// Takes the Note [noteId] out of its Area or Topic, filed nowhere
+  /// again: back in Unsorted unless something else keeps it out, such as
+  /// a Routine it spawned. One entry clears the place [file] wrote;
+  /// latest wins, so the user's other Devices follow. Refused unless
+  /// [mayUnfile].
+  void unfile(String noteId) {
+    if (byId(noteId)?.place == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a filed Note');
+    }
+    if (!store.mayChange(noteId)) {
+      throw StateError('$noteId may not be taken out of its place here');
+    }
+    store.append(noteId, NoteKeys.place, null);
   }
 
   /// Nudges the Note [noteId] [nudgeIn] from now instead of when it was
@@ -928,7 +1414,9 @@ class Notes {
 
   /// Merges the Note [noteId] into the Note [intoId]: it becomes a dated
   /// Section of it, with its own Capture Context, and leaves every list
-  /// and Unsorted.
+  /// and Unsorted. Hidden and shared do not meet (#267): a Note Hidden
+  /// from AI does not merge into a Note of a Shared Area, nor a Note of a
+  /// Shared Area into a hidden one ([HiddenFromAiRefused]).
   ///
   /// Nothing is copied: the merged Note keeps its entity and only points
   /// at its target, which shows it as a Section. Whatever belongs to it,
@@ -944,22 +1432,130 @@ class Notes {
     if (noteId == intoId) {
       throw ArgumentError.value(intoId, 'intoId', 'the Note itself');
     }
+    _refuseHiddenMerge([noteId], intoId);
     store.append(noteId, NoteKeys.merged, intoId);
+  }
+
+  /// Throws [HiddenFromAiRefused] when merging [noteIds] into [intoId]
+  /// would put something Hidden from AI together with a Shared Area: a
+  /// hidden Note into a Note of one, by the marks that hide it, or a Note
+  /// of one into a hidden Note, by the marks that hide the target. The
+  /// marks of all of them, sorted, each once.
+  void _refuseHiddenMerge(List<String> noteIds, String intoId) {
+    final marks = store.hiddenFromAiMarks();
+    if (marks.isEmpty) return;
+    bool shared(String id) {
+      final area = store.areaOf(id);
+      return area != null && store.isShared(area);
+    }
+
+    final found = <String>{};
+    final intoShared = shared(intoId);
+    final intoHidden = store.hiddenFromAiBy(intoId, marks);
+    for (final id in noteIds) {
+      if (intoShared) found.addAll(store.hiddenFromAiBy(id, marks));
+      if (intoHidden.isNotEmpty && shared(id)) found.addAll(intoHidden);
+    }
+    store.refuseHiddenFromAi(found.toList()..sort());
+  }
+
+  /// Whether this Device may undo the Merge of the Note [noteId] (#268):
+  /// it shows merged into another, and it is this Device's to change
+  /// ([SharedAreas.mayChange]), in no Area or one it manages, or as a
+  /// Member when they made it.
+  bool mayUndoMerge(String noteId) =>
+      byId(noteId)?.isMerged == true && store.mayChange(noteId);
+
+  /// Undoes the Merge of the Note [noteId]: it stands alone again, in
+  /// the lists and where it was filed, with its Sections, Routines,
+  /// Reminders and Frogs, all of which never left it. One entry clears
+  /// the pointer [merge] wrote; latest wins, so the user's other Devices
+  /// follow. Refused unless [mayUndoMerge].
+  void undoMerge(String noteId) {
+    if (byId(noteId)?.isMerged != true) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a merged Note');
+    }
+    if (!store.mayChange(noteId)) {
+      throw StateError('the Merge of $noteId may not be undone here');
+    }
+    store.append(noteId, NoteKeys.merged, null);
+  }
+
+  /// Merges every Note of [noteIds] into the Note [intoId] in one batch
+  /// (#273), each as [merge] does: all of them or, when one is refused,
+  /// none. A Note named twice merges once. Refused for the target among
+  /// [noteIds], a Note or target not in the lists, a Note this Device may
+  /// not change ([SharedAreas.mayChange]), and what is Hidden from AI
+  /// meeting a Shared Area as for [merge]. Gives the Notes merged, in the
+  /// order named, for [undoMergeAll].
+  List<String> mergeAll(Iterable<String> noteIds, String intoId) {
+    final ids = noteIds.toSet().toList();
+    for (final (id, name) in [
+      for (final id in ids) (id, 'noteIds'),
+      (intoId, 'intoId'),
+    ]) {
+      final note = byId(id);
+      if (note == null || note.isTrashed || note.isMerged) {
+        throw ArgumentError.value(id, name, 'not a Note in the lists');
+      }
+    }
+    if (ids.contains(intoId)) {
+      throw ArgumentError.value(intoId, 'intoId', 'among the Notes merged');
+    }
+    for (final id in ids) {
+      if (!store.mayChange(id)) {
+        throw StateError('$id may not be merged here');
+      }
+    }
+    _refuseHiddenMerge(ids, intoId);
+    store.batch(() {
+      for (final id in ids) {
+        store.append(id, NoteKeys.merged, intoId);
+      }
+    });
+    return ids;
+  }
+
+  /// Undoes the Merge of each Note of [noteIds] in one batch, as
+  /// [undoMerge] does for each one that [mayUndoMerge]; the others, which
+  /// a sync or another step got to first, are left as they are. Gives the
+  /// Notes that stand alone again.
+  List<String> undoMergeAll(Iterable<String> noteIds) {
+    final undone = <String>[];
+    store.batch(() {
+      for (final id in noteIds.toSet()) {
+        if (!mayUndoMerge(id)) continue;
+        store.append(id, NoteKeys.merged, null);
+        undone.add(id);
+      }
+    });
+    return undone;
   }
 
   /// The Sections of the Note [noteId], oldest first: its Amends, the
   /// Notes merged into it, and their Amends.
   List<Section> sections(String noteId) {
+    // Only a Note that was merged can be merged into this one, and only
+    // a Section that once named one of them can belong to it: the others
+    // are not read, which made opening a Note wait on all of them
+    // (#339). In the order every Note and Section is listed in.
+    final wasMerged = {
+      for (final (id, _) in store.fieldsWithPrefix(NoteKeys.merged)) id,
+    };
     final merged = {
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (_mergedInto(id) == noteId) id,
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (wasMerged.contains(id) && _mergedInto(id) == noteId) id,
     };
     final owners = {noteId, ...merged};
+    final named = {
+      for (final owner in owners) ...store.everWith(SectionKeys.note, owner),
+    };
     final sections = [
       for (final id in merged)
         if (byId(id) case final note?) _merged(note, noteId),
-      for (final id in store.entitiesOfType(SectionKeys.typeSection))
-        if (owners.contains(store.current(id, SectionKeys.note)))
+      for (final id in store.everOfType(SectionKeys.typeSection))
+        if (named.contains(id) &&
+            owners.contains(store.current(id, SectionKeys.note)))
           ?_section(id, noteId: noteId),
     ];
     sections.sort((a, b) => a.context.captured.compareTo(b.context.captured));
@@ -1019,6 +1615,10 @@ class Notes {
       removedRecordings: note.removedRecordings,
       removedTranscripts: note.removedTranscripts,
       removedPhotoTexts: note.removedPhotoTexts,
+      attachments: note.attachments,
+      attachmentTexts: note.attachmentTexts,
+      removedAttachments: note.removedAttachments,
+      removedAttachmentTexts: note.removedAttachmentTexts,
       boxes: note.boxes,
       modified: edit?.at,
       editedBy: edit?.by,
@@ -1209,8 +1809,10 @@ class Notes {
   }
 
   /// The Note [id], trashed or not, or null when there is none.
-  Note? byId(String id) {
-    final fields = store.currentFields(id);
+  Note? byId(String id) => _note(id, store.currentFields(id));
+
+  /// The Note [id] made of its current [fields], as [byId] reads it.
+  Note? _note(String id, Map<String, String?> fields) {
     if (fields[NoteKeys.type] != NoteKeys.typeNote) return null;
     final captured = fields[NoteKeys.captured];
     if (captured == null) return null;
@@ -1226,6 +1828,16 @@ class Notes {
       NoteKeys.audioPrefix,
       NoteKeys.audioAdded,
     );
+    final attachmentTexts = _texts(fields, NoteKeys.fileTextPrefix);
+    final attachments = [
+      for (final MapEntry(:key, :value) in fields.entries)
+        if (key.startsWith(NoteKeys.filePrefix) && value != null)
+          Attachment.read(key.substring(NoteKeys.filePrefix.length), value),
+    ];
+    final gone = [
+      for (final hash in _blobs(fields, NoteKeys.filePrefix, null))
+        if (_hasText(attachmentTexts[hash])) hash,
+    ];
     return Note(
       id: id,
       text: text.text,
@@ -1264,8 +1876,35 @@ class Notes {
         for (final hash in photos)
           if (_removedText(fields, NoteKeys.ocr(hash))) hash,
       ],
+      attachments: attachments,
+      attachmentTexts: attachmentTexts,
+      removedAttachments: gone.isEmpty ? const [] : _asAttached(id, gone),
+      removedAttachmentTexts: [
+        for (final file in attachments)
+          if (_removedText(fields, NoteKeys.fileText(file.hash))) file.hash,
+      ],
       boxes: _boxes(id, text, fields),
+      listKind: parseListKind(fields[ChecklistKeys.kind])?.list,
     );
+  }
+
+  /// The removed files [hashes] of the Note [id] as they were attached:
+  /// each by the value of its field that wins by latest wins among those
+  /// that name the file.
+  List<Attachment> _asAttached(String id, List<String> hashes) {
+    final history = store.history(id);
+    return [
+      for (final hash in hashes)
+        Attachment.read(hash, () {
+          final field = NoteKeys.file(hash);
+          Entry? held;
+          for (final e in history) {
+            if (e.field != field || e.value == null) continue;
+            if (held == null || Store.latestWins(e, held) > 0) held = e;
+          }
+          return held?.value ?? '';
+        }()),
+    ];
   }
 
   /// The boxes of the stored [text] of [id] with the ticks that count
@@ -1310,10 +1949,15 @@ class Notes {
 
   /// Every Note neither in the trash nor merged, newest capture first.
   List<Note> all() {
+    // Every Note's fields in one read, not two per Note (#339), in the
+    // order [Store.entitiesOfType] lists them.
+    final fields = store.currentFieldsOfType(NoteKeys.typeNote);
     final notes = [
-      for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed && !note.isMerged)
-          note,
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (fields[id] case final held?)
+          if (_note(id, held) case final note?
+              when !note.isTrashed && !note.isMerged)
+            note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return notes;

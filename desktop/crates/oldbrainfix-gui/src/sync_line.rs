@@ -6,6 +6,8 @@
 //! always moves, as the question marks do. A screen reader finds it as
 //! "Syncing…".
 
+use std::time::Duration;
+
 use egui::{Color32, Id, Rect, Sense, Ui, WidgetInfo, WidgetType, pos2};
 
 /// How thick the line is, in points.
@@ -13,6 +15,15 @@ pub const HEIGHT: f32 = 3.0;
 
 /// How long the stretch takes from one side to the other, in seconds.
 pub const SWEEP: f64 = 0.9;
+
+/// How long the line waits before its next frame: about 30 a second,
+/// smooth enough for the stretch, and a sync that runs for long keeps
+/// the window from drawing as fast as it can (#292).
+pub const FRAME: Duration = Duration::from_millis(33);
+
+/// How long the line shows for one sync at most: a sync that hangs past
+/// it keeps running, the line goes (#292).
+pub const LIMIT: Duration = Duration::from_secs(120);
 
 /// The stretch's share of the bar's width.
 const SHARE: f32 = 0.25;
@@ -27,7 +38,8 @@ pub fn place(time: f64) -> f32 {
 }
 
 /// Draws the line along the bottom of `bar`, named `label` for screen
-/// readers, and keeps the window drawing while it shows.
+/// readers, and keeps the window drawing at [`FRAME`]'s pace while it
+/// shows.
 pub fn show(ui: &Ui, bar: Rect, accent: Color32, label: &str) {
     let line = Rect::from_min_max(pos2(bar.left(), bar.bottom() - HEIGHT), bar.right_bottom());
     let width = line.width() * SHARE;
@@ -36,19 +48,8 @@ pub fn show(ui: &Ui, bar: Rect, accent: Color32, label: &str) {
     ui.painter().rect_filled(stretch, 0.0, accent);
     let named = ui.interact(line, Id::new("sync line"), Sense::hover());
     named.widget_info(|| WidgetInfo::labeled(WidgetType::ProgressIndicator, true, label));
-    ui.ctx().request_repaint();
+    ui.ctx().request_repaint_after(FRAME);
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_goes_back_and_forth() {
-        assert_eq!(place(0.0), 0.0);
-        assert_eq!(place(SWEEP), 1.0);
-        assert_eq!(place(2.0 * SWEEP), 0.0);
-        assert!((place(SWEEP / 2.0) - 0.5).abs() < 1e-6);
-        assert!(place(SWEEP * 1.25) < 1.0 && place(SWEEP * 1.25) > 0.5);
-    }
-}
+mod tests;

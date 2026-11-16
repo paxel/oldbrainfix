@@ -514,6 +514,126 @@
           "mayUse": false
         }
       ]
+    },
+    {
+      "id": "note:00000000000000000000000000000017",
+      "history": [
+        {
+          "at": "2026-01-01T10:03:14.000Z",
+          "entity": "line:0000000000000000000000000000001b",
+          "kind": "lineChecked",
+          "before": null,
+          "after": "Passport",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:14.000Z",
+          "entity": "line:0000000000000000000000000000001b",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Passport",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:07.000Z",
+          "entity": "line:0000000000000000000000000000001a",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Blue",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:01.000Z",
+          "entity": "line:00000000000000000000000000000019",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Socks",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:58.000Z",
+          "entity": "note:00000000000000000000000000000017",
+          "kind": "text",
+          "before": "Socks\n  Blue\n✓ Passport",
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:57.000Z",
+          "entity": "note:00000000000000000000000000000017",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:53.000Z",
+          "entity": "note:00000000000000000000000000000017",
+          "kind": "captured",
+          "before": null,
+          "after": "Socks\n  Blue\n✓ Passport",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000001c",
+      "history": [
+        {
+          "at": "2026-01-01T10:03:29.000Z",
+          "entity": "line:0000000000000000000000000000001e",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Towel",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:26.000Z",
+          "entity": "note:0000000000000000000000000000001c",
+          "kind": "text",
+          "before": "# Weekly\nTowel",
+          "after": "Weekly",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:25.000Z",
+          "entity": "note:0000000000000000000000000000001c",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:03:21.000Z",
+          "entity": "note:0000000000000000000000000000001c",
+          "kind": "captured",
+          "before": null,
+          "after": "# Weekly\nTowel",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
     }
   ]
 }

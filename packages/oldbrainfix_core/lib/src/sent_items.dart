@@ -5,6 +5,7 @@ import 'area_keys.dart';
 import 'box_keys.dart';
 import 'checklists.dart';
 import 'entry.dart';
+import 'hidden_from_ai.dart';
 import 'notes.dart';
 import 'pairing.dart';
 import 'pending.dart';
@@ -527,12 +528,16 @@ List<Recipient> sentItemRecipients(Store store) {
 /// time. With [cancel] it goes out as the cancellation of that id. It
 /// carries the own Profile, which the app makes at its first start.
 /// Only a link one of the user's own Devices wrote counts (ADR 0015).
+/// A Note Hidden from AI is refused ([HiddenFromAiRefused], #267).
 SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   final notes = Notes(store);
   final note = notes.byId(noteId);
   if (note == null || note.isTrashed || note.isMerged) {
     throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
   }
+  // A Note Hidden from AI goes to nobody, its cancellation neither, as it
+  // carries the text again (#267).
+  store.refuseHiddenFromAi(store.hiddenFromAiBy(noteId));
   final profile = SignedProfile.fromJson(store.ownProfileForOthers);
   if (profile == null) throw StateError('no own Profile to send with');
   final field = SentKeys.sent(store.deviceId);
@@ -653,23 +658,46 @@ Uint8List encodeSentItem(
 
 /// Writes the file the Note [noteId] goes out as ([sentItemOf],
 /// [encodeSentItem]): encrypted to the keys of [to], else signed only;
-/// with [cancel] as its cancellation.
+/// with [cancel] as its cancellation. Remembers [to] as the person this
+/// Device last sent the Note to, or forgets it for a file to anyone
+/// ([lastSentTo]).
 Uint8List sendNote(
   Store store,
   String noteId, {
   Recipient? to,
   bool cancel = false,
-}) => encodeSentItem(
-  sentItemOf(store, noteId, cancel: cancel),
-  store.signingKey,
-  to: to?.keys ?? const [],
-);
+}) {
+  final file = encodeSentItem(
+    sentItemOf(store, noteId, cancel: cancel),
+    store.signingKey,
+    to: to?.keys ?? const [],
+  );
+  final key = '$sentToPrefix$noteId';
+  if (to == null) {
+    store.removeLocalSetting(key);
+  } else {
+    store.setLocalSetting(key, to.id);
+  }
+  return file;
+}
+
+/// Whom this Device last sent a Note to (#288): a local setting (ADR
+/// 0008) `sentTo:<note id>` = the [Recipient.id], so no person's id
+/// goes into the log; none after a file to anyone.
+const sentToPrefix = 'sentTo:';
 
 /// Whether this Device sent the Note [noteId] before, so sending it
 /// again sends an update, or a cancellation. Only a link one of the
 /// user's own Devices wrote counts (ADR 0015).
 bool wasSent(Store store, String noteId) =>
     store.currentByOwn(noteId, SentKeys.sent(store.deviceId)) != null;
+
+/// The [Recipient.id] of the person this Device last sent the Note
+/// [noteId] to, for an update to start at (#288); null when it went to
+/// anyone last, or when sending it now is no update ([wasSent]), so a
+/// new send starts at nobody.
+String? lastSentTo(Store store, String noteId) =>
+    wasSent(store, noteId) ? store.localSetting('$sentToPrefix$noteId') : null;
 
 /// Who a Sent Item opened here comes from, as far as this Device knows
 /// their Profile (ADR 0017, #51).

@@ -86,4 +86,78 @@ void main() {
       ),
     );
   });
+
+  group('an offer to undo (#268)', () {
+    testWidgets('shows "Undo" at its end, and its tap undoes once', (
+      tester,
+    ) async {
+      await pumpApp(tester);
+      var undone = 0;
+      announcements.offerUndo('Line deleted', () => undone++);
+      await tester.pumpAndSettle();
+      expect(find.text('Line deleted'), findsOneWidget);
+      expect(find.byKey(const ValueKey('announcement-undo')), findsOneWidget);
+      expect(
+        tester.getRect(find.text('Undo')).left,
+        greaterThan(tester.getRect(find.text('Line deleted')).right),
+      );
+      // A screen reader hears what the tap does.
+      final strip = tester.widget<Semantics>(
+        find.ancestor(
+          of: find.text('Line deleted'),
+          matching: find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.liveRegion == true,
+          ),
+        ),
+      );
+      expect(strip.properties.hintOverrides?.onTapHint, 'Undo');
+
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(undone, 1);
+      expect(find.text('Line deleted'), findsNothing);
+    });
+
+    testWidgets('goes by itself after ten seconds without undoing, and the '
+        'next one shows', (tester) async {
+      await pumpApp(tester);
+      var undone = 0;
+      announcements
+        ..announce('Saved')
+        ..offerUndo('Line deleted', () => undone++);
+      await tester.pumpAndSettle();
+      // It shows before what waits.
+      expect(find.text('Line deleted'), findsOneWidget);
+      expect(find.text('Saved'), findsNothing);
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.text('Line deleted'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Line deleted'), findsNothing);
+      expect(undone, 0);
+      // What waited never goes by itself.
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 30));
+      expect(find.text('Saved'), findsOneWidget);
+    });
+
+    testWidgets('a newer offer takes the place of the one before, with its '
+        'own ten seconds', (tester) async {
+      await pumpApp(tester);
+      final undone = <String>[];
+      announcements.offerUndo('Line deleted', () => undone.add('line'));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
+      announcements.offerUndo('Entry deleted', () => undone.add('entry'));
+      await tester.pumpAndSettle();
+      expect(find.text('Line deleted'), findsNothing);
+      expect(find.text('Entry deleted'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      expect(find.text('Entry deleted'), findsOneWidget);
+      await tester.tap(find.text('Entry deleted'));
+      await tester.pumpAndSettle();
+      expect(undone, ['entry']);
+      expect(announcements.visible, isNull);
+    });
+  });
 }

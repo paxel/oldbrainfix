@@ -30,6 +30,7 @@
           "struck": false,
           "checkedAt": null,
           "backOn": null,
+          "backIn": null,
           "cameBackOn": null,
           "order": "V"
         },
@@ -40,6 +41,7 @@
           "struck": false,
           "checkedAt": null,
           "backOn": null,
+          "backIn": null,
           "cameBackOn": null,
           "order": "W"
         }
@@ -84,6 +86,7 @@
           "struck": false,
           "checkedAt": null,
           "backOn": null,
+          "backIn": null,
           "cameBackOn": null,
           "order": "X"
         },
@@ -94,6 +97,7 @@
           "struck": false,
           "checkedAt": null,
           "backOn": null,
+          "backIn": null,
           "cameBackOn": null,
           "order": "Y"
         },
@@ -104,6 +108,7 @@
           "struck": true,
           "checkedAt": "2026-01-05T09:00:00.000Z",
           "backOn": "2026-01-19",
+          "backIn": "12d",
           "cameBackOn": null,
           "order": "V"
         }
@@ -137,6 +142,7 @@
           "struck": false,
           "checkedAt": null,
           "backOn": null,
+          "backIn": null,
           "cameBackOn": null,
           "order": "X"
         }

@@ -9,6 +9,7 @@ import '../l10n/app_localizations.dart';
 import 'l10n.dart';
 import 'ocr_platform.dart' show GeneratedTextLabel;
 import 'place_names.dart';
+import 'routine_editor_screen.dart' show deviceWallClock;
 
 /// The speech models Transcripts can be made with (ADR 0007):
 /// whisper.cpp's multilingual models, for English and German. One is
@@ -410,7 +411,9 @@ class SpeechModel extends ChangeNotifier {
 /// recording that cannot be transcribed is left alone until the next
 /// start; it is never lost, as the recording itself is always kept.
 /// Asked to, it transcribes one recording again, ahead of the others
-/// and whether or not it has a Transcript ([transcribeAgain]).
+/// and whether or not it has a Transcript ([transcribeAgain]). A voice
+/// capture said into a Shopping List gets the items said added to it
+/// with its last Transcript, once ([ShoppingLists.addOwedLines], #311).
 class Transcriber extends ChangeNotifier {
   final Notes notes;
   final SpeechModel model;
@@ -543,7 +546,14 @@ class Transcriber extends ChangeNotifier {
           _skipped.add(next.hash);
         } else if (kept) {
           _skipped.remove(next.hash);
-          notes.setTranscript(next.noteId, next.hash, text);
+          // A voice capture said into a Shopping List gets the items said
+          // as Lines with it, once (#311).
+          final transcript = text;
+          notes.store.batch(() {
+            notes.setTranscript(next.noteId, next.hash, transcript);
+            ShoppingLists(notes.store)
+                .addOwedLines(next.noteId, deviceWallClock);
+          });
         }
         waiting?.complete(kept);
         waiting = null;

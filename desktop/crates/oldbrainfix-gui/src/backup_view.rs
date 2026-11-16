@@ -5,7 +5,9 @@
 //! weekly Backup and writes one now; and the first start's view that
 //! asks whether the user is new, then offers the Starter Set, adds a
 //! Device of their own or restores a Backup into the empty log with the
-//! passphrase or the recovery key.
+//! passphrase or the recovery key, or rebuilds a vault into it (#267);
+//! and a Backup opened to take Notes back from it (#285), on a page of
+//! its own.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -14,11 +16,11 @@ use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::backup::{self, Header, MIN_PASSPHRASE, Problem};
 use oldbrainfix_core::profile::OwnProfile;
 use oldbrainfix_core::recovery::{self, Sheet};
-use oldbrainfix_core::{Error, Store};
+use oldbrainfix_core::{Error, PackTicks, Store};
 
 use crate::app::Wall;
 use crate::l10n::L10n;
-use crate::theme;
+use crate::{pack_view, theme};
 
 /// The local setting saying the first start's view was answered.
 const RESTORE_OFFERED: &str = "restoreOffered";
@@ -47,6 +49,8 @@ pub enum BackupAction {
     Weekly(bool),
     /// Write a Backup now.
     Now,
+    /// Open a Backup… to take Notes back from it (#285).
+    OpenNotes,
 }
 
 /// The passphrase as typed into the Backups card, and why it was not
@@ -113,6 +117,17 @@ pub fn card(
     ui.label(RichText::new(t.backups_title()).strong().color(text));
     ui.label(RichText::new(t.backups_intro()).small().color(weak));
     own_backups(ui, t, store, wall, form, actions);
+}
+
+/// The card "Take Notes back" (#285), set up or not: what it is for,
+/// then Open a Backup…; whether that was clicked.
+pub fn notes_card(ui: &mut Ui, t: &L10n) -> bool {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.label(RichText::new(t.backup_open_title()).strong().color(text));
+    ui.label(RichText::new(t.backup_open_intro()).small().color(weak));
+    ui.button(RichText::new(t.backup_open()).color(text))
+        .clicked()
 }
 
 /// The Backups: set up, the Recovery Sheet, the folder, the weekly
@@ -246,6 +261,9 @@ pub enum WelcomeAction {
     Pick,
     /// Restore the file chosen with what was typed.
     Restore,
+    /// Choose a vault's folder and rebuild it into the empty log (#267,
+    /// ADR 0050).
+    Rebuild,
     /// A sync with the other Device went through; go on.
     Synced,
     /// Back to the three choices, nothing kept.
@@ -270,12 +288,15 @@ pub struct Welcome {
     /// Whether the key typed is no recovery key; said red under the
     /// field until it changes.
     pub code_invalid: bool,
+    /// While a vault is rebuilt: how many of its files were read, of how
+    /// many.
+    pub rebuilding: Option<(usize, usize)>,
 }
 
 impl Welcome {
-    /// Whether the view shows the three choices.
+    /// Whether the view shows the choices.
     pub fn choosing(&self) -> bool {
-        self.starter.is_none() && !self.adding && self.file.is_none()
+        self.starter.is_none() && !self.adding && self.file.is_none() && self.rebuilding.is_none()
     }
 }
 
@@ -308,6 +329,15 @@ pub fn welcome(
     }
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
+    if let Some((done, total)) = state.rebuilding {
+        ui.heading(RichText::new(t.vault_rebuild()).color(text));
+        ui.horizontal(|ui| {
+            ui.add(egui::Spinner::new());
+            let said = t.vault_rebuilding(done as i64, total as i64);
+            ui.label(RichText::new(said).color(weak));
+        });
+        return;
+    }
     let Some((_, header)) = &state.file else {
         ui.heading(RichText::new(t.first_start_title()).color(text));
         ui.label(RichText::new(t.first_start_intro()).color(text));
@@ -320,6 +350,9 @@ pub fn welcome(
         }
         if choice(ui, t.restore_offer_detail(), t.restore_offer()) {
             actions.push(WelcomeAction::Pick);
+        }
+        if choice(ui, t.vault_rebuild_detail(), t.vault_rebuild()) {
+            actions.push(WelcomeAction::Rebuild);
         }
         return;
     };
@@ -422,4 +455,162 @@ pub fn unlock(t: &L10n, welcome: &Welcome) -> Result<[u8; backup::KEY_BYTES], Un
             Err(Unlocked::Failed(cause, fix, format!("restore: {e}")))
         }
     }
+}
+
+/// Why a Backup opened to take Notes back from it (#285) refuses, and
+/// what to do, as the phone's `backupRefusal` says it: a damaged one
+/// asks for an older Backup, as nothing was changed.
+pub fn open_refusal(t: &L10n, error: &Error) -> (&'static str, &'static str) {
+    match error {
+        Error::Backup(Problem::Damaged) => (t.restore_damaged_cause(), t.backup_open_damaged_fix()),
+        _ => restore_failure(t, error),
+    }
+}
+
+/// What the user asked for on the page of a Backup opened (#285).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackupNotesAction {
+    /// Open it with what was typed.
+    Open,
+    /// Take the ticked Notes in as copies.
+    Add,
+}
+
+/// A Backup opened to take Notes back from it (#285, Q682 (a)), on a
+/// page of its own over the Backups dialog: the file and its header,
+/// what is typed to open it, then its Notes as a Pack's tree, the ones
+/// ticked, and whether it is being read or added off the window's
+/// thread. The passphrase and the recovery key go once it is open.
+pub struct BackupNotes {
+    pub path: PathBuf,
+    pub header: Header,
+    pub passphrase: String,
+    pub code: String,
+    /// Whether the key typed is no recovery key; said red under the
+    /// field until it changes.
+    pub code_invalid: bool,
+    pub opened: Option<Box<backup::OpenedBackup>>,
+    pub ticks: PackTicks,
+    pub worked: pack_view::Worked,
+    pub busy: bool,
+}
+
+impl BackupNotes {
+    /// The Backup at `path`, with its `header`, not open yet.
+    pub fn new(path: PathBuf, header: Header) -> BackupNotes {
+        BackupNotes {
+            path,
+            header,
+            passphrase: String::new(),
+            code: String::new(),
+            code_invalid: false,
+            opened: None,
+            ticks: PackTicks::new(),
+            worked: pack_view::Worked::default(),
+            busy: false,
+        }
+    }
+
+    /// Its Notes shown, none ticked but everything under each; what was
+    /// typed to open it gone.
+    pub fn show(&mut self, opened: backup::OpenedBackup) {
+        self.ticks = opened.pack.backup_ticks();
+        self.opened = Some(Box::new(opened));
+        self.passphrase.clear();
+        self.code.clear();
+        self.busy = false;
+    }
+}
+
+/// The page of a Backup opened (#285), as the phone's
+/// `BackupNotesScreen`: first the passphrase or the recovery key, as
+/// restoring asks for them, then its Notes as a Pack's tree under its
+/// date, the ones from its Trash said to be there, none ticked; "Untick
+/// all" goes back to that start, and Add is greyed while no Note is
+/// ticked or it is being read.
+pub fn notes_page(
+    ui: &mut Ui,
+    t: &L10n,
+    wall: &Wall,
+    state: &mut BackupNotes,
+    asked: &mut Option<BackupNotesAction>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.heading(RichText::new(t.backup_open_page_title()).color(text));
+    ui.add_space(8.0);
+    let created = match &state.opened {
+        Some(opened) => opened.created,
+        None => state.header.created,
+    };
+    let made = wall(created).format("%Y-%m-%d %H:%M").to_string();
+    ui.label(RichText::new(t.restore_file(&made)).strong().color(text));
+    let Some(opened) = &state.opened else {
+        ui.label(RichText::new(t.backup_open_unlock_intro()).color(weak));
+        ui.add_space(4.0);
+        secret(
+            ui,
+            t,
+            "backup notes passphrase",
+            t.backup_passphrase(),
+            &mut state.passphrase,
+        );
+        ui.label(RichText::new(t.restore_or()).color(weak));
+        let code = ui.add(
+            TextEdit::singleline(&mut state.code)
+                .id(Id::new("backup notes code"))
+                .hint_text(t.restore_code_label())
+                .text_color(text)
+                .desired_width(f32::INFINITY),
+        );
+        crate::text_menu::show(ui, t, &code, &state.code);
+        if code.changed() {
+            state.code_invalid = false;
+        }
+        if state.code_invalid {
+            let error = ui.visuals().error_fg_color;
+            ui.label(RichText::new(t.restore_invalid_code()).color(error));
+        }
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            if theme::main_action(ui, !state.busy, t.backup_open_start()) {
+                *asked = Some(BackupNotesAction::Open);
+            }
+            if state.busy {
+                ui.spinner();
+                ui.label(RichText::new(t.backup_open_working()).color(weak));
+            }
+        });
+        return;
+    };
+    let pack = &opened.pack;
+    ui.label(RichText::new(t.backup_notes_hint()).color(weak));
+    ui.horizontal(|ui| {
+        if ui
+            .button(RichText::new(t.pack_tick_all()).color(text))
+            .clicked()
+        {
+            state.ticks = pack.all_keys();
+        }
+        // Nothing of a Note ticked, everything under each: a Note ticked
+        // again comes back whole.
+        if ui
+            .button(RichText::new(t.pack_untick_all()).color(text))
+            .clicked()
+        {
+            state.ticks = pack.backup_ticks();
+        }
+    });
+    pack_view::tree(ui, t, pack, &mut state.ticks, &opened.trashed);
+    ui.separator();
+    let picked = state.worked.of(pack, &state.ticks).0 > 0;
+    ui.horizontal(|ui| {
+        if theme::main_action(ui, picked && !state.busy, t.pack_add()) {
+            *asked = Some(BackupNotesAction::Add);
+        }
+        if state.busy {
+            ui.spinner();
+        }
+    });
+    pack_view::nothing_ticked(ui, t, picked);
 }

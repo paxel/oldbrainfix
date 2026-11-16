@@ -108,14 +108,15 @@ impl PersonView {
 /// The person's Profile: their picture, name and code, verified or not,
 /// "Compare codes", "Send yours back" while `back` offers it, "Send
 /// changes" when changes travel with them as files, and the
-/// name and picture for the user, with the field `name` for the name;
-/// then Block, or Unblock.
+/// name and picture for the user, with the field `name` for the name,
+/// which takes the keyboard while `focus` (#277); then Block, or Unblock.
 pub fn form(
     ui: &mut Ui,
     t: &L10n,
     pictures: &mut Pictures,
     person: &PersonView,
     (comparing, name, back): (Comparing, &mut String, SendBack),
+    focus: bool,
     actions: &mut Vec<PersonAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -225,7 +226,7 @@ pub fn form(
         });
         ui.label(RichText::new(t.newer_version_needed()).color(weak));
     } else {
-        for_me(ui, t, pictures, person, (name, &theirs), actions);
+        for_me(ui, t, pictures, person, (name, &theirs, focus), actions);
     }
     ui.separator();
     let (label, asked) = if person.blocked {
@@ -245,7 +246,7 @@ fn for_me(
     t: &L10n,
     pictures: &mut Pictures,
     person: &PersonView,
-    (name, theirs): (&mut String, &str),
+    (name, theirs, focus): (&mut String, &str, bool),
     actions: &mut Vec<PersonAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -278,6 +279,9 @@ fn for_me(
             .desired_width(320.0),
     );
     crate::text_menu::show(ui, t, &field, name);
+    if focus {
+        field.request_focus();
+    }
     field.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, t.person_for_me_name()));
     if field.lost_focus() {
         actions.push(PersonAction::Rename(name.clone()));

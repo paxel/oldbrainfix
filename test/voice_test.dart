@@ -400,21 +400,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(NoteEditorScreen), findsOneWidget);
 
-      final buttons = find.descendant(
-        of: find.byType(NoteEditorScreen),
-        matching: find.byType(RecordingButton),
-      );
       Finder play(Finder button) =>
           find.descendant(of: button, matching: find.byIcon(Icons.play_arrow));
-      await tap(tester, play(buttons.first));
-      expect(voice.played, [first]);
-      // The merged Note's Section sits low on the page.
-      final low = find.byWidgetPredicate(
-        (w) => w is RecordingButton && w.hash == merged.recordings.single,
-      );
-      await reveal(tester, low);
-      await tap(tester, play(low));
-      expect(voice.played, [first, second]);
+      Finder of(String hash) =>
+          find.byWidgetPredicate((w) => w is RecordingButton && w.hash == hash);
+      // The merged Note's Section reads on in the Note's text (#307), the
+      // Note's own recording under the badges, lower on the page.
+      final section = of(merged.recordings.single);
+      await reveal(tester, section);
+      await tap(tester, play(section));
+      expect(voice.played, [second]);
+      final own = of(into.recordings.single);
+      await reveal(tester, own);
+      await tap(tester, play(own));
+      expect(voice.played, [second, first]);
     });
   });
 

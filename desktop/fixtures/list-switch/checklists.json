@@ -32,7 +32,9 @@
     "note:0000000000000000000000000000000a": false,
     "note:00000000000000000000000000000012": false,
     "note:0000000000000000000000000000001c": false,
-    "note:0000000000000000000000000000001e": true
+    "note:0000000000000000000000000000001e": true,
+    "note:0000000000000000000000000000001f": false,
+    "note:00000000000000000000000000000023": false
   },
   "agenda": [
     {
@@ -47,15 +49,45 @@
     "note:0000000000000000000000000000000a": "lines",
     "note:00000000000000000000000000000012": "lines",
     "note:0000000000000000000000000000001c": "lines",
-    "note:0000000000000000000000000000001e": "lines"
+    "note:0000000000000000000000000000001e": "lines",
+    "note:0000000000000000000000000000001f": "lines",
+    "note:00000000000000000000000000000023": "lines"
   },
   "mayShowOnAgenda": {
     "note:00000000000000000000000000000001": false,
     "note:0000000000000000000000000000000a": true,
     "note:00000000000000000000000000000012": false,
     "note:0000000000000000000000000000001c": false,
-    "note:0000000000000000000000000000001e": false
+    "note:0000000000000000000000000000001e": false,
+    "note:0000000000000000000000000000001f": false,
+    "note:00000000000000000000000000000023": false
   },
+  "checkedToday": [
+    {
+      "now": "2026-01-01T10:03:25.000Z",
+      "rows": [
+        {
+          "note": "note:0000000000000000000000000000000a",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": [
+            "line:00000000000000000000000000000011"
+          ]
+        }
+      ]
+    },
+    {
+      "now": "2026-01-02T10:03:25.000Z",
+      "rows": [
+        {
+          "note": "note:0000000000000000000000000000000a",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        }
+      ]
+    }
+  ],
   "plain": {
     "note:0000000000000000000000000000000a": "Shop\nEggs\n✓ Milk"
   },
@@ -314,6 +346,327 @@
       "text": "Tab",
       "indent": false,
       "checked": false
+    }
+  ],
+  "headingNames": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Heading",
+    null,
+    null,
+    null,
+    null,
+    "Weekly",
+    "Tab",
+    "Two",
+    "Six",
+    null,
+    null,
+    null,
+    "Indented",
+    "Four spaces",
+    "Title #",
+    "Wide",
+    "Weekly:",
+    "Shopping:",
+    ":",
+    null,
+    "✓ Done:",
+    "- Fruit:",
+    "Fruit :"
+  ],
+  "listsOfText": [
+    {
+      "name": "",
+      "lines": []
+    },
+    {
+      "name": "",
+      "lines": []
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Tent",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Tent",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Weekly",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Weekly",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Shopping:",
+      "lines": [
+        {
+          "text": "Milk",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Eggs",
+          "indent": false,
+          "checked": true
+        }
+      ]
+    },
+    {
+      "name": "Shopping:",
+      "lines": [
+        {
+          "text": "Milk",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Eggs",
+          "indent": false,
+          "checked": true
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "# Weekly",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "# Weekly",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "- Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "- ✓ Tent",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Tent",
+          "indent": false,
+          "checked": true
+        }
+      ]
+    },
+    {
+      "name": "Trip",
+      "lines": [
+        {
+          "text": "- Map",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "- Pen",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Trip",
+      "lines": [
+        {
+          "text": "Map",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Pen",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": true
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": true
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
     }
   ],
   "split": [

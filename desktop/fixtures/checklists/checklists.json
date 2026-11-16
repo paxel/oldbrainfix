@@ -117,16 +117,66 @@
       ],
       "checkedCount": 2,
       "count": 3
+    },
+    "note:00000000000000000000000000000017": {
+      "making": "00000000000000000000000000000018",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000019",
+          "text": "Socks",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:0000000000000000000000000000001a",
+          "text": "Blue",
+          "checked": false,
+          "checkedAt": null,
+          "parent": "line:00000000000000000000000000000019",
+          "order": "W"
+        },
+        {
+          "id": "line:0000000000000000000000000000001b",
+          "text": "Passport",
+          "checked": true,
+          "checkedAt": "2026-01-01T10:03:14.000Z",
+          "parent": null,
+          "order": "X"
+        }
+      ],
+      "checkedCount": 1,
+      "count": 3
+    },
+    "note:0000000000000000000000000000001c": {
+      "making": "0000000000000000000000000000001d",
+      "lines": [
+        {
+          "id": "line:0000000000000000000000000000001e",
+          "text": "Towel",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "V"
+        }
+      ],
+      "checkedCount": 0,
+      "count": 1
     }
   },
   "ofNotes": [
     "note:00000000000000000000000000000001",
-    "note:0000000000000000000000000000000d"
+    "note:0000000000000000000000000000000d",
+    "note:00000000000000000000000000000017",
+    "note:0000000000000000000000000000001c"
   ],
   "mayMake": {
     "note:00000000000000000000000000000001": false,
     "note:0000000000000000000000000000000d": false,
-    "note:00000000000000000000000000000016": true
+    "note:00000000000000000000000000000016": true,
+    "note:00000000000000000000000000000017": false,
+    "note:0000000000000000000000000000001c": false
   },
   "agenda": [
     {
@@ -140,21 +190,108 @@
       "open": 1,
       "count": 3,
       "shows": "lines"
+    },
+    {
+      "note": "note:00000000000000000000000000000017",
+      "open": 2,
+      "count": 3,
+      "shows": "lines"
+    },
+    {
+      "note": "note:0000000000000000000000000000001c",
+      "open": 1,
+      "count": 1,
+      "shows": "lines"
     }
   ],
   "onAgenda": {
     "note:00000000000000000000000000000001": "lines",
     "note:0000000000000000000000000000000d": "lines",
-    "note:00000000000000000000000000000016": "lines"
+    "note:00000000000000000000000000000016": "lines",
+    "note:00000000000000000000000000000017": "lines",
+    "note:0000000000000000000000000000001c": "lines"
   },
   "mayShowOnAgenda": {
     "note:00000000000000000000000000000001": true,
     "note:0000000000000000000000000000000d": true,
-    "note:00000000000000000000000000000016": false
+    "note:00000000000000000000000000000016": false,
+    "note:00000000000000000000000000000017": true,
+    "note:0000000000000000000000000000001c": true
   },
+  "checkedToday": [
+    {
+      "now": "2026-01-01T10:03:34.000Z",
+      "rows": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "open": 7,
+          "shows": "lines",
+          "checkedToday": [
+            "line:00000000000000000000000000000006",
+            "line:00000000000000000000000000000008",
+            "line:00000000000000000000000000000005"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000000d",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": [
+            "line:00000000000000000000000000000014",
+            "line:00000000000000000000000000000015"
+          ]
+        },
+        {
+          "note": "note:00000000000000000000000000000017",
+          "open": 2,
+          "shows": "lines",
+          "checkedToday": [
+            "line:0000000000000000000000000000001b"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000001c",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        }
+      ]
+    },
+    {
+      "now": "2026-01-02T10:03:34.000Z",
+      "rows": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "open": 7,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:0000000000000000000000000000000d",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:00000000000000000000000000000017",
+          "open": 2,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:0000000000000000000000000000001c",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        }
+      ]
+    }
+  ],
   "plain": {
     "note:00000000000000000000000000000001": "Packing\nMap\n✓ Passport\nTorch\n✓ Pegs\nSocks\n  Blue\n  Green\n  ✓ Red socks\nLast\nOdd",
-    "note:0000000000000000000000000000000d": "Shop\nOat milk\n✓ Eggs\n  ✓ Free range"
+    "note:0000000000000000000000000000000d": "Shop\nOat milk\n✓ Eggs\n  ✓ Free range",
+    "note:00000000000000000000000000000017": "Socks\n  Blue\n✓ Passport",
+    "note:0000000000000000000000000000001c": "Weekly\nTowel"
   },
   "rows": [
     null,
@@ -413,6 +550,327 @@
       "checked": false
     }
   ],
+  "headingNames": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Heading",
+    null,
+    null,
+    null,
+    null,
+    "Weekly",
+    "Tab",
+    "Two",
+    "Six",
+    null,
+    null,
+    null,
+    "Indented",
+    "Four spaces",
+    "Title #",
+    "Wide",
+    "Weekly:",
+    "Shopping:",
+    ":",
+    null,
+    "✓ Done:",
+    "- Fruit:",
+    "Fruit :"
+  ],
+  "listsOfText": [
+    {
+      "name": "",
+      "lines": []
+    },
+    {
+      "name": "",
+      "lines": []
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Tent",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Tent",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Weekly",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Weekly",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Shopping:",
+      "lines": [
+        {
+          "text": "Milk",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Eggs",
+          "indent": false,
+          "checked": true
+        }
+      ]
+    },
+    {
+      "name": "Shopping:",
+      "lines": [
+        {
+          "text": "Milk",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Eggs",
+          "indent": false,
+          "checked": true
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "# Weekly",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "# Weekly",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "- Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "- ✓ Tent",
+          "indent": false,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Tent",
+          "indent": false,
+          "checked": true
+        }
+      ]
+    },
+    {
+      "name": "Trip",
+      "lines": [
+        {
+          "text": "- Map",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "- Pen",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Trip",
+      "lines": [
+        {
+          "text": "Map",
+          "indent": false,
+          "checked": false
+        },
+        {
+          "text": "Pen",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": true
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "",
+      "lines": [
+        {
+          "text": "Socks",
+          "indent": false,
+          "checked": true
+        },
+        {
+          "text": "Blue",
+          "indent": true,
+          "checked": false
+        }
+      ]
+    }
+  ],
   "split": [
     "a",
     "b",
@@ -509,7 +967,9 @@
     {
       "occurrenceNow": {
         "note:00000000000000000000000000000001": null,
-        "note:0000000000000000000000000000000d": null
+        "note:0000000000000000000000000000000d": null,
+        "note:00000000000000000000000000000017": null,
+        "note:0000000000000000000000000000001c": null
       },
       "shownNow": {
         "note:00000000000000000000000000000001": {
@@ -629,13 +1089,61 @@
           ],
           "checkedCount": 2,
           "count": 3
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000019",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Blue",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000019",
+              "order": "W"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Passport",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:03:14.000Z",
+              "parent": null,
+              "order": "X"
+            }
+          ],
+          "checkedCount": 1,
+          "count": 3
+        },
+        "note:0000000000000000000000000000001c": {
+          "making": "0000000000000000000000000000001d",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001e",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 1
         }
       }
     },
     {
       "occurrenceNow": {
         "note:00000000000000000000000000000001": null,
-        "note:0000000000000000000000000000000d": null
+        "note:0000000000000000000000000000000d": null,
+        "note:00000000000000000000000000000017": null,
+        "note:0000000000000000000000000000001c": null
       },
       "shownNow": {
         "note:00000000000000000000000000000001": {
@@ -755,13 +1263,61 @@
           ],
           "checkedCount": 2,
           "count": 3
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000019",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Blue",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000019",
+              "order": "W"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Passport",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:03:14.000Z",
+              "parent": null,
+              "order": "X"
+            }
+          ],
+          "checkedCount": 1,
+          "count": 3
+        },
+        "note:0000000000000000000000000000001c": {
+          "making": "0000000000000000000000000000001d",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001e",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 1
         }
       }
     },
     {
       "occurrenceNow": {
         "note:00000000000000000000000000000001": null,
-        "note:0000000000000000000000000000000d": null
+        "note:0000000000000000000000000000000d": null,
+        "note:00000000000000000000000000000017": null,
+        "note:0000000000000000000000000000001c": null
       },
       "shownNow": {
         "note:00000000000000000000000000000001": {
@@ -881,13 +1437,61 @@
           ],
           "checkedCount": 2,
           "count": 3
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000019",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Blue",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000019",
+              "order": "W"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Passport",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:03:14.000Z",
+              "parent": null,
+              "order": "X"
+            }
+          ],
+          "checkedCount": 1,
+          "count": 3
+        },
+        "note:0000000000000000000000000000001c": {
+          "making": "0000000000000000000000000000001d",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001e",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 1
         }
       }
     },
     {
       "occurrenceNow": {
         "note:00000000000000000000000000000001": null,
-        "note:0000000000000000000000000000000d": null
+        "note:0000000000000000000000000000000d": null,
+        "note:00000000000000000000000000000017": null,
+        "note:0000000000000000000000000000001c": null
       },
       "shownNow": {
         "note:00000000000000000000000000000001": {
@@ -1007,13 +1611,61 @@
           ],
           "checkedCount": 2,
           "count": 3
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000019",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Blue",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000019",
+              "order": "W"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Passport",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:03:14.000Z",
+              "parent": null,
+              "order": "X"
+            }
+          ],
+          "checkedCount": 1,
+          "count": 3
+        },
+        "note:0000000000000000000000000000001c": {
+          "making": "0000000000000000000000000000001d",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001e",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 1
         }
       }
     },
     {
       "occurrenceNow": {
         "note:00000000000000000000000000000001": null,
-        "note:0000000000000000000000000000000d": null
+        "note:0000000000000000000000000000000d": null,
+        "note:00000000000000000000000000000017": null,
+        "note:0000000000000000000000000000001c": null
       },
       "shownNow": {
         "note:00000000000000000000000000000001": {
@@ -1133,6 +1785,52 @@
           ],
           "checkedCount": 2,
           "count": 3
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000019",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Blue",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000019",
+              "order": "W"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Passport",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:03:14.000Z",
+              "parent": null,
+              "order": "X"
+            }
+          ],
+          "checkedCount": 1,
+          "count": 3
+        },
+        "note:0000000000000000000000000000001c": {
+          "making": "0000000000000000000000000000001d",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001e",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 1
         }
       }
     }

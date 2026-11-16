@@ -744,6 +744,161 @@
       ]
     },
     {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "19:00"
+        ]
+      },
+      "text": "Every day at 7 pm",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "00:00",
+          "12:00",
+          "19:30"
+        ]
+      },
+      "text": "Every day at 7:30PM, 12 am and 12 pm.",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every day at 13 pm, 0 am, 7:5 pm",
+      "unknown": [
+        {
+          "end": 12,
+          "start": 10
+        },
+        {
+          "end": 18,
+          "start": 13
+        },
+        {
+          "end": 24,
+          "start": 20
+        },
+        {
+          "end": 32,
+          "start": 26
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every month on day 15 am",
+      "unknown": [
+        {
+          "end": 14,
+          "start": 12
+        },
+        {
+          "end": 18,
+          "start": 15
+        },
+        {
+          "end": 24,
+          "start": 19
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "tomorrow",
+      "unknown": [
+        {
+          "end": 8,
+          "start": 0
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every day at 19 Uhr",
+      "unknown": [
+        {
+          "end": 12,
+          "start": 10
+        },
+        {
+          "end": 15,
+          "start": 13
+        },
+        {
+          "end": 19,
+          "start": 16
+        }
+      ]
+    },
+    {
       "locale": "de",
       "schedule": {
         "repeat": {
@@ -1134,6 +1289,147 @@
           "start": 6
         }
       ]
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "19:00"
+        ]
+      },
+      "text": "Jeden Tag um 19 Uhr",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:30"
+        ]
+      },
+      "text": "Jeden Tag um 8:30 UHR.",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Tag um 24 Uhr",
+      "unknown": [
+        {
+          "end": 12,
+          "start": 10
+        },
+        {
+          "end": 19,
+          "start": 13
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Monat am 15 Uhr",
+      "unknown": [
+        {
+          "end": 14,
+          "start": 12
+        },
+        {
+          "end": 21,
+          "start": 15
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Tag um 7 pm",
+      "unknown": [
+        {
+          "end": 12,
+          "start": 10
+        },
+        {
+          "end": 14,
+          "start": 13
+        },
+        {
+          "end": 17,
+          "start": 15
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": null,
+      "text": "morgen",
+      "unknown": [
+        {
+          "end": 6,
+          "start": 0
+        }
+      ]
     }
   ],
   "suggested": [
@@ -1155,6 +1451,26 @@
           "end": 0,
           "start": 0,
           "text": "Weekdays"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Today"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Tonight"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Tomorrow"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "In"
         }
       ],
       "text": ""
@@ -1627,9 +1943,200 @@
           "end": 4,
           "start": 4,
           "text": "Weekdays"
+        },
+        {
+          "end": 4,
+          "start": 4,
+          "text": "Today"
+        },
+        {
+          "end": 4,
+          "start": 4,
+          "text": "Tonight"
+        },
+        {
+          "end": 4,
+          "start": 4,
+          "text": "Tomorrow"
+        },
+        {
+          "end": 4,
+          "start": 4,
+          "text": "In"
         }
       ],
       "text": "zzz "
+    },
+    {
+      "cursor": 1,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 1,
+          "start": 0,
+          "text": "Today"
+        },
+        {
+          "end": 1,
+          "start": 0,
+          "text": "Tonight"
+        },
+        {
+          "end": 1,
+          "start": 0,
+          "text": "Tomorrow"
+        }
+      ],
+      "text": "T"
+    },
+    {
+      "cursor": 9,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 9,
+          "start": 9,
+          "text": "evening"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "at"
+        }
+      ],
+      "text": "Tomorrow "
+    },
+    {
+      "cursor": 8,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 8,
+          "start": 8,
+          "text": "at"
+        }
+      ],
+      "text": "Tonight "
+    },
+    {
+      "cursor": 7,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 7,
+          "start": 6,
+          "text": "evening"
+        }
+      ],
+      "text": "Today e"
+    },
+    {
+      "cursor": 3,
+      "locale": "en",
+      "suggestions": [],
+      "text": "In "
+    },
+    {
+      "cursor": 5,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 5,
+          "start": 5,
+          "text": "minutes"
+        },
+        {
+          "end": 5,
+          "start": 5,
+          "text": "hours"
+        },
+        {
+          "end": 5,
+          "start": 5,
+          "text": "days"
+        },
+        {
+          "end": 5,
+          "start": 5,
+          "text": "weeks"
+        }
+      ],
+      "text": "In 2 "
+    },
+    {
+      "cursor": 5,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 5,
+          "start": 5,
+          "text": "minute"
+        },
+        {
+          "end": 5,
+          "start": 5,
+          "text": "hour"
+        },
+        {
+          "end": 5,
+          "start": 5,
+          "text": "day"
+        },
+        {
+          "end": 5,
+          "start": 5,
+          "text": "week"
+        }
+      ],
+      "text": "in a "
+    },
+    {
+      "cursor": 6,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 6,
+          "start": 5,
+          "text": "hour"
+        }
+      ],
+      "text": "in 1 h"
+    },
+    {
+      "cursor": 14,
+      "locale": "en",
+      "suggestions": [],
+      "text": "Tomorrow 7 pm "
+    },
+    {
+      "cursor": 10,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 10,
+          "start": 10,
+          "text": "at"
+        }
+      ],
+      "text": "in 3 days "
+    },
+    {
+      "cursor": 11,
+      "locale": "en",
+      "suggestions": [],
+      "text": "Tomorrow 7 "
+    },
+    {
+      "cursor": 15,
+      "locale": "en",
+      "suggestions": [],
+      "text": "Once on 1/1, 3 "
+    },
+    {
+      "cursor": 6,
+      "locale": "en",
+      "suggestions": [],
+      "text": "Once t"
     },
     {
       "cursor": 0,
@@ -1664,6 +2171,21 @@
           "end": 0,
           "start": 0,
           "text": "Wochentags"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Heute"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Morgen"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "In"
         }
       ],
       "text": ""
@@ -1926,6 +2448,115 @@
       "text": "Jeden Tag "
     },
     {
+      "cursor": 1,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 1,
+          "start": 0,
+          "text": "Heute"
+        }
+      ],
+      "text": "H"
+    },
+    {
+      "cursor": 6,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Abend"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "um"
+        }
+      ],
+      "text": "Heute "
+    },
+    {
+      "cursor": 12,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 12,
+          "start": 12,
+          "text": "um"
+        }
+      ],
+      "text": "Heute Abend "
+    },
+    {
+      "cursor": 7,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 7,
+          "start": 7,
+          "text": "Abend"
+        },
+        {
+          "end": 7,
+          "start": 7,
+          "text": "um"
+        }
+      ],
+      "text": "Morgen "
+    },
+    {
+      "cursor": 6,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 6,
+          "start": 5,
+          "text": "Tagen"
+        }
+      ],
+      "text": "In 3 T"
+    },
+    {
+      "cursor": 9,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Minute"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Stunde"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Tag"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Woche"
+        }
+      ],
+      "text": "in einer "
+    },
+    {
+      "cursor": 7,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 7,
+          "start": 5,
+          "text": "Stunden"
+        }
+      ],
+      "text": "in 2 St"
+    },
+    {
       "cursor": 10,
       "locale": "en",
       "suggestions": [
@@ -1936,6 +2567,6130 @@
         }
       ],
       "text": "Every 2 we at 08:00"
+    }
+  ],
+  "relative": [
+    {
+      "now": {
+        "dayStart": "07:30",
+        "time": "14:20",
+        "today": "2026-11-03"
+      },
+      "quick": [
+        {
+          "chip": "inAnHour",
+          "day": "2026-11-03",
+          "time": "15:20"
+        },
+        {
+          "chip": "tonight",
+          "day": "2026-11-03",
+          "time": "19:00"
+        },
+        {
+          "chip": "tomorrow",
+          "day": "2026-11-04",
+          "time": "07:30"
+        },
+        {
+          "chip": "inAWeek",
+          "day": "2026-11-10",
+          "time": "07:30"
+        }
+      ],
+      "read": [
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "17:00"
+            ]
+          },
+          "text": "Today at 17:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tonight",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "TOMORROW",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Tomorrow 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "tomorrow at 7:30pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow night",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "today evening, at 9 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "14:50"
+            ]
+          },
+          "text": "in 30 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "16:20"
+            ]
+          },
+          "text": "in 2 hours",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "15:20"
+            ]
+          },
+          "text": "in an hour",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "15:20"
+            ]
+          },
+          "text": "In 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "15:50"
+            ]
+          },
+          "text": "in 90 min",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "in 3 days",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "in a week",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-17",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 2 weeks 9 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "10:00"
+            ]
+          },
+          "text": "in 1 week at 10:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "16:20"
+            ]
+          },
+          "text": "in 2 hours at 08:00",
+          "unknown": [
+            {
+              "end": 19,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "16:20"
+            ]
+          },
+          "text": "in 2 hours 08:00, 09:00",
+          "unknown": [
+            {
+              "end": 16,
+              "start": 11
+            },
+            {
+              "end": 23,
+              "start": 18
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 7 pm 8 pm",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "tomorrow, 3 times",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 10
+            },
+            {
+              "end": 17,
+              "start": 12
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "tomorrow until 12/1",
+          "unknown": [
+            {
+              "end": 14,
+              "start": 9
+            },
+            {
+              "end": 19,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-01",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "tomorrow from 12/1",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today 13 pm",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today 0 am",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "00:00"
+            ]
+          },
+          "text": "today 12 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "12:00"
+            ]
+          },
+          "text": "today 12 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 0 minutes",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3 months",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 11,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 123456 days",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 9,
+              "start": 3
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "3943-05-11",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "in 99999 weeks",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-12",
+            "times": [
+              "00:59"
+            ]
+          },
+          "text": "in 99999 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "Once tomorrow",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Once on tomorrow at 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Once on today evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "Once on tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "Once in 3 days",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 5
+            },
+            {
+              "end": 9,
+              "start": 8
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "Every day tomorrow",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "heute",
+          "unknown": [
+            {
+              "end": 5,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Every day at 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 🧠 7 pm",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "heute Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:30"
+            ]
+          },
+          "text": "heute Abend um 20:30",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "Morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "Morgen um 8 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "morgen 19:30 Uhr.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "16:20"
+            ]
+          },
+          "text": "in 2 Stunden",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "14:21"
+            ]
+          },
+          "text": "in einer Minute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "in 3 Tagen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "in 3 Tage",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "in einer Woche",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "16:20"
+            ]
+          },
+          "text": "in 2 Std.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "15:20"
+            ]
+          },
+          "text": "in 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr, einmal",
+          "unknown": [
+            {
+              "end": 21,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Einmal am morgen um 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "Einmal morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "in 0 Minuten",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "07:30"
+            ]
+          },
+          "text": "morgen 7 pm",
+          "unknown": [
+            {
+              "end": 8,
+              "start": 7
+            },
+            {
+              "end": 11,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-05",
+            "times": []
+          },
+          "text": "Einmal am 5.11.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "tonight",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Jeden Tag um 19 Uhr",
+          "unknown": []
+        }
+      ]
+    },
+    {
+      "now": {
+        "dayStart": "08:00",
+        "time": "19:00",
+        "today": "2026-11-03"
+      },
+      "quick": [
+        {
+          "chip": "inAnHour",
+          "day": "2026-11-03",
+          "time": "20:00"
+        },
+        {
+          "chip": "tomorrow",
+          "day": "2026-11-04",
+          "time": "08:00"
+        },
+        {
+          "chip": "inAWeek",
+          "day": "2026-11-10",
+          "time": "08:00"
+        }
+      ],
+      "read": [
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "17:00"
+            ]
+          },
+          "text": "Today at 17:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tonight",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "TOMORROW",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Tomorrow 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "tomorrow at 7:30pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow night",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "today evening, at 9 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "in 30 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "in 2 hours",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "in an hour",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "In 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:30"
+            ]
+          },
+          "text": "in 90 min",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "in 3 days",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "in a week",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-17",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 2 weeks 9 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "10:00"
+            ]
+          },
+          "text": "in 1 week at 10:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "in 2 hours at 08:00",
+          "unknown": [
+            {
+              "end": 19,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "in 2 hours 08:00, 09:00",
+          "unknown": [
+            {
+              "end": 16,
+              "start": 11
+            },
+            {
+              "end": 23,
+              "start": 18
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 7 pm 8 pm",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "tomorrow, 3 times",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 10
+            },
+            {
+              "end": 17,
+              "start": 12
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "tomorrow until 12/1",
+          "unknown": [
+            {
+              "end": 14,
+              "start": 9
+            },
+            {
+              "end": 19,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-01",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "tomorrow from 12/1",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today 13 pm",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today 0 am",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "00:00"
+            ]
+          },
+          "text": "today 12 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "12:00"
+            ]
+          },
+          "text": "today 12 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 0 minutes",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3 months",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 11,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 123456 days",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 9,
+              "start": 3
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "3943-05-11",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "in 99999 weeks",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-12",
+            "times": [
+              "05:39"
+            ]
+          },
+          "text": "in 99999 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "Once tomorrow",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Once on tomorrow at 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Once on today evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "Once on tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "Once in 3 days",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 5
+            },
+            {
+              "end": 9,
+              "start": 8
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "Every day tomorrow",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "heute",
+          "unknown": [
+            {
+              "end": 5,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Every day at 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 🧠 7 pm",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "heute Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:30"
+            ]
+          },
+          "text": "heute Abend um 20:30",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "Morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "Morgen um 8 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "morgen 19:30 Uhr.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "in 2 Stunden",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:01"
+            ]
+          },
+          "text": "in einer Minute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "in 3 Tagen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "in 3 Tage",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "in einer Woche",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "in 2 Std.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "in 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr, einmal",
+          "unknown": [
+            {
+              "end": 21,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Einmal am morgen um 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "Einmal morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "in 0 Minuten",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "morgen 7 pm",
+          "unknown": [
+            {
+              "end": 8,
+              "start": 7
+            },
+            {
+              "end": 11,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-05",
+            "times": []
+          },
+          "text": "Einmal am 5.11.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "tonight",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Jeden Tag um 19 Uhr",
+          "unknown": []
+        }
+      ]
+    },
+    {
+      "now": {
+        "dayStart": "09:00",
+        "time": "23:30",
+        "today": "2026-12-31"
+      },
+      "quick": [
+        {
+          "chip": "inAnHour",
+          "day": "2027-01-01",
+          "time": "00:30"
+        },
+        {
+          "chip": "tomorrow",
+          "day": "2027-01-01",
+          "time": "09:00"
+        },
+        {
+          "chip": "inAWeek",
+          "day": "2027-01-07",
+          "time": "09:00"
+        }
+      ],
+      "read": [
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "today",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "17:00"
+            ]
+          },
+          "text": "Today at 17:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tonight",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "TOMORROW",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Tomorrow 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "tomorrow at 7:30pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow night",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "today evening, at 9 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "00:00"
+            ]
+          },
+          "text": "in 30 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "01:30"
+            ]
+          },
+          "text": "in 2 hours",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "00:30"
+            ]
+          },
+          "text": "in an hour",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "00:30"
+            ]
+          },
+          "text": "In 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "01:00"
+            ]
+          },
+          "text": "in 90 min",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-03",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 3 days",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-07",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in a week",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-14",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 2 weeks 9 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-07",
+            "times": [
+              "10:00"
+            ]
+          },
+          "text": "in 1 week at 10:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "01:30"
+            ]
+          },
+          "text": "in 2 hours at 08:00",
+          "unknown": [
+            {
+              "end": 19,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "01:30"
+            ]
+          },
+          "text": "in 2 hours 08:00, 09:00",
+          "unknown": [
+            {
+              "end": 16,
+              "start": 11
+            },
+            {
+              "end": 23,
+              "start": 18
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 7 pm 8 pm",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "tomorrow, 3 times",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 10
+            },
+            {
+              "end": 17,
+              "start": 12
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "tomorrow until 12/1",
+          "unknown": [
+            {
+              "end": 14,
+              "start": 9
+            },
+            {
+              "end": 19,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "tomorrow from 12/1",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "today 13 pm",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "today 0 am",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "00:00"
+            ]
+          },
+          "text": "today 12 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "12:00"
+            ]
+          },
+          "text": "today 12 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 0 minutes",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3 months",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 11,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 123456 days",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 9,
+              "start": 3
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "3943-07-08",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 99999 weeks",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-03-11",
+            "times": [
+              "10:09"
+            ]
+          },
+          "text": "in 99999 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "Once tomorrow",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Once on tomorrow at 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Once on today evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "Once on tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "Once in 3 days",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 5
+            },
+            {
+              "end": 9,
+              "start": 8
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "Every day tomorrow",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "heute",
+          "unknown": [
+            {
+              "end": 5,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Every day at 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 🧠 7 pm",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "heute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "heute Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "20:30"
+            ]
+          },
+          "text": "heute Abend um 20:30",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "Morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "Morgen um 8 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "morgen 19:30 Uhr.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "01:30"
+            ]
+          },
+          "text": "in 2 Stunden",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "23:31"
+            ]
+          },
+          "text": "in einer Minute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-03",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 3 Tagen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-03",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 3 Tage",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-07",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in einer Woche",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "01:30"
+            ]
+          },
+          "text": "in 2 Std.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "00:30"
+            ]
+          },
+          "text": "in 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr, einmal",
+          "unknown": [
+            {
+              "end": 21,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Einmal am morgen um 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "Einmal morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "in 0 Minuten",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-01",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "morgen 7 pm",
+          "unknown": [
+            {
+              "end": 8,
+              "start": 7
+            },
+            {
+              "end": 11,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-05",
+            "times": []
+          },
+          "text": "Einmal am 5.11.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "tonight",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-31",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Jeden Tag um 19 Uhr",
+          "unknown": []
+        }
+      ]
+    },
+    {
+      "now": {
+        "dayStart": "06:15",
+        "time": "00:00",
+        "today": "2026-11-03"
+      },
+      "quick": [
+        {
+          "chip": "inAnHour",
+          "day": "2026-11-03",
+          "time": "01:00"
+        },
+        {
+          "chip": "tonight",
+          "day": "2026-11-03",
+          "time": "19:00"
+        },
+        {
+          "chip": "tomorrow",
+          "day": "2026-11-04",
+          "time": "06:15"
+        },
+        {
+          "chip": "inAWeek",
+          "day": "2026-11-10",
+          "time": "06:15"
+        }
+      ],
+      "read": [
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "17:00"
+            ]
+          },
+          "text": "Today at 17:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tonight",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "TOMORROW",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Tomorrow 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "tomorrow at 7:30pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow night",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "21:00"
+            ]
+          },
+          "text": "today evening, at 9 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "00:30"
+            ]
+          },
+          "text": "in 30 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "02:00"
+            ]
+          },
+          "text": "in 2 hours",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "01:00"
+            ]
+          },
+          "text": "in an hour",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "01:00"
+            ]
+          },
+          "text": "In 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "01:30"
+            ]
+          },
+          "text": "in 90 min",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "in 3 days",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "in a week",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-17",
+            "times": [
+              "09:00"
+            ]
+          },
+          "text": "in 2 weeks 9 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "10:00"
+            ]
+          },
+          "text": "in 1 week at 10:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "02:00"
+            ]
+          },
+          "text": "in 2 hours at 08:00",
+          "unknown": [
+            {
+              "end": 19,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "02:00"
+            ]
+          },
+          "text": "in 2 hours 08:00, 09:00",
+          "unknown": [
+            {
+              "end": 16,
+              "start": 11
+            },
+            {
+              "end": 23,
+              "start": 18
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 7 pm 8 pm",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 14
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "tomorrow, 3 times",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 10
+            },
+            {
+              "end": 17,
+              "start": 12
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "tomorrow until 12/1",
+          "unknown": [
+            {
+              "end": 14,
+              "start": 9
+            },
+            {
+              "end": 19,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-12-01",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "tomorrow from 12/1",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today 13 pm",
+          "unknown": [
+            {
+              "end": 11,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "today 0 am",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "00:00"
+            ]
+          },
+          "text": "today 12 am",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "12:00"
+            ]
+          },
+          "text": "today 12 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 0 minutes",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 3 months",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 11,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "in 123456 days",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 9,
+              "start": 3
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "3943-05-11",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "in 99999 weeks",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2027-01-11",
+            "times": [
+              "10:39"
+            ]
+          },
+          "text": "in 99999 minutes",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "Once tomorrow",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Once on tomorrow at 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Once on today evening",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:00"
+            ]
+          },
+          "text": "Once on tonight 8 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "Once in 3 days",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 5
+            },
+            {
+              "end": 9,
+              "start": 8
+            },
+            {
+              "end": 14,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "Every day tomorrow",
+          "unknown": [
+            {
+              "end": 18,
+              "start": 10
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": null,
+          "text": "heute",
+          "unknown": [
+            {
+              "end": 5,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Every day at 7 pm",
+          "unknown": []
+        },
+        {
+          "locale": "en",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "tomorrow 🧠 7 pm",
+          "unknown": [
+            {
+              "end": 10,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "heute Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "20:30"
+            ]
+          },
+          "text": "heute Abend um 20:30",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "Morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "08:00"
+            ]
+          },
+          "text": "Morgen um 8 Uhr",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen Abend",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:30"
+            ]
+          },
+          "text": "morgen 19:30 Uhr.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "02:00"
+            ]
+          },
+          "text": "in 2 Stunden",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "00:01"
+            ]
+          },
+          "text": "in einer Minute",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "in 3 Tagen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-06",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "in 3 Tage",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-10",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "in einer Woche",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "02:00"
+            ]
+          },
+          "text": "in 2 Std.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "01:00"
+            ]
+          },
+          "text": "in 1 h",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": []
+          },
+          "text": "heute 25 Uhr",
+          "unknown": [
+            {
+              "end": 12,
+              "start": 6
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "morgen 19 Uhr, einmal",
+          "unknown": [
+            {
+              "end": 21,
+              "start": 15
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "15:00"
+            ]
+          },
+          "text": "Einmal am morgen um 15:00",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "Einmal morgen",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "in 0 Minuten",
+          "unknown": [
+            {
+              "end": 2,
+              "start": 0
+            },
+            {
+              "end": 4,
+              "start": 3
+            },
+            {
+              "end": 12,
+              "start": 5
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-04",
+            "times": [
+              "06:15"
+            ]
+          },
+          "text": "morgen 7 pm",
+          "unknown": [
+            {
+              "end": 8,
+              "start": 7
+            },
+            {
+              "end": 11,
+              "start": 9
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "once",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-05",
+            "times": []
+          },
+          "text": "Einmal am 5.11.",
+          "unknown": []
+        },
+        {
+          "locale": "de",
+          "schedule": null,
+          "text": "tonight",
+          "unknown": [
+            {
+              "end": 7,
+              "start": 0
+            }
+          ]
+        },
+        {
+          "locale": "de",
+          "schedule": {
+            "repeat": {
+              "count": null,
+              "every": 1,
+              "kind": "every",
+              "monthDay": null,
+              "nth": null,
+              "unit": "days",
+              "until": null,
+              "weekdays": []
+            },
+            "start": "2026-11-03",
+            "times": [
+              "19:00"
+            ]
+          },
+          "text": "Jeden Tag um 19 Uhr",
+          "unknown": []
+        }
+      ]
     }
   ],
   "today": "2026-11-03",

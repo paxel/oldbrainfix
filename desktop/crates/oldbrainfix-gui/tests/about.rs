@@ -1,4 +1,6 @@
-//! The About dialog driven headless: reached from the Settings, it links
+//! The About dialog driven headless: reached from Help ▸ About Old Brain
+//! Fix, never from the Settings (#325, see `menu_bar.rs` and
+//! `settings_search.rs`), it links
 //! the documentation site and its privacy policy, and opens the licences
 //! page, which lists every third-party component and opens its licence on
 //! a click.
@@ -15,7 +17,7 @@ fn harness(locale: &str) -> Result<Harness<'static, App>, Box<dyn std::error::Er
         Ok(SigningKey::from_seed([3; 32]))
     })?;
     let mut app = App::new(store, locale);
-    app.open(Page::Settings);
+    app.open(Page::About);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui_state(
@@ -34,12 +36,8 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
 }
 
 #[test]
-fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult {
+fn the_licences_open_from_about_and_list_every_component() -> TestResult {
     let mut harness = harness("en")?;
-    harness
-        .get_by_label("About Old Brain Fix")
-        .click_accesskit();
-    harness.run();
     assert_eq!(harness.state().page(), Some(Page::About));
     assert!(shows(
         &harness,
@@ -84,8 +82,6 @@ fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult 
 #[test]
 fn the_about_view_speaks_german() -> TestResult {
     let mut harness = harness("de")?;
-    harness.get_by_label("Über Old Brain Fix").click_accesskit();
-    harness.run();
     harness.get_by_label("Dokumentation");
     harness.get_by_label("Datenschutzerklärung");
     harness

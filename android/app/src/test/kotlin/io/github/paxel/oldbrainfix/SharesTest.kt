@@ -1,5 +1,6 @@
 package io.github.paxel.oldbrainfix
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,5 +35,31 @@ class SharesTest {
         assertFalse(Shares.isSound("image/jpeg", "audio/*"))
         assertFalse(Shares.isSound(null, "image/*"))
         assertFalse(Shares.isSound("application/octet-stream", "image/*"))
+    }
+
+    @Test
+    fun `a shared file is sound, a picture or an Attachment, never a PDF taken for a picture`() {
+        assertEquals(Shares.Kind.SOUND, Shares.kindOf("audio/ogg", "*/*"))
+        assertEquals(Shares.Kind.SOUND, Shares.kindOf("application/octet-stream", "audio/ogg"))
+        assertEquals(Shares.Kind.PICTURE, Shares.kindOf("image/jpeg", "*/*"))
+        // A provider that knows only "some file" in a share of pictures.
+        assertEquals(Shares.Kind.PICTURE, Shares.kindOf(null, "image/*"))
+        assertEquals(Shares.Kind.PICTURE, Shares.kindOf("application/octet-stream", "image/*"))
+        assertEquals(Shares.Kind.FILE, Shares.kindOf("application/pdf", "image/*"))
+        assertEquals(Shares.Kind.FILE, Shares.kindOf("application/pdf", "*/*"))
+        assertEquals(Shares.Kind.FILE, Shares.kindOf("application/zip", "application/zip"))
+        assertEquals(Shares.Kind.FILE, Shares.kindOf(null, "*/*"))
+        assertEquals(Shares.Kind.FILE, Shares.kindOf("text/plain", "text/plain"))
+    }
+
+    @Test
+    fun `a file of the app's own shared to the share target opens as with Open with`() {
+        assertTrue(Shares.isOwnFile("application/vnd.oldbrainfix.pack", "file"))
+        assertTrue(Shares.isOwnFile("application/octet-stream", "Trip.OBFPACK"))
+        assertTrue(Shares.isOwnFile(null, "Ann.obfcard"))
+        assertTrue(Shares.isOwnFile(null, "changes.obfsync"))
+        assertTrue(Shares.isOwnFile(null, "Note.oldbrain"))
+        assertFalse(Shares.isOwnFile("application/pdf", "Lease.pdf"))
+        assertFalse(Shares.isOwnFile("application/zip", "obfpack.zip"))
     }
 }

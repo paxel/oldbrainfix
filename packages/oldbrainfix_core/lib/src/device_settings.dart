@@ -1,13 +1,29 @@
 import 'dart:convert';
 
+import 'lan_ask.dart';
 import 'nudges.dart';
 import 'schedule.dart';
+import 'schedule_sentence.dart';
 import 'shopping_lists.dart';
 import 'store.dart';
 import 'tally_units.dart';
 
 /// Which theme this Device shows: the system's, or a fixed one.
 enum ThemeChoice { system, light, dark }
+
+/// How large this Device shows the text of Notes, Lines, Sections, the
+/// Agenda's rows and Ask's answers (#326, obf-1019): its own step, apart from "Fat fingers", which grows icons and buttons.
+/// The step multiplies the system's font size and "Fat fingers".
+enum TextSize {
+  normal(1.0),
+  larger(1.15),
+  largest(1.3);
+
+  /// How many times the normal size the text shows.
+  final double factor;
+
+  const TextSize(this.factor);
+}
 
 /// What the quick note (the text capture screen) shows beyond its text
 /// field, its Photo, Voice, Gallery and Paste, its Nudge buttons, "To
@@ -59,12 +75,22 @@ extension DeviceSettings on Store {
   static const _streaksOff = 'streaksOff';
   static const _agendaHideChecked = 'agendaHideChecked';
   static const _fatFingers = 'fatFingers';
+  static const _textSize = 'textSize';
   static const _twoRowEditorOff = 'twoRowEditorOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
   static const _unitSystem = 'unitSystem';
   static const _shoppingAgenda = 'shoppingAgenda';
   static const _quickNoteNudgeButtonsOff = 'quickNoteNudgeButtonsOff';
+  static const _lastShoppingList = 'lastShoppingList';
+  static const _recentlyFiledInto = 'recentlyFiledInto';
+  static const _recentlyAddedTo = 'recentlyAddedTo';
+  static const _askAllowed = 'askAllowed';
+  static const _askOn = 'askOn';
+
+  /// How many places filed into File into… shows at its top (#272), and
+  /// how many Notes added to Add to Note… shows at its top (#308).
+  static const recentPlacesKept = 3;
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -82,6 +108,9 @@ extension DeviceSettings on Store {
   /// When all-day Occurrences start to ring when nothing else is set
   /// (#201).
   static final defaultAllDayFrom = ClockTime(15, 0);
+
+  /// When the day starts without Quiet Hours (#271).
+  static final defaultDayStart = ClockTime(9, 0);
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -166,6 +195,22 @@ extension DeviceSettings on Store {
 
   set quietHoursOn(bool on) => setLocalSetting(_quietHoursOff, '${!on}');
 
+  /// When this Device's day starts, at which a Reminder for "tomorrow"
+  /// rings (#271): when its Quiet Hours end, or 09:00 while they are
+  /// switched off or empty.
+  ClockTime get dayStart {
+    final quiet = quietHours;
+    return quietHoursOn && quiet.start != quiet.end
+        ? quiet.end
+        : defaultDayStart;
+  }
+
+  /// Now by the store's clock on [wallClock], with this Device's
+  /// [dayStart]: what the schedule sentence's relative words and the
+  /// quick Reminder chips are read at (#271).
+  SentenceNow sentenceNow(WallClock wallClock) =>
+      SentenceNow.at(wallClock(clock().toUtc()), dayStart);
+
   /// From when on this Device an all-day Occurrence rings, on the wall
   /// clock; before that it only shows on the Agenda (#201).
   ClockTime get allDayFrom =>
@@ -245,6 +290,13 @@ extension DeviceSettings on Store {
 
   set fatFingers(bool on) => setLocalSetting(_fatFingers, '$on');
 
+  /// The step of this Device's text (#326, obf-1019); anything unknown
+  /// shows it normal.
+  TextSize get textSize =>
+      TextSize.values.asNameMap()[localSetting(_textSize)] ?? TextSize.normal;
+
+  set textSize(TextSize size) => setLocalSetting(_textSize, size.name);
+
   /// Whether the Note editor and Amend on this Device type in two rows,
   /// the bottom one above the keyboard; on unless switched off, which
   /// gives the system's text field back.
@@ -267,6 +319,103 @@ extension DeviceSettings on Store {
 
   set quickNoteNudgeButtonsOn(bool on) =>
       setLocalSetting(_quickNoteNudgeButtonsOff, '${!on}');
+
+  /// The Note id of the Shopping List a capture on this Device went into
+  /// last, at the top of the lists to pick from (#276); null for none. It
+  /// may name a list gone since.
+  String? get lastShoppingList => switch (localSetting(_lastShoppingList)) {
+    final id? when id.isNotEmpty => id,
+    _ => null,
+  };
+
+  set lastShoppingList(String? noteId) => noteId == null
+      ? removeLocalSetting(_lastShoppingList)
+      : setLocalSetting(_lastShoppingList, noteId);
+
+  /// The ids of the Areas and Topics this Device last filed into, the
+  /// latest first, at most [recentPlacesKept] (#272). They may name a
+  /// place deleted since; File into… shows only those it lists.
+  List<String> get recentlyFiledInto => _recent(_recentlyFiledInto);
+
+  /// Puts [placeId] first among [recentlyFiledInto], once, and forgets
+  /// the oldest beyond [recentPlacesKept].
+  void filedInto(String placeId) => _used(_recentlyFiledInto, placeId);
+
+  /// The ids of the Notes this Device last added a capture or an
+  /// Unsorted Note to with Add to Note…, the latest first, at most
+  /// [recentPlacesKept] (#308). They may name a Note gone since; Add to
+  /// Note… shows only those it lists.
+  List<String> get recentlyAddedTo => _recent(_recentlyAddedTo);
+
+  /// Puts [noteId] first among [recentlyAddedTo], once, and forgets the
+  /// oldest beyond [recentPlacesKept].
+  void addedTo(String noteId) => _used(_recentlyAddedTo, noteId);
+
+  /// The ids kept under [key], the latest first, each once, at most
+  /// [recentPlacesKept]; none for a broken setting.
+  List<String> _recent(String key) {
+    try {
+      if (jsonDecode(localSetting(key) ?? '[]') case final List<Object?> ids) {
+        return [
+          ...{...ids.whereType<String>()},
+        ].take(recentPlacesKept).toList();
+      }
+    } on FormatException {
+      // A broken setting names none.
+    }
+    return [];
+  }
+
+  /// Puts [id] first among the ids kept under [key], as [_recent] reads
+  /// them.
+  void _used(String key, String id) => setLocalSetting(
+    key,
+    jsonEncode(
+      [
+        id,
+        ..._recent(key).where((kept) => kept != id),
+      ].take(recentPlacesKept).toList(),
+    ),
+  );
+
+  /// Whether this phone offers Ask (#333): the Ask page, its button in
+  /// the Agenda's bar and the address by hand on the Sync page; off
+  /// until switched on, as Ask is experimental. An address by hand kept
+  /// meanwhile still serves sync either way.
+  bool get askOn => localSetting(_askOn) == 'true';
+
+  set askOn(bool on) => setLocalSetting(_askOn, '$on');
+
+  /// Whether the user allowed this Device to send questions through the
+  /// desktop to [provider] (#267, App Store guideline 5.1.2(i)): once for
+  /// each protocol, host and model, as an OpenAI-compatible host such as
+  /// OpenRouter hands a question on to the model's maker. Another
+  /// provider asks again.
+  bool askAllowed(DesktopProvider provider) =>
+      _askAllowedList.contains(_askKey(provider));
+
+  /// Keeps that the user allowed questions to [provider].
+  void allowAsking(DesktopProvider provider) {
+    final key = _askKey(provider);
+    final kept = _askAllowedList;
+    if (kept.contains(key)) return;
+    setLocalSetting(_askAllowed, jsonEncode([...kept, key]));
+  }
+
+  List<String> get _askAllowedList {
+    try {
+      if (jsonDecode(localSetting(_askAllowed) ?? '[]')
+          case final List<Object?> keys) {
+        return keys.whereType<String>().toList();
+      }
+    } on FormatException {
+      // A broken setting allows none.
+    }
+    return [];
+  }
+
+  static String _askKey(DesktopProvider provider) =>
+      jsonEncode([provider.protocol.name, provider.host, provider.model]);
 
   /// The system this Device shows the known units of Tallies in, when
   /// one was chosen; null follows the region.

@@ -9,6 +9,7 @@ import 'l10n.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'note_selection.dart';
 import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'system_bars.dart';
@@ -38,7 +39,7 @@ class AllNotesScreen extends StatefulWidget {
 }
 
 class _AllNotesScreenState extends State<AllNotesScreen>
-    with ReloadsOnLogChange, FoldsNoteCards {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
   late PersonFilter _people = widget.people;
   late List<PlacedNote> _shown = _load();
 
@@ -56,9 +57,13 @@ class _AllNotesScreenState extends State<AllNotesScreen>
   void _filter(PersonFilter people) => setState(() {
     _people = people;
     _shown = _load();
+    keepShown(_shown);
   });
 
-  void _reload() => setState(() => _shown = _load());
+  void _reload() => setState(() {
+    _shown = _load();
+    keepShown(_shown);
+  });
 
   @override
   Store get log => widget.notes.store;
@@ -128,66 +133,81 @@ class _AllNotesScreenState extends State<AllNotesScreen>
     // there.
     final adds = widget.people.isEveryone;
     return BrowserSwipes(
-      child: Scaffold(
-        appBar: pageBar(
-          context,
-          title: t.allNotesTitle,
-          actions: [
-            PersonFilterButton(
-              store: widget.notes.store,
-              filter: _people,
-              onChanged: _filter,
-            ),
-            CompactNotesButton(compact: compact, onChanged: setCompact),
-          ],
-        ),
-        body: ListView(
-          padding: adds
-              ? clearOfFloatingButtons(
-                  context,
-                  const EdgeInsets.symmetric(vertical: 8),
+      child: selectionBack(
+        Scaffold(
+          appBar: pageBar(
+            context,
+            title: selecting
+                ? t.notesSelected(selected.length)
+                : t.allNotesTitle,
+            actions: selecting
+                ? noteSelectionActions(
+                    context,
+                    widget.notes,
+                    widget.places,
+                    _shown,
+                    _reload,
+                  )
+                : [
+                    PersonFilterButton(
+                      store: widget.notes.store,
+                      filter: _people,
+                      onChanged: _filter,
+                    ),
+                    CompactNotesButton(compact: compact, onChanged: setCompact),
+                    if (mayTick(_shown)) selectButton(context),
+                  ],
+          ),
+          body: ListView(
+            padding: adds
+                ? clearOfFloatingButtons(
+                    context,
+                    const EdgeInsets.symmetric(vertical: 8),
+                  )
+                : clearOfSystemBars(
+                    context,
+                    const EdgeInsets.symmetric(vertical: 8),
+                  ),
+            children: [
+              PersonFilterChips(
+                store: widget.notes.store,
+                filter: _people,
+                onChanged: _filter,
+              ),
+              if (_shown.isEmpty)
+                BrowserEmpty(
+                  text: _people.isEveryone ? t.noNotesYet : t.nothingFound,
                 )
-              : clearOfSystemBars(
+              else
+                ...diaryCards(
                   context,
-                  const EdgeInsets.symmetric(vertical: 8),
+                  _shown,
+                  _file,
+                  _merge,
+                  _open,
+                  notes: widget.notes,
+                  onChanged: _reload,
+                  // Every Area at once: no screen title names one.
+                  showPlace: (_) => true,
+                  onSchedule: _schedule,
+                  compact: compact,
+                  switched: switched,
+                  onSwitch: switchView,
+                  selected: selecting ? selected : null,
+                  onSelect: setSelected,
                 ),
-          children: [
-            PersonFilterChips(
-              store: widget.notes.store,
-              filter: _people,
-              onChanged: _filter,
-            ),
-            if (_shown.isEmpty)
-              BrowserEmpty(
-                text: _people.isEveryone ? t.noNotesYet : t.nothingFound,
-              )
-            else
-              ...diaryCards(
-                context,
-                _shown,
-                _file,
-                _merge,
-                _open,
-                notes: widget.notes,
-                onChanged: _reload,
-                // Every Area at once: no screen title names one.
-                showPlace: (_) => true,
-                onSchedule: _schedule,
-                compact: compact,
-                switched: switched,
-                onSwitch: switchView,
-              ),
-          ],
+            ],
+          ),
+          floatingActionButton: !adds
+              ? null
+              : Builder(
+                  builder: (button) => FloatingActionButton(
+                    tooltip: t.addHere,
+                    onPressed: () => _add(button),
+                    child: const Icon(Icons.add),
+                  ),
+                ),
         ),
-        floatingActionButton: !adds
-            ? null
-            : Builder(
-                builder: (button) => FloatingActionButton(
-                  tooltip: t.addHere,
-                  onPressed: () => _add(button),
-                  child: const Icon(Icons.add),
-                ),
-              ),
       ),
     );
   }

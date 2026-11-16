@@ -57,6 +57,82 @@ use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 use crate::l10n::L10n;
 use crate::schedule_text;
 
+/// How far apart the lines of a formatted text lie (#327, obf-1020), as
+/// on the phone: a line's height in parts of its font's size.
+pub const LINE_HEIGHT: f32 = 1.5;
+
+/// A code block's line height, in parts of its font's size.
+pub const CODE_LINE_HEIGHT: f32 = 1.3;
+
+/// Code's font size, in parts of the words' around it.
+pub const CODE_SCALE: f32 = 0.9;
+
+/// How far code's tint reaches past its words, in parts of the font's
+/// size.
+pub const CODE_PAD: f32 = 0.12;
+
+/// A first heading's size, in parts of the words' size.
+pub const HEADING1: f32 = 1.3;
+
+/// A second heading's size, in parts of the words' size.
+pub const HEADING2: f32 = 1.15;
+
+/// The room a blank line between two lines of a formatted text makes as
+/// it reads, in parts of the font's size, instead of the room between
+/// the two.
+pub const BLANK_GAP: f32 = 1.0;
+
+/// The room before a line of a formatted text of the kind `next` after
+/// one of `prev`, besides the line height, in parts of the font's size:
+/// more before a heading, less after one, little between two items or
+/// two quote lines, half the size between all others (#327).
+pub fn line_gap(prev: BlockKind, next: BlockKind) -> f32 {
+    let item = |k| matches!(k, BlockKind::Bullet | BlockKind::Numbered);
+    match (prev, next) {
+        (_, BlockKind::Heading1 | BlockKind::Heading2) => 0.8,
+        (BlockKind::Heading1 | BlockKind::Heading2, _) => 0.3,
+        (BlockKind::Quote, BlockKind::Quote) => 0.2,
+        (a, b) if item(a) && item(b) => 0.2,
+        _ => 0.5,
+    }
+}
+
+/// How much farther apart two rows of `font` lie than the font's own
+/// row height for a line height of `height` parts of its size.
+pub fn line_extra(ui: &Ui, font: &FontId, height: f32) -> f32 {
+    let row = ui.fonts_mut(|f| f.row_height(font));
+    (height * font.size - row).max(0.0)
+}
+
+/// `galley` with each row after the first moved down by what `before`
+/// gives for it: the line it is on (counted from 0) and whether it is
+/// that line's first row, rounded to whole pixels. egui lays a taller
+/// line height out with all its room under the words, which takes an
+/// underline and a strike-through along, so rows are moved apart instead;
+/// a click still finds its character, as rows are found by where they
+/// lie.
+pub fn spread(mut galley: Arc<Galley>, before: impl Fn(usize, bool) -> f32) -> Arc<Galley> {
+    if galley.rows.len() < 2 {
+        return galley;
+    }
+    let laid = Arc::make_mut(&mut galley);
+    let pixels = laid.pixels_per_point.max(1.0);
+    let (mut line, mut first, mut down) = (0, true, 0.0);
+    for (i, placed) in laid.rows.iter_mut().enumerate() {
+        if i > 0 {
+            down += (before(line, first) * pixels).round() / pixels;
+        }
+        placed.pos.y += down;
+        first = placed.ends_with_newline;
+        if first {
+            line += 1;
+        }
+    }
+    laid.rect.max.y += down;
+    laid.mesh_bounds.max.y += down;
+    galley
+}
+
 /// A box as it is drawn: its id, the state it shows and where it lies
 /// on the screen.
 #[derive(Debug, Clone, PartialEq)]
@@ -264,10 +340,14 @@ pub fn marked_label(
     let tagged = found.tags.iter().any(|t| t.start >= from && t.end <= to);
     let linked = found.links.iter().any(|&(s, e)| s >= from && e <= to);
     if !marked && !tagged && !linked {
-        let mut rich = RichText::new(part).color(look.1);
-        if let Some(size) = look.0 {
-            rich = rich.size(size);
-        }
+        // At the Device's text size, as [`Look::of`] has it (#326,
+        // obf-1019).
+        let size = look
+            .0
+            .unwrap_or_else(|| TextStyle::Body.resolve(ui.style()).size);
+        let rich = RichText::new(part)
+            .color(look.1)
+            .size(crate::theme::content(ui, size));
         let label = egui::Label::new(rich);
         crate::read_text::label(ui, if truncate { label.truncate() } else { label });
         return Spots::default();
@@ -320,15 +400,37 @@ pub fn formatted_label(
     let blocks = markdown::parse(text);
     let (first, last) = (line_at(text, from), line_at(text, to));
     let mut spots = Spots::default();
+    let size = look.font.size;
+    let extra = line_extra(ui, &look.font, LINE_HEIGHT);
     ui.scope(|ui| {
-        ui.spacing_mut().item_spacing.y = 2.0;
+        ui.spacing_mut().item_spacing.y = 0.0;
+        // The kind of the line drawn last and the blank lines since.
+        let mut drawn: Option<BlockKind> = None;
+        let mut blank = 0;
+        // Room before each line drawn (#327): by the kinds of the two,
+        // or a blank line's; cut off, only the line height.
+        let mut room = |ui: &mut Ui, kind: BlockKind, blank: &mut usize| {
+            let gap = match drawn {
+                _ if truncate => 0.0,
+                _ if *blank > 0 => *blank as f32 * BLANK_GAP,
+                Some(prev) => line_gap(prev, kind),
+                None => 0.0,
+            };
+            if drawn.is_some() || *blank > 0 {
+                ui.add_space(extra + gap * size);
+            }
+            *blank = 0;
+            drawn = Some(kind);
+        };
         for block in blocks.get(first..=last).unwrap_or_default() {
             if let Some(code) = &block.code {
                 if !truncate {
                     if block.line == code.first_line.max(first) {
+                        room(ui, BlockKind::Code, &mut blank);
                         code_label(ui, text, (&blocks, code), (first, last), &look);
                     }
                 } else if !code.is_fence(block.line) {
+                    room(ui, BlockKind::Code, &mut blank);
                     spots.extend(block_label(ui, (text, block), &found, &look, truncate));
                 }
                 continue;
@@ -338,11 +440,28 @@ pub fn formatted_label(
                 // off, each line as its row reads.
                 Some(table) if !truncate => {
                     if block.line == table.first_line.max(first) {
+                        room(ui, BlockKind::Table, &mut blank);
                         spots.extend(table_label(ui, text, table, (&found, &look)));
                     }
                 }
-                _ => spots.extend(block_label(ui, (text, block), &found, &look, truncate)),
+                // A blank line reads as room, not as a line.
+                None if !truncate
+                    && block.kind == BlockKind::Paragraph
+                    && text
+                        .get(block.start..block.end)
+                        .is_some_and(|l| l.trim().is_empty()) =>
+                {
+                    blank += 1;
+                }
+                _ => {
+                    room(ui, block.kind, &mut blank);
+                    spots.extend(block_label(ui, (text, block), &found, &look, truncate));
+                }
             }
+        }
+        // Blank lines at the end keep their room.
+        if blank > 0 {
+            ui.add_space(blank as f32 * BLANK_GAP * size);
         }
     });
     spots
@@ -364,7 +483,7 @@ pub fn code_text_label(
         return;
     };
     let look = Look::of(ui, look);
-    let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
+    let format = TextFormat::simple(FontId::monospace(look.font.size * CODE_SCALE), look.colour);
     let job = LayoutJob::single_section(text_boxes::strip(part), format);
     if truncate {
         crate::read_text::label(ui, egui::Label::new(job).truncate());
@@ -415,7 +534,9 @@ fn code_label(
     if lines.is_empty() && code.first_line < first {
         return;
     }
-    let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
+    let font = FontId::monospace(look.font.size * CODE_SCALE);
+    let extra = line_extra(ui, &font, CODE_LINE_HEIGHT);
+    let format = TextFormat::simple(font, look.colour);
     let job = LayoutJob::single_section(lines.join("\n"), format);
     egui::Frame::NONE
         .fill(look.code)
@@ -423,7 +544,14 @@ fn code_label(
         .inner_margin(egui::Margin::symmetric(8, 6))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            crate::read_text::label(ui, egui::Label::new(job).wrap());
+            let galley = WidgetText::from(job).into_galley(
+                ui,
+                Some(TextWrapMode::Wrap),
+                ui.available_width(),
+                FontSelection::Default,
+            );
+            let galley = spread(galley, |_, _| extra);
+            crate::read_text::label(ui, egui::Label::new(galley));
         });
 }
 
@@ -440,13 +568,15 @@ pub(crate) struct Look {
 }
 
 impl Look {
-    /// The body's font of `size` (its own while `None`) in `colour`, the
-    /// rest as `ui`'s visuals have it.
+    /// The body's font of `size` (its own while `None`) in `colour`, at
+    /// the Device's text size (#326, obf-1019), the rest as `ui`'s
+    /// visuals have it.
     pub(crate) fn of(ui: &Ui, (size, colour): (Option<f32>, Color32)) -> Look {
         let mut font = TextStyle::Body.resolve(ui.style());
         if let Some(size) = size {
             font.size = size;
         }
+        font.size = crate::theme::content(ui, font.size);
         let visuals = ui.visuals();
         Look {
             font,
@@ -455,6 +585,11 @@ impl Look {
             weak: visuals.weak_text_color(),
             code: visuals.code_bg_color,
         }
+    }
+
+    /// Its font, at the size it shows.
+    pub(crate) fn font(&self) -> FontId {
+        self.font.clone()
     }
 
     /// The same, `scale` times as large.
@@ -563,7 +698,7 @@ impl Line {
 /// its background.
 fn part_format(look: &Look, style: Style, code: bool) -> TextFormat {
     let font = if code {
-        FontId::monospace(look.font.size * 0.9)
+        FontId::monospace(look.font.size * CODE_SCALE)
     } else {
         look.font.clone()
     };
@@ -583,7 +718,9 @@ fn part_format(look: &Look, style: Style, code: bool) -> TextFormat {
         format.underline = Stroke::new(1.0, colour);
     }
     if code {
+        // A light tint behind the word, a little wider than it (#327).
         format.background = look.code;
+        format.expand_bg = CODE_PAD * look.font.size;
     }
     format
 }
@@ -759,8 +896,8 @@ fn block_label(
 ) -> Spots {
     let mut font = look.font.clone();
     let heading = match block.kind {
-        BlockKind::Heading1 => Some(1.5),
-        BlockKind::Heading2 => Some(1.25),
+        BlockKind::Heading1 => Some(HEADING1),
+        BlockKind::Heading2 => Some(HEADING2),
         _ => None,
     };
     if let Some(scale) = heading
@@ -824,7 +961,8 @@ fn block_label(
     };
     let row = ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        ui.add_space(indent);
+        // The indent grows with the text size (#326, obf-1019).
+        ui.add_space(crate::theme::content(ui, indent));
         if let Some(prefix) = item_prefix(block, &look, look.colour) {
             let galley = WidgetText::from(prefix).into_galley(
                 ui,
@@ -850,13 +988,16 @@ fn block_label(
             ui.available_width(),
             FontSelection::Default,
         );
+        // Its rows as far apart as the line height says (#327).
+        let extra = line_extra(ui, &look.font, LINE_HEIGHT);
+        let galley = spread(galley, |_, _| extra);
         let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
         let origin = response.rect.min;
         if line.bold && ui.is_rect_visible(response.rect) {
             let mut ghost = std::mem::take(&mut line.ghost);
             ghost.wrap = galley.job.wrap.clone();
             ghost.halign = galley.job.halign;
-            let ghost = ui.fonts_mut(|f| f.layout_job(ghost));
+            let ghost = spread(ui.fonts_mut(|f| f.layout_job(ghost)), |_, _| extra);
             ui.painter()
                 .galley(origin + egui::vec2(0.6, 0.0), ghost, look.colour);
         }
@@ -1218,12 +1359,13 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
 /// and its tags in `accent`, unwrapped. A table's pipes, its delimiter
 /// row and the line marking its first column as headings are marks; so
 /// are a code block's fences, its lines in the fixed-width font on the
-/// background `code`.
+/// background `code`. Gives with it what each line is, for
+/// [`source_spread`].
 pub fn source_job(
     text: &str,
     font: FontId,
     (colour, accent, dim, code): (Color32, Color32, Color32, Color32),
-) -> LayoutJob {
+) -> (LayoutJob, Vec<SourceLine>) {
     // What each byte is: 0 words, 1 a mark, 2 a tag, 3 code.
     let mut kind = vec![0u8; text.len()];
     let mut mark = |a: usize, b: usize, k: u8| {
@@ -1251,7 +1393,21 @@ pub fn source_job(
     // again; then the marks of its words.
     let (mut lines, mut cells, mut inline) = (Vec::new(), Vec::new(), Vec::new());
     let mut code_lines = Vec::new();
+    let mut kinds = Vec::new();
     for block in markdown::parse(text) {
+        kinds.push(match (&block.code, &block.table) {
+            (Some(_), _) => SourceLine::Code,
+            (None, Some(table)) => SourceLine::Table {
+                first: block.line == table.first_line,
+            },
+            _ if text
+                .get(block.start..block.end)
+                .is_some_and(|l| l.trim().is_empty()) =>
+            {
+                SourceLine::Blank
+            }
+            _ => SourceLine::Words(block.kind),
+        });
         if let Some(c) = &block.code {
             if c.is_fence(block.line) {
                 lines.push((block.start, block.end));
@@ -1292,7 +1448,7 @@ pub fn source_job(
         1 => TextFormat::simple(font.clone(), dim),
         2 => TextFormat::simple(font.clone(), accent),
         3 => {
-            let mut format = TextFormat::simple(FontId::monospace(font.size * 0.9), colour);
+            let mut format = TextFormat::simple(FontId::monospace(font.size * CODE_SCALE), colour);
             format.background = code;
             format
         }
@@ -1310,7 +1466,61 @@ pub fn source_job(
         }
     }
     job.append(text.get(run..).unwrap_or_default(), 0.0, format(run_kind));
-    job
+    (job, kinds)
+}
+
+/// What a line of a formatted text's source is, for the room before it
+/// in its edit field.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SourceLine {
+    /// Words of this kind.
+    Words(BlockKind),
+    /// Nothing but spaces.
+    Blank,
+    /// A line of a code block, its fences too.
+    Code,
+    /// A line of a table, its first one or another.
+    Table { first: bool },
+}
+
+/// `galley`, laid out from a formatted text's source whose lines are
+/// `lines`, its rows as far apart as the text reads (#327): `extra`
+/// more than its font's rows, and before a line the room [`line_gap`]
+/// gives in parts of `size`. A blank line only has the line height;
+/// a code block's rows lie together on their background, and so do the
+/// rows of a table, of which only the first has room before it, so a
+/// grid drawn over them keeps its place.
+pub fn source_spread(
+    galley: Arc<Galley>,
+    lines: &[SourceLine],
+    size: f32,
+    extra: f32,
+) -> Arc<Galley> {
+    let kind = |line: SourceLine| match line {
+        SourceLine::Words(kind) => kind,
+        SourceLine::Code => BlockKind::Code,
+        SourceLine::Table { .. } | SourceLine::Blank => BlockKind::Table,
+    };
+    spread(galley, |line, first| {
+        let at = lines.get(line).copied().unwrap_or(SourceLine::Blank);
+        if !first {
+            return match at {
+                SourceLine::Code | SourceLine::Table { .. } => 0.0,
+                _ => extra,
+            };
+        }
+        let prev = line
+            .checked_sub(1)
+            .and_then(|l| lines.get(l))
+            .copied()
+            .unwrap_or(SourceLine::Blank);
+        match (prev, at) {
+            (SourceLine::Code, SourceLine::Code)
+            | (SourceLine::Table { .. }, SourceLine::Table { first: false }) => 0.0,
+            (SourceLine::Blank, _) | (_, SourceLine::Blank) => extra,
+            (prev, at) => extra + line_gap(kind(prev), kind(at)) * size,
+        }
+    })
 }
 
 /// Where the bytes `start..end` of `text`, laid out in `galley` from its
@@ -1789,112 +1999,4 @@ pub fn guard_cursor(ui: &mut Ui, id: Id, text: &mut String) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_menu_names_each_state_after_its_character() {
-        let en = L10n::new("en");
-        assert_eq!(menu_entry(&en, BoxState::Done), "✅ Check");
-        assert_eq!(menu_entry(&en, BoxState::Failed), "❌ Fail");
-        assert_eq!(menu_entry(&en, BoxState::Open), "☐ Open");
-        assert_eq!(box_label(&en, BoxState::Done), "Checked");
-        let de = L10n::new("de");
-        assert_eq!(menu_entry(&de, BoxState::Open), "☐ Wieder öffnen");
-        assert_eq!(box_label(&de, BoxState::Failed), "Gescheitert");
-    }
-
-    #[test]
-    fn a_tag_is_read_as_a_search_for_it_as_written() {
-        assert_eq!(
-            L10n::new("en").search_for_tag("#Garten"),
-            "Search for #Garten"
-        );
-        assert_eq!(
-            L10n::new("de").search_for_tag("#Garten"),
-            "Nach #Garten suchen"
-        );
-    }
-
-    #[test]
-    fn a_tags_job_colours_the_tag_alone() {
-        let text = "Seeds #Garten- und #1 now";
-        let font = FontId::proportional(14.0);
-        let job = tag_job(text, (0, text.len()), font, (Color32::WHITE, Color32::RED));
-        assert_eq!(job.text, text);
-        let red: Vec<_> = job
-            .sections
-            .iter()
-            .filter(|s| s.format.color == Color32::RED)
-            .filter_map(|s| job.text.get(s.byte_range.start.0..s.byte_range.end.0))
-            .collect();
-        assert_eq!(red, ["#Garten"]);
-        let part = tag_job(
-            text,
-            (6, 13),
-            FontId::proportional(14.0),
-            (Color32::WHITE, Color32::RED),
-        );
-        assert_eq!(part.text, "#Garten");
-    }
-
-    /// "Pack ☐" with the box of the id `a7k2`, and the box.
-    fn boxed() -> (String, FoundBox) {
-        let text = format!("Pack \u{2610}{}", text_boxes::encode_id("a7k2"));
-        let found = text_boxes::find(&text).remove(0);
-        (text, found)
-    }
-
-    #[test]
-    fn an_edit_fields_job_shows_the_state_and_hides_the_id() {
-        let (text, found) = boxed();
-        let font = FontId::proportional(14.0);
-        let job = tag_job(&text, (0, text.len()), font, (Color32::WHITE, Color32::RED));
-        let mut look = BoxLook::default();
-        look.states.insert("a7k2".into(), BoxState::Done);
-        look.after.insert("a7k2".into(), "You, Mon 11:00".into());
-        let laid = field_job(job, &look, &|_| 40.0);
-        // As many characters, the glyph of its state.
-        assert_eq!(laid.text.chars().count(), text.chars().count());
-        assert_eq!(laid.text.get(found.start..found.id_start), Some("\u{2705}"));
-        let hidden: Vec<_> = laid
-            .sections
-            .iter()
-            .filter(|s| s.format.color == Color32::TRANSPARENT)
-            .collect();
-        assert_eq!(
-            hidden.first().map(|s| s.byte_range.start.0),
-            Some(found.id_start)
-        );
-        assert_eq!(hidden.last().map(|s| s.byte_range.end.0), Some(found.end));
-        assert_eq!(
-            hidden.last().map(|s| s.format.extra_letter_spacing),
-            Some(40.0)
-        );
-    }
-
-    #[test]
-    fn the_cursor_steps_over_a_box_and_follows_a_save() {
-        let (text, _) = boxed();
-        let chars = box_chars(&text);
-        assert_eq!(chars, [(5, 11)]);
-        // Into the id from before it: to its end; from after it: before it.
-        assert_eq!(kept_out(&chars, 6, 5), 11);
-        assert_eq!(kept_out(&chars, 10, 11), 5);
-        assert_eq!(kept_out(&chars, 4, 11), 4);
-        // A save gave the box its id: the cursor after it stays after it.
-        assert_eq!(followed("Pack \u{2610}!", &format!("{text}!"), 7), 12);
-        assert_eq!(followed("Pack \u{2610}!", &format!("{text}!"), 2), 2);
-    }
-
-    #[test]
-    fn a_cut_through_an_id_leaves_none_of_it() {
-        let (text, _) = boxed();
-        let cut: String = text.chars().take(8).collect();
-        assert_eq!(without_stray_ids(&cut).as_deref(), Some("Pack \u{2610}"));
-        assert_eq!(without_stray_ids(&text), None);
-        // A subdivision's flag keeps its tags.
-        let flag = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
-        assert_eq!(without_stray_ids(flag), None);
-    }
-}
+mod tests;

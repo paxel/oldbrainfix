@@ -17,6 +17,8 @@
 //! anew through the core. A box in a cell (ADR 0035) shows the state of
 //! its latest tick and, where this Device may tick it, opens Check, Fail,
 //! Open and its History as on a card; a tick is no edit of the table.
+//! Copy in the bar puts the table on the clipboard as an HTML table and,
+//! as plain text, as Markdown (#324), each box in the state it shows.
 
 use egui::{Color32, Frame, Id, Key, Margin, Modifiers, Rect, RichText, Sense, TextEdit, Ui};
 use std::collections::BTreeSet;
@@ -61,6 +63,9 @@ pub enum Asked {
     Tick(String, BoxState),
     /// Show the History of the box of this id.
     History(String),
+    /// Put the table on the clipboard, its HTML beside its Markdown
+    /// (#324); the cell edited is written first.
+    Copy(table::TableCopy),
 }
 
 /// The table shown full screen and what is being done to it.
@@ -213,6 +218,12 @@ impl TableView {
         Some(self.text.clone())
     }
 
+    /// The table as Copy puts it on the clipboard (#324), each box in the
+    /// state it shows.
+    pub fn copy(&self) -> Option<table::TableCopy> {
+        table::copy(&self.text, self.at, &self.ticking.look.states)
+    }
+
     /// Ends editing the cell, its words written when they changed; one
     /// in the empty row or column adds that row or column, but only with
     /// words. Gives the text to write.
@@ -348,6 +359,15 @@ impl TableView {
                         }
                         ui.add_space(8.0);
                         ui.label(RichText::new(t.table_title()).size(18.0).color(text));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let copy = ui.button(RichText::new(t.table_copy()).color(text));
+                            if copy.clicked() {
+                                if let Some(text) = self.commit() {
+                                    asked.push(Asked::Write(text));
+                                }
+                                asked.extend(self.copy().map(Asked::Copy));
+                            }
+                        });
                     });
                 });
                 egui::ScrollArea::both()
@@ -430,7 +450,7 @@ impl TableView {
         let found = Found::of(&self.text, text_format::MARKDOWN, &self.ticking.look);
         let laid = text_marks_view::lay_table(ui, (&self.text, &table), (&found, &look));
         let (mut widths, mut heights) = text_marks_view::grid(ui, &laid, &look, PAD);
-        let lowest = ui.fonts_mut(|f| f.row_height(&FontId::proportional(SIZE))) + PAD.y * 2.0;
+        let lowest = ui.fonts_mut(|f| f.row_height(&look.font())) + PAD.y * 2.0;
         for width in &mut widths {
             *width = width.max(NARROWEST);
         }
@@ -706,9 +726,11 @@ impl TableView {
         // Its boxes as they show, their ids not drawn and the cursor kept
         // out of them (ADR 0035).
         let look = &self.ticking.look;
+        // Typed at the Device's text size, as the cells read (#326, obf-1019).
+        let size = crate::theme::content(ui, SIZE);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
-            let font = FontId::proportional(SIZE);
+            let font = FontId::proportional(size);
             let job = text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent));
             let mut job = text_marks_view::field_job(job, look, &|_| 0.0);
             job.wrap.max_width = width;
@@ -719,7 +741,7 @@ impl TableView {
             rect.shrink2(egui::vec2(PAD.x, 0.0)),
             TextEdit::singleline(&mut editing.typed)
                 .id(id)
-                .font(FontId::proportional(SIZE))
+                .font(FontId::proportional(size))
                 .text_color(text)
                 .layouter(&mut layouter)
                 .lock_focus(true)
@@ -1002,124 +1024,4 @@ pub fn letter(index: usize) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TABLE: &str = "| Item | Qty |\n| --- | --- |\n| milk | 2 |";
-
-    fn view(text: &str, cell: Option<(usize, usize)>) -> TableView {
-        TableView::new(Opening {
-            note: Some("n".into()),
-            text: text.into(),
-            at: 0,
-            cell,
-            tags: true,
-            boxes: Some("n".into()),
-        })
-    }
-
-    #[test]
-    fn columns_are_lettered_as_a_sheet_letters_them() {
-        assert_eq!(letter(0), "A");
-        assert_eq!(letter(25), "Z");
-        assert_eq!(letter(26), "AA");
-        assert_eq!(letter(27), "AB");
-        assert_eq!(letter(701), "ZZ");
-        assert_eq!(letter(702), "AAA");
-    }
-
-    #[test]
-    fn a_cell_typed_into_is_written_and_one_left_alone_is_not() {
-        let mut edited = view(TABLE, Some((1, 1)));
-        assert_eq!(edited.commit(), None);
-        let mut edited = view(TABLE, Some((1, 1)));
-        if let Some(editing) = &mut edited.editing {
-            editing.typed = "3 | 4".into();
-        }
-        let written = edited.commit();
-        assert_eq!(
-            written.as_deref(),
-            Some("| Item | Qty |\n| --- | --- |\n| milk | 3 \\| 4 |")
-        );
-        assert_eq!(edited.editing, None);
-    }
-
-    #[test]
-    fn the_empty_row_and_column_add_one_only_with_words() {
-        let mut blank = view(TABLE, Some((2, 0)));
-        if let Some(editing) = &mut blank.editing {
-            editing.typed = "  ".into();
-        }
-        assert_eq!(blank.commit(), None);
-        let mut row = view(TABLE, Some((2, 0)));
-        if let Some(editing) = &mut row.editing {
-            editing.typed = "eggs".into();
-        }
-        assert_eq!(
-            row.commit().as_deref(),
-            Some("| Item | Qty |\n| --- | --- |\n| milk | 2 |\n| eggs |  |")
-        );
-        let mut column = view(TABLE, Some((0, 2)));
-        if let Some(editing) = &mut column.editing {
-            editing.typed = "Shop".into();
-        }
-        assert_eq!(
-            column.commit().as_deref(),
-            Some("| Item | Qty | Shop |\n| --- | --- | --- |\n| milk | 2 |  |")
-        );
-    }
-
-    #[test]
-    fn deleting_the_last_row_takes_the_table_and_leaves() {
-        let mut shown = view("| a |\n| --- |", None);
-        let mut asked = Vec::new();
-        shown.operate(Op::Delete, false, 0, &mut asked);
-        // "a" is a word: asked first.
-        assert_eq!(asked, []);
-        let deleting = shown.deleting.take();
-        assert_eq!(
-            deleting,
-            Some(Deleting {
-                column: false,
-                index: 0,
-                gone: true
-            })
-        );
-        if let Some(deleting) = deleting {
-            shown.delete(deleting, &mut asked);
-        }
-        assert_eq!(asked, [Asked::Write(String::new()), Asked::Close]);
-        // An empty row goes without asking.
-        let mut empty = view("|  |  |\n| --- | --- |\n| x |  |", None);
-        let mut asked = Vec::new();
-        empty.operate(Op::Delete, true, 1, &mut asked);
-        assert_eq!(asked, [Asked::Write("|  |\n| --- |\n| x |".into())]);
-    }
-
-    #[test]
-    fn tab_goes_row_by_row_into_the_empty_row() {
-        let Some(table) = table::at(TABLE, 0) else {
-            panic!("a table");
-        };
-        assert_eq!(next_cell(&table, (0, 0)), (0, 1));
-        assert_eq!(next_cell(&table, (0, 1)), (1, 0));
-        assert_eq!(next_cell(&table, (1, 1)), (2, 0));
-        assert_eq!(next_cell(&table, (2, 1)), (2, 1));
-        assert_eq!(previous_cell(&table, (1, 0)), (0, 1));
-        assert_eq!(previous_cell(&table, (0, 0)), (0, 0));
-    }
-
-    #[test]
-    fn a_view_to_read_edits_nothing() {
-        let mut read = TableView::new(Opening {
-            note: None,
-            text: TABLE.into(),
-            at: 0,
-            cell: Some((0, 0)),
-            tags: false,
-            boxes: None,
-        });
-        assert_eq!(read.editing, None);
-        assert_eq!(read.commit(), None);
-    }
-}
+mod tests;

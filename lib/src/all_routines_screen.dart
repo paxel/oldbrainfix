@@ -50,8 +50,17 @@ class AllRoutinesScreen extends StatefulWidget {
   State<AllRoutinesScreen> createState() => _AllRoutinesScreenState();
 }
 
-class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
+class _AllRoutinesScreenState extends State<AllRoutinesScreen>
+    with ReloadsOnLogChange {
   late final _routines = Routines(widget.notes.store);
+
+  /// A Routine deleted or brought back elsewhere, as by the undo at the
+  /// top (#268), shows at once.
+  @override
+  Store get log => widget.notes.store;
+
+  @override
+  void reloadLog() => setState(_load);
 
   /// Each with the name it shows, its Note's Area and, when its Note is
   /// in the trash or deleted, the line saying so, read once per change.

@@ -14,8 +14,9 @@ import 'unit_system.dart';
 /// current bar of the Tally's bar length (#264), today's for a day, and
 /// its target per bar ("Pages 30 / 50 pages"), of the user's own entries in a Shared Area as its detailed
 /// view counts unless another choice is picked (#190); else of a Session
-/// Note (#191) the next run of any of its Routines not Done and how many
-/// runs of all of them were Done and Missed this week, weeks from
+/// Note (#191) the next run of any of its Routines neither Done nor
+/// skipped and how many runs of all of them were Done and skipped this
+/// week (#269), weeks from
 /// [weekStart], or without a Routine how many it picks. Nothing for a
 /// Note that is neither.
 class CardGlances {
@@ -67,7 +68,7 @@ class CardGlances {
     if (runs.isEmpty) return [t.sessionPicks(setup.count)];
     Occurrence? next;
     var done = 0;
-    var missed = 0;
+    var skipped = 0;
     for (final run in runs) {
       final routine = run.routine;
       final history = _routines.history(
@@ -76,9 +77,17 @@ class CardGlances {
         weekStart: weekStart,
       );
       done += history.thisWeek.done;
-      missed += history.thisWeek.missed;
-      for (final occurrence in routine.schedule.next(history.today, 64)) {
-        if (!routine.done.containsKey(occurrence.key)) {
+      skipped += history.thisWeek.skipped;
+      // The Routine's own Occurrences, those Tomorrow added among them
+      // (#269).
+      final upcoming = [
+        ...routine.schedule.next(history.today, 64),
+        for (final occurrence in routine.moved)
+          if (!(occurrence.day < history.today)) occurrence,
+      ]..sort();
+      for (final occurrence in upcoming) {
+        if (routine.doneAt(occurrence) == null &&
+            routine.skippedAt(occurrence) == null) {
           if (next == null || occurrence.compareTo(next) < 0) {
             next = occurrence;
           }
@@ -91,7 +100,7 @@ class CardGlances {
         t.sessionCardNext(
           '${dayText(locale, next.day)} ${occurrenceTime(t, locale, next)}',
         ),
-      t.sessionCardWeek(done, missed),
+      t.sessionCardWeek(done, skipped),
     ];
   }
 

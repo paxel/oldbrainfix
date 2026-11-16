@@ -7,6 +7,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Process
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -55,7 +56,7 @@ object WhisperNative {
  * the whole file again only when it changed.
  */
 class Speech(private val context: Context) {
-    /** The one thread transcribing: recordings go one at a time. */
+    /** The one thread transcribing: recordings go one at a time, each [atBackgroundPriority]. */
     private val worker = Executors.newSingleThreadExecutor()
 
     /** The model loaded on [worker], until [idle]; 0 while none is. */
@@ -183,9 +184,11 @@ class Speech(private val context: Context) {
      * null when it could not be read or there is no model.
      */
     fun transcribe(bytes: ByteArray, prompts: Prompts, done: (String?) -> Unit) {
-        worker.execute {
-            done(runCatching { transcribeNow(bytes, prompts) }.getOrNull())
-        }
+        worker.execute(
+            atBackgroundPriority {
+                done(runCatching { transcribeNow(bytes, prompts) }.getOrNull())
+            },
+        )
     }
 
     /** Nothing more to transcribe for now: the model's memory goes. */
@@ -210,7 +213,7 @@ class Speech(private val context: Context) {
         }
         if (loadedModel == 0L) loadedModel = WhisperNative.open(modelFile.path)
         if (loadedModel == 0L) return null
-        val threads = threadsFor(Runtime.getRuntime().availableProcessors())
+        val threads = whisperThreadsFor(Runtime.getRuntime().availableProcessors())
         return WhisperNative.transcribe(
             loadedModel,
             samples,
@@ -420,8 +423,28 @@ class Speech(private val context: Context) {
             }
         }
 
-        /** How many threads Whisper gets on [cores] cores: one is left for the app, at most four. */
+        /** How many threads RustO gets on [cores] cores: one is left for the app, at most four. */
         fun threadsFor(cores: Int): Int = (cores - 1).coerceIn(1, 4)
+
+        /**
+         * How many threads Whisper gets on [cores] cores: at most two, so
+         * the app stays quick while it transcribes (obf-1030).
+         */
+        fun whisperThreadsFor(cores: Int): Int = cores.coerceIn(1, 2)
+
+        /**
+         * [task] at Android's background priority, set first on the thread
+         * that runs it: the threads whisper.cpp starts from there keep
+         * that priority (obf-1030). Set anew for each task, since the
+         * runtime may on occasion reset it.
+         */
+        fun atBackgroundPriority(
+            setPriority: (Int) -> Unit = Process::setThreadPriority,
+            task: () -> Unit,
+        ): Runnable = Runnable {
+            setPriority(Process.THREAD_PRIORITY_BACKGROUND)
+            task()
+        }
 
         /**
          * Copies [input] to [output] and answers the SHA-256 of what was

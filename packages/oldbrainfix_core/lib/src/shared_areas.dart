@@ -5,8 +5,10 @@ import 'boxes.dart';
 import 'checklists.dart';
 import 'entry.dart';
 import 'frogs.dart';
+import 'hidden_from_ai.dart';
 import 'notes.dart';
 import 'pairing.dart';
+import 'person_settings.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'routines.dart';
@@ -337,10 +339,11 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
         if (full(a)) return true;
         if (a != AreaAccess.member) return false;
         // Any Note gets its texts from a Member's machine; removing one
-        // is the owner's (ADR 0025).
+        // is the owner's (ADR 0025, 0047).
         if (e.value != null &&
             (e.field.startsWith(NoteKeys.transcriptPrefix) ||
-                e.field.startsWith(NoteKeys.ocrPrefix))) {
+                e.field.startsWith(NoteKeys.ocrPrefix) ||
+                e.field.startsWith(NoteKeys.fileTextPrefix))) {
           return true;
         }
         // Anyone ticks the boxes of any text (ADR 0035).
@@ -390,13 +393,15 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
                             writer == ownerIn(area, byEntity[note] ?? const []),
                       null => false,
                     }
-              // A Member checks off, and a Session's picks and the
-              // entries recorded for them are anyone's (ADR 0029), as
-              // are the checks of Lines for an Occurrence (ADR 0030);
-              // the Frog and the Routine are the Manager's.
+              // A Member checks off and skips (ADR 0006), and a
+              // Session's picks and the entries recorded for them are
+              // anyone's (ADR 0029), as are the checks of Lines for an
+              // Occurrence (ADR 0030); the Frog and the Routine are the
+              // Manager's.
               : frog
               ? e.field == FrogKeys.done
               : e.field.startsWith(RoutineKeys.donePrefix) ||
+                    e.field.startsWith(RoutineKeys.skipPrefix) ||
                     e.field.startsWith(SessionKeys.pickPrefix) ||
                     e.field.startsWith(SessionKeys.entryPrefix) ||
                     e.field.startsWith(ChecklistKeys.checkPrefix),
@@ -546,11 +551,17 @@ extension SharedAreas on Store {
   /// Device plants it under the same one (a Starter Set Area), then
   /// makes this Device its first Manager, under the own Profile, and
   /// every own paired Device a Manager with it. Returns the id the Area
-  /// goes on under. An Area already shared stays as it is.
+  /// goes on under. An Area already shared stays as it is. A hidden Area,
+  /// or one holding hidden Notes, is not shared ([HiddenFromAiRefused],
+  /// #267), and nothing changes.
   String share(String areaId) {
     if (isShared(areaId)) return areaId;
+    refuseHiddenFromAi(hiddenFromAiIn(areaId));
     return batch(() {
       final id = areaId == _starterAreaId(areaId) ? _rehome(areaId) : areaId;
+      // A starter Area shared under a new id keeps its place in the
+      // person's own order (#280).
+      if (id != areaId) putAreaInPlaceOf(areaId, id);
       // Without a Profile yet (only in tests) the Device stands for it.
       final profile = ownProfile?.id ?? deviceId;
       final grant = Grant(AreaRole.manager, profile).encode();
@@ -857,6 +868,7 @@ extension SharedAreas on Store {
     final prefix = switch (ref.substring(0, slash)) {
       'photo' => NoteKeys.photoPrefix,
       'audio' => NoteKeys.audioPrefix,
+      'file' => NoteKeys.filePrefix,
       _ => null,
     };
     if (prefix == null) return false;

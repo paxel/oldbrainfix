@@ -259,6 +259,37 @@ void main() {
       expect(more, findsNothing);
     });
 
+    testWidgets('"File into…" makes a new Area from the filter and files the '
+        'Note there on Save (#272)', (tester) async {
+      store.setQuickNoteShows(QuickNoteControl.fileInto, true);
+      places.addArea('Household');
+      await start(tester);
+      await openTextCapture(tester);
+      await tester.enterText(
+        inCapture(find.byType(TextField)),
+        'call the dentist',
+      );
+      await tap(tester, fileInto);
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(FileIntoScreen),
+          matching: find.byType(TextField),
+        ),
+        'Dentist',
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, find.byKey(const ValueKey('file-into-new-area')));
+      await tap(tester, find.text('Create'));
+
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      expect(find.text('→ Dentist'), findsOneWidget);
+      final dentist = places.areas().singleWhere((a) => a.name == 'Dentist');
+      expect(notes.all(), isEmpty, reason: 'the Note waits for Save');
+      await tap(tester, save);
+      expect(notes.all().single.place, dentist.id);
+      expect(store.recentlyFiledInto, [dentist.id]);
+    });
+
     testWidgets('"Frog, Session or Tally" adds Frog and Session to the alarm '
         'clock and brings back ⋮ with "Make it a Tally" alone (Q481)', (
       tester,

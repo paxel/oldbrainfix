@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'capture_choices.dart';
 import 'l10n.dart';
+import 'leave_saves.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
@@ -22,8 +23,9 @@ import 'tally_form_screen.dart';
 /// picks and its schedule, every day all day at first, each opening its
 /// small editor, the schedule the Routine editor's. Save files its Note
 /// into [place], Unsorted for none, and spawns the Session; it pops the
-/// Session's id. Leaving without Save makes nothing but the Tallies made
-/// on the way.
+/// Session's id. Leaving by Back saves as Save does (#275); without a
+/// name or a Tally ticked it asks once whether to discard what was set.
+/// Left as it opened, it makes nothing; a Tally made on the way stays.
 ///
 /// For the kind badge of a plain Note ([noteId], #191) it sets that Note
 /// up instead: no name and no schedule, the Note's text being its name
@@ -75,6 +77,17 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     ),
   );
   var _nameMissing = false;
+
+  /// The pool, count and rule as the page opened, and whether the
+  /// schedule was set (#275).
+  late final String _asOpened;
+  var _scheduleSet = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _asOpened = _draft.signature;
+  }
 
   @override
   void dispose() {
@@ -144,14 +157,25 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       ),
     );
     if (!mounted || picked == null) return;
-    setState(
-      () => _schedule = ScheduleChoice(
+    setState(() {
+      _scheduleSet = true;
+      _schedule = ScheduleChoice(
         picked.schedule,
         renag: picked.renag,
         escalation: picked.escalation,
-      ),
-    );
+      );
+    });
   }
+
+  /// Whether anything differs from the page as it opened (#275).
+  bool _changed() =>
+      _name.text.trim().isNotEmpty ||
+      _scheduleSet ||
+      _draft.signature != _asOpened;
+
+  /// Whether Save would make the Session.
+  bool _valid() =>
+      (widget.noteId != null || _name.text.trim().isNotEmpty) && _draft.valid;
 
   void _save() {
     if (widget.noteId case final noteId?) {
@@ -245,66 +269,73 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final rule = sessionRuleName(t, _draft.rule);
-    return Scaffold(
-      appBar: pageBar(
-        context,
-        title: widget.noteId == null ? t.newSession : t.session,
-        actions: [
-          TextButton(
-            key: const ValueKey('session-form-save'),
-            onPressed: _save,
-            child: Text(t.save),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
-        children: [
-          if (widget.noteId == null)
-            EditorPanel(
-              child: TextField(
-                key: const ValueKey('session-form-name'),
-                controller: _name,
-                focusNode: _nameFocus,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: t.kindName,
-                  errorText: _nameMissing ? t.kindNameMissing : null,
-                ),
-              ),
+    return LeaveSaves(
+      changed: _changed,
+      valid: _valid,
+      save: _save,
+      // Save shows what to fix without saving.
+      onKeep: _save,
+      child: Scaffold(
+        appBar: pageBar(
+          context,
+          title: widget.noteId == null ? t.newSession : t.session,
+          actions: [
+            TextButton(
+              key: const ValueKey('session-form-save'),
+              onPressed: _save,
+              child: Text(t.save),
             ),
-          _pool(t),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              SettingBadge(
-                key: const ValueKey('session-form-count'),
-                setting: t.sessionCount,
-                icon: Icons.tag,
-                value: t.sessionPicks(_draft.count),
-                onTap: (_) => _editCount(),
-              ),
-              SettingBadge(
-                key: const ValueKey('session-form-rule'),
-                setting: t.sessionRule,
-                icon: sessionRuleBadgeIcon,
-                value: rule,
-                valueIcon: sessionRuleIcon(_draft.rule),
-                onTap: (_) => _editRule(),
-              ),
-              if (widget.noteId == null)
-                SettingBadge(
-                  key: const ValueKey('session-form-schedule'),
-                  setting: t.sessionSchedule,
-                  icon: Icons.event_repeat,
-                  value: scheduleText(t, locale, _schedule.schedule),
-                  onTap: (_) => _editSchedule(),
+          ],
+        ),
+        body: ListView(
+          padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+          children: [
+            if (widget.noteId == null)
+              EditorPanel(
+                child: TextField(
+                  key: const ValueKey('session-form-name'),
+                  controller: _name,
+                  focusNode: _nameFocus,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: t.kindName,
+                    errorText: _nameMissing ? t.kindNameMissing : null,
+                  ),
                 ),
-            ],
-          ),
-        ],
+              ),
+            _pool(t),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                SettingBadge(
+                  key: const ValueKey('session-form-count'),
+                  setting: t.sessionCount,
+                  icon: Icons.tag,
+                  value: t.sessionPicks(_draft.count),
+                  onTap: (_) => _editCount(),
+                ),
+                SettingBadge(
+                  key: const ValueKey('session-form-rule'),
+                  setting: t.sessionRule,
+                  icon: sessionRuleBadgeIcon,
+                  value: rule,
+                  valueIcon: sessionRuleIcon(_draft.rule),
+                  onTap: (_) => _editRule(),
+                ),
+                if (widget.noteId == null)
+                  SettingBadge(
+                    key: const ValueKey('session-form-schedule'),
+                    setting: t.sessionSchedule,
+                    icon: Icons.event_repeat,
+                    value: scheduleText(t, locale, _schedule.schedule),
+                    onTap: (_) => _editSchedule(),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

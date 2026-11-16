@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -112,6 +113,68 @@ void main() {
     expect(
       store.history(note.id).where((e) => e.field == NoteKeys.text),
       hasLength(1),
+    );
+  });
+
+  testWidgets('a Section reads on in the Note\'s text: no box of its own, '
+      'a tear line above it and its time under it (#307)', (tester) async {
+    final note = notes.capture('Boiler knocks');
+    now = now.add(const Duration(hours: 4));
+    final first = notes.amend(note.id, 'Called the plumber');
+    now = now.add(const Duration(hours: 1));
+    final second = notes.amend(note.id, 'Plumber was here');
+    await edit(tester, note.id);
+
+    Element boxOf(Finder finder) => tester.element(
+      find.ancestor(of: finder, matching: find.byType(Embossed)).first,
+    );
+    final noteBox = boxOf(key('note-text'));
+    for (final (section, at) in [
+      (first, DateTime.utc(2026, 11, 1, 12)),
+      (second, DateTime.utc(2026, 11, 1, 13)),
+    ]) {
+      final text = key('section-text:${section.id}');
+      expect(
+        find.ancestor(of: text, matching: find.byType(EditorPanel)),
+        findsNothing,
+      );
+      expect(boxOf(text), same(noteBox));
+      final tear = key('tear:${section.id}');
+      expect(tester.widget(tear), isA<TearLine>());
+      expect(
+        tester.getRect(tear).bottom,
+        lessThanOrEqualTo(tester.getRect(text).top),
+      );
+      final line = key('captured-line:${section.id}');
+      expect(boxOf(line), same(noteBox));
+      expect(
+        find.descendant(
+          of: line,
+          matching: find.text(DateFormat.Hm('en').format(at.toLocal())),
+        ),
+        findsOneWidget,
+      );
+    }
+    expect(find.byType(TearLine), findsNWidgets(2));
+  });
+
+  testWidgets('on the full card a Section reads on under a tear line, not '
+      'a divider (#307)', (tester) async {
+    final note = notes.capture('Boiler knocks');
+    final amend = notes.amend(note.id, 'Called the plumber');
+    await tester.pumpWidget(OldBrainFixApp(store: store));
+    await tester.pumpAndSettle();
+    await tap(tester, find.byTooltip('Search and browse'));
+    await tap(tester, find.byTooltip('All Notes'));
+
+    final part = key('section:${amend.id}');
+    expect(
+      find.descendant(of: part, matching: find.byType(TearLine)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: part, matching: find.byType(Divider)),
+      findsNothing,
     );
   });
 

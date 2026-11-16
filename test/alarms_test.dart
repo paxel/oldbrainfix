@@ -102,6 +102,21 @@ void main() {
       );
     });
 
+    testWidgets('titles an alarm of a Note of files alone by its first '
+        'file\'s name (#267)', (tester) async {
+      final notes = Notes(store);
+      final lease = notes.capture(
+        '',
+        files: [
+          NewFile(name: 'Lease.pdf', bytes: Uint8List.fromList([1])),
+        ],
+      );
+      routines.spawn(lease.id, daily([at(20)]));
+      await start(tester);
+
+      expect(alarms.armed.first.title, 'Lease.pdf');
+    });
+
     testWidgets('arms again on every change, without the Agenda', (
       tester,
     ) async {

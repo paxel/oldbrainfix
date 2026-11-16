@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use chrono::{DateTime, Duration, Utc};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{
     Joining, answer_sync, answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
 };
@@ -177,6 +177,12 @@ fn a_picture_on_a_card_opens_the_persons_profile_not_the_note() -> TestResult {
     assert!(shows(&harness, "Name and picture for me"));
     assert!(shows(&harness, &code));
     assert!(shows(&harness, "Not verified"));
+    // Its field, the name for me, takes the keyboard as it opens (#277).
+    let typing = harness.get_by(|n| n.is_focused());
+    assert_eq!(
+        typing.accesskit_node().label().as_deref(),
+        Some("Name for me")
+    );
 
     // A name for Ann alone: the card shows it once the Profile closes.
     type_into(&mut harness, "Name for me", "Mum");

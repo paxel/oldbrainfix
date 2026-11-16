@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
@@ -14,6 +13,7 @@ import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/shopping_list_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'held_ticks.dart';
 import 'reveal.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -181,9 +181,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// "back Sat, Oct 31" as the card shows it for [line].
-  String back(ShoppingLine line) =>
-      'back ${DateFormat.MMMEd('en').format(line.backOn!.wall)}';
+  /// What shows faint beside the Line [lineId] (#328), or null.
+  String? beside(WidgetTester tester, String lineId) {
+    final found = key('checklist-beside-$lineId');
+    return found.evaluate().isEmpty ? null : tester.widget<Text>(found).data;
+  }
 
   group('on the card', () {
     testWidgets('"Make it a Shopping List" in the ⋮ makes its lines Lines; '
@@ -195,10 +197,18 @@ void main() {
       expect(key('note-to-plain'), findsNothing);
       await tap(tester, key('note-make-shopping'));
 
-      expect(notes.byId(note)!.text, 'Shop');
-      expect(shown(note), ['Milk', 'Eggs']);
+      // Every line a Line (#309): no name, and its card says what it is.
+      expect(notes.byId(note)!.text, '');
+      expect(shown(note), ['Shop', 'Milk', 'Eggs']);
+      expect(
+        find.descendant(
+          of: key('card-name'),
+          matching: find.text('Shopping List'),
+        ),
+        findsOneWidget,
+      );
       expect(notes.unsorted(), isEmpty);
-      for (final text in ['Milk', 'Eggs']) {
+      for (final text in ['Shop', 'Milk', 'Eggs']) {
         expect(key('checklist-check-${idOf(note, text)}'), findsOneWidget);
       }
       expect(lineOf(note, 'Milk').reappear, Reappear.unset);
@@ -212,8 +222,8 @@ void main() {
     });
 
     testWidgets('a full card checks a Line: struck through, folded at the '
-        'end (#189), with the day it comes back; on that day it is open at '
-        'the top', (tester) async {
+        'end (#189), with when it comes back beside it (#328); on that day '
+        'it is open at the top', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs\nTea').id;
       lists.make(note);
       weekly(note);
@@ -232,12 +242,21 @@ void main() {
       expect(top(tester, milk), greaterThan(top(tester, tea)));
       final line = lineOf(note, 'Milk');
       expect(line.backOn, Day.of(deviceWallClock(now)).addDays(7));
-      expect(find.text(back(line)), findsOneWidget);
+      expect(beside(tester, milk), 'in 7 days');
+      // Beside its text, on the same row.
+      expect(
+        tester.getCenter(key('checklist-beside-$milk')).dy,
+        moreOrLessEquals(tester.getCenter(drawn(milk)).dy, epsilon: 4),
+      );
+      expect(
+        tester.getTopLeft(key('checklist-beside-$milk')).dx,
+        greaterThan(tester.getTopRight(drawn(milk)).dx),
+      );
 
       // Unchecking brings it back now, at the top.
       await tap(tester, key('checklist-check-$milk'));
       expect(shown(note), ['Milk', 'Eggs', 'Tea']);
-      expect(find.textContaining('back '), findsNothing);
+      expect(beside(tester, milk), isNull);
 
       // Checked again, it comes back by itself when that day begins.
       await tap(tester, key('checklist-check-$milk'));
@@ -246,7 +265,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(struck(tester, milk), isFalse);
       expect(top(tester, milk), lessThan(top(tester, tea)));
-      expect(find.textContaining('back '), findsNothing);
+      expect(beside(tester, milk), isNull);
+    });
+
+    testWidgets('the struck Lines show the soonest back first, those '
+        'without a time last (#328); a Line ticked stays in its row until '
+        'its save, then goes to its place among them', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs\nTea\nSalt').id;
+      lists.make(note);
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      final tea = idOf(note, 'Tea');
+      final salt = idOf(note, 'Salt');
+      lists.setReappear(milk, Reappear.after(3, ReappearUnit.week));
+      lists.setReappear(eggs, Reappear.after(1, ReappearUnit.week));
+      lists.setReappear(tea, Reappear.after(1, ReappearUnit.day));
+      for (final id in [milk, salt, tea]) {
+        lists.check(id, deviceWallClock);
+      }
+      await startAtNotes(tester);
+      await tap(tester, key('shopping-struck'));
+      expect(top(tester, tea), lessThan(top(tester, milk)));
+      expect(top(tester, milk), lessThan(top(tester, salt)));
+      expect(beside(tester, tea), 'tomorrow');
+      expect(beside(tester, milk), 'in 3 weeks');
+      expect(beside(tester, salt), isNull);
+
+      final ticks = HeldTicks();
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      // Ticked and struck at once, in its row above the fold.
+      expect(struck(tester, eggs), isTrue);
+      expect(
+        top(tester, eggs),
+        lessThan(tester.getTopLeft(key('shopping-struck')).dy),
+      );
+      expect(beside(tester, eggs), isNull);
+      await ticks.release(tester);
+      expect(top(tester, tea), lessThan(top(tester, eggs)));
+      expect(top(tester, eggs), lessThan(top(tester, milk)));
+      expect(beside(tester, eggs), 'in 7 days');
     });
 
     testWidgets('a compact card shows how many are open', (tester) async {
@@ -311,21 +369,82 @@ void main() {
       return true;
     }
 
+    testWidgets('a Line ticks and strikes in the frame after the tap, and is '
+        'saved after it (#338); a failed save shows it open again and says '
+        'so', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      bool? checked(String id) =>
+          tester.widget<Checkbox>(key('checklist-check-$id')).value;
+      final ticks = HeldTicks();
+
+      await tester.tap(key('checklist-check-$milk'));
+      await tester.pump();
+      expect(checked(milk), isTrue);
+      expect(struck(tester, milk), isTrue);
+      expect(shown(note), ['Milk', 'Eggs']);
+      await ticks.release(tester);
+      expect(shown(note), contains('[x] Milk'));
+
+      // Two quick taps end as the second left it.
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      expect(checked(eggs), isFalse);
+      await ticks.release(tester);
+      expect(checked(eggs), isFalse);
+      expect(shown(note), contains('Eggs'));
+
+      ticks.failWith(Exception('disk full'));
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      expect(checked(eggs), isTrue);
+      expect(struck(tester, eggs), isTrue);
+      await ticks.release(tester);
+      expect(checked(eggs), isFalse);
+      expect(struck(tester, eggs), isFalse);
+      expect(shown(note), contains('Eggs'));
+      expect(find.text('A tick could not be saved.'), findsOneWidget);
+    });
+
     testWidgets('Shopping List in the kind badge makes the text as typed '
         'one; the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
-      await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
+      // Under a line ending in ":", which stays its name (#309).
+      await tester.enterText(find.byType(TextField).first, 'Shop:\nMilk\nEggs');
       await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('shopping'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'Shop',
+        'Shop:',
       );
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(notes.byId(note)!.text, 'Shop');
+      expect(notes.byId(note)!.text, 'Shop:');
+      expect(shown(note), ['Milk', 'Eggs']);
+    });
+
+    testWidgets('Shopping List in the kind badge makes typed lines without '
+        'a heading every one a Line, the name left empty, also after leaving '
+        '(#309)', (tester) async {
+      final note = notes.capture('Milk').id;
+      await openEditor(tester, 'Milk');
+      await tester.enterText(find.byType(TextField).first, 'Milk\nEggs');
+      await pickKind(tester, NoteKind.shoppingList);
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        '',
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(notes.byId(note)!.text, '');
       expect(shown(note), ['Milk', 'Eggs']);
     });
 
@@ -396,8 +515,9 @@ void main() {
     testWidgets('a new list starts with one empty Line, the cursor in it; '
         'the Lines stay in the order typed, one checked in its row until the '
         'editor is opened again, then below the open ones', (tester) async {
-      final note = notes.capture('Trip').id;
-      await openEditor(tester, 'Trip');
+      // A heading alone stays its name (#309).
+      final note = notes.capture('Trip:').id;
+      await openEditor(tester, 'Trip:');
       await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), isEmpty);
       expect(cursor(tester), ('', 0));
@@ -427,7 +547,7 @@ void main() {
       await leave(tester);
       final tea = idOf(note, 'Tea');
       expect(shown(note), ['Tea', 'Eggs', 'Bread', '[x] Milk']);
-      await reopen(tester, 'Trip');
+      await reopen(tester, 'Trip:');
       expect(inOrder(tester, [tea, eggs, bread, milk]), isTrue);
     });
 
@@ -542,10 +662,70 @@ void main() {
       expect(key('shopping-rename'), findsNothing);
       expect(find.text('Reappear time'), findsNothing);
       await tap(tester, key('shopping-delete'));
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tap(tester, key('checklist-delete-confirm'));
+      // It asks nothing: the announcement at the top undoes it (#268).
+      expect(find.byType(AlertDialog), findsNothing);
       expect(shown(note), isEmpty);
       expect(find.byType(BottomSheet), findsNothing);
+      await tap(tester, find.text('Line deleted'));
+      expect(shown(note), ['[x] Milk']);
+    });
+
+    testWidgets('⋮ on an open Line moves it among the open ones, its row '
+        'with it; a struck one stays (#283)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nBread\nEggs\nTea').id;
+      lists.make(note);
+      final bread = idOf(note, 'Bread');
+      lists.check(bread, deviceWallClock);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      final tea = idOf(note, 'Tea');
+      await lineMenu(tester, milk);
+      expect(key('shopping-up'), findsNothing);
+      await tap(tester, key('shopping-down'));
+      expect(shown(note), ['Eggs', 'Milk', 'Tea', '[x] Bread']);
+      expect(top(tester, milk), greaterThan(top(tester, eggs)));
+      // Never among the struck ones.
+      await lineMenu(tester, tea);
+      expect(key('shopping-down'), findsNothing);
+      await tap(tester, key('shopping-up'));
+      expect(shown(note), ['Eggs', 'Tea', 'Milk', '[x] Bread']);
+      await lineMenu(tester, bread);
+      expect(key('shopping-up'), findsNothing);
+      expect(key('shopping-down'), findsNothing);
+      await closeMenu(tester);
+      // Checked here, Tea keeps its row; Milk moves past it.
+      await tap(tester, key('checklist-check-$tea'));
+      await lineMenu(tester, milk);
+      await tap(tester, key('shopping-up'));
+      expect(shown(note), ['Milk', 'Eggs', '[x] Bread', '[x] Tea']);
+      expect(top(tester, milk), lessThan(top(tester, eggs)));
+      expect(top(tester, eggs), lessThan(top(tester, tea)));
+      expect(top(tester, tea), lessThan(top(tester, bread)));
+    });
+
+    testWidgets('a deleted Line comes back from the folded "Removed Lines" '
+        '(#268)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      expect(key('lines-removed'), findsNothing);
+      await lineMenu(tester, milk);
+      await tap(tester, key('shopping-delete'));
+      expect(shown(note), ['Eggs']);
+      await tester.ensureVisible(key('lines-removed'));
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Removed Lines'));
+      await tester.ensureVisible(key('line-restore-$milk'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('line-restore-$milk'));
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(key('lines-removed'), findsNothing);
+      // The announcement has nothing left to undo.
+      await tap(tester, find.text('Line deleted'));
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('a Line just typed has its ⋮ once it holds text, and each '
@@ -570,7 +750,6 @@ void main() {
       await type(tester, 'new-2', 'Salt', 4);
       await lineMenu(tester, 'new-2');
       await tap(tester, key('shopping-delete'));
-      await tap(tester, key('checklist-delete-confirm'));
       expect(shown(note), ['Milk', 'Tea']);
       expect(key('shopping-field-new-2'), findsNothing);
     });
@@ -806,8 +985,8 @@ void main() {
       expect(find.text('New Line: Nails'), findsOneWidget);
     });
 
-    testWidgets('in German the day it comes back reads "wieder" with the '
-        'short weekday and date', (tester) async {
+    testWidgets('in German when it comes back reads "in 7 Tagen" beside '
+        'it', (tester) async {
       final note = notes.capture('Einkauf\nMilch').id;
       lists.make(note);
       weekly(note);
@@ -824,7 +1003,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Einkaufsliste'), findsOneWidget);
-      expect(find.text('wieder Sa., 31. Okt.'), findsOneWidget);
+      expect(beside(tester, idOf(note, 'Milch')), 'in 7 Tagen');
       expect(badgeText(tester, idOf(note, 'Milch')), '1W');
       expect(find.bySemanticsLabel('Wiederkehr: 1 Woche'), findsOneWidget);
     });
