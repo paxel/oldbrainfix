@@ -1972,7 +1972,12 @@ void main() {
             await formattedNotes(tester);
             final boiler = cardText(texts.formatted);
             await scrollTo(tester, boiler);
-            await tester.longPress(boiler.first);
+            // On a line: between its lines lies room (#327).
+            await tester.longPress(
+              find
+                  .descendant(of: boiler.first, matching: find.byType(RichText))
+                  .first,
+            );
             await tester.pumpAndSettle();
             expect(find.byType(NoteEditorScreen), findsOneWidget);
             // The keyboard up, drawn as nothing: the format bar and the

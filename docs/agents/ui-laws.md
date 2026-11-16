@@ -696,7 +696,7 @@ replace a law of Both apps where they say so. A desktop law marked
   being edited written first; on the phone the HTML goes through the
   app's own channel, else the Markdown alone. Copied says nothing.
 - **A Code text has no format bar and no ☐** (#213): the field shows it
-  in the fixed-width font on the grey ground of code, unwrapped, and it
+  in the fixed-width font on the light tint of code, unwrapped, and it
   moves sideways. **A paste that looks like code** into a Plain Note's
   text in the Note editor formats nothing and puts "Keep as code" under
   the text, with a cross that lets the paste be; Capture never asks.
@@ -851,6 +851,29 @@ replace a law of Both apps where they say so. A desktop law marked
   `LookGrown`. The Agenda's measures (`AgendaSizes`) grow by the same
   factor, and the widget's text with them. On the desktop it is egui's
   zoom at 1.3.
+- **Formatted text reads calm** (#327, obf-1020): wherever a formatted
+  text shows, on both apps, every measure in parts of its font's size,
+  so a bigger text keeps the look. Its lines lie 1.5 sizes apart. Between
+  two lines as it reads lie 0.5 more, 0.8 before a heading, 0.3 after
+  one, 0.2 between two items or two quote lines; a blank line makes 1.0
+  instead of a line; a compact card's lines keep only the line height.
+  Headings are 1.3 and 1.15 sizes, semi-bold on the phone (the desktop's
+  bold is its drawn-twice bold). Code is in the fixed-width font at 0.9
+  size, on a light tint of the text's colour (8 %, light and dark), no
+  frame, the tint only as high as its words (1.3 of code's size) and on
+  the desktop a little wider; a code block's lines are 1.3 apart on the
+  same tint, and so is a Code text's ground. The font stays the system's
+  on the phone and egui's own on the desktop. The phone's field keeps
+  the 1.5 line height but no room between lines (a Flutter field could
+  only add it unevenly to a wrapped paragraph); the desktop's field
+  shows the Markdown with the same room, a code block's and a table's
+  lines together, the table's grid where its first line lies. egui puts a
+  taller line height under the words and an underline with it, so the
+  desktop moves the rows of a laid-out text apart instead (`spread`),
+  and a click still finds its character. Phone: `formattedLineHeight`,
+  `lineGap`, `codeStyle`, `codeTint` in `text_marks_view.dart`; desktop:
+  `LINE_HEIGHT`, `line_gap`, `spread`, `source_spread` in
+  `text_marks_view.rs` and `theme::code_tint`.
 
 ### The sync line
 

@@ -21104,10 +21104,16 @@ fn edited_text(
                 let job = egui::text::LayoutJob::single_section(typed.to_string(), format);
                 return ui.fonts_mut(|f| f.layout_job(job));
             }
-            let job = if formatted {
-                text_marks_view::source_job(typed, font, (written, accent, weak, code))
+            let (job, lines) = if formatted {
+                text_marks_view::source_job(typed, font.clone(), (written, accent, weak, code))
             } else {
-                text_marks_view::tag_job(typed, (0, typed.len()), font, (written, accent))
+                let job = text_marks_view::tag_job(
+                    typed,
+                    (0, typed.len()),
+                    font.clone(),
+                    (written, accent),
+                );
+                (job, Vec::new())
             };
             let gap = |after: &str| {
                 let said = after.to_string();
@@ -21119,7 +21125,13 @@ fn edited_text(
                 job = grids.hide(typed, job);
             }
             job.wrap.max_width = width;
-            ui.fonts_mut(|f| f.layout_job(job))
+            let galley = ui.fonts_mut(|f| f.layout_job(job));
+            if !formatted {
+                return galley;
+            }
+            // As far apart as the text reads (#327).
+            let extra = text_marks_view::line_extra(ui, &font, text_marks_view::LINE_HEIGHT);
+            text_marks_view::source_spread(galley, &lines, size, extra)
         };
         // Pasted, a text that looks like code offers it and formats
         // nothing (#213); else pasted with a format, a plain text
@@ -21597,7 +21609,7 @@ fn name_edit(
         let typed = typed.as_str();
         let font = FontId::proportional(NAME_SIZE);
         let job = if formatted {
-            text_marks_view::source_job(typed, font, (text, accent, weak, code))
+            text_marks_view::source_job(typed, font, (text, accent, weak, code)).0
         } else {
             text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
         };

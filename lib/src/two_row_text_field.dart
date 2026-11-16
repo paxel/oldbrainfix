@@ -309,7 +309,7 @@ typedef FieldAction = ({
 /// ↵ of the keyboard does in it.
 ///
 /// A [TagTextController] holding a Code text (#213) has no bar of
-/// formats: its text shows in monospace, unwrapped, on the grey ground of
+/// formats: its text shows in monospace, unwrapped, on the tint of
 /// code, and a one-finger drag moves it sideways. With [onCodePasted], a
 /// pasted text that looks like code ([TextFormats.looksLikeCode]) calls
 /// it, and the paste does not make the text formatted.
@@ -1235,7 +1235,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     // also where it is only read.
     final controller = widget.controller;
     final strut = controller is TagTextController && controller.markdown
-        ? StrutStyle.fromTextStyle(
+        ? formattedStrut(
             widget.style ??
                 Theme.of(context).textTheme.bodyLarge ??
                 const TextStyle(),
@@ -1366,10 +1366,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   };
 
   /// A Code text's [field] (#213): as wide as its longest line and at
-  /// least as the room, on the grey ground of code, moved sideways.
+  /// least as the room, on the tint of code, moved sideways.
   Widget _sideways(BuildContext context, Widget field) => DecoratedBox(
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: codeTint(Theme.of(context).colorScheme),
       borderRadius: BorderRadius.circular(4),
     ),
     child: LayoutBuilder(

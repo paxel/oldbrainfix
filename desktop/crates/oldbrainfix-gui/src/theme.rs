@@ -269,6 +269,17 @@ pub fn icon_button_back(ui: &Ui, resp: &Response, rect: Rect) {
 /// tinted with the accent.
 const SELECTION_TINT: f32 = 0.25;
 
+/// How strongly code is tinted with the text's colour behind it, as on
+/// the phone (#327).
+pub const CODE_TINT: f32 = 0.08;
+
+/// The ground of code: a light tint of the text's colour `text`, no
+/// frame, in light and dark alike.
+pub fn code_tint(text: Color32) -> Color32 {
+    let alpha = (CODE_TINT * 255.0).round() as u8;
+    Color32::from_rgba_unmultiplied(text.r(), text.g(), text.b(), alpha)
+}
+
 /// The visuals of one brightness: egui's own, on the phone's colours.
 pub fn visuals(dark: bool) -> Visuals {
     let (t, x) = if dark {
@@ -292,6 +303,7 @@ pub fn visuals(dark: bool) -> Visuals {
     v.window_fill = t.card;
     v.extreme_bg_color = t.card;
     v.text_edit_bg_color = Some(t.card);
+    v.code_bg_color = code_tint(x.text);
     v.selection.bg_fill = t.accent.gamma_multiply(SELECTION_TINT);
     v.selection.stroke = Stroke::new(1.0, t.accent);
     paint_buttons(&mut v, button_tones(dark, ButtonKind::Secondary));

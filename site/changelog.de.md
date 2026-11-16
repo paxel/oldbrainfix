@@ -30,6 +30,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy scrollt das Suchfeld der Bereichsliste, eines Bereichs und eines Themas mit der Liste weg und kommt beim Zurückscrollen wieder. ([obf-1029](https://github.com/paxel/oldbrainfix/issues/336))
 - „Über Old Brain Fix“ steht nicht mehr in den Einstellungen: auf dem Handy hinter dem Profilbild, auf dem Desktop unter Hilfe. ([obf-1018](https://github.com/paxel/oldbrainfix/issues/325))
 - Die durchgestrichenen Zeilen einer Einkaufsliste zeigen die am frühesten wiederkommende zuerst, jede mit „in 3 Tagen“ oder ähnlich daneben. ([obf-1021](https://github.com/paxel/oldbrainfix/issues/328))
+- Formatierter Text liest sich ruhiger, mit mehr Abstand zwischen Zeilen und Absätzen, leichteren Überschriften und Code auf einer hellen Tönung statt in einem grauen Kasten. ([obf-1020](https://github.com/paxel/oldbrainfix/issues/327))
 
 ### Behoben
 
