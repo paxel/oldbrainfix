@@ -26,7 +26,9 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::packs::{self, EXTENSION};
 use oldbrainfix_core::schedule::{Recurrence, Schedule};
-use oldbrainfix_core::{ClockTime, Day, Notes, OwnProfile, Places, Routines, SigningKey, Store};
+use oldbrainfix_core::{
+    Checklists, ClockTime, Day, Notes, OwnProfile, Places, Routines, SigningKey, Store,
+};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -219,6 +221,19 @@ fn an_area_exports_as_a_pack_with_the_phones_ticks_and_size_and_saves_it() -> Te
     assert_eq!(texts, ["Water", "Laps"]);
     assert_eq!(opened.pack.notes[0].routines.len(), 2);
     assert!(opened.from.is_none());
+    Ok(())
+}
+
+#[test]
+fn a_list_without_a_name_shows_its_kind_in_the_tree() -> TestResult {
+    let desk = store(4, "Desk")?;
+    let (health, _, _) = health(&desk)?;
+    // Typed text made a Checklist, every line a Line, no name (#309).
+    let socks = Notes::new(&desk).capture("Socks\nTent", Some(&health), None)?;
+    Checklists::new(&desk).make_from_text(&socks.id)?;
+    let mut harness = window(App::new(desk, "en"));
+    place_menu(&mut harness, "Health", "Export as Pack…");
+    assert!(ticked(&harness, "Checklist"));
     Ok(())
 }
 

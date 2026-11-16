@@ -1,8 +1,10 @@
 package io.github.paxel.oldbrainfix
 
+import android.os.Process
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -14,6 +16,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FilterInputStream
 import java.io.InputStream
+import java.util.concurrent.Executors
 
 class SpeechTest {
     /** Deleted with everything in it after each test. */
@@ -111,11 +114,46 @@ class SpeechTest {
     }
 
     @Test
-    fun `Whisper gets one core less than there are, at most four`() {
+    fun `RustO gets one core less than there are, at most four`() {
         assertEquals(1, Speech.threadsFor(1))
         assertEquals(1, Speech.threadsFor(2))
         assertEquals(3, Speech.threadsFor(4))
         assertEquals(4, Speech.threadsFor(8))
+    }
+
+    @Test
+    fun `Whisper gets at most two threads`() {
+        assertEquals(1, Speech.whisperThreadsFor(1))
+        assertEquals(2, Speech.whisperThreadsFor(2))
+        assertEquals(2, Speech.whisperThreadsFor(4))
+        assertEquals(2, Speech.whisperThreadsFor(8))
+    }
+
+    @Test
+    fun `a transcription sets background priority on the thread that runs it, first`() {
+        val worker = Executors.newSingleThreadExecutor()
+        val steps = mutableListOf<String>()
+        var priority: Int? = null
+        var prioritized: Thread? = null
+        var ran: Thread? = null
+        val task = Speech.atBackgroundPriority(
+            setPriority = {
+                priority = it
+                prioritized = Thread.currentThread()
+                steps += "priority"
+            },
+        ) {
+            ran = Thread.currentThread()
+            steps += "task"
+        }
+        assertTrue(steps.isEmpty())
+        worker.submit(task).get()
+        worker.shutdown()
+        assertEquals(Process.THREAD_PRIORITY_BACKGROUND, priority)
+        assertEquals(10, priority)
+        assertSame(ran, prioritized)
+        assertNotSame(Thread.currentThread(), ran)
+        assertEquals(listOf("priority", "task"), steps)
     }
 
     @Test

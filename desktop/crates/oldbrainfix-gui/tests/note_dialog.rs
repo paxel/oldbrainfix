@@ -303,7 +303,8 @@ fn each_setting_is_a_badge_read_as_setting_and_value() -> TestResult {
 
 /// A badge whose setting has a fixed set of values shows its value as an
 /// icon, never with its word (#192): it is as wide for a long value as for
-/// a short one, and as wide as an icon; other values are text, wider.
+/// a short one, and as wide as an icon; other values are text, wider, and
+/// so is the kind, named in words (#310).
 #[test]
 fn a_fixed_set_of_values_shows_as_an_icon_without_its_word() -> TestResult {
     let (store, household) = store()?;
@@ -316,14 +317,12 @@ fn a_fixed_set_of_values_shows_as_an_icon_without_its_word() -> TestResult {
     let width = |label: &str| harness.get_by_label(label).rect().width();
     // The setting's icon part, 38 points, then an 18-point icon padded by
     // 10 on each side.
-    for label in [
-        "Kind: Plain Note",
-        "Importance: Unimportant",
-        "Show ticks: Off",
-    ] {
+    for label in ["Importance: Unimportant", "Show ticks: Off"] {
         assert_eq!(width(label), 38.0 + 18.0 + 20.0, "{label}");
     }
     assert!(width("Area and Topic: Household") > 38.0 + 18.0 + 20.0);
+    // The kind is the exception (#310): its name in words, ▾ after it.
+    assert!(width("Kind: Plain Note") > 38.0 + 18.0 + 20.0 + 40.0);
     Ok(())
 }
 

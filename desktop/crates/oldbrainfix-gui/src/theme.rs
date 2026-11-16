@@ -9,7 +9,7 @@ use egui::{
     Button, Color32, Context, Key, Modifiers, Rect, Response, Shape, Stroke, Theme,
     ThemePreference, Ui, Visuals,
 };
-use oldbrainfix_core::ThemeChoice;
+use oldbrainfix_core::{TextSize, ThemeChoice};
 
 /// The colours of one brightness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -269,6 +269,17 @@ pub fn icon_button_back(ui: &Ui, resp: &Response, rect: Rect) {
 /// tinted with the accent.
 const SELECTION_TINT: f32 = 0.25;
 
+/// How strongly code is tinted with the text's colour behind it, as on
+/// the phone (#327).
+pub const CODE_TINT: f32 = 0.08;
+
+/// The ground of code: a light tint of the text's colour `text`, no
+/// frame, in light and dark alike.
+pub fn code_tint(text: Color32) -> Color32 {
+    let alpha = (CODE_TINT * 255.0).round() as u8;
+    Color32::from_rgba_unmultiplied(text.r(), text.g(), text.b(), alpha)
+}
+
 /// The visuals of one brightness: egui's own, on the phone's colours.
 pub fn visuals(dark: bool) -> Visuals {
     let (t, x) = if dark {
@@ -292,6 +303,7 @@ pub fn visuals(dark: bool) -> Visuals {
     v.window_fill = t.card;
     v.extreme_bg_color = t.card;
     v.text_edit_bg_color = Some(t.card);
+    v.code_bg_color = code_tint(x.text);
     v.selection.bg_fill = t.accent.gamma_multiply(SELECTION_TINT);
     v.selection.stroke = Stroke::new(1.0, t.accent);
     paint_buttons(&mut v, button_tones(dark, ButtonKind::Secondary));
@@ -306,6 +318,30 @@ pub fn install(ctx: &Context) {
     for theme in [Theme::Light, Theme::Dark] {
         ctx.style_mut_of(theme, |s| s.spacing.button_padding = BUTTON_PADDING);
     }
+}
+
+/// Where the context keeps the factor of this Device's text size.
+fn text_size_id() -> egui::Id {
+    egui::Id::new("oldbrainfix-text-size")
+}
+
+/// Shows the text of Notes, Lines, Sections, the Agenda's rows and Ask's
+/// answers at `size`'s factor (#326, obf-1019), on top of the zoom of
+/// "Bigger text and icons"; the context keeps it, for every window.
+pub fn set_text_size(ctx: &Context, size: TextSize) {
+    ctx.data_mut(|d| d.insert_temp(text_size_id(), size.factor()));
+}
+
+/// The factor of the text size shown around `ctx`; 1 until one is set.
+pub fn text_factor(ctx: &Context) -> f32 {
+    ctx.data(|d| d.get_temp(text_size_id())).unwrap_or(1.0)
+}
+
+/// `size`, a content text's usual size in points, at the text size of
+/// this Device (#326, obf-1019). Buttons, icons and labels around the
+/// text keep theirs.
+pub fn content(ui: &Ui, size: f32) -> f32 {
+    size * text_factor(ui.ctx())
 }
 
 /// Shows the theme this Device chose: the system's, light or dark.
@@ -372,6 +408,34 @@ pub fn area_band(rect: Rect, colour: Color32) -> Shape {
     points.extend(lower);
     points.retain(|p| p.x <= inner + 0.01);
     Shape::convex_polygon(points, colour, Stroke::NONE)
+}
+
+/// How long a dash of a tear line is, and the gap after it (#307), as
+/// on the phone.
+pub const TEAR_DASH: f32 = 4.0;
+pub const TEAR_GAP: f32 = 4.0;
+
+/// The tear line from `left` to `right` at `y` (#307): a row of short
+/// dashes like the perforation of a roll of paper, parting a Note's
+/// text from each of its Sections, which read on as one text.
+pub fn tear_shapes(left: f32, right: f32, y: f32, stroke: Stroke) -> Vec<Shape> {
+    let ends = [egui::pos2(left, y), egui::pos2(right, y)];
+    Shape::dashed_line(&ends, stroke, TEAR_DASH, TEAR_GAP)
+}
+
+/// A tear line across `ui` (#307), in the weak text colour of the time
+/// stamp under it, wherever it is drawn, taking its room as a separator
+/// does.
+pub fn tear_line(ui: &mut Ui) -> Response {
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 8.0), egui::Sense::hover());
+    if ui.is_rect_visible(rect) {
+        let stroke = Stroke::new(1.0, ui.visuals().weak_text_color());
+        let y = rect.center().y;
+        let shapes = tear_shapes(rect.left(), rect.right(), y, stroke);
+        ui.painter().extend(shapes);
+    }
+    response
 }
 
 #[cfg(test)]

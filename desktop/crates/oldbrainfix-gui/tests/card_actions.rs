@@ -55,7 +55,11 @@ fn store() -> Result<Store, Box<dyn std::error::Error>> {
 }
 
 fn harness(store: Store, selection: Selection) -> Harness<'static, App> {
-    let mut app = App::new(store, "en");
+    harness_in(store, selection, "en")
+}
+
+fn harness_in(store: Store, selection: Selection, language: &str) -> Harness<'static, App> {
+    let mut app = App::new(store, language);
     app.select(selection);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
@@ -209,7 +213,7 @@ fn a_card_outside_the_selection_goes_alone() -> TestResult {
 }
 
 #[test]
-fn note_delete_with_no_note_open_trashes_the_cards_selected() -> TestResult {
+fn note_move_to_trash_with_no_note_open_trashes_the_cards_selected() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
@@ -220,9 +224,9 @@ fn note_delete_with_no_note_open_trashes_the_cards_selected() -> TestResult {
         .click();
     harness.run();
     harness
-        .query_all_by_label("Delete Delete")
+        .query_all_by_label("Move to trash Delete")
         .next_back()
-        .ok_or("Delete in the Note menu")?
+        .ok_or("Move to trash in the Note menu")?
         .click();
     harness.run();
     assert!(trashed(&harness, &ids, MILK)?);
@@ -231,6 +235,44 @@ fn note_delete_with_no_note_open_trashes_the_cards_selected() -> TestResult {
     undo(&mut harness);
     assert!(!trashed(&harness, &ids, MILK)?);
     assert!(!trashed(&harness, &ids, ROSES)?);
+    Ok(())
+}
+
+#[test]
+fn both_menus_name_move_to_trash_as_the_phone_does() -> TestResult {
+    // #329: the card's right-click and the Note menu say the phone's
+    // words, in German too, and neither says Delete.
+    for (language, menu, entry, delete) in [
+        ("en", "Note", "Move to trash", "Delete"),
+        ("de", "Notiz", "In den Papierkorb", "Löschen"),
+    ] {
+        let mut harness = harness_in(store()?, Selection::All, language);
+        let ids = known(&harness)?;
+        pause(&mut harness);
+        card(&harness, ROSES).click_secondary();
+        harness.run();
+        assert!(harness.query_by_label(entry).is_some(), "{language}");
+        assert!(harness.query_by_label(delete).is_none(), "{language}");
+        harness.key_press(egui::Key::Escape);
+        harness.run();
+
+        select(&mut harness, &[MILK]);
+        harness
+            .query_all_by_label(menu)
+            .next()
+            .ok_or("the Note menu")?
+            .click();
+        harness.run();
+        assert!(harness.query_by_label(delete).is_none(), "{language}");
+        harness
+            .query_all_by_label(&format!("{entry} Delete"))
+            .next_back()
+            .ok_or_else(|| format!("no {entry:?} in the Note menu"))?
+            .click();
+        harness.run();
+        assert!(trashed(&harness, &ids, MILK)?, "{language}");
+        assert!(!trashed(&harness, &ids, ROSES)?, "{language}");
+    }
     Ok(())
 }
 
@@ -314,7 +356,8 @@ fn the_cards_selected_merge_into_another_and_one_undo_parts_them() -> TestResult
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, ROSES, "Merge into…")?;
+    // On an Unsorted Note's card it is Add to Note… (#308).
+    right_pick(&mut harness, ROSES, "Add to Note…")?;
     // Picked in the dialog, drawn after the cards.
     harness
         .query_all_by_label(PLUMBER)
@@ -346,7 +389,7 @@ fn a_card_selected_picked_in_merge_into_takes_the_others_in() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, MILK, "Merge into…")?;
+    right_pick(&mut harness, MILK, "Add to Note…")?;
     harness
         .query_all_by_label(ROSES)
         .next_back()
@@ -425,7 +468,8 @@ fn a_merge_leaves_out_a_note_this_device_may_not_change() -> TestResult {
     let mut harness = harness(shared()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, ROSES, "Merge into…")?;
+    // Ben's Unsorted Note's card names it Add to Note… (#308).
+    right_pick(&mut harness, ROSES, "Add to Note…")?;
     pick_note(&mut harness, PLUMBER)?;
     // Ben's own Note merged; Ann's, in her Shared Area, did not stop it
     // and stayed.
@@ -566,7 +610,8 @@ fn a_cards_menu_offers_its_routines_after_file_into_and_before_merge_into() -> T
         "Reminder…",
         "Frog",
         "Session…",
-        "Merge into…",
+        // On an Unsorted Note's card (#308).
+        "Add to Note…",
         "Importance ⏵",
     ];
     assert_eq!(menu_of(&mut harness, MILK, &order), order);

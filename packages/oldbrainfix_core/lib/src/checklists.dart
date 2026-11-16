@@ -570,23 +570,31 @@ class Checklists {
         store.mayChange(noteId);
   }
 
-  /// Makes the Note [noteId] a Checklist: its first line stays its text,
-  /// every other line not blank becomes a Line, under the line above
-  /// when it starts with a space or a tab, checked when it starts with
-  /// "✓ ", in a formatted text without the mark of an item or a quote
-  /// ([parseLine]). Takes it out of Unsorted, as a Tally does. The text
-  /// keeps its format.
-  void make(String noteId) {
+  /// Makes the Note [noteId] a Checklist named by its first line, as a
+  /// new list is from the name typed for it: its first line stays its
+  /// text, every other line not blank becomes a Line, under the line
+  /// above when it starts with a space or a tab, checked when it starts
+  /// with "✓ ", in a formatted text without the mark of an item or a
+  /// quote ([parseLine]). Takes it out of Unsorted, as a Tally does. The
+  /// text keeps its format. Typed text is made a Checklist by
+  /// [makeFromText].
+  void make(String noteId) => _make(noteId, fromText: false);
+
+  /// Makes the typed text of the Note [noteId] a Checklist (#309), as
+  /// [make] does but with every line a Line unless the first looks like
+  /// a heading ([listOfText]): only then is it the Name, else the list
+  /// has none.
+  void makeFromText(String noteId) => _make(noteId, fromText: true);
+
+  void _make(String noteId, {required bool fromText}) {
     final note = Notes(store).byId(noteId);
     if (note == null || !mayMake(noteId)) {
       throw StateError('$noteId may not be made a Checklist here');
     }
-    final rows = splitLines(note.text);
-    final title = rows.first.trim();
     final markdown = note.textFormat == TextFormats.markdown;
-    final parsed = [
-      for (final row in rows.skip(1)) ?parseLine(row, markdown: markdown),
-    ];
+    final (name: title, lines: parsed) = fromText
+        ? listOfText(note.text, markdown: markdown)
+        : namedList(note.text, markdown: markdown);
     final making = Store.newId();
     store.batch(() {
       store.append(noteId, ChecklistKeys.kind, ChecklistKeys.kindOf(making));
@@ -1183,6 +1191,59 @@ ParsedLine? parseLine(String row, {bool markdown = false}) {
     }
   }
   return (text: text, indent: indent, checked: checked);
+}
+
+/// The Name and the Lines a list made of [text] named by its first line
+/// has: that line trimmed, and every other line not blank a Line
+/// ([parseLine]).
+({String name, List<ParsedLine> lines}) namedList(
+  String text, {
+  bool markdown = false,
+}) {
+  final rows = splitLines(text);
+  return (
+    name: rows.first.trim(),
+    lines: [
+      for (final row in rows.skip(1)) ?parseLine(row, markdown: markdown),
+    ],
+  );
+}
+
+/// The Name and the Lines a list made of the typed [text] has (#309):
+/// every line not blank becomes a Line ([parseLine]), but a first line
+/// that looks like a heading is the Name ([headingName]); without one
+/// the Name is empty.
+({String name, List<ParsedLine> lines}) listOfText(
+  String text, {
+  bool markdown = false,
+}) {
+  final rows = splitLines(text);
+  final name = headingName(rows.first);
+  return (
+    name: name ?? '',
+    lines: [
+      for (final row in name == null ? rows : rows.skip(1))
+        ?parseLine(row, markdown: markdown),
+    ],
+  );
+}
+
+/// The Name the first line [row] of a typed text gives the list made of
+/// it (#309), or null when that line is no heading and becomes a Line: a
+/// Markdown heading of any level, one to six "#" and a space or a tab
+/// before its words, without its marks, or a line ending in ":", as it
+/// is. Both trimmed.
+String? headingName(String row) {
+  final line = row.trim();
+  var marks = 0;
+  while (marks < line.length && line.codeUnitAt(marks) == 0x23) {
+    marks++;
+  }
+  if (marks > 0 && marks <= 6 && marks < line.length) {
+    final after = line.codeUnitAt(marks);
+    if (after == 0x20 || after == 0x09) return line.substring(marks).trim();
+  }
+  return line.endsWith(':') ? line : null;
 }
 
 /// [row] without the mark it starts with as a bulleted or numbered item

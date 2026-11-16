@@ -4,15 +4,23 @@
 //! Code block for it. It opens at the pointer; an entry that has nothing
 //! to work on is greyed.
 //!
-//! Cut, Copy and Paste ask the window's clipboard as their keys do, as
-//! Edit's do, so the field takes them as it takes Ctrl+X, Ctrl+C and
-//! Ctrl+V. The field keeps the keyboard through the menu, and a
+//! Cut, Copy and Paste, Edit's as well, come to the field at the start
+//! of its window's next frame as the cut, copy and paste Ctrl+X, Ctrl+C
+//! and Ctrl+V bring, so the field takes them as it takes the keys (#319).
+//! Asked of the window instead, they came two frames late and only with
+//! the next input, and never in a Note window of its own. Paste brings
+//! the system clipboard's text; where it cannot be read, the window is
+//! asked for it. The field keeps the keyboard through the menu, and a
 //! right-click on its selection keeps it selected, which a press in a
 //! field otherwise turns into the cursor at the pointer.
 
+use egui::plugin::Plugin;
 use egui::text::CCursorRange;
 use egui::widgets::text_edit::TextEditState;
-use egui::{Id, PointerButton, Popup, Response, RichText, Ui, ViewportCommand};
+use egui::{
+    Context, Event, Id, PointerButton, Popup, RawInput, Response, RichText, Ui, ViewportCommand,
+    ViewportId,
+};
 
 use crate::format_bar::{self, Format};
 use crate::l10n::L10n;
@@ -123,18 +131,90 @@ fn entries(
 /// Does `pick` in the field `id` holding `text`; a format is left to its
 /// bar.
 pub fn apply(ui: &Ui, id: Id, text: &str, pick: Pick) {
-    let asked = match pick {
-        Pick::Cut => ViewportCommand::RequestCut,
-        Pick::Copy => ViewportCommand::RequestCopy,
-        Pick::Paste => ViewportCommand::RequestPaste,
+    let clip = match pick {
+        Pick::Cut => Clip::Cut,
+        Pick::Copy => Clip::Copy,
+        Pick::Paste => Clip::Paste,
         Pick::SelectAll => {
             format_bar::select(ui, id, text, (0, text.len()));
             return;
         }
         Pick::Format(_) => return,
     };
-    ui.memory_mut(|m| m.request_focus(id));
-    ui.ctx().send_viewport_cmd(asked);
+    clip_into(ui.ctx(), id, clip);
+}
+
+/// Cut, Copy or Paste, of the menu or of Edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Clip {
+    Cut,
+    Copy,
+    Paste,
+}
+
+/// Reads the system clipboard's text; `None` where it cannot, or it
+/// holds none.
+pub type ReadClipboard = fn() -> Option<String>;
+
+/// The cuts, copies and pastes asked, each for the next frame of its
+/// window, and where Paste reads the clipboard.
+#[derive(Debug, Default)]
+pub struct Clips {
+    asked: Vec<(ViewportId, Event)>,
+    read: Option<ReadClipboard>,
+}
+
+impl Plugin for Clips {
+    fn debug_name(&self) -> &'static str {
+        "text menu clips"
+    }
+
+    /// Hands the window drawn now what was asked for it, as the keys
+    /// would bring it; what was asked for a window closed since is
+    /// dropped.
+    fn input_hook(&mut self, _ctx: &Context, input: &mut RawInput) {
+        let viewport = input.viewport_id;
+        let open = |id: &ViewportId| input.viewports.is_empty() || input.viewports.contains_key(id);
+        let mut kept = Vec::new();
+        for (id, event) in std::mem::take(&mut self.asked) {
+            if id == viewport {
+                input.events.push(event);
+            } else if open(&id) {
+                kept.push((id, event));
+            }
+        }
+        self.asked = kept;
+    }
+}
+
+/// Where Paste reads the system clipboard's text, for every window of
+/// `ctx`.
+pub fn read_clipboard_by(ctx: &Context, read: ReadClipboard) {
+    ctx.plugin_or_default::<Clips>().lock().read = Some(read);
+}
+
+/// Gives the field `id` `clip` at the start of its window's next frame,
+/// and the keyboard now. A Paste where the clipboard's text cannot be
+/// read asks the window for it.
+pub fn clip_into(ctx: &Context, id: Id, clip: Clip) {
+    ctx.memory_mut(|m| m.request_focus(id));
+    let plugin = ctx.plugin_or_default::<Clips>();
+    let mut clips = plugin.lock();
+    let event = match clip {
+        Clip::Cut => Event::Cut,
+        Clip::Copy => Event::Copy,
+        Clip::Paste => match clips.read.and_then(|read| read()) {
+            Some(text) => Event::Paste(text),
+            None => {
+                drop(clips);
+                ctx.send_viewport_cmd(ViewportCommand::RequestPaste);
+                return;
+            }
+        },
+    };
+    clips.asked.push((ctx.viewport_id(), event));
+    drop(clips);
+    ctx.request_repaint();
 }
 
 /// A press of the right button in the field `response` puts its cursor

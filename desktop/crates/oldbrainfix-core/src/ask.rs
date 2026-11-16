@@ -40,6 +40,13 @@ pub const ANTHROPIC_KEY_KEY: &str = "ask:anthropic:key";
 pub const OPENAI_URL_KEY: &str = "ask:openai:url";
 pub const OPENAI_MODEL_KEY: &str = "ask:openai:model";
 pub const OPENAI_KEY_KEY: &str = "ask:openai:key";
+/// The local setting "Let the model think" of an OpenAI-compatible
+/// provider (#318): `true` while on; absent, the default, is off.
+pub const OPENAI_THINKS_KEY: &str = "ask:openai:think";
+/// The local setting of the main switch "AI (experimental)" (#334):
+/// `true` while on; absent, the default, is off, also where a provider
+/// was set up before the switch came.
+pub const ON_KEY: &str = "ask:on";
 
 /// Where Anthropic's Messages API is, its version, and the model asked
 /// while the user names none.
@@ -50,6 +57,16 @@ pub const ANTHROPIC_MODEL: &str = "claude-opus-5-5";
 /// none: Ollama on this computer.
 pub const OPENAI_URL: &str = "http://localhost:11434/v1";
 
+/// What an OpenAI-compatible request sends as `reasoning_effort` while
+/// the model may not think (#318): Ollama's `/v1` reads `none` as think
+/// false, and OpenAI lists it among its efforts.
+pub const NO_THINKING: &str = "none";
+
+/// Where the thinking a model wrote into its content ends (#318): a model
+/// that always thinks, such as Qwen3-4B-Thinking, writes it there once
+/// asked not to think.
+const THINK_END: &str = "</think>";
+
 /// How long Anthropic's answer may be, its thinking included.
 const MAX_TOKENS: u32 = 16_000;
 /// How often the model is asked for one question at most: each round
@@ -58,11 +75,63 @@ pub const MAX_ROUNDS: usize = 24;
 
 /// What the model is told, the same for every question so that a
 /// provider can keep it cached; the time and the question come in the
-/// user's turn.
-pub const SYSTEM: &str = "You answer questions about the user's own Notes in Old Brain Fix, a memory aid. Find what you need with the tools: search with find_notes several times, with different words, synonyms and spellings in the user's language, use list_new for what came in since a time, and read the Notes you use with read_note. Answer briefly and only from the Notes you read with read_note during this question, never from general knowledge or a guess: an excerpt find_notes or list_new gives, or a Note an earlier answer named, counts only once you read that Note with read_note in this question; the Areas, Topics, tags, Routines and check-offs the other tools list count too. Link the Note of every statement you take from a Note as a Markdown link with its title as the label and oldbrainfix://note/ followed by its id as the address, such as [Dentist](oldbrainfix://note/note:3f2a); a link to a Note you did not read in this question is removed. When the Notes you read hold nothing about it, answer only \"That's not in your Notes\", translated into the language of the question. Answer in the language of the question. Change something only when the user asks for it, such as filing what is new into Areas and Topics or adding tags to a text: every change waits for the user's review in the app, so say what you changed and that it waits for review, linking only the Notes you read. Notes the user hid from the AI do not exist for you.";
+/// user's turn. Numbered short steps with an example, which a small
+/// local model follows (#314, ADR 0051).
+pub const SYSTEM: &str = "You answer questions about the user's own Notes in Old Brain Fix, a memory aid. Do these steps for every question:
+1. Call find_notes first, always, before you answer. Give it the main words of the question one by one, such as {\"words\": [\"dentist\", \"appointment\"]}, then search again with synonyms and other spellings in the language of the question. Use list_new for what came in since a time.
+2. Call read_note with the id of every Note you want to use. What find_notes and list_new show is not enough; only read_note counts. A Note an earlier answer named counts only once you read it again in this question.
+3. Answer briefly and only from the Notes you read with read_note in this question, never from general knowledge or a guess. The Areas, Topics, tags, Routines and check-offs the other tools list count too.
+4. Link the Note of every statement as a Markdown link: its title as the label, oldbrainfix://note/ and its id as the address. A link to a Note you did not read with read_note is removed.
+5. Only when you searched and found nothing about it, answer only \"That's not in your Notes\", translated into the language of the question.
+Example: the question is \"When is the dentist?\". You call find_notes with words [\"dentist\", \"doctor\"]. It finds the Note note:3f2a titled \"Dentist\". You call read_note with id \"note:3f2a\". It says \"Dentist on Friday at 9:00\". You answer: \"On Friday at 9:00, see [Dentist](oldbrainfix://note/note:3f2a).\"
+Answer in the language of the question. Change something only when the user asks for it, such as filing what is new into Areas and Topics or adding tags to a text. Every change waits for the user's review in the app, so say what you changed and that it waits for review, linking only the Notes you read. Notes the user hid from the AI do not exist for you.";
+
+/// What the model hears, once per question, when it answers having
+/// called no tool at all (#314): a small model otherwise says "That's not
+/// in your Notes" without having searched. It quotes `question` (#315):
+/// after earlier exchanges a small model otherwise searched the words of
+/// an earlier question.
+pub fn search_first(question: &str) -> String {
+    format!(
+        "Search the Notes first for my question \"{question}\": call find_notes with its main words, such as {{\"words\": [\"...\"]}}."
+    )
+}
+
+/// What the model hears, once per question, when it answered without
+/// words having read Notes (#315).
+fn answer_now(question: &str) -> String {
+    format!("Answer my question \"{question}\" from the Notes you read.")
+}
+
+/// What the model hears, once, when it answers having read none of the
+/// Notes find_notes or list_new showed it (#314), with the calls to make
+/// for the first [`READ_NAMED`] of them: a small model otherwise answers
+/// from an excerpt.
+fn read_first(shown: &[String]) -> String {
+    let calls: Vec<String> = shown
+        .iter()
+        .take(READ_NAMED)
+        .map(|id| json!({"id": id}).to_string())
+        .collect();
+    format!(
+        "Read before you answer: call read_note with {} for each Note you use. Then answer from what read_note returns.",
+        calls.join(" or ")
+    )
+}
+
+/// How many of the Notes shown [`read_first`] names.
+const READ_NAMED: usize = 3;
 
 /// The line before the question in the user's turn, the time after it.
 const NOW: &str = "Now on this computer: ";
+
+/// The line before the earlier questions and answers of the session,
+/// each as `Q: …` and `A: …`, in the user's turn (#315).
+const EARLIER: &str = "Earlier in this session, for context only:";
+
+/// The words before the question in a user's turn with earlier exchanges
+/// (#315).
+const QUESTION_NOW: &str = "My question now: ";
 
 /// How the desktop talks to the provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,6 +170,10 @@ pub struct Provider {
     pub model: String,
     /// The API key; empty for none, as a local Ollama needs.
     pub key: String,
+    /// Whether the model may think before it answers: "Let the model
+    /// think" of an OpenAI-compatible provider, off by default (#318);
+    /// Anthropic's thinks adaptively, always.
+    pub thinks: bool,
 }
 
 /// Why a provider cannot be asked yet.
@@ -113,6 +186,8 @@ pub enum Unready {
     /// The base URL is no `https://` address, nor an `http://` one on
     /// this computer or the home network.
     BadUrl,
+    /// The main switch "AI (experimental)" is off on the desktop (#334).
+    AiOff,
 }
 
 impl Provider {
@@ -187,6 +262,31 @@ pub fn url_allowed(url: &str) -> bool {
 }
 
 impl Store {
+    /// Whether the main switch "AI (experimental)" is on on this computer
+    /// (#334): off until the user switches it on. It gates the Ask panel
+    /// and the phone's questions, never the AI port.
+    pub fn ai_on(&self) -> Result<bool> {
+        Ok(self.local_setting(ON_KEY)?.as_deref() == Some("true"))
+    }
+
+    /// Switches the AI on or off; off forgets nothing of the provider.
+    pub fn set_ai_on(&self, on: bool) -> Result<()> {
+        if on {
+            self.set_local_setting(ON_KEY, "true")
+        } else {
+            self.remove_local_setting(ON_KEY)
+        }
+    }
+
+    /// What keeps the Ask panel and the phone from asking now: the AI
+    /// switched off, else what the provider lacks ([`Provider::unready`]).
+    pub fn ask_unready(&self, provider: &Provider) -> Result<Option<Unready>> {
+        if !self.ai_on()? {
+            return Ok(Some(Unready::AiOff));
+        }
+        Ok(provider.unready())
+    }
+
     /// The provider the Ask panel asks, as this Device keeps it: the
     /// protocol chosen, with its base URL, model and key, Anthropic's
     /// model and Ollama's address while none is entered.
@@ -203,6 +303,7 @@ impl Store {
                     m => m,
                 },
                 key: kept(ANTHROPIC_KEY_KEY)?,
+                thinks: true,
             },
             Protocol::OpenAi => Provider {
                 protocol,
@@ -212,6 +313,7 @@ impl Store {
                 },
                 model: kept(OPENAI_MODEL_KEY)?,
                 key: kept(OPENAI_KEY_KEY)?,
+                thinks: self.ask_thinks()?,
             },
         })
     }
@@ -244,6 +346,21 @@ impl Store {
     /// Ollama on this computer.
     pub fn set_ask_url(&self, url: &str) -> Result<()> {
         self.keep_or_remove(OPENAI_URL_KEY, url)
+    }
+
+    /// Whether "Let the model think" is on for an OpenAI-compatible
+    /// provider (#318): off until switched on.
+    pub fn ask_thinks(&self) -> Result<bool> {
+        Ok(self.local_setting(OPENAI_THINKS_KEY)?.as_deref() == Some("true"))
+    }
+
+    /// Switches "Let the model think" on or off.
+    pub fn set_ask_thinks(&self, thinks: bool) -> Result<()> {
+        if thinks {
+            self.set_local_setting(OPENAI_THINKS_KEY, "true")
+        } else {
+            self.remove_local_setting(OPENAI_THINKS_KEY)
+        }
     }
 
     fn keep_or_remove(&self, key: &str, value: &str) -> Result<()> {
@@ -363,10 +480,33 @@ pub struct Answer {
     pub unchecked: bool,
 }
 
+impl Answer {
+    /// The Notes shown under the answer as "Also read" (#314, Q719): those
+    /// read in this question that it does not link, in the order read.
+    /// Its links come first, as [`Answer::notes`].
+    pub fn also_read(&self) -> Vec<String> {
+        also_read(&self.notes, &self.read)
+    }
+}
+
+/// The ids of `read` not in `linked`, in the order read, each once: the
+/// Notes an answer shows as "Also read" (#314), on the panel and the
+/// phone alike.
+pub fn also_read(linked: &[String], read: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for id in read {
+        if !linked.contains(id) && !out.contains(id) {
+            out.push(id.clone());
+        }
+    }
+    out
+}
+
 /// What the model did after a request.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Step {
-    /// It paused a long turn: ask again as it stands.
+    /// It paused a long turn, or answered before it searched or read and
+    /// was told to ([`search_first`], #314): ask again as it stands.
     Again,
     /// It calls these tools; their outputs go to [`Conversation::answer`].
     Tools(Vec<ToolCall>),
@@ -419,24 +559,58 @@ pub struct Conversation {
     /// Calls whose arguments could not be read, answered as errors with
     /// the next tool outputs.
     unreadable: Vec<(String, String)>,
+    /// Whether the model called any tool in this question.
+    called: bool,
+    /// The Notes `find_notes` and `list_new` showed in this question, in
+    /// the order shown.
+    shown: Vec<String>,
+    /// Whether the model was told [`search_first`], or to read the Notes
+    /// shown ([`read_first`]): each once per question (#314).
+    told_search: bool,
+    told_read: bool,
+    /// Whether an answer without words was sent back, once per question
+    /// (#315).
+    told_empty: bool,
+    /// The question asked, which [`search_first`] quotes (#315).
+    question: String,
+    /// Whether the provider refused the request asking its model not to
+    /// think, so that it is asked without (#318).
+    no_thinking_refused: bool,
 }
 
 impl Conversation {
     /// The question `question` asked at `now` (this computer's time, as
-    /// it reads), after the panel's `earlier` exchanges.
+    /// it reads), after the panel's `earlier` exchanges. Those go in the
+    /// same one user turn, as a block for context before the question
+    /// ([`EARLIER`], [`QUESTION_NOW`], #315): as turns of their own, a
+    /// small model answered an earlier question again.
     pub fn new(provider: Provider, earlier: &[Exchange], question: &str, now: &str) -> Self {
-        let mut messages = Vec::new();
-        for exchange in earlier {
-            messages.push(json!({"role": "user", "content": exchange.question}));
-            messages.push(json!({"role": "assistant", "content": exchange.answer}));
-        }
-        messages.push(json!({"role": "user", "content": format!("{NOW}{now}\n\n{question}")}));
+        let content = if earlier.is_empty() {
+            format!("{NOW}{now}\n\n{question}")
+        } else {
+            let before: Vec<String> = earlier
+                .iter()
+                .map(|e| format!("Q: {}\nA: {}", e.question, e.answer))
+                .collect();
+            format!(
+                "{NOW}{now}\n\n{EARLIER}\n{}\n\n{QUESTION_NOW}{question}",
+                before.join("\n")
+            )
+        };
+        let messages = vec![json!({"role": "user", "content": content})];
         Conversation {
             provider,
             messages,
             rounds: 0,
             read: Vec::new(),
             unreadable: Vec::new(),
+            called: false,
+            shown: Vec::new(),
+            told_search: false,
+            told_read: false,
+            told_empty: false,
+            question: question.to_string(),
+            no_thinking_refused: false,
         }
     }
 
@@ -500,11 +674,16 @@ impl Conversation {
                     .collect();
                 let mut messages = vec![json!({"role": "system", "content": SYSTEM})];
                 messages.extend(self.messages.iter().cloned());
-                let body = json!({
+                let mut body = json!({
                     "messages": messages,
                     "model": self.provider.model.trim(),
                     "tools": tools,
                 });
+                if self.asks_no_thinking()
+                    && let Some(fields) = body.as_object_mut()
+                {
+                    fields.insert("reasoning_effort".into(), json!(NO_THINKING));
+                }
                 let mut headers = vec![json_type];
                 let key = self.provider.key.trim();
                 if !key.is_empty() {
@@ -522,8 +701,24 @@ impl Conversation {
         }
     }
 
+    /// Whether the next request asks the model not to think: an
+    /// OpenAI-compatible one while "Let the model think" is off, unless
+    /// the provider refused that once.
+    fn asks_no_thinking(&self) -> bool {
+        self.provider.protocol == Protocol::OpenAi
+            && !self.provider.thinks
+            && !self.no_thinking_refused
+    }
+
     /// Takes the provider's `reply` to the last request.
     pub fn take(&mut self, reply: &Reply) -> std::result::Result<Step, AskError> {
+        // A server that knows no `reasoning_effort`, or not `none` for
+        // this model, refuses the request: it is asked once more without
+        // (#318), and a second refusal is its error.
+        if matches!(reply.status, 400 | 422) && self.asks_no_thinking() {
+            self.no_thinking_refused = true;
+            return Ok(Step::Again);
+        }
         if !(200..300).contains(&reply.status) {
             let message = error_message(&reply.body);
             return Err(match reply.status {
@@ -573,7 +768,10 @@ impl Conversation {
                     .map(|b| ToolCall {
                         id: b["id"].as_str().unwrap_or_default().to_string(),
                         name: b["name"].as_str().unwrap_or_default().to_string(),
-                        args: b.get("input").cloned().unwrap_or_else(|| json!({})),
+                        args: mended(
+                            b["name"].as_str().unwrap_or_default(),
+                            b.get("input").cloned().unwrap_or_else(|| json!({})),
+                        ),
                     })
                     .collect();
                 if calls.is_empty() {
@@ -600,11 +798,20 @@ impl Conversation {
         if finish == Some("content_filter") {
             return Err(AskError::Refused);
         }
-        let text = message
-            .get("content")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
+        let mut message = message;
+        let text = without_thinking(
+            message
+                .get("content")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+        )
+        .to_string();
+        if let Some(content) = message.get_mut("content")
+            && content.is_string()
+        {
+            // Nor does the thinking go back to the model.
+            *content = json!(text);
+        }
         let mut calls = Vec::new();
         for call in message
             .get("tool_calls")
@@ -627,7 +834,10 @@ impl Conversation {
                 _ => Ok(json!({})),
             };
             match args {
-                Ok(args) => calls.push(ToolCall { id, name, args }),
+                Ok(args) => {
+                    let args = mended(&name, args);
+                    calls.push(ToolCall { id, name, args })
+                }
                 Err(e) => self
                     .unreadable
                     .push((id, format!("the arguments are no JSON object: {e}"))),
@@ -644,7 +854,39 @@ impl Conversation {
         Ok(self.answered(text, finish == Some("length")))
     }
 
-    fn answered(&self, text: String, cut: bool) -> Step {
+    /// The model's answer `text`, or [`Step::Again`] after telling it to
+    /// search or to read first (#314): once each per question, only
+    /// while it has read no Note, and never for an answer cut off at its
+    /// length. It is told to search when it called no tool at all, since
+    /// an answer from the Areas, tags or Routines the other tools list
+    /// counts, and to read when `find_notes` or `list_new` showed Notes.
+    /// An answer without words is none (#315): once per question it hears
+    /// again what fits, to read, to search, or to answer.
+    fn answered(&mut self, text: String, cut: bool) -> Step {
+        let mut told = None;
+        if !cut && self.read.is_empty() {
+            if !self.called && !self.told_search {
+                self.told_search = true;
+                told = Some(search_first(&self.question));
+            } else if !self.shown.is_empty() && !self.told_read {
+                self.told_read = true;
+                told = Some(read_first(&self.shown));
+            }
+        }
+        if told.is_none() && !cut && text.trim().is_empty() && !self.told_empty {
+            self.told_empty = true;
+            told = Some(if !self.shown.is_empty() && self.read.is_empty() {
+                read_first(&self.shown)
+            } else if !self.called {
+                search_first(&self.question)
+            } else {
+                answer_now(&self.question)
+            });
+        }
+        if let Some(told) = told {
+            self.messages.push(json!({"role": "user", "content": told}));
+            return Step::Again;
+        }
         let (text, unchecked) = checked(&text, &self.read);
         Step::Answered(Answer {
             notes: linked_notes(&text),
@@ -661,18 +903,19 @@ impl Conversation {
     /// Note, such as `read_check_offs`, answers for one hidden from the AI
     /// or none at all without an error.
     pub fn answer(&mut self, done: &[(ToolCall, ToolOutput)]) {
+        if !done.is_empty() || !self.unreadable.is_empty() {
+            self.called = true;
+        }
         for (call, output) in done {
-            let key = match call.name.as_str() {
-                "read_note" => "id",
-                "read_attachment_text" => "note",
-                _ => continue,
-            };
-            if !output.is_error
-                && let Some(id) = call.args.get(key).and_then(Value::as_str)
-                && id.starts_with("note:")
+            if let Some(id) = note_read(call, output)
                 && !self.read.iter().any(|r| r == id)
             {
                 self.read.push(id.to_string());
+            }
+            for id in notes_shown(call, output) {
+                if !self.shown.contains(&id) {
+                    self.shown.push(id);
+                }
             }
         }
         let unreadable = std::mem::take(&mut self.unreadable);
@@ -707,6 +950,15 @@ impl Conversation {
             }
         }
     }
+}
+
+/// `content` without the thinking a model wrote into it: what follows the
+/// last [`THINK_END`], its leading blank lines left out; all of it when
+/// there is none (#318).
+fn without_thinking(content: &str) -> &str {
+    content
+        .rsplit_once(THINK_END)
+        .map_or(content, |(_, after)| after.trim_start())
 }
 
 /// The text of a tool's output; a photo, which the panel's tools never
@@ -806,6 +1058,63 @@ pub fn checked(text: &str, read: &[String]) -> (String, bool) {
     }
 }
 
+/// The arguments of a call as the tool takes them: a `read_note` that
+/// names its Note as `note`, the key of `read_attachment_text`, and gives
+/// no `id`, reads it by `id`; an `id` given wins (#315). A small model
+/// passed it so even after [`read_first`] spelt the call out. The one
+/// argument rule, which the end to end check's record of the Notes asked
+/// for follows too.
+pub fn mended(name: &str, mut args: Value) -> Value {
+    if name != "read_note" || args.get("id").is_some() {
+        return args;
+    }
+    if let Some(all) = args.as_object_mut()
+        && let Some(id) = all.remove("note")
+    {
+        all.insert("id".into(), id);
+    }
+    args
+}
+
+/// The Note `call` read in full, as `output` handed it out: the id that
+/// `read_note` or `read_attachment_text` was given, when it answered
+/// without an error. A tool that only names a Note, such as
+/// `read_check_offs`, reads none. The one rule for what counts as read,
+/// for the check of the answer's links (#294) and for how many Notes the
+/// question has read so far (#317).
+pub fn note_read<'a>(call: &'a ToolCall, output: &ToolOutput) -> Option<&'a str> {
+    let key = match call.name.as_str() {
+        "read_note" => "id",
+        "read_attachment_text" => "note",
+        _ => return None,
+    };
+    if output.is_error {
+        return None;
+    }
+    call.args
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|id| id.starts_with("note:"))
+}
+
+/// The ids of the Notes `find_notes` or `list_new` showed in `output`,
+/// in order; none for another tool or an error.
+fn notes_shown(call: &ToolCall, output: &ToolOutput) -> Vec<String> {
+    if output.is_error || !matches!(call.name.as_str(), "find_notes" | "list_new") {
+        return Vec::new();
+    }
+    let parsed: Option<Value> = serde_json::from_str(&output_text(output)).ok();
+    parsed
+        .as_ref()
+        .and_then(|v| v.get("notes"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|n| n.get("id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect()
+}
+
 /// Asks `conversation` through `transport` until the model answers, the
 /// tools it calls answered by `tools`, an output for each call in
 /// order; `None` from `tools` stops it ([`AskError::Stopped`]).
@@ -850,10 +1159,36 @@ impl Store {
         transport: &dyn Transport,
         wall: &WallClock,
     ) -> std::result::Result<Asked, AskError> {
+        self.ask_with(conversation, transport, wall, &|_| true)
+    }
+
+    /// [`Store::ask`], telling `progress` how many Notes the model read
+    /// so far ([`note_read`]) before and after each round of tools (#317);
+    /// `false` from it stops the question there ([`AskError::Stopped`]),
+    /// as the phone's Stop does.
+    pub fn ask_with(
+        &self,
+        conversation: &mut Conversation,
+        transport: &dyn Transport,
+        wall: &WallClock,
+        progress: &dyn Fn(usize) -> bool,
+    ) -> std::result::Result<Asked, AskError> {
         let before = self.ai_task().ok().flatten();
         let mut task = before.clone();
+        let mut read: Vec<String> = Vec::new();
         let answered = run(conversation, transport, |calls| {
-            Some(self.ask_calls(calls, wall, &mut task))
+            if !progress(read.len()) {
+                return None;
+            }
+            let outputs = self.ask_calls(calls, wall, &mut task);
+            for (call, output) in calls.iter().zip(&outputs) {
+                if let Some(id) = note_read(call, output)
+                    && !read.iter().any(|r| r == id)
+                {
+                    read.push(id.to_string());
+                }
+            }
+            progress(read.len()).then_some(outputs)
         });
         if before.is_none()
             && let Some(id) = &task

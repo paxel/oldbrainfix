@@ -132,11 +132,18 @@ class SpeechFilesTests: XCTestCase {
     }
   }
 
-  func testWhisperGetsOneThreadFewerThanTheCoresAtMostFour() {
+  func testRustOGetsOneThreadFewerThanTheCoresAtMostFour() {
     XCTAssertEqual(SpeechFiles.threads(cores: 1), 1)
     XCTAssertEqual(SpeechFiles.threads(cores: 2), 1)
     XCTAssertEqual(SpeechFiles.threads(cores: 4), 3)
     XCTAssertEqual(SpeechFiles.threads(cores: 6), 4)
+  }
+
+  func testWhisperGetsAtMostTwoThreads() {
+    XCTAssertEqual(SpeechFiles.whisperThreads(cores: 1), 1)
+    XCTAssertEqual(SpeechFiles.whisperThreads(cores: 2), 2)
+    XCTAssertEqual(SpeechFiles.whisperThreads(cores: 4), 2)
+    XCTAssertEqual(SpeechFiles.whisperThreads(cores: 6), 2)
   }
 
   func testChannelsAreAveragedAndResampledTo16kHz() {

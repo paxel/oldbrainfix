@@ -213,3 +213,22 @@ fn an_embossed_card_has_two_shadows_under_it_and_its_band_stays_left() {
     assert!(path.points.iter().all(|p| p.x >= 10.0 && p.x <= 16.01));
     assert!(path.points.iter().all(|p| p.y >= 10.0 && p.y <= 90.0));
 }
+
+#[test]
+fn a_tear_line_is_a_row_of_short_dashes_across() {
+    let stroke = Stroke::new(1.0, Color32::GRAY);
+    let shapes = tear_shapes(10.0, 90.0, 5.0, stroke);
+    // 80 points of dashes 4 long with gaps of 4: ten dashes.
+    assert_eq!(shapes.len(), 10);
+    for shape in &shapes {
+        let Shape::LineSegment { points, .. } = shape else {
+            panic!("a dash is a line segment, not {shape:?}");
+        };
+        assert!(
+            points
+                .iter()
+                .all(|p| p.y == 5.0 && (10.0..=90.0).contains(&p.x))
+        );
+        assert!((points[1].x - points[0].x - TEAR_DASH).abs() < 0.01);
+    }
+}

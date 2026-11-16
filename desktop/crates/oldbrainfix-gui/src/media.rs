@@ -569,6 +569,12 @@ pub struct SystemClipboard {
     open: Option<arboard::Clipboard>,
 }
 
+/// The system clipboard's text, read anew, for the text fields' Paste
+/// (#319); `None` where it holds none or does not open. Device-only.
+pub fn system_clipboard_text() -> Option<String> {
+    SystemClipboard::default().text()
+}
+
 impl SystemClipboard {
     fn open(&mut self) -> Option<&mut arboard::Clipboard> {
         if self.open.is_none() {

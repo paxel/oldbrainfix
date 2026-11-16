@@ -209,9 +209,8 @@ void main() {
       expect(onCard('Unsorted'), findsOneWidget);
     });
 
-    testWidgets('an Area, a Topic and Unsorted name no place on the cards', (
-      tester,
-    ) async {
+    testWidgets('an Area and a Topic name no place on the cards, Unsorted '
+        'does (#330)', (tester) async {
       capture('in the Area', home.id);
       capture('in the kitchen', kitchen.id);
       capture('not filed');
@@ -245,8 +244,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(placeShown(tester), {'not filed': false});
-      expect(onCard('Unsorted'), findsNothing);
+      // Unsorted is a mixed list (#330).
+      expect(placeShown(tester), {'not filed': true});
+      expect(onCard('Unsorted'), findsOneWidget);
     });
   });
 

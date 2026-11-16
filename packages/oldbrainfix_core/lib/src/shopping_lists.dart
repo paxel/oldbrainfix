@@ -30,6 +30,11 @@ abstract final class ShoppingKeys {
   /// Shopping List shows on their Agenda (#186), a [ShoppingOnAgenda]'s
   /// code.
   static const agenda = 'shopping';
+
+  /// On a voice capture merged into a Shopping List (#311): the Note id
+  /// of the list it still owes the Lines of its Transcripts; cleared
+  /// once they are added, so they are added once.
+  static const owesLines = 'owesLines';
 }
 
 /// The unit of a [Reappear] time (#195), the letter its code ends in.
@@ -209,6 +214,37 @@ typedef ShoppingAgendaRow = ({
   List<ShoppingLine> lines,
 });
 
+/// How far off the day a struck Line comes back lies (#328), as the apps
+/// show it faint beside the Line: a number of days, weeks, months or
+/// years.
+final class BackIn {
+  final int count;
+  final ReappearUnit unit;
+
+  const BackIn(this.count, this.unit);
+
+  /// [days] from 1 on as they read: up to 13 days as days, 1 being
+  /// tomorrow; then up to 59 as weeks, under a year as months of 30 days
+  /// and from 365 on as years, each the nearest whole number, half up.
+  factory BackIn.days(int days) => switch (days) {
+    < 14 => BackIn(days, ReappearUnit.day),
+    < 60 => BackIn((days + 3) ~/ 7, ReappearUnit.week),
+    < 365 => BackIn((days + 15) ~/ 30, ReappearUnit.month),
+    _ => BackIn((days + 182) ~/ 365, ReappearUnit.year),
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is BackIn && other.count == count && other.unit == unit;
+
+  @override
+  int get hashCode => Object.hash(count, unit);
+
+  /// The number and the unit's letter, as a reappear time's code: `3w`.
+  @override
+  String toString() => '$count${unit.letter}';
+}
+
 /// One line of a Shopping List (CONTEXT.md): a Line with its reappear
 /// time, struck through for a while once checked.
 class ShoppingLine {
@@ -230,6 +266,10 @@ class ShoppingLine {
   /// while it is open, and while it is struck without a reappear time.
   final Day? backOn;
 
+  /// How far off [backOn] lies from the day it was read on (#328); null
+  /// where [backOn] is.
+  final BackIn? backIn;
+
   /// The day it came back by itself, at its start, while it is open
   /// since then: on that day it "came back today". Null while it is
   /// struck, and for a Line never checked or brought back by hand or by
@@ -247,6 +287,7 @@ class ShoppingLine {
     required this.struck,
     required this.checkedAt,
     required this.backOn,
+    required this.backIn,
     required this.cameBackOn,
     required this.order,
   });
@@ -268,7 +309,9 @@ class ShoppingList {
   final String making;
 
   /// Every Line that shows: the open ones first, in the order they were
-  /// placed in, then the struck ones, the one checked last at the end.
+  /// placed in, then the struck ones, the soonest back first (#328), the
+  /// same day the one checked first first, those without a reappear time
+  /// last, by their checks too.
   final List<ShoppingLine> lines;
 
   /// The Lines checked Once: gone, but a name added again brings them
@@ -538,23 +581,31 @@ class ShoppingLists {
         store.mayChange(noteId);
   }
 
-  /// Makes the Note [noteId] a Shopping List: its first line stays its
+  /// Makes the Note [noteId] a Shopping List named by its first line, as
+  /// a new list is from the name typed for it: its first line stays its
   /// text, every other line not blank becomes a Line, indented or not,
   /// struck when it starts with "✓ ", in a formatted text without the
   /// mark of an item or a quote ([parseLine]). Every Line comes in at one moment,
   /// so they show in the order of the text. Takes it out of Unsorted, as
-  /// a Checklist does. The text keeps its format.
-  void make(String noteId) {
+  /// a Checklist does. The text keeps its format. Typed text is made a
+  /// Shopping List by [makeFromText].
+  void make(String noteId) => _make(noteId, fromText: false);
+
+  /// Makes the typed text of the Note [noteId] a Shopping List (#309), as
+  /// [make] does but with every line a Line unless the first looks like
+  /// a heading ([listOfText]): only then is it the Name, else the list
+  /// has none.
+  void makeFromText(String noteId) => _make(noteId, fromText: true);
+
+  void _make(String noteId, {required bool fromText}) {
     final note = Notes(store).byId(noteId);
     if (note == null || !mayMake(noteId)) {
       throw StateError('$noteId may not be made a Shopping List here');
     }
-    final rows = splitLines(note.text);
-    final title = rows.first.trim();
     final markdown = note.textFormat == TextFormats.markdown;
-    final parsed = [
-      for (final row in rows.skip(1)) ?parseLine(row, markdown: markdown),
-    ];
+    final (name: title, lines: parsed) = fromText
+        ? listOfText(note.text, markdown: markdown)
+        : namedList(note.text, markdown: markdown);
     final making = Store.newId();
     store.batch(() {
       store.append(noteId, ChecklistKeys.kind, ShoppingKeys.kindOf(making));
@@ -781,6 +832,174 @@ class ShoppingLists {
     );
   }
 
+  /// The items said in the Transcript [text] (#311), in the order said:
+  /// it is split at line breaks, at `;`, `!`, `?` and `…`, at a comma or
+  /// a full stop but one between two digits ("1,5", "1.5"), and at the
+  /// words "und" and "and" in any case, whole words only. Whisper writes
+  /// a pause as such a mark, and the app keeps no time of its pauses.
+  /// Each item is its words with one space between them; empty ones are
+  /// dropped, a repeated one is kept.
+  static List<String> spokenItems(String text) {
+    final runes = text.runes.toList();
+    final items = <String>[];
+    final piece = <int>[];
+    bool digit(int at) =>
+        at >= 0 && at < runes.length && runes[at] >= 0x30 && runes[at] <= 0x39;
+    void flush() {
+      final words = <String>[];
+      void item() {
+        if (words.isNotEmpty) items.add(words.join(' '));
+        words.clear();
+      }
+
+      final word = StringBuffer();
+      void endWord() {
+        if (word.isEmpty) return;
+        final said = word.toString();
+        word.clear();
+        if (_joins.contains(said.toLowerCase())) {
+          item();
+        } else {
+          words.add(said);
+        }
+      }
+
+      for (final rune in piece) {
+        if (_isSpace(rune)) {
+          endWord();
+        } else {
+          word.writeCharCode(rune);
+        }
+      }
+      endWord();
+      item();
+      piece.clear();
+    }
+
+    for (final (at, rune) in runes.indexed) {
+      final ends = switch (rune) {
+        0x0a || 0x0d || 0x3b || 0x21 || 0x3f || 0x2026 => true,
+        0x2c || 0x2e => !(digit(at - 1) && digit(at + 1)),
+        _ => false,
+      };
+      if (ends) {
+        flush();
+      } else {
+        piece.add(rune);
+      }
+    }
+    flush();
+    return items;
+  }
+
+  /// The words that join two items said ([spokenItems]), in lower case.
+  static const _joins = {'und', 'and'};
+
+  /// Unicode's White_Space and the byte order mark.
+  static bool _isSpace(int rune) =>
+      (rune >= 0x09 && rune <= 0x0d) ||
+      rune == 0x20 ||
+      rune == 0x85 ||
+      rune == 0xa0 ||
+      rune == 0x1680 ||
+      (rune >= 0x2000 && rune <= 0x200a) ||
+      rune == 0x2028 ||
+      rune == 0x2029 ||
+      rune == 0x202f ||
+      rune == 0x205f ||
+      rune == 0x3000 ||
+      rune == 0xfeff;
+
+  /// Adds the voice capture [noteId] to the Shopping List [listId]
+  /// (#311), all in one batch: each line of its text that is not blank
+  /// becomes a Line as [addLines] makes it, and the Note, with its text
+  /// and recordings, goes where the list lies and is merged into it, so
+  /// its recordings stay on the list as a Section, to be listened to. It
+  /// owes the list the items said in its Transcripts ([spokenItems]),
+  /// added at once when every recording has one, else once the last one
+  /// comes ([addOwedLines]). Refused as [add] and [Notes.merge] refuse.
+  /// Returns the ids of the Lines added, brought back or found now.
+  List<String> addVoiceCapture(
+    String listId,
+    String noteId,
+    WallClock wallClock,
+  ) {
+    final (into, _) = _requireList(listId, wallClock);
+    if (!mayCheck(listId)) {
+      throw StateError('no role in the Shared Area of $listId');
+    }
+    final notes = Notes(store);
+    final note = notes.byId(noteId);
+    if (note == null || note.isTrashed || note.isMerged) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
+    }
+    return store.batch(() {
+      final typed = addLines(listId, note.shownText, wallClock);
+      final place = into.place;
+      if (note.place != place) {
+        if (place == null) {
+          notes.unfile(noteId);
+        } else {
+          notes.file(noteId, place);
+        }
+      }
+      notes.merge(noteId, listId);
+      store.append(noteId, ShoppingKeys.owesLines, listId);
+      return [...typed, ...addOwedLines(noteId, wallClock)];
+    });
+  }
+
+  /// The Note id of the Shopping List the voice capture [noteId] still
+  /// owes the items said in its Transcripts (#311); null when it owes
+  /// none.
+  String? owedTo(String noteId) =>
+      store.current(noteId, ShoppingKeys.owesLines);
+
+  /// Adds the items said in the Transcripts of the voice capture
+  /// [noteId] to the Shopping List it owes them ([owedTo]), once every
+  /// recording has a Transcript or a removed one, recording by recording
+  /// in their order, each as [add] adds it, and clears what it owes in
+  /// the same batch, so they are added once (#311). While a recording
+  /// waits for its Transcript nothing is written. A Note no longer merged
+  /// into that list, in the trash, or a list that can no longer be added
+  /// to owes nothing any more: that is cleared, and no Line is added.
+  /// Returns the ids of the Lines added, brought back or found.
+  List<String> addOwedLines(String noteId, WallClock wallClock) {
+    final listId = owedTo(noteId);
+    if (listId == null) return const [];
+    final note = Notes(store).byId(noteId);
+    if (note == null) return const [];
+    void settled() => store.append(noteId, ShoppingKeys.owesLines, null);
+    if (note.isTrashed || note.mergedInto != listId) {
+      settled();
+      return const [];
+    }
+    if (note.recordings.any(
+      (hash) =>
+          !note.transcripts.containsKey(hash) &&
+          !note.removedTranscripts.contains(hash),
+    )) {
+      return const [];
+    }
+    try {
+      return store.batch(() {
+        final added = [
+          for (final hash in note.recordings)
+            for (final item in spokenItems(note.transcripts[hash] ?? ''))
+              add(listId, item, wallClock),
+        ];
+        settled();
+        return added;
+      });
+    } on StateError {
+      // No role there any more: nothing is owed.
+    } on ArgumentError {
+      // No Shopping List any more: the same.
+    }
+    settled();
+    return const [];
+  }
+
   /// Renames the Line [lineId].
   void rename(String lineId, String text) {
     final fields = _requireEditable(lineId);
@@ -918,7 +1137,18 @@ class ShoppingLists {
       return byAt != 0 ? byAt : byOrder(a, b);
     }
 
-    struck.sort(byCheck);
+    // The soonest back first, those that never come back by themselves
+    // after them (#328).
+    struck.sort((a, b) {
+      final (ab, bb) = (a.line.backOn, b.line.backOn);
+      final byBack = switch ((ab, bb)) {
+        (final ab?, final bb?) => ab.compareTo(bb),
+        (null, null) => 0,
+        (null, _) => 1,
+        (_, null) => -1,
+      };
+      return byBack != 0 ? byBack : byCheck(a, b);
+    });
     gone.sort(byCheck);
     return ShoppingList(
       noteId,
@@ -1012,7 +1242,8 @@ class ShoppingLists {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one
+/// moment it sorts by: a struck one, after its day back (#328), and a
+/// gone one by its check, an open one
 /// without a valid key by when it came back or was added, on the wall
 /// clock.
 class _Read {
@@ -1060,6 +1291,7 @@ class _Read {
         struck: struck,
         checkedAt: DateTime.tryParse(value ?? '')?.toUtc(),
         backOn: back,
+        backIn: back == null ? null : BackIn.days(today.daysUntil(back)),
         cameBackOn: came,
         order: latest[ChecklistKeys.order]?.value,
       ),

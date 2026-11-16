@@ -224,6 +224,16 @@ class MainActivity : FlutterActivity() {
                             ),
                         )
                     }
+                    "copyHtml" -> {
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        result.success(
+                            Clipboards.putHtml(
+                                this@MainActivity,
+                                args["text"] as? String ?: "",
+                                args["html"] as? String ?: "",
+                            ),
+                        )
+                    }
                     else -> result.notImplemented()
                 }
             }

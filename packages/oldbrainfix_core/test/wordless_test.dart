@@ -98,6 +98,26 @@ void main() {
       expect(wordless(notes.capture('Words').id), Wordless.photo);
     });
 
+    test('as the list it is when a list has no Name (#309), by what it '
+        'holds first', () {
+      final socks = notes.capture('Socks\nTent').id;
+      Checklists(store).makeFromText(socks);
+      expect(wordless(socks), Wordless.checklist);
+      final milk = notes.capture('Milk').id;
+      ShoppingLists(store).makeFromText(milk);
+      expect(wordless(milk), Wordless.shoppingList);
+      // What it holds wins.
+      final receipt = notes.capture('Bread', photos: [photo(1)]).id;
+      ShoppingLists(store).makeFromText(receipt);
+      expect(wordless(receipt), Wordless.photo);
+      // Back to a plain Note, and a kind no app writes, nothing but a
+      // photo.
+      Checklists(store).toPlain(socks);
+      expect(wordless(socks), Wordless.photo);
+      store.append(milk, ChecklistKeys.kind, 'tally:x');
+      expect(wordless(milk), Wordless.photo);
+    });
+
     test('in its alarms as in its rows', () {
       final routines = Routines(store);
       final memo = notes.capture('', recordings: [voice(1)]);

@@ -16,7 +16,8 @@ import UniformTypeIdentifiers
 /// The rest of both channels came with #243, as MainActivity.kt answers
 /// them: on `photos` the camera (`take`), the photo picker (`pick`),
 /// the clipboard (`paste`) and a photo saved into the Photos library or
-/// copied (`save`, `copy`); on `bundle` where a file is written to go
+/// copied (`save`, `copy`), a text put there with HTML beside it
+/// (`copyHtml`, #324); on `bundle` where a file is written to go
 /// out (`exportPath`), the share sheet (`share`, `shareText`), the
 /// Files picker (`pick`) and the print dialog (`print`).
 enum SharesChannel {
@@ -63,6 +64,11 @@ enum SharesChannel {
         result(
           ShareSheet.copyPhoto(
             path: args["path"] as? String ?? "", type: args["type"] as? String ?? "image/jpeg"))
+      case "copyHtml":
+        let args = call.arguments as? [String: Any] ?? [:]
+        result(
+          ShareSheet.copyHtml(
+            text: args["text"] as? String ?? "", html: args["html"] as? String ?? ""))
       default:
         result(FlutterMethodNotImplemented)
       }

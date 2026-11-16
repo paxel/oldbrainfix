@@ -150,13 +150,16 @@ impl Importance {
 
 /// What a Note without words is titled as where only its words fit, as
 /// in a row or an alarm: a photo, a voice recording, or a file, which
-/// goes by its name ([`Note::wordless_name`]).
+/// goes by its name ([`Note::wordless_name`]); a list without a Name and
+/// any of them by the list it is (#309).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Wordless {
     #[default]
     Photo,
     VoiceRecording,
     File,
+    Checklist,
+    ShoppingList,
 }
 
 impl Wordless {
@@ -166,6 +169,8 @@ impl Wordless {
             Wordless::Photo => "photo",
             Wordless::VoiceRecording => "voiceRecording",
             Wordless::File => "file",
+            Wordless::Checklist => "checklist",
+            Wordless::ShoppingList => "shoppingList",
         }
     }
 }
@@ -353,6 +358,11 @@ pub struct Note {
     /// The boxes of `text` as they show now, in the order they come (ADR
     /// 0035); none in a text this version may not change.
     pub boxes: Vec<ShownBox>,
+    /// The list its `kind` names ([`crate::checklists::parse_list_kind`]),
+    /// `checklist` or `shopping` and any other an app may write, or
+    /// `None`: what a list without a Name is titled as
+    /// ([`Note::wordless`], #309).
+    pub list_kind: Option<String>,
 }
 
 impl Note {
@@ -409,8 +419,8 @@ impl Note {
     /// What the Note is titled as while its text is blank, removed
     /// photos, recordings and files whose texts stay included: a photo
     /// when it has one; else a voice recording when it has one; else a
-    /// file when it has one, by [`Note::wordless_name`]; a photo
-    /// otherwise.
+    /// file when it has one, by [`Note::wordless_name`]; else a Checklist
+    /// or a Shopping List by the list it is (#309); a photo otherwise.
     pub fn wordless(&self) -> Wordless {
         if !(self.photos.is_empty() && self.removed_photos.is_empty()) {
             Wordless::Photo
@@ -419,7 +429,11 @@ impl Note {
         } else if !(self.attachments.is_empty() && self.removed_attachments.is_empty()) {
             Wordless::File
         } else {
-            Wordless::Photo
+            match self.list_kind.as_deref() {
+                Some(crate::checklists::keys::CHECKLIST) => Wordless::Checklist,
+                Some(crate::shopping_lists::keys::SHOPPING) => Wordless::ShoppingList,
+                _ => Wordless::Photo,
+            }
         }
     }
 
@@ -1811,6 +1825,12 @@ impl<'a> Notes<'a> {
     /// The Note `id`, trashed or not, or `None` when there is none.
     pub fn by_id(&self, id: &str) -> Result<Option<Note>> {
         let fields = self.store.current_fields(id)?;
+        self.note_of(id, fields)
+    }
+
+    /// The Note `id` made of its current `fields`, as [`Notes::by_id`]
+    /// reads it.
+    fn note_of(&self, id: &str, fields: Fields) -> Result<Option<Note>> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_NOTE) {
             return Ok(None);
         }
@@ -1889,6 +1909,10 @@ impl<'a> Notes<'a> {
             removed_attachments,
             removed_attachment_texts,
             boxes,
+            list_kind: crate::checklists::parse_list_kind(
+                fields.get(crate::checklists::keys::KIND),
+            )
+            .map(|(list, _)| list.to_string()),
         }))
     }
 
@@ -1953,9 +1977,15 @@ impl<'a> Notes<'a> {
 
     /// Every Note neither in the trash nor merged, newest capture first.
     pub fn all(&self) -> Result<Vec<Note>> {
+        // Every Note's fields in one read, not two per Note (#339), in the
+        // order [`Store::entities_of_type`] lists them.
+        let mut fields = self.store.current_fields_of_type(keys::TYPE_NOTE)?;
         let mut notes = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
-            if let Some(note) = self.by_id(&id)?
+        for id in self.store.ever_of_type(keys::TYPE_NOTE)? {
+            let Some(held) = fields.remove(&id) else {
+                continue;
+            };
+            if let Some(note) = self.note_of(&id, held)?
                 && !note.is_trashed()
                 && !note.is_merged()
             {
@@ -2018,11 +2048,28 @@ impl<'a> Notes<'a> {
     /// The Sections of the Note `note_id`, oldest first: its Amends, the
     /// Notes merged into it, and their Amends.
     pub fn sections(&self, note_id: &str) -> Result<Vec<Section>> {
+        // Only a Note that was merged can be merged into this one, and
+        // only a Section that once named one of them can belong to it:
+        // the others are not read, which made opening a Note wait on all
+        // of them (#339). In the order every Note and Section is listed.
+        let was_merged: HashSet<String> = self
+            .store
+            .fields_with_prefix(keys::MERGED)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
         let mut merged: Vec<String> = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
+        for id in self
+            .store
+            .entities_of_type_among(keys::TYPE_NOTE, &was_merged)?
+        {
             if self.merged_into(&id)?.as_deref() == Some(note_id) && !merged.contains(&id) {
                 merged.push(id);
             }
+        }
+        let mut named = self.store.ever_with(keys::NOTE, note_id)?;
+        for id in &merged {
+            named.extend(self.store.ever_with(keys::NOTE, id)?);
         }
         let mut sections = Vec::new();
         for id in &merged {
@@ -2030,7 +2077,10 @@ impl<'a> Notes<'a> {
                 sections.push(self.merged_section(note, note_id)?);
             }
         }
-        for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
+        for id in self
+            .store
+            .entities_of_type_among(keys::TYPE_SECTION, &named)?
+        {
             let owner = self.store.current(&id, keys::NOTE)?;
             let owned = owner
                 .as_deref()

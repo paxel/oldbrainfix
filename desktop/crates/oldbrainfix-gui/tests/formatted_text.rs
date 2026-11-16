@@ -6,20 +6,27 @@
 //! once. "Add to Note" has the format bar too, without ☐, and the text
 //! fields have names a screen reader says once they hold text. A code
 //! block (#212) reads as written, without its fences, and the format
-//! bar's "Code block" puts one in and takes it off.
+//! bar's "Code block" puts one in and takes it off. It reads calm
+//! (#327): its lines 1.5 times its font's size apart, room between them
+//! by their kinds, and code on a light tint, in the field too, where a
+//! click still finds its character.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use chrono::{DateTime, Duration, Utc};
 use egui::accesskit::Role;
-use egui::{Key, Modifiers, OutputCommand};
+use egui::text::LayoutJob;
+use egui::{Color32, FontId, Key, Modifiers, OutputCommand, TextEdit, TextFormat};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::text_format::MARKDOWN;
 use oldbrainfix_core::{Notes, OwnProfile, Places, SigningKey, Store};
 use oldbrainfix_gui::l10n::L10n;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::text_marks_view::{
+    self, BLANK_GAP, BoxLook, LINE_HEIGHT, SourceLine, line_gap, source_spread, spread,
+};
+use oldbrainfix_gui::{App, Selection, theme};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -543,4 +550,245 @@ fn the_text_fields_have_a_name_once_they_hold_text() -> TestResult {
     harness.run();
     assert_eq!(named(&harness, "Capture"), [""]);
     Ok(())
+}
+
+/// The size of the words in the windows of their own below.
+const SIZE: f32 = 16.0;
+
+/// Draws the formatted `text` as it reads, `width` wide, in a window of
+/// its own.
+fn reading(text: &'static str, width: f32) -> Harness<'static> {
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(width, 600.0))
+        .build_ui(move |ui| {
+            text_marks_view::formatted_label(
+                ui,
+                (text, MARKDOWN, &BoxLook::default()),
+                (0, text.len()),
+                (Some(SIZE), Color32::BLACK),
+                false,
+            );
+        });
+    harness.run();
+    harness
+}
+
+/// Where the line that reads `label` lies.
+fn line(harness: &Harness<'_>, label: &str) -> egui::Rect {
+    harness.get_by_label(label).rect()
+}
+
+/// How much farther apart two rows lie than the font's own rows, for
+/// [`LINE_HEIGHT`], measured on a line of one row.
+fn extra(harness: &Harness<'_>, one_row: &str) -> f32 {
+    LINE_HEIGHT * SIZE - line(harness, one_row).height()
+}
+
+#[test]
+fn a_formatted_text_reads_with_room_by_the_kinds_of_its_lines() {
+    let harness = reading(
+        "# Head\nfirst\nsecond\n- one\n- two\n\nafter `F28` it",
+        400.0,
+    );
+    let extra = extra(&harness, "first");
+    assert!(extra > 0.0, "the font's own rows are lower than 1.5");
+    let gap =
+        |above: &str, below: &str| line(&harness, below).top() - line(&harness, above).bottom();
+    let near = |got: f32, want: f32| (got - want).abs() <= 1.0;
+    for (above, below, room) in [
+        ("Head", "first", 0.3),
+        ("first", "second", 0.5),
+        ("second", "one", 0.5),
+        ("one", "two", 0.2),
+        // A blank line reads as room, not as a line.
+        ("two", "after F28 it", BLANK_GAP),
+    ] {
+        let got = gap(above, below);
+        assert!(near(got, extra + room * SIZE), "{above} to {below}: {got}");
+    }
+}
+
+#[test]
+fn a_wrapped_line_has_its_rows_one_and_a_half_sizes_apart() {
+    let words = "calm words that go on over several rows of a narrow window";
+    let harness = reading(words, 140.0);
+    let laid = line(&harness, words);
+    let row = harness
+        .ctx
+        .fonts_mut(|f| f.row_height(&FontId::proportional(SIZE)));
+    // Its first row as high as the font's, each one after it 1.5 sizes.
+    let rows = ((laid.height() - row) / (LINE_HEIGHT * SIZE)).round() + 1.0;
+    assert!(rows >= 3.0, "{rows} rows");
+    let want = row + (rows - 1.0) * LINE_HEIGHT * SIZE;
+    assert!(
+        (laid.height() - want).abs() <= 1.5,
+        "{} for {want}",
+        laid.height()
+    );
+}
+
+#[test]
+fn the_gaps_go_by_the_kinds_of_two_lines() {
+    use oldbrainfix_core::markdown::BlockKind::*;
+    assert_eq!(line_gap(Paragraph, Paragraph), 0.5);
+    assert_eq!(line_gap(Paragraph, Heading1), 0.8);
+    assert_eq!(line_gap(Bullet, Heading2), 0.8);
+    assert_eq!(line_gap(Heading1, Paragraph), 0.3);
+    assert_eq!(line_gap(Bullet, Numbered), 0.2);
+    assert_eq!(line_gap(Quote, Quote), 0.2);
+    assert_eq!(line_gap(Bullet, Paragraph), 0.5);
+    assert_eq!(line_gap(Code, Table), 0.5);
+}
+
+#[test]
+fn code_lies_on_a_light_tint_of_the_texts_colour_in_light_and_dark() {
+    for dark in [false, true] {
+        let visuals = theme::visuals(dark);
+        let tint = visuals.code_bg_color;
+        assert_eq!(
+            tint,
+            theme::code_tint(visuals.widgets.noninteractive.fg_stroke.color)
+        );
+        let alpha = f32::from(tint.a()) / 255.0;
+        assert!((alpha - theme::CODE_TINT).abs() < 0.01, "{alpha}");
+    }
+}
+
+/// Lays out `text` as an edit field shows it in a window, its rows
+/// spread as a formatted text reads.
+fn spread_source(
+    ctx: &egui::Context,
+    text: &str,
+    width: f32,
+) -> (Arc<egui::Galley>, Vec<SourceLine>) {
+    let font = FontId::proportional(SIZE);
+    let colours = (
+        Color32::BLACK,
+        Color32::BLUE,
+        Color32::GRAY,
+        Color32::LIGHT_GRAY,
+    );
+    let (mut job, lines) = text_marks_view::source_job(text, font.clone(), colours);
+    job.wrap.max_width = width;
+    let galley = ctx.fonts_mut(|f| f.layout_job(job));
+    let row = ctx.fonts_mut(|f| f.row_height(&font));
+    let extra = (LINE_HEIGHT * SIZE - row).max(0.0);
+    (source_spread(galley, &lines, SIZE, extra), lines)
+}
+
+#[test]
+fn spread_rows_keep_every_characters_place() {
+    let harness = Harness::builder().build_ui(|_| {});
+    let ctx = harness.ctx.clone();
+    let font = FontId::proportional(SIZE);
+    let mut job = LayoutJob::single_section(
+        "ab\ncd ef gh ij kl mn op".into(),
+        TextFormat::simple(font, Color32::BLACK),
+    );
+    job.wrap.max_width = 60.0;
+    let laid = ctx.fonts_mut(|f| f.layout_job(job));
+    let rows = laid.rows.len();
+    assert!(rows >= 3, "{rows} rows");
+    let apart = spread(
+        laid.clone(),
+        |line, first| if first { 10.0 * line as f32 } else { 3.0 },
+    );
+    // The second line's first row 10 lower, each row after it 3 more.
+    let moved: Vec<f32> = laid
+        .rows
+        .iter()
+        .zip(&apart.rows)
+        .map(|(a, b)| b.pos.y - a.pos.y)
+        .collect();
+    let mut want = vec![0.0, 10.0];
+    for i in 2..rows {
+        want.push(10.0 + 3.0 * (i - 1) as f32);
+    }
+    assert_eq!(moved, want);
+    let down = want.last().copied().unwrap_or_default();
+    assert_eq!(apart.rect.height(), laid.rect.height() + down);
+    assert_eq!(apart.mesh_bounds.max.y, laid.mesh_bounds.max.y + down);
+    // A point on each row finds the character it found before.
+    for (a, b) in laid.rows.iter().zip(&apart.rows) {
+        let x = a.pos.x + 2.0;
+        let was = laid.cursor_from_pos(egui::vec2(x, a.rect().center().y));
+        let now = apart.cursor_from_pos(egui::vec2(x, b.rect().center().y));
+        assert_eq!(was.index, now.index);
+    }
+}
+
+#[test]
+fn a_fields_code_block_rows_lie_together_and_a_tables_rows_keep_their_place() {
+    let harness = Harness::builder().build_ui(|_| {});
+    let text = "intro\n```\nlet a = 1;\nlet b = 2;\n```\n| a | b |\n|---|---|\n| 1 | 2 |\n\nend";
+    let (laid, lines) = spread_source(&harness.ctx, text, 400.0);
+    assert_eq!(lines.get(2), Some(&SourceLine::Code));
+    assert_eq!(lines.get(5), Some(&SourceLine::Table { first: true }));
+    let top = |i: usize| laid.rows.get(i).map_or(f32::NAN, |r| r.rect().top());
+    let bottom = |i: usize| laid.rows.get(i).map_or(f32::NAN, |r| r.rect().bottom());
+    // Fence to code to code to fence: no room between.
+    for i in 1..4 {
+        assert_eq!(top(i + 1), bottom(i), "code row {i}");
+    }
+    // A table's rows after its first: none either.
+    for i in 5..7 {
+        assert_eq!(top(i + 1), bottom(i), "table row {i}");
+    }
+    // Before the code block and after the table: room.
+    assert_eq!(lines.get(8), Some(&SourceLine::Blank));
+    assert!(top(1) > bottom(0));
+    assert!(top(8) > bottom(7));
+}
+
+#[test]
+fn a_click_in_the_field_finds_the_line_it_lands_on() {
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(400.0, 300.0))
+        .build_ui_state(
+            |ui, text: &mut String| {
+                let mut layouter = |ui: &egui::Ui, typed: &dyn egui::TextBuffer, width: f32| {
+                    spread_source(ui.ctx(), typed.as_str(), width).0
+                };
+                TextEdit::multiline(text)
+                    .frame(egui::Frame::NONE)
+                    .margin(egui::Margin::ZERO)
+                    .desired_width(f32::INFINITY)
+                    .layouter(&mut layouter)
+                    .show(ui);
+            },
+            "first\nsecond\nthird".to_string(),
+        );
+    harness.run();
+    let (laid, _) = spread_source(&harness.ctx, "first\nsecond\nthird", 400.0);
+    let field = harness.get_by_role(Role::MultilineTextInput).rect();
+    let middle = laid
+        .rows
+        .get(1)
+        .map(|r| r.rect().center())
+        .expect("its second row");
+    let at = field.min + egui::vec2(3.0, middle.y);
+    for pressed in [true, false] {
+        harness.input_mut().events.push(egui::Event::PointerButton {
+            pos: at,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        });
+        harness.run();
+    }
+    harness
+        .input_mut()
+        .events
+        .push(egui::Event::Text("X".into()));
+    harness.run();
+    let typed = harness.state();
+    assert_eq!(
+        typed.lines().filter(|l| l.contains('X')).count(),
+        1,
+        "{typed}"
+    );
+    assert!(
+        typed.lines().nth(1).is_some_and(|l| l.contains('X')),
+        "{typed}"
+    );
 }

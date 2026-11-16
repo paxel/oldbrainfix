@@ -8,13 +8,14 @@
 //! same order and read from the clock as often, as the Dart core's.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
 use crate::checklists::{
-    Checklists, DeletedLine, NewLine, deleted_lines_of, keys as checklist_keys, line_text, order,
-    parse_line_in, parse_list_kind, split_lines, write_line,
+    Checklists, DeletedLine, NewLine, deleted_lines_of, keys as checklist_keys, line_text,
+    list_of_text, named_list, order, parse_list_kind, split_lines, write_line,
 };
 use crate::entry::{Entry, dart_iso, parse_time};
 use crate::notes::{Note, Notes, keys as note_keys};
@@ -23,7 +24,7 @@ use crate::settings::DeviceSettings;
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
 use crate::text_format::{self, StoredText, VERSION};
-use crate::transcript_prompts::{dart_trim, lower};
+use crate::transcript_prompts::{dart_trim, is_space, lower};
 use crate::{Error, Result};
 
 /// Field keys of a Shopping List; the rest are a Checklist's.
@@ -46,6 +47,11 @@ pub mod keys {
     /// field: how the Shopping List shows on their Agenda (#186), a
     /// [`super::ShoppingOnAgenda`]'s code.
     pub const AGENDA: &str = "shopping";
+
+    /// On a voice capture merged into a Shopping List (#311): the Note id
+    /// of the list it still owes the Lines of its Transcripts; cleared
+    /// once they are added, so they are added once.
+    pub const OWES_LINES: &str = "owesLines";
 }
 
 /// The unit of a [`Reappear`] time (#195), the letter its code ends in.
@@ -282,6 +288,38 @@ pub struct ShoppingAgendaRow {
     pub lines: Vec<ShoppingLine>,
 }
 
+/// How far off the day a struck Line comes back lies (#328), as the apps
+/// show it faint beside the Line: a number of days, weeks, months or
+/// years.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackIn {
+    pub count: i64,
+    pub unit: ReappearUnit,
+}
+
+impl BackIn {
+    /// `days` from 1 on as they read: up to 13 days as days, 1 being
+    /// tomorrow; then up to 59 as weeks, under a year as months of 30
+    /// days and from 365 on as years, each the nearest whole number, half
+    /// up.
+    pub fn days(days: i64) -> BackIn {
+        let (count, unit) = match days {
+            ..14 => (days, ReappearUnit::Day),
+            14..60 => ((days + 3) / 7, ReappearUnit::Week),
+            60..365 => ((days + 15) / 30, ReappearUnit::Month),
+            _ => ((days + 182) / 365, ReappearUnit::Year),
+        };
+        BackIn { count, unit }
+    }
+}
+
+impl fmt::Display for BackIn {
+    /// The number and the unit's letter, as a reappear time's code: `3w`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", self.count, self.unit.letter())
+    }
+}
+
 /// One line of a Shopping List (CONTEXT.md): a Line with its reappear
 /// time, struck through for a while once checked.
 #[derive(Debug, Clone, PartialEq)]
@@ -300,6 +338,9 @@ pub struct ShoppingLine {
     /// The day it comes back, at its start, while it is struck; `None`
     /// while it is open, and while it is struck without a reappear time.
     pub back_on: Option<Day>,
+    /// How far off `back_on` lies from the day it was read on (#328);
+    /// `None` where `back_on` is.
+    pub back_in: Option<BackIn>,
     /// The day it came back by itself, at its start, while it is open
     /// since then: on that day it "came back today". `None` while it is
     /// struck, and for a Line never checked or brought back by hand or by
@@ -325,8 +366,9 @@ pub struct ShoppingList {
     /// The id of its making, as the Note's `kind` names it.
     pub making: String,
     /// Every Line that shows: the open ones first, in the order they were
-    /// placed in, then the struck ones, the one
-    /// checked last at the end.
+    /// placed in, then the struck ones, the soonest back first (#328), the
+    /// same day the one checked first first, those without a reappear
+    /// time last, by their checks too.
     pub lines: Vec<ShoppingLine>,
     /// The Lines checked Once: gone, but a name added again brings them
     /// back.
@@ -392,7 +434,8 @@ impl ShoppingList {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one
+/// moment it sorts by: a struck one, after its day back (#328), and a
+/// gone one by its check, an open one
 /// without a valid key by when it came back or was added, on the wall
 /// clock.
 struct Read {
@@ -451,6 +494,7 @@ impl Read {
                 struck,
                 checked_at: value.and_then(|v| parse_time(v).ok()),
                 back_on: back,
+                back_in: back.map(|back| BackIn::days(today.days_until(back))),
                 came_back_on: came_back,
                 order: value_of(checklist_keys::ORDER).map(str::to_string),
             },
@@ -482,6 +526,26 @@ fn by_order(a: &ShoppingLine, b: &ShoppingLine) -> Ordering {
             )
         })
         .then_with(|| utf16_cmp(&a.id, &b.id))
+}
+
+/// Adds the items of `piece`, a stretch of a Transcript between two
+/// pauses, to `items`: its words with one space between them, split at
+/// the words "und" and "and" in any case ([`ShoppingLists::spoken_items`]).
+fn spoken_piece(piece: &str, items: &mut Vec<String>) {
+    let mut words: Vec<&str> = Vec::new();
+    for word in piece.split(is_space).filter(|w| !w.is_empty()) {
+        if ["und", "and"].contains(&lower(word).as_str()) {
+            if !words.is_empty() {
+                items.push(words.join(" "));
+            }
+            words.clear();
+        } else {
+            words.push(word);
+        }
+    }
+    if !words.is_empty() {
+        items.push(words.join(" "));
+    }
 }
 
 /// The key for a new Line at the place `at` of the open Lines of `list`,
@@ -553,7 +617,12 @@ fn list_of(note_id: &str, making: &str, lines: Vec<Read>) -> ShoppingList {
             .cmp(&b.checked)
             .then_with(|| by_order(&a.line, &b.line))
     };
-    struck.sort_by(by_check);
+    // The soonest back first, those that never come back by themselves
+    // after them (#328).
+    struck.sort_by(|a, b| {
+        let back = |r: &Read| (r.line.back_on.is_none(), r.line.back_on);
+        back(a).cmp(&back(b)).then_with(|| by_check(a, b))
+    });
     gone.sort_by(by_check);
     ShoppingList {
         note_id: note_id.to_string(),
@@ -811,26 +880,39 @@ impl<'a> ShoppingLists<'a> {
             && self.store.may_change(note_id)?)
     }
 
-    /// Makes the Note `note_id` a Shopping List: its first line stays its
-    /// text, every other line not blank becomes a Line, indented or not,
-    /// struck when it starts with "✓ ", in a formatted text without the
-    /// mark of an item or a quote ([`parse_line_in`]). Every Line comes in
-    /// at one moment, so they show in the order of the text. Takes it out of Unsorted, as
-    /// a Checklist does. The text keeps its format.
+    /// Makes the Note `note_id` a Shopping List named by its first line,
+    /// as a new list is from the name typed for it: its first line stays
+    /// its text, every other line not blank becomes a Line, indented or
+    /// not, struck when it starts with "✓ ", in a formatted text without
+    /// the mark of an item or a quote ([`crate::checklists::parse_line_in`]). Every Line comes
+    /// in at one moment, so they show in the order of the text. Takes it out of Unsorted, as
+    /// a Checklist does. The text keeps its format. Typed text is made a
+    /// Shopping List by [`Self::make_from_text`].
     pub fn make(&self, note_id: &str) -> Result<()> {
+        self.make_by(note_id, false)
+    }
+
+    /// Makes the typed text of the Note `note_id` a Shopping List (#309),
+    /// as [`Self::make`] does but with every line a Line unless the first
+    /// looks like a heading ([`list_of_text`]): only then is it the Name,
+    /// else the list has none.
+    pub fn make_from_text(&self, note_id: &str) -> Result<()> {
+        self.make_by(note_id, true)
+    }
+
+    fn make_by(&self, note_id: &str, from_text: bool) -> Result<()> {
         let refused = || Error::Invalid(format!("{note_id} may not be made a Shopping List here"));
         let note = Notes::new(self.store).by_id(note_id)?.ok_or_else(refused)?;
         if !self.may_make(note_id)? {
             return Err(refused());
         }
-        let rows = split_lines(&note.text);
-        let title = dart_trim(rows.first().map(String::as_str).unwrap_or(""));
         let markdown = note.text_format == text_format::MARKDOWN;
-        let parsed: Vec<_> = rows
-            .iter()
-            .skip(1)
-            .filter_map(|r| parse_line_in(r, markdown))
-            .collect();
+        let (title, parsed) = if from_text {
+            list_of_text(&note.text, markdown)
+        } else {
+            named_list(&note.text, markdown)
+        };
+        let title = title.as_str();
         let making = self.store.new_id()?;
         self.store.batch(|| {
             let s = self.store;
@@ -1047,7 +1129,17 @@ impl<'a> ShoppingLists<'a> {
     pub fn addable(&self) -> Result<Vec<Note>> {
         let notes = Notes::new(self.store);
         let mut found = Vec::new();
-        for id in self.store.entities_of_type(note_keys::TYPE_NOTE)? {
+        // Only a Note that was a list once can be one (#339).
+        let lists: HashSet<String> = self
+            .store
+            .fields_with_prefix(checklist_keys::KIND)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        for id in self
+            .store
+            .entities_of_type_among(note_keys::TYPE_NOTE, &lists)?
+        {
             if self.making(&id)?.is_none() || !self.may_check(&id)? {
                 continue;
             }
@@ -1084,6 +1176,141 @@ impl<'a> ShoppingLists<'a> {
                 .map(|row| self.add(note_id, row, wall))
                 .collect::<Result<Vec<String>>>()
         })
+    }
+
+    /// The items said in the Transcript `text` (#311), in the order said,
+    /// as the Dart core's `spokenItems` splits it: at line breaks, at `;`,
+    /// `!`, `?` and `…`, at a comma or a full stop but one between two
+    /// digits ("1,5", "1.5"), and at the words "und" and "and" in any
+    /// case, whole words only. Whisper writes a pause as such a mark, and
+    /// the app keeps no time of its pauses. Each item is its words with one
+    /// space between them; empty ones are dropped, a repeated one is kept.
+    pub fn spoken_items(text: &str) -> Vec<String> {
+        let chars: Vec<char> = text.chars().collect();
+        let digit = |at: Option<usize>| {
+            at.and_then(|at| chars.get(at))
+                .is_some_and(|c| c.is_ascii_digit())
+        };
+        let mut items = Vec::new();
+        let mut piece = String::new();
+        for (at, &c) in chars.iter().enumerate() {
+            let ends = match c {
+                '\n' | '\r' | ';' | '!' | '?' | '\u{2026}' => true,
+                ',' | '.' => !(digit(at.checked_sub(1)) && digit(Some(at + 1))),
+                _ => false,
+            };
+            if ends {
+                spoken_piece(&piece, &mut items);
+                piece.clear();
+            } else {
+                piece.push(c);
+            }
+        }
+        spoken_piece(&piece, &mut items);
+        items
+    }
+
+    /// Adds the voice capture `note_id` to the Shopping List `list_id`
+    /// (#311), all in one batch: each line of its text that is not blank
+    /// becomes a Line as [`ShoppingLists::add_lines`] makes it, and the
+    /// Note, with its text and recordings, goes where the list lies and is
+    /// merged into it, so its recordings stay on the list as a Section, to
+    /// be listened to. It owes the list the items said in its Transcripts
+    /// ([`ShoppingLists::spoken_items`]), added at once when every
+    /// recording has one, else once the last one comes
+    /// ([`ShoppingLists::add_owed_lines`]). Refused as
+    /// [`ShoppingLists::add`] and [`Notes::merge`] refuse. Returns the ids
+    /// of the Lines added, brought back or found now.
+    pub fn add_voice_capture(
+        &self,
+        list_id: &str,
+        note_id: &str,
+        wall: &WallClock,
+    ) -> Result<Vec<String>> {
+        let (into, _) = self.require_list(list_id, wall)?;
+        if !self.may_check(list_id)? {
+            return Err(Error::Invalid(format!(
+                "no role in the Shared Area of {list_id}"
+            )));
+        }
+        let notes = Notes::new(self.store);
+        let note = match notes.by_id(note_id)? {
+            Some(note) if !note.is_trashed() && !note.is_merged() => note,
+            _ => {
+                return Err(Error::Invalid(format!(
+                    "not a Note in the lists: {note_id}"
+                )));
+            }
+        };
+        self.store.batch(|| {
+            let mut added = self.add_lines(list_id, &note.shown_text(), wall)?;
+            if note.place != into.place {
+                match &into.place {
+                    None => notes.unfile(note_id)?,
+                    Some(place) => notes.file(note_id, place)?,
+                }
+            }
+            notes.merge(note_id, list_id)?;
+            self.store
+                .append(note_id, keys::OWES_LINES, Some(list_id), None)?;
+            added.extend(self.add_owed_lines(note_id, wall)?);
+            Ok(added)
+        })
+    }
+
+    /// The Note id of the Shopping List the voice capture `note_id` still
+    /// owes the items said in its Transcripts (#311); `None` when it owes
+    /// none.
+    pub fn owed_to(&self, note_id: &str) -> Result<Option<String>> {
+        self.store.current(note_id, keys::OWES_LINES)
+    }
+
+    /// Adds the items said in the Transcripts of the voice capture
+    /// `note_id` to the Shopping List it owes them
+    /// ([`ShoppingLists::owed_to`]), once every recording has a Transcript
+    /// or a removed one, recording by recording in their order, each as
+    /// [`ShoppingLists::add`] adds it, and clears what it owes in the same
+    /// batch, so they are added once (#311). While a recording waits for
+    /// its Transcript nothing is written. A Note no longer merged into that
+    /// list, in the trash, or a list that can no longer be added to owes
+    /// nothing any more: that is cleared, and no Line is added. Returns the
+    /// ids of the Lines added, brought back or found.
+    pub fn add_owed_lines(&self, note_id: &str, wall: &WallClock) -> Result<Vec<String>> {
+        let Some(list_id) = self.owed_to(note_id)? else {
+            return Ok(Vec::new());
+        };
+        let Some(note) = Notes::new(self.store).by_id(note_id)? else {
+            return Ok(Vec::new());
+        };
+        let settled = || self.store.append(note_id, keys::OWES_LINES, None, None);
+        if note.is_trashed() || note.merged_into.as_deref() != Some(list_id.as_str()) {
+            settled()?;
+            return Ok(Vec::new());
+        }
+        if note.recordings.iter().any(|hash| {
+            !note.transcripts.contains_key(hash) && !note.removed_transcripts.contains(hash)
+        }) {
+            return Ok(Vec::new());
+        }
+        let added = self.store.batch(|| {
+            let mut added = Vec::new();
+            for hash in &note.recordings {
+                let said = note.transcripts.get(hash).map_or("", String::as_str);
+                for item in ShoppingLists::spoken_items(said) {
+                    added.push(self.add(&list_id, &item, wall)?);
+                }
+            }
+            settled()?;
+            Ok(added)
+        });
+        match added {
+            // No role there any more, or no Shopping List: nothing is owed.
+            Err(Error::Invalid(_)) => {
+                settled()?;
+                Ok(Vec::new())
+            }
+            added => added,
+        }
     }
 
     /// Renames the Line `line_id`.

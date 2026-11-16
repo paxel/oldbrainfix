@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show setEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, setEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -18,7 +18,9 @@ import 'routine_editor_screen.dart';
 /// Reloads a page's list once after the log changed, never in the middle
 /// of whatever changed it, so what a page opened on top sorted, like the
 /// Nudge screen from its notification, or what a sync brought, is gone
-/// or there once the page shows again.
+/// or there once the page shows again. A page out of sight, under
+/// another page or behind the lock, reads nothing on a change; it reads
+/// once as it shows again, before the frame that shows it (#339).
 mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
   /// The log whose changes the page follows.
   Store get log;
@@ -28,6 +30,14 @@ mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
 
   var _reloadQueued = false;
 
+  /// Whether the log changed while the page was out of sight.
+  var _missed = false;
+
+  /// Whether the page is in sight: its tickers run.
+  ValueListenable<TickerModeData>? _sight;
+
+  bool get _inSight => _sight?.value.enabled ?? true;
+
   @override
   void initState() {
     super.initState();
@@ -35,19 +45,48 @@ mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sight = TickerMode.getValuesNotifier(context);
+    if (sight == _sight) return;
+    _sight?.removeListener(_sightChanged);
+    _sight = sight..addListener(_sightChanged);
+    _sightChanged();
+  }
+
+  @override
   void dispose() {
+    _sight?.removeListener(_sightChanged);
     log.removeListener(_logChanged);
     super.dispose();
   }
 
-  void _logChanged() {
+  /// Back in sight after a change: reads now, in the build that shows
+  /// it again.
+  void _sightChanged() {
+    if (!_missed || !_inSight || !mounted) return;
+    _missed = false;
+    reloadLog();
+  }
+
+  /// Reads the list again once, with the next microtask, however many
+  /// changes and calls ask for it meanwhile: a page that saved calls it
+  /// rather than reading at once, as the log's change reads it too.
+  void reloadSoon() {
     if (_reloadQueued) return;
     _reloadQueued = true;
     scheduleMicrotask(() {
       _reloadQueued = false;
-      if (mounted) reloadLog();
+      if (!mounted) return;
+      if (!_inSight) {
+        _missed = true;
+        return;
+      }
+      reloadLog();
     });
   }
+
+  void _logChanged() => reloadSoon();
 }
 
 /// A Note list's switch between the compact and the detailed view (#114,
@@ -719,6 +758,85 @@ class BrowserSearchField extends StatelessWidget {
   }
 }
 
+/// The header of a list page with a search field, the Areas list, an
+/// Area and a Topic (#336, Q749): the first sliver of the list, it scrolls
+/// away with it and comes back over it, the list staying where it is, as
+/// soon as the list is scrolled up a little; one half shown at the end of
+/// a scroll snaps shown or gone. While [child]'s field has the focus or
+/// [controller] holds a search it stays, so a search being typed or shown
+/// never goes away. Filled like the page bar, so no card shows through.
+class SearchHeaderSliver extends StatefulWidget {
+  /// The field's text: a search in it keeps the header.
+  final TextEditingController controller;
+
+  /// The search field, with what goes under it.
+  final Widget child;
+
+  const SearchHeaderSliver({
+    super.key,
+    required this.controller,
+    required this.child,
+  });
+
+  @override
+  State<SearchHeaderSliver> createState() => _SearchHeaderSliverState();
+}
+
+class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
+  /// Keeps the field with its focus, text and keyboard while the sliver
+  /// around it changes between scrolling away and staying.
+  final _kept = GlobalKey();
+  var _focused = false;
+  late var _searching = _search;
+
+  bool get _search => widget.controller.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_typed);
+  }
+
+  @override
+  void didUpdateWidget(SearchHeaderSliver old) {
+    super.didUpdateWidget(old);
+    if (old.controller == widget.controller) return;
+    old.controller.removeListener(_typed);
+    widget.controller.addListener(_typed);
+    _searching = _search;
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_typed);
+    super.dispose();
+  }
+
+  void _typed() {
+    if (_search != _searching) setState(() => _searching = _search);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final header = KeyedSubtree(
+      key: _kept,
+      child: ColoredBox(
+        color: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: (focused) => setState(() => _focused = focused),
+          child: widget.child,
+        ),
+      ),
+    );
+    return _focused || _searching
+        ? PinnedHeaderSliver(child: header)
+        : SliverFloatingHeader(child: header);
+  }
+}
+
 /// The tags of the tag tree that start with the `#…` typed into
 /// [controller], as chips that fill one in (#267, Q639), the one typed
 /// exactly left out; nothing while what is typed starts otherwise. They
@@ -823,10 +941,10 @@ class _TagSuggestionsState extends State<TagSuggestions> {
 /// view; a tap on a card runs [onSwitch] (#189). A long press or Edit in
 /// ⋮ opens the editor (#114).
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
-/// [showPlace] says which cards name where they are filed: those the
-/// screen does not name already. While [selected] is given the list
-/// selects (#273): each card this Device may change has a box, ticked
-/// for those in it, whose tap runs [onSelect].
+/// [showPlace] says which cards name where they are filed: all but those
+/// in the Area or Topic the list is of (#330). While [selected] is given
+/// the list selects (#273): each card this Device may change has a box,
+/// ticked for those in it, whose tap runs [onSelect].
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,

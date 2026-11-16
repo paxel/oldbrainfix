@@ -15,7 +15,8 @@ void main() {
   setUp(() {
     store = Store.inMemory(clock: () => now)
       ..starterSetOffered = true
-      ..alarmSetupDone = true;
+      ..alarmSetupDone = true
+      ..askOn = true;
   });
   tearDown(() => store.close());
 
@@ -67,6 +68,30 @@ void main() {
     expect(find.textContaining('such as Tailscale'), findsOneWidget);
     expect(field('device:theirs'), findsNothing);
     expect(field('device:joiner'), findsNothing);
+  });
+
+  testWidgets('shows only while Ask is switched on (#333), and an address '
+      'kept meanwhile is still tried by sync', (tester) async {
+    remember('device:desk', 'Desk');
+    store
+      ..setHandAddress('device:desk', 'desk.tail1234.ts.net')
+      ..askOn = false;
+    await page(tester);
+    expect(find.text('Desk'), findsOneWidget, reason: 'still paired');
+    expect(field('device:desk'), findsNothing);
+    expect(find.text('Address by hand'), findsNothing);
+    final desk = store.pairedDevices().single;
+    expect(store.handAddress('device:desk')?.text, 'desk.tail1234.ts.net');
+    expect(
+      store.pairedAddresses(desk).map((a) => a.host),
+      contains('desk.tail1234.ts.net'),
+    );
+
+    store.askOn = true;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await page(tester);
+    expect(field('device:desk'), findsOneWidget);
+    expect(find.text('desk.tail1234.ts.net'), findsOneWidget);
   });
 
   testWidgets('keeps an address as typed, says why one is none, and an '

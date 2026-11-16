@@ -12,6 +12,7 @@ import 'look.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
+import 'tick_saves.dart';
 
 /// The frog that marks Frogs, silent: there is none among the Material
 /// icons.
@@ -260,7 +261,8 @@ class FrogsScreen extends StatefulWidget {
   State<FrogsScreen> createState() => _FrogsScreenState();
 }
 
-class _FrogsScreenState extends State<FrogsScreen> with ReloadsOnLogChange {
+class _FrogsScreenState extends State<FrogsScreen>
+    with ReloadsOnLogChange, TicksAtOnce {
   /// The local setting that keeps the "Done" section open.
   static const _doneOpenKey = 'frogsDoneOpen';
 
@@ -297,13 +299,14 @@ class _FrogsScreenState extends State<FrogsScreen> with ReloadsOnLogChange {
     widget.notes.store.setLocalSetting(_doneOpenKey, '$open');
   }
 
+  /// Ticks [frog] at once and saves it after the frame (#338).
   void _toggle(Frog frog) {
-    if (frog.isDone) {
-      _frogs.unmarkDone(frog.id);
-    } else {
-      _frogs.markDone(frog.id);
-    }
-    setState(_load);
+    final key = tickKey(frog: frog.id);
+    final done = TickSaves.instance.waiting<bool>(key) ?? frog.isDone;
+    tickAtOnce(key, !done, () {
+      done ? _frogs.unmarkDone(frog.id) : _frogs.markDone(frog.id);
+      if (mounted) setState(_load);
+    });
   }
 
   Future<void> _openNote(Note note) async {
@@ -320,6 +323,7 @@ class _FrogsScreenState extends State<FrogsScreen> with ReloadsOnLogChange {
       area: area,
       title: noteText(context.t, note),
       subtitle: subtitle,
+      done: TickSaves.instance.waiting<bool>(tickKey(frog: frog.id)),
       onToggle: widget.notes.store.mayCheckOff(frog.id)
           ? () => _toggle(frog)
           : null,

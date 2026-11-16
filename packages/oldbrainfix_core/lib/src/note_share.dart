@@ -1,6 +1,16 @@
+import 'checklists.dart';
 import 'markdown.dart';
 import 'notes.dart';
+import 'schedule.dart';
+import 'shopping_lists.dart';
+import 'store.dart';
 import 'text_format.dart';
+
+/// One Line of a Checklist or Shopping List as it is copied (#323), the
+/// same in both cores (`share.rs`): its text, whether it is checked, on a
+/// Shopping List struck, and whether it is under the Line above, in its
+/// group.
+typedef TaskLine = ({String text, bool checked, bool inGroup});
 
 /// What a Note hands to another app (#129), the same in both cores
 /// (`share.rs`): its text, then each Section's, every Section under its
@@ -27,6 +37,40 @@ class NoteShare {
     required this.photos,
     required this.recordings,
   });
+
+  /// The Lines of the Note [noteId] as they show now, a Checklist's
+  /// checked as for the Occurrence it is on ([Checklists.shownNow]), a
+  /// Shopping List's struck ones after its open ones and those checked
+  /// Once left out; null when it is no Checklist or Shopping List.
+  static List<TaskLine>? taskLines(
+    Store store,
+    String noteId,
+    WallClock wallClock,
+  ) {
+    if (Checklists(store).shownNow(noteId, wallClock) case final list?) {
+      return [
+        for (final l in list.lines)
+          (text: l.text, checked: l.checked, inGroup: l.inGroup),
+      ];
+    }
+    if (ShoppingLists(store).byNote(noteId, wallClock) case final list?) {
+      return [
+        for (final l in list.lines)
+          (text: l.text, checked: l.struck, inGroup: false),
+      ];
+    }
+    return null;
+  }
+
+  /// [lines] as a task list of GFM (#263, #323), as `share.rs` writes it:
+  /// one item a line, `- [ ] ` before an open Line, `- [x] ` before a
+  /// checked one, a Line of a group indented by two spaces, each text as
+  /// written.
+  static String taskList(Iterable<TaskLine> lines) => [
+    for (final l in lines)
+      '${l.inGroup ? ChecklistKeys.groupIndent : ''}'
+          '- ${l.checked ? '[x]' : '[ ]'} ${l.text}',
+  ].join('\n');
 
   /// What [note] with its [sections], oldest first, hands along; [date]
   /// writes a Section's capture time as the app shows dates.

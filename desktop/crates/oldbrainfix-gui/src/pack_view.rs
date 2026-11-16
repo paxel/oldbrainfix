@@ -397,7 +397,18 @@ fn label(t: &L10n, pack: &Pack, item: &PackItem) -> String {
     };
     let at = item.index.unwrap_or(0);
     match item.kind {
-        PackItemKind::Note => first_line(note),
+        // A list without a name by its kind (#309).
+        PackItemKind::Note => match first_line(note) {
+            line if line.is_empty() && note.lines.is_some() => {
+                let kind = if note.shopping {
+                    t.shopping_heading()
+                } else {
+                    t.checklist_heading()
+                };
+                kind.to_string()
+            }
+            line => line,
+        },
         PackItemKind::Photo => {
             t.pack_photo(&size_text(t, note.photos.get(at).map_or(0, |p| p.size)))
         }

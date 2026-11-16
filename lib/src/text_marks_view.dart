@@ -11,8 +11,10 @@ import '../l10n/app_localizations.dart';
 import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'profile.dart';
 import 'table_screen.dart';
+import 'tick_saves.dart';
 
 /// What a screen reader says for a box showing [state].
 String boxStateLabel(AppLocalizations t, BoxState state) => switch (state) {
@@ -87,22 +89,39 @@ class BoxTicking {
     changed: changed,
   );
 
-  /// The state the box [id] shows, written as [starting].
+  /// The state the box [id] shows, written as [starting]: as tapped
+  /// while its save waits (#338), else as ticked in the log.
   BoxState stateOf(String id, BoxState starting) =>
-      ticks[id]?.state ?? starting;
+      TickSaves.instance.waiting<BoxState>(_key(id)) ??
+      ticks[id]?.state ??
+      starting;
 
-  /// Ticks the box [id] to [to]; whether it was written. A sync may have
-  /// taken the box or the role meanwhile: then nothing is.
-  bool tick(String id, BoxState to) {
-    try {
-      Boxes(notes.store).tick(entity, id, to);
-    } on ArgumentError {
-      return false;
-    } on StateError {
-      return false;
-    }
-    changed?.call();
-    return true;
+  String _key(String id) => tickKey(entity: entity, box: id);
+
+  /// Ticks the box [id] to [to] at once, as [stateOf] shows it once
+  /// [redraw] drew it, and writes it after the frame, then runs
+  /// [changed] (#338). A sync may have taken the box or the role
+  /// meanwhile: then nothing is written, the box shows as stored again
+  /// and [failed] runs.
+  void tick(
+    String id,
+    BoxState to, {
+    required VoidCallback redraw,
+    required void Function(Object error) failed,
+  }) {
+    TickSaves.instance.tick(
+      _key(id),
+      to,
+      save: () {
+        Boxes(notes.store).tick(entity, id, to);
+        changed?.call();
+      },
+      failed: (error) {
+        redraw();
+        failed(error);
+      },
+    );
+    redraw();
   }
 
   /// Every tick of the box [id], the oldest first, with who wrote it.
@@ -239,7 +258,18 @@ Future<void> openBoxMenu(
   if (!context.mounted) return;
   switch (picked) {
     case _ToState(:final state):
-      ticking.tick(id, state);
+      // The page the box is on draws it ticked in the next frame.
+      void redraw() {
+        if (context.mounted) (context as Element).markNeedsBuild();
+      }
+      ticking.tick(
+        id,
+        state,
+        redraw: redraw,
+        failed: (error) {
+          if (context.mounted) announceTickFailed(context, error);
+        },
+      );
     case _History():
       await showBoxHistory(context, ticking, id);
     case null:
@@ -344,6 +374,69 @@ class LinkOpenScope extends InheritedWidget {
 }
 
 /// How a tag is drawn: in the accent colour.
+/// How a formatted text is spaced and drawn (#327, obf-1020), alike on
+/// the desktop: everything in parts of its font's size, so a bigger text
+/// keeps its look. A line is [formattedLineHeight] high; code is
+/// [codeScale] of the words around it, on a light tint ([codeTint]) only
+/// as high as [codeLineHeight] says, never a framed box.
+const formattedLineHeight = 1.5;
+
+/// Code's line height, of inline code and of a code block's lines.
+const codeLineHeight = 1.3;
+
+/// Code's font size, in parts of the words' around it.
+const codeScale = 0.9;
+
+/// A first and a second heading's size, in parts of the words' size.
+const heading1Scale = 1.3;
+const heading2Scale = 1.15;
+
+/// A heading's weight: lighter than bold.
+const headingWeight = FontWeight.w600;
+
+/// The room a blank line between two lines makes as the text reads.
+const blankGap = 1.0;
+
+/// How strongly code is tinted behind it with the text's colour.
+const codeTintAlpha = 0.08;
+
+/// The ground of code: a light tint of the text's colour, in light and
+/// dark alike.
+Color codeTint(ColorScheme scheme) =>
+    scheme.onSurface.withValues(alpha: codeTintAlpha);
+
+/// What a formatted text's lines are at least as high as: [base]'s font,
+/// [formattedLineHeight] high.
+StrutStyle formattedStrut(TextStyle base) =>
+    StrutStyle.fromTextStyle(base, height: formattedLineHeight);
+
+/// [base] as code is drawn in a formatted text: fixed-width, a little
+/// smaller, on its tint just behind its words.
+TextStyle codeStyle(ColorScheme scheme, TextStyle base) => base.copyWith(
+  fontFamily: 'monospace',
+  fontSize: (base.fontSize ?? 14) * codeScale,
+  height: codeLineHeight,
+  backgroundColor: codeTint(scheme),
+);
+
+/// The room before a line of the kind [next] after one of [prev], in
+/// parts of the font's size: more before a heading, less after one,
+/// little between two items or two quote lines, half the size between
+/// all others (#327).
+double lineGap(MarkdownBlockKind prev, MarkdownBlockKind next) {
+  bool item(MarkdownBlockKind k) =>
+      k == MarkdownBlockKind.bullet || k == MarkdownBlockKind.numbered;
+  bool heading(MarkdownBlockKind k) =>
+      k == MarkdownBlockKind.heading1 || k == MarkdownBlockKind.heading2;
+  if (heading(next)) return 0.8;
+  if (heading(prev)) return 0.3;
+  if (prev == MarkdownBlockKind.quote && next == MarkdownBlockKind.quote) {
+    return 0.2;
+  }
+  if (item(prev) && item(next)) return 0.2;
+  return 0.5;
+}
+
 TextStyle tagStyle(BuildContext context, [TextStyle? style]) =>
     (style ?? const TextStyle()).copyWith(
       color: Theme.of(context).colorScheme.primary,
@@ -550,6 +643,7 @@ class TagTextController extends TextEditingController {
   static const _composing = 2048;
   static const _id = 4096;
   static const _grid = 8192;
+  static const _codeLine = 16384;
 
   /// The text formatted, character for character: each one gets the bits
   /// of what it is, and neighbours with the same bits share a span. A
@@ -664,7 +758,7 @@ class TagTextController extends TextEditingController {
             if (end < text.length && text[end] == '\n') end++;
             set(block.start, end, _mark);
           } else {
-            set(block.start, block.end, _code);
+            set(block.start, block.end, _code | _codeLine);
           }
         case MarkdownBlockKind.paragraph:
           break;
@@ -782,18 +876,27 @@ class TagTextController extends TextEditingController {
       if (has(_strike)) TextDecoration.lineThrough,
       if (has(_link) || has(_composing)) TextDecoration.underline,
     ];
+    final heading = has(_heading1)
+        ? size * heading1Scale
+        : has(_heading2)
+        ? size * heading2Scale
+        : null;
     final style = TextStyle(
-      fontSize: has(_heading1)
-          ? size * 1.5
-          : has(_heading2)
-          ? size * 1.25
+      fontSize: has(_code) ? (heading ?? size) * codeScale : heading,
+      // A code block's lines lie together on their tint.
+      height: has(_codeLine)
+          ? formattedLineHeight / codeScale
+          : has(_code)
+          ? codeLineHeight
           : null,
-      fontWeight: has(_bold) || has(_heading1) || has(_heading2)
+      fontWeight: has(_heading1) || has(_heading2)
+          ? headingWeight
+          : has(_bold)
           ? FontWeight.bold
           : null,
       fontStyle: has(_italic) ? FontStyle.italic : null,
       fontFamily: has(_code) ? 'monospace' : null,
-      backgroundColor: has(_code) ? scheme.surfaceContainerHighest : null,
+      backgroundColor: has(_code) ? codeTint(scheme) : null,
       color: has(_link) || has(_tag) || has(_sign)
           ? scheme.primary
           : has(_quote)
@@ -897,12 +1000,12 @@ int storedOffset(List<ShownBox> boxes, int shown) {
 /// A text in [TextFormats.markdown] is drawn formatted (ADR 0033), each
 /// of its lines that [start] to [end] touches: headings larger, items
 /// after a bullet or their number, quotes beside a bar, bold, italic,
-/// struck through, code in a fixed width on grey and links. A link to a
-/// web or e-mail address opens with a tap ([LinkOpenScope]); any other
-/// stays text. Boxes, tags and web addresses work in it as in a plain
-/// text, except a tag in a link's label, which is part of the link, and
-/// a web address in code, a code block or a link, which is none
-/// ([Markdown.autolinks]).
+/// struck through, code in a fixed width on a light tint and links. A
+/// link to a web or e-mail address opens with a tap ([LinkOpenScope]);
+/// any other stays text. Boxes, tags and web addresses work in it as in
+/// a plain text, except a tag in a link's label, which is part of the
+/// link, and a web address in code, a code block or a link, which is
+/// none ([Markdown.autolinks]).
 ///
 /// A table is drawn as a grid, made smaller to fit the width, its header
 /// row in bold, its boxes as in a line. A tap on it opens it full screen
@@ -967,8 +1070,13 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     return _found = _FoundIn(widget.text, widget.boxes);
   }
 
+  // The text grows with the Device's text size (#326, obf-1019); what is
+  // built reads the size it shows at below the [ContentText].
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ContentText(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     if (widget.format == TextFormats.markdown) return _formatted(context);
     if (widget.format == TextFormats.code) return _code(context);
     final found = _foundIn;
@@ -1054,7 +1162,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
   /// A Code text (#213) from [start] to [end] as written, in monospace,
   /// unwrapped and cut off at the edge: swipes on a card belong to the
   /// browser, and the Note editor shows it whole. Its lines lie on the
-  /// grey ground of a code block, a compact line ([maxLines]) without
+  /// tint of a code block, a compact line ([maxLines]) without
   /// it.
   Widget _code(BuildContext context) {
     final text = widget.text;
@@ -1076,7 +1184,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: codeTint(Theme.of(context).colorScheme),
         borderRadius: BorderRadius.circular(4),
       ),
       child: lines,
@@ -1085,7 +1193,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
 
   /// Each line of a formatted text in [start] to [end], one under the
   /// other; a table once, as a grid, and a code block once, as its lines
-  /// in monospace on a grey ground. A compact card shows a code block's
+  /// in monospace on a tint. A compact card shows a code block's
   /// lines one by one, without its fences.
   Widget _formatted(BuildContext context) {
     final found = _foundIn;
@@ -1096,7 +1204,25 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final tags = found.markdownTags;
     final base = DefaultTextStyle.of(context).style.merge(widget.style);
     final compact = widget.maxLines != null;
+    final size = base.fontSize ?? 14;
+    // The room is in parts of the size the text shows at, the system's
+    // font size, "Fat fingers" and the text size in it (#326, obf-1019).
+    final em = MediaQuery.textScalerOf(context).scale(size);
     final lines = <Widget>[];
+    // The kind of the line drawn last and the blank lines since: the room
+    // before a line goes by both (#327); a compact card's lines keep only
+    // their height.
+    MarkdownBlockKind? last;
+    var blank = 0;
+    void room(MarkdownBlockKind kind) {
+      if (!compact && (last != null || blank > 0)) {
+        final gap = blank > 0 ? blank * blankGap : lineGap(last ?? kind, kind);
+        lines.add(SizedBox(height: gap * em));
+      }
+      last = kind;
+      blank = 0;
+    }
+
     MarkdownCodeBlock? drawn;
     for (final block in found.blocks) {
       if (block.end < from || block.start > to) continue;
@@ -1104,24 +1230,38 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       if (block.code case final code?) {
         if (compact) {
           if (!code.isFence(block.line)) {
+            room(MarkdownBlockKind.code);
             lines.add(_line(context, block, base, boxes, tags));
           }
         } else if (!identical(code, drawn)) {
           drawn = code;
+          room(MarkdownBlockKind.code);
           lines.add(_codeBlock(context, code, base, from, to));
         }
       } else if (table == null) {
+        // A blank line reads as room, not as a line.
+        if (!compact &&
+            block.kind == MarkdownBlockKind.paragraph &&
+            text.substring(block.start, block.end).trim().isEmpty) {
+          blank++;
+          continue;
+        }
+        room(block.kind);
         lines.add(_line(context, block, base, boxes, tags));
       } else if (compact) {
         // Its comment line reads as nothing: the header row stands in.
         final row = block.row ?? (block.line == table.firstLine ? 0 : null);
         if (row != null) {
+          room(MarkdownBlockKind.table);
           lines.add(_rowLine(context, table.rows[row], base, boxes, tags));
         }
       } else if (block.line == table.firstLine) {
+        room(MarkdownBlockKind.table);
         lines.add(_table(context, table, base, boxes, tags));
       }
     }
+    // Blank lines at the end keep their room.
+    if (blank > 0) lines.add(SizedBox(height: blank * blankGap * em));
     if (lines.length == 1) return lines.single;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1143,18 +1283,15 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final size = base.fontSize ?? 14;
     final style = switch (block.kind) {
       MarkdownBlockKind.heading1 => base.copyWith(
-        fontWeight: FontWeight.bold,
-        fontSize: grows ? size * 1.5 : null,
+        fontWeight: headingWeight,
+        fontSize: grows ? size * heading1Scale : null,
       ),
       MarkdownBlockKind.heading2 => base.copyWith(
-        fontWeight: FontWeight.bold,
-        fontSize: grows ? size * 1.25 : null,
+        fontWeight: headingWeight,
+        fontSize: grows ? size * heading2Scale : null,
       ),
       MarkdownBlockKind.quote => base.copyWith(color: scheme.onSurfaceVariant),
-      MarkdownBlockKind.code => base.copyWith(
-        fontFamily: 'monospace',
-        backgroundColor: scheme.surfaceContainerHighest,
-      ),
+      MarkdownBlockKind.code => codeStyle(scheme, base),
       _ => base,
     };
     final spans = <InlineSpan>[];
@@ -1164,6 +1301,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final words = Text.rich(
       TextSpan(children: spans),
       style: style,
+      strutStyle: formattedStrut(base),
       maxLines: widget.maxLines,
       overflow: widget.overflow,
     );
@@ -1174,12 +1312,14 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       MarkdownBlockKind.heading1 ||
       MarkdownBlockKind.heading2 => Semantics(header: true, child: words),
       MarkdownBlockKind.bullet => _item(
+        _grown(context, size),
         block.level == 0 ? '•' : '◦',
         block.level,
         style,
         words,
       ),
       MarkdownBlockKind.numbered => _item(
+        _grown(context, size),
         '${block.number}.',
         block.level,
         style,
@@ -1200,7 +1340,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
   }
 
   /// The lines of [code] in [from] to [to] as written, in monospace on a
-  /// grey ground: nothing in them is a format, a tag or a box.
+  /// tint: nothing in them is a format, a tag or a box.
   Widget _codeBlock(
     BuildContext context,
     MarkdownCodeBlock code,
@@ -1216,15 +1356,24 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
             when !code.isFence(l) && b.end >= from && b.start <= to)
           text.substring(b.start, b.end),
     ].join('\n');
+    final scheme = Theme.of(context).colorScheme;
+    final grow = _grown(context, base.fontSize ?? 14);
     return Container(
       key: ValueKey('code-${code.firstLine}'),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 8 * grow, vertical: 6 * grow),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: codeTint(scheme),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(content, style: base.copyWith(fontFamily: 'monospace')),
+      // The block's tint is its ground: its words have none of their own.
+      child: Text(
+        content,
+        style: codeStyle(
+          scheme,
+          base,
+        ).copyWith(backgroundColor: Colors.transparent),
+      ),
     );
   }
 
@@ -1248,6 +1397,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     return Text.rich(
       TextSpan(children: spans),
       style: base,
+      strutStyle: formattedStrut(base),
       maxLines: widget.maxLines,
       overflow: widget.overflow,
     );
@@ -1348,23 +1498,34 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     return out;
   }
 
-  /// An item of a list: its bullet or number, the words beside it.
-  Widget _item(String sign, int level, TextStyle style, Widget words) =>
-      Padding(
-        padding: EdgeInsetsDirectional.only(start: level * 20.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 20),
-              child: Text(sign, style: style),
-            ),
-            const SizedBox(width: 4),
-            Flexible(child: words),
-          ],
+  /// How many times its [size] the text around [context] shows at (#326,
+  /// obf-1019): the room of an item and of a code block grows with it.
+  double _grown(BuildContext context, double size) =>
+      MediaQuery.textScalerOf(context).scale(size) / size;
+
+  /// An item of a list: its bullet or number, the words beside it, its
+  /// room [grow] times the usual.
+  Widget _item(
+    double grow,
+    String sign,
+    int level,
+    TextStyle style,
+    Widget words,
+  ) => Padding(
+    padding: EdgeInsetsDirectional.only(start: level * 20.0 * grow),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(minWidth: 20 * grow),
+          child: Text(sign, style: style),
         ),
-      );
+        SizedBox(width: 4 * grow),
+        Flexible(child: words),
+      ],
+    ),
+  );
 }
 
 /// How a cell of a column that lines up as [align] sets its words.
@@ -1461,8 +1622,12 @@ class _MarkedCellState extends State<MarkedCell> with _InlineSpans {
   @override
   BoxTicking? get _ticking => widget.ticking;
 
+  // A table's cell grows with the Device's text size too (#326, obf-1019).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ContentText(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final style = DefaultTextStyle.of(context).style.merge(widget.style);
     final spans = <InlineSpan>[];
     for (final span in widget.cell.spans) {
@@ -1543,10 +1708,7 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
         out.add(
           TextSpan(
             text: span.text,
-            style: style.copyWith(
-              fontFamily: 'monospace',
-              backgroundColor: scheme.surfaceContainerHighest,
-            ),
+            style: codeStyle(scheme, style),
             recognizer: link,
           ),
         );
@@ -1709,8 +1871,10 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
     TextStyle? style,
   ) {
     final ticking = _ticking;
-    final glyph = box.state.glyph;
-    final label = boxStateLabel(t, box.state);
+    // As tapped while its save waits (#338).
+    final state = ticking?.stateOf(box.id, box.state) ?? box.state;
+    final glyph = state.glyph;
+    final label = boxStateLabel(t, state);
     final ticked = ticking?.labelOf(context, box.id);
     if (ticking == null || (!ticking.mayTick && ticked == null)) {
       return [
@@ -1731,7 +1895,7 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
               context,
               at,
               id: box.id,
-              state: box.state,
+              state: state,
               ticking: ticking,
             ),
           ),

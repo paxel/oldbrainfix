@@ -82,8 +82,24 @@ void main() {
         DateFormat.yMd('en_US').add_Hm().format(now.toLocal()),
       );
       expect(key('badge-add'), findsOneWidget);
-      // Every Note has a kind (#188).
+      // Every Note has a kind (#188), the first badge, in words (#310).
       expect(value(tester, 'badge-kind'), 'Plain Note');
+      expect(
+        find.descendant(
+          of: key('badge-kind'),
+          matching: find.text('Plain Note'),
+        ),
+        findsOneWidget,
+      );
+      final first = tester
+          .widgetList<SettingBadge>(
+            find.descendant(
+              of: key('note-badges'),
+              matching: find.byType(SettingBadge),
+            ),
+          )
+          .first;
+      expect(first.key, const ValueKey('badge-kind'));
       for (final none in ['badge-agenda', 'badge-ticks']) {
         expect(key(none), findsNothing, reason: none);
       }
@@ -222,16 +238,18 @@ void main() {
     ];
 
     testWidgets('a fixed set of values shows as an icon, never with its '
-        'word; other values as short text', (tester) async {
+        'word, the kind in words; other values as short text', (tester) async {
       final home = places.addArea('Household');
       final id = notes.capture('Trip\nPassport\nTickets').id;
       notes.file(id, home.id);
       Checklists(store).make(id);
       notes.setImportance(id, Importance.important);
       await edit(tester, id);
+      // The kind in words, ▾ as it opens the choice (#310).
       expect(drawn(tester, 'badge-kind'), [
         Icons.category_outlined,
-        Icons.checklist,
+        Icons.arrow_drop_down,
+        'Checklist',
       ]);
       expect(drawn(tester, 'badge-importance'), [
         Icons.label_important_outline,
@@ -400,9 +418,9 @@ void main() {
     });
 
     testWidgets('a plain Note offers every kind as radio buttons, its own '
-        'marked; Checklist makes it one at once, its first line the name, '
-        'the rest its Lines', (tester) async {
-      final id = notes.capture('Trip\nPassport\nTickets').id;
+        'marked; Checklist makes it one at once, its first line, ending in '
+        '":", the name, the rest its Lines', (tester) async {
+      final id = notes.capture('Trip:\nPassport\nTickets').id;
       await edit(tester, id);
       // The badge replaces the buttons at the bottom.
       expect(key('checklist-make'), findsNothing);
@@ -428,7 +446,7 @@ void main() {
       expect(key('note-text'), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'Trip',
+        'Trip:',
       );
       expect(
         [for (final line in Checklists(store).byNote(id)!.lines) line.text],

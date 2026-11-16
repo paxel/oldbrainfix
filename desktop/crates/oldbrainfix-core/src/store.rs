@@ -24,7 +24,7 @@
 //! every write becomes a draft of its pending set instead of an entry.
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -1484,6 +1484,22 @@ impl Store {
             .collect())
     }
 
+    /// The entities [`Store::entities_of_type`] gives that are among
+    /// `among`, in its order, reading only those (#339).
+    pub(crate) fn entities_of_type_among(
+        &self,
+        ty: &str,
+        among: &HashSet<String>,
+    ) -> Result<Vec<String>> {
+        let mut out = Vec::new();
+        for id in self.ever_of_type(ty)? {
+            if among.contains(&id) && self.current(&id, "$type")?.as_deref() == Some(ty) {
+                out.push(id);
+            }
+        }
+        Ok(out)
+    }
+
     /// Entities whose current `$type` is `ty`.
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let mut out = Vec::new();
@@ -1520,6 +1536,27 @@ impl Store {
     /// Entities whose `$type` was `ty` at some time, the shown pending
     /// sets included, in the order [`Store::entities_of_type`] keeps:
     /// also for a list of some of them in that order (ADR 0048).
+    /// Entities whose `field` held `value` at some time, the shown pending
+    /// sets included: those that may hold it now, found without reading
+    /// every entity (#339), as the Dart core's `everWith`.
+    pub(crate) fn ever_with(&self, field: &str, value: &str) -> Result<HashSet<String>> {
+        let mut ids: HashSet<String> = {
+            let db = self.db.lock();
+            let mut stmt = db.prepare(&format!(
+                "SELECT DISTINCT entity FROM entries WHERE {APPLIED} \
+                     AND field = ? AND value = ?"
+            ))?;
+            let rows = stmt.query_map([field, value], |r| r.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        for e in self.shown()?.iter() {
+            if e.field == field && e.value.as_deref() == Some(value) {
+                ids.insert(e.entity.clone());
+            }
+        }
+        Ok(ids)
+    }
+
     pub(crate) fn ever_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let mut ids: Vec<String> = {
             let db = self.db.lock();

@@ -7,7 +7,10 @@
 //!
 //! Above the Nudge buttons sits "To full editor" (#142), which saves the
 //! Note as Enter does and opens it in the window's Note dialog; it waits
-//! while there is nothing to save. Beside it, of the Note card's buttons
+//! while there is nothing to save. "Add to Note…" beside it (#308) opens
+//! its picker as a page, a recording running ended and kept first; the
+//! Note picked there gets what is typed and held as a Section at once,
+//! and the popup closes. Beside them, of the Note card's buttons
 //! (#113), only what this Device switched on in Settings ▸ Quick note
 //! shows: "File into…", Routine, Reminder, Frog and Session where this
 //! Device may spawn, and "More" with the Importance, "Make it a Tally"
@@ -63,12 +66,12 @@ use oldbrainfix_core::{
     text_format,
 };
 
+use crate::add_to_note::{self, NoteAsk, NotePicker};
 use crate::app::{Wall, done_form, failure_form, local_wall, name_field, region_of};
 use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
 };
 use crate::cli::note_text;
-use crate::enrich::Enricher;
 use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::format_bar::{self, Format};
 use crate::icons;
@@ -80,7 +83,6 @@ use crate::names::area_name;
 use crate::paste;
 use crate::routine_editor::{Intent, RoutineEditor};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
-use crate::speech::SpeechModel;
 use crate::tally_view::{FieldForm, FormIntent, TallyForm};
 use crate::text_menu::{self, Pick};
 use crate::theme;
@@ -128,6 +130,8 @@ enum Page {
     Schedule(Box<RoutineEditor>),
     Tally(Box<TallyForm>),
     FileInto(Box<FileIntoPicker>),
+    /// Add to Note… (#308).
+    AddToNote(Box<NotePicker>),
 }
 
 /// What was asked of the page shown.
@@ -135,6 +139,7 @@ enum PageAsk {
     Schedule(Intent),
     Tally(FormIntent),
     FileInto(Picked),
+    AddToNote(NoteAsk),
 }
 
 /// What is announced at the top of the popup: what it says, why for a
@@ -191,9 +196,6 @@ pub struct CapturePopup {
     /// The Shopping Lists the lines can go into, by their Note's id with
     /// their title, read with the Areas.
     lists: Vec<ListTitle>,
-    /// The thread making Transcripts, and the speech model it needs; a
-    /// recording goes into a Shopping List only with both.
-    transcriber: Option<(Enricher, Option<SpeechModel>)>,
     wall: Wall,
     page: Option<Page>,
     /// Whether "Discard changes?" shows over the page left (#275).
@@ -202,6 +204,9 @@ pub struct CapturePopup {
     region: Option<String>,
     /// What this Device's quick note shows (#142), read with the Areas.
     quick: QuickNote,
+    /// Whether Add to Note… added the capture to a Note (#308), so the
+    /// popup is done with.
+    added: bool,
 }
 
 impl CapturePopup {
@@ -225,12 +230,12 @@ impl CapturePopup {
             areas: Vec::new(),
             spawns: true,
             lists: Vec::new(),
-            transcriber: None,
             wall: Arc::new(local_wall),
             page: None,
             discarding: false,
             region: region_of(sys_locale::get_locale().as_deref()),
             quick: QuickNote::default(),
+            added: false,
         };
         popup.read_places();
         popup
@@ -246,31 +251,15 @@ impl CapturePopup {
         self.clipboard = Some(clipboard);
     }
 
-    /// The thread making Transcripts and the speech model it needs, for
-    /// a voice capture going into a Shopping List; without a model it
-    /// waits for none.
-    pub fn set_transcriber(&mut self, transcriber: Enricher, speech: Option<SpeechModel>) {
-        self.transcriber = Some((transcriber, speech));
-    }
-
     /// The wall clock the days of a Shopping List's Lines are on.
     pub fn set_wall_clock(&mut self, wall: Wall) {
         self.wall = wall;
     }
 
-    /// Whether a recording captured now gets its Transcript here.
-    fn transcribes(&self) -> bool {
-        self.transcriber
-            .as_ref()
-            .is_some_and(|(_, speech)| speech.as_ref().is_none_or(|s| s.current().is_some()))
-    }
-
     /// The Shopping Lists the lines can go into: none while a photo is
-    /// held or a recording gets no Transcript here.
+    /// held; a recording goes with a speech model or without (#311).
     fn offered_lists(&self) -> &[ListTitle] {
-        let voice = self.recording() || !self.recorded.is_empty();
-        let photo = !self.photos.is_empty();
-        capture_choices::shopping_offer(&self.lists, photo, voice, self.transcribes())
+        capture_choices::shopping_offer(&self.lists, !self.photos.is_empty())
     }
 
     /// Whether a voice recording runs.
@@ -452,9 +441,7 @@ impl CapturePopup {
             photos: &self.photos,
             recordings: &self.recorded,
             files: &[],
-            transcribes: self.transcribes(),
         };
-        let transcriber = self.transcriber.as_ref().map(|(enricher, _)| enricher);
         let saved = capture_choices::save(
             (&self.store, &self.wall),
             &self.text,
@@ -462,7 +449,7 @@ impl CapturePopup {
             nudge_in,
             held,
             &self.choices,
-            (transcriber, self.t),
+            self.t,
         );
         match saved {
             // Only once all of it is written: a failed save keeps it here.
@@ -561,6 +548,10 @@ impl CapturePopup {
             } else {
                 self.show_page(ui);
             }
+            // Added to a Note, it is done with (#308).
+            if std::mem::take(&mut self.added) {
+                return Outcome::Closed;
+            }
             return Outcome::Open;
         }
         if escape {
@@ -581,6 +572,7 @@ impl CapturePopup {
         }
         let mut picked = None;
         let mut to_editor = false;
+        let mut add_to_note = false;
         let mut record = false;
         let mut stop = false;
         let mut asked = None;
@@ -615,6 +607,12 @@ impl CapturePopup {
                 if self.paste_empty {
                     paste::empty_line(ui, &t);
                 }
+                // The Kind it is made, above the field (#310).
+                if recording.is_none()
+                    && let Some(kind) = capture_choices::kind_choice(ui, &t, &self.choices)
+                {
+                    asked = Some(kind);
+                }
                 if quick.format_bar {
                     format_bar::capture_bar(ui, &t, id, &mut self.text, (text, tones.accent));
                 }
@@ -629,7 +627,8 @@ impl CapturePopup {
                                 .id(id)
                                 .hint_text(t.capture_hint())
                                 .text_color(text)
-                                .font(FontId::proportional(18.0))
+                                // At the Device's text size (#326, obf-1019).
+                                .font(FontId::proportional(theme::content(ui, 18.0)))
                                 .desired_rows(1)
                                 .desired_width(f32::INFINITY)
                                 .return_key(KeyboardShortcut::new(Modifiers::SHIFT, Key::Enter)),
@@ -690,6 +689,7 @@ impl CapturePopup {
                 match capture_choices::action_row(ui, &t, &self.choices, offer, (&quick, typed)) {
                     Some(RowAsk::Choice(button)) => asked = Some(button),
                     Some(RowAsk::ToEditor) => to_editor = true,
+                    Some(RowAsk::AddToNote) => add_to_note = true,
                     None => {}
                 }
                 ui.add_space(4.0);
@@ -751,6 +751,9 @@ impl CapturePopup {
         if to_editor {
             return self.open_in_editor();
         }
+        if add_to_note {
+            self.ask_add_to_note(ui.ctx());
+        }
         match picked {
             Some(nudge_in) => self.save(nudge_in),
             None => Outcome::Open,
@@ -772,6 +775,45 @@ impl CapturePopup {
         if let Some(photo) = pasted.photo {
             capture_choices::hold_photo(&mut self.photos, &mut self.choices, photo);
         }
+    }
+
+    /// Opens Add to Note… as a page (#308), a running recording ended and
+    /// held with the rest first, so it goes with them.
+    fn ask_add_to_note(&mut self, ctx: &egui::Context) {
+        if let Some(recorder) = &mut self.recorder
+            && recorder.recording()
+            && let Some(bytes) = recorder.stop()
+        {
+            self.recorded.push(bytes);
+        }
+        match NotePicker::read(&self.store, &self.t, &[]) {
+            Ok(picker) => {
+                self.page = Some(Page::AddToNote(Box::new(picker)));
+                ctx.send_viewport_cmd(ViewportCommand::InnerSize(PAGE_SIZE.into()));
+            }
+            Err(e) => self.error = Some(Failure::of(&self.t, &e)),
+        }
+    }
+
+    /// Adds what is typed and held to the Note `into` as a Section at once
+    /// (#308) and empties the popup, which is then done with; a failure is
+    /// said at the top and keeps all of it.
+    fn add_to(&mut self, into: &str) -> oldbrainfix_core::Result<()> {
+        let held = (&self.photos[..], &self.recorded[..], &[][..]);
+        let added = capture_choices::add_to_note(&self.store, &self.text, into, held)?;
+        self.text.clear();
+        self.recorded.clear();
+        self.photos.clear();
+        self.paste_empty = false;
+        self.error = None;
+        self.choices = CaptureChoices::default();
+        self.added = true;
+        if added.is_some()
+            && let Some(saved) = &self.saved
+        {
+            saved();
+        }
+        Ok(())
     }
 
     /// Takes what was asked of the buttons or the choices; a page it
@@ -882,6 +924,7 @@ impl CapturePopup {
         let shown_now = (self.wall)(self.store.now());
         let now = crate::routine_editor::sentence_now(&self.store, &*self.wall);
         let mut asked = None;
+        let mut failed = None;
         Frame::NONE
             .fill(tones.background)
             .inner_margin(Margin::same(16))
@@ -898,9 +941,30 @@ impl CapturePopup {
                         ui.label(RichText::new(t.file_into()).size(18.0).strong().color(text));
                         picker.show(ui, &t).map(PageAsk::FileInto)
                     }
+                    Some(Page::AddToNote(picker)) => {
+                        let text = ui.visuals().text_color();
+                        ui.label(
+                            RichText::new(t.add_to_note())
+                                .size(18.0)
+                                .strong()
+                                .color(text),
+                        );
+                        match picker.show(ui, (&t, tones)) {
+                            Some(NoteAsk::Find) => {
+                                if let Err(e) = picker.find(&self.store, &t) {
+                                    failed = Some(e);
+                                }
+                                None
+                            }
+                            asked => asked.map(PageAsk::AddToNote),
+                        }
+                    }
                     None => None,
                 };
             });
+        if let Some(e) = failed {
+            self.error = Some(Failure::of(&self.t, &e));
+        }
         let Some(asked) = asked else {
             return;
         };
@@ -951,7 +1015,17 @@ impl CapturePopup {
                 self.read_spawns();
                 Ok(true)
             }
-            (PageAsk::Schedule(Intent::Close) | PageAsk::Tally(FormIntent::Close), _) => Ok(true),
+            (PageAsk::AddToNote(NoteAsk::Note(into)), _) => {
+                add_to_note::picked(&self.store, &into)?;
+                self.add_to(&into)?;
+                Ok(true)
+            }
+            (
+                PageAsk::Schedule(Intent::Close)
+                | PageAsk::Tally(FormIntent::Close)
+                | PageAsk::AddToNote(NoteAsk::Close | NoteAsk::Find),
+                _,
+            ) => Ok(true),
             // A page of a Note not written yet deletes, hides and links
             // to nothing.
             _ => Ok(false),

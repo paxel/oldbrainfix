@@ -7,9 +7,10 @@
 //! recording or photo itself is always kept. Asked to, one reads a
 //! recording or photo again, ahead of the others and whether or not it
 //! has a text, as "Transcribe again" and "Read the text again" do
-//! (ADR 0025). What waits for the recordings of a Note, as a voice
-//! capture going into a Shopping List does (#124), is told once each has
-//! a Transcript or one could not be read.
+//! (ADR 0025). What waits for the recordings of a Note is told once each
+//! has a Transcript or one could not be read. A voice capture said into a
+//! Shopping List gets the items said as Lines with its last Transcript
+//! (#311).
 //!
 //! The engines sit behind a trait: Whisper and RustO in the app, fakes in
 //! the tests. Whisper is led in with the Area and Topic names as the user
@@ -24,12 +25,13 @@ use std::sync::mpsc::{Receiver, Sender};
 
 use ndarray::ArrayD;
 use oldbrainfix_core::file_text::{self, FileKind, FileReading};
-use oldbrainfix_core::{Blob, Notes, Places, Store, TranscriptPrompts, pdf};
+use oldbrainfix_core::{Blob, Notes, Places, ShoppingLists, Store, TranscriptPrompts, pdf};
 use oldbrainfix_whisper::Prompts;
 use parking_lot::Mutex;
 use rten_tensor::prelude::*;
 use rusto::engine::{EngineError, InferenceSession};
 
+use crate::app::local_wall;
 use crate::l10n::L10n;
 use crate::names;
 
@@ -95,14 +97,20 @@ impl Kind {
     }
 
     /// Keeps `text` for `blob`, unless its Note let go of it meanwhile;
-    /// whether it did.
-    fn keep(self, notes: &Notes, blob: &Blob, text: &str) -> oldbrainfix_core::Result<bool> {
+    /// whether it did. A voice capture said into a Shopping List gets the
+    /// items said as Lines with its last Transcript, once (#311), the days
+    /// on this computer's clock.
+    fn keep(self, store: &Store, blob: &Blob, text: &str) -> oldbrainfix_core::Result<bool> {
+        let notes = Notes::new(store);
         let Some(note) = notes.by_id(&blob.note_id)? else {
             return Ok(false);
         };
         match self {
             Kind::Transcripts if note.recordings.contains(&blob.hash) => {
-                notes.set_transcript(&blob.note_id, &blob.hash, text)?;
+                store.batch(|| {
+                    notes.set_transcript(&blob.note_id, &blob.hash, text)?;
+                    ShoppingLists::new(store).add_owed_lines(&blob.note_id, &local_wall)
+                })?;
             }
             Kind::PhotoTexts if note.photos.contains(&blob.hash) => {
                 notes.set_photo_text(&blob.note_id, &blob.hash, text)?;
@@ -253,7 +261,7 @@ fn run(
             changed();
             let text = kind.read(&notes, &blob, bytes, &mut *engine);
             *current.lock() = None;
-            let kept = text.is_some_and(|text| kind.keep(&notes, &blob, &text).unwrap_or(false));
+            let kept = text.is_some_and(|text| kind.keep(store, &blob, &text).unwrap_or(false));
             if kept {
                 skipped.remove(&blob.hash);
             } else {

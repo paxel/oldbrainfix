@@ -740,6 +740,24 @@ abstract class AppLocalizations {
   /// **'There is no other Note to merge into.'**
   String get noOtherNotes;
 
+  /// Picks another Note and adds the capture to it as a Section; on an Unsorted Note's card, Merge into… under this name (#308)
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Note…'**
+  String get addToNote;
+
+  /// Heading over the last three Notes this Device added to, at the top of Add to Note…
+  ///
+  /// In en, this message translates to:
+  /// **'Added to recently'**
+  String get addToNoteRecent;
+
+  /// No description provided for @noNoteToAddTo.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no Note to add to.'**
+  String get noNoteToAddTo;
+
   /// No description provided for @locationExplainTitle.
   ///
   /// In en, this message translates to:
@@ -1856,7 +1874,7 @@ abstract class AppLocalizations {
   /// **'Connected: {devices}'**
   String contextBluetooth(String devices);
 
-  /// In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard.
+  /// In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard, a Checklist's or Shopping List's Lines as a Markdown task list (#323).
   ///
   /// In en, this message translates to:
   /// **'Copy text'**
@@ -2593,6 +2611,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.'**
   String get fatFingersDetail;
+
+  /// The choice in Settings > Look, on the desktop in Settings > This computer and View > Text size, of how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows on this Device, apart from Fat fingers (#326, obf-1019).
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get textSize;
+
+  /// Under the choice textSize on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'How large the text of Notes, Lines, the Agenda and Ask\'s answers shows, on top of the system\'s font size and “Fat fingers”.'**
+  String get textSizeDetail;
+
+  /// The text size of textSize as it was before, 1 times.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get textSizeNormal;
+
+  /// The text size of textSize at 1.15 times normal.
+  ///
+  /// In en, this message translates to:
+  /// **'Larger'**
+  String get textSizeLarger;
+
+  /// The text size of textSize at 1.3 times normal.
+  ///
+  /// In en, this message translates to:
+  /// **'Largest'**
+  String get textSizeLargest;
 
   /// No description provided for @settingsAlarms.
   ///
@@ -5378,6 +5426,42 @@ abstract class AppLocalizations {
   /// **'The Area could not be shared.'**
   String get shareAfarFailed;
 
+  /// Announced when a box or Line ticked at once could not be saved afterwards and shows as before again (#338); the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'A tick could not be saved.'**
+  String get tickFailed;
+
+  /// Title of the dialog opened from the tickFailed announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick not saved'**
+  String get tickFailedTitle;
+
+  /// Cause in the tickFailed dialog when the core refused the tick.
+  ///
+  /// In en, this message translates to:
+  /// **'A sync took the box away, or this Device\'s role in the Shared Area, while the tick waited.'**
+  String get tickRefusedCause;
+
+  /// Fix in the tickFailed dialog when the core refused the tick.
+  ///
+  /// In en, this message translates to:
+  /// **'Look at the Note again and tick once more, or ask a Manager of the Area for a role.'**
+  String get tickRefusedFix;
+
+  /// Cause in the tickFailed dialog when writing the tick failed.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device could not write to its storage.'**
+  String get tickStorageCause;
+
+  /// Fix in the tickFailed dialog when writing the tick failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Free some storage, then tick again.'**
+  String get tickStorageFix;
+
   /// The cause in the dialog behind 'areaOfferNotTaken' when a received Area file was sealed for other Devices.
   ///
   /// In en, this message translates to:
@@ -5654,7 +5738,7 @@ abstract class AppLocalizations {
   /// **'This Tally is no longer there.'**
   String get tallyShortcutGone;
 
-  /// Makes a Note a Checklist: its first line stays its text, every other line becomes a Line (CONTEXT.md: Checklist, Line).
+  /// Makes a Note a Checklist: every line becomes a Line, unless the first looks like a heading, which stays as its name (CONTEXT.md: Checklist, Line, Name).
   ///
   /// In en, this message translates to:
   /// **'Make it a Checklist'**
@@ -5792,7 +5876,7 @@ abstract class AppLocalizations {
   /// **'Delete this Line?'**
   String get checklistDeleteQuestion;
 
-  /// Makes a Note a Shopping List: its first line stays its text, every other line becomes a Line that comes back a while after it is checked (CONTEXT.md: Shopping List, Line).
+  /// Makes a Note a Shopping List: every line becomes a Line that comes back a while after it is checked, unless the first looks like a heading, which stays as its name (CONTEXT.md: Shopping List, Line, Name).
   ///
   /// In en, this message translates to:
   /// **'Make it a Shopping List'**
@@ -5810,11 +5894,29 @@ abstract class AppLocalizations {
   /// **'{count} open'**
   String shoppingOpenCount(int count);
 
-  /// Under a struck Line of a Shopping List: the day it is open again, as a short weekday and date such as 'Tue, Nov 12'.
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again this many days from today, 1 to 13; the struck Lines show the soonest back first.
   ///
   /// In en, this message translates to:
-  /// **'back {day}'**
-  String shoppingBack(String day);
+  /// **'{count, plural, =1{tomorrow} other{in {count} days}}'**
+  String shoppingBackDays(int count);
+
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again in about this many weeks, from 14 to 59 days from today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{in 1 week} other{in {count} weeks}}'**
+  String shoppingBackWeeks(int count);
+
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again in about this many months, from 60 days to under a year from today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{in 1 month} other{in {count} months}}'**
+  String shoppingBackMonths(int count);
+
+  /// Faint beside a struck Line of a Shopping List (#328): it is open again in about this many years, a year or more from today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{in 1 year} other{in {count} years}}'**
+  String shoppingBackYears(int count);
 
   /// The setting a Shopping List Line's badge shows and the title of its dialog (#195): how long the Line stays struck once checked (CONTEXT.md: Shopping List).
   ///
@@ -6662,29 +6764,17 @@ abstract class AppLocalizations {
   /// **'Shopping List: {list}'**
   String captureChoiceShopping(String list);
 
-  /// Announcement after a voice capture sorted into a Shopping List whose recording got no Transcript: the Note stays (CONTEXT.md: Transcript).
-  ///
-  /// In en, this message translates to:
-  /// **'Kept as a Note: its recording could not be transcribed for the Shopping List.'**
-  String get captureShoppingUntranscribed;
-
   /// Announcement after a capture sorted into a Shopping List that was deleted or changed meanwhile: the Note stays.
   ///
   /// In en, this message translates to:
   /// **'Kept as a Note: that Shopping List can no longer be added to.'**
   String get captureShoppingGone;
 
-  /// Title of the dialog behind captureShoppingUntranscribed and captureShoppingGone.
+  /// Title of the dialog behind captureShoppingGone.
   ///
   /// In en, this message translates to:
   /// **'Not added to the Shopping List'**
   String get captureShoppingNotAddedTitle;
-
-  /// Cause in the dialog behind captureShoppingUntranscribed (CONTEXT.md: Transcript).
-  ///
-  /// In en, this message translates to:
-  /// **'Whisper could not write a Transcript of the recording.'**
-  String get captureShoppingUntranscribedCause;
 
   /// Cause in the dialog behind captureShoppingGone.
   ///
@@ -6692,7 +6782,7 @@ abstract class AppLocalizations {
   /// **'The Shopping List was deleted or made a plain Note meanwhile, here or on another Device.'**
   String get captureShoppingGoneCause;
 
-  /// Fix in the dialog behind captureShoppingUntranscribed and captureShoppingGone: nothing is lost.
+  /// Fix in the dialog behind captureShoppingGone: nothing is lost.
   ///
   /// In en, this message translates to:
   /// **'The Note keeps all of it: add its lines to a Shopping List by hand.'**
@@ -7904,6 +7994,12 @@ abstract class AppLocalizations {
   /// **'Table'**
   String get tableTitle;
 
+  /// Button in the bar of a table full screen: puts the table on the clipboard as an HTML table and, as plain text, as Markdown (#324).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get tableCopy;
+
   /// Screen reader hint of a table in a text: a tap opens it full screen.
   ///
   /// In en, this message translates to:
@@ -8123,7 +8219,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
+  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -10064,11 +10160,53 @@ abstract class AppLocalizations {
   /// **'Start over'**
   String get phoneAskStartOver;
 
-  /// Shown under the question while the computer asks its provider.
+  /// The status line under the question while the user's computer asks its provider (#317), before its model has read a Note.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for the answer from {provider}…'**
-  String phoneAskAsking(String provider);
+  /// **'Asking {computer}…'**
+  String phoneAskAsking(String computer);
+
+  /// The status line under the question while the user's computer asks its provider (#317): how many Notes its model has read in full so far.
+  ///
+  /// In en, this message translates to:
+  /// **'Asking {computer}… reading {count, plural, =1{1 Note} other{{count} Notes}}'**
+  String phoneAskAskingReading(String computer, int count);
+
+  /// Button in the status line under the question (#317): stops waiting for the answer and puts the question back into the field.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get phoneAskStop;
+
+  /// Button under a question not answered (#317): opens the cause, the fix and the full text, with Report.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get phoneAskFailureDetails;
+
+  /// Under the question field while the user's computer has its AI (experimental) switched off (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'The AI is switched off on {computer}.'**
+  String phoneAskUnreadyAiOffCause(String computer);
+
+  /// Under the question field while the user's computer names no model for its provider (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'No model is named on {computer}.'**
+  String phoneAskUnreadyModelCause(String computer);
+
+  /// Under the question field while the user's computer has no API key for its provider (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} has no API key on {computer}.'**
+  String phoneAskUnreadyKeyCause(String provider, String computer);
+
+  /// Under the question field while the provider's address on the user's computer is not https:// nor on the home network (#317).
+  ///
+  /// In en, this message translates to:
+  /// **'{computer} may not ask {provider} at its address.'**
+  String phoneAskUnreadyUrlCause(String provider, String computer);
 
   /// Line at the top of the Ask page naming the computer, its provider and model.
   ///
@@ -10088,6 +10226,12 @@ abstract class AppLocalizations {
   /// **'From these Notes'**
   String get phoneAskFromNotes;
 
+  /// Heading under the Notes an answer links, over the other Notes the model read in full for this question, each opening its Note (#314).
+  ///
+  /// In en, this message translates to:
+  /// **'Also read'**
+  String get phoneAskAlsoRead;
+
   /// Button that saves the question and its answer as a Note in Unsorted.
   ///
   /// In en, this message translates to:
@@ -10099,6 +10243,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Kept as a Note'**
   String get phoneAskKept;
+
+  /// Shown under an answer once Add to Note… added the question and answer to a Note (#316); a tap opens that Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to “{title}”'**
+  String phoneAskAddedTo(String title);
+
+  /// Announced when Share to an app under an answer could not hand it to another app (#316); the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer was not shared.'**
+  String get phoneAskNotShared;
+
+  /// Title of the dialog behind 'phoneAskNotShared'.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer not shared'**
+  String get phoneAskNotSharedTitle;
+
+  /// Why an answer was not shared: no app takes text (#316). Its fix is 'shareNoAppFix'.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the answer.'**
+  String get phoneAskShareNoApp;
 
   /// Line under an answer the provider cut off.
   ///
@@ -10121,26 +10289,44 @@ abstract class AppLocalizations {
   /// Fix when the computer's provider is not set up, for a reason this version does not know.
   ///
   /// In en, this message translates to:
-  /// **'Set up the provider under Ask panel in the computer\'s Settings.'**
+  /// **'Set up the provider under Ask panel in the computer\'s AI settings.'**
   String get phoneAskUnreadyFix;
 
   /// Fix: the computer's provider has no model.
   ///
   /// In en, this message translates to:
-  /// **'Name a model under Ask panel in the computer\'s Settings.'**
+  /// **'Name a model under Ask panel in the computer\'s AI settings.'**
   String get phoneAskUnreadyModel;
 
   /// Fix: the computer's Anthropic provider has no key.
   ///
   /// In en, this message translates to:
-  /// **'Enter the API key under Ask panel in the computer\'s Settings.'**
+  /// **'Enter the API key under Ask panel in the computer\'s AI settings.'**
   String get phoneAskUnreadyKey;
 
   /// Fix: the computer's provider address may not be asked.
   ///
   /// In en, this message translates to:
-  /// **'Give the provider an https:// address under Ask panel in the computer\'s Settings; http:// only on the computer or the home network.'**
+  /// **'Give the provider an https:// address under Ask panel in the computer\'s AI settings; http:// only on the computer or the home network.'**
   String get phoneAskUnreadyUrl;
+
+  /// Fix: the computer's main switch 'AI (experimental)' is off (#334).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch on AI (experimental) in the computer\'s AI menu.'**
+  String get phoneAskUnreadyAiOff;
+
+  /// The phone's switch for Ask in Settings, Advanced only (#333); off by default. Ask is the phone's Ask page (phoneAskTitle).
+  ///
+  /// In en, this message translates to:
+  /// **'Ask (experimental)'**
+  String get phoneAskSwitch;
+
+  /// Under the switch phoneAskSwitch in the phone's Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask in the Agenda\'s bar, which asks your computer about your Notes, and Address by hand on the Sync page. An address typed before stays, and sync still tries it.'**
+  String get phoneAskSwitchDetail;
 
   /// Heading of the permission asked on the Ask page before the first question to a provider (App Store guideline 5.1.2(i)).
   ///
@@ -10213,12 +10399,6 @@ abstract class AppLocalizations {
   /// **'Allow'**
   String get phoneAskAllow;
 
-  /// Announcement at the top when a question got no answer; its tap gives cause and fix.
-  ///
-  /// In en, this message translates to:
-  /// **'The question was not answered.'**
-  String get phoneAskFailed;
-
   /// Title of its details.
   ///
   /// In en, this message translates to:
@@ -10234,7 +10414,7 @@ abstract class AppLocalizations {
   /// Fix for a refused key.
   ///
   /// In en, this message translates to:
-  /// **'Check the API key under Ask panel in the computer\'s Settings.'**
+  /// **'Check the API key under Ask panel in the computer\'s AI settings.'**
   String get phoneAskKeyFix;
 
   /// Why a question was not answered.
@@ -10246,7 +10426,7 @@ abstract class AppLocalizations {
   /// Fix for an error of the provider.
   ///
   /// In en, this message translates to:
-  /// **'Check the model\'s name in the computer\'s Settings, or ask again later.'**
+  /// **'Check the model\'s name in the computer\'s AI settings, or ask again later.'**
   String get phoneAskProviderFix;
 
   /// Why a question was not answered.
@@ -10258,7 +10438,7 @@ abstract class AppLocalizations {
   /// Fix for no reply from the provider.
   ///
   /// In en, this message translates to:
-  /// **'Check the computer\'s network and the provider\'s address in its Settings, then ask again.'**
+  /// **'Check the computer\'s network and the provider\'s address in its AI settings, then ask again.'**
   String get phoneAskNoReplyFix;
 
   /// Why a question was not answered.
@@ -10270,7 +10450,7 @@ abstract class AppLocalizations {
   /// Fix for an unreadable reply.
   ///
   /// In en, this message translates to:
-  /// **'Check that the base URL in the computer\'s Settings leads to an OpenAI-compatible API.'**
+  /// **'Check that the base URL in the computer\'s AI settings leads to an OpenAI-compatible API.'**
   String get phoneAskUnreadableFix;
 
   /// Why a question was not answered.

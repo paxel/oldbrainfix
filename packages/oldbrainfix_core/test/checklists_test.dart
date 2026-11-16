@@ -105,6 +105,80 @@ void main() {
       expect(shown(ann, plain), ['- Socks', '> Torch']);
     });
 
+    group('from typed text (#309)', () {
+      String typed(String text, {String format = TextFormats.plain}) {
+        final id = Notes(ann).capture(text, format: format).id;
+        Checklists(ann).makeFromText(id);
+        return id;
+      }
+
+      String name(String note) => Notes(ann).byId(note)!.text;
+
+      test('every line becomes a Line, and the list has no Name', () {
+        final note = typed('Socks\nTent\n\nTorch');
+        expect(shown(ann, note), ['Socks', 'Tent', 'Torch']);
+        expect(name(note), '');
+        expect(Notes(ann).byId(note)!.isUnsorted, isFalse);
+        expect(NoteKinds(ann).of(note), NoteKind.checklist);
+      });
+
+      test('a Markdown heading of any level is the Name, without its '
+          'marks', () {
+        final note = typed('# Weekly\nSocks\nTent');
+        expect(name(note), 'Weekly');
+        expect(shown(ann, note), ['Socks', 'Tent']);
+        final deep = typed(
+          '  ###### Trip  \nMap',
+          format: TextFormats.markdown,
+        );
+        expect(name(deep), 'Trip');
+        expect(shown(ann, deep), ['Map']);
+        // Seven marks, no space after them or a tag: no heading.
+        final tag = typed('#packing\n####### Seven\nMap');
+        expect(name(tag), '');
+        expect(shown(ann, tag), ['#packing', '####### Seven', 'Map']);
+      });
+
+      test('a line ending in ":" is the Name, as it is', () {
+        final note = typed('Packing:\nSocks');
+        expect(name(note), 'Packing:');
+        expect(shown(ann, note), ['Socks']);
+      });
+
+      test('indented lines go under the line above and "✓ " checks, the '
+          'first line among them', () {
+        final note = typed('✓ Socks\nTent\n  Blue\n\tRed\n  ✓ Pegs');
+        expect(name(note), '');
+        expect(shown(ann, note), [
+          '[x] Socks',
+          'Tent',
+          '  Blue',
+          '  Red',
+          '  [x] Pegs',
+        ]);
+        // A first Line indented stays at the top.
+        expect(shown(ann, typed('  Socks\n  Blue')), ['Socks', '  Blue']);
+      });
+
+      test('a blank first line leaves the Name empty, a heading after it '
+          'a Line', () {
+        final note = typed('\n# Weekly\nSocks');
+        expect(name(note), '');
+        expect(shown(ann, note), ['# Weekly', 'Socks']);
+      });
+
+      test('the name typed for a new list stays its Name', () {
+        final note = checklist(ann, 'Packing');
+        expect(name(note), 'Packing');
+        expect(shown(ann, note), isEmpty);
+      });
+
+      test('a Note it may not make one throws', () {
+        final note = typed('Socks');
+        expect(() => Checklists(ann).makeFromText(note), throwsStateError);
+      });
+    });
+
     test('a Note is at most one of a Tally and a Checklist', () {
       final gym = Notes(ann).capture('Gym\nPush-ups').id;
       Tallies(ann).addField(gym, name: 'Push-ups');

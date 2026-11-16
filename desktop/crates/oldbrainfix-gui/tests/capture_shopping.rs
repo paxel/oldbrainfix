@@ -5,12 +5,12 @@
 //! and picks it at once (#276); the one picked shows at
 //! the top alone and the other choices come back when it is dropped;
 //! saving makes each line a Line, a name the list has bringing its Line
-//! back, and keeps no Note; a recording's Transcript gives its lines once
-//! it is there, and without one the Note stays, announced at the top as
-//! a job done, not a failure; a photo keeps it a Note, a photo pasted in
-//! the popup as in the window dropping the list picked; and it is not
-//! offered without a list, while a photo is held, nor with a recording
-//! that gets no Transcript here.
+//! back, and keeps no Note; a voice capture stays on the list as a
+//! Section with its recording, and the items said in its Transcript become
+//! Lines once it is transcribed, with a speech model or without one yet,
+//! once (#311); a photo keeps it a Note, a photo pasted in the popup as in
+//! the window dropping the list picked; and it is not offered without a
+//! list, nor while a photo is held.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -22,8 +22,8 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
-    DeviceSettings, Note, Notes, OwnProfile, Places, QuickNoteControl, ShoppingLists, SigningKey,
-    Store,
+    Blob, DeviceSettings, Note, Notes, OwnProfile, Places, QuickNoteControl, ShoppingLists,
+    SigningKey, Store,
 };
 use oldbrainfix_gui::App;
 use oldbrainfix_gui::enrich::{Engine, Enricher, Kind};
@@ -330,77 +330,119 @@ impl Engine for Hears {
     }
 }
 
-/// The window with the microphone and a transcriber hearing `heard`,
-/// with a recording stopped and the list "Groceries" picked.
-fn voice(
-    store: &Arc<Store>,
-    heard: Option<&'static str>,
-) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
-    let mut app = App::new(store.clone(), "en");
-    app.set_recorder(Box::new(Mic::default()));
-    let transcriber = Enricher::spawn(
+/// The thread making Transcripts of `store`, hearing `heard`.
+fn transcriber(store: &Arc<Store>, heard: Option<&'static str>) -> Enricher {
+    Enricher::spawn(
         store.clone(),
         Kind::Transcripts,
         Box::new(Hears(heard)),
         Box::new(|| {}),
+    )
+}
+
+/// The voice capture's Note, merged into a list or not.
+fn voice_note(store: &Store) -> Result<Note, Box<dyn std::error::Error>> {
+    let notes = Notes::new(store);
+    for id in store.entities_of_type("note")? {
+        if let Some(note) = notes.by_id(&id)?
+            && !note.recordings.is_empty()
+        {
+            return Ok(note);
+        }
+    }
+    Err("no voice capture".into())
+}
+
+/// The struck Lines of the list `list`.
+fn struck(store: &Store, list: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    Ok(ShoppingLists::new(store)
+        .by_note(list, &utc)?
+        .ok_or("a Shopping List")?
+        .struck()
+        .iter()
+        .map(|l| l.text.clone())
+        .collect())
+}
+
+#[test]
+fn a_voice_capture_stays_on_the_list_and_the_items_said_become_lines() -> TestResult {
+    let (store, _, list) = store()?;
+    let mut app = App::new(store.clone(), "en");
+    app.set_recorder(Box::new(Mic::default()));
+    app.set_enrichers(
+        Some(transcriber(&store, Some("Eggs, milk und Butter."))),
+        None,
+        None,
     );
-    app.set_enrichers(Some(transcriber), None, None);
     let mut harness = window(app);
+    type_rows(&mut harness, &["Bread"]);
     click(&mut harness, t().record_voice());
     click(&mut harness, t().stop_recording());
     pick(&mut harness, "Groceries");
-    Ok(harness)
-}
-
-#[test]
-fn a_recordings_transcript_goes_into_the_list_once_it_is_there() -> TestResult {
-    let (store, _, list) = store()?;
-    let mut harness = voice(&store, Some("Eggs\nmilk"))?;
     click(&mut harness, "Save");
-    let poured = eventually(|| others(&store, &list).is_ok_and(|n| n.is_empty()));
-    assert!(poured, "{:?}", others(&store, &list)?);
-    assert_eq!(lines(&store, &list)?, ["Eggs", "Milk"]);
-    harness.run();
-    assert!(!shows(&harness, t().capture_shopping_untranscribed()));
+    // The typed line at once, the items said once transcribed; Milk once.
+    let added = eventually(|| lines(&store, &list).is_ok_and(|l| l.len() == 4));
+    assert!(added, "{:?}", lines(&store, &list)?);
+    assert_eq!(lines(&store, &list)?, ["Bread", "Butter", "Eggs", "Milk"]);
+    let voice = voice_note(&store)?;
+    assert_eq!(voice.merged_into.as_deref(), Some(list.as_str()));
+    let sections = Notes::new(&store).sections(&list)?;
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].recordings, voice.recordings);
+    assert_eq!(ShoppingLists::new(&store).owed_to(&voice.id)?, None);
+    assert_eq!(others(&store, &list)?, Vec::<Note>::new());
     Ok(())
 }
 
 #[test]
-fn without_a_transcript_the_recording_stays_a_note_announced_at_the_top() -> TestResult {
+fn without_a_speech_model_the_recording_goes_on_the_list_and_the_lines_follow_once() -> TestResult {
     let (store, _, list) = store()?;
-    let mut harness = voice(&store, None)?;
-    click(&mut harness, "Save");
-    // It waits Unsorted, holding the recording.
-    let kept = others(&store, &list)?;
-    assert_eq!(kept.len(), 1);
-    assert_eq!(kept[0].recordings.len(), 1);
-    assert_eq!(kept[0].place, None);
-    let said = eventually(|| {
-        harness.run();
-        shows(&harness, t().capture_shopping_untranscribed())
-    });
-    assert!(said);
-    assert_eq!(others(&store, &list)?.len(), 1);
-    assert_eq!(lines(&store, &list)?, ["Milk"]);
-    Ok(())
-}
-
-#[test]
-fn a_recording_without_a_transcriber_is_not_offered() -> TestResult {
-    let (store, _, _) = store()?;
     let mut app = App::new(store.clone(), "en");
     app.set_recorder(Box::new(Mic::default()));
     let mut harness = window(app);
     click(&mut harness, t().record_voice());
     click(&mut harness, t().stop_recording());
-    click(&mut harness, "More");
-    assert!(shows(&harness, "Important"));
-    assert!(!shows(&harness, t().add_to_shopping_list()));
+    // Offered without anything to transcribe with.
+    pick(&mut harness, "Groceries");
+    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
+    click(&mut harness, "Save");
+    assert_eq!(lines(&store, &list)?, ["Milk"]);
+    let voice = voice_note(&store)?;
+    assert_eq!(voice.merged_into.as_deref(), Some(list.as_str()));
+    let lists = ShoppingLists::new(&store);
+    assert_eq!(lists.owed_to(&voice.id)?, Some(list.clone()));
+    harness.run();
+    assert!(!shows(&harness, t().capture_shopping_gone()));
+
+    // The model comes later, and Whisper transcribes the recording.
+    let later = transcriber(&store, Some("Eggs und Tee"));
+    later.kick();
+    let added = eventually(|| lists.owed_to(&voice.id).is_ok_and(|o| o.is_none()));
+    assert!(added);
+    assert_eq!(lines(&store, &list)?, ["Eggs", "Milk", "Tee"]);
+
+    // Eggs struck, and transcribed again: nothing comes back.
+    let eggs = lists
+        .by_note(&list, &utc)?
+        .ok_or("a Shopping List")?
+        .lines
+        .into_iter()
+        .find(|l| l.text == "Eggs")
+        .ok_or("Eggs")?;
+    lists.check(&eggs.id, &utc)?;
+    let hash = voice.recordings[0].clone();
+    later.again(Blob {
+        note_id: voice.id.clone(),
+        hash: hash.clone(),
+    });
+    assert!(eventually(|| !later.busy_with(&hash)));
+    assert_eq!(lines(&store, &list)?, ["Eggs", "Milk", "Tee"]);
+    assert_eq!(struck(&store, &list)?, ["Eggs"]);
     Ok(())
 }
 
 #[test]
-fn a_recording_without_a_transcriber_keeps_the_popups_capture_a_note_as_said() -> TestResult {
+fn the_popups_voice_capture_goes_on_the_list_without_a_speech_model() -> TestResult {
     let (store, _, list) = store()?;
     let mut harness = popup(&store);
     harness
@@ -414,27 +456,16 @@ fn a_recording_without_a_transcriber_keeps_the_popups_capture_a_note_as_said() -
     click(&mut harness, t().record_voice());
     click(&mut harness, t().stop_recording());
     click(&mut harness, "Save");
-    // Kept with its recording and said at the top, the popup still open.
-    assert!(!harness.state().closed);
-    assert!(shows(&harness, t().capture_shopping_untranscribed()));
-    // As the window says it: what happened, the full text and Close, no
-    // failure's Report.
-    harness
-        .get_by_label(t().capture_shopping_untranscribed())
-        .click();
-    harness.run();
-    assert!(shows(
-        &harness,
-        &format!("shopping list {list}: no speech model to transcribe with")
-    ));
-    assert!(!shows(&harness, t().report()));
-    click(&mut harness, t().close());
-    assert!(!shows(&harness, t().capture_shopping_untranscribed()));
-    let kept = others(&store, &list)?;
-    assert_eq!(kept.len(), 1);
-    assert_eq!(kept[0].text, "Bread");
-    assert_eq!(kept[0].recordings.len(), 1);
-    assert_eq!(lines(&store, &list)?, ["Milk"]);
+    assert!(harness.state().closed);
+    assert_eq!(lines(&store, &list)?, ["Bread", "Milk"]);
+    let voice = voice_note(&store)?;
+    assert_eq!(voice.merged_into.as_deref(), Some(list.as_str()));
+    assert_eq!(voice.text, "Bread");
+    assert_eq!(
+        ShoppingLists::new(&store).owed_to(&voice.id)?,
+        Some(list.clone())
+    );
+    assert_eq!(others(&store, &list)?, Vec::<Note>::new());
     Ok(())
 }
 

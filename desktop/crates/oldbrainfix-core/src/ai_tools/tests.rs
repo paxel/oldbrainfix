@@ -361,6 +361,7 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
     DeviceSettings::new(&store).set_agenda_hides_checked(true)?;
     DeviceSettings::new(&store).set_fat_fingers(true)?;
+    DeviceSettings::new(&store).set_text_size(crate::settings::TextSize::Larger)?;
     PersonSettings::new(&store).set_trashes_done_reminder(true)?;
     let settings = call(&store, &task, "read_settings", &json!({}))?;
     assert!(!settings.is_error);
@@ -373,16 +374,27 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     assert_eq!(read.pointer("/quickNote/nudgeButtons"), Some(&json!(true)));
     assert_eq!(read.pointer("/theme"), Some(&json!("system")));
     assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
+    assert_eq!(read.pointer("/aiOn"), Some(&json!(false)));
+    assert_eq!(read.pointer("/askThinks"), Some(&json!(false)));
     assert_eq!(read.pointer("/allDayFrom"), Some(&json!("15:00")));
     assert_eq!(read.pointer("/agendaHidesChecked"), Some(&json!(true)));
     assert_eq!(read.pointer("/fatFingers"), Some(&json!(true)));
+    // The text's own step (#326, obf-1019), read only as every setting.
+    assert_eq!(read.pointer("/textSize"), Some(&json!("larger")));
     assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
     assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
     PersonSettings::new(&store).set_advanced(false)?;
+    store.set_ai_on(true)?;
+    store.set_ask_thinks(true)?;
     let settings = call(&store, &task, "read_settings", &json!({}))?;
     assert_eq!(
         json_of(&settings)?.pointer("/features"),
         Some(&json!("simple"))
+    );
+    assert_eq!(json_of(&settings)?.pointer("/aiOn"), Some(&json!(true)));
+    assert_eq!(
+        json_of(&settings)?.pointer("/askThinks"),
+        Some(&json!(true))
     );
     Ok(())
 }
@@ -684,9 +696,12 @@ fn every_list_set_up_waits_for_the_review() -> TestResult {
             },
             |s, a| {
                 let id = arg(a, "id")?;
+                // Every line a Line, the first one too (#309).
                 Ok(match is {
-                    true => Checklists::new(s).is_checklist(&id)?,
-                    false => ShoppingLists::new(s).is_shopping_list(&id)?,
+                    true => Checklists::new(s).is_checklist(&id)? && lines(s, &id)?.len() == 3,
+                    false => ShoppingLists::new(s)
+                        .by_note(&id, &utc)?
+                        .is_some_and(|l| l.count() == 3),
                 })
             },
         )?;
@@ -990,6 +1005,16 @@ fn a_list_with_checked_lines_or_a_checked_name_is_refused_with_words() -> TestRe
     )?;
     assert!(made.is_error);
     assert!(format!("{made:?}").contains("✓"), "{made:?}");
+    // A marked first line becomes a checked Line too (#309).
+    let first = Notes::new(&store).capture("✓ Socks\nShirt", None, None)?;
+    let made = call(
+        &store,
+        &task,
+        "make_list",
+        &json!({"id": first.id, "list": "shoppingList"}),
+    )?;
+    assert!(made.is_error, "{made:?}");
+    assert!(format!("{made:?}").contains("edit_note"), "{made:?}");
     let added = call(
         &store,
         &task,

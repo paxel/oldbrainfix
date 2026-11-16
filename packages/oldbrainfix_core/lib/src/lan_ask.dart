@@ -13,17 +13,21 @@ import 'store.dart';
 /// the phone runs no model and talks to no provider, so it asks the
 /// user's own desktop over the paired LAN connection, and the desktop
 /// runs the question as its Ask panel does, with its own provider and
-/// key, and sends back the answer with the Notes it links, or why there
-/// is none. Any change the model makes waits as an AI Task for the review
+/// key, and sends back the answer with the Notes it links and those its
+/// model read (#314), or why there is none. Any change the model makes waits as an AI Task for the review
 /// on the desktop; the answer says when one does.
 ///
-/// Two requests on the desktop's paired host, each with this Device's
+/// Requests on the desktop's paired host, each with this Device's
 /// proof over a fresh nonce, as automatic sync makes them, and only once
 /// the host's certificate is the one pinned for it: `GET /ask/provider`
 /// names the provider the desktop uses, never its key, which the phone
 /// shows before its first question (App Store guideline 5.1.2(i)), and
 /// `POST /ask` carries the question and the earlier exchanges of the same
-/// conversation as text. Only the user's own Devices ask; a Device of
+/// conversation as text, with an id the phone gives it. While it runs,
+/// `POST /ask/status` with that id says how many Notes the model has read
+/// so far, and `POST /ask/stop` stops it at its next round (#317); a
+/// desktop older than these answers 404 to both, and the phone then shows
+/// only that it asks. Only the user's own Devices ask; a Device of
 /// another person is never asked, as the question would go to their
 /// provider. The desktop core's `lan_ask.rs` writes and reads the same
 /// bodies.
@@ -34,13 +38,21 @@ const askPath = '/ask';
 /// Where the phone learns which provider the desktop asks.
 const providerPath = '/ask/provider';
 
+/// Where the phone learns how far the desktop is with its question
+/// (#317).
+const askStatusPath = '/ask/status';
+
+/// Where the phone stops its question on the desktop (#317).
+const askStopPath = '/ask/stop';
+
 /// How the desktop talks to its provider: Anthropic's Messages API, or
 /// the OpenAI-compatible Chat Completions API at an address.
 enum AskProtocol { anthropic, openai }
 
 /// Why the desktop's provider cannot be asked yet: no model is named,
-/// Anthropic has no key, or the address is not one it may ask.
-enum AskUnready { noModel, noKey, badUrl }
+/// Anthropic has no key, the address is not one it may ask, or the user
+/// switched off "AI (experimental)" on the desktop (#334).
+enum AskUnready { noModel, noKey, badUrl, aiOff }
 
 /// The provider the desktop asks, as the phone may learn it: the
 /// protocol, the model, and the host of its address with its port; never
@@ -116,36 +128,102 @@ class AskExchange {
 }
 
 /// The body of `POST /ask`: [question] after the [earlier] exchanges of
-/// the same conversation, keys in order as the desktop core writes them.
-Map<String, Object?> askBody(String question, List<AskExchange> earlier) => {
+/// the same conversation, with the [id] its status and stop name (#317),
+/// keys in order as the desktop core writes them.
+Map<String, Object?> askBody(
+  String question,
+  List<AskExchange> earlier, {
+  String? id,
+}) => {
   'earlier': [
     for (final e in earlier) {'answer': e.answer, 'question': e.question},
   ],
+  'id': ?id,
   'question': question,
 };
 
+/// The body of `POST /ask/status` and `POST /ask/stop`: the id of the
+/// question they are about.
+Map<String, Object?> askIdBody(String id) => {'id': id};
+
+/// A new id for a question, which its status and stop name.
+String newAskId() => Store.newId();
+
+/// How far the desktop is with a question (#317): whether it still asks
+/// its provider about it, and how many Notes the model read in full so
+/// far, as `read_note` and `read_attachment_text` handed them out.
+class AskProgress {
+  final bool asking;
+  final int read;
+
+  const AskProgress({required this.asking, this.read = 0});
+
+  /// The body of the answer to `POST /ask/status`, keys in order as the
+  /// desktop core writes them.
+  Map<String, Object?> toJson() => {'asking': asking, 'read': read};
+
+  /// The progress [json] holds; null when it is none. A count that is no
+  /// whole number of zero or more is 0.
+  static AskProgress? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final asking = json['asking'];
+    if (asking is! bool) return null;
+    final read = json['read'];
+    return AskProgress(
+      asking: asking,
+      read: read is int && read >= 0 ? read : 0,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is AskProgress && other.asking == asking && other.read == read;
+
+  @override
+  int get hashCode => Object.hash(asking, read);
+
+  @override
+  String toString() => 'AskProgress(${jsonEncode(toJson())})';
+}
+
 /// The answer as the phone gets it: its Markdown text, the ids of the
 /// Notes it links as app links in the order first linked (ADR 0046),
-/// which open on the phone, whether it was cut off at its length, and
-/// whether the desktop removed a link to a Note its model did not read in
-/// this question ([unchecked], #294); a reply without it removed none.
+/// which open on the phone, the ids of the Notes its model read in full
+/// in the order read ([read], #314; a reply of a desktop before it read
+/// none), whether it was cut off at its length, and whether the desktop
+/// removed a link to a Note its model did not read in this question
+/// ([unchecked], #294); a reply without it removed none.
 class DesktopAnswer {
   final String text;
   final List<String> notes;
+  final List<String> read;
   final bool cut;
   final bool unchecked;
 
   const DesktopAnswer({
     required this.text,
     required this.notes,
+    this.read = const [],
     this.cut = false,
     this.unchecked = false,
   });
+
+  /// The Notes shown under the answer as "Also read" (#314, Q719): those
+  /// read that it does not link, in the order read, each once; its links
+  /// come first, as [notes].
+  List<String> get alsoRead {
+    final out = <String>[];
+    for (final id in read) {
+      if (!notes.contains(id) && !out.contains(id)) out.add(id);
+    }
+    return out;
+  }
 }
 
 /// Why the desktop gave no answer to the question.
 enum AskFailure {
-  /// No provider is set up on the desktop yet ([AskReply.unready]).
+  /// No provider is set up on the desktop yet, or its AI is switched
+  /// off ([AskReply.unready]).
   unready,
 
   /// The provider refused the desktop's API key ([AskReply.message]).
@@ -219,6 +297,7 @@ class AskReply {
         'answer': {
           'cut': answer.cut,
           'notes': answer.notes,
+          'read': answer.read,
           'text': answer.text,
           'unchecked': answer.unchecked,
         },
@@ -254,15 +333,16 @@ class AskReply {
       if (answered is! Map) return null;
       final text = answered['text'];
       if (text is! String) return null;
-      final notes = answered['notes'];
+      List<String> ids(Object? list) => [
+        if (list is List)
+          for (final id in list)
+            if (id is String) id,
+      ];
       return AskReply.answered(
         DesktopAnswer(
           text: text,
-          notes: [
-            if (notes is List)
-              for (final id in notes)
-                if (id is String) id,
-          ],
+          notes: ids(answered['notes']),
+          read: ids(answered['read']),
           cut: answered['cut'] == true,
           unchecked: answered['unchecked'] == true,
         ),
@@ -362,6 +442,7 @@ Future<AskReply> askDesktop(
   required List<PairedAddress> at,
   required String question,
   List<AskExchange> earlier = const [],
+  String? id,
   Duration timeout = const Duration(seconds: 20),
   Duration wait = const Duration(minutes: 10),
 }) async {
@@ -371,12 +452,61 @@ Future<AskReply> askDesktop(
     at,
     'POST',
     askPath,
-    body: utf8.encode(jsonEncode(askBody(question, earlier))),
+    body: utf8.encode(jsonEncode(askBody(question, earlier, id: id))),
     timeout: timeout,
     wait: wait,
   );
   return AskReply.fromJson(_decode(data)) ??
       (throw const AskException(AskTrouble.failed));
+}
+
+/// How far the paired desktop [device] is with the question [id] (#317),
+/// from the first of [at] that answers; null when it does not tell, as a
+/// desktop older than this does. Throws an [AskException].
+Future<AskProgress?> askProgress(
+  Store store,
+  PairedDevice device, {
+  required List<PairedAddress> at,
+  required String id,
+  Duration timeout = const Duration(seconds: 20),
+}) => _progressCall(store, device, at, askStatusPath, id, timeout);
+
+/// Stops the question [id] on the paired desktop [device] at its next
+/// round (#317); how far it got, or null from a desktop that cannot stop
+/// it. Throws an [AskException].
+Future<AskProgress?> stopAsking(
+  Store store,
+  PairedDevice device, {
+  required List<PairedAddress> at,
+  required String id,
+  Duration timeout = const Duration(seconds: 20),
+}) => _progressCall(store, device, at, askStopPath, id, timeout);
+
+Future<AskProgress?> _progressCall(
+  Store store,
+  PairedDevice device,
+  List<PairedAddress> at,
+  String path,
+  String id,
+  Duration timeout,
+) async {
+  try {
+    final data = await _askCall(
+      store,
+      device,
+      at,
+      'POST',
+      path,
+      body: utf8.encode(jsonEncode(askIdBody(id))),
+      timeout: timeout,
+      wait: timeout,
+    );
+    return AskProgress.fromJson(_decode(data)) ??
+        (throw const AskException(AskTrouble.failed));
+  } on AskException catch (e) {
+    if (e.trouble == AskTrouble.notOffered) return null;
+    rethrow;
+  }
 }
 
 /// One request to [path] on the paired [device], at the first of [at]

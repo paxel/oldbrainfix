@@ -22,6 +22,10 @@ class MissedSummaryCard extends StatelessWidget {
 
   /// Checks off [occurrence] of [routine] as Done, late.
   final void Function(Routine routine, Occurrence occurrence) onCheck;
+
+  /// Whether [occurrence] of [routine] shows ticked, struck through, as
+  /// tapped while its save waits (#338); none does when not given.
+  final bool Function(Routine routine, Occurrence occurrence)? ticked;
   final VoidCallback onSeen;
 
   const MissedSummaryCard({
@@ -29,6 +33,7 @@ class MissedSummaryCard extends StatelessWidget {
     required this.summary,
     this.masks,
     required this.onCheck,
+    this.ticked,
     required this.onSeen,
   });
 
@@ -72,22 +77,31 @@ class MissedSummaryCard extends StatelessWidget {
                 for (final (:occurrence, missedAt: _) in missed.missed.take(
                   shown,
                 ))
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: false,
-                        semanticLabel: t.markDone,
-                        onChanged: (_) => onCheck(missed.routine, occurrence),
-                      ),
-                      // Wraps on a narrow phone rather than running off.
-                      Expanded(
-                        child: Text(
-                          '${dayText(locale, occurrence.day)}  '
-                          '${occurrenceTime(t, locale, occurrence)}',
+                  if (ticked?.call(missed.routine, occurrence) ?? false
+                      case final done)
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: done,
+                          semanticLabel: t.markDone,
+                          onChanged: done
+                              ? null
+                              : (_) => onCheck(missed.routine, occurrence),
                         ),
-                      ),
-                    ],
-                  ),
+                        // Wraps on a narrow phone rather than running off.
+                        Expanded(
+                          child: Text(
+                            '${dayText(locale, occurrence.day)}  '
+                            '${occurrenceTime(t, locale, occurrence)}',
+                            style: done
+                                ? const TextStyle(
+                                    decoration: TextDecoration.lineThrough,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
                 if (missed.count > shown)
                   Padding(
                     padding: const EdgeInsets.only(left: 12, bottom: 4),

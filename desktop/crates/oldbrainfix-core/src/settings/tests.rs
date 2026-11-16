@@ -135,6 +135,28 @@ fn settings_keep_what_they_are_set_to() -> Result<()> {
     assert!(!settings.fat_fingers()?);
     store.set_local_setting(FAT_FINGERS, "garbled")?;
     assert!(!settings.fat_fingers()?);
+    // The text's own step (#326, obf-1019), under the Dart core's key
+    // and names, apart from "Bigger text and icons".
+    assert_eq!(settings.text_size()?, TextSize::Normal);
+    for size in TextSize::ALL {
+        settings.set_text_size(size)?;
+        assert_eq!(settings.text_size()?, size);
+        assert_eq!(
+            store.local_setting(TEXT_SIZE)?.as_deref(),
+            Some(size.name())
+        );
+    }
+    assert!(!settings.fat_fingers()?);
+    store.set_local_setting(TEXT_SIZE, "garbled")?;
+    assert_eq!(settings.text_size()?, TextSize::Normal);
+    let factors: Vec<f32> = TextSize::ALL.iter().map(|s| s.factor()).collect();
+    assert_eq!(factors, [1.0, 1.15, 1.3]);
+    // One step at a time, kept at the ends.
+    assert_eq!(TextSize::Normal.step(true), Some(TextSize::Larger));
+    assert_eq!(TextSize::Larger.step(true), Some(TextSize::Largest));
+    assert_eq!(TextSize::Largest.step(true), None);
+    assert_eq!(TextSize::Largest.step(false), Some(TextSize::Larger));
+    assert_eq!(TextSize::Normal.step(false), None);
     for control in QuickNoteControl::ALL {
         settings.set_quick_note_shows(control, true)?;
         assert!(settings.quick_note_shows(control)?, "{control:?}");
@@ -288,6 +310,45 @@ fn file_into_keeps_the_last_three_places_filed_into_latest_first() -> Result<()>
     assert!(settings.recently_filed_into()?.is_empty());
     settings.filed_into("e")?;
     assert_eq!(settings.recently_filed_into()?, ["e"]);
+    assert!(store.all_entries()?.is_empty(), "settings are never logged");
+    Ok(())
+}
+
+#[test]
+fn add_to_note_keeps_the_last_three_notes_added_to_latest_first() -> Result<()> {
+    let store = crate::store::tests::store();
+    let settings = DeviceSettings::new(&store);
+    assert!(settings.recently_added_to()?.is_empty());
+    for id in ["a", "b", "c"] {
+        settings.added_to(id)?;
+    }
+    assert_eq!(settings.recently_added_to()?, ["c", "b", "a"]);
+    settings.added_to("a")?;
+    assert_eq!(
+        settings.recently_added_to()?,
+        ["a", "c", "b"],
+        "once, moved up"
+    );
+    settings.added_to("d")?;
+    assert_eq!(
+        settings.recently_added_to()?,
+        ["d", "a", "c"],
+        "b forgotten"
+    );
+    assert_eq!(
+        store.local_setting(RECENTLY_ADDED_TO)?.as_deref(),
+        Some(r#"["d","a","c"]"#)
+    );
+    assert!(
+        settings.recently_filed_into()?.is_empty(),
+        "a list of its own"
+    );
+    store.set_local_setting(RECENTLY_ADDED_TO, r#"["x",7,"x","y","z","w"]"#)?;
+    assert_eq!(settings.recently_added_to()?, ["x", "y", "z"]);
+    store.set_local_setting(RECENTLY_ADDED_TO, "not json")?;
+    assert!(settings.recently_added_to()?.is_empty());
+    settings.added_to("e")?;
+    assert_eq!(settings.recently_added_to()?, ["e"]);
     assert!(store.all_entries()?.is_empty(), "settings are never logged");
     Ok(())
 }

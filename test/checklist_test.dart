@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'held_ticks.dart';
 import 'reveal.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -161,15 +162,20 @@ void main() {
   group('on the card', () {
     testWidgets('"Make it a Checklist" in the ⋮ makes its lines Lines, an '
         'indented one under the line above, the group in a frame with '
-        'its parent', (tester) async {
+        'its parent; without a heading on top it has no name and its card '
+        'says "Checklist" (#309)', (tester) async {
       final note = notes.capture('Trip\nBath\n  Soap\nTent').id;
       await startAtNotes(tester);
       await cardMenu(tester);
       expect(key('note-to-plain'), findsNothing);
       await tap(tester, key('note-make-checklist'));
 
-      expect(notes.byId(note)!.text, 'Trip');
-      expect(shown(note), ['Bath', '  Soap', 'Tent']);
+      expect(notes.byId(note)!.text, '');
+      expect(shown(note), ['Trip', 'Bath', '  Soap', 'Tent']);
+      expect(
+        find.descendant(of: key('card-name'), matching: find.text('Checklist')),
+        findsOneWidget,
+      );
       expect(notes.unsorted(), isEmpty);
       final bath = idOf(note, 'Bath');
       final soap = idOf(note, 'Soap');
@@ -232,6 +238,67 @@ void main() {
       expect(checkbox(tester, soap), isFalse);
     });
 
+    testWidgets('a Line ticks and strikes in the frame after the tap, and is '
+        'saved after it (#338); a box tapped while one waits is saved too, '
+        'and two quick taps end as the second left it', (tester) async {
+      final note = notes.capture('Trip\nBath\nTent').id;
+      lists.make(note);
+      final bath = idOf(note, 'Bath');
+      final tent = idOf(note, 'Tent');
+      await startAtNotes(tester);
+      final ticks = HeldTicks();
+
+      await tester.tap(key('checklist-check-$bath'));
+      await tester.pump();
+      expect(checkbox(tester, bath), isTrue);
+      expect(struck(tester, bath), isTrue);
+      // Nothing is saved before that frame.
+      expect(shown(note), ['Bath', 'Tent']);
+
+      await tester.tap(key('checklist-check-$tent'));
+      await tester.pump();
+      await tester.tap(key('checklist-check-$bath'));
+      await tester.pump();
+      expect(checkbox(tester, bath), isFalse);
+      expect(struck(tester, bath), isFalse);
+      expect(checkbox(tester, tent), isTrue);
+      expect(shown(note), ['Bath', 'Tent']);
+
+      await ticks.release(tester);
+      expect(shown(note), ['Bath', '[x] Tent']);
+      expect(checkbox(tester, bath), isFalse);
+      expect(checkbox(tester, tent), isTrue);
+      expect(struck(tester, tent), isTrue);
+    });
+
+    testWidgets('a tick whose save fails shows the Line as stored again and '
+        'says so at the top, with the cause and the fix (#338)', (
+      tester,
+    ) async {
+      final note = notes.capture('Trip\nBath\nTent').id;
+      lists.make(note);
+      final bath = idOf(note, 'Bath');
+      await startAtNotes(tester);
+      final ticks = HeldTicks()..failWith(Exception('disk full'));
+
+      await tester.tap(key('checklist-check-$bath'));
+      await tester.pump();
+      expect(checkbox(tester, bath), isTrue);
+      await ticks.release(tester);
+      expect(checkbox(tester, bath), isFalse);
+      expect(struck(tester, bath), isFalse);
+      expect(shown(note), ['Bath', 'Tent']);
+      await tap(tester, find.text('A tick could not be saved.'));
+      expect(find.text('Tick not saved'), findsOneWidget);
+      expect(
+        find.text(
+          'This Device could not write to its storage. '
+          'Free some storage, then tick again.',
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('a compact card shows how many are open (#189); "Uncheck all" '
         'in the ⋮ unchecks them', (tester) async {
       final note = notes.capture('Shop\n✓ Milk\nEggs\n✓ Tea').id;
@@ -248,6 +315,24 @@ void main() {
       await cardMenu(tester);
       // Nothing left to uncheck.
       expect(key('note-uncheck-all'), findsNothing);
+    });
+
+    testWidgets('a compact card of a list without a name says "Checklist" '
+        'over its count (#309)', (tester) async {
+      final note = notes.capture('Milk\nEggs').id;
+      lists.makeFromText(note);
+      await startAtNotes(tester);
+      await tap(tester, key('compactNotes'));
+      expect(
+        find.descendant(
+          of: key('card-name'),
+          matching: find.text('Checklist'),
+          matchRoot: true,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('2 of 2 open'), findsOneWidget);
+      expect(notes.byId(note)!.text, '');
     });
 
     testWidgets('"Back to a plain Note" in the ⋮ writes every Line into the '
@@ -288,7 +373,11 @@ void main() {
         'the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
-      await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
+      // Under a heading, which stays its name (#309).
+      await tester.enterText(
+        find.byType(TextField).first,
+        '# Shop\nMilk\nEggs',
+      );
       await pickKind(tester, NoteKind.checklist);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('checklist'), findsOneWidget);
@@ -299,6 +388,24 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(notes.byId(note)!.text, 'Shop');
+      expect(shown(note), ['Milk', 'Eggs']);
+    });
+
+    testWidgets('Checklist in the kind badge makes typed lines without a '
+        'heading every one a Line, the name left empty, also after leaving '
+        '(#309)', (tester) async {
+      final note = notes.capture('Milk').id;
+      await openEditor(tester, 'Milk');
+      await tester.enterText(find.byType(TextField).first, 'Milk\nEggs');
+      await pickKind(tester, NoteKind.checklist);
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        '',
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(notes.byId(note)!.text, '');
       expect(shown(note), ['Milk', 'Eggs']);
     });
 
@@ -376,8 +483,9 @@ void main() {
 
     testWidgets('a new list starts with one empty Line, the cursor in it; '
         'Return makes the next, and the only Line stays', (tester) async {
-      final note = notes.capture('Trip').id;
-      await openEditor(tester, 'Trip');
+      // A heading alone stays its name (#309).
+      final note = notes.capture('Trip:').id;
+      await openEditor(tester, 'Trip:');
       await pickKind(tester, NoteKind.checklist);
       expect(shown(note), isEmpty);
       expect(key('checklist-field-new-1'), findsOneWidget);
@@ -619,6 +727,38 @@ void main() {
       await tap(tester, key('checklist-delete'));
       expect(shown(note), ['Milk', 'Tea', 'Eggs', '  Soap']);
       expect(key('checklist-field-new-3'), findsNothing);
+    });
+
+    testWidgets('a Line ticks and strikes in the frame after the tap, and is '
+        'saved after it (#338)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final ticks = HeldTicks();
+
+      await tester.tap(key('checklist-check-$milk'));
+      await tester.pump();
+      expect(checkbox(tester, milk), isTrue);
+      expect(struck(tester, milk), isTrue);
+      expect(shown(note), ['Milk', 'Eggs']);
+
+      await ticks.release(tester);
+      expect(shown(note), ['[x] Milk', 'Eggs']);
+      expect(checkbox(tester, milk), isTrue);
+      expect(struck(tester, milk), isTrue);
+
+      // A save that fails shows it as stored again and says so.
+      final eggs = idOf(note, 'Eggs');
+      ticks.failWith(Exception('disk full'));
+      await tester.tap(key('checklist-check-$eggs'));
+      await tester.pump();
+      expect(checkbox(tester, eggs), isTrue);
+      await ticks.release(tester);
+      expect(checkbox(tester, eggs), isFalse);
+      expect(struck(tester, eggs), isFalse);
+      expect(shown(note), ['[x] Milk', 'Eggs']);
+      expect(find.text('A tick could not be saved.'), findsOneWidget);
     });
 
     testWidgets('checks and "Uncheck all" there too, "Back to a plain Note" '

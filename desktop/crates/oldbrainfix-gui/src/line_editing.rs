@@ -943,7 +943,8 @@ pub fn field(
     };
     let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, wrap: f32| {
         let format = TextFormat {
-            font_id: FontId::proportional(16.0),
+            // Typed at the Device's text size (#326, obf-1019).
+            font_id: FontId::proportional(crate::theme::content(ui, 16.0)),
             color: colour,
             strikethrough: if checked {
                 Stroke::new(1.0, colour)

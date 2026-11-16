@@ -636,7 +636,12 @@ class PackTreeView extends StatelessWidget {
     final note = pack.notes[at];
     String start(String? text) => (text ?? '').split('\n').first.trim();
     return switch ((item.kind, item.index)) {
-      (PackItemKind.note, _) => _firstLine(note),
+      // A list without a name by its kind (#309).
+      (PackItemKind.note, _) => switch (_firstLine(note)) {
+        '' when note.lines != null =>
+          note.shopping ? t.shoppingHeading : t.checklistHeading,
+        final line => line,
+      },
       (PackItemKind.photo, final i?) => t.packPhoto(
         packSizeText(locale, note.photos[i].size),
       ),
