@@ -36,5 +36,5 @@ Privacy and security
 • Encrypted Backups (Argon2id, XChaCha20-Poly1305) into a chosen folder, optionally weekly, with a printable Recovery Sheet. The iPhone's own backup leaves the app's data out.
 
 Other
-• English and German. Light and dark theme. iOS 26 or newer.
+• English and German. Light and dark theme. Text in three sizes. iOS 26 or newer.
 • Free and open source, licensed under Apache-2.0 or MIT.
