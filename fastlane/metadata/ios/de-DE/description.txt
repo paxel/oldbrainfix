@@ -6,7 +6,7 @@ Erfassen
 • Jede Notiz speichert den Zeitpunkt der Erfassung. Optional: den Ort (als benannter Ort wie „Zuhause“, wenn einer passt), den laufenden Kalendertermin und das Auto oder die Kopfhörer, über die der Ton läuft.
 • Sprachnotizen werden auf dem Gerät mit Whisper transkribiert (Deutsch und Englisch). Das Sprachmodell (148 MB) wird einmalig auf Wunsch geladen.
 • Text in Fotos und Screenshots wird auf dem Gerät mit RustO erkannt.
-• Transkripte und erkannter Text werden bei der Suche berücksichtigt.
+• Die Suche findet auch Transkripte und erkannten Text.
 • Jede Datei lässt sich anhängen; ein PDF öffnet im Vollbild, sein Text wird durchsucht.
 
 Ordnen
@@ -36,5 +36,5 @@ Datenschutz und Sicherheit
 • Verschlüsselte Sicherungen (Argon2id, XChaCha20-Poly1305) in einen gewählten Ordner, optional wöchentlich, mit einem druckbaren Wiederherstellungsblatt. Die iPhone-Datensicherung lässt die Daten der App aus.
 
 Sonstiges
-• Deutsch und Englisch. Helles und dunkles Design. Ab iOS 26.
+• Deutsch und Englisch. Helles und dunkles Design. Text in drei Größen. Ab iOS 26.
 • Kostenlos und quelloffen, lizenziert unter Apache-2.0 oder MIT.
