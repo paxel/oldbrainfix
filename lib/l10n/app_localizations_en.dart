@@ -6692,4 +6692,116 @@ class AppLocalizationsEn extends AppLocalizations {
   String grammarRefused(String file, String reason) {
     return '$file was not added: $reason';
   }
+
+  @override
+  String get spotNext => 'Next';
+
+  @override
+  String get spotSkip => 'Skip';
+
+  @override
+  String get spotDone => 'Got it';
+
+  @override
+  String get settingsShowTips => 'Show tips again';
+
+  @override
+  String get settingsShowTipsDone => 'Each screen shows its tips again.';
+
+  @override
+  String get spotAgendaPlus =>
+      '+ captures a Note; hold it to start typing at once.';
+
+  @override
+  String get spotAgendaToday =>
+      'Today lists what is due; tick each one off once it is done.';
+
+  @override
+  String get spotAgendaUnsorted =>
+      'Notes not filed yet wait here as Unsorted, to be sorted later.';
+
+  @override
+  String get spotAgendaBrowse =>
+      'The folder opens your Areas and Topics, where filed Notes are.';
+
+  @override
+  String get spotAgendaQuiet =>
+      'Quiet today: nothing rings until midnight, and everything still shows.';
+
+  @override
+  String get spotAgendaProfile =>
+      'Your picture opens your Profile, with Settings, Sync and Backups.';
+
+  @override
+  String get spotCaptureNudge =>
+      'Each button saves the Note, and a Nudge reminds you to sort it then.';
+
+  @override
+  String get spotCaptureMore =>
+      'More saves the Note and opens it in the full editor.';
+
+  @override
+  String get spotEditorKind =>
+      'The kind makes this Note a Checklist, a Shopping List and more.';
+
+  @override
+  String get spotEditorPlace =>
+      'Here you file the Note into an Area or a Topic.';
+
+  @override
+  String get spotEditorRemind =>
+      'In +, Remind me… sets up a Reminder or a Routine for this Note.';
+
+  @override
+  String get spotEditorCodeLanguage =>
+      'Here you also pick the language that colours this Code text.';
+
+  @override
+  String get spotEditorLinkedFrom =>
+      'Linked from lists the Notes whose links lead to this one.';
+
+  @override
+  String get spotAreaSearch => 'Search finds the Notes filed here.';
+
+  @override
+  String get spotAreaAdd => '+ makes a new Note or list, filed right here.';
+
+  @override
+  String get spotCardsView =>
+      'This switches the cards between the compact and the detailed view.';
+
+  @override
+  String get spotUnsortedCard =>
+      'Sort each Note: file it into an Area, merge it or set a Reminder.';
+
+  @override
+  String get spotRoutineSentence =>
+      'Type when it is due, such as “every Monday at 08:00”.';
+
+  @override
+  String get spotRoutineTimes =>
+      'Add a time of day; without one it is due all day.';
+
+  @override
+  String get spotRoutineHeadsUps =>
+      'A heads-up tells you ahead of time, such as 20 min before.';
+
+  @override
+  String get spotRoutineSave =>
+      'Save keeps the schedule; going back saves it too.';
+
+  @override
+  String get spotSettingsSearch => 'Search finds any setting by a word in it.';
+
+  @override
+  String get spotSettingsShowTips =>
+      'Show tips again brings back every tip on this Device.';
+
+  @override
+  String get spotSettingsFeatures =>
+      'Simple or Advanced: Advanced also makes Tallies, Sessions, Frogs and Topics.';
+
+  @override
+  String get spotSettingsGrammar =>
+      'Add grammar… colours code in one more language, on all your Devices.';
 }

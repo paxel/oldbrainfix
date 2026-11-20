@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -9,29 +7,12 @@ import 'shared_areas_test.dart' show ticking;
 /// The texts as an English Device writes them.
 final english = HelpTexts(
   areaName: 'Old Brain Fix',
-  quickStartTitle: 'Quick start',
-  quickStartLines: const ['Capture a thought with +', 'File it into an Area'],
-  quickStartDescription: 'On the desktop:\nCapture: Ctrl+N\nFile: drag it',
-  iconsText: 'What the icons mean\n\nKind: what the Note is',
-  iconPictures: [
-    Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 1]),
-  ],
   whatsNewTitle: (v) => "What's new in $v",
 );
 
 /// The same as a German one writes them.
 final german = HelpTexts(
   areaName: 'Old Brain Fix',
-  quickStartTitle: 'Schnellstart',
-  quickStartLines: const [
-    'Einen Gedanken mit + erfassen',
-    'Ihn in einen Bereich einsortieren',
-  ],
-  quickStartDescription: 'Auf dem Desktop:\nErfassen: Strg+N\nAblegen: ziehen',
-  iconsText: 'Was die Symbole bedeuten',
-  iconPictures: [
-    Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 2]),
-  ],
   whatsNewTitle: (v) => 'Neu in $v',
 );
 
@@ -56,12 +37,11 @@ void main() {
     String version = '0.4.0',
     bool fresh = true,
     String language = 'en',
-    HelpTexts? texts,
   }) => HelpNotes(store).makeDue(
     version: version,
     fresh: fresh,
     language: language,
-    texts: texts ?? (language == 'de' ? german : english),
+    texts: language == 'de' ? german : english,
     whatsNew: bundle,
   );
 
@@ -77,60 +57,13 @@ void main() {
   }
 
   group('a fresh install', () {
-    test('files Quick start and What the icons mean into their own Area, '
-        'and no What\'s new', () {
-      final made = make(ann);
-      final p = person(ann);
-      expect(made, [HelpNotes.quickStartId(p), HelpNotes.iconsId(p)]);
-      final area = Places(ann).areaById(HelpNotes.areaId(p))!;
-      expect(area.name, 'Old Brain Fix');
-      expect(area.colour, HelpNotes.areaColour);
-      expect(area.icon, 'brain');
-      expect(areaIcons, contains(area.icon));
-      final notes = Notes(ann).inside(area.id);
-      expect(notes, hasLength(2));
-      for (final note in notes) {
-        expect(note.nudge, isNull);
-        expect(note.place, area.id);
-      }
-      expect(Notes(ann).unsorted(), isEmpty);
-      final list = Checklists(ann).byNote(HelpNotes.quickStartId(p))!;
-      // Named "Quick start", the desktop's way folded under it (#260).
-      final text = Notes(ann).byId(HelpNotes.quickStartId(p))!.text;
-      expect(
-        text,
-        'Quick start\nOn the desktop:\nCapture: Ctrl+N\nFile: drag it',
-      );
-      // Formatted, so the links of its steps open (#261); so is What the
-      // icons mean.
-      expect(
-        Notes(ann).byId(HelpNotes.quickStartId(p))!.textFormat,
-        TextFormats.markdown,
-      );
-      expect(
-        Notes(ann).byId(HelpNotes.iconsId(p))!.textFormat,
-        TextFormats.markdown,
-      );
-      expect(NoteKinds.name(text), english.quickStartTitle);
-      expect(NoteKinds.description(text), english.quickStartDescription);
-      expect([for (final l in list.lines) l.text], english.quickStartLines);
-      expect(
-        [for (final l in list.lines) l.id],
-        [HelpNotes.quickStartLineId(p, 0), HelpNotes.quickStartLineId(p, 1)],
-      );
-      // On the Agenda as one row with its count, not a row per Line.
-      final checklists = Checklists(ann);
-      expect(
-        checklists.onAgenda(HelpNotes.quickStartId(p)),
-        ListOnAgenda.count,
-      );
-      final rows = checklists.agendaRows();
-      expect(rows, hasLength(1));
-      expect(rows.single.shows, ListOnAgenda.count);
-      final icons = Notes(ann).byId(HelpNotes.iconsId(p))!;
-      expect(icons.text, english.iconsText);
-      expect(icons.photos, hasLength(1));
-      expect(ann.photo(icons.photos.single), english.iconPictures.single);
+    test('makes nothing and records the version', () {
+      final written = ann.allEntries().length;
+      expect(make(ann), isEmpty);
+      expect(ann.allEntries().length, written);
+      expect(ann.localSetting(HelpNotes.versionSetting), '0.4.0');
+      // No Area without a Note to go into it.
+      expect(Places(ann).areaById(HelpNotes.areaId(person(ann))), isNull);
     });
 
     test('the same start again writes nothing', () {
@@ -143,29 +76,78 @@ void main() {
     test('nothing is made before the own Profile exists', () {
       final bare = Store.inMemory(clock: clock);
       addTearDown(bare.close);
-      expect(make(bare), isEmpty);
+      expect(make(bare, fresh: false), isEmpty);
       expect(bare.allEntries(), isEmpty);
       expect(bare.localSetting(HelpNotes.versionSetting), isNull);
     });
   });
 
+  group('Quick start and What the icons mean', () {
+    // Spotlights explain the screens instead (obf-1043, ADR 0055).
+    test('are made by no start: neither a fresh one, an update nor one '
+        'that recorded no version', () {
+      final p = person(ann);
+      final made = [...make(ann), ...make(ann, version: '0.4.1', fresh: false)];
+      ann.removeLocalSetting(HelpNotes.versionSetting);
+      made.addAll(make(ann, version: '0.5.0', fresh: false));
+      expect(made, [
+        HelpNotes.whatsNewId(p, '0.4.1'),
+        HelpNotes.whatsNewId(p, '0.4.0'),
+        HelpNotes.whatsNewId(p, '0.5.0'),
+      ]);
+      for (final id in [HelpNotes.quickStartId(p), HelpNotes.iconsId(p)]) {
+        expect(ann.loggedHistory(id), isEmpty, reason: id);
+      }
+      expect(Checklists(ann).agendaRows(), isEmpty);
+    });
+
+    test('made before, stay as they are', () {
+      final p = person(ann);
+      // As 0.6.1 made them, in short.
+      for (final id in [HelpNotes.quickStartId(p), HelpNotes.iconsId(p)]) {
+        ann.append(id, NoteKeys.type, NoteKeys.typeNote);
+        ann.append(id, NoteKeys.place, HelpNotes.areaId(p));
+      }
+      final before = [
+        for (final id in [HelpNotes.quickStartId(p), HelpNotes.iconsId(p)])
+          ann.loggedHistory(id).length,
+      ];
+      expect(make(ann, version: '0.4.0', fresh: false), [
+        HelpNotes.whatsNewId(p, '0.4.0'),
+      ]);
+      expect([
+        for (final id in [HelpNotes.quickStartId(p), HelpNotes.iconsId(p)])
+          ann.loggedHistory(id).length,
+      ], before);
+    });
+  });
+
   group('an update', () {
     test('from a Device that recorded nothing makes every What\'s new after '
-        '0.3.1, oldest first, and the help Notes once', () {
+        '0.3.1, oldest first, into their own Area', () {
       final p = person(ann);
       final made = make(ann, version: '0.4.1', fresh: false);
       expect(made, [
-        HelpNotes.quickStartId(p),
-        HelpNotes.iconsId(p),
         HelpNotes.whatsNewId(p, '0.4.0'),
         HelpNotes.whatsNewId(p, '0.4.1'),
       ]);
-      expect(
-        Notes(ann).byId(HelpNotes.whatsNewId(p, '0.4.0'))!.text,
-        "What's new in 0.4.0\n\nAdded\n• Help Notes.",
-      );
+      final note = Notes(ann).byId(HelpNotes.whatsNewId(p, '0.4.0'))!;
+      expect(note.text, "What's new in 0.4.0\n\nAdded\n• Help Notes.");
+      expect(note.textFormat, TextFormats.plain);
       final at = [for (final id in made) Notes(ann).byId(id)!.captured];
       expect(at, [...at]..sort());
+      final area = Places(ann).areaById(HelpNotes.areaId(p))!;
+      expect(area.name, 'Old Brain Fix');
+      expect(area.colour, HelpNotes.areaColour);
+      expect(area.icon, 'brain');
+      expect(areaIcons, contains(area.icon));
+      final notes = Notes(ann).inside(area.id);
+      expect(notes, hasLength(2));
+      for (final note in notes) {
+        expect(note.nudge, isNull);
+        expect(note.place, area.id);
+      }
+      expect(Notes(ann).unsorted(), isEmpty);
     });
 
     test('makes the What\'s new of the versions passed since the last one '
@@ -210,17 +192,17 @@ void main() {
       final written = desk.allEntries().length;
       expect(make(desk, version: '0.4.1', language: 'de'), isEmpty);
       expect(desk.allEntries().length, written);
+      desk.removeLocalSetting(HelpNotes.versionSetting);
       expect(make(desk, version: '0.4.1', fresh: false), isEmpty);
+      expect(desk.allEntries().length, written);
     });
 
     test('a deleted help Note never returns', () {
       final p = person(ann);
       make(ann, version: '0.4.1', fresh: false);
-      final notes = Notes(ann);
-      notes.trash(HelpNotes.quickStartId(p));
-      notes.trash(HelpNotes.whatsNewId(p, '0.4.0'));
+      Notes(ann).trash(HelpNotes.whatsNewId(p, '0.4.0'));
       // Purged, as 30 days in the trash do.
-      ann.append(HelpNotes.iconsId(p), NoteKeys.type, null);
+      ann.append(HelpNotes.whatsNewId(p, '0.4.1'), NoteKeys.type, null);
       final desk = ownDevice(ann);
       expect(make(desk, version: '0.5.0', fresh: false), [
         HelpNotes.whatsNewId(p, '0.5.0'),
@@ -229,7 +211,7 @@ void main() {
       expect(make(ann, version: '0.4.1', fresh: false), isEmpty);
     });
 
-    test('two Devices that make them apart hold one of each after a sync', () {
+    test('two Devices that make one apart hold one after a sync', () {
       final desk = ownDevice(ann);
       make(ann, version: '0.4.0', fresh: false);
       make(desk, version: '0.4.0', fresh: false, language: 'de');
@@ -239,30 +221,16 @@ void main() {
       for (final store in [ann, desk]) {
         expect(Places(store).areas(), hasLength(1));
         final inside = Notes(store).inside(HelpNotes.areaId(p));
-        expect(inside, hasLength(3));
-        final list = Checklists(store).byNote(HelpNotes.quickStartId(p))!;
-        // The later Device's words win on every field, the Lines as
-        // many in each language: one list in one language, no copy.
-        final words = [for (final l in list.lines) l.text];
-        final title = Notes(store).byId(HelpNotes.quickStartId(p))!.text;
+        // The later Device's words win: one Note in one language, no
+        // copy.
         expect(
-          [title, ...words],
-          anyOf(
-            equals([
-              NoteKinds.join(
-                english.quickStartTitle,
-                english.quickStartDescription,
-              ),
-              ...english.quickStartLines,
-            ]),
-            equals([
-              NoteKinds.join(
-                german.quickStartTitle,
-                german.quickStartDescription,
-              ),
-              ...german.quickStartLines,
-            ]),
-          ),
+          [for (final n in inside) n.text],
+          [
+            anyOf(
+              "What's new in 0.4.0\n\nAdded\n• Help Notes.",
+              'Neu in 0.4.0\n\nNeu\n• Hilfe-Notizen.',
+            ),
+          ],
         );
       }
     });
@@ -270,16 +238,17 @@ void main() {
     test('a Note another person wrote under the id counts for nothing', () {
       final ben = device(clock, 'Ben');
       final p = person(ann);
+      final id = HelpNotes.whatsNewId(p, '0.4.0');
       // Ben writes under Ann's id; his Device is no Device of hers.
-      ben.append(HelpNotes.quickStartId(p), NoteKeys.type, NoteKeys.typeNote);
+      ben.append(id, NoteKeys.type, NoteKeys.typeNote);
       ann.applyEntries(ben.entriesSince(const {}), keys: [ben.ownKeyRecord]);
-      expect(make(ann), contains(HelpNotes.quickStartId(p)));
+      expect(make(ann, fresh: false), contains(id));
     });
   });
 
   group('the Area', () {
     test('a renamed one stays as it is', () {
-      make(ann);
+      make(ann, fresh: false);
       final p = person(ann);
       Places(ann).rename(HelpNotes.areaId(p), 'Help');
       make(ann, version: '0.4.1', fresh: false);
@@ -292,7 +261,7 @@ void main() {
 
     test('a deleted one is made again with its look for a new What\'s new, '
         'so it is not Unsorted', () {
-      make(ann);
+      make(ann, fresh: false);
       final p = person(ann);
       Places(ann).setColour(HelpNotes.areaId(p), 'FF0000');
       Places(ann).deleteArea(HelpNotes.areaId(p), NotesGo.trash);
@@ -305,7 +274,7 @@ void main() {
     });
 
     test('is made only when a Note goes into it', () {
-      make(ann);
+      make(ann, fresh: false);
       final p = person(ann);
       Places(ann).deleteArea(HelpNotes.areaId(p), NotesGo.trash);
       expect(make(ann, version: '0.4.2', fresh: false), [

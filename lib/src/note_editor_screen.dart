@@ -49,6 +49,7 @@ import 'shopping_list_view.dart';
 import 'shopping_pick_screen.dart';
 import 'sorting_unsorted.dart';
 import 'speech_platform.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 import 'tally_entry_screen.dart';
 import 'tally_field_screen.dart';
@@ -1913,13 +1914,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       children: [
         // Every Note has a kind (#188), first and in words (#310), with ▾
         // while there is another to change it to; else it only shows it.
-        SettingBadge(
-          key: const ValueKey('badge-kind'),
-          setting: t.badgeKind,
-          icon: kindBadgeIcon,
-          value: kindName(t, _kind),
-          dropDown: true,
-          onTap: _kinds.isEmpty ? null : (_) => _editKind(),
+        Spotlight(
+          id: 'editor-kind',
+          child: SettingBadge(
+            key: const ValueKey('badge-kind'),
+            setting: t.badgeKind,
+            icon: kindBadgeIcon,
+            value: kindName(t, _kind),
+            dropDown: true,
+            onTap: _kinds.isEmpty ? null : (_) => _editKind(),
+          ),
         ),
         SettingBadge(
           key: const ValueKey('badge-importance'),
@@ -1934,13 +1938,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           onTap: changes ? (_) => _editImportance() : null,
         ),
         // Area and Topic in one: File into… picks both at once.
-        SettingBadge(
-          key: const ValueKey('badge-place'),
-          setting: t.badgePlace,
-          icon: _placeIcon,
-          iconColour: colour,
-          value: place,
-          onTap: changes ? (_) => _file() : null,
+        Spotlight(
+          id: 'editor-place',
+          child: SettingBadge(
+            key: const ValueKey('badge-place'),
+            setting: t.badgePlace,
+            icon: _placeIcon,
+            iconColour: colour,
+            value: place,
+            onTap: changes ? (_) => _file() : null,
+          ),
         ),
         SettingBadge(
           key: const ValueKey('badge-captured'),
@@ -1981,13 +1988,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         if (_frog case final frog?) _frogBadge(frog),
         // A Plain Note's text is plain, formatted or code (#213).
         if (_kind == NoteKind.plain && note.textEditable)
-          SettingBadge(
-            key: const ValueKey('badge-format'),
-            setting: t.badgeTextFormat,
-            icon: textFormatBadgeIcon,
-            value: textFormatName(t, note.textFormat),
-            valueIcon: textFormatIcon(note.textFormat),
-            onTap: changes ? (_) => _editFormat() : null,
+          _codeLanguageSpot(
+            note,
+            changes,
+            SettingBadge(
+              key: const ValueKey('badge-format'),
+              setting: t.badgeTextFormat,
+              icon: textFormatBadgeIcon,
+              value: textFormatName(t, note.textFormat),
+              valueIcon: textFormatIcon(note.textFormat),
+              onTap: changes ? (_) => _editFormat() : null,
+            ),
           ),
         // A Session's rule and weekdays' counts (#191).
         if (_setup case final setup?)
@@ -2042,16 +2053,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         // In a Shared Area only a Manager sets them up (ADR 0013).
         if (schedules)
-          SettingBadge(
-            key: const ValueKey('badge-add'),
-            setting: t.routineOrReminder,
-            icon: Icons.add,
-            value: null,
-            onTap: _addMenu,
+          Spotlight(
+            id: 'editor-remind',
+            child: SettingBadge(
+              key: const ValueKey('badge-add'),
+              setting: t.routineOrReminder,
+              icon: Icons.add,
+              value: null,
+              onTap: _addMenu,
+            ),
           ),
       ],
     );
   }
+
+  /// The text format badge [badge], with the tip of the code language
+  /// (obf-1043) while its format dialog offers one: a Code text this
+  /// Device may change.
+  Widget _codeLanguageSpot(Note note, bool changes, Widget badge) =>
+      changes && note.textFormat == TextFormats.code
+      ? Spotlight(id: 'editor-code-language', child: badge)
+      : badge;
 
   /// The Frog's badge (#259): the frog, then Open, or Eaten today or
   /// yesterday; a tap offers what this Device may do to it.
@@ -3418,7 +3440,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   ),
                 ),
             // At the Note's end, after its Sections (obf-1035).
-            LinkedFrom(linking: _linkedFrom),
+            if (_linkedFrom.isEmpty)
+              LinkedFrom(linking: _linkedFrom)
+            else
+              Spotlight(
+                id: 'editor-linked-from',
+                child: LinkedFrom(linking: _linkedFrom),
+              ),
             const SizedBox(height: 24),
             if (amends)
               Align(

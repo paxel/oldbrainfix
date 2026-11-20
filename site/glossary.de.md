@@ -162,8 +162,12 @@ Ein Schalter der Person, auf allen ihren eigenen Geräten gleich, beim ersten St
 _Avoid_: Modus, Stufe, Anfänger, Profi
 
 **Hilfe-Notiz** [Help Note]:
-Eine Notiz, mit der die App sich selbst erklärt: „Schnellstart“, eine Checkliste mit Schritten zum Ausprobieren, „Was die Symbole bedeuten“, mit Bildern der Symbole, und je Version ein „Neu in X.Y.Z“ mit ihren Versionshinweisen. Sie liegen in ihrem eigenen Bereich „Old Brain Fix“, nie unsortiert und ohne Stupser, in der Sprache des Geräts, das sie zuerst anlegt. Jede wird einmal je Person angelegt: Wer neu ist, bekommt die ersten beiden, ein Update das „Neu in“ seiner Version und die beiden, die noch nie angelegt wurden. Du bearbeitest, verschiebst und löschst sie wie jede Notiz; eine gelöschte kommt nicht wieder.
-_Avoid_: Tutorial, Einführung, Tipp, Änderungsnotiz
+Eine Notiz, mit der die App sich selbst erklärt: je Version ein „Neu in X.Y.Z“ mit ihren Versionshinweisen, angelegt beim Update auf diese Version. Sie liegen in ihrem eigenen Bereich „Old Brain Fix“, nie unsortiert und ohne Stupser, in der Sprache des Geräts, das sie zuerst anlegt, jede einmal je Person. „Schnellstart“, eine Checkliste mit Schritten zum Ausprobieren, und „Was die Symbole bedeuten“ bekam bis 0.6.1, wer neu war; ab 0.7.0 erklären Tipps die Seiten, kein Gerät legt die beiden mehr an, und schon angelegte bleiben, wie du sie hast. Du bearbeitest, verschiebst und löschst sie wie jede Notiz; eine gelöschte kommt nicht wieder.
+_Avoid_: Tutorial, Einführung, Änderungsnotiz
+
+**Tipp** [Spotlight]:
+Erklärt eine Sache auf einer Seite: Die Seite wird um sie herum abgedunkelt, und eine Karte daneben sagt in einem Satz, was sie tut. Eine Seite zeigt ihre Tipps beim ersten Besuch nacheinander, „Weiter“ den nächsten, „Überspringen“ oder ein Tippen außerhalb der Karte beendet sie; danach bekommt nur Neues auf der Seite einmal seinen Tipp. Jedes Gerät merkt sich, welche es gezeigt hat; ein Gerät, das von einer früheren Version kommt, zählt die Tipps zu dem, was es schon hatte, als gezeigt, und „Tipps wieder zeigen“ in den Einstellungen bringt sie auf diesem Gerät zurück.
+_Avoid_: Tutorial, Anleitung, Hilfe-Notiz
 
 ## Routinen und Erinnerungen
 

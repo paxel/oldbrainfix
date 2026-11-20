@@ -154,6 +154,8 @@ Future<void> _openAndRun(Directory dir) async {
       help: version == null
           ? null
           : HelpSetup(const BundledHelp(), version: version),
+      // The screens explain themselves here only (obf-1043).
+      spotlights: true,
     ),
   );
 }

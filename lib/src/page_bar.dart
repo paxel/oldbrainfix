@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'l10n.dart';
 import 'look.dart';
+import 'spotlight.dart';
 import 'sync_line.dart';
 
 /// Width from which a screen counts as wide (UI laws, "The bar"): below
@@ -20,22 +21,34 @@ const _iconRoom = 44.0;
 /// An action of a page's bar that goes into ⋮ when the bar is full (UI
 /// laws, "The bar"): on the bar its icon with [label] as its tooltip, in
 /// ⋮ its icon and [label], greyed in both while [onPressed] is null. Any
-/// other widget among a bar's actions stays on the bar.
+/// other widget among a bar's actions stays on the bar. With a
+/// [spotlight], its tip (obf-1043) points at it on the bar, else at ⋮.
 class BarAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
+  final String? spotlight;
 
   const BarAction({
     super.key,
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.spotlight,
   });
 
   @override
-  Widget build(BuildContext context) =>
-      IconButton(tooltip: label, onPressed: onPressed, icon: Icon(icon));
+  Widget build(BuildContext context) {
+    final button = IconButton(
+      tooltip: label,
+      onPressed: onPressed,
+      icon: Icon(icon),
+    );
+    return switch (spotlight) {
+      final id? => Spotlight(id: id, child: button),
+      null => button,
+    };
+  }
 }
 
 /// [actions] as a bar with room for [slots] buttons shows them (UI laws,
@@ -69,7 +82,17 @@ class _BarMore extends StatelessWidget {
   const _BarMore({required this.actions});
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<VoidCallback>(
+  Widget build(BuildContext context) {
+    Widget more = _menu(context);
+    for (final action in actions) {
+      if (action.spotlight case final id?) {
+        more = Spotlight(id: id, child: more);
+      }
+    }
+    return more;
+  }
+
+  Widget _menu(BuildContext context) => PopupMenuButton<VoidCallback>(
     key: const ValueKey('bar-more'),
     tooltip: context.t.more,
     icon: const Icon(Icons.more_vert),

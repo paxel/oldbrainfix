@@ -66,6 +66,7 @@ import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix/src/speech_model_screen.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
+import 'package:oldbrainfix/src/spotlight.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix/src/tag_tree_screen.dart';
@@ -438,6 +439,9 @@ class _Seeded {
           )
           ..starterSetOffered = true
           ..alarmSetupDone = true;
+    // No frame is taken with a tip on it (obf-1043), whatever starts the
+    // Spotlights.
+    markAllSpotlightsSeen(store);
     final snack = _seed(store, x, (at) => clock = at, dueReminder: dueReminder);
     if (lists) _seedLists(store, x, (at) => clock = at);
     if (formatted) _seedFormatted(store, x, (at) => clock = at);

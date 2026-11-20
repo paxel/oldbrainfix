@@ -777,14 +777,15 @@ final _scenarios = <Scenario>[
   (
     name: 'help',
     about:
-        'The help Notes (#180, ADR 0042): a fresh install makes Quick start, '
-        'a Checklist, and What the icons mean with its picture in the Area '
-        '"Old Brain Fix", and no What\'s new; the same start again makes '
-        'nothing; Quick start deleted; an update to 0.4.1 in German makes '
-        'its What\'s new only; with no version recorded, an update makes '
-        'the What\'s new of 0.4.0 in English and nothing deleted again; the '
-        'Area deleted, an update to 0.5.0 makes it again with its What\'s '
-        'new. `help.json` holds the ids each step made.',
+        'The help Notes (#180, ADR 0042, ADR 0055): a fresh install makes '
+        'nothing, neither Quick start nor What the icons mean nor a What\'s '
+        'new, and records its version; the same start again makes nothing; '
+        'an update to 0.4.1 in German makes its What\'s new only, in the '
+        'Area "Old Brain Fix"; that What\'s new deleted, with no version '
+        'recorded, an update makes the What\'s new of 0.4.0 in English and '
+        'nothing deleted again; the Area deleted, an update to 0.5.0 makes '
+        'it again with its What\'s new. `help.json` holds the ids each step '
+        'made.',
     build: (store) {
       store.applyProfileDefaults(name: 'Ada');
       final help = HelpNotes(store);
@@ -801,8 +802,8 @@ final _scenarios = <Scenario>[
       make('0.4.0', fresh: true);
       make('0.4.0', fresh: true);
       final person = store.ownProfile!.id;
-      Notes(store).trash(HelpNotes.quickStartId(person));
       make('0.4.1', fresh: false, lang: 'de');
+      Notes(store).trash(HelpNotes.whatsNewId(person, '0.4.1'));
       store.removeLocalSetting(HelpNotes.versionSetting);
       make('0.4.1', fresh: false);
       Places(store).deleteArea(HelpNotes.areaId(person), NotesGo.trash);
@@ -5512,35 +5513,10 @@ final _helpMade = <List<String>>[];
 /// write them.
 final _helpEnglish = HelpTexts(
   areaName: 'Old Brain Fix',
-  quickStartTitle: 'Quick start',
-  quickStartLines: const ['Capture a thought with +', 'File it into an Area'],
-  quickStartDescription:
-      'Go there:\n1. [Agenda](oldbrainfix://agenda)\n\n'
-      'On the desktop:\nCapture: Ctrl+N',
-  iconsText:
-      'What the icons mean\n\nKind: what the Note is\n\n'
-      '[User guide](oldbrainfix://guide)',
-  iconPictures: [
-    Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1]),
-  ],
   whatsNewTitle: (v) => "What's new in $v",
 );
 final _helpGerman = HelpTexts(
   areaName: 'Old Brain Fix',
-  quickStartTitle: 'Schnellstart',
-  quickStartLines: const [
-    'Einen Gedanken mit + erfassen',
-    'Ihn in einen Bereich einsortieren',
-  ],
-  quickStartDescription:
-      'Hingehen:\n1. [Agenda](oldbrainfix://agenda)\n\n'
-      'Auf dem Desktop:\nErfassen: Strg+N',
-  iconsText:
-      'Was die Symbole bedeuten\n\nArt: was die Notiz ist\n\n'
-      '[Anleitung](oldbrainfix://guide)',
-  iconPictures: [
-    Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2]),
-  ],
   whatsNewTitle: (v) => 'Neu in $v',
 );
 const _helpBundle = {

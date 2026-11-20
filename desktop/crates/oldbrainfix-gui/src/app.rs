@@ -173,6 +173,7 @@ use crate::settings_search;
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
+use crate::spotlight::{self, Spotlights};
 use crate::starter_set_view;
 use crate::sync_line;
 use crate::sync_view::{
@@ -1675,6 +1676,9 @@ enum Action {
     AddGrammar,
     /// Remove beside the person's grammar of this scope (obf-1037).
     RemoveGrammar(String),
+    /// "Show tips again" (obf-1043): every screen shows its tips again on
+    /// this Device.
+    ShowTipsAgain,
     Sync(SyncAction),
     /// Imports the bundle file dropped onto the window or handed over,
     /// or shows the preview of the Sent Item.
@@ -2240,6 +2244,9 @@ pub struct App {
     /// The version the help Notes are made for (#180); none in tests, so
     /// no Area "Old Brain Fix" appears there unless a test asks.
     help_version: Option<String>,
+    /// The tips explaining each screen (obf-1043): off unless the
+    /// desktop binary switches them on, so tests see none.
+    spotlights: Spotlights,
     /// The AI port while it is open (#112, ADR 0026): closed by "Done,
     /// review" or when the window goes.
     ai_port: Option<AiPort>,
@@ -2743,6 +2750,7 @@ impl App {
             backup_notes: None,
             profile_defaults: Box::new(login::apply_system_defaults),
             help_version: None,
+            spotlights: Spotlights::default(),
             ai_port: None,
             ask: AskPanel::default(),
             ask_run: None,
@@ -3279,9 +3287,9 @@ impl App {
         backup_view::restore_answered(&self.store)?;
         self.welcome = None;
         (self.profile_defaults)(&self.store)?;
-        // Right after the first start: the help Notes never made for this
-        // person, and no What's new (#180). Without them the start goes
-        // on, as at launch.
+        // Right after the first start: no What's new (#180), only the
+        // version recorded. When that fails the start goes on, as at
+        // launch.
         if let Err(e) = self.help_due(true) {
             eprintln!("help Notes: {e}");
         }
@@ -3297,6 +3305,60 @@ impl App {
             return Ok(());
         }
         self.help_due(false)
+    }
+
+    /// Switches the tips explaining each screen (obf-1043) on or off. On,
+    /// it first counts, once per Device, the tips of what an earlier
+    /// version had as shown, unless the first start is due; so it comes
+    /// before the first start's view is answered and before the help
+    /// Notes.
+    pub fn set_spotlights(&mut self, on: bool) -> oldbrainfix_core::Result<()> {
+        self.spotlights.set_on(on);
+        if on {
+            spotlight::seed(&self.store, self.welcoming())?;
+        }
+        Ok(())
+    }
+
+    /// The id of the tip showing (obf-1043).
+    pub fn spotlight_showing(&self) -> Option<&'static str> {
+        self.spotlights.showing()
+    }
+
+    /// The screen whose tips may show now (obf-1043), by its manifest id,
+    /// with what makes a new visit of it: the dialog on top or the list
+    /// shown, none while a dialog, menu, photo or table lies over it, the
+    /// window is hidden or the first start's view shows.
+    fn spotlight_screen(&self, ctx: &egui::Context) -> Option<(&'static str, String)> {
+        if !self.spotlights.on()
+            || self.welcome.is_some()
+            || self.alone.is_some()
+            || self.dialog.is_some()
+            || self.badge.is_some()
+            || self.viewer.is_some()
+            || self.table.is_some()
+            || egui::Popup::is_any_open(ctx)
+            || !self.drawn(ctx)
+        {
+            return None;
+        }
+        let screen = match self.top_dialog() {
+            Some(TopDialog::Editor) if self.editor.is_some() => spotlight::ROUTINE_EDITOR,
+            Some(TopDialog::QuickNote) => spotlight::QUICK_NOTE,
+            Some(TopDialog::Page) if self.page() == Some(Page::Settings) => spotlight::SETTINGS,
+            Some(TopDialog::Note) => {
+                let note = self.view.detail.as_ref().map(|(p, _)| p.note.id.clone());
+                return Some((spotlight::NOTE_DIALOG, note.unwrap_or_default()));
+            }
+            Some(_) => return None,
+            None => match &self.selection {
+                Selection::Agenda => spotlight::AGENDA,
+                Selection::Unsorted => spotlight::UNSORTED,
+                Selection::Place(id) => return Some((spotlight::LIST, id.clone())),
+                _ => return None,
+            },
+        };
+        Some((screen, String::new()))
     }
 
     /// The help Notes due now, once the own Profile exists; `fresh` right
@@ -8040,6 +8102,10 @@ impl App {
             Action::RemoveGrammar(scope) => {
                 PersonSettings::new(&self.store).remove_grammar(&scope)?
             }
+            Action::ShowTipsAgain => {
+                spotlight::show_again(&self.store)?;
+                self.notice = Some(self.t.settings_show_tips_done().to_string());
+            }
             Action::Sync(SyncAction::Trust(trust)) => {
                 if self.sync.answer(&self.store, trust, &self.sync_name) {
                     // A Moment and the new entries: read again below.
@@ -10916,7 +10982,10 @@ impl App {
         if !files.is_empty() {
             actions.push(Action::Files(files));
         }
-        if self.viewer.is_none() && self.table.is_some() {
+        if self.spotlights.keys(ui.ctx(), &self.store) {
+            // A tip shows (obf-1043): Esc and back end its tour, and
+            // nothing goes back behind it.
+        } else if self.viewer.is_none() && self.table.is_some() {
             // Back closes the table shown full screen, the cell being
             // edited written; Alt+Left rests while a cell is typed into.
             let typing = ui.ctx().text_edit_focused();
@@ -11115,6 +11184,7 @@ impl App {
             .min_size(window_sizes::MIN_SIDEBAR)
             .show(ui, |ui| self.places_pane(ui, tones, &mut actions));
         self.sidebar_shown = sidebar.response.rect.width();
+        spotlight::anchor(ui, "sidebar", sidebar.response.rect);
         // Kept once its border is let go, as egui names the border.
         let border = ui
             .ctx()
@@ -11182,6 +11252,11 @@ impl App {
         if let Some(link) = text_marks_view::take_app_link(ui.ctx()) {
             actions.push(Action::FollowLink(link));
         }
+        // The tip showing over all of it, or the screen's tour starting
+        // (obf-1043).
+        let screen = self.spotlight_screen(ui.ctx());
+        self.spotlights
+            .show(ui.ctx(), (&self.store, &self.t, tones), screen);
         for action in actions {
             if let Some(action) = self.tick_later(ui.ctx(), action) {
                 self.apply(action);
@@ -13167,7 +13242,7 @@ impl App {
         let t = self.t;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        ui.horizontal(|ui| {
+        let row = ui.horizontal(|ui| {
             let arrows = [
                 (
                     self.nav.can_go_back(),
@@ -13206,6 +13281,7 @@ impl App {
                 }
             }
         });
+        spotlight::anchor(ui, "nav", row.response.rect);
         ui.add_space(4.0);
     }
 
@@ -13393,11 +13469,13 @@ impl App {
                                         // Beside the list, in a window of
                                         // its own (#287).
                                         let open = t.note_window_open();
-                                        if let Some(id) = &windowed
-                                            && icon_button(ui, icons::OPEN_IN_NEW, open, text)
-                                                .clicked()
-                                        {
-                                            actions.push(Action::OpenWindow(id.clone()));
+                                        if let Some(id) = &windowed {
+                                            let button =
+                                                icon_button(ui, icons::OPEN_IN_NEW, open, text);
+                                            spotlight::anchor(ui, "note-window", button.rect);
+                                            if button.clicked() {
+                                                actions.push(Action::OpenWindow(id.clone()));
+                                            }
                                         }
                                     },
                                 );
@@ -14000,6 +14078,7 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
+            spotlight::anchor(ui, "quick-text", field.rect);
             // Its right-click menu; Paste as Ctrl+V's (#130).
             match text_menu::menu(ui, &t, &field, &self.capture, &[]) {
                 Some(MenuPick::Paste) if has_clipboard => self.paste(ui, id, None),
@@ -14022,7 +14101,9 @@ impl App {
             }
             ui.add_space(4.0);
             // Saves as leaving does and opens the Note dialog (#352).
-            if ui.button(RichText::new(t.more()).color(text)).clicked() {
+            let more = ui.button(RichText::new(t.more()).color(text));
+            spotlight::anchor(ui, "quick-more", more.rect);
+            if more.clicked() {
                 actions.push(Action::CaptureToEditor);
             }
             ui.add_space(4.0);
@@ -14041,7 +14122,7 @@ impl App {
                 return;
             }
             ui.label(RichText::new(t.nudge_heading()).strong().color(text));
-            ui.horizontal(|ui| {
+            let nudges = ui.horizontal(|ui| {
                 let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
                 for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times()) {
                     if ui.button(RichText::new(label).color(text)).clicked() {
@@ -14049,6 +14130,7 @@ impl App {
                     }
                 }
             });
+            spotlight::anchor(ui, "quick-nudges", nudges.response.rect);
             ui.label(
                 RichText::new(t.capture_nudge_keys_hint())
                     .small()
@@ -14113,7 +14195,8 @@ impl App {
         }
         let text = ui.visuals().text_color();
         ui.horizontal(|ui| {
-            ui.heading(RichText::new(self.title()).color(text));
+            let heading = ui.heading(RichText::new(self.title()).color(text));
+            spotlight::anchor(ui, "heading", heading.rect);
             // Every Note list but the trash has its compact/detailed switch.
             if self.cards_key().is_some() && compact_button(ui, tones, &self.t, self.view.compact) {
                 actions.push(Action::Compact(!self.view.compact));
@@ -14152,6 +14235,7 @@ impl App {
                         .text_color(text)
                         .desired_width(ui.available_width() - 32.0),
                 );
+                spotlight::anchor(ui, "search", field.rect);
                 text_menu::show(ui, &self.t, &field, &self.query);
                 // Edit ▸ Find: after the field, so the menu's click does
                 // not take it out again.
@@ -14285,6 +14369,9 @@ impl App {
                 );
                 if scroll_to.as_deref() == Some(id.as_str()) {
                     clicks.card.scroll_to_me(None);
+                }
+                if order.first() == Some(id) {
+                    spotlight::anchor(ui, "first-card", clicks.card.rect);
                 }
                 // Dragged, the card takes the cards selected with it when
                 // it is one of them (#148).
@@ -15882,10 +15969,14 @@ impl App {
             let buttons = 2 + usize::from(advanced) + usize::from(menu);
             let room = buttons as f32 * 32.0 - 4.0;
             ui.add_space((ui.available_width() - room).max(0.0));
-            if icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text).clicked() {
+            let all = icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text);
+            spotlight::anchor(ui, "all-routines", all.rect);
+            if all.clicked() {
                 actions.push(Action::Select(Selection::AllRoutines));
             }
-            if icon_button(ui, icons::ADD_ALARM, t.new_routine_tooltip(), text).clicked() {
+            let new = icon_button(ui, icons::ADD_ALARM, t.new_routine_tooltip(), text);
+            spotlight::anchor(ui, "new-routine", new.rect);
+            if new.clicked() {
                 actions.push(Action::NewRoutine {
                     note: None,
                     reminder: false,
@@ -15903,6 +15994,7 @@ impl App {
                     &t.occurrence_menu(t.agenda_title()),
                     text,
                 );
+                spotlight::anchor(ui, "agenda-menu", more.rect);
                 egui::Popup::menu(&more).show(|ui| {
                     if ui
                         .button(RichText::new(t.quiet_today()).color(text))
@@ -16718,6 +16810,7 @@ impl App {
                     .text_color(text)
                     .desired_width(ui.available_width() - 32.0),
             );
+            spotlight::anchor(ui, "settings-search", field.rect);
             name_field(ui, &field, t.settings_search_hint());
             text_menu::show(ui, &t, &field, &self.settings_query);
             if std::mem::take(&mut self.settings_find) {
@@ -16801,6 +16894,7 @@ impl App {
                         t.text_size_larger(),
                         t.text_size_largest(),
                     ],
+                    &[t.settings_show_tips()],
                 ],
             );
             if shows.contains(&true) {
@@ -16864,6 +16958,15 @@ impl App {
                                 .small()
                                 .color(weak),
                         );
+                    }
+                    // The tips of every screen back on this computer
+                    // (obf-1043).
+                    if shows[4] {
+                        let again = ui.button(RichText::new(t.settings_show_tips()).color(text));
+                        spotlight::anchor(ui, "settings-show-tips", again.rect);
+                        if again.clicked() {
+                            actions.push(Action::ShowTipsAgain);
+                        }
                     }
                 });
             }
@@ -17181,10 +17284,9 @@ impl App {
                             }
                         });
                     }
-                    if ui
-                        .button(RichText::new(t.grammar_add()).color(text))
-                        .clicked()
-                    {
+                    let add = ui.button(RichText::new(t.grammar_add()).color(text));
+                    spotlight::anchor(ui, "settings-grammar", add.rect);
+                    if add.clicked() {
                         actions.push(Action::AddGrammar);
                     }
                     if let Some(refused) = &grammar_refused {
@@ -17207,13 +17309,14 @@ impl App {
             );
             if features {
                 found = true;
-                embossed(ui, tones, false, None, |ui| {
+                let card = embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.features(), "features");
                     let mut picked = advanced;
                     if starter_set_view::features_choice(ui, &t, &mut picked) {
                         actions.push(Action::Setting(Setting::Advanced(picked)));
                     }
                 });
+                spotlight::anchor(ui, "settings-features", card.rect);
             }
             if !found {
                 ui.label(RichText::new(t.settings_search_nothing(&typed)).color(text));
@@ -20768,7 +20871,9 @@ fn note_badges(
             BadgeValue::Text(name)
         });
         let kind = (icons::KIND, None);
-        if badge(ui, look, kind, t.badge_kind(), value, choosing).clicked() {
+        let kind = badge(ui, look, kind, t.badge_kind(), value, choosing);
+        spotlight::anchor(ui, "note-kind", kind.rect);
+        if kind.clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
         }
         let importance = match note.importance {
@@ -20786,16 +20891,16 @@ fn note_badges(
         let area = placed.area.as_ref();
         let colour = area.and_then(|a| area_colour(a.colour.as_deref()));
         let place = place_line(t, placed).unwrap_or_else(|| t.unsorted().to_string());
-        if badge(
+        let place = badge(
             ui,
             look,
             (icons::NO_AREA_ICON, colour),
             t.badge_place(),
             Some(BadgeValue::Text(&place)),
             changes,
-        )
-        .clicked()
-        {
+        );
+        spotlight::anchor(ui, "note-place", place.rect);
+        if place.clicked() {
             actions.push(Action::AskFileInto(vec![note.id.clone()]));
         }
         let captured = when(t, note.captured);
@@ -20847,7 +20952,12 @@ fn note_badges(
             let (icon, name) = text_format_look(t, &note.text_format);
             let value = Some(BadgeValue::Icon(icon, name));
             let setting = (icons::TEXT_FORMAT, None);
-            if badge(ui, look, setting, t.badge_text_format(), value, changes).clicked() {
+            let format = badge(ui, look, setting, t.badge_text_format(), value, changes);
+            // Its small editor picks a Code text's language (obf-1036).
+            if changes && note.text_format == text_format::CODE {
+                spotlight::anchor(ui, "note-format-code", format.rect);
+            }
+            if format.clicked() {
                 actions.push(Action::Badge(Some(NoteBadge::Format)));
             }
         }
@@ -20928,6 +21038,8 @@ fn note_badges(
             None,
             true,
         );
+        // Its menu holds Remind me… (obf-1034).
+        spotlight::anchor(ui, "note-add-badge", add.rect);
         let id = note.id.clone();
         let text = ui.visuals().text_color();
         egui::Popup::menu(&add).show(|ui| {
@@ -21439,9 +21551,11 @@ fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
     let text = ui.visuals().text_color();
     if let [kind] = kinds {
         let add = icon_button(ui, icons::ADD, t.menu_new_note(), text);
+        spotlight::anchor(ui, "add", add.rect);
         return add.clicked().then_some(*kind);
     }
     let add = icon_button(ui, icons::ADD, t.add_here(), text);
+    spotlight::anchor(ui, "add", add.rect);
     let mut picked = None;
     egui::Popup::menu(&add).show(|ui| {
         for kind in kinds {
@@ -21473,6 +21587,7 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
         (icons::NOTES_FULL, t.show_notes_compact())
     };
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
+    spotlight::anchor(ui, "compact", rect);
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
     // The hover under the tint, so the selected look stays.
     theme::icon_button_back(ui, &resp, rect);

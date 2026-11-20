@@ -164,8 +164,12 @@ One switch of the person, the same on all of their own Devices, asked with the S
 _Avoid_: mode, level, beginner, expert
 
 **Help Note**:
-A Note the app makes to explain itself (#180, ADR 0042): "Quick start", a Checklist of steps to try, "What the icons mean", with pictures of the icons, and one "What's new in X.Y.Z" per release, holding its Play notes. They are filed into their own Area "Old Brain Fix", never Unsorted and never Nudged, in the language of the Device that makes them first. Each is made once per person: a new person gets the first two, an update that release's What's new and the two it never got. The user edits, moves and deletes them like any Note; a deleted one does not come back.
-_Avoid_: tutorial, onboarding, tip, changelog Note
+A Note the app makes to explain itself (#180, ADR 0042): one "What's new in X.Y.Z" per release, holding its Play notes, made for an update to that release. They are filed into their own Area "Old Brain Fix", never Unsorted and never Nudged, in the language of the Device that makes them first, each once per person. "Quick start", a Checklist of steps to try, and "What the icons mean" were made for new people up to 0.6.1; from 0.7.0 Spotlights explain the screens instead and no Device makes them, while those already made stay as the user has them (ADR 0055). The user edits, moves and deletes them like any Note; a deleted one does not come back.
+_Avoid_: tutorial, onboarding, tip (that is a Spotlight), changelog Note
+
+**Spotlight**:
+A tip that explains one thing on a screen (obf-1043, ADR 0055): the page dims around it and a card beside it says in one sentence what it does. A screen shows its Spotlights one after another on a person's first visit, Next the next one, Skip or a tap outside ending them; from then on only a new thing on the screen gets its Spotlight, once. Each Device keeps which ones it showed, a Device updated from an earlier version counting those of what it already had as shown, and "Show tips again" in the Settings brings them back on that Device. German: Tipp.
+_Avoid_: tutorial, coach mark, hint, Help Note
 
 ### Routines and Reminders
 

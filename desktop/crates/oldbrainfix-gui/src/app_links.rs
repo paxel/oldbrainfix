@@ -194,7 +194,12 @@ pub struct LinkedRow {
 /// it reads, its capture time where it has none. Nothing while `linking`
 /// is empty. A click on a row opens its Note as its app link does.
 pub fn linked_from(ui: &mut Ui, t: &L10n, of: &str, linking: &[Note]) {
-    for row in linked_from_rows(ui, t, linking) {
+    let rows = linked_from_rows(ui, t, linking);
+    // Where a tip points at it (obf-1043): the rows together.
+    if let Some(all) = rows.iter().map(|row| row.rect).reduce(|a, b| a.union(b)) {
+        crate::spotlight::anchor(ui, "note-linked-from", all);
+    }
+    for row in rows {
         linked_row_clicks(ui, of, &row);
     }
 }

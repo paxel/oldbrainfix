@@ -48,6 +48,7 @@ use crate::schedule_text::{
     weekday_text,
 };
 use crate::session_editor::{SessionDraft, SessionIntent};
+use crate::spotlight;
 use crate::theme::{self, Tones};
 
 /// The Re-nag intervals offered, in minutes (the phone's choices).
@@ -1048,7 +1049,7 @@ impl RoutineEditor {
         let open = !self.locked;
         let mut changed = false;
         ui.add_enabled_ui(open, |ui| {
-            embossed(ui, tones, false, None, |ui| {
+            let schedule = embossed(ui, tones, false, None, |ui| {
                 changed |= self.sentence_line(ui, t, now);
                 changed |= self.quick_line(ui, t, now);
                 let mut advanced = self.advanced;
@@ -1070,11 +1071,12 @@ impl RoutineEditor {
                     changed |= self.end_editor(ui, t);
                 }
             });
+            spotlight::anchor(ui, "routine-schedule", schedule.rect);
             embossed(ui, tones, false, None, |ui| {
                 changed |= self.times_editor(ui, t, tones, once, shown_now);
             });
         });
-        embossed(ui, tones, false, None, |ui| {
+        let next = embossed(ui, tones, false, None, |ui| {
             ui.label(RichText::new(t.next_occurrences()).strong().color(text));
             if self.schedule.is_some() && self.next.is_empty() {
                 ui.label(RichText::new(t.never_due()).color(text));
@@ -1084,9 +1086,12 @@ impl RoutineEditor {
                 ui.label(RichText::new(line).color(text));
             }
         });
-        embossed(ui, tones, false, None, |ui| self.heads_ups_editor(ui, t));
+        spotlight::anchor(ui, "routine-next", next.rect);
+        let heads_ups = embossed(ui, tones, false, None, |ui| self.heads_ups_editor(ui, t));
+        spotlight::anchor(ui, "routine-heads-ups", heads_ups.rect);
         ui.add_enabled_ui(open, |ui| {
-            embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
+            let renag = embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
+            spotlight::anchor(ui, "routine-renag", renag.rect);
             embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
         });
         changed

@@ -252,28 +252,8 @@ void main() {
       return [for (final n in Notes(store).inside(area.id)) n.text]..sort();
     }
 
-    testWidgets('a fresh install gets Quick start and What the icons mean, '
-        'no What\'s new, nothing Unsorted', (tester) async {
-      await start(tester);
-      await tester.tap(find.byKey(const ValueKey('first-new')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Start'));
-      await tester.pumpAndSettle();
-      // Named "Quick start", the desktop's way folded under it (#260).
-      expect(helpNotes(), [
-        'Quick start\n${quickStartDescription(en)}',
-        helpIconsText(en),
-      ]);
-      expect(Notes(store).unsorted(), isEmpty);
-      final person = store.ownProfile!.id;
-      final list = Checklists(store).byNote(HelpNotes.quickStartId(person))!;
-      expect([for (final l in list.lines) l.text], quickStartLines(en));
-      final icons = Notes(store).byId(HelpNotes.iconsId(person))!;
-      expect(icons.photos, hasLength(helpIconGroups.length));
-    });
-
-    testWidgets('a fresh install\'s Agenda shows the Quick start as one row '
-        'with its count, not a row per Line', (tester) async {
+    testWidgets('a fresh install gets no help Note: no Quick start, no '
+        'What the icons mean (obf-1043), no What\'s new', (tester) async {
       // Past the alarm setup, so the first start ends on the Agenda.
       store.alarmSetupDone = true;
       await start(tester);
@@ -281,25 +261,25 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Start'));
       await tester.pumpAndSettle();
-      final id = HelpNotes.quickStartId(store.ownProfile!.id);
-      expect(find.byKey(ValueKey('checklist-row-$id')), findsOneWidget);
-      expect(find.text('Quick start: 8 of 8 open'), findsOneWidget);
-      for (final line in quickStartLines(en)) {
-        expect(find.text(line), findsNothing);
+      final person = store.ownProfile!.id;
+      expect(Places(store).areaById(HelpNotes.areaId(person)), isNull);
+      for (final id in [
+        HelpNotes.quickStartId(person),
+        HelpNotes.iconsId(person),
+      ]) {
+        expect(store.loggedHistory(id), isEmpty, reason: id);
       }
+      expect(store.localSetting(HelpNotes.versionSetting), '0.4.0');
+      expect(find.textContaining('Quick start'), findsNothing);
     });
 
-    testWidgets('an update gets that release\'s What\'s new and the two '
-        'help Notes, in the Device\'s language', (tester) async {
+    testWidgets('an update gets that release\'s What\'s new only, in the '
+        'Device\'s language', (tester) async {
       store
         ..applyProfileDefaults(name: 'Pixel')
         ..starterSetOffered = true;
       await start(tester, language: 'de');
-      expect(helpNotes(), [
-        'Neu in 0.4.0\n\nNeu\n• Hilfe-Notizen.',
-        'Schnellstart\n${quickStartDescription(de)}',
-        helpIconsText(de),
-      ]);
+      expect(helpNotes(), ['Neu in 0.4.0\n\nNeu\n• Hilfe-Notizen.']);
       // The next start makes nothing again.
       final written = store.allEntries().length;
       await tester.pumpWidget(const SizedBox());

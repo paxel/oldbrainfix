@@ -890,6 +890,35 @@ replace a law of Both apps where they say so. A desktop law marked
   "More…".
 - Errors name the cause and the fix in one sentence each.
 
+### Spotlights
+
+- **Each screen explains itself** (obf-1043, ADR 0055): on a person's
+  first visit to a screen its Spotlights show one after another, and
+  from then on only a new thing on it gets its Spotlight, once. Each
+  screen has its manifest of tips, in the order they show (phone:
+  `spotlightManifest` in `spotlight.dart`; desktop: `spotlight.rs`); a
+  ticket that adds something to a screen adds its tip there, in English
+  and German.
+- **The look**: the whole window dims, black at 60 %, with the element
+  cut out of the dim, a little larger than it and with rounded
+  corners. A card of the theme beside it, on the side with room, over
+  it only where a tall element leaves no room elsewhere, at most
+  400 wide and 24 from the window's edges, holds one sentence of at
+  most 15 words, what the element does for the person, without "tap" or
+  "click" where it can do without, then Skip and Next at its bottom
+  right, Next reading "Got it" on the screen's last tip.
+- **It never traps input**: Skip is always on the card; Skip, a tap or
+  click outside the card, Esc and Back end the screen's tour and count
+  its other tips as shown. A tip is counted as shown before it shows.
+- A tour starts only once the screen is on top, its page transition
+  settled, with no dialog, menu or other page over it; an element below
+  the fold is scrolled into sight first. A tip whose element is not on
+  the screen (Advanced only in Simple, Linked from without a link)
+  waits for a visit where it is.
+- The marks are this Device's (local settings), and "Show tips again"
+  in the Settings brings every tip back on it. Tests, kittests and the
+  screenshot generators show none; no guide frame shows a tip.
+
 ### Look
 
 - Light mode: a light teal background. Dark mode: anthracite. The

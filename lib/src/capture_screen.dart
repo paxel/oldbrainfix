@@ -17,6 +17,7 @@ import 'note_editor_screen.dart';
 import 'photo_platform.dart';
 import 'photo_views.dart';
 import 'routine_editor_screen.dart';
+import 'spotlight.dart';
 import 'sync_line.dart';
 import 'voice_recorder.dart';
 import 'voice_platform.dart';
@@ -821,8 +822,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       child: Text(t.save),
                     ),
                   )
+                // No tip over the stop button while a recording runs.
+                else if (_voiceMode)
+                  NudgeButtons(onPicked: _save)
                 else
-                  NudgeButtons(onPicked: _save),
+                  Spotlight(
+                    id: 'capture-nudge',
+                    child: NudgeButtons(onPicked: _save),
+                  ),
                 // While recording, the big stop button comes first.
                 if (!recording) ?_moreButton(context),
               ],
@@ -855,15 +862,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
     if (_lock?.locked ?? false) return null;
     return Align(
       alignment: Alignment.centerLeft,
-      child: ListenableBuilder(
-        listenable: _text,
-        builder: (context, _) => TextButton.icon(
-          key: const ValueKey('captureToEditor'),
-          onPressed: _captured != null || _text.text.trim().isNotEmpty
-              ? _toEditor
-              : null,
-          icon: const Icon(Icons.open_in_full),
-          label: Text(context.t.more),
+      child: Spotlight(
+        id: 'capture-more',
+        child: ListenableBuilder(
+          listenable: _text,
+          builder: (context, _) => TextButton.icon(
+            key: const ValueKey('captureToEditor'),
+            onPressed: _captured != null || _text.text.trim().isNotEmpty
+                ? _toEditor
+                : null,
+            icon: const Icon(Icons.open_in_full),
+            label: Text(context.t.more),
+          ),
         ),
       ),
     );

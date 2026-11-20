@@ -28,6 +28,7 @@ import 'place_names.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'share_area_screen.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 import 'tag_tree_screen.dart';
 import 'text_marks_view.dart';
@@ -955,7 +956,13 @@ class _AreaScreenState extends State<AreaScreen>
                         _load();
                       }),
                     ),
-                    CompactNotesButton(compact: compact, onChanged: setCompact),
+                    Spotlight(
+                      id: 'area-compact',
+                      child: CompactNotesButton(
+                        compact: compact,
+                        onChanged: setCompact,
+                      ),
+                    ),
                     if (mayTick(_diary)) selectButton(context),
                   ],
           ),
@@ -966,10 +973,13 @@ class _AreaScreenState extends State<AreaScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    BrowserSearchField(
-                      controller: _query,
-                      hint: t.searchAreaHint,
-                      onChanged: (_) => _reload(),
+                    Spotlight(
+                      id: 'area-search',
+                      child: BrowserSearchField(
+                        controller: _query,
+                        hint: t.searchAreaHint,
+                        onChanged: (_) => _reload(),
+                      ),
                     ),
                     PersonFilterChips(
                       store: widget.places.store,
@@ -1016,11 +1026,14 @@ class _AreaScreenState extends State<AreaScreen>
           ),
           floatingActionButton: !_writes
               ? null
-              : Builder(
-                  builder: (button) => FloatingActionButton(
-                    tooltip: t.addHere,
-                    onPressed: () => _add(button),
-                    child: const Icon(Icons.add),
+              : Spotlight(
+                  id: 'area-add',
+                  child: Builder(
+                    builder: (button) => FloatingActionButton(
+                      tooltip: t.addHere,
+                      onPressed: () => _add(button),
+                      child: const Icon(Icons.add),
+                    ),
                   ),
                 ),
         ),
@@ -1200,7 +1213,13 @@ class _TopicScreenState extends State<TopicScreen>
                         _load();
                       }),
                     ),
-                    CompactNotesButton(compact: compact, onChanged: setCompact),
+                    Spotlight(
+                      id: 'area-compact',
+                      child: CompactNotesButton(
+                        compact: compact,
+                        onChanged: setCompact,
+                      ),
+                    ),
                     if (mayTick(_diary)) selectButton(context),
                   ],
           ),
@@ -1211,10 +1230,13 @@ class _TopicScreenState extends State<TopicScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    BrowserSearchField(
-                      controller: _query,
-                      hint: t.searchTopicHint,
-                      onChanged: (_) => _reload(),
+                    Spotlight(
+                      id: 'area-search',
+                      child: BrowserSearchField(
+                        controller: _query,
+                        hint: t.searchTopicHint,
+                        onChanged: (_) => _reload(),
+                      ),
                     ),
                     PersonFilterChips(
                       store: widget.places.store,
@@ -1284,11 +1306,14 @@ class _TopicScreenState extends State<TopicScreen>
           ),
           floatingActionButton: !_writes
               ? null
-              : Builder(
-                  builder: (button) => FloatingActionButton(
-                    tooltip: t.addHere,
-                    onPressed: () => _add(button),
-                    child: const Icon(Icons.add),
+              : Spotlight(
+                  id: 'area-add',
+                  child: Builder(
+                    builder: (button) => FloatingActionButton(
+                      tooltip: t.addHere,
+                      onPressed: () => _add(button),
+                      child: const Icon(Icons.add),
+                    ),
                   ),
                 ),
         ),

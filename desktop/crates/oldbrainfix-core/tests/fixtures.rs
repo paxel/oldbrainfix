@@ -2128,42 +2128,15 @@ fn the_areas_read_by_the_name_shown_as_the_dart_core_reads_them() -> TestResult 
 
 /// The texts of the generator's `help` scenario, English or German.
 fn help_texts(german: bool) -> oldbrainfix_core::HelpTexts<'static> {
-    const EN: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
-    const DE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2];
-    if german {
-        oldbrainfix_core::HelpTexts {
-            area_name: "Old Brain Fix".into(),
-            quick_start_title: "Schnellstart".into(),
-            quick_start_lines: vec![
-                "Einen Gedanken mit + erfassen".into(),
-                "Ihn in einen Bereich einsortieren".into(),
-            ],
-            quick_start_description:
-                "Hingehen:\n1. [Agenda](oldbrainfix://agenda)\n\nAuf dem Desktop:\nErfassen: Strg+N"
-                    .into(),
-            icons_text:
-                "Was die Symbole bedeuten\n\nArt: was die Notiz ist\n\n[Anleitung](oldbrainfix://guide)"
-                    .into(),
-            icon_pictures: vec![DE],
-            whats_new_title: Box::new(|v| format!("Neu in {v}")),
-        }
-    } else {
-        oldbrainfix_core::HelpTexts {
-            area_name: "Old Brain Fix".into(),
-            quick_start_title: "Quick start".into(),
-            quick_start_lines: vec![
-                "Capture a thought with +".into(),
-                "File it into an Area".into(),
-            ],
-            quick_start_description:
-                "Go there:\n1. [Agenda](oldbrainfix://agenda)\n\nOn the desktop:\nCapture: Ctrl+N"
-                    .into(),
-            icons_text:
-                "What the icons mean\n\nKind: what the Note is\n\n[User guide](oldbrainfix://guide)"
-                    .into(),
-            icon_pictures: vec![EN],
-            whats_new_title: Box::new(|v| format!("What's new in {v}")),
-        }
+    oldbrainfix_core::HelpTexts {
+        area_name: "Old Brain Fix".into(),
+        whats_new_title: Box::new(move |v| {
+            if german {
+                format!("Neu in {v}")
+            } else {
+                format!("What's new in {v}")
+            }
+        }),
     }
 }
 
@@ -2194,8 +2167,8 @@ fn write_help_steps(store: &Store) -> Result<Vec<Vec<String>>, Box<dyn std::erro
     make("0.4.0", true, false)?;
     make("0.4.0", true, false)?;
     let person = OwnProfile::new(store).get()?.ok_or("a Profile")?.id;
-    Notes::new(store).trash(&help_notes::quick_start_id(&person))?;
     make("0.4.1", false, true)?;
+    Notes::new(store).trash(&help_notes::whats_new_id(&person, "0.4.1"))?;
     store.remove_local_setting(help_notes::VERSION_SETTING)?;
     make("0.4.1", false, false)?;
     Places::new(store).delete_area(&help_notes::area_id(&person), NotesGo::Trash)?;

@@ -1,18 +1,16 @@
 //! The help Notes on the desktop (#180), driven headless: the first start
-//! answered with "New to Old Brain Fix" files Quick start and What the
-//! icons mean into the Area "Old Brain Fix", and no What's new; an
-//! ordinary start makes what was never made, in the computer's language,
-//! once; an App not handed the version makes none, as in every other
-//! test.
+//! answered with "New to Old Brain Fix" makes none, neither Quick start
+//! nor What the icons mean (obf-1043, ADR 0055) nor a What's new; an
+//! ordinary start makes the What's new of this version, in the
+//! computer's language, once; an App not handed the version makes none,
+//! as in every other test.
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::help_notes::{self, VERSION_SETTING, parse_whats_new};
-use oldbrainfix_core::{Checklists, Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_core::{Notes, OwnProfile, Places, SigningKey, Store};
 use oldbrainfix_gui::App;
-use oldbrainfix_gui::help_notes::{
-    GROUPS, WHATS_NEW, icons_text, quick_start_description, quick_start_lines,
-};
+use oldbrainfix_gui::help_notes::{GROUPS, WHATS_NEW, icons_text};
 use oldbrainfix_gui::l10n::L10n;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -61,59 +59,39 @@ fn help_texts(store: &Store) -> Result<Vec<String>, Box<dyn std::error::Error>> 
 }
 
 #[test]
-fn the_first_start_files_quick_start_and_the_icons_and_no_whats_new() -> TestResult {
+fn the_first_start_makes_no_help_note() -> TestResult {
     let mut app = App::new(store()?, "en");
     app.set_profile_defaults(Box::new(|store| {
         OwnProfile::new(store).apply_defaults("Desk", None)
     }));
     app.offer_restore();
     app.set_help("0.4.0")?;
-    // Nothing before the first start is answered.
-    assert!(Places::new(app.store()).areas()?.is_empty());
     let mut harness = harness(app);
     click(&mut harness, "New to Old Brain Fix");
     click(&mut harness, "Start");
     let desk = harness.state().store();
-    let t = L10n::new("en");
-    // Named "Quick start", the desktop's way folded under it (#260).
-    assert_eq!(
-        help_texts(desk)?,
-        [
-            format!("Quick start\n{}", quick_start_description(&t)),
-            icons_text(&t)
-        ]
-    );
-    assert!(Notes::new(desk).unsorted()?.is_empty());
     let person = OwnProfile::new(desk).get()?.ok_or("a Profile")?.id;
-    let list = Checklists::new(desk)
-        .by_note(&help_notes::quick_start_id(&person))?
-        .ok_or("the Checklist")?;
-    let lines: Vec<String> = list.lines.into_iter().map(|l| l.text).collect();
-    assert_eq!(lines, quick_start_lines(&t));
-    let icons = Notes::new(desk)
-        .by_id(&help_notes::icons_id(&person))?
-        .ok_or("the icons")?;
-    assert_eq!(icons.photos.len(), GROUPS.len());
-    // The Agenda shows the Quick start as one row with its count, not a
-    // row per Line (Q549).
+    let places = Places::new(desk);
+    assert!(places.area_by_id(&help_notes::area_id(&person))?.is_none());
+    assert!(!places.areas()?.iter().any(|a| a.name == "Old Brain Fix"));
+    assert!(Notes::new(desk).unsorted()?.is_empty());
+    assert_eq!(
+        desk.local_setting(VERSION_SETTING)?.as_deref(),
+        Some("0.4.0")
+    );
+    // No Quick start row on the Agenda.
     harness.step();
     assert!(
         harness
-            .query_all_by_label_contains("Quick start: 8 of 8 open")
+            .query_all_by_label_contains("Quick start")
             .next()
-            .is_some()
+            .is_none()
     );
-    for line in quick_start_lines(&t) {
-        assert!(
-            harness.query_all_by_label_contains(&line).next().is_none(),
-            "{line}"
-        );
-    }
     Ok(())
 }
 
 #[test]
-fn an_ordinary_start_makes_what_was_never_made_in_its_language_once() -> TestResult {
+fn an_ordinary_start_makes_its_whats_new_in_its_language_once() -> TestResult {
     let desk = store()?;
     OwnProfile::new(&desk).apply_defaults("Desk", None)?;
     Places::new(&desk).add_area("Doctor")?;
@@ -122,20 +100,17 @@ fn an_ordinary_start_makes_what_was_never_made_in_its_language_once() -> TestRes
     assert!(!app.welcoming());
     app.set_help("0.4.0")?;
     let t = L10n::new("de");
-    // An update from before the help Notes also gets the bundled What's
-    // new of this version, in the computer's language.
+    // An update from before the help Notes gets the bundled What's new
+    // of this version, in the computer's language, and nothing else.
     let bundled = parse_whats_new(WHATS_NEW);
     let notes = bundled
         .get("0.4.0")
         .and_then(|n| n.get("de"))
         .ok_or("the bundled German What's new of 0.4.0")?;
-    let mut expected = vec![
-        format!("{}\n\n{notes}", t.help_whats_new_title("0.4.0")),
-        format!("Schnellstart\n{}", quick_start_description(&t)),
-        icons_text(&t),
-    ];
-    expected.sort();
-    assert_eq!(help_texts(app.store())?, expected);
+    assert_eq!(
+        help_texts(app.store())?,
+        [format!("{}\n\n{notes}", t.help_whats_new_title("0.4.0"))]
+    );
     assert_eq!(
         app.store().local_setting(VERSION_SETTING)?.as_deref(),
         Some("0.4.0")

@@ -12,6 +12,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Der Import nimmt auch AsciiDoc-, Org-, reStructuredText- und HTML-Dateien, jede als formatierte Notiz, ohne etwas darin auszuführen. ([obf-1038](https://github.com/paxel/oldbrainfix/issues/348))
 - Code wird nach seiner Sprache eingefärbt: ein Code-Text nach der neben „Code“ gewählten, ein Codeblock nach der in seiner ersten Zeile genannten. ([obf-1036](https://github.com/paxel/oldbrainfix/issues/346))
 - „Grammatik hinzufügen …“ in den Einstellungen färbt Code in weiteren Sprachen aus einer Sublime-Syntaxdatei, auf all deinen Geräten und nur für dich. ([obf-1037](https://github.com/paxel/oldbrainfix/issues/347))
+- Tipps erklären jede Seite beim ersten Besuch und danach Neues einmal; wer neu ist, bekommt sie statt der Hilfe-Notizen zum Schnellstart. ([obf-1043](https://github.com/paxel/oldbrainfix/issues/353))
 
 ### Geändert
 

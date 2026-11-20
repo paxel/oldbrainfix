@@ -63,6 +63,7 @@ import 'setup_screen.dart';
 import 'speech_model_screen.dart';
 import 'speech_offer_screen.dart';
 import 'speech_platform.dart';
+import 'spotlight.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
 import 'sync_runner.dart';
@@ -190,6 +191,11 @@ class OldBrainFixApp extends StatefulWidget {
   /// a test hands one in.
   final HelpSetup? help;
 
+  /// Whether the screens explain themselves with Spotlights (obf-1043);
+  /// only the app `main.dart` starts, so no test or screenshot meets a
+  /// tip unless it switches them on.
+  final bool spotlights;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -225,6 +231,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.profile = const NoProfilePlatform(),
     this.workDir,
     this.help,
+    this.spotlights = false,
   });
 
   @override
@@ -316,6 +323,11 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     // start only once it is past its first screen (ADR 0017), so a Device
     // being added takes the Profile of the user's other Devices.
     if (!_places.starterSetDue) unawaited(_profile.applyDefaults());
+    // Before the first start or the help Notes change anything: a Device
+    // that ran an earlier version shows only the tips of what is new.
+    if (widget.spotlights) {
+      seedSpotlights(widget.store, firstStartDue: _places.starterSetDue);
+    }
   }
 
   @override
@@ -375,6 +387,11 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     ),
   );
 
+  /// [child] under the Spotlights' scope while they are on (obf-1043).
+  Widget _spotlit(Widget child) => widget.spotlights
+      ? SpotlightScope(store: widget.store, child: child)
+      : child;
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     navigatorKey: widget.navigatorKey,
@@ -384,7 +401,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     theme: _light,
     darkTheme: _dark,
     themeMode: _themeMode,
-    navigatorObservers: [_scroll, _routes],
+    navigatorObservers: [_scroll, _routes, spotlightRoutes],
     builder: (context, child) => FrameTimesScope(
       frameTimes: _frameTimes,
       child: FrameTimesOverlay(
@@ -454,9 +471,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                               child: HomeShortcutsScope(
                                                                 shortcuts: widget
                                                                     .shortcuts,
-                                                                child:
-                                                                    child ??
-                                                                    const SizedBox.shrink(),
+                                                                child: _spotlit(
+                                                                  child ??
+                                                                      const SizedBox.shrink(),
+                                                                ),
                                                               ),
                                                             ),
                                                           ),
@@ -732,7 +750,7 @@ class _HomeState extends State<_Home> {
       unawaited(_tallyOpened());
       unawaited(_autoBackupStart());
       // Past the first start already: what this version's help Notes
-      // still owe (#180), an update's What's new among them.
+      // still owe (#180), an update's What's new.
       if (_starterSetOffered) _helpDue(fresh: false);
     });
     // Back from the background, or from a settings page: apply what was

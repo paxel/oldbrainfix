@@ -6773,4 +6773,118 @@ class AppLocalizationsDe extends AppLocalizations {
   String grammarRefused(String file, String reason) {
     return '$file wurde nicht hinzugefügt: $reason';
   }
+
+  @override
+  String get spotNext => 'Weiter';
+
+  @override
+  String get spotSkip => 'Überspringen';
+
+  @override
+  String get spotDone => 'Verstanden';
+
+  @override
+  String get settingsShowTips => 'Tipps wieder zeigen';
+
+  @override
+  String get settingsShowTipsDone => 'Jede Seite zeigt ihre Tipps wieder.';
+
+  @override
+  String get spotAgendaPlus =>
+      '„+“ erfasst eine Notiz; halte es gedrückt, um sofort zu schreiben.';
+
+  @override
+  String get spotAgendaToday =>
+      'Unter Heute steht, was fällig ist; hake es ab, sobald es erledigt ist.';
+
+  @override
+  String get spotAgendaUnsorted =>
+      'Noch nicht abgelegte Notizen warten hier unsortiert, bis du sie sortierst.';
+
+  @override
+  String get spotAgendaBrowse =>
+      'Der Ordner öffnet deine Bereiche und Themen mit den abgelegten Notizen.';
+
+  @override
+  String get spotAgendaQuiet =>
+      'Heute ruhig: Bis Mitternacht klingelt nichts, und alles bleibt zu sehen.';
+
+  @override
+  String get spotAgendaProfile =>
+      'Dein Bild öffnet dein Profil, mit Einstellungen, Synchronisieren und Sicherungen.';
+
+  @override
+  String get spotCaptureNudge =>
+      'Jeder Knopf speichert die Notiz, und dann erinnert dich ein Stupser ans Sortieren.';
+
+  @override
+  String get spotCaptureMore =>
+      '„Mehr“ speichert die Notiz und öffnet sie im vollen Editor.';
+
+  @override
+  String get spotEditorKind =>
+      'Die Art macht aus dieser Notiz eine Checkliste, eine Einkaufsliste und mehr.';
+
+  @override
+  String get spotEditorPlace =>
+      'Hier legst du die Notiz in einem Bereich oder Thema ab.';
+
+  @override
+  String get spotEditorRemind =>
+      'Unter „+“ richtet „Erinnere mich …“ eine Erinnerung oder Routine für diese Notiz ein.';
+
+  @override
+  String get spotEditorCodeLanguage =>
+      'Hier wählst du auch die Sprache, nach der dieser Code-Text eingefärbt wird.';
+
+  @override
+  String get spotEditorLinkedFrom =>
+      '„Verlinkt von“ nennt die Notizen, deren Links zu dieser führen.';
+
+  @override
+  String get spotAreaSearch => 'Die Suche findet die hier abgelegten Notizen.';
+
+  @override
+  String get spotAreaAdd =>
+      '„+“ legt eine neue Notiz oder Liste an, gleich hier abgelegt.';
+
+  @override
+  String get spotCardsView =>
+      'Dies schaltet die Karten zwischen Kompaktansicht und Detailansicht um.';
+
+  @override
+  String get spotUnsortedCard =>
+      'Sortiere jede Notiz: ablegen, zusammenführen oder eine Erinnerung geben.';
+
+  @override
+  String get spotRoutineSentence =>
+      'Schreib, wann sie fällig ist, etwa „jeden Montag um 08:00“.';
+
+  @override
+  String get spotRoutineTimes =>
+      'Füge eine Uhrzeit hinzu; ohne eine ist sie den ganzen Tag fällig.';
+
+  @override
+  String get spotRoutineHeadsUps =>
+      'Eine Vorwarnung meldet sich vorher, etwa 20 Min. davor.';
+
+  @override
+  String get spotRoutineSave =>
+      'Speichern behält den Zeitplan; Zurück speichert ihn auch.';
+
+  @override
+  String get spotSettingsSearch =>
+      'Die Suche findet jede Einstellung über ein Wort darin.';
+
+  @override
+  String get spotSettingsShowTips =>
+      '„Tipps wieder zeigen“ holt auf diesem Gerät alle Tipps zurück.';
+
+  @override
+  String get spotSettingsFeatures =>
+      'Einfach oder Erweitert: Erweitert legt auch Strichlisten, Einheiten, Frösche und Themen an.';
+
+  @override
+  String get spotSettingsGrammar =>
+      '„Grammatik hinzufügen …“ färbt Code in einer weiteren Sprache ein, auf all deinen Geräten.';
 }

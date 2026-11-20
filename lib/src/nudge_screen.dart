@@ -13,6 +13,7 @@ import 'note_selection.dart';
 import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'sorting_unsorted.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 
 /// How many of the oldest Unsorted Notes the Nudge screen shows.
@@ -220,7 +221,13 @@ class _UnsortedScreenState extends State<UnsortedScreen>
                     filter: _filter,
                     onChanged: _filtered,
                   ),
-                  CompactNotesButton(compact: compact, onChanged: setCompact),
+                  Spotlight(
+                    id: 'unsorted-compact',
+                    child: CompactNotesButton(
+                      compact: compact,
+                      onChanged: setCompact,
+                    ),
+                  ),
                   if (mayTick(_unsorted)) selectButton(context),
                 ],
         ),
@@ -240,18 +247,20 @@ class _UnsortedScreenState extends State<UnsortedScreen>
                 text: _filter.isEveryone ? t.noUnsorted : t.nothingFound,
               )
             else
-              ..._sortingCards(
-                context,
-                widget.notes,
-                widget.places,
-                _unsorted,
-                _reload,
-                sorting: _kept,
-                compact: compact,
-                switched: switched,
-                onSwitch: switchView,
-                selected: selecting ? selected : null,
-                onSelect: setSelected,
+              ..._firstSpotlit(
+                _sortingCards(
+                  context,
+                  widget.notes,
+                  widget.places,
+                  _unsorted,
+                  _reload,
+                  sorting: _kept,
+                  compact: compact,
+                  switched: switched,
+                  onSwitch: switchView,
+                  selected: selecting ? selected : null,
+                  onSelect: setSelected,
+                ),
               ),
           ],
         ),
@@ -259,6 +268,12 @@ class _UnsortedScreenState extends State<UnsortedScreen>
     );
   }
 }
+
+/// [cards] with the tip of sorting (obf-1043) on the first one.
+List<Widget> _firstSpotlit(List<Widget> cards) => [
+  for (final (i, card) in cards.indexed)
+    i == 0 ? Spotlight(id: 'unsorted-card', child: card) : card,
+];
 
 /// What runs once a step on the cards [shown] is done: [changed], and once
 /// it sorted the last Unsorted Note the Agenda (#313).

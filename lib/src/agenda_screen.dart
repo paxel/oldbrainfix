@@ -45,6 +45,7 @@ import 'routine_history_screen.dart';
 import 'schedule_text.dart';
 import 'session_view.dart';
 import 'setup_screen.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
 import 'text_marks_view.dart';
@@ -1412,11 +1413,14 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
           ),
           actions: [
             // The Areas list, first in the bar (#221).
-            IconButton(
-              key: const ValueKey('browse'),
-              tooltip: t.browseTooltip,
-              onPressed: _browse,
-              icon: const Icon(Icons.folder_outlined),
+            Spotlight(
+              id: 'agenda-browse',
+              child: IconButton(
+                key: const ValueKey('browse'),
+                tooltip: t.browseTooltip,
+                onPressed: _browse,
+                icon: const Icon(Icons.folder_outlined),
+              ),
             ),
             // What does not fit goes into ⋮ from the end, the folder
             // and the Profile picture never (UI laws, "The bar").
@@ -1462,17 +1466,21 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             if (_quietUntil == null)
               BarAction(
                 key: const ValueKey('quietToday'),
+                spotlight: 'agenda-quiet',
                 label: t.quietToday,
                 onPressed: _quietToday,
                 icon: Icons.notifications_off_outlined,
               ),
             // The Profile picture, where the settings gear was: Settings,
             // Sync and Backups are reached through the Profile page.
-            IconButton(
-              key: const ValueKey('profile'),
-              tooltip: t.profileTitle,
-              onPressed: _openProfile,
-              icon: OwnProfileAvatar(model: widget.profile),
+            Spotlight(
+              id: 'agenda-profile',
+              child: IconButton(
+                key: const ValueKey('profile'),
+                tooltip: t.profileTitle,
+                onPressed: _openProfile,
+                icon: OwnProfileAvatar(model: widget.profile),
+              ),
             ),
           ],
         ),
@@ -1498,11 +1506,14 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
                 onSeen: _seen,
               ),
             if (_unsorted > 0)
-              _CountBanner(
-                bannerKey: const ValueKey('unsortedBanner'),
-                icon: Icons.move_to_inbox,
-                text: t.unsortedBanner(_unsorted),
-                onTap: _openUnsorted,
+              Spotlight(
+                id: 'agenda-unsorted',
+                child: _CountBanner(
+                  bannerKey: const ValueKey('unsortedBanner'),
+                  icon: Icons.move_to_inbox,
+                  text: t.unsortedBanner(_unsorted),
+                  onTap: _openUnsorted,
+                ),
               ),
             if (_waiting > 0)
               _CountBanner(
@@ -1570,7 +1581,7 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             // Nothing of the days before their first read is in (#207):
             // no "Nothing planned" that is not so.
             if (_days != null) ...[
-              _Heading(t.agendaToday),
+              Spotlight(id: 'agenda-today', child: _Heading(t.agendaToday)),
               if (_today.isEmpty)
                 BrowserEmpty(text: t.nothingToday)
               else
@@ -1632,11 +1643,14 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             ],
           ],
         ),
-        floatingActionButton: CapturePlus(
-          plusKey: _plus,
-          heroTag: 'capture',
-          onPressed: _capture,
-          onLongPress: _captureText,
+        floatingActionButton: Spotlight(
+          id: 'agenda-plus',
+          child: CapturePlus(
+            plusKey: _plus,
+            heroTag: 'capture',
+            onPressed: _capture,
+            onLongPress: _captureText,
+          ),
         ),
       ),
     );

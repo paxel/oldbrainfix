@@ -10794,6 +10794,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{file} was not added: {reason}'**
   String grammarRefused(String file, String reason);
+
+  /// The button on a Spotlight's card (obf-1043) that shows the screen's next tip. CONTEXT.md, Spotlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get spotNext;
+
+  /// The button on a Spotlight's card (obf-1043) that ends the screen's tour; its other tips count as seen.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get spotSkip;
+
+  /// The button on the last Spotlight of a screen's tour (obf-1043), in place of Next.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get spotDone;
+
+  /// The Settings row (obf-1043) that brings back every Spotlight on this Device: each screen explains itself again on its next visit.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tips again'**
+  String get settingsShowTips;
+
+  /// Said once Show tips again (obf-1043) was used, on this Device only.
+  ///
+  /// In en, this message translates to:
+  /// **'Each screen shows its tips again.'**
+  String get settingsShowTipsDone;
+
+  /// A Spotlight (obf-1043) on the Agenda's +: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'+ captures a Note; hold it to start typing at once.'**
+  String get spotAgendaPlus;
+
+  /// A Spotlight (obf-1043) on the Agenda's Today heading: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Today lists what is due; tick each one off once it is done.'**
+  String get spotAgendaToday;
+
+  /// A Spotlight (obf-1043) on the Agenda's Unsorted count: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes not filed yet wait here as Unsorted, to be sorted later.'**
+  String get spotAgendaUnsorted;
+
+  /// A Spotlight (obf-1043) on the Agenda's folder: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder opens your Areas and Topics, where filed Notes are.'**
+  String get spotAgendaBrowse;
+
+  /// A Spotlight (obf-1043) on Quiet today in the Agenda's bar or its ⋮ menu (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet today: nothing rings until midnight, and everything still shows.'**
+  String get spotAgendaQuiet;
+
+  /// A Spotlight (obf-1043) on the Agenda's Profile picture: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Your picture opens your Profile, with Settings, Sync and Backups.'**
+  String get spotAgendaProfile;
+
+  /// A Spotlight (obf-1043) on the quick note's three Nudge buttons: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Each button saves the Note, and a Nudge reminds you to sort it then.'**
+  String get spotCaptureNudge;
+
+  /// A Spotlight (obf-1043) on the quick note's More (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'More saves the Note and opens it in the full editor.'**
+  String get spotCaptureMore;
+
+  /// A Spotlight (obf-1043) on the Note editor's kind badge: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'The kind makes this Note a Checklist, a Shopping List and more.'**
+  String get spotEditorKind;
+
+  /// A Spotlight (obf-1043) on the Note editor's Area and Topic badge: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Here you file the Note into an Area or a Topic.'**
+  String get spotEditorPlace;
+
+  /// A Spotlight (obf-1043) on the Note editor's + badge, which holds Remind me… (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'In +, Remind me… sets up a Reminder or a Routine for this Note.'**
+  String get spotEditorRemind;
+
+  /// A Spotlight (obf-1043) on the text format badge of a Code text, where its language is picked (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Here you also pick the language that colours this Code text.'**
+  String get spotEditorCodeLanguage;
+
+  /// A Spotlight (obf-1043) on Linked from at a Note's end (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked from lists the Notes whose links lead to this one.'**
+  String get spotEditorLinkedFrom;
+
+  /// A Spotlight (obf-1043) on the search field of an Area or a Topic: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Search finds the Notes filed here.'**
+  String get spotAreaSearch;
+
+  /// A Spotlight (obf-1043) on the + of an Area or a Topic: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'+ makes a new Note or list, filed right here.'**
+  String get spotAreaAdd;
+
+  /// A Spotlight (obf-1043) on the compact view button of a list of Notes: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'This switches the cards between the compact and the detailed view.'**
+  String get spotCardsView;
+
+  /// A Spotlight (obf-1043) on the first card on the Unsorted list: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort each Note: file it into an Area, merge it or set a Reminder.'**
+  String get spotUnsortedCard;
+
+  /// A Spotlight (obf-1043) on the Routine editor's schedule sentence: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Type when it is due, such as “every Monday at 08:00”.'**
+  String get spotRoutineSentence;
+
+  /// A Spotlight (obf-1043) on the Routine editor's Add time: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a time of day; without one it is due all day.'**
+  String get spotRoutineTimes;
+
+  /// A Spotlight (obf-1043) on the Routine editor's Add heads-up (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'A heads-up tells you ahead of time, such as 20 min before.'**
+  String get spotRoutineHeadsUps;
+
+  /// A Spotlight (obf-1043) on the Routine editor's Save: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Save keeps the schedule; going back saves it too.'**
+  String get spotRoutineSave;
+
+  /// A Spotlight (obf-1043) on the search field of the Settings: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Search finds any setting by a word in it.'**
+  String get spotSettingsSearch;
+
+  /// A Spotlight (obf-1043) on Show tips again in the Settings (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tips again brings back every tip on this Device.'**
+  String get spotSettingsShowTips;
+
+  /// A Spotlight (obf-1043) on Simple and Advanced in the Settings: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Simple or Advanced: Advanced also makes Tallies, Sessions, Frogs and Topics.'**
+  String get spotSettingsFeatures;
+
+  /// A Spotlight (obf-1043) on Add grammar… in the Settings (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Add grammar… colours code in one more language, on all your Devices.'**
+  String get spotSettingsGrammar;
 }
 
 class _AppLocalizationsDelegate

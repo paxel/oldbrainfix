@@ -33,6 +33,7 @@ import 'settings_search.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
 import 'speech_platform.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 
 export 'settings_search.dart' show SettingsHeading, SettingsSection;
@@ -50,8 +51,9 @@ enum _Importing { folder, keep }
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; in Advanced, Ask (#333); the person's own Code
-/// languages (obf-1037); and Send feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
+/// Google Keep export; in Advanced, Ask (#333); Show tips again
+/// (obf-1043); the person's own Code languages (obf-1037); and Send
+/// feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -112,6 +114,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// Show tips again (obf-1043): every screen of this Device shows its
+  /// Spotlights again on its next visit, and the top says so.
+  void _showTips() {
+    resetSpotlights(widget.store);
+    AnnouncementsScope.of(context)?.announce(context.t.settingsShowTipsDone);
   }
 
   @override
@@ -574,11 +583,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // At the top, above the page it filters (#282).
-          BrowserSearchField(
-            key: const ValueKey('settingsSearch'),
-            controller: _search,
-            hint: t.settingsSearchHint,
-            onChanged: _searched,
+          Spotlight(
+            id: 'settings-search',
+            child: BrowserSearchField(
+              key: const ValueKey('settingsSearch'),
+              controller: _search,
+              hint: t.settingsSearchHint,
+              onChanged: _searched,
+            ),
           ),
           Expanded(
             // A short page, built whole.
@@ -1097,6 +1109,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
+                    // The last of this phone's own (obf-1043): every
+                    // screen explains itself again.
+                    SettingsGroup(
+                      children: [
+                        const SizedBox(height: 16),
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [t.settingsShowTips],
+                              child: Spotlight(
+                                id: 'settings-show-tips',
+                                child: ListTile(
+                                  key: const ValueKey('showTips'),
+                                  leading: const Icon(
+                                    Icons.tips_and_updates_outlined,
+                                  ),
+                                  title: Text(t.settingsShowTips),
+                                  onTap: _showTips,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                     // The person's own, on all of their own Devices
                     // (#197): after the settings of this phone, before
                     // Send feedback.
@@ -1112,9 +1149,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             t.featuresAdvanced,
                             t.featuresAdvancedDetail,
                           ],
-                          child: FeaturesChoice(
-                            advanced: _advanced,
-                            onChanged: _setAdvanced,
+                          child: Spotlight(
+                            id: 'settings-features',
+                            child: FeaturesChoice(
+                              advanced: _advanced,
+                              onChanged: _setAdvanced,
+                            ),
                           ),
                         ),
                       ],
@@ -1515,12 +1555,15 @@ class _GrammarSettingsState extends State<_GrammarSettings> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ListTile(
-                      key: const ValueKey('grammarAdd'),
-                      leading: const Icon(Icons.add),
-                      title: Text(t.grammarAdd),
-                      enabled: !_picking,
-                      onTap: _add,
+                    Spotlight(
+                      id: 'settings-grammar',
+                      child: ListTile(
+                        key: const ValueKey('grammarAdd'),
+                        leading: const Icon(Icons.add),
+                        title: Text(t.grammarAdd),
+                        enabled: !_picking,
+                        onTap: _add,
+                      ),
                     ),
                     if (refused != null)
                       Padding(

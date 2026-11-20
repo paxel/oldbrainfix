@@ -13,6 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Import also takes AsciiDoc, Org, reStructuredText and HTML files, each as a formatted Note, without running anything in them. ([obf-1038](https://github.com/paxel/oldbrainfix/issues/348))
 - Code is coloured by its language: a Code text by the one picked beside "Code", a code block by the one its first line names. ([obf-1036](https://github.com/paxel/oldbrainfix/issues/346))
 - "Add grammar…" in Settings colours code in more languages from a Sublime syntax file, on all your Devices and only for you. ([obf-1037](https://github.com/paxel/oldbrainfix/issues/347))
+- Tips explain each screen on a first visit and each new thing once; new people get them instead of the Quick start Help Notes. ([obf-1043](https://github.com/paxel/oldbrainfix/issues/353))
 
 ### Changed
 

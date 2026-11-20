@@ -603,6 +603,8 @@ fn shoot(harness: &mut Harness<'static, App>, name: &str) -> TestResult {
 #[ignore = "needs a GPU or a software Vulkan; run by the release workflow"]
 fn render_the_screenshots() -> TestResult {
     let (store, ids) = demo(&EN)?;
+    // The guide's frames show no tip (obf-1043).
+    oldbrainfix_gui::spotlight::mark_all_seen(&store)?;
     let mut app = App::new(store, "en");
     app.set_wall_clock(Arc::new(utc));
     let mut harness = Harness::builder()
@@ -776,6 +778,8 @@ fn window_with_clock(
 ) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
     let (store, ids, now) = demo_with_clock(x)?;
     prepare(&store, &ids, &now)?;
+    // The guide's frames show no tip (obf-1043).
+    oldbrainfix_gui::spotlight::mark_all_seen(&store)?;
     let mut app = App::new(store, locale);
     app.set_wall_clock(Arc::new(utc));
     let mut harness = Harness::builder()
@@ -861,6 +865,8 @@ fn first_start(
     let store = Store::in_memory(Box::new(move || now), || {
         Ok(SigningKey::from_seed([46; 32]))
     })?;
+    // The guide's frames show no tip (obf-1043).
+    oldbrainfix_gui::spotlight::mark_all_seen(&store)?;
     let mut app = App::new(store, locale);
     app.set_wall_clock(Arc::new(utc));
     app.set_profile_defaults(Box::new(|store| {

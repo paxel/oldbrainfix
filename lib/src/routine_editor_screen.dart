@@ -18,6 +18,7 @@ import 'routine_history_screen.dart';
 import 'schedule_sentence_field.dart';
 import 'schedule_text.dart';
 import 'session_editor.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 
 /// The Device's wall clock: what its own clock shows for an instant.
@@ -724,9 +725,12 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                 icon: const Icon(Icons.delete_outline),
               ),
             // Locked, it saves the Heads-ups alone.
-            TextButton(
-              onPressed: _locked || _canSave ? _save : null,
-              child: Text(t.save),
+            Spotlight(
+              id: 'routine-save',
+              child: TextButton(
+                onPressed: _locked || _canSave ? _save : null,
+                child: Text(t.save),
+              ),
             ),
           ],
         ),
@@ -825,17 +829,20 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ScheduleSentenceField(
-              schedule: _advanced
-                  ? null
-                  : SimpleSchedule(_simpleRepeat(), _start, _times),
-              summary: switch (_schedule) {
-                final schedule? => scheduleText(t, locale, schedule),
-                null => '',
-              },
-              today: _today,
-              now: _sentenceNow,
-              onRead: _takeSentence,
+            Spotlight(
+              id: 'routine-sentence',
+              child: ScheduleSentenceField(
+                schedule: _advanced
+                    ? null
+                    : SimpleSchedule(_simpleRepeat(), _start, _times),
+                summary: switch (_schedule) {
+                  final schedule? => scheduleText(t, locale, schedule),
+                  null => '',
+                },
+                today: _today,
+                now: _sentenceNow,
+                onRead: _takeSentence,
+              ),
             ),
             if (_quick.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -900,10 +907,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                 ),
               ),
             if (!once || _times.isEmpty)
-              ActionChip(
-                avatar: const Icon(Icons.add),
-                label: Text(t.addTime),
-                onPressed: _addTime,
+              Spotlight(
+                id: 'routine-times',
+                child: ActionChip(
+                  avatar: const Icon(Icons.add),
+                  label: Text(t.addTime),
+                  onPressed: _addTime,
+                ),
               ),
           ],
         ),
@@ -932,7 +942,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             child: Text(t.onlyManagers),
           ),
         for (final part in schedule) shown(part),
-        _headsUpsPanel(t),
+        Spotlight(id: 'routine-heads-ups', child: _headsUpsPanel(t)),
         shown(_renagPanel(t)),
         shown(_escalationPanel(t)),
       ],
