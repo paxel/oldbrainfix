@@ -207,10 +207,9 @@ void main() {
       await tester.enterText(find.byType(TextField), 'water the plants');
       await tap(tester, spawnMenu);
       await tap(tester, find.text('Remind me…').last);
-      await tester.ensureVisible(find.text('Every …'));
-      await tap(tester, find.text('Every …'));
 
-      // The editor shows the Note being captured.
+      // The editor shows the Note being captured, at its top, which
+      // scrolls away once Every … is brought into view.
       expect(
         find.descendant(
           of: find.byType(RoutineEditorScreen),
@@ -218,6 +217,8 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
       await tap(
         tester,
         find.descendant(

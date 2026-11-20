@@ -603,7 +603,10 @@ void main() {
       await tester.ensureVisible(find.text('Every …'));
       await tap(tester, find.text('Every …'));
       expect(find.text('New Routine'), findsOneWidget);
+      // Switching scrolled the list, and ensureVisible only sets where it
+      // goes: lay it out there before tapping.
       await tester.ensureVisible(find.text('Once'));
+      await tester.pumpAndSettle();
       await tap(tester, find.text('Once'));
       expect(find.text('New Reminder'), findsOneWidget);
       await tap(tester, find.text('Save'));
