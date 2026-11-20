@@ -1,0 +1,28 @@
+#+TITLE: Week plan
+#+AUTHOR: Ada
+* TODO Shopping :errands:
+  - milk and *butter*
+  - [ ] /fresh/ bread
+    - rye
+  1. first
+  2) second
+** Notes
+Call =Bob= about the +old+ ~car~, see [[https://example.org/a_b][the page]] or [[file:other.org][other]].
+*** Deeper heading
+:PROPERTIES:
+:ID: 1234
+:END:
+#+BEGIN_SRC shell
+  echo "hi"
+  ,* not a heading
+#+END_SRC
+#+begin_quote
+Be kind.
+#+end_quote
+#+INCLUDE: "secret.org"
+| Name | Age |
+|------+-----|
+| Ann  | 3   |
+# a comment
+_underlined_ line\\
+https://example.org/x_y is bare.

@@ -50,7 +50,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 33] = [
+const SCENARIOS: [&str; 34] = [
     "area-order",
     "area-order-shown",
     "attachments",
@@ -67,6 +67,7 @@ const SCENARIOS: [&str; 33] = [
     "hidden-from-ai",
     "history",
     "import",
+    "import-formats",
     "keep",
     "list-switch",
     "markdown",
@@ -2262,6 +2263,78 @@ fn write_import(store: &Store) -> Built {
     Ok(())
 }
 
+/// A document handed to an Import, with what the Dart core read it as.
+type Document = (ImportFile, Option<Value>);
+
+/// The documents the generator's `import-formats` scenario imports, in
+/// the order it handed them over, read back from what it wrote: each its
+/// name, when it was last changed and its bytes from `inputs/`, with what
+/// the Dart core read it as.
+fn documents() -> Result<Vec<Document>, Box<dyn std::error::Error>> {
+    let dir = fixtures().join("import-formats");
+    let listed = read_json(&dir.join("documents.json"))?;
+    let mut out = Vec::new();
+    for document in listed["documents"]
+        .as_array()
+        .ok_or("documents.json lists documents")?
+    {
+        let name = document["name"].as_str().ok_or("a name")?;
+        let modified = match document["modified"].as_str() {
+            Some(at) => Some(parse_time(at)?),
+            None => None,
+        };
+        let file = ImportFile {
+            name: name.into(),
+            modified,
+            bytes: std::fs::read(dir.join("inputs").join(name))?,
+        };
+        out.push((file, document.get("read").cloned()));
+    }
+    Ok(out)
+}
+
+/// The Import of the generator's `import-formats` scenario.
+fn import_formats_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
+    let files: Vec<ImportFile> = documents()?.into_iter().map(|(file, _)| file).collect();
+    Ok(vec![Imports::new(store).folder("From Documents", &files)?])
+}
+
+/// The generator's `import-formats` scenario.
+fn write_import_formats(store: &Store) -> Built {
+    import_formats_into(store)?;
+    Ok(())
+}
+
+#[test]
+fn documents_of_other_tools_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::import_formats::{self, ImportFormat};
+    let mut checked = 0;
+    for (file, read) in documents()? {
+        let extension = file
+            .name
+            .rsplit_once('.')
+            .map(|(_, e)| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        let format = ImportFormat::of_extension(&extension);
+        let Some(format) = format else {
+            assert_eq!(read, None, "{}", file.name);
+            continue;
+        };
+        let text = String::from_utf8(file.bytes)?;
+        let ours = import_formats::read(format, &text);
+        let theirs = read.ok_or("the Dart core read it")?;
+        assert_eq!(
+            json!({ "text": ours.text, "title": ours.title }),
+            theirs,
+            "{}",
+            file.name
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 7);
+    Ok(())
+}
+
 /// The generator's `_keepTakeout`: the Takeout the `keep` scenario
 /// imports, as an app hands its entries over.
 fn keep_takeout() -> Vec<ImportFile> {
@@ -2381,7 +2454,11 @@ fn summary_json(s: &ImportSummary) -> Value {
 #[test]
 fn imports_come_to_what_the_dart_core_says() -> TestResult {
     type Into = fn(&Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>>;
-    let scenarios: [(&str, Into); 2] = [("import", import_into), ("keep", keep_into)];
+    let scenarios: [(&str, Into); 3] = [
+        ("import", import_into),
+        ("import-formats", import_formats_into),
+        ("keep", keep_into),
+    ];
     for (scenario, into) in scenarios {
         let store = writer_store()?;
         let summaries: Vec<Value> = into(&store)?.iter().map(summary_json).collect();
@@ -2656,7 +2733,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 33] = [
+    let writers: [(&str, Writer); 34] = [
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
         ("attachments", write_attachments),
@@ -2673,6 +2750,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("hidden-from-ai", write_hidden_from_ai),
         ("history", write_history),
         ("import", write_import),
+        ("import-formats", write_import_formats),
         ("keep", write_keep),
         ("list-switch", write_list_switch),
         ("markdown", write_markdown),

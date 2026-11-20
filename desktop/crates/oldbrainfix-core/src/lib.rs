@@ -37,6 +37,7 @@ pub mod help_notes;
 pub mod hidden;
 pub mod history;
 pub mod ics;
+pub mod import_formats;
 pub mod imports;
 pub mod join;
 pub mod keys;

@@ -5259,7 +5259,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importFolderDetail =>
-      'Each Markdown or text file in it becomes a Note in a new Area, dated when the file was last changed.';
+      'Each Markdown, text, AsciiDoc, Org, reStructuredText or HTML file in it becomes a Note in a new Area, dated when the file was last changed.';
 
   @override
   String get importReading => 'Reading the folder…';
@@ -5298,14 +5298,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importOpenArea => 'Open the Area';
 
   @override
-  String get importNothing => 'No Markdown or text file found.';
+  String get importNothing => 'No file found to import.';
 
   @override
   String get importNothingTitle => 'Nothing imported';
 
   @override
   String get importNothingCause =>
-      'The folder and its folders hold no Markdown file (.md, .markdown) or text file (.txt) that could be taken; other files and files that are too large are skipped.';
+      'The folder and its folders hold no Markdown file (.md, .markdown), text file (.txt), AsciiDoc file (.adoc, .asciidoc, .asc), Org file (.org), reStructuredText file (.rst) or HTML file (.html, .htm) that could be taken; other files and files that are too large are skipped.';
 
   @override
   String get importNothingFix =>
@@ -5313,7 +5313,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String importSkippedDetails(String folder, int notText, int tooLarge) {
-    return 'Folder: $folder\nNot Markdown or text: $notText\nToo large: $tooLarge';
+    return 'Folder: $folder\nOther files: $notText\nToo large: $tooLarge';
   }
 
   @override

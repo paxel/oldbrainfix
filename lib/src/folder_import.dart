@@ -38,8 +38,10 @@ Future<ImportFile> _read(FolderPlatform folders, FolderFile file) async {
 final _tooLarge = Uint8List(Imports.maxFileBytes + 1);
 
 /// Whether the file at [path] may become a Note, as the core takes it:
-/// a Markdown (`.md`, `.markdown`) or text (`.txt`) file, in any case of
-/// ASCII letters, not a hidden one. Others are not worth reading.
+/// a Markdown (`.md`, `.markdown`), text (`.txt`), AsciiDoc (`.adoc`,
+/// `.asciidoc`, `.asc`), Org (`.org`), reStructuredText (`.rst`) or HTML
+/// (`.html`, `.htm`) file, in any case of ASCII letters, not a hidden
+/// one. Others are not worth reading.
 bool mayBecomeNote(String path) {
   final name = path.substring(path.lastIndexOf('/') + 1);
   if (name.startsWith('.')) return false;
@@ -49,5 +51,6 @@ bool mayBecomeNote(String path) {
     for (final c in name.substring(dot + 1).codeUnits)
       c >= 0x41 && c <= 0x5a ? c + 0x20 : c,
   ]);
-  return const {'md', 'markdown', 'txt'}.contains(extension);
+  return const {'md', 'markdown', 'txt'}.contains(extension) ||
+      ImportFormats.ofExtension(extension) != null;
 }

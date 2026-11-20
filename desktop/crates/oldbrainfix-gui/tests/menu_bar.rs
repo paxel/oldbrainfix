@@ -146,7 +146,7 @@ fn the_file_menu_reaches_new_note_quick_note_import_and_quit() -> TestResult {
     assert!(shows(&harness, "Google Keep…"));
     assert!(shows(
         &harness,
-        "Each Markdown or text file in it becomes a Note"
+        "Each Markdown, text, AsciiDoc, Org, reStructuredText or HTML file in it becomes a Note"
     ));
     harness.get_by_label("Close").click();
     harness.run();

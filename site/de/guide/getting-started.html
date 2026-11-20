@@ -146,7 +146,7 @@
 
 <guide-box name="import-folder">
 <h2>Notizen aus einer anderen App importieren</h2>
-<p>Mach aus einem Ordner mit Markdown- oder Textdateien Notizen.</p>
+<p>Mach aus einem Ordner mit Markdown-, Text-, AsciiDoc-, Org-, reStructuredText- oder HTML-Dateien Notizen.</p>
 <box-tab device="phone" alt="Die Zeilen zum Importieren in den Einstellungen des Handys, gefunden über ihre Suche">
 <li>Tippe dein Profilbild, dann <strong>Einstellungen dieses Geräts</strong>.</li>
 <li>Tippe <strong>Import</strong> oben ins Suchfeld.</li>
@@ -167,13 +167,25 @@
   auf die Zeit datiert, zu der ihre Datei zuletzt geändert wurde.
 </p>
 <p>
+  Dateien anderer Werkzeuge werden ebenfalls formatierte Notizen: AsciiDoc (.adoc, .asciidoc, .asc),
+  Org (.org), reStructuredText (.rst) und HTML (.html, .htm). Ihre Überschriften, fetter, kursiver
+  und durchgestrichener Text, Code, Links, Listen, Zitate, Codeblöcke und Tabellen werden in der
+  Notiz dasselbe; nur die ersten zwei Überschriftenebenen und eine Ebene eingerückter Listen
+  erscheinen als solche. Was formatierter Text nicht zeigen kann, etwa tiefere Überschriften,
+  Hinweise, Kommentare und Einstellungen des Dokuments, bleibt, wie es geschrieben ist. Eine
+  Webseite behält ihren Text und ihren eigenen Titel unter dem Namen der Datei; ihre Skripte und
+  Stile bleiben weg, und ein Bild wird seine Beschreibung. Nichts einer Datei wird ausgeführt: Ein
+  Include bleibt die Zeile, die es ist, keine andere Datei wird gelesen, und nichts wird aus dem
+  Internet geladen. Ein Ordner darf alle diese Arten zugleich enthalten.
+</p>
+<p>
   Alle landen in einem neuen Bereich, der nach dem Ordner benannt ist, etwa „Aus Notes“; denselben
   Ordner noch einmal zu importieren legt einen zweiten Bereich an, „Aus Notes (2)“. Keine davon ist
   unsortiert, und für keine kommt ein Stupser. Andere Dateien, versteckte Dateien und Dateien, die zu
   groß für eine Notiz sind (mehr als 1 MiB), werden übersprungen. Solange der Ordner gelesen wird,
   zeigt die Zeile oder der Dialog „Import“ „Der Ordner wird gelesen …“. „Import abgeschlossen.“
   zeigt, wie viele Notizen in welchen Bereich kamen und wie viele Dateien warum übersprungen wurden,
-  mit <strong>Bereich öffnen</strong>. Ein Ordner ohne Markdown- oder Textdatei ändert nichts. Nach
+  mit <strong>Bereich öffnen</strong>. Ein Ordner ohne eine solche Datei ändert nichts. Nach
   dem Import behält die App keinen Zugriff auf den Ordner, außer er ist der geteilte Ordner oder der
   Sicherungsordner.
 </p>

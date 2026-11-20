@@ -1041,7 +1041,7 @@ enum Dialog {
     /// Whether the Google Takeout export to import from Google Keep is
     /// still its zip or a folder unpacked from it (ADR 0036).
     ImportKeep,
-    /// File ▸ Import… (#145): a folder of Markdown or text files, or a
+    /// File ▸ Import… (#145): a folder of Markdown, text and other documents, or a
     /// Google Keep export, each with what it does, or that it reads
     /// while it runs.
     Import,
