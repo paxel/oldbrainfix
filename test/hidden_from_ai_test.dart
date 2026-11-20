@@ -3,8 +3,6 @@ import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:oldbrainfix/src/announcements.dart';
-import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
@@ -15,8 +13,6 @@ import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
-import 'fake_photos.dart';
-import 'open_capture.dart';
 
 /// Hidden from AI on the phone (#267, ADR 0049): the switch in a card's
 /// ⋮, an Area's menu and the Note editor's badge, a shield on what is
@@ -380,47 +376,5 @@ void main() {
     await tester.longPress(card('Back pain'));
     await tester.pumpAndSettle();
     expect(shown(), 'Off, hidden by its Area');
-  });
-
-  testWidgets('Capture asks nothing: a Note hidden from AI picked for a '
-      'Shared Area stays where it was, said at the top', (tester) async {
-    store.setQuickNoteShows(QuickNoteControl.fileInto, true);
-    final family = places.addArea('Family');
-    store.share(family.id);
-    final announcements = Announcements();
-    addTearDown(announcements.dispose);
-    tester.view.physicalSize = const Size(800, 2400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(
-      OldBrainFixApp(
-        store: store,
-        photos: FakePhotos(nextPhoto: onePixelPng),
-        announcements: announcements,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await openTextCapture(tester);
-    await tap(tester, find.byKey(const ValueKey('capturePhoto')));
-    // The photo wrote the Note; it is marked meanwhile, as on another
-    // Device.
-    final id = notes.all().single.id;
-    store.setHiddenFromAi(id, true);
-    await tap(
-      tester,
-      find.descendant(
-        of: find.byType(CaptureScreen),
-        matching: find.byTooltip('File into…'),
-      ),
-    );
-    await tap(tester, find.text('Family'));
-    expect(key('hidden-from-ai-refused'), findsNothing);
-    await tap(tester, find.byKey(const ValueKey('captureSave')));
-
-    expect(tester.takeException(), isNull);
-    expect(find.byType(CaptureScreen), findsNothing);
-    expect(notes.byId(id)?.place, isNull);
-    expect(store.isMarkedHiddenFromAi(id), isTrue);
-    expect(announcements.visible, 'A Note was not filed.');
   });
 }

@@ -99,9 +99,8 @@ void main() {
     );
 
     for (final key in [
-      const ValueKey('capturePhoto'),
-      const ValueKey('captureVoice'),
       for (final (_, key) in NudgeButtons.choices) key,
+      const ValueKey('captureToEditor'),
     ]) {
       expectAboveBar(tester, find.byKey(key));
     }

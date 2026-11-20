@@ -102,48 +102,48 @@ replace a law of Both apps where they say so. A desktop law marked
 - Voice recording starts at once and **ends by tapping one big stop
   button**. No hold-to-talk, no stop on silence. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
-  with the recording or photo on it, the buttons and room to type.
-  Leaving saves.
-- Every capture screen shows three buttons at the bottom: remind me in
-  **10 min, 30 min, 1 h**. Leaving without tapping one means 1 h.
-  The three are actions, not a choice of value: a tap saves the Note
-  with that Nudge time, so the single-choice law does not apply to them.
-  Where the Device switched the Nudge buttons off (Settings ▸ Quick
-  note), one Save takes their place, and it nudges in 1 h as leaving does.
-- **Capture offers the Kind above the field** (#310, Q715): Text,
-  Checklist and Shopping List as choice chips, Text picked at first, on
-  every text capture screen, in Simple too, behind the App Lock too. A
-  Checklist or Shopping List makes the Note that list as it is saved, each
-  typed line a Line unless the first is a heading, which is then its Name
-  (#309); Text keeps it a Plain Note. **The Kind applies to the typed text
-  only**: a recording's Transcript, a photo and a file stay on the Note as
-  its own and never become Lines, and with nothing typed the Note stays a
-  Plain Note. The list needs the Note itself: while one is chosen, Add to
-  Note…, "Make it a Tally" and the Session are not offered, and a Tally or
-  Session set up hides the choice until its chip is dropped. The Kind is
-  made only on leaving; a Note written before, as the app went to the
-  background, waits as a Plain Note with its Nudge. The Kind "Shopping
-  List" makes a new list; Add to a Shopping List adds to one there is.
-- **Add to a Shopping List** makes each line of the capture a Line of
-  the list picked, and keeps no Note. While a list is picked, the other
-  choices wait unshown. It is not offered with a photo on the screen, a
-  photo taken afterwards drops it, and behind the App Lock it is not
-  offered. **A voice capture is offered it with a speech model or
-  without** (#311, Q716): the capture, its text and recording, stays on
-  the list as a Section under a tear line, so a misheard item can be
-  listened to, and the typed lines become Lines at once. The items said
+  with the recording or photo on it and room to type. Leaving saves.
+- **The quick note is the text, three Nudge buttons and More, nothing
+  else** (#352): the text field at the top, under it remind me in
+  **10 min, 30 min, 1 h**, and More, which saves the Note as leaving
+  does and opens it in the full editor in its place (on the desktop the
+  Note dialog). Simple and Advanced alike, on the phone, in the desktop's
+  quick note dialog and in the capture popup. No Save and no Back on
+  top: Android's system Back saves, the iPhone keeps a back arrow top
+  left that saves, the desktop's Esc and the dialog's cross save, each
+  as the 1 h button does; an empty text saves nothing. Everything else,
+  Photo, Voice, Gallery, Paste, File, the Kind, Add to Note… (there Merge
+  into…), Remind me…, File into…, the Frog, the Importance and the format bar, lives
+  in the full editor and the Note dialog. An entry point that starts
+  with something, voice, the camera, a picker, the clipboard, a share or
+  a list's "+", still opens the quick note with it: what it brought
+  shows above the text, and More takes it on.
+- Leaving without tapping a Nudge button means 1 h. The three are
+  actions, not a choice of value: a tap saves the Note with that Nudge
+  time, so the single-choice law does not apply to them. Where the
+  Device switched the Nudge buttons off (Settings ▸ Quick note), one
+  Save takes their place, and it nudges in 1 h as leaving does.
+- **The Kind is the full editor's** (#352): the quick note makes a Plain
+  Note; its kind badge, in the Note editor and the Note dialog, makes it a
+  Checklist, a Shopping List, a Tally or a Session, each line a Line
+  unless the first is a heading, which is then its Name (#309).
+- **Add to a Shopping List**, in the Note editor and the Note dialog
+  (#352), makes each line of a Plain Note a Line of the list picked, and
+  keeps no Note. It is offered only for a Note that holds no photo, file
+  or Section and has nothing spawned from it. **A Note with a recording
+  is offered it with a speech model or without** (#311, Q716): it stays
+  on the list as a Section under a tear line, so a misheard item can be
+  listened to, and its typed lines become Lines at once. The items said
   in the recording's Transcript become Lines too, split at commas, at
   "und" and "and" and at the pauses Whisper marks; at once when it is
   transcribed already, else as soon as it is, on this Device or another,
   also when the speech model is downloaded later. They are added once:
   transcribing again adds nothing.
 - **Everything is saved together** when the user leaves the screen or
-  taps a save button. Nothing is half-saved: for an empty Note nothing
-  is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs
-  on an empty Note.
-- **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, a
-  Routine, Reminder, Frog, Session or Tally is set up, or a Checklist or
-  Shopping List is chosen as its Kind (#310), the three Nudge buttons
+  taps a Nudge button, Save or More. Nothing is half-saved: for an
+  empty Note nothing is saved.
+- **A sorted Note needs no Nudge.** Opened from an Area's or Topic's
+  "+", the quick note files the Note there: the three Nudge buttons
   become one Save and no Nudge is set; leaving saves too.
 
 ### Agenda
@@ -1154,53 +1154,28 @@ replace a law of Both apps where they say so. A desktop law marked
   Settings ▸ Capture ▸ "Print to Old Brain Fix", in Simple and Advanced,
   says whether Android has the service on and opens Android's print
   settings, where only the user turns it on; the iPhone has no row.
-- **The quick note is uncluttered** (#142): by default it shows the
-  Kind choice above the text field (#310, no switch in Settings), the
-  text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
-  **To full editor**, **Add to Note…** (#308) and the alarm clock beside them (#223), whose menu
-  offers Remind me… as the Note editor's "+" does, in Simple
-  too; nothing else that sorts and no other chips. The Routine or Reminder
-  editor opens over the quick note and comes back to it with the choice
-  at the top, written only with the Note. To full editor
-  saves the Note at once, Unsorted with the default Nudge, and opens the
-  Note editor on it in place of the capture screen; leaving the editor
-  returns to where Capture was opened from. It waits while there is
-  nothing to save and is not offered behind the App Lock or while a
-  Shopping List is picked.
-- **Add to Note… adds the capture to another Note at once** (#308,
-  Q713): it picks the Note in Add to Note…, a running recording ended
-  and kept first, and the text, recording, photos and files become one
-  Section of it with their Capture Context, the capture written where
-  that Note lies (so in a Shared Area for its people), with no Nudge,
-  and merged into it, so nothing waits in Unsorted; Capture then closes,
-  on the phone back where it was opened from, which shows that Note.
-  Back in the picker leaves the capture as it was. It waits as To full
-  editor does and is not offered behind the App Lock, while a Shopping
-  List is picked, nor once a Routine, Reminder, Session, Frog or Tally
-  is set up or a Checklist or Shopping List is chosen as its Kind
-  (#310), which need the Note itself; a place picked gives way to
-  the Note's.
-- **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
-  all off by default, for File into…, Frog, Session or Tally (only in
-  Advanced, #197), Add to a Shopping List, the Importance and the format
-  bar (only in Advanced),
-  and the switch Nudge buttons, on by default. What is switched on shows
-  in the Note card's action row beside To full editor, on every capture
+- **The quick note is the text, the Nudge buttons and More** (#142,
+  #352): nothing else, in Simple and Advanced alike, on every capture
   path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
-  shortcut, also one a phone key or gesture starts): File into…, Frog
-  and Session in the alarm clock's menu, and ⋮ with the Importance, Make
-  it a Tally (with the Frog, Session or Tally switch) and Add to a
-  Shopping List. Each opens its usual
-  page (Add to a Shopping List none while there is one list to add to:
-  its entry names it, "Add to Weekly", and picks it at once, #276) and
-  comes back to the capture screen with the choice shown at the
-  top ("→ Household"), not saved yet; the user can keep typing or add
-  more. All of it is optional. With the format bar on, it rides on the
-  keyboard; where the room is small the buttons under the text scroll
-  and the text keeps two lines.
-- Behind the App Lock, the row offers neither File into… nor the
-  Session, which would show the Areas and the Tallies. File into… lists
-  a closed locked Area without its Topics.
+  shortcut, also one a phone key or gesture starts). What a path brought
+  in, a recording, photos or files, shows above the text. **More** saves
+  the Note at once, Unsorted with the default Nudge, and opens the Note
+  editor on it in place of the capture screen; leaving the editor
+  returns to where Capture was opened from. It waits while there is
+  nothing to save and is not offered behind the App Lock.
+- **The Note editor holds what the quick note no longer shows** (#352):
+  in its bar Photo, Voice, Gallery, Paste and Add to a Shopping List
+  beside Attach file (on a phone-wide bar mostly in ⋮); its badges the
+  Kind, the place (File into…), the Importance and "+" with Remind me…,
+  in Advanced Frog and Session; Merge into… adds it to another Note; the
+  format bar rides on the keyboard. Voice records on a page of its own
+  with the big stop button; Stop, Back and Stop on the notification keep
+  the recording on the Note.
+- **Settings ▸ Quick note** (per Device, ADR 0008) keeps only the switch
+  Nudge buttons, on by default. The switches that once added File
+  into…, Frog, Session or Tally, Add to a Shopping List, the Importance
+  and the format bar to the quick note are hidden (#352); what they
+  stored stays and has no effect.
 - After saving, the new Note's card shows with the same options, for
   whatever was not done while capturing (merging into another Note
   among them): in its detailed view, a tap switching it to compact. Enriching is never required; a Note left without an
@@ -1914,32 +1889,28 @@ replace a law of Both apps where they say so. A desktop law marked
 
 - **On the desktop** the capture popup and the window's quick note
   dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
-  quick note and follow the same switches (desktop Settings ▸ Quick
-  note, beside Quick capture): by default the Kind choice above the
-  text as radio pills (#310), the text, Record voice, Paste
-  (the dialog also From file…), the Nudge buttons, To full editor, Add
-  to Note… (#308), a dialog over the quick note dialog or a page of the
-  popup, and the alarm clock, whose menu offers Remind me… (#223, #344), its
-  editor a dialog over the quick note dialog or a page of the popup;
-  switched on, File into…, Frog and Session in the clock's menu, and
-  More with the Importance, Make it a Tally and Add to a Shopping List
-  (its lists as radio buttons, the one used last at the top; with one
-  list a single entry naming it, "Add to Weekly", #276),
-  and the format bar over the field, without ☐, link and table. Files
-  dropped onto the window open the dialog and wait in it (#267): a
-  picture as a photo, a sound file as a voice recording, any other file
-  as an Attachment, each named on its own line; From file… picks files
-  of any kind the same way. **A file dropped onto the Note dialog goes
-  onto its Note** while nothing lies over the dialog, a picture as its
-  photo, a sound file as its recording, any other as its Attachment;
-  onto a Note's own window the same. A file larger than 256 MB, or one
-  that cannot be read, is told by its size before it is read, not
-  attached and announced; the others are. Leaving the
-  dialog by its cross, Esc, Alt+Left, the mouse's back button or a click
-  beside it keeps what is typed, nudged in 1 h. To full editor in the
-  window opens the Note in the Note dialog in its place; in the popup it
-  closes the popup and opens the Note there in the window, brought back
-  from the tray.
+  quick note (#352): the text, then, once something is typed or held,
+  More and the Nudge buttons, nothing else; desktop Settings ▸ Quick
+  note keeps only Nudge buttons. More saves the Note and opens it in the
+  window's Note dialog in place of the dialog; in the popup it closes
+  the popup and opens the Note there in the window, brought back from
+  the tray. The Note dialog holds Record voice, Paste (in a row with
+  Attach a file…), Add to a Shopping List (at the bottom, between Merge
+  into… and Move to trash; its lists as radio buttons, the one used last
+  at the top; with one list a single entry naming it, "Add to Weekly",
+  #276), the badges and the format bar. Files dropped onto the window,
+  and File ▸ Attach a file… with no Note open, open the quick note
+  dialog and wait in it above the text (#267): a picture as a photo, a
+  sound file as a voice recording, any other file as an Attachment, each
+  named on its own line; Ctrl+V in the empty field holds a pasted
+  picture the same way. **A file dropped onto the Note dialog goes onto
+  its Note** while nothing lies over the dialog, a picture as its photo,
+  a sound file as its recording, any other as its Attachment; onto a
+  Note's own window the same. A file larger than 256 MB, or one that
+  cannot be read, is told by its size before it is read, not attached
+  and announced; the others are. Leaving the dialog by its cross, Esc,
+  Alt+Left, the mouse's back button or a click beside it keeps what is
+  typed, nudged in 1 h.
 
 ### Text editor and Lines
 

@@ -5138,7 +5138,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, Datei, „Zum vollen Editor“, „Zu einer Notiz hinzufügen …“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, die drei Stupser-Knöpfe und „Mehr“, das den vollen Editor öffnet. Foto, Sprache, Galerie, Einfügen, Datei und alles, was die Notiz einsortiert, gibt es im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';
@@ -5577,11 +5577,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Tippe auf + und Text, schreib eine Aufgabe, tippe auf den Wecker und Erinnerung, stell die Zeit ein, zweimal Speichern.';
+      'Tippe auf + und Text, schreib eine Aufgabe, tippe auf „Mehr“, dann auf die Plakette + und Erinnere mich …, stell die Zeit ein und tippe auf Speichern.';
 
   @override
   String get helpQuickStart4 =>
-      'Tippe auf + und Text, schreib eine Gewohnheit, tippe auf den Wecker und Routine, wähl, wann sie sich wiederholt, zweimal Speichern.';
+      'Tippe auf + und Text, schreib eine Gewohnheit, tippe auf „Mehr“, dann auf die Plakette + und Erinnere mich …, tippe auf Alle …, wähl, wann sie sich wiederholt, und tippe auf Speichern.';
 
   @override
   String get helpQuickStart5 =>
@@ -5613,10 +5613,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop3 =>
-      'Erinnerung: in der Schnellnotiz auf den Wecker klicken, dann Erinnerung; die Zeit einstellen, Speichern klicken, dann Strg+Enter.';
+      'Erinnerung: in der Schnellnotiz schreiben, Mehr klicken, dann + und Erinnere mich …; die Zeit einstellen und Speichern klicken.';
 
   @override
-  String get helpQuickStartDesktop4 => 'Routine: genauso, mit Routine.';
+  String get helpQuickStartDesktop4 =>
+      'Routine: genauso, dann Alle … und wann sie sich wiederholt.';
 
   @override
   String get helpQuickStartDesktop5 =>

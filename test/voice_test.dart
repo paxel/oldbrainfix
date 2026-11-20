@@ -54,21 +54,44 @@ void main() {
     expect(find.byType(CaptureScreen), findsOneWidget);
   }
 
-  group('the mic button', () {
+  /// Opens voice Capture from the Agenda's +, recording at once; the
+  /// quick note has no Voice of its own (#352).
+  Future<void> openVoice(WidgetTester tester) async {
+    await openCaptureBy(tester, 'voice');
+    expect(find.byType(CaptureScreen), findsOneWidget);
+  }
+
+  /// Opens the editor of the Note [note] from the Agenda.
+  Future<void> edit(WidgetTester tester, Note note) async {
+    final agenda = tester.element(find.byType(AgendaScreen));
+    unawaited(openNote(agenda, notes, Places(store), note));
+    await tester.pumpAndSettle();
+    expect(find.byType(NoteEditorScreen), findsOneWidget);
+  }
+
+  final editorVoice = find.byKey(const ValueKey('editor-voice'));
+
+  group('voice', () {
     testWidgets('is not offered where there is no microphone', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await openCapture(tester);
-      expect(mic, findsNothing);
+      await tap(tester, find.byIcon(Icons.add));
+      expect(fanEntry('voice'), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      final note = notes.capture('milk');
+      await edit(tester, note);
+      expect(editorVoice, findsNothing);
     });
 
-    testWidgets('text Capture never asks for the microphone', (tester) async {
+    testWidgets('text Capture never asks for the microphone, and offers no '
+        'Voice (#352)', (tester) async {
       voice.allowed = false;
       await start(tester);
       await openCapture(tester);
-      expect(mic, findsOneWidget);
+      expect(mic, findsNothing);
       await tester.enterText(find.byType(TextField), 'milk');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       expect(voice.requests, 0);
       expect(voice.starts, 0);
@@ -79,8 +102,7 @@ void main() {
       tester,
     ) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
 
       expect(find.byType(AlertDialog), findsNothing);
       expect(voice.recording, isTrue);
@@ -99,8 +121,7 @@ void main() {
     testWidgets('is explained and asked for the first time', (tester) async {
       voice.allowed = false;
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
 
       expect(find.text('Use the microphone?'), findsOneWidget);
       expect(voice.requests, 0);
@@ -115,8 +136,7 @@ void main() {
     testWidgets('"Not now" records nothing and asks nothing', (tester) async {
       voice.allowed = false;
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, find.text('Not now'));
 
       expect(voice.requests, 0);
@@ -125,7 +145,7 @@ void main() {
       // Typing is still there.
       await tap(tester, find.text('Type instead'));
       await tester.enterText(find.byType(TextField), 'milk');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.text, 'milk');
     });
 
@@ -134,8 +154,7 @@ void main() {
         ..allowed = false
         ..allowOnRequest = false;
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, find.text('Allow'));
       expect(voice.starts, 0);
       expect(find.text('Voice Notes need the microphone.'), findsOneWidget);
@@ -152,8 +171,7 @@ void main() {
   group('recording', () {
     testWidgets('shows the elapsed time', (tester) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       expect(elapsed(tester), '0:00');
 
       await tester.pump(const Duration(seconds: 3));
@@ -165,12 +183,11 @@ void main() {
     });
 
     testWidgets('the stop button comes back to the capture screen with the '
-        'recording and room to type; Save keeps both, nudged in 1 h', (
+        'recording and room to type; leaving keeps both, nudged in 1 h', (
       tester,
     ) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, stop);
 
       expect(voice.stops, 1);
@@ -186,7 +203,7 @@ void main() {
       );
       expect(find.byKey(const ValueKey('captureToEditor')), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'plumber');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       expect(find.byType(CaptureScreen), findsNothing);
       final note = notes.all().single;
@@ -207,8 +224,7 @@ void main() {
 
     testWidgets('a Nudge button stops and saves with its time', (tester) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, find.byKey(const ValueKey('nudge10')));
 
       expect(voice.recording, isFalse);
@@ -217,26 +233,75 @@ void main() {
       expect(note.nudge, now.add(const Duration(minutes: 10)));
     });
 
-    testWidgets('typed text and the recording go into one Note', (
+    testWidgets('the editor\'s Voice records into the open Note on a page '
+        'with the big stop button, back to the editor after Stop (#352)', (
       tester,
     ) async {
+      final note = notes.capture('call the plumber');
       await start(tester);
-      await openCapture(tester);
-      await tester.enterText(find.byType(TextField), 'call the plumber');
-      await tap(tester, mic);
-      // The words stay in sight while recording.
-      expect(find.text('call the plumber'), findsOneWidget);
+      await edit(tester, note);
+      await tap(tester, editorVoice);
+
+      expect(voice.recording, isTrue);
+      expect(stop, findsOneWidget);
+      expect(find.text('Recording…'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(elapsed(tester), '0:02');
       await tap(tester, stop);
 
-      final note = notes.all().single;
-      expect(note.text, 'call the plumber');
-      expect(note.recordings, hasLength(1));
+      expect(voice.recording, isFalse);
+      expect(stop, findsNothing);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      final recorded = notes.byId(note.id)!;
+      expect(recorded.text, 'call the plumber');
+      expect(recorded.recordings, [store.putAudio(first)]);
+      expect(notes.all(), hasLength(1));
+    });
+
+    testWidgets('the editor\'s Voice asks for the microphone the first time, '
+        'and Back ends and keeps the recording (#352)', (tester) async {
+      voice.allowed = false;
+      final note = notes.capture('call the plumber');
+      await start(tester);
+      await edit(tester, note);
+      await tap(tester, editorVoice);
+      expect(find.text('Use the microphone?'), findsOneWidget);
+      await tap(tester, find.text('Allow'));
+      expect(voice.recording, isTrue);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(voice.recording, isFalse);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(notes.byId(note.id)!.recordings, hasLength(1));
+    });
+
+    testWidgets('a voice Capture asked for while the editor records ends and '
+        'keeps that recording first: one at a time (#350, #352)', (
+      tester,
+    ) async {
+      final note = notes.capture('call the plumber');
+      await start(tester);
+      await edit(tester, note);
+      await tap(tester, editorVoice);
+      expect(voice.starts, 1);
+
+      final agenda = tester.element(find.byType(AgendaScreen));
+      unawaited(captureNote(agenda, notes, voice: true, onChanged: () {}));
+      await tester.pumpAndSettle();
+      expect(voice.starts, 2);
+      expect(voice.stops, 1);
+      expect(notes.byId(note.id)!.recordings, [store.putAudio(first)]);
+
+      voice.nextRecording = second;
+      await tap(tester, find.byKey(const ValueKey('stopRecording')).last);
+      final captured = notes.all().where((n) => n.id != note.id).single;
+      expect(captured.recordings, [store.putAudio(second)]);
     });
 
     testWidgets('Back stops and keeps the recording', (tester) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tester.pump(const Duration(seconds: 2));
       final dynamic navigator = tester.state(find.byType(Navigator).first);
       await (navigator as NavigatorState).maybePop();
@@ -252,8 +317,7 @@ void main() {
       tester,
     ) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tester.pump(const Duration(seconds: 2));
       for (final state in [
         AppLifecycleState.inactive,
@@ -289,8 +353,7 @@ void main() {
     testWidgets("Stop on the notification ends the recording and keeps it, "
         "as the screen's Stop does (#350)", (tester) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       for (final state in [
         AppLifecycleState.inactive,
         AppLifecycleState.hidden,
@@ -318,7 +381,7 @@ void main() {
       expect(stop, findsNothing);
       expect(find.byType(RecordingButton), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'for the car');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       final note = notes.all().single;
       expect(note.id, captured.id);
@@ -329,8 +392,7 @@ void main() {
 
     testWidgets("the notification is in the app's words", (tester) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
 
       expect(voice.notice?.toMap(), {
         'channel': 'Recording',
@@ -340,13 +402,15 @@ void main() {
       await tap(tester, stop);
     });
 
-    testWidgets('a second recording goes into the same Note', (tester) async {
+    testWidgets('a second recording in the editor goes into the same Note', (
+      tester,
+    ) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, stop);
+      await tap(tester, find.byKey(const ValueKey('captureToEditor')));
       voice.nextRecording = second;
-      await tap(tester, mic);
+      await tap(tester, editorVoice);
       await tap(tester, stop);
 
       expect(notes.all().single.recordings, [
@@ -358,8 +422,7 @@ void main() {
     testWidgets('nothing usable recorded captures nothing', (tester) async {
       voice.nextRecording = null;
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, stop);
 
       expect(voice.stops, 1);
@@ -382,10 +445,9 @@ void main() {
   group('playing back', () {
     testWidgets('the card plays and stops its recording', (tester) async {
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, stop);
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       final play = find.descendant(
         of: find.byType(NoteCard),
         matching: find.byIcon(Icons.play_arrow),
@@ -407,21 +469,30 @@ void main() {
     });
 
     testWidgets('recording again stops the playing', (tester) async {
+      final note = notes.capture('sauce', recordings: [first]);
       await start(tester);
-      await openCapture(tester);
-      await tap(tester, mic);
-      // The background no longer ends a recording (#350): Stop does.
-      await tap(tester, stop);
-      await tap(tester, find.byIcon(Icons.play_arrow));
+      await edit(tester, note);
+      final play = find.descendant(
+        of: find.byType(NoteEditorScreen),
+        matching: find.byIcon(Icons.play_arrow),
+      );
+      await reveal(tester, play);
+      await tap(tester, play);
       expect(voice.played, [first]);
 
       voice.nextRecording = second;
-      await tap(tester, mic);
+      await tap(tester, editorVoice);
       expect(voice.stoppedPlaying, 1);
       await tap(tester, stop);
-      // Both cards' buttons show play again.
-      expect(find.byIcon(Icons.stop), findsNothing);
-      expect(find.byIcon(Icons.play_arrow), findsNWidgets(2));
+      expect(notes.byId(note.id)!.recordings, hasLength(2));
+      // Its buttons show play again.
+      expect(
+        find.descendant(
+          of: find.byType(NoteEditorScreen),
+          matching: find.byIcon(Icons.stop),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('the editor plays its own and a merged Note\'s recordings', (
@@ -465,17 +536,9 @@ void main() {
 
     /// Records a voice Note, whose card shows on the Agenda.
     Future<void> record(WidgetTester tester) async {
-      await openCapture(tester);
-      await tap(tester, mic);
+      await openVoice(tester);
       await tap(tester, stop);
-      // Save, in the language shown.
-      await tap(
-        tester,
-        find.descendant(
-          of: find.byType(AppBar),
-          matching: find.byType(TextButton),
-        ),
-      );
+      await saveCapture(tester);
     }
 
     testWidgets('changes at once, while playing, and is kept', (tester) async {

@@ -55,16 +55,15 @@ void main() {
 
   group('Simple or Advanced', () {
     testWidgets('reads Advanced where nothing was chosen; Simple is kept for '
-        'the person and hides the quick note\'s format bar switch', (
-      tester,
-    ) async {
+        'the person', (tester) async {
       await start(tester);
       await openDeviceSettings(tester);
       final choice = find.byKey(const ValueKey('features'));
       expect(tester.widget<RadioColumn<bool>>(choice).value, isTrue);
+      // The quick note is the same in both (#352): no switch of its own.
       expect(
         find.byKey(const ValueKey('quickNote-formatBar'), skipOffstage: false),
-        findsOneWidget,
+        findsNothing,
       );
       await tap(tester, find.byKey(const ValueKey('features-simple')));
       expect(store.advanced, isFalse);

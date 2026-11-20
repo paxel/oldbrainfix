@@ -8225,7 +8225,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
+  /// **'The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -8927,13 +8927,13 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStart3.
   ///
   /// In en, this message translates to:
-  /// **'Tap + and Text, type a task, tap the alarm clock, then Reminder; set its time and tap Save twice.'**
+  /// **'Tap + and Text, type a task, tap More, then the + badge and Remind me…; set its time and tap Save.'**
   String get helpQuickStart3;
 
   /// No description provided for @helpQuickStart4.
   ///
   /// In en, this message translates to:
-  /// **'Tap + and Text, type a habit, tap the alarm clock, then Routine; choose when it repeats and tap Save twice.'**
+  /// **'Tap + and Text, type a habit, tap More, then the + badge and Remind me…; tap Every …, choose when it repeats and tap Save.'**
   String get helpQuickStart4;
 
   /// No description provided for @helpQuickStart5.
@@ -8981,13 +8981,13 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStartDesktop3.
   ///
   /// In en, this message translates to:
-  /// **'Reminder: in the quick note, click the alarm clock, then Reminder; set its time, click Save, then Ctrl+Enter.'**
+  /// **'Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.'**
   String get helpQuickStartDesktop3;
 
   /// No description provided for @helpQuickStartDesktop4.
   ///
   /// In en, this message translates to:
-  /// **'Routine: the same, with Routine.'**
+  /// **'Routine: the same, then Every … and when it repeats.'**
   String get helpQuickStartDesktop4;
 
   /// No description provided for @helpQuickStartDesktop5.

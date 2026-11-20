@@ -28,8 +28,8 @@ use egui::{Key, Modifiers};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::{
-    Day, DeviceSettings, Importance, Note, Notes, OwnProfile, Places, QuickNoteControl, Recurrence,
-    Routines, Schedule, Sessions, SigningKey, Store, Tallies, dart_iso,
+    Day, DeviceSettings, Importance, Note, Notes, OwnProfile, Places, Recurrence, Routines,
+    Schedule, Sessions, SigningKey, Store, Tallies, dart_iso,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
@@ -563,37 +563,43 @@ fn send_goes_by_ctrl_enter_from_the_note_dialog() -> TestResult {
 }
 
 #[test]
-fn file_into_takes_its_first_row_and_names_a_new_area_by_ctrl_enter_over_the_quick_note()
+fn file_into_takes_its_first_row_and_names_a_new_area_by_ctrl_enter_over_the_note_dialog()
 -> TestResult {
     let device = device()?;
-    DeviceSettings::new(&device.store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
-    let mut harness = window(&device.store, Selection::Agenda);
-    quick_note(&mut harness, "Buy screws");
-    click(&mut harness, "File into…");
+    let mut harness = window(&device.store, Selection::All);
+    harness.state_mut().select_note(&device.milk);
+    harness.run();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
+    harness.run();
     assert!(shows(&harness, "Filter Areas and Topics"));
     type_here(&mut harness, "Cellar");
     // Nothing matches: Enter asks the name.
     harness.key_press(Key::Enter);
     harness.run();
     assert!(shows(&harness, "New Area"));
-    // Create, and the capture under it keeps its Ctrl+Enter.
+    // Create files it there.
     ctrl(&mut harness, Key::Enter);
     assert!(!shows(&harness, "Filter Areas and Topics"));
-    assert!(harness.state().quick_note_open());
-    assert!(note_by_text(&device.store, "Buy screws")?.is_none());
     let areas = Places::new(&device.store).areas()?;
     let cellar = areas
         .iter()
         .find(|a| a.name == "Cellar")
         .ok_or("the Area")?;
+    let milk = Notes::new(&device.store)
+        .by_id(&device.milk)?
+        .ok_or("the milk")?;
+    assert_eq!(milk.place.as_deref(), Some(cellar.id.as_str()));
     // The list's first row by Ctrl+Enter: the Area filed into last.
-    click(&mut harness, "File into…");
+    harness.state_mut().select_note(&device.plants);
+    harness.run();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
+    harness.run();
     ctrl(&mut harness, Key::Enter);
     assert!(!shows(&harness, "Filter Areas and Topics"));
-    ctrl(&mut harness, Key::Enter);
-    assert!(!harness.state().quick_note_open());
-    let screws = note_by_text(&device.store, "Buy screws")?.ok_or("the Note")?;
-    assert_eq!(screws.place.as_deref(), Some(cellar.id.as_str()));
+    let plants = Notes::new(&device.store)
+        .by_id(&device.plants)?
+        .ok_or("the plants")?;
+    assert_eq!(plants.place.as_deref(), Some(cellar.id.as_str()));
     Ok(())
 }
 
@@ -641,45 +647,5 @@ fn a_tally_fields_page_opens_in_its_name_and_ctrl_enter_saves_it() -> TestResult
         .by_note(&device.tally)?
         .ok_or("the Tally")?;
     assert_eq!(tally.fields[0].name, "Sit-ups");
-    Ok(())
-}
-
-#[test]
-fn ctrl_enter_takes_a_page_of_the_popup_and_file_intos_naming_step() -> TestResult {
-    let device = device()?;
-    DeviceSettings::new(&device.store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
-    let mut harness = popup(&device.store);
-    type_here(&mut harness, "Call the dentist");
-    // The Reminder's page: Ctrl+Enter is its Save.
-    harness
-        .get_by_role_and_label(Role::Button, "Routine, Reminder, Frog or Session")
-        .click();
-    harness.run();
-    click(&mut harness, "Remind me…");
-    assert!(harness.state().popup.page_open());
-    ctrl(&mut harness, Key::Enter);
-    assert!(!harness.state().popup.page_open());
-    assert_eq!(harness.state().outcome, Outcome::Open);
-    assert_eq!(harness.state().popup.choices().schedules.len(), 1);
-    // File into…'s naming step: Ctrl+Enter is its Create.
-    click(&mut harness, "File into…");
-    assert!(harness.state().popup.page_open());
-    type_here(&mut harness, "Dentist");
-    harness.key_press(Key::Enter);
-    harness.run();
-    assert!(shows(&harness, "New Area"));
-    ctrl(&mut harness, Key::Enter);
-    assert!(!harness.state().popup.page_open());
-    assert_eq!(harness.state().outcome, Outcome::Open);
-    let areas = Places::new(&device.store).areas()?;
-    let dentist = areas
-        .iter()
-        .find(|a| a.name == "Dentist")
-        .ok_or("the Area")?;
-    assert_eq!(
-        harness.state().popup.choices().place.as_deref(),
-        Some(dentist.id.as_str())
-    );
-    assert!(note_by_text(&device.store, "Call the dentist")?.is_none());
     Ok(())
 }

@@ -7,10 +7,12 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'app_lock.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'attachment_views.dart';
 import 'box_ids.dart';
+import 'capture_screen.dart' show insertAtCursor, pourIntoShopping;
 import 'calendar_platform.dart';
 import 'checklist_view.dart';
 import 'context_platform.dart';
@@ -31,6 +33,7 @@ import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
+import 'photo_platform.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
 import 'profile.dart' show profileDisplayName;
@@ -42,6 +45,7 @@ import 'session_note.dart';
 import 'setting_badges.dart';
 import 'share_note.dart';
 import 'shopping_list_view.dart';
+import 'shopping_pick_screen.dart';
 import 'sorting_unsorted.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
@@ -52,6 +56,7 @@ import 'tally_view.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
 import 'voice_platform.dart';
+import 'voice_recorder.dart';
 
 /// Opens the editor of [note]; returns once the user left it, or once it
 /// moved on to the next of [sorting]. With [typeLines] the cursor starts
@@ -612,7 +617,12 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// Session from it, as the card's menu does; the calendar button adds it,
 /// or its Routines and Reminders, to the calendar; the send button sends
 /// it as a Sent Item; "merge into…" merges it into another Note; the
-/// trash button deletes it. A photo or recording with a text, of the
+/// trash button deletes it. Photo, Voice, Gallery and Paste, where the
+/// Device has them, take a photo, record on a page with the big stop
+/// button ([recordInto]), pick pictures or read the clipboard into the
+/// Note, as the quick note did before (#352); "Add to a Shopping List"
+/// makes the lines of a plain Note the Lines of a list and the Note goes
+/// (#124). A photo or recording with a text, of the
 /// Note or a Section, has a button under it that removes it and keeps the
 /// text (ADR 0020).
 ///
@@ -788,6 +798,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// shows on this person's Agenda; null for any other Note.
   ListOnAgendaChoice? _onAgenda;
 
+  /// Whether the last Paste found nothing to paste, said above the text
+  /// until the user types or pastes again.
+  final _pasteEmpty = ValueNotifier(false);
+
+  /// The App Lock, whose closed locked Areas keep their Shopping Lists
+  /// out of Add to a Shopping List.
+  AppLock? _lock;
+
+  /// The Shopping Lists the Note's lines could go into (#124), read with
+  /// the Note.
+  List<Note> _toShopping = const [];
+
   @override
   void initState() {
     super.initState();
@@ -810,6 +832,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final lock = LockScope.of(context);
+    if (lock != _lock) {
+      _lock = lock;
+      _readShopping();
+    }
     final announcements = AnnouncementsScope.of(context);
     if (announcements == _announcements) return;
     _announcements?.undone.removeListener(_undone);
@@ -832,6 +859,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _text.dispose();
     _name.dispose();
     _descriptionFocus.dispose();
+    _pasteEmpty.dispose();
     _sessionDraft?.dispose();
     for (final field in _sectionTexts.values) {
       field.dispose();
@@ -849,6 +877,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _typed() {
+    _pasteEmpty.value = false;
     _draftTimer?.cancel();
     _draftTimer = Timer(NoteEditorScreen.draftPause, _writeDraft);
   }
@@ -962,6 +991,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void _load() {
     final note = widget.notes.byId(widget.noteId);
     _placed = note == null ? null : placeNote(widget.places, note);
+    _readShopping();
     _amends = widget.notes.store.mayWriteIn(widget.noteId);
     final lists = Checklists(widget.notes.store);
     final shopping = ShoppingLists(widget.notes.store);
@@ -2350,6 +2380,146 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (mounted) _reload();
   }
 
+  /// Takes a photo with the camera into the Note (#352), as the quick
+  /// note's Photo did; closing the camera changes nothing.
+  Future<void> _takePhoto() async {
+    _saveText();
+    final bytes = await PhotoScope.of(context).takePhoto();
+    if (bytes == null) return;
+    // Written also when the editor was left meanwhile: nothing is lost.
+    widget.notes.addPhoto(widget.noteId, bytes);
+    if (mounted) _reload();
+  }
+
+  /// Picks pictures with the system's picker into the Note (#352),
+  /// several at once; picking none changes nothing.
+  Future<void> _pickPhotos() async {
+    _saveText();
+    final picked = await PhotoScope.of(context).pickPhotos();
+    if (picked.isEmpty) return;
+    for (final bytes in picked) {
+      widget.notes.addPhoto(widget.noteId, bytes);
+    }
+    if (mounted) _reload();
+  }
+
+  /// Reads the clipboard, only on this tap (#352): its text goes into the
+  /// text at the cursor, its pictures into the Note as photos, and a
+  /// clipboard with neither is said in a line above the text.
+  Future<void> _paste() async {
+    final pasted = await PhotoScope.of(context).takeClipboard();
+    if (!mounted) return;
+    if (pasted == null) {
+      _pasteEmpty.value = true;
+      return;
+    }
+    if (pasted.text.trim().isNotEmpty) insertAtCursor(_text, pasted.text);
+    _saveText();
+    for (final bytes in pasted.photos) {
+      widget.notes.addPhoto(widget.noteId, bytes);
+    }
+    _reload();
+  }
+
+  /// Records a voice recording into the Note (#352) on a page with the
+  /// big stop button, as the quick note's Voice did ([recordInto]).
+  Future<void> _record() async {
+    _saveText();
+    await recordInto(context, widget.notes, widget.noteId);
+    if (mounted) _reload();
+  }
+
+  /// Reads the Shopping Lists the Note's lines could go into.
+  void _readShopping() => _toShopping = [
+    for (final list in shoppingListsToAddTo(widget.notes.store, _lock))
+      if (list.id != widget.noteId) list,
+  ];
+
+  /// "Add to a Shopping List" (#124, #352), as the quick note offered it:
+  /// for a plain Note this Device may change, in the lists, with no
+  /// photo or file, which no Line holds, no Section and nothing spawned
+  /// from it, while there is a list to add to. With one list it names it,
+  /// "Add to Weekly", and adds at once (#276).
+  BarAction? _shoppingAction(AppLocalizations t, Note note, bool changes) {
+    final lists = _toShopping;
+    if (!changes ||
+        lists.isEmpty ||
+        _kind != NoteKind.plain ||
+        !note.textEditable ||
+        note.isTrashed ||
+        note.isMerged ||
+        note.spawned ||
+        note.photos.isNotEmpty ||
+        note.attachments.isNotEmpty ||
+        _sections.isNotEmpty) {
+      return null;
+    }
+    final only = lists.length == 1 ? lists.single : null;
+    return BarAction(
+      key: const ValueKey('add-to-shopping'),
+      label: only == null
+          ? t.addToShoppingList
+          : t.addToNamedShoppingList(shoppingTitle(t, only)),
+      onPressed: () => unawaited(_addToShopping(only?.id)),
+      icon: Icons.add_shopping_cart,
+    );
+  }
+
+  /// Makes each line of the Note's text a Line of the Shopping List
+  /// [listId], or of the one picked when it is null, and the Note goes
+  /// (#124); a Note with a recording stays on the list as a Section,
+  /// the items said in its Transcript added as Lines (#311). The editor
+  /// then closes, or opened from Unsorted moves on (#313). What cannot go
+  /// stays the Note, said at the top.
+  Future<void> _addToShopping(String? listId) async {
+    _saveText();
+    final store = widget.notes.store;
+    final picked =
+        listId ??
+        await Navigator.of(context).push(
+          MaterialPageRoute<String>(
+            builder: (_) => ShoppingPickScreen(store: store),
+          ),
+        );
+    if (!mounted || picked == null) return;
+    _saveText();
+    final notes = widget.notes;
+    final before = _sortingBefore();
+    var added = false;
+    if (notes.byId(widget.noteId)?.recordings.isNotEmpty ?? false) {
+      try {
+        ShoppingLists(store)
+            .addVoiceCapture(picked, widget.noteId, deviceWallClock);
+        added = true;
+      } on StateError {
+        // The list can no longer be added to: the Note stays.
+      } on ArgumentError {
+        // The same.
+      } on HiddenFromAiRefused {
+        // Hidden from AI, it goes into no Shared Area (#267).
+      }
+    } else {
+      added = pourIntoShopping(notes, widget.noteId, picked) == true;
+    }
+    if (!added) {
+      final t = context.t;
+      announceFailure(
+        context,
+        t.captureShoppingGone,
+        title: t.captureShoppingNotAddedTitle,
+        cause: t.captureShoppingGoneCause,
+        fix: t.captureShoppingKeptFix,
+        details: 'editor into a Shopping List: the Note could not go there',
+      );
+      _reload();
+      return;
+    }
+    // The list used last goes to the top of the pick (#276).
+    store.lastShoppingList = picked;
+    if (_movedOn(before)) return;
+    Navigator.of(context).pop();
+  }
+
   /// Reads the photo ([photo]) or transcribes the recording [hash] of the
   /// Note or Section [id] again; a failure is announced at the top, also
   /// when the editor was left meanwhile.
@@ -2914,6 +3084,35 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               icon: Icons.history,
             ),
             if (changes) ...[
+              // What the quick note offered before (#352).
+              if (PhotoScope.of(context).available)
+                BarAction(
+                  key: const ValueKey('editor-photo'),
+                  label: t.photo,
+                  onPressed: () => unawaited(_takePhoto()),
+                  icon: Icons.photo_camera_outlined,
+                ),
+              if (VoiceScope.of(context).available)
+                BarAction(
+                  key: const ValueKey('editor-voice'),
+                  label: t.voice,
+                  onPressed: () => unawaited(_record()),
+                  icon: Icons.mic_none,
+                ),
+              if (PhotoScope.of(context).pickable)
+                BarAction(
+                  key: const ValueKey('editor-gallery'),
+                  label: t.gallery,
+                  onPressed: () => unawaited(_pickPhotos()),
+                  icon: Icons.photo_library_outlined,
+                ),
+              if (PhotoScope.of(context).pasteable && editable)
+                BarAction(
+                  key: const ValueKey('editor-paste'),
+                  label: t.paste,
+                  onPressed: () => unawaited(_paste()),
+                  icon: Icons.content_paste,
+                ),
               if (FileScope.of(context).pickable)
                 BarAction(
                   key: const ValueKey('attach-file'),
@@ -2926,6 +3125,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onPressed: _merge,
                 icon: Icons.call_merge,
               ),
+              ?_shoppingAction(t, note, changes),
               BarAction(
                 label: t.moveToTrash,
                 onPressed: _trash,
@@ -2942,6 +3142,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               const SizedBox(height: 8),
             ],
             ..._openLines(t, changes),
+            ValueListenableBuilder(
+              valueListenable: _pasteEmpty,
+              builder: (context, empty, _) => empty
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        t.pasteEmpty,
+                        key: const ValueKey('paste-empty'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             // The Note's text and its Sections read on as one text, each
             // Section under a tear line, in no box of its own (#307).
             Embossed(

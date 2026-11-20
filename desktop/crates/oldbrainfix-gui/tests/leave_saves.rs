@@ -6,7 +6,7 @@
 //! be saved as their Save does, and ask "Discard changes?" once about one
 //! that can't: Discard closes without saving, Keep editing, Esc or a
 //! click beside the question stay and say what to fix. Cancel still
-//! closes without saving. The capture popup's Routine page does the same.
+//! closes without saving.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -26,10 +26,9 @@ use egui_kittest::kittest::Queryable;
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::{
     ClockTime, Day, Notes, OwnProfile, Places, Recurrence, Routines, Schedule, Sessions,
-    SigningKey, Store, Tallies, parse_time,
+    SigningKey, Store, Tallies,
 };
 use oldbrainfix_gui::l10n::L10n;
-use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -556,89 +555,5 @@ fn the_new_tally_page_saves_on_leaving_and_asks_without_a_field() -> TestResult 
         .by_note(&morning.id)?
         .ok_or("the Tally")?;
     assert_eq!(tally.fields[0].name, "Steps");
-    Ok(())
-}
-
-struct Popup {
-    popup: CapturePopup,
-    closed: bool,
-}
-
-/// A capture popup over `store`, "Repot the fern" typed.
-fn popup(store: &Arc<Store>) -> Harness<'static, Popup> {
-    let popup = CapturePopup::new(store.clone(), "en");
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(560.0, 900.0))
-        .build_ui_state(
-            |ui, state: &mut Popup| {
-                App::install(ui.ctx());
-                if state.popup.show(ui) == Outcome::Closed {
-                    state.closed = true;
-                }
-            },
-            Popup {
-                popup,
-                closed: false,
-            },
-        );
-    harness.run();
-    harness
-        .get_by(|n| n.is_focused())
-        .type_text("Repot the fern");
-    harness.run();
-    harness
-}
-
-/// The popup's page of a new Routine or Reminder, from the alarm clock's
-/// menu (#344).
-fn routine_page(harness: &mut Harness<'_, Popup>, t: &L10n) {
-    harness
-        .get_by_role_and_label(Role::Button, "Routine, Reminder, Frog or Session")
-        .click();
-    harness.run();
-    harness
-        .get_by_role_and_label(Role::Button, t.remind_me())
-        .click_accesskit();
-    harness.run();
-    assert!(harness.state().popup.page_open());
-}
-
-#[test]
-fn the_popups_routine_page_hands_back_a_change_on_leaving_and_asks_about_none() -> TestResult {
-    let store = Arc::new({
-        let now = parse_time("2026-03-02T11:00:00.000Z")?;
-        let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([9; 32])))?;
-        OwnProfile::new(&store).apply_defaults("Desk", None)?;
-        store
-    });
-    let t = L10n::new("en");
-    let mut harness = popup(&store);
-    // Unchanged, Esc takes nothing.
-    routine_page(&mut harness, &t);
-    esc(&mut harness);
-    assert!(!harness.state().popup.page_open());
-    assert!(harness.state().popup.choices().schedules.is_empty());
-    // A change is handed back as Save does.
-    routine_page(&mut harness, &t);
-    click(&mut harness, t.repeat_weekdays());
-    esc(&mut harness);
-    assert!(!harness.state().popup.page_open());
-    assert!(!harness.state().closed);
-    assert_eq!(harness.state().popup.choices().schedules.len(), 1);
-    // No weekday: asked; Esc keeps editing, Discard takes nothing.
-    routine_page(&mut harness, &t);
-    click(&mut harness, t.repeat_weekdays());
-    click(&mut harness, t.weekday_mon());
-    leave_field(&mut harness);
-    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
-    harness.run();
-    assert!(shows(&harness, "Discard changes?"));
-    esc(&mut harness);
-    assert!(!shows(&harness, "Discard changes?"));
-    assert!(harness.state().popup.page_open());
-    esc(&mut harness);
-    click(&mut harness, t.leave_discard());
-    assert!(!harness.state().popup.page_open());
-    assert_eq!(harness.state().popup.choices().schedules.len(), 1);
     Ok(())
 }

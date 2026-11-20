@@ -145,7 +145,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'Call about #Wasser');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(find.text('Just captured'), findsOneWidget);
 
       await tap(tester, key('tag-11'));

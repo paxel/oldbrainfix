@@ -156,8 +156,7 @@ void main() {
     await start(tester);
     // Recording started in the app: a Capture a request opened keeps the
     // next request waiting until it closes, as two never stack.
-    await openTextCapture(tester);
-    await tap(tester, find.byIcon(Icons.mic_none));
+    await openCaptureBy(tester, 'voice');
     expect(voice.starts, 1);
 
     // Out of the app, recording on, the tile asks for voice again.

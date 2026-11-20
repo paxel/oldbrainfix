@@ -1,35 +1,26 @@
-//! Sorting a capture into a Shopping List (#124), in the capture popup
-//! and the window's capture field, driven headless by egui_kittest: "Add
-//! to a Shopping List" in "More" lists the lists, the one a capture went
-//! into last at the top, or with one list names it, "Add to Groceries",
-//! and picks it at once (#276); the one picked shows at
-//! the top alone and the other choices come back when it is dropped;
-//! saving makes each line a Line, a name the list has bringing its Line
-//! back, and keeps no Note; a voice capture stays on the list as a
-//! Section with its recording, and the items said in its Transcript become
-//! Lines once it is transcribed, with a speech model or without one yet,
-//! once (#311); a photo keeps it a Note, a photo pasted in the popup as in
-//! the window dropping the list picked; and it is not offered without a
-//! list, nor while a photo is held.
+//! The Note dialog's Add to a Shopping List (#352), which took over the
+//! quick note's (#124), driven headless by egui_kittest: with one list
+//! its entry names it, "Add to Groceries", with several they show as
+//! radio buttons, the one used last at the top (#276); a pick makes each
+//! line of the Note a Line, a name the list has bringing its Line back,
+//! keeps no Note and closes the Note dialog; a Note recorded into in the
+//! Note dialog stays on the list as a Section with its recording, and the
+//! items said in its Transcript become Lines once it is transcribed
+//! (#311); it is not offered without a list, nor for a Note with a photo.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration as StdDuration, Instant};
 
 use chrono::{DateTime, Utc};
-use egui::Key;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use oldbrainfix_core::{
-    Blob, DeviceSettings, Note, Notes, OwnProfile, Places, QuickNoteControl, ShoppingLists,
-    SigningKey, Store,
-};
-use oldbrainfix_gui::App;
+use oldbrainfix_core::{DeviceSettings, Note, Notes, OwnProfile, ShoppingLists, SigningKey, Store};
 use oldbrainfix_gui::enrich::{Engine, Enricher, Kind};
 use oldbrainfix_gui::l10n::L10n;
-use oldbrainfix_gui::media::{self, Clipboard, Recorder};
-use oldbrainfix_gui::popup::{CapturePopup, Outcome};
+use oldbrainfix_gui::media::{self, Recorder};
+use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -41,10 +32,9 @@ fn t() -> L10n {
     L10n::new("en")
 }
 
-/// A store on a clock that moves a second per read, with the Area
-/// "Household" and the Shopping List "Groceries" holding "Milk": the
-/// store, the Area's id and the list's Note.
-fn store() -> Result<(Arc<Store>, String, String), Box<dyn std::error::Error>> {
+/// A store on a clock that moves a second per read, with the Shopping
+/// List "Groceries" holding "Milk": the store and the list's Note.
+fn store() -> Result<(Arc<Store>, String), Box<dyn std::error::Error>> {
     let start = DateTime::parse_from_rfc3339(NOW)?.timestamp();
     let moment = Arc::new(AtomicI64::new(start));
     let clock = Box::new(move || {
@@ -53,16 +43,11 @@ fn store() -> Result<(Arc<Store>, String, String), Box<dyn std::error::Error>> {
     });
     let store = Store::in_memory(clock, || Ok(SigningKey::from_seed([3; 32])))?;
     OwnProfile::new(&store).apply_defaults("Desk", None)?;
-    // Every Quick note switch on (#142).
-    for control in QuickNoteControl::ALL {
-        DeviceSettings::new(&store).set_quick_note_shows(control, true)?;
-    }
-    let household = Places::new(&store).add_area("Household")?.id;
     let list = Notes::new(&store)
         .capture("Groceries\nMilk", None, None)?
         .id;
     ShoppingLists::new(&store).make(&list)?;
-    Ok((Arc::new(store), household, list))
+    Ok((Arc::new(store), list))
 }
 
 /// The days of the tests, on UTC.
@@ -103,21 +88,9 @@ fn click<S>(harness: &mut Harness<'_, S>, label: &str) {
     harness.run();
 }
 
-/// Picks the Shopping List `title` in "More": the entry naming it while
-/// it is the only one (#276), else its radio button under the heading.
-fn pick<S>(harness: &mut Harness<'_, S>, title: &str) {
-    click(harness, "More");
-    let named = t().add_to_named_shopping_list(title);
-    match harness.query_all_by_label(&named).next() {
-        Some(entry) => entry.click_accesskit(),
-        None => {
-            assert!(shows(harness, t().add_to_shopping_list()));
-            harness
-                .get_by_role_and_label(Role::RadioButton, title)
-                .click_accesskit();
-        }
-    }
-    harness.run();
+/// Opens the Note dialog's Add to a Shopping List.
+fn open_menu<S>(harness: &mut Harness<'_, S>) {
+    click(harness, t().add_to_shopping_list());
 }
 
 /// Waits until `done` holds, for at most ten seconds.
@@ -132,71 +105,13 @@ fn eventually(mut done: impl FnMut() -> bool) -> bool {
     true
 }
 
-struct Popup {
-    popup: CapturePopup,
-    closed: bool,
-}
-
-fn popup(store: &Arc<Store>) -> Harness<'static, Popup> {
-    let mut popup = CapturePopup::new(store.clone(), "en");
-    popup.set_wall_clock(Arc::new(utc));
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(560.0, 900.0))
-        .build_ui_state(
-            |ui, state: &mut Popup| {
-                App::install(ui.ctx());
-                if state.popup.show(ui) == Outcome::Closed {
-                    state.closed = true;
-                }
-            },
-            Popup {
-                popup,
-                closed: false,
-            },
-        );
-    harness.run();
-    harness
-}
-
-#[test]
-fn the_popup_adds_the_line_to_the_list_and_keeps_no_note() -> TestResult {
-    let (store, household, list) = store()?;
-    let mut harness = popup(&store);
-    harness.get_by(|n| n.is_focused()).type_text("Bread");
-    harness.run();
-    click(&mut harness, "File into…");
-    click(&mut harness, "Household");
-    pick(&mut harness, "Groceries");
-    // Only the list shows; the rest waits unshown.
-    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    assert!(!shows(&harness, "Into: Household"));
-    for label in ["File into…", "Routine, Reminder, Frog or Session", "10 min"] {
-        assert!(!shows(&harness, label), "{label}");
-    }
-    assert!(shows(&harness, "Save"));
-    // Dropped, the list gives the other choices back.
-    let chip = t().capture_choice_shopping("Groceries");
-    click(&mut harness, &t().remove_choice(&chip));
-    assert!(shows(&harness, "Into: Household"));
-    assert!(shows(&harness, "File into…"));
-    assert_eq!(
-        harness.state().popup.choices().place,
-        Some(household.clone())
-    );
-    pick(&mut harness, "Groceries");
-    click(&mut harness, "Save");
-    assert!(harness.state().closed);
-    assert_eq!(lines(&store, &list)?, ["Bread", "Milk"]);
-    assert_eq!(others(&store, &list)?, Vec::<Note>::new());
-    Ok(())
-}
-
-/// The window of `app` on the Agenda, its days on UTC.
-fn window(app: App) -> Harness<'static, App> {
+/// The window over `app` on All Notes, its days on UTC, with the Note
+/// `note` open in the Note dialog.
+fn window(app: App, note: &str) -> Harness<'static, App> {
     let mut app = app;
     app.set_wall_clock(Arc::new(utc));
-    // The quick note's dialog, as File ▸ New Note opens it (#146).
-    app.new_note();
+    app.select(Selection::All);
+    app.select_note(note);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1400.0))
         .build_ui_state(
@@ -210,89 +125,54 @@ fn window(app: App) -> Harness<'static, App> {
     harness
 }
 
-/// Types `rows` into the capture field, one line each.
-fn type_rows(harness: &mut Harness<'_, App>, rows: &[&str]) {
-    // The quick note's dialog first (#146).
-    if !harness.state().quick_note_open() {
-        harness.state_mut().new_note();
-        harness.run();
-    }
-    harness
-        .get_by(|n| n.placeholder() == Some("What's on your mind?"))
-        .click();
-    harness.run();
-    for (i, row) in rows.iter().enumerate() {
-        if i > 0 {
-            harness.key_press(Key::Enter);
-            harness.run();
-        }
-        harness.get_by(|n| n.is_focused()).type_text(row);
-        harness.run();
-    }
-}
-
 #[test]
-fn each_line_typed_in_the_window_becomes_a_line_without_duplicates() -> TestResult {
-    let (store, _, list) = store()?;
-    let mut harness = window(App::new(store.clone(), "en"));
-    type_rows(&mut harness, &["Eggs", "milk", "Butter"]);
-    pick(&mut harness, "Groceries");
-    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    click(&mut harness, "Save");
+fn each_line_of_the_note_becomes_a_line_without_duplicates_and_no_note_stays() -> TestResult {
+    let (store, list) = store()?;
+    let note = Notes::new(&store)
+        .capture("Eggs\nmilk\nButter", None, None)?
+        .id;
+    let mut harness = window(App::new(store.clone(), "en"), &note);
+    open_menu(&mut harness);
+    // One list to add to: its entry names it (#276).
+    harness
+        .get_by_label(&t().add_to_named_shopping_list("Groceries"))
+        .click_accesskit();
+    harness.run();
     // "milk" brings the Line there back instead of a second one.
     assert_eq!(lines(&store, &list)?, ["Butter", "Eggs", "Milk"]);
     assert_eq!(others(&store, &list)?, Vec::<Note>::new());
-    assert!(!shows(&harness, &t().capture_choice_shopping("Groceries")));
+    assert_eq!(harness.state().selected_note(), None);
+    assert_eq!(
+        DeviceSettings::new(&store).last_shopping_list()?.as_deref(),
+        Some(list.as_str())
+    );
     Ok(())
 }
 
 #[test]
-fn it_is_not_offered_without_a_shopping_list() -> TestResult {
-    let (store, _, list) = store()?;
-    Notes::new(&store).trash(&list)?;
-    let mut harness = window(App::new(store.clone(), "en"));
-    type_rows(&mut harness, &["Eggs"]);
-    click(&mut harness, "More");
-    assert!(shows(&harness, "Important"));
+fn it_is_not_offered_without_a_list_nor_for_a_note_with_a_photo() -> TestResult {
+    let (store, list) = store()?;
+    let notes = Notes::new(&store);
+    let bread = notes.capture("Bread", None, None)?.id;
+    let harness = window(App::new(store.clone(), "en"), &bread);
+    assert!(shows(&harness, t().add_to_shopping_list()));
+    drop(harness);
+    // No Line holds a photo.
+    let image = image::RgbaImage::from_pixel(4, 4, image::Rgba([20, 120, 200, 255]));
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image).write_to(&mut png, image::ImageFormat::Png)?;
+    let pictured = notes.capture("Paint", None, None)?.id;
+    notes.add_photo(&pictured, &png.into_inner())?;
+    let harness = window(App::new(store.clone(), "en"), &pictured);
     assert!(!shows(&harness, t().add_to_shopping_list()));
-    Ok(())
-}
-
-struct Pictures;
-
-impl Clipboard for Pictures {
-    fn photo(&mut self) -> Option<Vec<u8>> {
-        let image = image::RgbaImage::from_pixel(4, 4, image::Rgba([20, 120, 200, 255]));
-        let mut out = std::io::Cursor::new(Vec::new());
-        image::DynamicImage::ImageRgba8(image)
-            .write_to(&mut out, image::ImageFormat::Png)
-            .ok()?;
-        Some(out.into_inner())
-    }
-}
-
-#[test]
-fn a_photo_keeps_the_capture_a_note() -> TestResult {
-    let (store, _, list) = store()?;
-    let mut app = App::new(store.clone(), "en");
-    app.set_clipboard(Box::new(Pictures));
-    let mut harness = window(app);
-    type_rows(&mut harness, &["Bread"]);
-    pick(&mut harness, "Groceries");
-    click(&mut harness, t().paste());
-    // The picture waits on the field until the capture is saved.
-    assert!(others(&store, &list)?.is_empty());
-    harness
-        .get_by(|n| n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Bread"))
-        .click();
-    harness.run();
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, Key::Enter);
-    harness.run();
-    let kept = others(&store, &list)?;
-    assert_eq!(kept.len(), 1);
-    assert_eq!(kept[0].text, "Bread");
-    assert_eq!(kept[0].photos.len(), 1);
-    assert_eq!(lines(&store, &list)?, ["Milk"]);
+    drop(harness);
+    // Nor the list itself, nor without a list.
+    let harness = window(App::new(store.clone(), "en"), &list);
+    assert!(!shows(&harness, t().add_to_shopping_list()));
+    drop(harness);
+    notes.trash(&list)?;
+    let harness = window(App::new(store.clone(), "en"), &bread);
+    assert!(!shows(&harness, t().add_to_shopping_list()));
     Ok(())
 }
 
@@ -353,20 +233,10 @@ fn voice_note(store: &Store) -> Result<Note, Box<dyn std::error::Error>> {
     Err("no voice capture".into())
 }
 
-/// The struck Lines of the list `list`.
-fn struck(store: &Store, list: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    Ok(ShoppingLists::new(store)
-        .by_note(list, &utc)?
-        .ok_or("a Shopping List")?
-        .struck()
-        .iter()
-        .map(|l| l.text.clone())
-        .collect())
-}
-
 #[test]
-fn a_voice_capture_stays_on_the_list_and_the_items_said_become_lines() -> TestResult {
-    let (store, _, list) = store()?;
+fn a_note_recorded_into_stays_on_the_list_and_the_items_said_become_lines() -> TestResult {
+    let (store, list) = store()?;
+    let bread = Notes::new(&store).capture("Bread", None, None)?.id;
     let mut app = App::new(store.clone(), "en");
     app.set_recorder(Box::new(Mic::default()));
     app.set_enrichers(
@@ -374,177 +244,36 @@ fn a_voice_capture_stays_on_the_list_and_the_items_said_become_lines() -> TestRe
         None,
         None,
     );
-    let mut harness = window(app);
-    type_rows(&mut harness, &["Bread"]);
+    let mut harness = window(app, &bread);
+    // Record voice in the Note dialog goes onto its Note (#352).
     click(&mut harness, t().record_voice());
     click(&mut harness, t().stop_recording());
-    pick(&mut harness, "Groceries");
-    click(&mut harness, "Save");
+    let recorded = Notes::new(&store).by_id(&bread)?.ok_or("Bread")?;
+    assert_eq!(recorded.recordings.len(), 1);
+    open_menu(&mut harness);
+    harness
+        .get_by_label(&t().add_to_named_shopping_list("Groceries"))
+        .click_accesskit();
+    harness.run();
     // The typed line at once, the items said once transcribed; Milk once.
     let added = eventually(|| lines(&store, &list).is_ok_and(|l| l.len() == 4));
     assert!(added, "{:?}", lines(&store, &list)?);
     assert_eq!(lines(&store, &list)?, ["Bread", "Butter", "Eggs", "Milk"]);
     let voice = voice_note(&store)?;
+    assert_eq!(voice.id, bread);
     assert_eq!(voice.merged_into.as_deref(), Some(list.as_str()));
     let sections = Notes::new(&store).sections(&list)?;
     assert_eq!(sections.len(), 1);
     assert_eq!(sections[0].recordings, voice.recordings);
-    assert_eq!(ShoppingLists::new(&store).owed_to(&voice.id)?, None);
     assert_eq!(others(&store, &list)?, Vec::<Note>::new());
     Ok(())
 }
 
 #[test]
-fn without_a_speech_model_the_recording_goes_on_the_list_and_the_lines_follow_once() -> TestResult {
-    let (store, _, list) = store()?;
-    let mut app = App::new(store.clone(), "en");
-    app.set_recorder(Box::new(Mic::default()));
-    let mut harness = window(app);
-    click(&mut harness, t().record_voice());
-    click(&mut harness, t().stop_recording());
-    // Offered without anything to transcribe with.
-    pick(&mut harness, "Groceries");
-    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    click(&mut harness, "Save");
-    assert_eq!(lines(&store, &list)?, ["Milk"]);
-    let voice = voice_note(&store)?;
-    assert_eq!(voice.merged_into.as_deref(), Some(list.as_str()));
-    let lists = ShoppingLists::new(&store);
-    assert_eq!(lists.owed_to(&voice.id)?, Some(list.clone()));
-    harness.run();
-    assert!(!shows(&harness, t().capture_shopping_gone()));
-
-    // The model comes later, and Whisper transcribes the recording.
-    let later = transcriber(&store, Some("Eggs und Tee"));
-    later.kick();
-    let added = eventually(|| lists.owed_to(&voice.id).is_ok_and(|o| o.is_none()));
-    assert!(added);
-    assert_eq!(lines(&store, &list)?, ["Eggs", "Milk", "Tee"]);
-
-    // Eggs struck, and transcribed again: nothing comes back.
-    let eggs = lists
-        .by_note(&list, &utc)?
-        .ok_or("a Shopping List")?
-        .lines
-        .into_iter()
-        .find(|l| l.text == "Eggs")
-        .ok_or("Eggs")?;
-    lists.check(&eggs.id, &utc)?;
-    let hash = voice.recordings[0].clone();
-    later.again(Blob {
-        note_id: voice.id.clone(),
-        hash: hash.clone(),
-    });
-    assert!(eventually(|| !later.busy_with(&hash)));
-    assert_eq!(lines(&store, &list)?, ["Eggs", "Milk", "Tee"]);
-    assert_eq!(struck(&store, &list)?, ["Eggs"]);
-    Ok(())
-}
-
-#[test]
-fn the_popups_voice_capture_goes_on_the_list_without_a_speech_model() -> TestResult {
-    let (store, _, list) = store()?;
-    let mut harness = popup(&store);
-    harness
-        .state_mut()
-        .popup
-        .set_recorder(Box::new(Mic::default()));
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Bread");
-    harness.run();
-    pick(&mut harness, "Groceries");
-    click(&mut harness, t().record_voice());
-    click(&mut harness, t().stop_recording());
-    click(&mut harness, "Save");
-    assert!(harness.state().closed);
-    assert_eq!(lines(&store, &list)?, ["Bread", "Milk"]);
-    let voice = voice_note(&store)?;
-    assert_eq!(voice.merged_into.as_deref(), Some(list.as_str()));
-    assert_eq!(voice.text, "Bread");
-    assert_eq!(
-        ShoppingLists::new(&store).owed_to(&voice.id)?,
-        Some(list.clone())
-    );
-    assert_eq!(others(&store, &list)?, Vec::<Note>::new());
-    Ok(())
-}
-
-#[test]
-fn a_photo_pasted_in_the_popup_drops_the_list_and_none_is_offered_while_held() -> TestResult {
-    let (store, _, list) = store()?;
-    let mut harness = popup(&store);
-    harness.state_mut().popup.set_clipboard(Box::new(Pictures));
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Bread");
-    harness.run();
-    pick(&mut harness, "Groceries");
-    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    click(&mut harness, t().paste());
-    // No Line holds a photo: the list goes, and none is offered.
-    assert_eq!(harness.state().popup.choices().shopping, None);
-    assert!(!shows(&harness, &t().capture_choice_shopping("Groceries")));
-    click(&mut harness, "More");
-    assert!(shows(&harness, "Important"));
-    assert!(!shows(&harness, t().add_to_shopping_list()));
-    // Left, it keeps the Note with its photo.
-    assert_eq!(harness.state_mut().popup.leave(), Outcome::Closed);
-    let kept = others(&store, &list)?;
-    assert_eq!(kept.len(), 1);
-    assert_eq!(kept[0].text, "Bread");
-    assert_eq!(kept[0].photos.len(), 1);
-    assert_eq!(lines(&store, &list)?, ["Milk"]);
-    Ok(())
-}
-
-#[test]
-fn a_list_picked_by_keyboard_or_screen_reader_closes_more() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = popup(&store);
-    harness.get_by(|n| n.is_focused()).type_text("Bread");
-    harness.run();
-    // No pointer click: the pick alone closes the menu.
-    let named = t().add_to_named_shopping_list("Groceries");
-    pick(&mut harness, "Groceries");
-    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    assert!(!shows(&harness, &named));
-    // The list picked again, in the "More" that holds only it, closes it
-    // too and keeps it.
-    click(&mut harness, "More");
-    harness
-        .get_by_role_and_label(Role::RadioButton, &named)
-        .click_accesskit();
-    harness.run();
-    assert!(!shows(&harness, &named));
-    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    Ok(())
-}
-
-#[test]
-fn one_list_is_named_and_picked_at_once() -> TestResult {
-    let (store, _, list) = store()?;
-    let mut harness = window(App::new(store.clone(), "en"));
-    type_rows(&mut harness, &["Eggs"]);
-    click(&mut harness, "More");
-    // No heading over one list to pick from: its entry names it.
-    assert!(!shows(&harness, t().add_to_shopping_list()));
-    assert!(
-        harness
-            .query_by_role_and_label(Role::RadioButton, "Groceries")
-            .is_none()
-    );
-    click(&mut harness, &t().add_to_named_shopping_list("Groceries"));
-    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
-    click(&mut harness, "Save");
-    assert_eq!(lines(&store, &list)?, ["Eggs", "Milk"]);
-    Ok(())
-}
-
-#[test]
-fn of_several_lists_the_one_a_capture_went_into_last_is_at_the_top() -> TestResult {
-    let (store, _, groceries) = store()?;
-    let hardware = Notes::new(&store)
-        .capture("Hardware\nNails", None, None)?
-        .id;
+fn of_several_lists_the_one_used_last_is_at_the_top() -> TestResult {
+    let (store, groceries) = store()?;
+    let notes = Notes::new(&store);
+    let hardware = notes.capture("Hardware\nNails", None, None)?.id;
     ShoppingLists::new(&store).make(&hardware)?;
     let top = |harness: &Harness<'_, App>, title: &str| {
         harness
@@ -552,25 +281,19 @@ fn of_several_lists_the_one_a_capture_went_into_last_is_at_the_top() -> TestResu
             .rect()
             .top()
     };
-    let mut harness = window(App::new(store.clone(), "en"));
-    type_rows(&mut harness, &["Glue"]);
+    let glue = notes.capture("Glue", None, None)?.id;
+    let mut harness = window(App::new(store.clone(), "en"), &glue);
+    open_menu(&mut harness);
     // Oldest capture first while none was used.
-    click(&mut harness, "More");
-    assert!(shows(&harness, t().add_to_shopping_list()));
     assert!(top(&harness, "Groceries") < top(&harness, "Hardware"));
-    harness.key_press(Key::Escape);
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Hardware")
+        .click_accesskit();
     harness.run();
-    pick(&mut harness, "Hardware");
-    // Picked, but nothing added yet: nothing remembered.
-    assert_eq!(DeviceSettings::new(&store).last_shopping_list()?, None);
-    click(&mut harness, "Save");
     assert_eq!(lines(&store, &hardware)?, ["Glue", "Nails"]);
-    assert_eq!(
-        DeviceSettings::new(&store).last_shopping_list()?.as_deref(),
-        Some(hardware.as_str())
-    );
-    type_rows(&mut harness, &["Tea"]);
-    click(&mut harness, "More");
+    let tea = notes.capture("Tea", None, None)?.id;
+    let mut harness = window(App::new(store.clone(), "en"), &tea);
+    open_menu(&mut harness);
     assert!(top(&harness, "Hardware") < top(&harness, "Groceries"));
     assert_eq!(lines(&store, &groceries)?, ["Milk"]);
     Ok(())

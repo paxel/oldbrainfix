@@ -41,7 +41,6 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/feedback_screen.dart';
-import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/file_platform.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
@@ -1304,8 +1303,9 @@ void _storeScreenshots({required bool iphone}) {
           await openTextCapture(tester);
           await tester.enterText(find.byType(TextField), texts.captureText);
           await tester.pumpAndSettle();
-          expect(find.text(t.voice), findsOneWidget);
-          expect(find.text(t.photo), findsOneWidget);
+          // The quick note: the text, three Nudge buttons and More (#352).
+          expect(find.byType(NudgeButtons), findsOneWidget);
+          expect(find.text(t.more), findsOneWidget);
         });
 
         frame('3-diary.png', (tester) async {
@@ -1563,47 +1563,23 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.byType(CaptureScreen), findsOneWidget);
             expect(find.byType(NudgeButtons), findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('captureToEditor')),
+              findsOneWidget,
+            );
           });
 
           boxFrame('capture-and-sort', 'sort-while-capturing', (tester) async {
-            final seeded = seed();
-            // Settings ▸ Quick note: File into…, the alarm clock and the
-            // Importance switched on (#142).
-            for (final control in [
-              QuickNoteControl.fileInto,
-              QuickNoteControl.schedule,
-              QuickNoteControl.importance,
-            ]) {
-              seeded.store.setQuickNoteShows(control, true);
-            }
-            // Filed into the Kitchen, then Work, before: on top (#272).
-            final places = Places(seeded.store);
-            final household = places.areas().firstWhere(
-              (a) => a.starter == 'household',
-            );
-            seeded.store
-              ..filedInto(
-                places
-                    .topics(household.id)
-                    .firstWhere((t) => t.starter == 'kitchen')
-                    .id,
-              )
-              ..filedInto(
-                places.areas().firstWhere((a) => a.starter == 'work').id,
-              );
-            final t = await start(tester, seeded);
+            // More on the quick note opens the full editor on the Note,
+            // where it is sorted (#352).
+            await start(tester, seed());
             await openTextCapture(tester);
             await tester.enterText(find.byType(TextField), texts.captureText);
-            await _tap(
-              tester,
-              find.descendant(
-                of: find.byKey(const ValueKey('note-actions')),
-                matching: find.byTooltip(t.fileInto),
-              ),
-            );
-            // File into… over the quick note: "→" has no glyph in the
-            // frames' fonts, so the frame stops before the pick.
-            expect(find.byType(FileIntoScreen), findsOneWidget);
+            // More waits for the text: built anew with it first.
+            await tester.pumpAndSettle();
+            await _tap(tester, find.byKey(const ValueKey('captureToEditor')));
+            expect(find.byType(CaptureScreen), findsNothing);
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
           });
 
           boxFrame('capture-and-sort', 'sort-later', (tester) async {

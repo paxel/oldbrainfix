@@ -350,7 +350,7 @@ void main() {
           .state<EditableTextState>(find.byType(EditableText))
           .pasteText(SelectionChangedCause.toolbar);
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       final pasted = notes.all().firstWhere((n) => n.id != list.id);
       expect(pasted.textFormat, TextFormats.markdown);
       expect(
@@ -381,7 +381,7 @@ void main() {
       photos.clipboard = SharedItem(text: copied.single ?? '');
       await tap(tester, find.byIcon(Icons.add));
       await tap(tester, fanEntry('paste'));
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       final pasted = notes.all().firstWhere((n) => n.id != list.id);
       expect(pasted.textFormat, TextFormats.markdown);
       expect(
@@ -417,7 +417,7 @@ void main() {
     await start(tester);
     await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), 'milk\nand bread');
-    await tap(tester, find.text('Save'));
+    await saveCapture(tester);
 
     expect(find.text('Just captured'), findsOneWidget);
     expect(find.text('milk\nand bread'), findsOneWidget);

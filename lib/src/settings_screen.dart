@@ -951,7 +951,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _QuickNoteSettings(
                       store: widget.store,
-                      advanced: _advanced,
                       headingKey: _heading('quick-note'),
                     ),
                     if (hasCalendarPage(context))
@@ -1341,40 +1340,24 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
   }
 }
 
-/// What this Device's quick note shows besides its text field, its
-/// Photo, Voice, Gallery and Paste and "To full editor" (#142): each of
-/// the card's actions and the format bar once switched on, and the Nudge
-/// buttons until switched off.
+/// The quick note's settings (#352): the text, the three Nudge buttons
+/// and More, nothing else, the rest in the full editor; only the Nudge
+/// buttons can be switched off for a single Save. The quick note's
+/// switches of before (#142) stay stored and no longer show.
 class _QuickNoteSettings extends StatefulWidget {
   final Store store;
-
-  /// Whether the format bar's switch shows: only in Advanced (#197).
-  final bool advanced;
 
   /// The heading's key, for an app link (#261).
   final Key? headingKey;
 
-  const _QuickNoteSettings({
-    required this.store,
-    required this.advanced,
-    this.headingKey,
-  });
+  const _QuickNoteSettings({required this.store, this.headingKey});
 
   @override
   State<_QuickNoteSettings> createState() => _QuickNoteSettingsState();
 }
 
 class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
-  late final _shows = {
-    for (final control in QuickNoteControl.values)
-      control: widget.store.quickNoteShows(control),
-  };
   late bool _nudgeButtons = widget.store.quickNoteNudgeButtonsOn;
-
-  void _set(QuickNoteControl control, bool on) {
-    widget.store.setQuickNoteShows(control, on);
-    setState(() => _shows[control] = on);
-  }
 
   void _setNudgeButtons(bool on) {
     widget.store.quickNoteNudgeButtonsOn = on;
@@ -1384,17 +1367,6 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    Widget shows(QuickNoteControl control, IconData icon, String title) =>
-        SettingsRow(
-          words: [title],
-          child: SwitchBelow(
-            switchKey: ValueKey('quickNote-${control.name}'),
-            leading: Icon(icon),
-            title: Text(title),
-            value: _shows[control] ?? false,
-            onChanged: (on) => _set(control, on),
-          ),
-        );
     return SettingsGroup(
       heading: t.settingsQuickNote,
       headingKey: widget.headingKey,
@@ -1408,35 +1380,6 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
                 child: Text(t.settingsQuickNoteDetail),
               ),
             ),
-            shows(
-              QuickNoteControl.fileInto,
-              Icons.drive_file_move_outline,
-              t.fileInto,
-            ),
-            // The alarm clock offers a Routine or Reminder without it (#223);
-            // Frogs, Sessions and Tallies are made only in Advanced (#197).
-            if (widget.advanced)
-              shows(
-                QuickNoteControl.schedule,
-                Icons.alarm_add_outlined,
-                t.quickNoteSchedule,
-              ),
-            shows(
-              QuickNoteControl.shopping,
-              Icons.add_shopping_cart,
-              t.addToShoppingList,
-            ),
-            shows(
-              QuickNoteControl.importance,
-              Icons.priority_high,
-              t.importance,
-            ),
-            if (widget.advanced)
-              shows(
-                QuickNoteControl.formatBar,
-                Icons.format_bold,
-                t.quickNoteFormatBar,
-              ),
             SettingsRow(
               words: [t.quickNoteNudgeButtons, t.quickNoteNudgeButtonsDetail],
               child: SwitchBelow(

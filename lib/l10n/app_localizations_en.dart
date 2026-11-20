@@ -5073,7 +5073,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
+      'The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -5511,11 +5511,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Tap + and Text, type a task, tap the alarm clock, then Reminder; set its time and tap Save twice.';
+      'Tap + and Text, type a task, tap More, then the + badge and Remind me…; set its time and tap Save.';
 
   @override
   String get helpQuickStart4 =>
-      'Tap + and Text, type a habit, tap the alarm clock, then Routine; choose when it repeats and tap Save twice.';
+      'Tap + and Text, type a habit, tap More, then the + badge and Remind me…; tap Every …, choose when it repeats and tap Save.';
 
   @override
   String get helpQuickStart5 =>
@@ -5547,10 +5547,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop3 =>
-      'Reminder: in the quick note, click the alarm clock, then Reminder; set its time, click Save, then Ctrl+Enter.';
+      'Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.';
 
   @override
-  String get helpQuickStartDesktop4 => 'Routine: the same, with Routine.';
+  String get helpQuickStartDesktop4 =>
+      'Routine: the same, then Every … and when it repeats.';
 
   @override
   String get helpQuickStartDesktop5 =>

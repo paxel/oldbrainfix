@@ -76,7 +76,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'wash the windows');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.unsorted(), hasLength(1));
 
       await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));

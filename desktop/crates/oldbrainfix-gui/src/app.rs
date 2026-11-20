@@ -98,10 +98,10 @@ use oldbrainfix_core::{
     CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
     ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
-    OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuickNoteControl,
-    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions,
-    ShoppingLine, ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies,
-    TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
+    OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuietHours, Routine,
+    RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
+    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, TextSize, ThemeChoice,
+    Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -119,9 +119,7 @@ use crate::backup_view::{
     self, BackupAction, BackupNotes, BackupNotesAction, Passphrase, Welcome, WelcomeAction,
 };
 use crate::backups;
-use crate::capture_choices::{
-    self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
-};
+use crate::capture_choices::{self, CaptureChoices, Captured, Held, ListTitle, QuickNote};
 use crate::card_glance;
 use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
@@ -675,8 +673,6 @@ struct View {
     descriptions_unfolded: HashSet<String>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
-    /// Whether the Note being captured may spawn where it goes (#113).
-    capture_spawns: bool,
     /// Whether this Device may set up Sessions and Frogs where the list
     /// shows, for what "+" offers (#161).
     list_manages: bool,
@@ -685,8 +681,8 @@ struct View {
     advanced: bool,
     /// What this Device's quick note shows (#142).
     capture_quick: QuickNote,
-    /// The Shopping Lists the Note being captured can go into, by their
-    /// Note's id with their title (#124).
+    /// The Shopping Lists a Note open in the Note dialog can go into, by
+    /// their Note's id with their title (#124, #352).
     capture_lists: Vec<ListTitle>,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
@@ -823,13 +819,12 @@ struct UpdateNotice {
     details: String,
 }
 
-/// What File into… files (#272): these Notes, or the Note being
-/// captured; and what Add to Note… adds (#308), also the question and
-/// answer at this place of the Ask panel (#316).
+/// What File into… files (#272): these Notes; and what Add to Note…
+/// adds (#308), also the question and answer at this place of the Ask
+/// panel (#316).
 #[derive(Debug, Clone, PartialEq)]
 enum Filing {
     Notes(Vec<String>),
-    Capture,
     Answer(usize),
 }
 
@@ -1427,26 +1422,25 @@ enum Action {
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
-    /// Something asked of the capture's buttons or its choices (#113).
-    CaptureChoice(Ask),
-    /// "To full editor" (#142): captures as leaving does and opens the
-    /// Note in the Note dialog (#146), its text taking the keyboard.
+    /// More (#142, #352): captures as leaving does and opens the Note in
+    /// the Note dialog (#146), its text taking the keyboard.
     CaptureToEditor,
-    /// "Add to Note…" in the quick note (#308): asks which Note the
-    /// capture goes into.
-    CaptureAddToNote,
-    /// Starts recording voice into the Note being captured.
+    /// Record voice in the Note dialog (#352): starts recording voice
+    /// into the Note open there.
     Record,
-    /// Ends the recording and holds it on the capture field.
+    /// Ends the recording and adds it to the Note it was started on.
     StopRecording,
+    /// Paste in the Note dialog (#352): the clipboard's text into the
+    /// Note's text, its picture as the Note's photo.
+    PasteOntoNote,
+    /// Add to a Shopping List in the Note dialog (#352): the Note's lines
+    /// become Lines of the list of this Note's id and the Note goes.
+    PourIntoShopping(String),
     /// Plays the voice recording with this hash, or stops it playing.
     Play(String),
     /// Plays recordings at this speed from now on, the one playing
     /// included, and keeps it on this Device.
     Speed(f64),
-    /// Asks the system's dialog for files of any kind and holds them on
-    /// the capture field.
-    PickFiles,
     /// "Attach a file…" (#267): asks the system's dialog for files and
     /// does with them what a drop does.
     AttachFiles,
@@ -1842,8 +1836,6 @@ enum Setting {
     /// Simple or Advanced: the person's, on all of their own Devices
     /// (#197).
     Advanced(bool),
-    /// Whether the quick note shows this control (#142).
-    QuickNote(QuickNoteControl, bool),
     /// Whether the quick note shows the three Nudge buttons (#142).
     QuickNoteNudgeButtons(bool),
     /// The main switch "AI (experimental)" (#334).
@@ -2042,6 +2034,13 @@ pub struct App {
     /// The recordings that ended, held on the capture field until its
     /// Note is saved.
     recorded: Vec<Vec<u8>>,
+    /// The Note the recording running was started on in the Note dialog
+    /// (#352), which it goes onto as it ends; `None` for one held on the
+    /// capture field.
+    recording_into: Option<String>,
+    /// Whether the Note dialog's last Paste found nothing, said in grey
+    /// under its button until the Note dialog closes (#352).
+    note_paste_empty: bool,
     /// The pictures pasted, chosen or dropped, held on the capture field
     /// until its Note is saved.
     held_photos: Vec<Vec<u8>>,
@@ -2604,6 +2603,8 @@ impl App {
             playing: None,
             speed,
             recorded: Vec::new(),
+            recording_into: None,
+            note_paste_empty: false,
             held_photos: Vec::new(),
             held_files: Vec::new(),
             held_problems: Vec::new(),
@@ -5968,16 +5969,6 @@ impl App {
         if self.view.detail.is_none() {
             self.badge = None;
         }
-        // An Area or Topic deleted meanwhile is no place to capture into.
-        if let Some(place) = &self.capture_choices.place
-            && self.view.area(place).is_none()
-            && self.view.topic(place).is_none()
-        {
-            self.capture_choices.place = None;
-            let place = self.capture_place();
-            self.view.capture_spawns =
-                capture_choices::may_spawn(&self.store, place.as_deref()).unwrap_or(true);
-        }
         self.read_at = self.store.now();
         // A Note window (#287) leaves what is announced to the main one.
         let main = self.alone.is_none();
@@ -6726,10 +6717,6 @@ impl App {
             struck_shown,
             descriptions_unfolded,
             detail,
-            capture_spawns: capture_choices::may_spawn(
-                &self.store,
-                self.capture_place().as_deref(),
-            )?,
             list_manages: capture_choices::may_spawn(&self.store, self.list_place().as_deref())?,
             advanced: PersonSettings::new(&self.store).advanced()?,
             capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
@@ -6895,6 +6882,10 @@ impl App {
     fn apply(&mut self, action: Action) {
         let sorting = self.sorting_now();
         let done = self.act(action);
+        // A recording into a Note that is no longer open, whatever closed
+        // it, goes onto it (#352).
+        let left = self.recording_left();
+        let done = done.and(left);
         // One place per Note (#287): a Note open in its own window comes
         // forward there, not in the dialog.
         if let Some(id) = &self.selected_note
@@ -7137,24 +7128,14 @@ impl App {
             Action::Capture(nudge_in) => {
                 // A running recording is ended and kept first; held
                 // until it is, so a failed save loses nothing.
-                if let Some(r) = &mut self.recorder
-                    && r.recording()
-                    && let Some(bytes) = r.stop()
-                {
-                    self.recorded.push(bytes);
-                }
+                self.end_recording()?;
                 self.capture_note(nudge_in, &[], &[])?;
                 // Saved, the quick note's dialog goes (#146).
                 self.quick_open = false;
                 self.capture_focus = false;
             }
             Action::CaptureToEditor => {
-                if let Some(r) = &mut self.recorder
-                    && r.recording()
-                    && let Some(bytes) = r.stop()
-                {
-                    self.recorded.push(bytes);
-                }
+                self.end_recording()?;
                 // The quick note goes and the Note dialog opens on the Note
                 // saved, its text taking the keyboard (#142, #146).
                 if let Some(id) = self.capture_note(Notes::default_nudge(), &[], &[])? {
@@ -7164,22 +7145,6 @@ impl App {
                     self.edit_wanted = Some(id);
                 }
             }
-            Action::CaptureChoice(asked) => self.capture_choice(asked)?,
-            Action::CaptureAddToNote => {
-                // A running recording is ended and held with the rest, so
-                // it goes with them.
-                if let Some(r) = &mut self.recorder
-                    && r.recording()
-                    && let Some(bytes) = r.stop()
-                {
-                    self.recorded.push(bytes);
-                }
-                let picker = NotePicker::read(&self.store, &self.t, &[])?;
-                self.dialog = Some(Dialog::AddToNote {
-                    adding: Filing::Capture,
-                    picker: Box::new(picker),
-                });
-            }
             Action::AskAddToNote(ids) => {
                 let picker = NotePicker::read(&self.store, &self.t, &ids)?;
                 self.dialog = Some(Dialog::AddToNote {
@@ -7188,12 +7153,20 @@ impl App {
                 });
             }
             Action::AddToNotePicked(asked) => self.add_to_note_picked(asked)?,
-            Action::StopRecording => {
-                if let Some(bytes) = self.recorder.as_mut().and_then(|r| r.stop()) {
-                    self.recorded.push(bytes);
-                }
-            }
+            Action::StopRecording => self.end_recording()?,
             Action::Record => {
+                // Onto the Note open in the window's Note dialog (#352),
+                // where this Device may change it.
+                let on_top = self.alone.is_none()
+                    && self.top_dialog() == Some(TopDialog::Note)
+                    && self.dialog.is_none();
+                let Some(into) = self
+                    .note_menu()
+                    .filter(|n| n.changes && on_top)
+                    .map(|n| n.id)
+                else {
+                    return Ok(());
+                };
                 if let Some(player) = &mut self.player {
                     player.stop();
                 }
@@ -7204,7 +7177,10 @@ impl App {
                     self.announce_refusal(t.microphone_missing(), "record: no microphone");
                     return Ok(());
                 }
+                self.recording_into = Some(into);
             }
+            Action::PasteOntoNote => self.paste_onto_note()?,
+            Action::PourIntoShopping(list) => self.pour_into_shopping(&list)?,
             Action::Play(hash) => {
                 let Some(player) = &mut self.player else {
                     return Ok(());
@@ -7224,11 +7200,6 @@ impl App {
                     player.set_speed(speed);
                 }
                 DeviceSettings::new(&self.store).set_playback_speed(speed)?;
-            }
-            Action::PickFiles => {
-                let paths = (self.files_picker)(self.t.from_file_title());
-                let read = self.read_files(&paths);
-                self.hold_files(read);
             }
             Action::AttachFiles => {
                 let paths = (self.files_picker)(self.t.attach_file_title());
@@ -9460,60 +9431,102 @@ impl App {
         !self.recorded.is_empty() || !self.held_photos.is_empty() || !self.held_files.is_empty()
     }
 
-    /// The Shopping Lists the Note being captured can go into: none while
-    /// it holds a photo; a recording goes with a speech model or without
-    /// (#311).
-    fn capture_lists(&self) -> &[ListTitle] {
-        // No Line holds a file either (#267).
-        let photo = !self.held_photos.is_empty() || !self.held_files.is_empty();
-        capture_choices::shopping_offer(&self.view.capture_lists, photo)
-    }
-
-    /// Where the Note being captured goes: the Area or Topic picked with
-    /// "File into…", else the one shown, as the phone's "Note here";
-    /// Unsorted without either.
-    fn capture_place(&self) -> Option<String> {
-        self.capture_choices
-            .place
-            .clone()
-            .or_else(|| match &self.selection {
-                Selection::Place(id) => Some(id.clone()),
-                _ => None,
-            })
-    }
-
-    /// Does what was asked of the capture's buttons or its choices: a
-    /// Routine, Reminder, Session or Tally opens its page in a dialog over
-    /// the quick note, which hands its choice back to the capture (#113),
-    /// and File into… its dialog (#272).
-    fn capture_choice(&mut self, asked: Ask) -> oldbrainfix_core::Result<()> {
-        let place = self.capture_place();
-        match self.capture_choices.take(asked, &self.store)? {
-            None => {}
-            Some(Opens::Schedule { reminder, session }) => {
-                self.save_text()?;
-                let renag = DeviceSettings::new(&self.store).renag_interval()?;
-                let now = self.store.now();
-                let mut editor =
-                    RoutineEditor::choose(&self.capture, reminder, now, &*self.wall, renag);
-                if session {
-                    // The Tallies of where it goes; while Unsorted, any.
-                    let entity = place.as_deref().unwrap_or("");
-                    let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
-                    editor = editor.with_session(draft);
-                }
-                self.tally_form = None;
-                self.editor = Some(editor);
+    /// Ends the recording running and keeps it: onto the Note it was
+    /// started on in the Note dialog (#352), else held on the capture
+    /// field for the Note being captured. One the Note can no longer take
+    /// is held on the capture field instead, so it is never lost, and the
+    /// failure is told.
+    fn end_recording(&mut self) -> oldbrainfix_core::Result<()> {
+        let into = self.recording_into.take();
+        let Some(bytes) = self
+            .recorder
+            .as_mut()
+            .filter(|r| r.recording())
+            .and_then(|r| r.stop())
+        else {
+            return Ok(());
+        };
+        let Some(note) = into else {
+            self.recorded.push(bytes);
+            return Ok(());
+        };
+        match Notes::new(&self.store).add_recording(&note, &bytes) {
+            Ok(_) => {
+                self.kick();
+                Ok(())
             }
-            Some(Opens::FileInto) => self.ask_file_into(Filing::Capture)?,
-            Some(Opens::Tally) => {
-                self.save_text()?;
-                self.editor = None;
-                let system = self.unit_system()?;
-                self.tally_form = Some(TallyForm::Field(FieldForm::choose(system, &self.t)));
+            Err(e) => {
+                self.recorded.push(bytes);
+                Err(e)
             }
         }
+    }
+
+    /// Ends a recording into a Note no longer open in the Note dialog
+    /// onto it (#352), however the dialog closed.
+    fn recording_left(&mut self) -> oldbrainfix_core::Result<()> {
+        match &self.recording_into {
+            Some(note) if self.selected_note.as_ref() != Some(note) => self.end_recording(),
+            _ => Ok(()),
+        }
+    }
+
+    /// Paste in the Note dialog (#352): the clipboard's text into the
+    /// Note's text, on a line of its own at the end, where this Device
+    /// may write it, and its picture as the Note's photo; with neither,
+    /// the grey line under the button says so.
+    fn paste_onto_note(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(note) = self.note_menu().filter(|n| n.changes).map(|n| n.id) else {
+            return Ok(());
+        };
+        let Some(clipboard) = self.clipboard.as_deref_mut() else {
+            return Ok(());
+        };
+        let pasted = paste::take(clipboard, None);
+        self.note_paste_empty = pasted.is_empty();
+        let writes = self.view.detail.as_ref().is_some_and(|(placed, _)| {
+            placed.note.text_editable && self.text_of.as_deref() == Some(note.as_str())
+        });
+        if let Some(text) = pasted.text.filter(|_| writes) {
+            if !self.text.trim().is_empty() && !self.text.ends_with('\n') {
+                self.text.push('\n');
+            }
+            self.text.push_str(&text);
+        }
+        self.save_text()?;
+        if let Some(photo) = pasted.photo {
+            Notes::new(&self.store).add_photo(&note, &photo)?;
+            self.kick();
+        }
         Ok(())
+    }
+
+    /// Add to a Shopping List in the Note dialog (#352): what is typed
+    /// kept and a recording running ended onto the Note first, its lines
+    /// go into the list `list` and the Note dialog closes, as the phone's
+    /// editor does it. A list that can no longer be added to keeps the
+    /// Note, said at the top.
+    fn pour_into_shopping(&mut self, list: &str) -> oldbrainfix_core::Result<()> {
+        let Some(note) = self.note_menu().filter(|n| n.changes).map(|n| n.id) else {
+            return Ok(());
+        };
+        self.leave_note()?;
+        if !capture_choices::pour_into_shopping(&self.store, &note, list, &*self.wall)? {
+            let t = self.t;
+            let details = format!("shopping list {list}: it can no longer be added to");
+            self.announce_done(t.capture_shopping_gone(), details);
+            self.selected_note = Some(note);
+        }
+        Ok(())
+    }
+
+    /// Where the Note being captured goes: the Area or Topic shown, as
+    /// the phone's "Note here"; Unsorted elsewhere.
+    fn capture_place(&self) -> Option<String> {
+        match &self.selection {
+            Selection::Place(id) => Some(id.clone()),
+            _ => None,
+        }
     }
 
     /// The user's Done on `occurrence` of the Routine `routine`, from the
@@ -9676,6 +9689,9 @@ impl App {
         if self.selected_note.is_none() {
             return Ok(());
         }
+        self.note_paste_empty = false;
+        // A recording running goes onto the Note first (#352).
+        self.end_recording()?;
         self.save_text()?;
         if !self.amend.trim().is_empty() && self.view.may.amends {
             self.act(Action::Amend)?;
@@ -10119,7 +10135,6 @@ impl App {
                 PersonSettings::new(&self.store).set_trashes_done_reminder(on)?;
             }
             Setting::Advanced(on) => PersonSettings::new(&self.store).set_advanced(on)?,
-            Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
             Setting::AiOn(on) => {
                 self.store.set_ai_on(on)?;
@@ -12109,9 +12124,8 @@ impl App {
 
     /// Does what Add to Note… asked (#308): the Notes found again for
     /// what is typed, or the Note picked, kept as added to last, gets the
-    /// capture as a Section, the quick note going as a save makes it go,
-    /// or has the Notes from the card merged into it, as Merge into…
-    /// merges them.
+    /// Ask panel's answer as a Section, or has the Notes from the card
+    /// merged into it, as Merge into… merges them.
     fn add_to_note_picked(&mut self, asked: NoteAsk) -> oldbrainfix_core::Result<()> {
         let into = match asked {
             NoteAsk::Find => {
@@ -12133,13 +12147,6 @@ impl App {
             }) => {
                 add_to_note::picked(&self.store, &into)?;
                 self.merge_picked(notes, into)?;
-            }
-            Some(Dialog::AddToNote {
-                adding: Filing::Capture,
-                ..
-            }) => {
-                add_to_note::picked(&self.store, &into)?;
-                self.capture_into_note(&into)?;
             }
             Some(Dialog::AddToNote {
                 adding: Filing::Answer(at),
@@ -12181,28 +12188,6 @@ impl App {
         Ok(())
     }
 
-    /// Adds what the quick note holds to the Note `into` at once as a
-    /// Section (#308); emptied, the quick note goes as a save makes it go.
-    /// A failure keeps all of it there.
-    fn capture_into_note(&mut self, into: &str) -> oldbrainfix_core::Result<()> {
-        let held = (
-            &self.held_photos[..],
-            &self.recorded[..],
-            &self.held_files[..],
-        );
-        capture_choices::add_to_note(&self.store, &self.capture, into, held)?;
-        self.capture.clear();
-        self.recorded.clear();
-        self.held_photos.clear();
-        self.held_files.clear();
-        // Added to what still waits to be clicked, so none goes unsaid.
-        self.untranscribable.append(&mut self.held_problems);
-        self.capture_choices = CaptureChoices::default();
-        self.quick_open = false;
-        self.capture_focus = false;
-        Ok(())
-    }
-
     /// Files what File into… was for into the place picked, a new one
     /// made first, which stays even when a Note captured is not saved.
     fn file_into_picked(&mut self, picked: Picked) -> oldbrainfix_core::Result<()> {
@@ -12221,13 +12206,6 @@ impl App {
             }) => {
                 let done = self.file_notes(&notes, &place);
                 self.unless_hidden(done, None, Action::File { notes, place })?;
-            }
-            Some(Dialog::FileInto {
-                into: Filing::Capture,
-                ..
-            }) => {
-                self.capture_choice(Ask::FileInto(place))?;
-                self.capture_focus = true;
             }
             other => self.dialog = other,
         }
@@ -13781,37 +13759,22 @@ impl App {
     }
 
     /// The quick note's content (UI laws, "Capture"), in its dialog
-    /// (#146): it never asks anything.
-    /// Once something is typed, "To full editor" shows (#142) and beside
-    /// it what of the Note card's buttons (#113) this Device switched on
-    /// in Settings ▸ Quick note, whose choices show at the top, not saved
-    /// yet, and under them the Nudge times, Ctrl+Enter taking the 1 h
-    /// one and Ctrl+1 to 3 each of them (#277); a Note filed or with something set up, or where the Nudge
-    /// buttons are switched off, gets one Save instead, nudging only an
-    /// Unsorted Note. With a Shopping List picked in "More", the lines go
-    /// into it instead of a Note (#124). Above the field the Kind choice,
-    /// Text, Checklist or Shopping List, makes the Note that Kind as it is
-    /// saved (#310). The format bar shows over the field where it is
-    /// switched on.
+    /// (#146): it never asks anything. The text, and once something is
+    /// typed or held, More (#352), which saves the Note and opens it in
+    /// the Note dialog, and under it the Nudge times, Ctrl+Enter taking
+    /// the 1 h one and Ctrl+1 to 3 each of them (#277); a Note filed by a
+    /// list's "+", or where the Nudge buttons are switched off, gets one
+    /// Save instead, nudging only an Unsorted Note. What the files
+    /// dropped, File ▸ Attach file… and Ctrl+V brought shows above the
+    /// text; everything else is the Note dialog's.
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let place = self.capture_place();
         let sorted = self.capture_choices.sorted(place.as_deref());
-        // The Area shown is where it goes, not a choice to drop.
-        let place_chip = self.capture_choices.place.as_ref().and_then(|id| {
-            capture_choices::place_name(&t, &self.view.areas, id).map(|name| (name, true))
-        });
-        let spawns = self.view.capture_spawns;
         let quick = self.view.capture_quick;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let id = Id::new("capture");
-        let recording = self
-            .recorder
-            .as_ref()
-            .filter(|r| r.recording())
-            .map(|r| r.elapsed());
-        let has_recorder = self.recorder.is_some();
         let has_clipboard = self.clipboard.is_some();
         embossed(ui, tones, false, None, |ui| {
             // Ctrl+Enter saves, and Ctrl+1 to 3 with the Nudge buttons'
@@ -13822,73 +13785,18 @@ impl App {
             {
                 actions.push(Action::Capture(nudge_in));
             }
-            // Announcements and choices go to the top (UI laws).
-            let shown = (place_chip, self.view.capture_lists.as_slice());
-            if let Some(asked) = capture_choices::chips(ui, &t, &self.capture_choices, shown) {
-                actions.push(Action::CaptureChoice(asked));
-            }
             // Ctrl+V in the empty field takes text and picture alike,
             // before the field takes the text alone (#130).
             let blank = self.capture.trim().is_empty();
-            if has_clipboard
-                && recording.is_none()
-                && let Some(text) = paste::ctrl_v(ui, id, blank, &mut self.paste_held)
+            if has_clipboard && let Some(text) = paste::ctrl_v(ui, id, blank, &mut self.paste_held)
             {
                 self.paste(ui, id, text);
             }
             if self.paste_empty {
                 paste::empty_line(ui, &t);
             }
-            // The Kind it is made, above the field (#310); a pick hands the
-            // cursor back to the field, to type on.
-            if recording.is_none()
-                && let Some(kind) = capture_choices::kind_choice(ui, &t, &self.capture_choices)
-            {
-                actions.push(Action::CaptureChoice(kind));
-                self.capture_focus = true;
-            }
-            if quick.format_bar {
-                format_bar::capture_bar(ui, &t, id, &mut self.capture, (text, tones.accent));
-            }
-            let field = ui.add(
-                TextEdit::multiline(&mut self.capture)
-                    .id(id)
-                    .hint_text(t.capture_hint())
-                    .text_color(text)
-                    // The text typed at the Device's text size (#326).
-                    .font(FontId::proportional(theme::content(ui, 16.0)))
-                    .desired_rows(2)
-                    .desired_width(f32::INFINITY)
-                    .frame(Frame::NONE),
-            );
-            // Its right-click menu, with the bar's formats while the
-            // bar shows (#253); Paste as the capture's Paste (#130).
-            let formats: &[Format] = if quick.format_bar {
-                &Format::CAPTURE
-            } else {
-                &[]
-            };
-            match text_menu::menu(ui, &t, &field, &self.capture, formats) {
-                Some(MenuPick::Format(format)) => {
-                    format_bar::put(ui, id, &mut self.capture, format)
-                }
-                Some(MenuPick::Paste) if has_clipboard => self.paste(ui, id, None),
-                Some(pick) => text_menu::apply(ui, id, &self.capture, pick),
-                None => {}
-            }
-            name_field(ui, &field, t.capture_field_name());
-            // File ▸ New Note: after the field, so the menu's click does
-            // not take it out again; asked again past the dialog's first,
-            // sizing pass, which drops it.
-            if self.capture_focus {
-                field.request_focus();
-                self.capture_focus = ui.is_sizing_pass() || !field.has_focus();
-            }
-            if field.changed() {
-                self.paste_empty = false;
-            }
-            // A stopped recording, a picture pasted and the files chosen
-            // or dropped stay here until the Note is saved.
+            // A recording, a picture pasted and the files dropped stay
+            // here, above the text, until the Note is saved (#352).
             for _ in &self.recorded {
                 ui.horizontal(|ui| {
                     icons::show(ui, icons::MIC, 18.0, text);
@@ -13908,42 +13816,41 @@ impl App {
                     ui.label(RichText::new(&file.name).color(text));
                 });
             }
-            if has_recorder {
-                match media_view::voice_button(ui, &t, recording) {
-                    Some(Voice::Record) => actions.push(Action::Record),
-                    Some(Voice::Stop) => actions.push(Action::StopRecording),
-                    None => {}
-                }
+            let field = ui.add(
+                TextEdit::multiline(&mut self.capture)
+                    .id(id)
+                    .hint_text(t.capture_hint())
+                    .text_color(text)
+                    // The text typed at the Device's text size (#326).
+                    .font(FontId::proportional(theme::content(ui, 16.0)))
+                    .desired_rows(2)
+                    .desired_width(f32::INFINITY)
+                    .frame(Frame::NONE),
+            );
+            // Its right-click menu; Paste as Ctrl+V's (#130).
+            match text_menu::menu(ui, &t, &field, &self.capture, &[]) {
+                Some(MenuPick::Paste) if has_clipboard => self.paste(ui, id, None),
+                Some(pick) => text_menu::apply(ui, id, &self.capture, pick),
+                None => {}
             }
-            if has_clipboard && recording.is_none() {
-                if paste::button(ui, &t) {
-                    self.paste(ui, id, None);
-                }
-                ui.label(RichText::new(t.photos_hint()).small().color(weak));
+            name_field(ui, &field, t.capture_field_name());
+            // File ▸ New Note: after the field, so the menu's click does
+            // not take it out again; asked again past the dialog's first,
+            // sizing pass, which drops it.
+            if self.capture_focus {
+                field.request_focus();
+                self.capture_focus = ui.is_sizing_pass() || !field.has_focus();
             }
-            if recording.is_none() {
-                ui.horizontal(|ui| {
-                    icons::show(ui, icons::FOLDER_OPEN, 20.0, text);
-                    if ui
-                        .button(RichText::new(t.from_file()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::PickFiles);
-                    }
-                });
-                ui.label(RichText::new(t.from_file_hint()).small().color(weak));
+            if field.changed() {
+                self.paste_empty = false;
             }
-            if self.capture.trim().is_empty() && recording.is_none() && !self.holds_media() {
+            if self.capture.trim().is_empty() && !self.recording() && !self.holds_media() {
                 return;
             }
             ui.add_space(4.0);
-            let offer = (spawns, self.capture_lists());
-            let row = (&quick, true);
-            match capture_choices::action_row(ui, &t, &self.capture_choices, offer, row) {
-                Some(RowAsk::Choice(asked)) => actions.push(Action::CaptureChoice(asked)),
-                Some(RowAsk::ToEditor) => actions.push(Action::CaptureToEditor),
-                Some(RowAsk::AddToNote) => actions.push(Action::CaptureAddToNote),
-                None => {}
+            // Saves as leaving does and opens the Note dialog (#352).
+            if ui.button(RichText::new(t.more()).color(text)).clicked() {
+                actions.push(Action::CaptureToEditor);
             }
             ui.add_space(4.0);
             if sorted || !quick.nudge_buttons {
@@ -14495,6 +14402,42 @@ impl App {
         let today = Day::today(store.now(), &*self.wall);
         // Its one Reminder goes with it, where this Device moves it.
         let trashes = may.changes && linked.len() == 1;
+        // Record voice and Paste onto it (#352), while a microphone and
+        // a clipboard are there; Record voice only in the window's Note
+        // dialog, as a Note's own window only borrows the microphone
+        // while it draws (#287).
+        let alone = self.alone.is_some();
+        let recording = self
+            .recorder
+            .as_ref()
+            .filter(|r| r.recording())
+            .map(|r| r.elapsed());
+        let has_recorder = self.recorder.is_some() && !alone;
+        let has_clipboard = self.clipboard.is_some();
+        let paste_empty = self.note_paste_empty;
+        // Add to a Shopping List (#352): a Plain Note with nothing that
+        // needs it, as a capture sorted into a list makes no Note.
+        let pours = may.changes
+            && !alone
+            && !trashed
+            && !kinded
+            && !note.is_merged()
+            && !note.spawned
+            && note_frog.is_none()
+            && session_setup.is_none()
+            && sections.is_empty()
+            && note.photos.is_empty()
+            && note.attachments.is_empty();
+        let lists: Vec<ListTitle> = if pours {
+            self.view
+                .capture_lists
+                .iter()
+                .filter(|(id, _)| *id != note.id)
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        };
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
@@ -14851,15 +14794,31 @@ impl App {
                         );
                     });
                 }
-                // Files of any kind onto this Note, as a drop on the dialog
-                // brings them (#267).
+                // A recording, the clipboard and files of any kind onto
+                // this Note (#352), as a drop on the dialog brings them
+                // (#267); a recording running ends by one big stop button.
                 if may.changes && !trashed {
-                    let attach = ui.horizontal(|ui| {
-                        icons::show(ui, icons::ATTACH_FILE, 20.0, text);
-                        ui.button(RichText::new(t.attach_file_menu()).color(text))
+                    if has_recorder {
+                        match media_view::voice_button(ui, &t, recording) {
+                            Some(Voice::Record) => actions.push(Action::Record),
+                            Some(Voice::Stop) => actions.push(Action::StopRecording),
+                            None => {}
+                        }
+                    }
+                    ui.horizontal_wrapped(|ui| {
+                        if has_clipboard && recording.is_none() && paste::button(ui, &t) {
+                            actions.push(Action::PasteOntoNote);
+                        }
+                        let attach = ui.horizontal(|ui| {
+                            icons::show(ui, icons::ATTACH_FILE, 20.0, text);
+                            ui.button(RichText::new(t.attach_file_menu()).color(text))
+                        });
+                        if attach.inner.clicked() {
+                            actions.push(Action::AttachFiles);
+                        }
                     });
-                    if attach.inner.clicked() {
-                        actions.push(Action::AttachFiles);
+                    if paste_empty {
+                        paste::empty_line(ui, &t);
                     }
                 }
                 // On the page, their text where the boxes' text begins and
@@ -15065,6 +15024,18 @@ impl App {
                         .clicked()
                     {
                         actions.push(Action::StartMerge);
+                    }
+                    // Its lines into a Shopping List there is (#352), the
+                    // one used last at the top (#276).
+                    if !lists.is_empty() {
+                        let label = RichText::new(t.add_to_shopping_list()).color(text);
+                        ui.menu_button(label, |ui| {
+                            if let Some(list) =
+                                capture_choices::shopping_picker(ui, &t, None, &lists)
+                            {
+                                actions.push(Action::PourIntoShopping(list));
+                            }
+                        });
                     }
                     if theme::destructive(ui, true, t.move_to_trash()).clicked() {
                         actions.push(Action::Trash);
@@ -16742,12 +16713,11 @@ impl App {
                     );
                 });
             }
-            let rows = quick_note_rows(&t, &quick);
-            let shows = quick_note_shows(q, &t, &rows);
+            let shows = quick_note_shows(q, &t);
             if shows.contains(&true) {
                 found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    quick_note_card(ui, &t, (&quick, &rows, &shows), actions);
+                    quick_note_card(ui, &t, (&quick, &shows), actions);
                 });
             }
             if let Some(speech) = speech {
@@ -18870,95 +18840,43 @@ fn quick_capture_card(
     ui.label(RichText::new(t.capture_command()).small().color(weak));
 }
 
-/// A switch of the quick note's card: what it shows and its label.
-type QuickNoteSwitch = (QuickNoteControl, bool, &'static str);
-
-/// The switches of the Settings' card on the quick note (#142) offered
-/// here, one for each of the Note card's buttons and the format bar.
-fn quick_note_rows(t: &L10n, quick: &QuickNote) -> Vec<QuickNoteSwitch> {
-    let switches = [
-        (QuickNoteControl::FileInto, quick.file_into, t.file_into()),
-        (
-            QuickNoteControl::Schedule,
-            quick.schedule,
-            t.quick_note_schedule(),
-        ),
-        (
-            QuickNoteControl::Shopping,
-            quick.shopping,
-            t.add_to_shopping_list(),
-        ),
-        (
-            QuickNoteControl::Importance,
-            quick.importance,
-            t.importance(),
-        ),
-        (
-            QuickNoteControl::FormatBar,
-            quick.format_bar,
-            t.quick_note_format_bar(),
-        ),
-    ];
-    // The format bar, Frogs, Sessions and Tallies are offered only in
-    // Advanced (#197); the alarm clock offers a Routine or Reminder
-    // without the switch (#223).
-    switches
-        .into_iter()
-        .filter(|(control, _, _)| {
-            quick.advanced
-                || !matches!(
-                    control,
-                    QuickNoteControl::FormatBar | QuickNoteControl::Schedule
-                )
-        })
-        .collect()
-}
-
 /// Which rows of the quick note's card the search `query` shows (#282):
-/// its detail line, each of `switches` and the Nudge buttons, in order.
-fn quick_note_shows(query: &str, t: &L10n, switches: &[QuickNoteSwitch]) -> Vec<bool> {
+/// its detail line and the Nudge buttons, in order.
+fn quick_note_shows(query: &str, t: &L10n) -> [bool; 2] {
     let whole = settings_search::heading_matches(query, Some(t.settings_quick_note()));
     let shows = |words: &[&str]| whole || settings_search::matches(words, query);
-    let mut rows = vec![shows(&[t.settings_quick_note_detail_device()])];
-    rows.extend(switches.iter().map(|(_, _, label)| shows(&[label])));
-    rows.push(shows(&[
-        t.quick_note_nudge_buttons(),
-        t.quick_note_nudge_buttons_detail(),
-    ]));
-    rows
+    [
+        shows(&[t.settings_quick_note_detail_device()]),
+        shows(&[
+            t.quick_note_nudge_buttons(),
+            t.quick_note_nudge_buttons_detail(),
+        ]),
+    ]
 }
 
 /// The Settings' card on what the quick note, its dialog in the window
-/// and the popup, shows besides its text (#142): one switch for each of
-/// the Note card's `switches`, off until switched on, and the Nudge
-/// buttons, on until switched off; of them the rows `shows` (#282).
+/// and the popup, shows besides its text and More (#142, #352): the
+/// Nudge buttons, on until switched off; of it the rows `shows` (#282).
+/// The switches for File into…, the Frog and Session, Add to a Shopping
+/// List, the Importance and the format bar went with those controls
+/// into the Note dialog; what they stored stays, unused.
 fn quick_note_card(
     ui: &mut Ui,
     t: &L10n,
-    (quick, switches, shows): (&QuickNote, &[QuickNoteSwitch], &[bool]),
+    (quick, shows): (&QuickNote, &[bool; 2]),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let shown = |row: usize| shows.get(row).copied().unwrap_or(true);
     ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
-    if shown(0) {
+    if shows[0] {
         ui.label(
             RichText::new(t.settings_quick_note_detail_device())
                 .small()
                 .color(weak),
         );
     }
-    for (row, &(control, on, label)) in switches.iter().enumerate() {
-        if !shown(row + 1) {
-            continue;
-        }
-        let mut on = on;
-        if theme::checkbox(ui, &mut on, RichText::new(label).color(text)).changed() {
-            actions.push(Action::Setting(Setting::QuickNote(control, on)));
-        }
-    }
-    if !shown(switches.len() + 1) {
+    if !shows[1] {
         return;
     }
     let mut on = quick.nudge_buttons;

@@ -476,7 +476,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'call the plumber');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       expect(find.text('Just captured'), findsOneWidget);
       expect(find.byType(NoteCard), findsOneWidget);
@@ -512,7 +512,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'milk');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       final binding = tester.binding;
       // A system dialog or the notification shade over the app.
       binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);

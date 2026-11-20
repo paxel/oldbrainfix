@@ -1,5 +1,5 @@
 //! Voice recordings, photos, Transcripts, Photo Texts and the search over
-//! them in the window and the capture popup, driven headless by
+//! them in the window, recorded in the Note dialog (#352), driven headless by
 //! egui_kittest with a fake microphone, speakers, clipboard and engines.
 //! The real microphone, speakers, clipboard and Whisper are device-only.
 
@@ -18,15 +18,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration as StdDuration, Instant};
 
-use chrono::Duration;
 use egui::Key;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use oldbrainfix_core::{Notes, SigningKey, Store, WireEntry, dart_iso, parse_time};
+use oldbrainfix_core::{Notes, SigningKey, Store, WireEntry, parse_time};
 use oldbrainfix_gui::enrich::{Engine, Enricher, Kind};
 use oldbrainfix_gui::media::{self, Clipboard, Player, Recorder};
-use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
 use oldbrainfix_gui::{App, Page, Selection};
 use oldbrainfix_whisper::model::{ModelDir, Outcome as ModelOutcome, WhisperModel, copy_hashing};
@@ -208,42 +206,55 @@ fn quick(harness: &mut Harness<'_, App>) {
     harness.run();
 }
 
+/// The Note "Garage", made and opened in the Note dialog; its id.
+fn open_garage(harness: &mut Harness<'_, App>) -> String {
+    let id = Notes::new(harness.state().store())
+        .capture("Garage", None, None)
+        .unwrap()
+        .id;
+    harness.state_mut().select_note(&id);
+    harness.run();
+    id
+}
+
 #[test]
-fn recording_starts_at_once_and_the_big_stop_button_holds_it_until_saved() -> TestResult {
+fn the_quick_note_offers_no_record_voice_and_no_paste() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().mic = true;
+    let mut harness = window(store, &devices);
+    quick(&mut harness);
+    // They are the Note dialog's (#352).
+    assert!(!shows(&harness, "Record voice"));
+    assert!(
+        harness
+            .query_by_role_and_label(Role::Button, "Paste")
+            .is_none()
+    );
+    Ok(())
+}
+
+#[test]
+fn recording_in_the_note_dialog_starts_at_once_and_the_big_stop_button_adds_it() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
-    quick(&mut harness);
+    let garage = open_garage(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     assert!(harness.state().recording());
     assert!(shows(&harness, "Recording… 1:15"));
-    // While recording, the Nudge times keep it too.
-    assert!(shows(&harness, "10 min"));
     harness.get_by_label("Stop").click();
     harness.run();
     assert!(!harness.state().recording());
-    // Stopped, it stays on the capture field with the buttons, unsaved.
-    assert!(Notes::new(&store).all()?.is_empty());
-    assert!(shows(&harness, "Voice recording"));
-    assert!(shows(&harness, "To full editor"));
-    harness.get_by_label("1 h").click();
-    harness.run();
-    let notes = Notes::new(&store).all()?;
-    assert_eq!(notes.len(), 1);
-    let note = &notes[0];
-    assert_eq!(note.text, "");
+    // Stopped, it is the open Note's, which stays open.
+    let note = Notes::new(&store).by_id(&garage)?.ok_or("Garage")?;
     assert_eq!(note.recordings.len(), 1);
     assert_eq!(store.audio(&note.recordings[0]), Some(heard()));
-    assert_eq!(
-        store.current(&note.id, "nudge")?,
-        Some(dart_iso(store.now() + Duration::hours(1)))
-    );
-    // The new Note's card shows; opened, its dialog has its play button.
-    assert_eq!(harness.state().selected_note(), None);
-    harness.state_mut().select_note(&note.id);
-    harness.run();
+    assert_eq!(Notes::new(&store).all()?.len(), 1);
+    assert_eq!(harness.state().selected_note(), Some(garage.as_str()));
+    // Its play button shows in the dialog.
     harness
         .get_all_by_label("Play the voice recording")
         .last()
@@ -259,25 +270,28 @@ fn recording_starts_at_once_and_the_big_stop_button_holds_it_until_saved() -> Te
 }
 
 #[test]
-fn a_recording_and_the_typed_text_go_into_one_note_with_the_picked_nudge() -> TestResult {
+fn leaving_the_note_dialog_while_recording_keeps_the_recording_on_its_note() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
-    quick(&mut harness);
+    let garage = open_garage(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
-    type_into(&mut harness, "What's on your mind?", "Garage");
-    harness.get_by_label("10 min").click();
+    harness.key_press(Key::Escape);
     harness.run();
+    assert!(!harness.state().recording());
+    assert_eq!(harness.state().selected_note(), None);
+    let note = Notes::new(&store).by_id(&garage)?.ok_or("Garage")?;
+    assert_eq!(note.recordings.len(), 1);
+    // The quick note opened and left meanwhile holds nothing of it.
+    quick(&mut harness);
+    harness.key_press(Key::Escape);
+    harness.run();
+    assert!(!harness.state().quick_note_open());
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
-    assert_eq!(notes[0].text, "Garage");
     assert_eq!(notes[0].recordings.len(), 1);
-    assert_eq!(
-        store.current(&notes[0].id, "nudge")?,
-        Some(dart_iso(store.now() + Duration::minutes(10)))
-    );
     Ok(())
 }
 
@@ -287,12 +301,13 @@ fn closing_the_window_while_recording_keeps_the_recording() -> TestResult {
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
-    quick(&mut harness);
+    let garage = open_garage(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     harness.state_mut().flush();
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].id, garage);
     assert_eq!(notes[0].recordings.len(), 1);
     Ok(())
 }
@@ -302,7 +317,7 @@ fn without_a_microphone_the_top_says_so_and_nothing_is_kept() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
-    quick(&mut harness);
+    let garage = open_garage(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     assert_eq!(devices.borrow().starts, 1);
@@ -310,7 +325,8 @@ fn without_a_microphone_the_top_says_so_and_nothing_is_kept() -> TestResult {
         harness.state().notice(),
         Some("Voice Notes need the microphone.")
     );
-    assert!(Notes::new(&store).all()?.is_empty());
+    let note = Notes::new(&store).by_id(&garage)?.ok_or("Garage")?;
+    assert!(note.recordings.is_empty());
     // The click opens what to do, with Close and Report.
     harness
         .get_by_label("Voice Notes need the microphone.")
@@ -319,47 +335,6 @@ fn without_a_microphone_the_top_says_so_and_nothing_is_kept() -> TestResult {
     assert_eq!(harness.state().notice(), None);
     assert!(shows(&harness, "Not done"));
     assert!(shows(&harness, "Report"));
-    Ok(())
-}
-
-#[test]
-fn a_pasted_picture_becomes_a_photo_note_kept_the_phones_way() -> TestResult {
-    let store = empty_store()?;
-    let devices: Shared = Rc::default();
-    let mut harness = window(store.clone(), &devices);
-    quick(&mut harness);
-    harness.get_by_label("Paste").click();
-    harness.run();
-    // Nothing there is said in grey, not announced (#130).
-    assert_eq!(harness.state().notice(), None);
-    assert!(shows(
-        &harness,
-        "Nothing to paste: the clipboard holds no text and no picture."
-    ));
-    let photo = media::photo_from_file(&png(40, 30)).ok_or("a photo")?;
-    devices.borrow_mut().clipboard = Some(photo.clone());
-    type_into(&mut harness, "What's on your mind?", "Parking spot");
-    harness.get_by_label("Paste").click();
-    harness.run();
-    assert_eq!(harness.state().error(), None);
-    // The picture waits on the field until the capture is saved.
-    assert!(Notes::new(&store).all()?.is_empty());
-    assert!(shows(&harness, "Photo"));
-    harness
-        .get_by(|n| {
-            n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Parking spot")
-        })
-        .click();
-    harness.run();
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, Key::Enter);
-    harness.run();
-    let notes = Notes::new(&store).all()?;
-    assert_eq!(notes.len(), 1);
-    assert_eq!(notes[0].text, "Parking spot");
-    assert_eq!(notes[0].photos.len(), 1);
-    assert_eq!(store.photo(&notes[0].photos[0]), Some(photo));
-    // Its card shows it.
-    assert!(harness.query_all_by_label("Photo").count() >= 1);
     Ok(())
 }
 
@@ -686,85 +661,6 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     Ok(())
 }
 
-/// A popup with the fake microphone.
-struct Popup {
-    popup: CapturePopup,
-    closed: bool,
-}
-
-fn popup(store: Arc<Store>, devices: &Shared) -> Harness<'static, Popup> {
-    let mut popup = CapturePopup::new(store, "en");
-    popup.set_recorder(Box::new(FakeMic(devices.clone())));
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(480.0, 340.0))
-        .build_ui_state(
-            |ui, state: &mut Popup| {
-                App::install(ui.ctx());
-                if state.popup.show(ui) == Outcome::Closed {
-                    state.closed = true;
-                }
-            },
-            Popup {
-                popup,
-                closed: false,
-            },
-        );
-    harness.run();
-    harness
-}
-
-#[test]
-fn the_popup_records_and_keeps_the_recording_stopped_until_left() -> TestResult {
-    let store = empty_store()?;
-    let devices: Shared = Rc::default();
-    devices.borrow_mut().mic = true;
-    let mut harness = popup(store.clone(), &devices);
-    harness.get_by_label("Record voice").click();
-    harness.run();
-    assert!(harness.state().popup.recording());
-    // All of it fits the popup's window while recording.
-    let hint = harness.get_by_label_contains("Enter saves it with a Nudge in 1 h.");
-    assert!(hint.rect().bottom() <= 340.0, "{:?}", hint.rect());
-    harness.get_by_label("Stop").click();
-    harness.run();
-    // Stopped, the popup stays with the recording and room to type.
-    assert!(!harness.state().closed);
-    assert!(!harness.state().popup.recording());
-    assert!(Notes::new(&store).all()?.is_empty());
-    assert!(harness.query_by_label("Voice recording").is_some());
-    harness.get_by(|n| n.is_focused()).type_text("Tyres");
-    harness.run();
-    // Leaving saves it all together.
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(harness.state().closed);
-    let notes = Notes::new(&store).all()?;
-    assert_eq!(notes.len(), 1);
-    assert_eq!(notes[0].text, "Tyres");
-    assert_eq!(notes[0].recordings.len(), 1);
-    Ok(())
-}
-
-#[test]
-fn esc_while_the_popup_records_keeps_what_was_said_and_typed() -> TestResult {
-    let store = empty_store()?;
-    let devices: Shared = Rc::default();
-    devices.borrow_mut().mic = true;
-    let mut harness = popup(store.clone(), &devices);
-    harness.get_by_label("Record voice").click();
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Call back");
-    harness.run();
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(harness.state().closed);
-    let notes = Notes::new(&store).all()?;
-    assert_eq!(notes.len(), 1);
-    assert_eq!(notes[0].text, "Call back");
-    assert_eq!(notes[0].recordings.len(), 1);
-    Ok(())
-}
-
 #[test]
 fn the_merge_dialog_finds_notes_by_their_transcripts_too() -> TestResult {
     let store = media_store()?;
@@ -929,16 +825,14 @@ fn disk_store(dir: &std::path::Path) -> Result<Arc<Store>, Box<dyn std::error::E
     Ok(Arc::new(store))
 }
 
-/// Records a voice Note through the fake microphone in the quick note,
-/// then opens it in the Note dialog with its play button.
+/// Records a voice Note through the fake microphone in the Note dialog
+/// (#352), which stays open with its play button.
 fn record_note(harness: &mut Harness<'_, App>, devices: &Shared) {
     devices.borrow_mut().mic = true;
-    quick(harness);
+    open_garage(harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     harness.get_by_label("Stop").click();
-    harness.run();
-    harness.get_by_label("1 h").click();
     harness.run();
     open_newest(harness);
 }

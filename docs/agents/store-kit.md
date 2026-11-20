@@ -90,7 +90,7 @@ and F-Droid both take them. `docs/screenshots/play` links to
 | # | File            | What is on it                                                                            |
 |---|-----------------|------------------------------------------------------------------------------------------|
 | 1 | `1-agenda.png`  | Agenda: today's Routines, two Frogs, the Unsorted banner                                 |
-| 2 | `2-capture.png` | The quick note with Photo, Voice, Gallery, Paste, the Nudge buttons and "To full editor" |
+| 2 | `2-capture.png` | The quick note with its text, the Nudge buttons and More |
 | 3 | `3-diary.png`   | An Area's diary of Note cards in full                                                    |
 | 4 | `4-editor.png`  | Note editor with its badges and dated parts                                              |
 | 5 | `5-fan.png`     | The "+" fanned out: Text, Voice, Photo, Gallery, Paste                                   |

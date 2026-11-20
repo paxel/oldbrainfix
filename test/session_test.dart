@@ -300,7 +300,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'Sport');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
       expect(find.byType(BottomSheet), findsNothing);

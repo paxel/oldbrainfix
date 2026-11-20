@@ -1,13 +1,8 @@
 //! Add to Note… on the desktop (#308), driven headless by egui_kittest:
-//! the quick note and the capture popup add what is typed, recorded or
-//! held to the Note picked at once as a Section, written where that Note
-//! lies and merged into it, so nothing is left in Unsorted; the picker's
-//! filter has the keyboard, "Added to recently" shows the Notes added to
-//! last on top while nothing is typed, and Enter takes the first row. An
-//! Unsorted Note's card offers it in place of Merge into….
-
-use std::sync::Arc;
-use std::time::Duration as StdDuration;
+//! an Unsorted Note's card offers it in place of Merge into…, and the
+//! Note picked gets it merged in as a Section. The quick note offers it
+//! no longer (#352): its More opens the Note dialog, whose Merge into…
+//! adds the capture to another Note.
 
 use chrono::{DateTime, Utc};
 use egui::Key;
@@ -15,8 +10,6 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{DeviceSettings, Note, Notes, OwnProfile, Places, SigningKey, Store};
-use oldbrainfix_gui::media::{self, Recorder};
-use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -65,31 +58,6 @@ fn quick_note(app: App, text: &str) -> Harness<'static, App> {
     harness.run();
     type_here(&mut harness, text);
     harness
-}
-
-/// A microphone that hears a tenth of a second of silence.
-#[derive(Default)]
-struct Mic {
-    recording: bool,
-}
-
-impl Recorder for Mic {
-    fn start(&mut self) -> bool {
-        self.recording = true;
-        true
-    }
-
-    fn stop(&mut self) -> Option<Vec<u8>> {
-        std::mem::take(&mut self.recording).then(|| media::wav(&[0.0; 1600]))
-    }
-
-    fn recording(&self) -> bool {
-        self.recording
-    }
-
-    fn elapsed(&self) -> StdDuration {
-        StdDuration::from_secs(3)
-    }
 }
 
 /// Types `text` where the keyboard is.
@@ -144,183 +112,25 @@ fn unsorted(store: &Store) -> Result<Vec<String>, Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn the_quick_note_adds_its_text_to_the_note_picked_as_a_section() -> TestResult {
+fn the_quick_notes_more_leads_to_merge_into_another_note() -> TestResult {
+    // The quick note no longer adds to another Note itself (#352): More
+    // saves it and opens the Note dialog, whose Merge into… does it.
     let store = store()?;
     let mut harness = quick_note(App::new(store, "en"), "more garlic");
-    press(&mut harness, "Add to Note…")?;
-    assert!(harness.state().quick_note_open());
-    // The filter has the keyboard; the trash is not offered.
-    assert!(!shows(&harness, MILK));
-    type_here(&mut harness, "sauce");
-    assert!(!shows(&harness, PASTA));
-    harness.key_press(Key::Enter);
-    harness.run();
-
+    assert!(!shows(&harness, "Add to Note…"));
+    press(&mut harness, "More")?;
     assert!(!harness.state().quick_note_open());
+    press(&mut harness, "Merge into…")?;
+    type_here(&mut harness, "sauce");
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, Key::Enter);
+    harness.run();
+
     let store = harness.state().store();
     let sauce = note(store, SAUCE)?;
     let sections = Notes::new(store).sections(&sauce.id)?;
     assert_eq!(sections.len(), 1);
     assert_eq!(sections[0].text, "more garlic");
-    // Where the Note lies, so it is sealed for the same people.
-    let added = Notes::new(store)
-        .by_id(&sections[0].id)?
-        .ok_or("the Note added")?;
-    assert_eq!(added.place, sauce.place);
     assert_eq!(unsorted(store)?, [PASTA]);
-    assert_eq!(DeviceSettings::new(store).recently_added_to()?, [sauce.id]);
-    Ok(())
-}
-
-#[test]
-fn the_notes_added_to_last_show_on_top_and_enter_takes_the_latest() -> TestResult {
-    let store = store()?;
-    let sauce = note(&store, SAUCE)?.id;
-    let pasta = note(&store, PASTA)?.id;
-    let settings = DeviceSettings::new(&store);
-    settings.added_to(&pasta)?;
-    settings.added_to(&sauce)?;
-    let mut harness = quick_note(App::new(store, "en"), "basil");
-    press(&mut harness, "Add to Note…")?;
-    assert!(shows(&harness, "Added to recently"));
-    let heading = harness.get_by_label("Added to recently").rect().top();
-    let below = harness
-        .query_all_by_label(PASTA)
-        .next_back()
-        .ok_or("Pasta in the list")?
-        .rect()
-        .top();
-    assert!(heading < below);
-    // Typed, the recent ones go.
-    type_here(&mut harness, "pas");
-    assert!(!shows(&harness, "Added to recently"));
-    for _ in 0..3 {
-        harness.key_press(Key::Backspace);
-    }
-    harness.run_steps(8);
-    // Nothing typed, Enter takes the Note added to last.
-    harness.key_press(Key::Enter);
-    harness.run();
-
-    let store = harness.state().store();
-    let sections = Notes::new(store).sections(&sauce)?;
-    assert_eq!(sections.len(), 1);
-    assert_eq!(sections[0].text, "basil");
-    Ok(())
-}
-
-#[test]
-fn a_recording_in_the_quick_note_becomes_a_section_too() -> TestResult {
-    let store = store()?;
-    let mut app = App::new(store, "en");
-    app.set_recorder(Box::new(Mic::default()));
-    let mut harness = window(app);
-    harness.state_mut().new_note();
-    harness.run();
-    press(&mut harness, "Record voice")?;
-    // Still recording: Add to Note… ends it and keeps it.
-    press(&mut harness, "Add to Note…")?;
-    pick(&mut harness, SAUCE)?;
-
-    let store = harness.state().store();
-    let sauce = note(store, SAUCE)?;
-    let sections = Notes::new(store).sections(&sauce.id)?;
-    assert_eq!(sections.len(), 1);
-    assert_eq!(sections[0].recordings.len(), 1);
-    assert_eq!(unsorted(store)?, [PASTA]);
-    Ok(())
-}
-
-#[test]
-fn cancel_in_add_to_note_keeps_the_quick_note_as_it_was() -> TestResult {
-    let store = store()?;
-    let mut harness = quick_note(App::new(store, "en"), "more garlic");
-    press(&mut harness, "Add to Note…")?;
-    press(&mut harness, "Cancel")?;
-
-    assert!(harness.state().quick_note_open());
-    let store = harness.state().store();
-    assert!(
-        Notes::new(store)
-            .sections(&note(store, SAUCE)?.id)?
-            .is_empty()
-    );
-    assert!(DeviceSettings::new(store).recently_added_to()?.is_empty());
-    Ok(())
-}
-
-struct Popup {
-    popup: CapturePopup,
-    closed: bool,
-}
-
-fn popup(store: &Arc<Store>, recorder: bool) -> Harness<'static, Popup> {
-    let mut popup = CapturePopup::new(store.clone(), "en");
-    if recorder {
-        popup.set_recorder(Box::new(Mic::default()));
-    }
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(560.0, 900.0))
-        .build_ui_state(
-            |ui, state: &mut Popup| {
-                App::install(ui.ctx());
-                if state.popup.show(ui) == Outcome::Closed {
-                    state.closed = true;
-                }
-            },
-            Popup {
-                popup,
-                closed: false,
-            },
-        );
-    harness.run();
-    harness
-}
-
-#[test]
-fn the_popup_adds_to_the_note_picked_on_its_page_and_closes() -> TestResult {
-    let store = Arc::new(store()?);
-    let mut harness = popup(&store, false);
-    type_here(&mut harness, "more garlic");
-    press(&mut harness, "Add to Note…")?;
-    assert!(harness.state().popup.page_open());
-    // Esc goes back to the capture, nothing added.
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(!harness.state().popup.page_open());
-    assert!(!harness.state().closed);
-    press(&mut harness, "Add to Note…")?;
-    pick(&mut harness, SAUCE)?;
-
-    assert!(harness.state().closed);
-    assert_eq!(harness.state().popup.text(), "");
-    let sauce = note(&store, SAUCE)?;
-    let sections = Notes::new(&store).sections(&sauce.id)?;
-    assert_eq!(sections.len(), 1);
-    assert_eq!(sections[0].text, "more garlic");
-    assert_eq!(unsorted(&store)?, [PASTA]);
-    Ok(())
-}
-
-#[test]
-fn the_popup_adds_a_recording_still_running_to_the_note_picked() -> TestResult {
-    let store = Arc::new(store()?);
-    let mut harness = popup(&store, true);
-    press(&mut harness, "Record voice")?;
-    press(&mut harness, "Add to Note…")?;
-    pick(&mut harness, PASTA)?;
-
-    assert!(harness.state().closed);
-    let pasta = note(&store, PASTA)?;
-    let sections = Notes::new(&store).sections(&pasta.id)?;
-    assert_eq!(sections.len(), 1);
-    assert_eq!(sections[0].recordings.len(), 1);
-    // Added to an Unsorted Note, the Section is in no Area either.
-    let added = Notes::new(&store)
-        .by_id(&sections[0].id)?
-        .ok_or("the Note added")?;
-    assert_eq!(added.place, None);
-    assert_eq!(unsorted(&store)?, [PASTA]);
     Ok(())
 }
 

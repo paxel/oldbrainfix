@@ -8,7 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Changed
 
 - On the phone the search field of the Areas list, an Area and a Topic sits on a band that shares a colour set off from the page with the top bar, with a line under it, so the cards go under it when they scroll or the list is pulled down. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))
-- One "Remind me…" sets up a Routine or a Reminder wherever a Note offered "Routine…" and "Reminder…" apart, on the phone and the desktop: a card's alarm clock and ⋮, the Note editor's "+", the quick note's alarm clock, the Note dialog's "+", the Note menu and a card's right-click. Its editor starts as a Reminder, and picking a repeat makes it a Routine, keeping what was set. ([obf-1034](https://github.com/paxel/oldbrainfix/issues/344))
+- One "Remind me…" sets up a Routine or a Reminder wherever a Note offered "Routine…" and "Reminder…" apart, on the phone and the desktop: a card's alarm clock and ⋮, the Note editor's "+", the Note dialog's "+", the Note menu and a card's right-click. Its editor starts as a Reminder, and picking a repeat makes it a Routine, keeping what was set. ([obf-1034](https://github.com/paxel/oldbrainfix/issues/344))
+- The quick note, on the phone and in the desktop's quick note dialog and capture popup, shows only the text, the three Nudge buttons and More, which saves the Note and opens it in the full editor or the Note dialog. Back, the iPhone's back arrow and Esc save it as before, and the Save on top is gone. Photo, Voice, Gallery, Paste, Add to a Shopping List and, on the desktop, Record voice and Paste are now in the Note editor and the Note dialog, beside the Kind, Remind me…, File into…, the Frog and the Importance; Settings ▸ Quick note keeps only the Nudge buttons switch. ([obf-1042](https://github.com/paxel/oldbrainfix/issues/352))
 
 ### Fixed
 

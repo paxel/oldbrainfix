@@ -638,10 +638,9 @@ void main() {
         ..transcripts[1] = 'call the garage'
         ..transcribeGate = Completer<void>();
       await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, find.byIcon(Icons.mic_none));
+      await openCaptureBy(tester, 'voice');
       await tap(tester, find.byKey(const ValueKey('stopRecording')));
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       // Saved and back on the Agenda while Whisper still works.
       expect(find.byType(CaptureScreen), findsNothing);

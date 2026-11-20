@@ -15,6 +15,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_photos.dart';
 import 'fake_speech.dart';
 import 'fake_voice.dart';
+import 'open_capture.dart';
 
 /// Stand-ins for two shared sound files, an Ogg voice message and an
 /// m4a file: the app keeps any bytes as they are.
@@ -114,7 +115,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(RecordingButton), findsNWidgets(2));
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       final note = notes.all().single;
       expect(note.text, 'From the plumber');
@@ -129,7 +130,7 @@ void main() {
       await start(tester);
       photos.share(SharedItem(recordings: [SharedRecording(message)]));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       await tap(tester, inCard(find.byIcon(Icons.play_arrow)));
       expect(voice.played, [message]);
@@ -141,7 +142,7 @@ void main() {
       await start(tester);
       photos.share(SharedItem(recordings: [SharedRecording(message)]));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       final note = notes.all().single;
       final hash = note.recordings.single;
 
@@ -196,7 +197,7 @@ void main() {
 
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(CaptureScreen), findsOneWidget);
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.recordings, hasLength(1));
     });
 

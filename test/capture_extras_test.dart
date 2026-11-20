@@ -54,7 +54,7 @@ void main() {
   Future<void> capture(WidgetTester tester, String text) async {
     await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), text);
-    await tap(tester, find.text('Save'));
+    await saveCapture(tester);
   }
 
   Future<void> arrive(
@@ -220,7 +220,7 @@ void main() {
         ),
       );
       await start(tester);
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       final note = notes.all().single;
       expect(note.context.sourceApp?.name, 'WhatsApp');
@@ -236,7 +236,7 @@ void main() {
     testWidgets('a share without a source records none', (tester) async {
       photos.waiting.add(const SharedItem(text: 'https://example.org/pills'));
       await start(tester);
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.context.sourceApp, isNull);
       expect(captured(tester), isNot(contains(' · ')));
     });

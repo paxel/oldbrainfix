@@ -509,8 +509,7 @@ void main() {
       await tester.pumpAndSettle();
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), text);
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
+      await saveCapture(tester);
     }
 
     testWidgets('a text that uses a format is kept formatted, and its card '

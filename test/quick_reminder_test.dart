@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
-import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -71,7 +70,7 @@ void main() {
     await start(tester);
     await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), 'call the plumber');
-    await tap(tester, find.text('Save'));
+    await saveCapture(tester);
     await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
     await tap(tester, find.text('Remind me…'));
     expect(find.text('New Reminder'), findsOneWidget);
@@ -169,25 +168,22 @@ void main() {
       expect(kept.times, [at(18)], reason: 'the next full hour, as it was');
     });
 
-    testWidgets('of the quick note\'s alarm clock takes a chip with the Note', (
+    testWidgets('of the full editor More opens takes a chip (#352)', (
       tester,
     ) async {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'ring the plumber');
-      await tap(
-        tester,
-        find.descendant(
-          of: find.byType(CaptureScreen),
-          matching: find.byIcon(Icons.alarm_add_outlined),
-        ),
-      );
-      await tap(tester, find.text('Remind me…').last);
+      // More waits for the text: built anew with it first.
+      await tester.pump();
+      await tap(tester, find.byKey(const ValueKey('captureToEditor')));
+      await tap(tester, find.byKey(const ValueKey('badge-add')));
+      await tap(tester, find.byKey(const ValueKey('spawn-remind')));
       await tap(tester, chip('tonight'));
       await tap(tester, save);
-      await tap(tester, find.byKey(const ValueKey('captureSave')));
 
       final reminder = routines.all().single;
+      expect(reminder.noteId, Notes(store).all().single.id);
       expect(reminder.schedule.start, today);
       expect(reminder.schedule.times, [at(19)]);
     });
