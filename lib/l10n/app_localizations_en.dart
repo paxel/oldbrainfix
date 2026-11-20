@@ -975,6 +975,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quietChannel => 'Routines and Reminders in the Quiet Hours';
 
   @override
+  String get quietToday => 'Quiet today';
+
+  @override
+  String get quietDayLine => 'Quiet day until midnight';
+
+  @override
+  String get quietDayEnd => 'End';
+
+  @override
   String get headsUpChannel => 'Heads-ups';
 
   @override

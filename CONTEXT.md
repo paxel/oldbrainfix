@@ -189,6 +189,10 @@ _Avoid_: postpone, reschedule (that changes the schedule), defer
 Marking an Occurrence as not to be done, a decision rather than a lapse: it is neither Done nor Missed, its alarm and Re-nag stop, it never shows in the Missed Summary, and it leaves the Adherence, which counts the skips beside it. It can be taken back. German: Auslassen.
 _Avoid_: dismiss, cancel, Missed
 
+**Quiet day**:
+A day the user made quiet with "Quiet today" in the Agenda's menu, such as a sick day: everything still shows on the Agenda and can be checked off one by one, but nothing notifies that day, no ring, Re-nag, Heads-up, Escalation, Nudge or Changes Nudge. What starts on it and is still not Done at its midnight counts as a Skip, so it never shows in the Missed Summary and the Adherence counts it beside the others. It is a setting of the person, the same on all of their own Devices, and ends at midnight on each by its own clock; End ends it earlier, and then what is still to come rings again, not what passed (obf-1044, ADR 0053). German: Ruhiger Tag.
+_Avoid_: Quiet Hours (that is a daily window of this Device), do not disturb, day off
+
 **Re-nag**:
 Firing an ignored Occurrence again at a fixed interval until it is Done, snoozed, skipped, or the next Occurrence starts.
 _Avoid_: repeat, reminder

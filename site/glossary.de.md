@@ -187,6 +187,10 @@ _Avoid_: Aufschieben, Umplanen (das ändert den Plan), Vertagen
 Eine Fälligkeit als nicht zu erledigen markieren, eine Entscheidung und kein Versäumnis: Sie ist weder erledigt noch verpasst, ihr Alarm und das erneute Erinnern hören auf, sie erscheint nie in der Verpasst-Übersicht, und sie fällt aus der Einhaltung heraus, die die ausgelassenen daneben zählt. Es lässt sich zurücknehmen.
 _Avoid_: Verwerfen, Abbrechen, Verpasst
 
+**Ruhiger Tag** [Quiet day]:
+Ein Tag, den du mit „Heute ruhig“ im Menü der Agenda ruhig gemacht hast, etwa wenn du krank bist: Die Agenda zeigt weiter alles, und du hakst es einzeln ab, aber an dem Tag meldet sich nichts, kein Klingeln, kein erneutes Erinnern, keine Vorwarnung, keine Eskalation, kein Stupser und kein Änderungs-Stupser. Was an ihm beginnt und um Mitternacht noch nicht erledigt ist, gilt als ausgelassen, erscheint also nie in der Verpasst-Übersicht, und die Einhaltung zählt es daneben. Er ist eine Einstellung der Person, auf allen eigenen Geräten gleich, und endet auf jedem um Mitternacht nach dessen Uhr; Beenden beendet ihn früher, und dann klingelt wieder, was noch kommt, nicht, was vorbei ist.
+_Avoid_: Ruhezeit (das ist ein tägliches Fenster dieses Geräts), Nicht stören, freier Tag
+
 **Erneut erinnern** [Re-nag]:
 Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledigt ist, verschoben oder ausgelassen wird oder die nächste Fälligkeit beginnt.
 _Avoid_: Wiederholen, Erinnerung

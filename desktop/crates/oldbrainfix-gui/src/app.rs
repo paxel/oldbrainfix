@@ -451,6 +451,9 @@ struct AgendaView {
     /// through (#217): the rows shown as Done are left out already; the
     /// checked Lines and the picks with an entry go as they are drawn.
     hides_checked: bool,
+    /// Whether today is a quiet day now (obf-1044): its line shows on
+    /// top, and the Agenda's ⋮ offers no "Quiet today".
+    quiet: bool,
 }
 
 /// The Agenda read on a thread of its own (#207): the window draws on
@@ -1400,6 +1403,12 @@ enum Action {
     /// detailed one and keeps the choice for that list on this Device
     /// (#114, #189).
     Compact(bool),
+    /// "Quiet today" in the Agenda's ⋮ (obf-1044): today shows as it
+    /// is, nothing notifies until midnight, on all of the user's own
+    /// Devices.
+    QuietToday,
+    /// End on the quiet day's line: today's quiet day ends now.
+    EndQuietDay,
     /// Shows the theme chosen in View ▸ Theme at once and keeps it on
     /// this Device (#147).
     Theme(ThemeChoice),
@@ -7384,6 +7393,8 @@ impl App {
                     DeviceSettings::new(&self.store).set_text_size(size)?;
                 }
             }
+            Action::QuietToday => PersonSettings::new(&self.store).quiet_today(&*self.wall)?,
+            Action::EndQuietDay => PersonSettings::new(&self.store).end_quiet_day(&*self.wall)?,
             Action::Compact(on) => {
                 if let Some(key) = self.cards_key() {
                     // Nothing kept means full, the default.
@@ -15693,9 +15704,12 @@ impl App {
                 actions.push(Action::NewNote);
             }
             // Room for the buttons at the end: 24 wide and 8 apart, and
-            // New Session only in Advanced (#197, #246).
+            // New Session only in Advanced (#197, #246); ⋮ while it has
+            // "Quiet today" to offer, once the Agenda is read (obf-1044).
             let advanced = self.view.advanced;
-            let room = if advanced { 92.0 } else { 60.0 };
+            let menu = self.view.agenda.as_ref().is_some_and(|a| !a.quiet);
+            let buttons = 2 + usize::from(advanced) + usize::from(menu);
+            let room = buttons as f32 * 32.0 - 4.0;
             ui.add_space((ui.available_width() - room).max(0.0));
             if icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text).clicked() {
                 actions.push(Action::Select(Selection::AllRoutines));
@@ -15710,6 +15724,23 @@ impl App {
             if advanced && icon_button(ui, icons::SESSION, t.new_session(), text).clicked() {
                 actions.push(Action::NewSession(None));
             }
+            // The Agenda's menu, the phone's ⋮ in its bar.
+            if menu {
+                let more = icon_button(
+                    ui,
+                    icons::MORE_VERT,
+                    &t.occurrence_menu(t.agenda_title()),
+                    text,
+                );
+                egui::Popup::menu(&more).show(|ui| {
+                    if ui
+                        .button(RichText::new(t.quiet_today()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::QuietToday);
+                    }
+                });
+            }
         });
         ui.add_space(8.0);
         ui.spacing_mut().item_spacing.y = 16.0;
@@ -15720,6 +15751,10 @@ impl App {
             // Tighter than 0.3.1's 12 (#208).
             ui.spacing_mut().item_spacing.y = 6.0;
             ui.add_space(4.0);
+            // First of all while today is quiet (obf-1044).
+            if agenda.quiet {
+                quiet_day_line(ui, &t, tones, actions);
+            }
             if !agenda.missed.is_empty() {
                 missed_card(ui, &t, tones, &agenda.missed, actions);
             }
@@ -18426,6 +18461,27 @@ fn count_banner(ui: &mut Ui, tones: Tones, (id, icon): (Id, char), said: &str) -
     })
 }
 
+/// The quiet day's line on top of the Agenda (obf-1044), a card as "x
+/// Sent Items waiting" but not clicked as a whole: "Quiet day until
+/// midnight" and End, which ends it now.
+fn quiet_day_line(ui: &mut Ui, t: &L10n, tones: Tones, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    embossed(ui, tones, false, None, |ui| {
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::NOTIFICATIONS_OFF, 20.0, tones.accent);
+            ui.label(RichText::new(t.quiet_day_line()).color(text));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .button(RichText::new(t.quiet_day_end()).color(text))
+                    .clicked()
+                {
+                    actions.push(Action::EndQuietDay);
+                }
+            });
+        });
+    });
+}
+
 /// An embossed card holding `content` that is clicked as a whole, a
 /// button with `id` labelled `label`; whether it was clicked.
 pub(crate) fn clickable_card(
@@ -19355,6 +19411,7 @@ fn read_agenda(
             frogs: Some(today),
             frog_rows,
             hides_checked,
+            quiet: PersonSettings::new(store).quiet_until(wall)?.is_some(),
         },
         seq,
     ))

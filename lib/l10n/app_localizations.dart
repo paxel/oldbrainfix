@@ -1610,6 +1610,24 @@ abstract class AppLocalizations {
   /// **'Routines and Reminders in the Quiet Hours'**
   String get quietChannel;
 
+  /// The Agenda's menu entry that makes today a quiet day: everything shows, nothing notifies (obf-1044).
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet today'**
+  String get quietToday;
+
+  /// The line at the top of the Agenda while today is a quiet day (obf-1044).
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet day until midnight'**
+  String get quietDayLine;
+
+  /// The button on the quiet day's line that ends it now (obf-1044).
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get quietDayEnd;
+
   /// The Android notification channel of the Heads-ups (obf-1046).
   ///
   /// In en, this message translates to:

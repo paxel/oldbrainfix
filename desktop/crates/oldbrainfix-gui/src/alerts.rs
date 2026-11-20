@@ -32,6 +32,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
 use oldbrainfix_core::alarms::{PlannedAlarm, alarm_plan, heads_up_plan};
+use oldbrainfix_core::person_settings::PersonSettings;
 use oldbrainfix_core::{
     Alarms, Day, DeviceSettings, Occurrence, PlannedChangesNudge, PlannedHeadsUp, PlannedNudge,
     Routines, Store, WallClock, Wordless,
@@ -283,6 +284,7 @@ pub fn heads_ups_at(
         wall,
         settings.all_day_from()?,
         quiet,
+        &PersonSettings::new(store).quiet_days()?,
     ))
 }
 
@@ -543,6 +545,7 @@ impl Alerts {
             settings.renag_interval()?,
             settings.all_day_from()?,
             quiet,
+            &PersonSettings::new(store).quiet_days()?,
         );
         let missed = catch_up(&then, since, now);
         if missed == 0 {

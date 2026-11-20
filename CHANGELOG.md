@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Added
 
 - Heads-ups: a Routine or Reminder can warn ahead of its Occurrence, such as "Dentist in 20 min", with as many as wanted, set in its editor, whole days only for an all-day one, on Android, the iPhone and the desktop. A heads-up is one notification without Re-nag, silent in Quiet Hours; Done, Skip or Snooze before it cancels it, and the Occurrence still rings at its time. In a Shared Area each person sets their own for a shared Routine, kept on their own Devices only. ([obf-1046](https://github.com/paxel/oldbrainfix/issues/356))
+- A quiet day: "Quiet today" in the Agenda's menu keeps today quiet on all your own Devices, on the phone and the desktop. The Agenda still shows everything, each to check off on its own, and says "Quiet day until midnight" with End, but nothing rings, Re-nags, warns ahead, escalates or nudges that day. What is left undone at midnight counts as skipped, never as Missed. End brings back what is still to come, not what already passed. ([obf-1044](https://github.com/paxel/oldbrainfix/issues/354))
 
 ### Changed
 

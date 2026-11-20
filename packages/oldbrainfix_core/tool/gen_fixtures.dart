@@ -21,8 +21,10 @@
 /// back (`shopping.json`); the History scenario each Routine's history at
 /// held moments with this Device's settings (`history.json`); the Not
 /// today scenario what is skipped and moved, the Agenda, the alarms, the
-/// Missed Summary and the histories at held moments (`not_today.json`).
-/// A scenario with photos and voice recordings writes their bytes as the
+/// Missed Summary and the histories at held moments (`not_today.json`);
+/// the quiet day scenario the quiet days read and at held moments the
+/// alarms, Heads-ups, Nudge, Missed Summary and histories
+/// (`quiet_day.json`). A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
 /// question-mark scatter, RRULEs with their Occurrences and the
@@ -888,6 +890,75 @@ final _scenarios = <Scenario>[
         bins.id,
         '${RoutineKeys.skipPrefix}2026-01-06T03:00',
         '2026-01-03T09:00:00.000Z tomorrow',
+      );
+    },
+  ),
+  (
+    name: 'quiet-day',
+    about:
+        'Quiet days (obf-1044): a Routine twice a day, a weekly one '
+        'Re-nagging into a quiet day, an all-day one, a Reminder with '
+        'Heads-ups and an Unsorted Note; one day made quiet until '
+        'midnight, a later one made quiet and ended in the afternoon; and '
+        'quiet days under keys and with values no app writes.',
+    build: (store) {
+      final routines = Routines(store);
+      void jump(Duration by) => _tick = _tick.add(by);
+      routines.create(
+        'Take the pills',
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: [_at(8), _at(20)],
+          rule: Recurrence.parse('FREQ=DAILY'),
+        ),
+      );
+      routines.create(
+        'Stretch',
+        Schedule(
+          start: Day(2026, 1, 5),
+          times: [_at(9)],
+          rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO'),
+        ),
+      );
+      routines.create(
+        'Walk',
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: const [],
+          rule: Recurrence.parse('FREQ=DAILY'),
+        ),
+      );
+      final dentist = routines.create(
+        'Dentist',
+        Schedule(start: Day(2026, 1, 7), times: [_at(10)]),
+      );
+      routines.setHeadsUps(dentist.id, [60, 1440]);
+      Notes(store).capture('Call Grandma back');
+      // Tuesday the 6th, 13:00: quiet until midnight.
+      jump(const Duration(days: 5, hours: 2));
+      store.quietToday(_europe);
+      store.quietToday(_europe);
+      // Thursday the 8th, 08:00: quiet, and ended at 14:00.
+      jump(const Duration(hours: 43));
+      store.quietToday(_europe);
+      jump(const Duration(hours: 6));
+      store.endQuietDay(_europe);
+      store.endQuietDay(_europe);
+      // As no app writes them.
+      store.append(
+        PersonSettingKeys.entity,
+        '${PersonSettingKeys.quietDayPrefix}2026-1-9',
+        PersonSettingKeys.on,
+      );
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.quietDay(Day(2026, 1, 10)),
+        'Rude',
+      );
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.quietDay(Day(2026, 1, 11)),
+        '2026-01-11T12:00:00.000Z later',
       );
     },
   ),
@@ -4422,6 +4493,130 @@ Map<String, Object?> _notToday(Store store) {
                           iso(e.doneAt),
                           iso(e.skippedAt),
                           e.moved,
+                        ],
+                    ],
+                  };
+                }(),
+            ],
+          };
+        }(),
+    ],
+  };
+  _held = held;
+  return result;
+}
+
+/// What the `quiet-day` scenario comes to (obf-1044): the quiet days
+/// read, and at held moments the stretch now lies in, the Agenda, the
+/// alarm plan, the Heads-ups, the Nudge, the Missed Summary, what each
+/// Note asks to check off, what the notifications may close and each
+/// Routine's history, on [_europe]. Leaves the clock held as it was.
+Map<String, Object?> _quietDay(Store store) {
+  final routines = Routines(store);
+  String? iso(DateTime? at) => at?.toUtc().toIso8601String();
+  Map<String, Object?> adherence(Adherence a) => {
+    'done': a.done,
+    'missed': a.missed,
+    'skipped': a.skipped,
+    'share': a.share,
+  };
+  List<Object?> rows(List<AgendaRow> rows) => [
+    for (final row in rows)
+      [row.routine.id, row.occurrence.key, iso(row.done), iso(row.skipped)],
+  ];
+  final held = _held;
+  final checks = [
+    // Tuesday 09:00, quiet all day: nothing rings, the Monday Stretch
+    // waits for midnight.
+    DateTime.utc(2026, 1, 6, 8),
+    // Wednesday 09:00: Tuesday's leftovers are skipped.
+    DateTime.utc(2026, 1, 7, 8),
+    // Thursday 11:00, quiet until 14:00.
+    DateTime.utc(2026, 1, 8, 10),
+    // Thursday 15:00, after End: what is still to come rings.
+    DateTime.utc(2026, 1, 8, 14),
+    // The Monday after: both quiet days in the histories.
+    DateTime.utc(2026, 1, 12, 11),
+  ];
+  final days = store.quietDays.ends;
+  final result = {
+    'quietDays': {
+      for (final day in days.keys.toList()..sort()) '$day': iso(days[day]),
+    },
+    'checks': [
+      for (final now in checks)
+        () {
+          _held = now;
+          final alarms = Alarms(store);
+          final agenda = routines.agenda(_europe);
+          final nudge = alarms.nudge(_europe);
+          final missed = alarms.missed(_europe);
+          return {
+            'now': now.toIso8601String(),
+            'quietUntil': iso(store.quietUntil(_europe)),
+            'agenda': {
+              'today': rows(agenda.todayRows),
+              'tomorrow': rows(agenda.tomorrowRows),
+            },
+            'alarms': [
+              for (final a in alarms.plan(_europe))
+                [
+                  a.id,
+                  iso(a.at),
+                  a.wall == null ? null : _wall(a.wall!),
+                  iso(a.endsAt),
+                  iso(a.firesAfter(now)),
+                  iso(a.escalatesAt),
+                ],
+            ],
+            'headsUps': [
+              for (final h in alarms.headsUps(_europe)) [h.id, iso(h.at)],
+            ],
+            'nudge': nudge == null
+                ? null
+                : {
+                    'at': iso(nudge.at),
+                    'since': iso(nudge.since),
+                    'own': [for (final a in nudge.anchors) iso(a.due)],
+                  },
+            'missed': {
+              'count': missed.count,
+              'nextChange': iso(missed.nextChange),
+              'routines': [
+                for (final m in missed.routines)
+                  [
+                    m.routine.id,
+                    for (final o in m.missed)
+                      [o.occurrence.key, iso(o.missedAt)],
+                  ],
+              ],
+            },
+            'openOf': {
+              for (final note in Notes(store).all())
+                note.id: [
+                  for (final o in alarms.openOf(note.id, _europe))
+                    [o.routine.id, o.occurrence.key, o.missed],
+                ],
+            },
+            'recentlyDone': [
+              for (final (id, o) in alarms.recentlyDone(_europe)) [id, o.key],
+            ],
+            'histories': [
+              for (final r in routines.all())
+                () {
+                  final h = routines.history(r, _europe);
+                  return {
+                    'routine': r.id,
+                    'thisWeek': adherence(h.thisWeek),
+                    'thisMonth': adherence(h.thisMonth),
+                    'entries': [
+                      for (final e in h.entries)
+                        [
+                          e.occurrence.key,
+                          e.status.name,
+                          iso(e.missedAt),
+                          iso(e.doneAt),
+                          iso(e.skippedAt),
                         ],
                     ],
                   };
@@ -11049,6 +11244,12 @@ Future<void> main(List<String> args) async {
     'alarm plan, the Missed Summary, what each Note asks to check off, '
     'what the notifications may close and each Routine\'s history, its '
     'Streaks and its Adherence with the skips beside it.\n'
+    '- `quiet-day/quiet_day.json`: what the `quiet-day` log comes to '
+    '(obf-1044): the quiet days read, and at held moments the quiet '
+    'stretch now lies in, the Agenda, the alarm plan, the Heads-ups, the '
+    'Nudge, the Missed Summary, what each Note asks to check off, what the '
+    'notifications may close and each Routine\'s history, with what a '
+    'quiet day left undone counted as skipped.\n'
     '- `markers/markers.json`: what the values of a later version in the '
     '`markers` log come to (ADR 0034): the Routines read and those whose '
     'schedule needs a newer version, by Note too, the people of the '
@@ -11576,6 +11777,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/not_today.json'),
           '${_json.convert(_notToday(store))}\n',
+        );
+      }
+      if (scenario.name == 'quiet-day') {
+        _write(
+          File('${out.path}/quiet_day.json'),
+          '${_json.convert(_quietDay(store))}\n',
         );
       }
       if (store.entitiesOfType(FrogKeys.typeFrog).isNotEmpty) {

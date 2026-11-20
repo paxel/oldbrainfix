@@ -383,6 +383,20 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     assert_eq!(read.pointer("/textSize"), Some(&json!("larger")));
     assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
     assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
+    // Today's quiet day (obf-1044), read only.
+    assert_eq!(read.pointer("/quietDayUntil"), Some(&Value::Null));
+    let utc = |t: DateTime<Utc>| t.naive_utc();
+    PersonSettings::new(&store).quiet_today(&utc)?;
+    let midnight = Day::today(store.now(), &utc).add_days(1);
+    let settings = call(&store, &task, "read_settings", &json!({}))?;
+    assert_eq!(
+        json_of(&settings)?.pointer("/quietDayUntil"),
+        Some(&json!(dart_iso(crate::alarms::instant_of(
+            midnight,
+            crate::schedule::ClockTime { hour: 0, minute: 0 },
+            &utc,
+        ))))
+    );
     PersonSettings::new(&store).set_advanced(false)?;
     store.set_ai_on(true)?;
     store.set_ask_thinks(true)?;

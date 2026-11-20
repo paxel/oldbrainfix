@@ -148,7 +148,8 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Agenda
 
-- Order: the Missed Summary card, then the "x Unsorted" banner, then
+- Order: the quiet day's line while today is quiet (obf-1044), then
+  the Missed Summary card, then the "x Unsorted" banner, then
   the "x Sent Items waiting" line while a stranger's Sent Item waits for
   "Show", then the "x shared Areas waiting" line while an offered Area
   waits for Accept or Decline, then today's all-day Occurrences, then the
@@ -216,6 +217,17 @@ replace a law of Both apps where they say so. A desktop law marked
   as it is.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
+- **A quiet day shows everything and rings nothing** (obf-1044, ADR
+  0053): **Quiet today** in the Agenda's menu, offered while today is
+  not quiet (on the phone a bar action with a bell, in ⋮ when the bar
+  is full; on the desktop in a ⋮ last in the Agenda's bar), makes today quiet on all of the person's own Devices,
+  without an announcement. While it holds, the Agenda's first line reads
+  "Quiet day until midnight" with **End**; End ends it at once and the
+  menu offers Quiet today again; at midnight the line goes by itself.
+  Today's rows stay as they are, each checked off on its own; nothing
+  notifies, no ring, Re-nag, Heads-up, Escalation, Nudge or Changes
+  Nudge, and what is left undone counts as skipped from midnight, never
+  as Missed. After End what is still to come rings, not what passed.
 - **Checked off today, there all day.** An Occurrence checked off today
   stays on the Agenda for the day as Done, box checked and title struck
   through; the box unchecks it. Checking off opens nothing. **A skipped
@@ -1209,7 +1221,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **The Agenda's bar**, in this order: All Routines and Reminders,
   Calendar, new Routine, New Session (only in Advanced, #246), then the
   Profile picture in the corner; the desktop's has the same without
-  Calendar. When the phone's bar is full, the last of All Routines,
+  Calendar, and a ⋮ last with Quiet today while today is not quiet
+  (#354). When the phone's bar is full, the last of All Routines,
   Calendar, new Routine and New Session go into ⋮, after the Profile
   picture (see The bar); the folder and the Profile picture never do. All
   Routines and Reminders lists every one alphabetically by name, also

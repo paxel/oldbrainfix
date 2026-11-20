@@ -351,11 +351,11 @@ fn the_plan_sorts_the_people_by_their_first_change_then_by_id() -> TestResult {
         ("a".to_string(), at(9, 0)),
         ("c".to_string(), at(8, 0)),
     ]);
-    let plan =
-        changes_nudge_plan(&people, at(7, 0), &utc, Duration::hours(1), None)?.ok_or("a plan")?;
+    let plan = changes_nudge_plan(&people, at(7, 0), &utc, Duration::hours(1), None, None)?
+        .ok_or("a plan")?;
     assert_eq!(plan.people, vec!["c", "a", "b"]);
     assert_eq!(plan.at, at(8, 30));
     let nobody = BTreeMap::new();
-    assert!(changes_nudge_plan(&nobody, at(7, 0), &utc, Duration::hours(1), None)?.is_none());
+    assert!(changes_nudge_plan(&nobody, at(7, 0), &utc, Duration::hours(1), None, None)?.is_none());
     Ok(())
 }

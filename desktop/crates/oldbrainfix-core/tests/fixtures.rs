@@ -50,7 +50,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 32] = [
+const SCENARIOS: [&str; 33] = [
     "area-order",
     "area-order-shown",
     "attachments",
@@ -75,6 +75,7 @@ const SCENARIOS: [&str; 32] = [
     "not-today",
     "notes",
     "places",
+    "quiet-day",
     "routines",
     "sections",
     "session-legacy",
@@ -2655,7 +2656,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 32] = [
+    let writers: [(&str, Writer); 33] = [
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
         ("attachments", write_attachments),
@@ -2680,6 +2681,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("not-today", write_not_today),
         ("notes", write_notes),
         ("places", write_places),
+        ("quiet-day", write_quiet_day),
         ("routines", write_routines),
         ("sections", write_sections),
         ("session-legacy", write_session_legacy),
@@ -3943,6 +3945,192 @@ fn skips_and_moved_occurrences_come_to_what_the_dart_core_says() -> TestResult {
             "openOf",
             "recentlyDone",
             "todayByNote",
+            "histories",
+        ] {
+            assert_eq!(ours[key], check[key], "{now} {key}");
+        }
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------ Quiet day
+
+/// The generator's `quiet-day` scenario (obf-1044).
+fn write_quiet_day(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    use oldbrainfix_core::person_settings::keys;
+    let routines = Routines::new(store);
+    routines.create(
+        "Take the pills",
+        &schedule(
+            Day::new(2026, 1, 1),
+            &[at(8, 0)?, at(20, 0)?],
+            Some("FREQ=DAILY"),
+        )?,
+    )?;
+    routines.create(
+        "Stretch",
+        &schedule(
+            Day::new(2026, 1, 5),
+            &[at(9, 0)?],
+            Some("FREQ=WEEKLY;BYDAY=MO"),
+        )?,
+    )?;
+    routines.create(
+        "Walk",
+        &schedule(Day::new(2026, 1, 1), &[], Some("FREQ=DAILY"))?,
+    )?;
+    let dentist = routines
+        .create(
+            "Dentist",
+            &schedule(Day::new(2026, 1, 7), &[at(10, 0)?], None)?,
+        )?
+        .id;
+    routines.set_heads_ups(&dentist, &[60, 1440])?;
+    Notes::new(store).capture("Call Grandma back", None, None)?;
+    let settings = PersonSettings::new(store);
+    // Tuesday the 6th, 13:00: quiet until midnight.
+    jump(Duration::days(5) + Duration::hours(2));
+    settings.quiet_today(&berlin)?;
+    settings.quiet_today(&berlin)?;
+    // Thursday the 8th, 08:00: quiet, and ended at 14:00.
+    jump(Duration::hours(43));
+    settings.quiet_today(&berlin)?;
+    jump(Duration::hours(6));
+    settings.end_quiet_day(&berlin)?;
+    settings.end_quiet_day(&berlin)?;
+    // As no app writes them.
+    let raw = |field: &str, value: &str| store.append(keys::ENTITY, field, Some(value), None);
+    raw(&format!("{}2026-1-9", keys::QUIET_DAY_PREFIX), keys::ON)?;
+    raw(&keys::quiet_day(Day::new(2026, 1, 10)), "Rude")?;
+    raw(
+        &keys::quiet_day(Day::new(2026, 1, 11)),
+        "2026-01-11T12:00:00.000Z later",
+    )?;
+    Ok(())
+}
+
+fn quiet_day_adherence(a: &Adherence) -> Value {
+    json!({"done": a.done, "missed": a.missed, "skipped": a.skipped, "share": a.share()})
+}
+
+fn quiet_day_rows(rows: &[AgendaRow]) -> Value {
+    json!(
+        rows.iter()
+            .map(|r| json!([
+                r.routine.id,
+                r.occurrence.key(),
+                iso(r.done()),
+                iso(r.skipped())
+            ]))
+            .collect::<Vec<_>>()
+    )
+}
+
+/// What this core makes of the `quiet-day` log at one held moment, in
+/// the shape of a check in the generator's `quiet_day.json`.
+fn quiet_day_check(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::PersonSettings;
+    let now = store.now();
+    let routines = Routines::new(store);
+    let alarms = Alarms::new(store);
+    let agenda = routines.agenda(&berlin)?;
+    let missed = alarms.missed(&berlin)?;
+    let mut open_of = serde_json::Map::new();
+    for note in Notes::new(store).all()? {
+        let open: Vec<Value> = alarms
+            .open_of(&note.id, &berlin)?
+            .iter()
+            .map(|o| json!([o.routine.id, o.occurrence.key(), o.missed]))
+            .collect();
+        open_of.insert(note.id, json!(open));
+    }
+    let mut histories = Vec::new();
+    for r in routines.all()? {
+        let h = routines.history(&r, &berlin, oldbrainfix_core::history::MONDAY)?;
+        histories.push(json!({
+            "routine": r.id,
+            "thisWeek": quiet_day_adherence(&h.this_week),
+            "thisMonth": quiet_day_adherence(&h.this_month),
+            "entries": h.entries.iter().map(|e| json!([
+                e.occurrence.key(),
+                e.status.name(),
+                dart_iso(e.missed_at),
+                iso(e.done_at),
+                iso(e.skipped_at),
+            ])).collect::<Vec<_>>(),
+        }));
+    }
+    let nudge = alarms.nudge(&berlin)?.map(|n| {
+        json!({
+            "at": dart_iso(n.at),
+            "since": iso(n.since),
+            "own": n.anchors.iter().map(|a| dart_iso(a.due)).collect::<Vec<_>>(),
+        })
+    });
+    Ok(json!({
+        "now": dart_iso(now),
+        "quietUntil": iso(PersonSettings::new(store).quiet_until(&berlin)?),
+        "agenda": {
+            "today": quiet_day_rows(&agenda.today_rows),
+            "tomorrow": quiet_day_rows(&agenda.tomorrow_rows),
+        },
+        "alarms": alarms.plan(&berlin)?.iter().map(|a| json!([
+            a.id(),
+            dart_iso(a.at),
+            a.wall.as_ref().map(wall),
+            dart_iso(a.ends_at),
+            iso(a.fires_after(now)),
+            iso(a.escalates_at()),
+        ])).collect::<Vec<_>>(),
+        "headsUps": alarms.heads_ups(&berlin)?.iter()
+            .map(|h| json!([h.id(), dart_iso(h.at)]))
+            .collect::<Vec<_>>(),
+        "nudge": nudge,
+        "missed": {
+            "count": missed.count(),
+            "nextChange": iso(missed.next_change),
+            "routines": missed.routines.iter().map(|m| {
+                let mut row = vec![json!(m.routine.id)];
+                row.extend(m.missed.iter().map(|o| json!([o.occurrence.key(), dart_iso(o.missed_at)])));
+                Value::Array(row)
+            }).collect::<Vec<_>>(),
+        },
+        "openOf": open_of,
+        "recentlyDone": alarms.recently_done(&berlin)?.iter()
+            .map(|(id, o)| json!([id, o.key()]))
+            .collect::<Vec<_>>(),
+        "histories": histories,
+    }))
+}
+
+#[test]
+fn quiet_days_come_to_what_the_dart_core_says() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let expected = read_json(&fixtures().join("quiet-day").join("quiet_day.json"))?;
+    let read_at = read_json(&fixtures().join("quiet-day").join("expected.json"))?;
+    let store = load("quiet-day", read_at["now"].as_str().ok_or("now")?)?;
+    let days: serde_json::Map<String, Value> = PersonSettings::new(&store)
+        .quiet_days()?
+        .ends
+        .iter()
+        .map(|(day, end)| (day.to_string(), iso(*end)))
+        .collect();
+    assert_eq!(Value::Object(days), expected["quietDays"]);
+    let checks = expected["checks"].as_array().ok_or("checks")?;
+    assert_eq!(checks.len(), 5);
+    for check in checks {
+        let now = check["now"].as_str().ok_or("now")?;
+        let ours = quiet_day_check(&load("quiet-day", now)?)?;
+        for key in [
+            "quietUntil",
+            "agenda",
+            "alarms",
+            "headsUps",
+            "nudge",
+            "missed",
+            "openOf",
+            "recentlyDone",
             "histories",
         ] {
             assert_eq!(ours[key], check[key], "{now} {key}");

@@ -52,6 +52,8 @@ pub const PERSON: char = '\u{e491}';
 pub const MAIL_UNREAD: char = '\u{f1b6}';
 /// `group_add_outlined`, as the phone marks Areas shared from afar.
 pub const GROUP_ADD: char = '\u{f0d8}';
+/// `notifications_off`, on the Agenda's line of a quiet day (obf-1044).
+pub const NOTIFICATIONS_OFF: char = '\u{e452}';
 pub const ARROW_UP: char = '\u{e0a0}';
 pub const ARROW_DOWN: char = '\u{e097}';
 /// `check_circle_outline` and `radio_button_unchecked`, as the phone marks

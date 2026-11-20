@@ -212,6 +212,10 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   var _waiting = 0;
   var _offers = 0;
 
+  /// When today's quiet day ends, read with the rows; null while today
+  /// is not quiet (obf-1044).
+  DateTime? _quietUntil;
+
   /// The Note captured last from here, shown on top until it is let go.
   String? _capturedId;
   PlacedNote? _captured;
@@ -477,6 +481,9 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
     _offers = widget.notes.store.pendingSets
         .where((s) => s.kind == areaOfferPendingKind)
         .length;
+    // Read again after every change, a synced one too, and just after
+    // midnight, when the quiet day is over (obf-1044).
+    _quietUntil = widget.notes.store.quietUntil(deviceWallClock);
     _armTimer();
     final captured = _capturedId == null
         ? null
@@ -727,6 +734,20 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   }
 
   Future<void> _openAsk() => openAsk(context, widget.notes.store);
+
+  /// "Quiet today" (obf-1044): nothing notifies until midnight; the line
+  /// on top shows it at once, so nothing is announced. The log's change
+  /// reads the rows again, which stay as they are.
+  void _quietToday() {
+    final store = widget.notes.store..quietToday(deviceWallClock);
+    setState(() => _quietUntil = store.quietUntil(deviceWallClock));
+  }
+
+  /// End on the quiet day's line: what is still to come rings again.
+  void _endQuietDay() {
+    final store = widget.notes.store..endQuietDay(deviceWallClock);
+    setState(() => _quietUntil = store.quietUntil(deviceWallClock));
+  }
 
   Future<void> _openAllRoutines() async {
     await openAllRoutines(context, widget.notes, widget.places);
@@ -1436,6 +1457,15 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
                 onPressed: _newSession,
                 icon: Icons.event_repeat,
               ),
+            // Offered while today is not quiet; End on the line ends it
+            // (obf-1044).
+            if (_quietUntil == null)
+              BarAction(
+                key: const ValueKey('quietToday'),
+                label: t.quietToday,
+                onPressed: _quietToday,
+                icon: Icons.notifications_off_outlined,
+              ),
             // The Profile picture, where the settings gear was: Settings,
             // Sync and Backups are reached through the Profile page.
             IconButton(
@@ -1452,6 +1482,8 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             const EdgeInsets.only(top: 8),
           ),
           children: [
+            // First in the Agenda's order (obf-1044).
+            if (_quietUntil != null) _QuietDayLine(onEnd: _endQuietDay),
             if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
             if (!_missed.isEmpty)
               MissedSummaryCard(
@@ -1643,6 +1675,51 @@ class _AlarmsBanner extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Quiet day until midnight" while today is quiet, with End (obf-1044);
+/// drawn as the count lines are.
+class _QuietDayLine extends StatelessWidget {
+  final VoidCallback onEnd;
+
+  const _QuietDayLine({required this.onEnd});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        key: const ValueKey('quietDayLine'),
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 8, 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.notifications_off_outlined,
+                color: scheme.onSecondaryContainer,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  t.quietDayLine,
+                  style: TextStyle(color: scheme.onSecondaryContainer),
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('quietDayEnd'),
+                onPressed: onEnd,
+                child: Text(t.quietDayEnd),
+              ),
+            ],
           ),
         ),
       ),

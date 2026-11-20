@@ -584,3 +584,106 @@ fn a_members_done_moves_nothing_of_another_persons_note() -> TestResult {
     assert!(done.done_at(&occurrence).is_some());
     Ok(())
 }
+
+/// The wall clock in UTC.
+fn utc(t: chrono::DateTime<chrono::Utc>) -> chrono::NaiveDateTime {
+    t.naive_utc()
+}
+
+#[test]
+fn a_quiet_day_lasts_until_midnight_and_quiet_today_again_writes_nothing() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let settings = PersonSettings::new(&ann);
+    assert_eq!(settings.quiet_until(&utc)?, None);
+    settings.quiet_today(&utc)?;
+    let today = Day::today(ann.now(), &utc);
+    let midnight = crate::alarms::instant_of(
+        today.add_days(1),
+        crate::schedule::ClockTime { hour: 0, minute: 0 },
+        &utc,
+    );
+    assert_eq!(settings.quiet_until(&utc)?, Some(midnight));
+    let written = ann.all_entries()?.len();
+    settings.quiet_today(&utc)?;
+    assert_eq!(ann.all_entries()?.len(), written);
+    assert_eq!(
+        ann.current(keys::ENTITY, &keys::quiet_day(today))?
+            .as_deref(),
+        Some(keys::ON)
+    );
+    Ok(())
+}
+
+#[test]
+fn end_keeps_the_moment_it_was_tapped_and_ends_nothing_twice() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let settings = PersonSettings::new(&ann);
+    settings.end_quiet_day(&utc)?;
+    assert!(ann.logged_history(keys::ENTITY)?.is_empty());
+    settings.quiet_today(&utc)?;
+    settings.end_quiet_day(&utc)?;
+    assert_eq!(settings.quiet_until(&utc)?, None);
+    let days = settings.quiet_days()?;
+    let (_, end) = days.ends.iter().next().ok_or("a quiet day")?;
+    assert!(end.is_some());
+    let written = ann.all_entries()?.len();
+    settings.end_quiet_day(&utc)?;
+    assert_eq!(ann.all_entries()?.len(), written);
+    Ok(())
+}
+
+#[test]
+fn a_quiet_day_or_value_no_app_writes_is_not_quiet() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let raw = |field: &str, value: &str| ann.append(keys::ENTITY, field, Some(value), None);
+    raw(&format!("{}2026-1-6", keys::QUIET_DAY_PREFIX), keys::ON)?;
+    raw(&keys::quiet_day(Day::new(2026, 1, 7)), "yes")?;
+    raw(
+        &keys::quiet_day(Day::new(2026, 1, 8)),
+        "2026-01-08T12:00:00.000Z later",
+    )?;
+    raw(&keys::quiet_day(Day::new(2026, 1, 9)), "2026-02-30T12:00Z")?;
+    assert!(PersonSettings::new(&ann).quiet_days()?.ends.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_quiet_day_travels_between_own_devices_and_never_to_another_person() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let desk = device(3, "Ann at the desk")?;
+    exchange(&desk, &ann, false)?;
+    remember(&ann, &desk, false)?;
+    remember(&desk, &ann, false)?;
+    PersonSettings::new(&ann).quiet_today(&utc)?;
+    exchange(&desk, &ann, false)?;
+    assert_eq!(
+        PersonSettings::new(&desk).quiet_days()?,
+        PersonSettings::new(&ann).quiet_days()?
+    );
+    assert!(PersonSettings::new(&desk).quiet_until(&utc)?.is_some());
+
+    let (ann, ben, area) = household()?;
+    PersonSettings::new(&ann).quiet_today(&utc)?;
+    Notes::new(&ann).capture("Milk", Some(&area), None)?;
+    exchange(&ben, &ann, true)?;
+    assert!(ben.logged_history(keys::ENTITY)?.is_empty());
+    assert!(PersonSettings::new(&ben).quiet_days()?.ends.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_quiet_day_another_persons_device_wrote_counts_for_nothing() -> TestResult {
+    let (ann, ben, _) = household()?;
+    exchange(&ben, &ann, true)?;
+    // As a modified app would: Ben slips a quiet day into Ann's log.
+    let forged = ben.append(
+        keys::ENTITY,
+        &keys::quiet_day(Day::today(ben.now(), &utc)),
+        Some(keys::ON),
+        None,
+    )?;
+    let mut report = ImportReport::default();
+    ann.apply_entries(&[forged.wire()], &[], Some(&ben.device_id()?), &mut report)?;
+    assert!(PersonSettings::new(&ann).quiet_days()?.ends.is_empty());
+    Ok(())
+}

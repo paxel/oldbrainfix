@@ -397,6 +397,7 @@ fn a_heads_up_comes_a_day_back_on_the_calendar_across_the_switch() -> Result<()>
             &europe,
             crate::settings::DEFAULT_ALL_DAY_FROM,
             None,
+            &QuietDays::default(),
         );
         Ok(plan.iter().map(|h| h.minutes).collect())
     };
@@ -523,5 +524,87 @@ fn a_routine_has_at_most_so_many_heads_ups() -> Result<()> {
         Alarms::new(&store).heads_ups(&europe)?.len(),
         ALARMS_PER_ROUTINE
     );
+    Ok(())
+}
+
+/// A quiet day (obf-1044): what starts on it rings nothing and is never
+/// Missed; what began before it Re-nags again from its end.
+#[test]
+fn a_quiet_day_rings_nothing_of_its_own_and_misses_nothing()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let utc = |t: DateTime<Utc>| t.naive_utc();
+    let at = |h: u32| ClockTime { hour: h, minute: 0 };
+    let store = crate::store::tests::store();
+    let routines = Routines::new(&store);
+    let made = |text: &str, times: &[ClockTime], rule: &str, start: Day| {
+        let schedule = crate::schedule::Schedule::new(
+            start,
+            times,
+            Some(crate::schedule::Recurrence::parse(rule)?),
+        )
+        .ok_or("a schedule")?;
+        Ok::<_, Box<dyn std::error::Error>>(routines.create(text, &schedule)?)
+    };
+    let day = Day::new(2026, 1, 6);
+    let pills = made(
+        "pills",
+        &[at(8), at(14)],
+        "FREQ=DAILY",
+        Day::new(2026, 1, 1),
+    )?;
+    let stretch = made(
+        "stretch",
+        &[at(9)],
+        "FREQ=WEEKLY;BYDAY=MO",
+        Day::new(2026, 1, 5),
+    )?;
+    let mut quiet = QuietDays::default();
+    quiet.ends.insert(day, None);
+    let midnight = instant_of(day.add_days(1), at(0), &utc);
+    let plan = alarm_plan(
+        &[(pills.clone(), None), (stretch.clone(), None)],
+        &BTreeMap::new(),
+        instant_of(day, at(9), &utc),
+        &utc,
+        Duration::minutes(10),
+        crate::settings::DEFAULT_ALL_DAY_FROM,
+        None,
+        &quiet,
+    );
+    assert!(plan.iter().all(|a| a.occurrence.day != day));
+    let weekly = plan
+        .iter()
+        .find(|a| a.routine_id == stretch.id)
+        .ok_or("the weekly one")?;
+    assert_eq!(weekly.at, midnight);
+    // At 15:00 the 08:00 one would be Missed.
+    let missed = missed_summary(
+        &[(pills.clone(), None)],
+        None,
+        instant_of(day, at(15), &utc),
+        &utc,
+        crate::settings::DEFAULT_ALL_DAY_FROM,
+        &quiet,
+    );
+    assert!(
+        missed
+            .routines
+            .iter()
+            .all(|m| m.missed.iter().all(|o| o.occurrence.day != day))
+    );
+    // End at 10:00 brings back the 14:00 one, not the 08:00.
+    quiet.ends.insert(day, Some(instant_of(day, at(10), &utc)));
+    let plan = alarm_plan(
+        &[(pills, None)],
+        &BTreeMap::new(),
+        instant_of(day, at(11), &utc),
+        &utc,
+        Duration::minutes(10),
+        crate::settings::DEFAULT_ALL_DAY_FROM,
+        None,
+        &quiet,
+    );
+    let first = plan.first().ok_or("an alarm")?;
+    assert_eq!(first.occurrence, Occurrence::new(day, Some(at(14))));
     Ok(())
 }

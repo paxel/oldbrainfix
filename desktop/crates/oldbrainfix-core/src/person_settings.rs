@@ -5,11 +5,18 @@
 //! person's Device wrote counts for nothing. The per-Device ones are
 //! [`crate::DeviceSettings`].
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
 
 use serde_json::{Value, json};
 
+use crate::alarms::QuietDays;
+use crate::entry::{Entry, dart_iso};
 use crate::places::{Area, Places};
+use crate::routines::skip_of;
+use crate::schedule::{Day, WallClock};
 use crate::search::lower_case;
 use crate::store::{Store, utf16_cmp};
 use crate::{Error, Result};
@@ -35,6 +42,17 @@ pub mod keys {
     /// anything not a string are skipped; absent, null or anything not a
     /// list reads as no order, so the Areas show by name.
     pub const AREA_ORDER: &str = "areaOrder";
+    /// A quiet day (obf-1044): the field [`quiet_day`] of each Day made
+    /// quiet, the Day as the wall clock of the Device that made it quiet
+    /// showed it; [`ON`] while it lasts to midnight, the moment End was
+    /// tapped once it ended, as an instant in UTC. Any other value reads
+    /// as not quiet.
+    pub const QUIET_DAY_PREFIX: &str = "quietDay@";
+
+    /// The field of the quiet day `day`.
+    pub fn quiet_day(day: crate::schedule::Day) -> String {
+        format!("{QUIET_DAY_PREFIX}{day}")
+    }
 }
 
 /// The person's own settings in the log.
@@ -45,6 +63,90 @@ pub struct PersonSettings<'a> {
 impl<'a> PersonSettings<'a> {
     pub fn new(store: &'a Store) -> PersonSettings<'a> {
         PersonSettings { store }
+    }
+
+    /// The person's quiet days (obf-1044), as the user's own Devices
+    /// wrote them, the newest entry of each Day winning. A Day or a value
+    /// no app writes is left out, so nothing is kept quiet by it.
+    pub fn quiet_days(&self) -> Result<QuietDays> {
+        let mut own = HashMap::new();
+        let mut held: HashMap<String, Entry> = HashMap::new();
+        for e in self.store.logged_history(keys::ENTITY)? {
+            if !e.field.starts_with(keys::QUIET_DAY_PREFIX)
+                || !self.store.written_by_own_in(&e.device, &mut own)?
+            {
+                continue;
+            }
+            let newer = held
+                .get(&e.field)
+                .is_none_or(|had| Store::latest_wins(&e, had) == Ordering::Greater);
+            if newer {
+                held.insert(e.field.clone(), e);
+            }
+        }
+        let mut days = QuietDays::default();
+        for (field, e) in held {
+            let text = &field[keys::QUIET_DAY_PREFIX.len()..];
+            let (Some(day), Some(value)) = (Day::parse(text), e.value) else {
+                continue;
+            };
+            if day.to_string() != text {
+                continue;
+            }
+            if value == keys::ON {
+                days.ends.insert(day, None);
+            } else if !value.contains(' ')
+                && let Some((at, _)) = skip_of(&value)
+            {
+                days.ends.insert(day, Some(at));
+            }
+        }
+        Ok(days)
+    }
+
+    /// When the quiet stretch now lies in ends on `wall`: midnight, or
+    /// End once tapped; `None` while today is not quiet (obf-1044).
+    pub fn quiet_until(&self, wall: &WallClock) -> Result<Option<DateTime<Utc>>> {
+        Ok(self
+            .quiet_days()?
+            .holding(self.store.now(), wall)
+            .map(|s| s.until))
+    }
+
+    /// "Quiet today" (obf-1044): makes today, as `wall` shows it, a quiet
+    /// day for all of the user's own Devices, until midnight on each.
+    /// Nothing while it is quiet already.
+    pub fn quiet_today(&self, wall: &WallClock) -> Result<()> {
+        let now = self.store.now();
+        if self.quiet_days()?.holding(now, wall).is_some() {
+            return Ok(());
+        }
+        self.store
+            .append(
+                keys::ENTITY,
+                &keys::quiet_day(Day::today(now, wall)),
+                Some(keys::ON),
+                None,
+            )
+            .map(drop)
+    }
+
+    /// End: today's quiet day ends now on all of the user's own Devices;
+    /// what is still to come rings again. Nothing while today is not
+    /// quiet.
+    pub fn end_quiet_day(&self, wall: &WallClock) -> Result<()> {
+        let now = self.store.now();
+        if self.quiet_days()?.holding(now, wall).is_none() {
+            return Ok(());
+        }
+        self.store
+            .append(
+                keys::ENTITY,
+                &keys::quiet_day(Day::today(now, wall)),
+                Some(&dart_iso(now)),
+                None,
+            )
+            .map(drop)
     }
 
     /// Whether Done on a one-time Reminder that is the only Routine or

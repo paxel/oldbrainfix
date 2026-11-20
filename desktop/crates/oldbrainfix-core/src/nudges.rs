@@ -202,6 +202,9 @@ impl Rule<'_> {
 /// The Nudge at `now` over the `unsorted` Notes, `None` when there are
 /// none. It repeats every `repeat` while ignored and waits out `quiet`
 /// (`None` when Quiet Hours are off); `snooze` is this Device's latest.
+/// On a quiet day it waits until `quiet_until`, the end of the quiet
+/// stretch `now` lies in (obf-1044): no own time and no snooze comes
+/// before it.
 pub fn nudge_plan(
     unsorted: &[Note],
     snooze: Option<NudgeSnooze>,
@@ -209,6 +212,7 @@ pub fn nudge_plan(
     wall: &WallClock,
     repeat: Duration,
     quiet: Option<QuietHours>,
+    quiet_until: Option<DateTime<Utc>>,
 ) -> Result<Option<PlannedNudge>> {
     if unsorted.is_empty() {
         return Ok(None);
@@ -223,10 +227,14 @@ pub fn nudge_plan(
     let anchors = notes
         .iter()
         .map(|n| NudgeAnchor {
-            due: n.nudge_at(),
+            due: waited_out(n.nudge_at(), quiet_until),
             captured: n.captured,
         })
         .collect();
+    let snooze = snooze.map(|s| NudgeSnooze {
+        at: s.at,
+        until: waited_out(s.until, quiet_until),
+    });
     let mut plan = PlannedNudge {
         notes,
         anchors,
@@ -240,6 +248,14 @@ pub fn nudge_plan(
     plan.since = since;
     plan.at = at;
     Ok(Some(plan))
+}
+
+/// `at`, or `quiet_until` when that is later (obf-1044).
+fn waited_out(at: DateTime<Utc>, quiet_until: Option<DateTime<Utc>>) -> DateTime<Utc> {
+    match quiet_until {
+        Some(until) if at < until => until,
+        _ => at,
+    }
 }
 
 /// How long after the first change a person lacks the Changes Nudge
@@ -288,13 +304,16 @@ impl PlannedChangesNudge {
 
 /// The Changes Nudge at `now` for the people `waiting`, by Profile id
 /// with the time of the first change each lacks, as the Dart core's
-/// `changesNudgePlan`; `None` when nobody waits.
+/// `changesNudgePlan`; `None` when nobody waits. On a quiet day it waits
+/// until `quiet_until`, the end of the quiet stretch `now` lies in
+/// (obf-1044).
 pub fn changes_nudge_plan(
     waiting: &BTreeMap<String, DateTime<Utc>>,
     now: DateTime<Utc>,
     wall: &WallClock,
     repeat: Duration,
     quiet: Option<QuietHours>,
+    quiet_until: Option<DateTime<Utc>>,
 ) -> Result<Option<PlannedChangesNudge>> {
     if waiting.is_empty() {
         return Ok(None);
@@ -312,7 +331,7 @@ pub fn changes_nudge_plan(
         anchors: firsts
             .iter()
             .map(|(_, first)| NudgeAnchor {
-                due: *first + delay,
+                due: waited_out(*first + delay, quiet_until),
                 captured: *first,
             })
             .collect(),

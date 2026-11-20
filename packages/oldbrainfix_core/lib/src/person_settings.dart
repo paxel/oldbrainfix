@@ -1,6 +1,10 @@
 import 'dart:convert';
 
+import 'alarms.dart';
+import 'entry.dart';
 import 'places.dart';
+import 'routines.dart';
+import 'schedule.dart';
 import 'profiles.dart';
 import 'store.dart';
 
@@ -30,6 +34,14 @@ abstract final class PersonSettingKeys {
   /// string are skipped; absent, null or anything not a list reads as no
   /// order, so the Areas show by name.
   static const areaOrder = 'areaOrder';
+
+  /// A quiet day (obf-1044): the field [quietDay] of each Day made quiet,
+  /// the Day as the wall clock of the Device that made it quiet showed
+  /// it; [on] while it lasts to midnight, the moment End was tapped once
+  /// it ended, as an instant in UTC. Any other value reads as not quiet.
+  static String quietDay(Day day) => '$quietDayPrefix$day';
+
+  static const quietDayPrefix = 'quietDay@';
 }
 
 /// The settings of the person rather than of this Device (#211): kept in
@@ -78,6 +90,65 @@ extension PersonSettings on Store {
       return;
     }
     append(PersonSettingKeys.entity, PersonSettingKeys.features, value);
+  }
+
+  /// The person's quiet days (obf-1044), as the user's own Devices wrote
+  /// them, the newest entry of each Day winning. A Day or a value no app
+  /// writes is left out, so nothing is kept quiet by it.
+  QuietDays get quietDays {
+    final own = <String, bool>{};
+    final held = <String, Entry>{};
+    for (final e in loggedHistory(PersonSettingKeys.entity)) {
+      if (!e.field.startsWith(PersonSettingKeys.quietDayPrefix)) continue;
+      if (!own.putIfAbsent(e.device, () => writtenByOwn(e.device))) continue;
+      final had = held[e.field];
+      if (had == null || Store.latestWins(e, had) > 0) held[e.field] = e;
+    }
+    final ends = <Day, DateTime?>{};
+    for (final MapEntry(key: field, value: e) in held.entries) {
+      final text = field.substring(PersonSettingKeys.quietDayPrefix.length);
+      final day = Day.tryParse(text);
+      final value = e.value;
+      if (day == null || '$day' != text || value == null) continue;
+      if (value == PersonSettingKeys.on) {
+        ends[day] = null;
+      } else if (!value.contains(' ')) {
+        if (Routines.skipOf(value) case (:final at, tomorrow: _)) {
+          ends[day] = at.toUtc();
+        }
+      }
+    }
+    return QuietDays(ends);
+  }
+
+  /// When the quiet stretch now lies in ends on [wallClock]: midnight, or
+  /// End once tapped; null while today is not quiet (obf-1044).
+  DateTime? quietUntil(WallClock wallClock) =>
+      quietDays.holding(clock(), wallClock)?.until;
+
+  /// "Quiet today" (obf-1044): makes today, as [wallClock] shows it, a
+  /// quiet day for all of the user's own Devices, until midnight on each.
+  /// Nothing while it is quiet already.
+  void quietToday(WallClock wallClock) {
+    final now = clock();
+    if (quietDays.holding(now, wallClock) != null) return;
+    append(
+      PersonSettingKeys.entity,
+      PersonSettingKeys.quietDay(Day.today(now, wallClock)),
+      PersonSettingKeys.on,
+    );
+  }
+
+  /// End: today's quiet day ends now on all of the user's own Devices;
+  /// what is still to come rings again. Nothing while today is not quiet.
+  void endQuietDay(WallClock wallClock) {
+    final now = clock();
+    if (quietDays.holding(now, wallClock) == null) return;
+    append(
+      PersonSettingKeys.entity,
+      PersonSettingKeys.quietDay(Day.today(now, wallClock)),
+      now.toUtc().toIso8601String(),
+    );
   }
 
   /// Every Area in the person's own order (#280), as the Areas list and

@@ -7,6 +7,7 @@ library;
 import 'alarms.dart';
 import 'device_settings.dart';
 import 'entry.dart';
+import 'person_settings.dart';
 import 'routines.dart';
 import 'schedule.dart';
 import 'store.dart';
@@ -314,7 +315,9 @@ class RoutineHistory {
 /// before, or it was skipped. Whatever was Done counts, asked for or not.
 /// Each span holds the Occurrences Tomorrow added to its schedule
 /// ([movedOccurrences]). An all-day Occurrence starts at [allDayFrom], as
-/// the alarm plan has it.
+/// the alarm plan has it. One that starts on one of the [quietDays] and is
+/// not Done is never Missed: it counts as skipped from the midnight after
+/// its quiet day, open or coming until then (obf-1044).
 RoutineHistory routineHistory({
   required List<ScheduleSpan> spans,
   required Map<String, DateTime> done,
@@ -325,6 +328,7 @@ RoutineHistory routineHistory({
   required WallClock wallClock,
   int weekStart = DateTime.monday,
   ClockTime? allDayFrom,
+  QuietDays quietDays = QuietDays.none,
 }) {
   final allDay = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
   final today = Day.today(now, wallClock);
@@ -337,6 +341,7 @@ RoutineHistory routineHistory({
     DateTime start,
     DateTime missedAt, {
     bool moved = false,
+    DateTime? skippedAt,
   }) => HistoryEntry(
     occurrence: occurrence,
     status: status,
@@ -344,7 +349,7 @@ RoutineHistory routineHistory({
     missedAt: missedAt,
     doneAt: done[occurrence.key],
     snoozedUntil: snoozes[occurrence.key],
-    skippedAt: skipped[occurrence.key],
+    skippedAt: skippedAt ?? skipped[occurrence.key],
     moved: moved,
   );
 
@@ -394,6 +399,28 @@ RoutineHistory routineHistory({
           missedAt,
           moved: isMoved,
         );
+      } else if (quietDays.settlesAt(start, wallClock) case final settles?) {
+        // Left undone on a quiet day: skipped from its midnight on.
+        if (!settles.isAfter(now)) {
+          asked[key] = entry(
+            occurrence,
+            OccurrenceStatus.skipped,
+            start,
+            missedAt,
+            moved: isMoved,
+            skippedAt: settles,
+          );
+        } else if (until == null) {
+          asked[key] = entry(
+            occurrence,
+            start.isAfter(now)
+                ? OccurrenceStatus.coming
+                : OccurrenceStatus.open,
+            start,
+            missedAt,
+            moved: isMoved,
+          );
+        }
       } else if (!missedAt.isAfter(now) &&
           (until == null || !missedAt.isAfter(until))) {
         asked[key] = entry(
@@ -460,6 +487,7 @@ extension RoutineHistories on Routines {
       wallClock: wallClock,
       weekStart: weekStart,
       allDayFrom: store.allDayFrom,
+      quietDays: store.quietDays,
     );
   }
 }
