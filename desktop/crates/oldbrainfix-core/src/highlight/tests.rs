@@ -112,6 +112,38 @@ fn what_goes_beyond_the_subset_is_refused() {
 }
 
 #[test]
+fn a_lookbehind_of_one_fixed_width_is_read_and_of_none_refused() {
+    for read in [
+        r"(?<=a)b",
+        r"(?<![\w$])b",
+        r"(?<=ab|cd)e",
+        r"(?<=a{3}(?:bc){2})d",
+        r"(?<=\b(?=x)[a-z]$)y",
+        r"(?<=(?<!q)😀)z",
+        r"(?<=x{1000})y",
+    ] {
+        assert!(CodeRegex::parse(read).is_ok(), "{read}");
+    }
+    for refused in [
+        r"(?<=a+)b",
+        r"(?<=a*)b",
+        r"(?<=a?)b",
+        r"(?<=a{1,2})b",
+        r"(?<=ab|c)d",
+        r"(?<!x+)y",
+        r"(?<=(?:a|bc))d",
+        r"(?<=x{1001})y",
+        r"(?<=(?:x{10}){101})y",
+    ] {
+        let why = CodeRegex::parse(refused).map(|r| r.groups);
+        assert!(
+            matches!(&why, Err(GrammarRefused(w)) if w.contains("no fixed width")),
+            "{refused}: {why:?}"
+        );
+    }
+}
+
+#[test]
 fn fences_and_guesses_find_their_grammar() {
     let all = Grammars::built_in();
     assert_eq!(all.for_fence("RS").map(|g| g.name.as_str()), Some("Rust"));

@@ -10758,6 +10758,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open in another app'**
   String get openInOtherApp;
+
+  /// The heading of the Settings section of the person's own grammars (obf-1037): files that colour code in more languages.
+  ///
+  /// In en, this message translates to:
+  /// **'Code languages'**
+  String get grammarsTitle;
+
+  /// The line under the heading of the Settings section of the person's own grammars (obf-1037).
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Sublime syntax file (.sublime-syntax) to colour code in another language. It colours code on all your Devices, only for you.'**
+  String get grammarsHint;
+
+  /// The button in Settings ▸ Code languages (obf-1037) that picks a grammar file with the system's picker and adds it.
+  ///
+  /// In en, this message translates to:
+  /// **'Add grammar…'**
+  String get grammarAdd;
+
+  /// The line under an added grammar in Settings ▸ Code languages (obf-1037) whose scope is that of a built-in one, which it replaces until it is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces the built-in grammar for {name}'**
+  String grammarInPlaceOf(String name);
+
+  /// The button beside an added grammar in Settings ▸ Code languages (obf-1037): the grammar is gone from all of the person's Devices, a built-in one of its language colours again.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get grammarRemove;
+
+  /// The red line under Add grammar… in Settings ▸ Code languages (obf-1037) when the picked file is refused; nothing was added. The reason is the core's own, in English.
+  ///
+  /// In en, this message translates to:
+  /// **'{file} was not added: {reason}'**
+  String grammarRefused(String file, String reason);
 }
 
 class _AppLocalizationsDelegate

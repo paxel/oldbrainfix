@@ -50,7 +50,8 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 34] = [
+const SCENARIOS: [&str; 35] = [
+    "added-grammars",
     "area-order",
     "area-order-shown",
     "attachments",
@@ -1819,6 +1820,79 @@ fn simple_or_advanced_reads_as_the_dart_core_reads_it() -> TestResult {
     Ok(())
 }
 
+/// The generator's `added-grammars` scenario (obf-1037).
+fn write_added_grammars(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    use oldbrainfix_core::person_settings::keys;
+    let settings = PersonSettings::new(store);
+    let grammar = |name: &str, scope: &str| {
+        format!(
+            "name: {name}\nscope: {scope}\nfile_extensions: [cbl, rs]\n\
+             contexts:\n  main:\n    - match: '\\bMOVE\\b'\n      scope: keyword\n"
+        )
+    };
+    let add = |source: &str| -> Built {
+        settings.add_grammar(source.as_bytes())?.map_err(|e| e.0)?;
+        Ok(())
+    };
+    add(&grammar("COBOL", "source.cobol"))?;
+    add(&grammar("COBOL", "source.cobol"))?;
+    let refused = settings
+        .add_grammar(b"name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a++\n")?;
+    assert!(refused.is_err());
+    add(&grammar("My Rust", "source.rust"))?;
+    add(&grammar("COBOL 85", "source.cobol"))?;
+    add(&grammar("Ä", "source.ä"))?;
+    add(&grammar("ZZ", "source.😀"))?;
+    store.append(
+        keys::ENTITY,
+        &keys::grammar("source.broken"),
+        Some("name: [x\n"),
+        None,
+    )?;
+    store.append(
+        keys::ENTITY,
+        &keys::grammar("source.go"),
+        Some(&grammar("Not Go", "source.notgo")),
+        None,
+    )?;
+    settings.remove_grammar("source.cobol")?;
+    settings.remove_grammar("source.cobol")?;
+    settings.remove_grammar("source.rust")?;
+    Ok(())
+}
+
+#[test]
+fn the_persons_own_grammars_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let expected = read_json(
+        &fixtures()
+            .join("added-grammars")
+            .join("added_grammars.json"),
+    )?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    assert!(!reads.is_empty());
+    let entries = log("added-grammars")?;
+    for read in reads {
+        let length = read["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        let grammars = PersonSettings::new(&store).grammars()?;
+        let all: Vec<&str> = grammars.all.iter().map(|g| g.scope.as_str()).collect();
+        let added: Vec<&str> = grammars.added.iter().map(|g| g.name.as_str()).collect();
+        let fences: Vec<Option<&str>> = ["cbl", "rs", "rust", "zz"]
+            .iter()
+            .map(|name| grammars.for_fence(name).map(|g| g.scope.as_str()))
+            .collect();
+        assert_eq!(json!(all), read["all"], "after {length} entries");
+        assert_eq!(json!(added), read["added"], "after {length} entries");
+        assert_eq!(json!(fences), read["fences"], "after {length} entries");
+    }
+    Ok(())
+}
+
 /// The generator's `area-order` scenario (#280).
 fn write_area_order(store: &Store) -> Built {
     use oldbrainfix_core::PersonSettings;
@@ -2733,7 +2807,8 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 34] = [
+    let writers: [(&str, Writer); 35] = [
+        ("added-grammars", write_added_grammars),
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
         ("attachments", write_attachments),

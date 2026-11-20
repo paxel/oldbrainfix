@@ -616,6 +616,73 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'added-grammars',
+    about:
+        'The person\'s own grammars (obf-1037): one added, and again, which '
+        'writes nothing; a file refused, which writes nothing; one of the '
+        'scope of a built-in one, replacing it in its place; a newer file '
+        'of a scope added before; two more whose scopes sort by UTF-16 code '
+        'units; texts no app writes, one that does not read and one kept '
+        'under another scope; one removed, and again, which writes nothing; '
+        'the built-in one back by Remove. `added_grammars.json` holds what '
+        'each length of the log reads as.',
+    build: (store) {
+      void read() {
+        final grammars = store.grammars;
+        _addedGrammarReads.add({
+          'entries': store.allEntries().length,
+          'all': [for (final g in grammars.all) g.scope],
+          'added': [for (final g in grammars.added) g.name],
+          'fences': [
+            for (final name in ['cbl', 'rs', 'rust', 'zz'])
+              grammars.forFence(name)?.scope,
+          ],
+        });
+      }
+
+      String grammar(String name, String scope) =>
+          'name: $name\nscope: $scope\nfile_extensions: [cbl, rs]\n'
+          'contexts:\n  main:\n    - match: \'\\bMOVE\\b\'\n'
+          '      scope: keyword\n';
+      void add(String source) => store.addGrammar(utf8.encode(source));
+      read();
+      add(grammar('COBOL', 'source.cobol'));
+      read();
+      add(grammar('COBOL', 'source.cobol'));
+      read();
+      try {
+        add('name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a++\n');
+      } on GrammarRefused {
+        // Nothing written.
+      }
+      read();
+      add(grammar('My Rust', 'source.rust'));
+      read();
+      add(grammar('COBOL 85', 'source.cobol'));
+      read();
+      add(grammar('Ä', 'source.ä'));
+      add(grammar('ZZ', 'source.😀'));
+      read();
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.grammar('source.broken'),
+        'name: [x\n',
+      );
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.grammar('source.go'),
+        grammar('Not Go', 'source.notgo'),
+      );
+      read();
+      store.removeGrammar('source.cobol');
+      read();
+      store.removeGrammar('source.cobol');
+      read();
+      store.removeGrammar('source.rust');
+      read();
+    },
+  ),
+  (
     name: 'hidden-from-ai',
     about:
         'Hidden from AI (#267): a Note in a Topic of an Area and its Amend, '
@@ -5424,6 +5491,9 @@ final _featureReads = <Map<String, Object>>[];
 
 /// What the `area-order` scenario read after each of its steps.
 final _areaOrderReads = <Map<String, Object>>[];
+
+/// What the `added-grammars` scenario read after each of its steps.
+final _addedGrammarReads = <Map<String, Object>>[];
 
 /// What the `hidden-from-ai` scenario read after each of its steps.
 final _hiddenFromAiReads = <Map<String, Object>>[];
@@ -10580,6 +10650,16 @@ Map<String, Object?> _highlight() {
         '  after:\n    - match: \'\\w+\'\n      scope: keyword\n      pop: true\n',
     '"a 😀 b" x 😀y 😀\n"😀😀\n',
   ));
+  corners.add((
+    'a lookbehind of one fixed width with lookarounds and \\b inside it '
+        '(obf-1037)',
+    'name: Behind\nscope: source.behind\ncontexts:\n  main:\n'
+        '    - match: \'(?<=\\b[a-z])\\d+\'\n      scope: constant.numeric\n'
+        '    - match: \'(?<=(?!q)[a-z]{2})!\'\n      scope: keyword\n'
+        '    - match: \'(?<!(?<=x)y)z\'\n      scope: string\n'
+        '    - match: \'(?<=ab|cd)e\'\n      scope: entity.name.function\n',
+    'a12 ab3 _4 é5 ab! qa! qq! xyz yz z abe cde xbe\n😀a7 a😀8\n',
+  ));
   final cornerSamples = <Object>[];
   for (final (about, source, text) in corners) {
     final g = Grammar.parse(source);
@@ -10633,6 +10713,41 @@ Map<String, Object?> _highlight() {
     (
       'a match that is a number',
       'name: X\nscope: source.x\ncontexts:\n  main:\n    - match: 12\n',
+    ),
+    // YAML both libraries must read alike (obf-1037).
+    (
+      'a key twice',
+      'name: X\nname: Y\nscope: source.x\ncontexts:\n  main: []\n',
+    ),
+    (
+      'two documents',
+      'name: X\nscope: source.x\ncontexts:\n  main: []\n---\nname: Y\n',
+    ),
+    (
+      'one document between markers',
+      '---\nname: X\nscope: source.x\ncontexts:\n  main: []\n...\n',
+    ),
+    (
+      'anchors and aliases',
+      'name: &n X\nscope: source.x\nvariables:\n  a: &v b\n  c: *v\n'
+          'contexts:\n  main:\n    - match: \'{{c}}\'\n      scope: *n\n',
+    ),
+    (
+      'a tag of a text',
+      'name: !!str 12\nscope: source.x\ncontexts:\n  main: []\n',
+    ),
+    ('a name yes', 'name: yes\nscope: source.x\ncontexts:\n  main: []\n'),
+    ('a name 0o7', 'name: 0o7\nscope: source.x\ncontexts:\n  main: []\n'),
+    ('a name 1_000', 'name: 1_000\nscope: source.x\ncontexts:\n  main: []\n'),
+    ('a name null', 'name: ~\nscope: source.x\ncontexts:\n  main: []\n'),
+    (
+      'a flow mapping',
+      '{name: X, scope: source.x, contexts: {main: [{match: "a", scope: k}]}}\n',
+    ),
+    (
+      'a block text',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: |\n        a\n      scope: keyword\n',
     ),
   ];
   final refused = <Object>[
@@ -10695,6 +10810,16 @@ Map<String, Object?> _highlight() {
     r'{',
     r'(?<=ab|c)d(?<!x+)',
     r'(?:(a)|(b))c',
+    // lookbehinds (obf-1037): of one fixed width only
+    r'(?<=a+)b',
+    r'(?<=a{1,2})b',
+    r'(?<=(?:a|bc))d',
+    r'(?<=x{1001})y',
+    r'(?<=ab|cd)e',
+    r'(?<=a{3}(?:bc){2})d',
+    r'(?<=\b(?=x)[a-z])y',
+    r'(?<=(?<!q)😀)z',
+    r'(?<=x{1000})y',
   ];
   return {
     'grammars': [
@@ -11930,6 +12055,11 @@ Future<void> main(List<String> args) async {
     'choice (#219) and whether the choice applies to it.\n'
     '- `features/features.json`: whether the first entries of the '
     '`features` log, as many as each read gives, read as Advanced.\n'
+    '- `added-grammars/added_grammars.json`: after the first entries of '
+    'the `added-grammars` log, as many as each read gives, the scopes of '
+    'the grammars in the order the language picker shows them, the names '
+    'of the person\'s own ones by scope, and the scope each of the fences '
+    '`cbl`, `rs`, `rust` and `zz` names (obf-1037).\n'
     '- `area-order/area_order.json`: the ids of the Areas in the person\'s '
     'own order after the first entries of the `area-order` log, as many as '
     'each read gives.\n'
@@ -12522,6 +12652,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/features.json'),
           '${_json.convert({'reads': _featureReads})}\n',
+        );
+      }
+      if (scenario.name == 'added-grammars') {
+        _write(
+          File('${out.path}/added_grammars.json'),
+          '${_json.convert({'reads': _addedGrammarReads})}\n',
         );
       }
       if (scenario.name == 'area-order') {

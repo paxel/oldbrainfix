@@ -747,6 +747,18 @@ replace a law of Both apps where they say so. A desktop law marked
   grammars by name, and a pick is written at once; "Keep as code" picks
   the language the first line names. Search, Share and Copy give the
   text as written.
+- **Grammars of one's own in Settings ▸ Code languages** (obf-1037):
+  the section's line says what a grammar is, then each grammar the
+  person added by name, with "Replaces the built-in grammar for …"
+  under it when it takes a built-in one's place (else its scope), and
+  Remove beside it, which removes it at once; under them "Add
+  grammar…" opens the system's file picker, any file shown. A file
+  refused says so red under the button, with the file's name and what
+  is wrong, and nothing is added; the next add clears it. A setting of
+  the person, the same on all of their own Devices, in Simple and
+  Advanced, on the phone and the desktop alike. An added grammar's
+  language is offered in the text format badge's Language after the
+  built-in ones, one replacing a built-in one in its place.
 
 ### Boxes
 

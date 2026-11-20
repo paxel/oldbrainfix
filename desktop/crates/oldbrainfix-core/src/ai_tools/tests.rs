@@ -285,6 +285,47 @@ fn the_text_format_is_read_and_set_as_a_pending_change() -> TestResult {
 }
 
 #[test]
+fn the_persons_own_grammars_are_listed_read_and_taken_by_set_code_language() -> TestResult {
+    let store = store();
+    let cobol = "name: COBOL\nscope: source.cobol\nfile_extensions: [cbl]\n\
+                 contexts:\n  main:\n    - match: '\\bMOVE\\b'\n      scope: keyword\n";
+    PersonSettings::new(&store)
+        .add_grammar(cobol.as_bytes())?
+        .map_err(|e| e.0)?;
+    let script = Notes::new(&store).capture("MOVE A TO B", None, None)?;
+    let task = store.open_ai_task()?;
+    let listed = json_of(&call(&store, &task, "list_code_languages", &json!({}))?)?;
+    let scopes: Vec<&Value> = listed
+        .as_array()
+        .ok_or("a list")?
+        .iter()
+        .map(|g| &g["scope"])
+        .collect();
+    assert!(scopes.contains(&&json!("source.cobol")));
+    assert!(scopes.contains(&&json!("source.rust")));
+    // read_settings names them, nothing of their files.
+    let settings = json_of(&call(&store, &task, "read_settings", &json!({}))?)?;
+    assert_eq!(
+        settings.pointer("/grammars"),
+        Some(&json!([{"name": "COBOL", "scope": "source.cobol"}]))
+    );
+    call(
+        &store,
+        &task,
+        "set_text_format",
+        &json!({"id": script.id, "format": "code"}),
+    )?;
+    let set = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.cobol"}),
+    )?;
+    assert!(!set.is_error, "{set:?}");
+    Ok(())
+}
+
+#[test]
 fn a_code_texts_language_is_listed_read_and_set_as_a_pending_change() -> TestResult {
     let store = store();
     let notes = Notes::new(&store);

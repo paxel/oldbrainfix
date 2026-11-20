@@ -224,7 +224,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "list_code_languages",
-            "Lists the languages a Code text and a fenced code block of a formatted text can be coloured by (obf-1036): each grammar's name, its scope (what set_code_language and read_note's codeLanguage use) and the names a fence may give it.",
+            "Lists the languages a Code text and a fenced code block of a formatted text can be coloured by (obf-1036): the built-in grammars and those the person added (obf-1037), one of the same scope in the built-in one's place; each grammar's name, its scope (what set_code_language and read_note's codeLanguage use) and the names a fence may give it.",
             true,
             json!({}),
             &[],
@@ -266,7 +266,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows, on top of that (textSize: normal, larger at 1.15 or largest at 1.3 times), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), when today's quiet day ends, a setting of the person too, on which nothing notifies while the Agenda still shows everything (quietDayUntil: midnight, or when End was tapped, as an instant; null while today is not quiet), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer), whether the user switched on AI (experimental) on this computer (aiOn: the Ask panel and the phone's questions; this port works either way), and whether the Ask panel lets an OpenAI-compatible provider's model think before it answers (askThinks: off asks it not to). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows, on top of that (textSize: normal, larger at 1.15 or largest at 1.3 times), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), when today's quiet day ends, a setting of the person too, on which nothing notifies while the Agenda still shows everything (quietDayUntil: midnight, or when End was tapped, as an instant; null while today is not quiet), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), the grammars the person added to colour code in more languages, a setting of the person too (grammars: each one's name and scope; one of a built-in language's scope replaces the built-in one; they are added and removed in the apps only), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer), whether the user switched on AI (experimental) on this computer (aiOn: the Ask panel and the phone's questions; this port works either way), and whether the Ask panel lets an OpenAI-compatible provider's model think before it answers (askThinks: off asks it not to). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -1675,7 +1675,8 @@ impl Store {
                 ToolOutput::json(&Value::Array(out))
             }
             "list_code_languages" => {
-                let all: Vec<Value> = crate::highlight::Grammars::built_in()
+                let all: Vec<Value> = PersonSettings::new(self)
+                    .grammars()?
                     .all
                     .iter()
                     .map(|g| {
@@ -1846,6 +1847,14 @@ impl Store {
                     "renagMinutes": settings.renag_interval()?.num_minutes(),
                     "theme": settings.theme()?.name(),
                     "trashesDoneReminder": PersonSettings::new(self).trashes_done_reminder()?,
+                    // The person's own grammars, by name and scope only
+                    // (obf-1037): their files are added in the apps.
+                    "grammars": PersonSettings::new(self)
+                        .grammars()?
+                        .added
+                        .iter()
+                        .map(|g| json!({"name": g.name, "scope": g.scope}))
+                        .collect::<Vec<_>>(),
                     // Read only, as every setting (ADR 0026, obf-1044).
                     "quietDayUntil": PersonSettings::new(self).quiet_until(wall)?.map(dart_iso),
                 }))
@@ -2201,7 +2210,8 @@ impl Store {
                     )));
                 }
                 if !language.is_empty()
-                    && crate::highlight::Grammars::built_in()
+                    && PersonSettings::new(self)
+                        .grammars()?
                         .by_scope(Some(language))
                         .is_none()
                 {

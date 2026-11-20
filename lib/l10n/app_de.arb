@@ -1783,5 +1783,11 @@
   "handAddressInvalid": "Keine Adresse. Gib einen Namen oder eine IP-Adresse ein, bei Bedarf mit :Port.",
   "handAddressBadPort": "Der Port muss eine Zahl von 1 bis 65535 sein.",
   "pdfPageOf": "Seite {page} von {pages}",
-  "openInOtherApp": "In anderer App öffnen"
+  "openInOtherApp": "In anderer App öffnen",
+  "grammarsTitle": "Codesprachen",
+  "grammarsHint": "Füge eine Sublime-Syntaxdatei (.sublime-syntax) hinzu, um Code in einer weiteren Sprache einzufärben. Sie färbt Code auf all deinen Geräten, nur für dich.",
+  "grammarAdd": "Grammatik hinzufügen …",
+  "grammarInPlaceOf": "Ersetzt die eingebaute Grammatik für {name}",
+  "grammarRemove": "Entfernen",
+  "grammarRefused": "{file} wurde nicht hinzugefügt: {reason}"
 }

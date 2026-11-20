@@ -152,6 +152,45 @@ void main() {
     });
   });
 
+  group('a lookbehind (obf-1037)', () {
+    test('of one fixed width is read, of no fixed width refused', () {
+      for (final read in [
+        r'(?<=a)b',
+        r'(?<![\w$])b',
+        r'(?<=ab|cd)e',
+        r'(?<=a{3}(?:bc){2})d',
+        r'(?<=\b(?=x)[a-z]$)y',
+        r'(?<=(?<!q)😀)z',
+        r'(?<=x{1000})y',
+      ]) {
+        expect(CodeRegex.parse(read).groups, 0, reason: read);
+      }
+      for (final refused in [
+        r'(?<=a+)b',
+        r'(?<=a*)b',
+        r'(?<=a?)b',
+        r'(?<=a{1,2})b',
+        r'(?<=ab|c)d',
+        r'(?<!x+)y',
+        r'(?<=(?:a|bc))d',
+        r'(?<=x{1001})y',
+        r'(?<=(?:x{10}){101})y',
+      ]) {
+        expect(
+          () => CodeRegex.parse(refused),
+          throwsA(
+            isA<GrammarRefused>().having(
+              (r) => r.reason,
+              'reason',
+              contains('no fixed width'),
+            ),
+          ),
+          reason: refused,
+        );
+      }
+    });
+  });
+
   group('finding a grammar', () {
     test('by scope, none for an empty or unknown one', () {
       final all = Grammars.builtIn;

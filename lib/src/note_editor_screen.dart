@@ -1586,12 +1586,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// The text format badge's editor (#213): the formats the text may
   /// take, a formatted text never plain again (ADR 0033); a Code text's
   /// language under them (obf-1036), No language and each one the app
-  /// knows as radio buttons, a tap writing it and closing.
+  /// knows, the person's own too (obf-1037), as radio buttons, a tap
+  /// writing it and closing.
   Future<void> _editFormat() async {
     final note = _placed?.note;
     if (note == null) return;
     final current = note.textFormat;
     final t = context.t;
+    final grammars = widget.notes.store.grammars;
     Widget formats(BuildContext context) => ChoiceChips<String>(
       value: current,
       options: [
@@ -1636,7 +1638,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         value: '',
                         title: Text(t.codeLanguageNone),
                       ),
-                      for (final grammar in Grammars.builtIn.all)
+                      for (final grammar in grammars.all)
                         RadioOption(
                           key: ValueKey('code-language-${grammar.scope}'),
                           value: grammar.scope,
@@ -1669,9 +1671,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// such as a `#!/bin/bash`, or else the whole text's; without one the
   /// language stays as it was (obf-1036).
   void _keepAsCode() {
-    final guess =
-        Grammars.builtIn.guess(_pastedCode) ??
-        Grammars.builtIn.guess(_text.text);
+    // The person's own grammars too (obf-1037).
+    final grammars = widget.notes.store.grammars;
+    final guess = grammars.guess(_pastedCode) ?? grammars.guess(_text.text);
     if (guess != null) {
       widget.notes.setCodeLanguage(widget.noteId, guess.scope);
     }

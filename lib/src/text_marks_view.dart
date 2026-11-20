@@ -12,6 +12,7 @@ import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'person_screen.dart';
 import 'profile.dart';
 import 'table_screen.dart';
 import 'tick_saves.dart';
@@ -437,11 +438,19 @@ Color codeColour(CodeColour colour, Brightness brightness) {
   });
 }
 
+/// The grammars code is coloured with below [context] (obf-1037): the
+/// person's own with the built-in ones, as the store has them now; the
+/// built-in ones alone outside the app.
+Grammars codeGrammars(BuildContext context) =>
+    PersonScope.of(context)?.store.grammars ?? Grammars.builtIn;
+
 /// The coloured parts of [text] in [grammar]'s language, read once for
-/// each language and text of the last few: a rebuild, or a card shown
-/// again, does not read it anew.
+/// each grammar and text of the last few: a rebuild, or a card shown
+/// again, does not read it anew. The grammar itself is the key, not its
+/// scope, so one of the person's own in a built-in one's place, or that
+/// one back after Remove, colours anew (obf-1037).
 List<CodeSpan> codeSpans(Grammar grammar, String text) {
-  final key = (grammar.scope, text);
+  final key = (grammar, text);
   final known = _codeSpans.remove(key);
   if (known != null) return _codeSpans[key] = known;
   final spans = grammar.colour(text);
@@ -451,7 +460,7 @@ List<CodeSpan> codeSpans(Grammar grammar, String text) {
 }
 
 // Oldest first: a hit goes to the end again.
-final _codeSpans = <(String, String), List<CodeSpan>>{};
+final _codeSpans = <(Grammar, String), List<CodeSpan>>{};
 
 /// [text] from [from] to [to] as spans in [style], each coloured part of
 /// [spans] (in [text]) in its colour; null when none of them lies there,
@@ -658,7 +667,7 @@ class TagTextController extends TextEditingController {
       final mono = (style ?? const TextStyle()).copyWith(
         fontFamily: 'monospace',
       );
-      final grammar = Grammars.builtIn.byScope(_language);
+      final grammar = codeGrammars(context).byScope(_language);
       final spans = grammar == null
           ? const <CodeSpan>[]
           : codeSpans(grammar, text);
@@ -759,10 +768,11 @@ class TagTextController extends TextEditingController {
   }
 
   /// The colour of each code block's line of [text] whose fence names a
-  /// language known here (obf-1036), by character; null where none.
+  /// language of [grammars] (obf-1036), by character; null where none.
   static List<CodeColour?> _blockColours(
     String text,
     List<MarkdownBlock> blocks,
+    Grammars grammars,
   ) {
     final colours = List<CodeColour?>.filled(text.length, null);
     MarkdownCodeBlock? done;
@@ -770,7 +780,7 @@ class TagTextController extends TextEditingController {
       final code = block.code;
       if (code == null || identical(code, done)) continue;
       done = code;
-      final grammar = Grammars.builtIn.forFence(code.language);
+      final grammar = grammars.forFence(code.language);
       if (grammar == null) continue;
       final lines = [
         for (var l = code.firstLine; l <= code.lastLine; l++)
@@ -932,7 +942,7 @@ class TagTextController extends TextEditingController {
       block.spans.forEach(walk);
     }
     // A code block's words in the colours of its fence's language.
-    final colours = _blockColours(text, blocks);
+    final colours = _blockColours(text, blocks, codeGrammars(context));
     for (var i = 0; i < text.length; i++) {
       final colour = colours[i];
       if (colour != null && bits[i] & (_codeLine | _mark) == _codeLine) {
@@ -1357,7 +1367,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         .merge(widget.style)
         .copyWith(fontFamily: 'monospace');
     // The whole text is read, so what began before [from] reads so.
-    final grammar = Grammars.builtIn.byScope(widget.language);
+    final grammar = codeGrammars(context).byScope(widget.language);
     final coloured = grammar == null
         ? null
         : colouredCode(context, text, codeSpans(grammar, text), from, to);
@@ -1562,7 +1572,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     }
     final start = first ?? 0;
     final end = first == null ? 0 : last;
-    final grammar = Grammars.builtIn.forFence(code.language);
+    final grammar = codeGrammars(context).forFence(code.language);
     final coloured = grammar == null
         ? null
         : colouredCode(context, all, codeSpans(grammar, all), start, end);
@@ -1613,7 +1623,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     MarkdownBlock block,
     TextStyle base,
   ) {
-    final grammar = Grammars.builtIn.forFence(code.language);
+    final grammar = codeGrammars(context).forFence(code.language);
     if (grammar == null) return null;
     final (all, starts) = _codeContent(code);
     final at = starts[block.line];

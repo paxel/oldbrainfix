@@ -101,6 +101,10 @@ _Avoid_: Rich Text, gestalteter Text
 Der ganze Text einer einfachen Notiz als Code: in der Schrift fester Breite genau so gezeigt, wie er geschrieben ist, ohne Zeilenumbruch, nichts darin als Markdown, Statuskästchen oder #Wort gelesen; im Notiz-Editor lässt er sich seitwärts schieben. Er wird an der Plakette „Textformat“ im Notiz-Editor eingestellt, die ihn auch wieder zu einem unformatierten oder formatierten Text macht, und der Editor bietet ihn an, wenn ein eingefügter Text wie ein Skript oder Code aussieht. Die Suche findet seine Wörter; Teilen und Text kopieren geben ihn, wie er ist. Ein Code-Text ist keine Checkliste oder Einkaufsliste und wird zu keiner anderen Art.
 _Avoid_: Skript, Schnipsel, Codeblock (ein Codeblock ist Teil eines formatierten Texts)
 
+**Grammatik** [Grammar]:
+Die Datei, die Code in einer Sprache einfärbt: eine gewöhnliche Sublime-Syntaxdefinition (`.sublime-syntax`), als Daten gelesen, nichts darin wird ausgeführt, innerhalb der Teilmenge, die beide Apps gleich lesen. Etwa fünfzehn liegen der App bei. Weitere fügst du mit „Grammatik hinzufügen …“ unter Einstellungen ▸ Codesprachen hinzu und entfernst sie dort; eine hinzugefügte ist eine Einstellung der Person, auf all deinen eigenen Geräten und nie bei einer anderen Person, und färbt Code-Texte und Codeblöcke ihrer Sprache; eine für eine mitgelieferte Sprache ersetzt die mitgelieferte, bis du sie entfernst. Eine Datei jenseits der Teilmenge wird mit dem Grund abgelehnt, und nichts wird hinzugefügt.
+_Avoid_: Plugin, Syntax, Hervorheber, Sprachdatei
+
 **Formatleiste** [Format bar]:
 Die Reihe von Tasten, die die Auswahl oder das Wort am Cursor formatiert, oder die Zeilen, die die Auswahl berührt, und ein ☐ oder eine Tabelle einsetzt: auf dem Handy auf der Tastatur im Notiz-Editor und in Zur Notiz hinzufügen, am Computer über dem Textfeld des Notiz-Editors.
 _Avoid_: Werkzeugleiste, Symbolleiste

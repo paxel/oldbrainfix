@@ -10,7 +10,7 @@
 //! ASCII letters only. Offsets here are UTF-8 bytes.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use fancy_regex::Regex;
 use yaml_rust2::{Yaml, YamlLoader};
@@ -477,7 +477,7 @@ impl Compiler<'_> {
                         k,
                         Some("meta_scope" | "meta_content_scope" | "meta_include_prototype")
                     ) {
-                        return refuse(format!("the key {k:?} in {what}"));
+                        return refuse(format!("the key {} in {what}", k.unwrap_or("?")));
                     }
                 }
                 if !first {
@@ -519,7 +519,7 @@ impl Compiler<'_> {
                     k,
                     Some("match" | "scope" | "captures" | "push" | "set" | "pop")
                 ) {
-                    return refuse(format!("the key {k:?} in {what}"));
+                    return refuse(format!("the key {} in {what}", k.unwrap_or("?")));
                 }
             }
             let mut pattern = Pattern::of(&substitute(text(m, "match")?, &self.variables)?)?;
@@ -612,12 +612,16 @@ impl Grammar {
     pub fn parse(source: &str) -> Refused<Grammar> {
         let docs = YamlLoader::load_from_str(source)
             .map_err(|e| GrammarRefused(format!("not YAML: {e}")))?;
+        // As Dart's `loadYaml`, which reads one document only.
+        if docs.len() > 1 {
+            return refuse("not YAML: more than one document");
+        }
         let Some(Yaml::Hash(doc)) = docs.first() else {
             return refuse("not a map");
         };
         for k in hash_keys(doc) {
             if !k.is_some_and(|k| TOP_KEYS.contains(&k)) {
-                return refuse(format!("the key {k:?}"));
+                return refuse(format!("the key {}", k.unwrap_or("?")));
             }
         }
         let get = |k: &str| doc.get(&key(k));
@@ -884,10 +888,17 @@ pub const BUILT_IN_SOURCES: [&str; 15] = [
     include_str!("../../../../assets/grammars/markdown.sublime-syntax"),
 ];
 
-/// The grammars this app reads, in the order a guess tries them.
+/// The grammars this app reads: the ones it ships with (obf-1036) and
+/// those the person added (obf-1037).
 #[derive(Debug)]
 pub struct Grammars {
-    pub all: Vec<Grammar>,
+    /// In the order the language picker shows them and a guess tries
+    /// them: the built-in ones, each in the place of the one of the
+    /// person's own of the same scope if there is one, then the person's
+    /// other ones.
+    pub all: Vec<Arc<Grammar>>,
+    /// The person's own, by scope; a fence tries them first.
+    pub added: Vec<Arc<Grammar>>,
 }
 
 impl Grammars {
@@ -898,27 +909,55 @@ impl Grammars {
             all: BUILT_IN_SOURCES
                 .iter()
                 .filter_map(|s| Grammar::parse(s).ok())
+                .map(Arc::new)
                 .collect(),
+            added: Vec::new(),
         })
+    }
+
+    /// The built-in grammars with the person's own `added`, by scope: one
+    /// of the scope of a built-in one replaces it in its place.
+    pub fn with_added(added: Vec<Arc<Grammar>>) -> Grammars {
+        let built_in = &Grammars::built_in().all;
+        let mut all: Vec<Arc<Grammar>> = built_in
+            .iter()
+            .map(|g| {
+                added
+                    .iter()
+                    .find(|a| a.scope == g.scope)
+                    .unwrap_or(g)
+                    .clone()
+            })
+            .collect();
+        all.extend(
+            added
+                .iter()
+                .filter(|a| !built_in.iter().any(|g| g.scope == a.scope))
+                .cloned(),
+        );
+        Grammars { all, added }
     }
 
     /// The grammar whose scope is `scope`, a Code text's language; none
     /// for an empty one and for one not known here.
     pub fn by_scope(&self, scope: Option<&str>) -> Option<&Grammar> {
         let scope = scope.filter(|s| !s.is_empty())?;
-        self.all.iter().find(|g| g.scope == scope)
+        self.all.iter().find(|g| g.scope == scope).map(|g| &**g)
     }
 
     /// The grammar a fence's `language` names: by one of its file
-    /// extensions or its name, compared in lower case.
+    /// extensions or its name, compared in lower case, the person's own
+    /// ones first.
     pub fn for_fence(&self, language: &str) -> Option<&Grammar> {
         let name = language.trim().to_lowercase();
         if name.is_empty() {
             return None;
         }
-        self.all
+        self.added
             .iter()
+            .chain(&self.all)
             .find(|g| g.file_extensions.contains(&name) || g.name.to_lowercase() == name)
+            .map(|g| &**g)
     }
 
     /// The grammar a pasted `text` is guessed to be in: the first whose
@@ -926,7 +965,10 @@ impl Grammars {
     pub fn guess(&self, text: &str) -> Option<&Grammar> {
         let line = text.split('\n').find(|l| !l.trim().is_empty())?;
         let line = line.strip_suffix('\r').unwrap_or(line);
-        self.all.iter().find(|g| g.matches_first_line(line))
+        self.all
+            .iter()
+            .find(|g| g.matches_first_line(line))
+            .map(|g| &**g)
     }
 }
 
@@ -968,6 +1010,49 @@ enum AnchorKind {
     End,
     Word,
     NotWord,
+}
+
+/// The widest lookbehind read, in characters (obf-1037), as the Dart
+/// core's `_maxLookbehind`.
+const MAX_LOOKBEHIND: u32 = 1000;
+
+/// How many characters `n` always matches, at most [`MAX_LOOKBEHIND`];
+/// none when that varies or is more (obf-1037). A lookbehind must have
+/// one: both engines then look back alike.
+fn width(n: &Node) -> Option<u32> {
+    match n {
+        Node::Seq(terms) => {
+            let mut sum = 0;
+            for t in terms {
+                sum += width(t)?;
+                if sum > MAX_LOOKBEHIND {
+                    return None;
+                }
+            }
+            Some(sum)
+        }
+        Node::Alt(alts) => {
+            let mut all = None;
+            for a in alts {
+                let w = width(a)?;
+                if all.is_some_and(|had| had != w) {
+                    return None;
+                }
+                all = Some(w);
+            }
+            Some(all.unwrap_or(0))
+        }
+        Node::Group(GroupKind::Capture | GroupKind::Plain, body) => width(body),
+        Node::Group(..) | Node::Anchor(_) => Some(0),
+        Node::Quant { atom, min, max, .. } => {
+            if *max != Some(*min) {
+                return None;
+            }
+            let w = width(atom)?.checked_mul(*min)?;
+            (w <= MAX_LOOKBEHIND).then_some(w)
+        }
+        Node::Set { .. } => Some(1),
+    }
 }
 
 fn has_capture(n: &Node) -> bool {
@@ -1295,6 +1380,9 @@ impl Parser<'_> {
         self.i += 1;
         if !matches!(kind, GroupKind::Capture | GroupKind::Plain) && has_capture(&body) {
             return self.refuse("a capture in a lookaround");
+        }
+        if matches!(kind, GroupKind::Behind | GroupKind::NotBehind) && width(&body).is_none() {
+            return self.refuse("a lookbehind of no fixed width");
         }
         Ok(Node::Group(kind, Box::new(body)))
     }

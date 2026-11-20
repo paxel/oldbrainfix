@@ -4,15 +4,17 @@
 /// same text into the same spans, so they read only a subset of what
 /// Sublime Text reads, and refuse a grammar that goes beyond it:
 ///
-/// - the keys `name`, `scope`, `file_extensions`, `first_line_match`,
-///   `variables` and `contexts` (`hidden` and `version` are ignored);
+/// - one YAML document of the keys `name`, `scope`, `file_extensions`,
+///   `first_line_match`, `variables` and `contexts` (`hidden` and
+///   `version` are ignored);
 /// - in a context, `match` with `scope`, `captures` and one of `push`,
 ///   `set` and `pop: true`, `include` of a context of the same grammar,
 ///   `meta_scope`, `meta_content_scope` and `meta_include_prototype`;
 ///   never `embed`, `escape`, `branch_point`, `fail`, `extends`,
 ///   `with_prototype` or `clear_scopes`;
 /// - regular expressions of literals, `.`, `^`, `$`, `|`, groups,
-///   lookaround, greedy and lazy quantifiers, classes and the escapes
+///   lookaround (a lookbehind of one fixed width only, at most 1000
+///   characters), greedy and lazy quantifiers, classes and the escapes
 ///   `\w \W \d \D \s \S \b \B \t \n \r \f \v \e \a \xHH \x{H…} \uHHHH`,
 ///   with a leading `(?x)` or `(?i)`; never possessive quantifiers,
 ///   atomic or named groups, backreferences, other flags, `\G \A \z \Z
@@ -696,6 +698,47 @@ class _Anchor extends _Node {
   _Anchor(this.kind);
 }
 
+/// The widest lookbehind read, in characters (obf-1037).
+const _maxLookbehind = 1000;
+
+/// How many characters [n] always matches, at most [_maxLookbehind]; null
+/// when that varies or is more (obf-1037). A lookbehind must have one:
+/// both engines then look back alike.
+int? _width(_Node n) {
+  int? capped(int w) => w > _maxLookbehind ? null : w;
+  switch (n) {
+    case _Seq(:final terms):
+      var sum = 0;
+      for (final t in terms) {
+        final w = _width(t);
+        if (w == null) return null;
+        sum += w;
+        if (sum > _maxLookbehind) return null;
+      }
+      return sum;
+    case _Alt(:final alts):
+      int? width;
+      for (final a in alts) {
+        final w = _width(a);
+        if (w == null || (width != null && w != width)) return null;
+        width = w;
+      }
+      return width ?? 0;
+    case _Group(:final kind, :final body):
+      return kind == _GroupKind.capture || kind == _GroupKind.plain
+          ? _width(body)
+          : 0;
+    case _Quant(:final atom, :final min, :final max):
+      if (max != min) return null;
+      final w = _width(atom);
+      return w == null ? null : capped(w * min);
+    case _Set():
+      return 1;
+    case _Anchor():
+      return 0;
+  }
+}
+
 bool _hasCapture(_Node n) => switch (n) {
   _Seq(:final terms) => terms.any(_hasCapture),
   _Alt(:final alts) => alts.any(_hasCapture),
@@ -969,6 +1012,10 @@ class _RegexParser {
         kind != _GroupKind.plain &&
         _hasCapture(body)) {
       _refuse('a capture in a lookaround');
+    }
+    if ((kind == _GroupKind.behind || kind == _GroupKind.notBehind) &&
+        _width(body) == null) {
+      _refuse('a lookbehind of no fixed width');
     }
     return group;
   }
@@ -1391,12 +1438,31 @@ const _w = '[A-Za-z0-9_]';
 const _wordBoundary = '(?:(?<=$_w)(?!$_w)|(?<!$_w)(?=$_w))';
 const _notWordBoundary = '(?:(?<=$_w)(?=$_w)|(?<!$_w)(?!$_w))';
 
-/// The grammars this app reads: the ones it ships with (obf-1036), in
-/// the order a guess tries them.
+/// The grammars this app reads: the ones it ships with (obf-1036) and
+/// those the person added (obf-1037).
 class Grammars {
+  /// In the order the language picker shows them and a guess tries them:
+  /// the built-in ones, each in the place of the one of the person's own
+  /// of the same scope if there is one, then the person's other ones.
   final List<Grammar> all;
 
-  Grammars(this.all);
+  /// The person's own, by scope; a fence tries them first.
+  final List<Grammar> added;
+
+  Grammars(this.all, {this.added = const []});
+
+  /// The built-in grammars with the person's own [added], by scope: one
+  /// of the scope of a built-in one replaces it in its place.
+  factory Grammars.withAdded(List<Grammar> added) {
+    if (added.isEmpty) return builtIn;
+    final byScope = {for (final g in added) g.scope: g};
+    final builtInScopes = {for (final g in builtIn.all) g.scope};
+    return Grammars([
+      for (final g in builtIn.all) byScope[g.scope] ?? g,
+      for (final g in added)
+        if (!builtInScopes.contains(g.scope)) g,
+    ], added: added);
+  }
 
   /// The grammars the app ships with, read once.
   static final Grammars builtIn = Grammars([
@@ -1422,12 +1488,12 @@ class Grammars {
   }
 
   /// The grammar a fence's [language] names (```` ```rs ````): by one of
-  /// its file extensions or its name, compared in lower case; null for
-  /// none and for one not known.
+  /// its file extensions or its name, compared in lower case, the
+  /// person's own ones first; null for none and for one not known.
   Grammar? forFence(String language) {
     final name = language.trim().toLowerCase();
     if (name.isEmpty) return null;
-    for (final g in all) {
+    for (final g in [...added, ...all]) {
       if (g.fileExtensions.contains(name) || g.name.toLowerCase() == name) {
         return g;
       }

@@ -6669,4 +6669,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openInOtherApp => 'Open in another app';
+
+  @override
+  String get grammarsTitle => 'Code languages';
+
+  @override
+  String get grammarsHint =>
+      'Add a Sublime syntax file (.sublime-syntax) to colour code in another language. It colours code on all your Devices, only for you.';
+
+  @override
+  String get grammarAdd => 'Add grammar…';
+
+  @override
+  String grammarInPlaceOf(String name) {
+    return 'Replaces the built-in grammar for $name';
+  }
+
+  @override
+  String get grammarRemove => 'Remove';
+
+  @override
+  String grammarRefused(String file, String reason) {
+    return '$file was not added: $reason';
+  }
 }

@@ -22,8 +22,8 @@ use oldbrainfix_core::shopping_lists::{Reappear, keys as shopping_keys};
 use oldbrainfix_core::tallies::keys as tally_keys;
 use oldbrainfix_core::tally_units::{self, UnitSystem};
 use oldbrainfix_core::{
-    Checklists, DeviceSettings, Importance, ListOnAgenda, Notes, Places, Routines, SessionRule,
-    ShoppingOnAgenda, Store, StoredText, parse_time,
+    Checklists, DeviceSettings, Importance, ListOnAgenda, Notes, PersonSettings, Places, Routines,
+    SessionRule, ShoppingOnAgenda, Store, StoredText, parse_time,
 };
 
 use crate::app::{clickable_card, embossed, list_scroll, row_title, when};
@@ -256,8 +256,9 @@ fn change_line(
         // A Code text's language (obf-1036) by its grammar's name; one not
         // known here as stored.
         (note_keys::TYPE_NOTE, note_keys::LANGUAGE) => {
+            let grammars = PersonSettings::new(store).grammars()?;
             return Ok(words(t.code_language().to_string(), &|v| {
-                language_text(t, v)
+                language_text(t, &grammars, v)
             }));
         }
         (note_keys::TYPE_NOTE, line_keys::KIND) => {
@@ -500,11 +501,12 @@ fn value_text(
 }
 
 /// A Code text's language `scope` in words (obf-1036): its grammar's
-/// name, "No language" for none, and one not known here as stored.
-fn language_text(t: &L10n, scope: Option<&str>) -> String {
+/// name among the person's `grammars` (obf-1037), "No language" for
+/// none, and one not known here as stored.
+fn language_text(t: &L10n, grammars: &Grammars, scope: Option<&str>) -> String {
     match scope.filter(|s| !s.is_empty()) {
         None => t.code_language_none().to_string(),
-        Some(scope) => Grammars::built_in()
+        Some(scope) => grammars
             .by_scope(Some(scope))
             .map_or_else(|| scope.to_string(), |g| g.name.clone()),
     }

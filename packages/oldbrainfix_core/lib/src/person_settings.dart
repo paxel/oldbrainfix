@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'alarms.dart';
 import 'entry.dart';
+import 'highlight.dart';
 import 'places.dart';
 import 'routines.dart';
 import 'schedule.dart';
@@ -42,6 +43,36 @@ abstract final class PersonSettingKeys {
   static String quietDay(Day day) => '$quietDayPrefix$day';
 
   static const quietDayPrefix = 'quietDay@';
+
+  /// A grammar the person added (obf-1037): the field [grammar] of its
+  /// scope, holding the grammar's text, a Sublime syntax definition;
+  /// null once removed. A text that does not read, is over
+  /// [maxGrammarBytes] or is of another scope counts for nothing.
+  static String grammar(String scope) => '$grammarPrefix$scope';
+
+  static const grammarPrefix = 'grammar@';
+}
+
+/// The largest grammar the person may add, in UTF-8 bytes (obf-1037).
+const maxGrammarBytes = 256 * 1024;
+
+/// The most grammars the person may add (obf-1037).
+const maxAddedGrammars = 32;
+
+/// The grammars read before, by their text, so a change of the log
+/// elsewhere reads none again; null for one refused.
+final _readGrammars = <String, Grammar?>{};
+
+Grammar? _readGrammar(String source) {
+  if (_readGrammars.length > 2 * maxAddedGrammars) _readGrammars.clear();
+  return _readGrammars.putIfAbsent(source, () {
+    if (utf8.encode(source).length > maxGrammarBytes) return null;
+    try {
+      return Grammar.parse(source);
+    } on GrammarRefused {
+      return null;
+    }
+  });
 }
 
 /// The settings of the person rather than of this Device (#211): kept in
@@ -149,6 +180,74 @@ extension PersonSettings on Store {
       PersonSettingKeys.quietDay(Day.today(now, wallClock)),
       now.toUtc().toIso8601String(),
     );
+  }
+
+  /// The grammars code is coloured with for this person (obf-1037): the
+  /// built-in ones and those the person added, as the user's own Devices
+  /// wrote them, the newest entry of each scope winning. One that does
+  /// not read, is over [maxGrammarBytes] or is kept under another scope
+  /// is left out, so the built-in one of its scope stays. Another
+  /// person's grammars never count here: they never reach this Device,
+  /// and what another person's Device wrote counts for nothing.
+  Grammars get grammars => workedOut(Grammars, () {
+    final own = <String, bool>{};
+    final held = <String, Entry>{};
+    for (final e in loggedHistory(PersonSettingKeys.entity)) {
+      if (!e.field.startsWith(PersonSettingKeys.grammarPrefix)) continue;
+      if (!own.putIfAbsent(e.device, () => writtenByOwn(e.device))) continue;
+      final had = held[e.field];
+      if (had == null || Store.latestWins(e, had) > 0) held[e.field] = e;
+    }
+    final added = <Grammar>[];
+    for (final MapEntry(key: field, value: e) in held.entries) {
+      final value = e.value;
+      if (value == null) continue;
+      final grammar = _readGrammar(value);
+      final scope = field.substring(PersonSettingKeys.grammarPrefix.length);
+      if (grammar != null && grammar.scope == scope) added.add(grammar);
+    }
+    added.sort((a, b) => a.scope.compareTo(b.scope));
+    return Grammars.withAdded(added);
+  });
+
+  /// "Add grammar…" (obf-1037): adds the grammar in the file [bytes] for
+  /// all of the user's own Devices, in the place of the one of its scope,
+  /// built in or added before; the same again writes nothing. Throws
+  /// [GrammarRefused] with what is wrong, adding nothing, when the file
+  /// is over [maxGrammarBytes], is no UTF-8 text, does not read as a
+  /// grammar or goes beyond what the cores read, or when it would be one
+  /// more than [maxAddedGrammars].
+  Grammar addGrammar(List<int> bytes) {
+    if (bytes.length > maxGrammarBytes) {
+      throw const GrammarRefused('over 256 KiB');
+    }
+    String source;
+    try {
+      source = utf8.decode(bytes);
+    } on FormatException {
+      throw const GrammarRefused('not a UTF-8 text');
+    }
+    if (source.startsWith('\u{FEFF}')) source = source.substring(1);
+    final grammar = Grammar.parse(source);
+    final added = grammars.added;
+    final field = PersonSettingKeys.grammar(grammar.scope);
+    if (added.every((g) => g.scope != grammar.scope) &&
+        added.length >= maxAddedGrammars) {
+      throw const GrammarRefused('more than 32 grammars');
+    }
+    if (currentByOwn(PersonSettingKeys.entity, field) != source) {
+      append(PersonSettingKeys.entity, field, source);
+    }
+    return grammar;
+  }
+
+  /// Remove (obf-1037): the person's grammar of [scope] is gone from all
+  /// of the user's own Devices, and the built-in one of its scope, if
+  /// any, colours again. Nothing when there is none.
+  void removeGrammar(String scope) {
+    final field = PersonSettingKeys.grammar(scope);
+    if (currentByOwn(PersonSettingKeys.entity, field) == null) return;
+    append(PersonSettingKeys.entity, field, null);
   }
 
   /// Every Area in the person's own order (#280), as the Areas list and

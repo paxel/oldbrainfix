@@ -44,7 +44,9 @@
 //! names, each part in the colour of its kind ([`theme::code_colour`]);
 //! only the glyphs' colour changes, the font, the tint and the sizes
 //! stay. Without a language, or with one not known here, it shows in one
-//! colour as before.
+//! colour as before. The grammars are the person's (obf-1037): the
+//! built-in ones and those they added, which the app hands in each frame
+//! ([`set_grammars`]).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -512,7 +514,8 @@ pub fn code_text_label(
     let look = Look::of(ui, look);
     let format = TextFormat::simple(FontId::monospace(look.font.size * CODE_SCALE), look.colour);
     let shown = text_boxes::strip(part);
-    let colours = match Grammars::built_in().by_scope(language) {
+    let grammars = grammars(ui.ctx());
+    let colours = match grammars.by_scope(language) {
         Some(grammar) => code_text_colours(ui.ctx(), grammar, text, (from, &shown)),
         None => Vec::new(),
     };
@@ -638,19 +641,103 @@ impl Look {
     }
 }
 
-/// Colours code by the grammar of a scope, for [`ColourCache`].
-#[derive(Default)]
-struct Colourer;
+/// The grammars code is coloured with around a context (obf-1037) and
+/// how often the person's own ones changed, so colours worked out with
+/// one that is gone are not taken again.
+#[derive(Clone)]
+struct Held {
+    grammars: Arc<Grammars>,
+    generation: u64,
+}
 
-impl ComputerMut<(&str, &str), Arc<Vec<CodeSpan>>> for Colourer {
-    fn compute(&mut self, (scope, text): (&str, &str)) -> Arc<Vec<CodeSpan>> {
-        let grammar = Grammars::built_in().by_scope(Some(scope));
-        Arc::new(grammar.map(|g| g.colour(text)).unwrap_or_default())
+/// Where the context keeps the [`Held`] grammars.
+fn grammars_id() -> Id {
+    Id::new("oldbrainfix-grammars")
+}
+
+/// The built-in grammars alone, as the person's grammars before any are
+/// handed in.
+fn built_in() -> Arc<Grammars> {
+    static BUILT_IN: std::sync::OnceLock<Arc<Grammars>> = std::sync::OnceLock::new();
+    BUILT_IN
+        .get_or_init(|| Arc::new(Grammars::with_added(Vec::new())))
+        .clone()
+}
+
+/// Colours code around `ctx` with `grammars`, the person's (obf-1037),
+/// for every window; set each frame, so one added, removed or arriving
+/// by sync colours at once.
+pub fn set_grammars(ctx: &egui::Context, grammars: Arc<Grammars>) {
+    ctx.data_mut(|d| {
+        let held = d.get_temp::<Held>(grammars_id());
+        let generation = match held {
+            Some(held) if Arc::ptr_eq(&held.grammars, &grammars) => return,
+            Some(held) => {
+                let same = held.grammars.added.len() == grammars.added.len()
+                    && held
+                        .grammars
+                        .added
+                        .iter()
+                        .zip(&grammars.added)
+                        .all(|(a, b)| Arc::ptr_eq(a, b));
+                held.generation + u64::from(!same)
+            }
+            None => 0,
+        };
+        d.insert_temp(
+            grammars_id(),
+            Held {
+                grammars,
+                generation,
+            },
+        );
+    });
+}
+
+/// The grammars code is coloured with around `ctx`: the person's as last
+/// handed in, the built-in ones until then.
+pub fn grammars(ctx: &egui::Context) -> Arc<Grammars> {
+    ctx.data(|d| d.get_temp::<Held>(grammars_id()))
+        .map_or_else(built_in, |held| held.grammars)
+}
+
+/// How often the person's own grammars changed around `ctx`.
+fn generation(ctx: &egui::Context) -> u64 {
+    ctx.data(|d| d.get_temp::<Held>(grammars_id()))
+        .map_or(0, |held| held.generation)
+}
+
+/// A text to colour in a grammar, for [`ColourCache`]: told apart by the
+/// grammar, the generation of the person's grammars it is one of, and
+/// the text.
+#[derive(Clone, Copy)]
+struct Colouring<'a> {
+    grammar: &'a Grammar,
+    generation: u64,
+    text: &'a str,
+}
+
+impl std::hash::Hash for Colouring<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::ptr::from_ref(self.grammar).hash(state);
+        self.grammar.scope.hash(state);
+        self.generation.hash(state);
+        self.text.hash(state);
     }
 }
 
-/// The coloured parts of the texts drawn, by their grammar's scope and
-/// the text, kept while they are drawn frame after frame.
+/// Colours code by its grammar, for [`ColourCache`].
+#[derive(Default)]
+struct Colourer;
+
+impl ComputerMut<Colouring<'_>, Arc<Vec<CodeSpan>>> for Colourer {
+    fn compute(&mut self, key: Colouring<'_>) -> Arc<Vec<CodeSpan>> {
+        Arc::new(key.grammar.colour(key.text))
+    }
+}
+
+/// The coloured parts of the texts drawn, by their grammar and the text,
+/// kept while they are drawn frame after frame.
 type ColourCache = FrameCache<Arc<Vec<CodeSpan>>, Colourer>;
 
 /// The coloured parts of `text` in `grammar` (obf-1036), in bytes of
@@ -660,12 +747,12 @@ pub fn code_colours(ctx: &egui::Context, grammar: &Grammar, text: &str) -> Arc<V
     if text.is_empty() {
         return Arc::default();
     }
-    ctx.memory_mut(|m| {
-        m.caches
-            .cache::<ColourCache>()
-            .get((grammar.scope.as_str(), text))
-            .clone()
-    })
+    let key = Colouring {
+        grammar,
+        generation: generation(ctx),
+        text,
+    };
+    ctx.memory_mut(|m| m.caches.cache::<ColourCache>().get(key).clone())
 }
 
 /// The parts of `spans` within the bytes `from..to`, counted from `from`.
@@ -701,10 +788,10 @@ fn code_text_colours(
     }
 }
 
-/// The grammar the fence of `code` names (obf-1036); none for a fence
-/// naming none or one not known here.
-fn fence_grammar(code: &CodeBlock) -> Option<&'static Grammar> {
-    Grammars::built_in().for_fence(code.language())
+/// The grammar among `grammars` the fence of `code` names (obf-1036);
+/// none for a fence naming none or one not known here.
+fn fence_grammar<'a>(grammars: &'a Grammars, code: &CodeBlock) -> Option<&'a Grammar> {
+    grammars.for_fence(code.language())
 }
 
 /// The coloured parts of the lines `first..=last` of `code`, among
@@ -718,7 +805,8 @@ fn block_colours(
     (blocks, code): (&[Block], &CodeBlock),
     (first, last): (usize, usize),
 ) -> Vec<CodeSpan> {
-    let Some(grammar) = fence_grammar(code) else {
+    let grammars = grammars(ctx);
+    let Some(grammar) = fence_grammar(&grammars, code) else {
         return Vec::new();
     };
     let (mut whole, mut from, mut to) = (String::new(), None, 0);
@@ -796,6 +884,7 @@ pub fn paint_code(job: &mut LayoutJob, from: usize, spans: &[CodeSpan], dark: bo
 /// coloured as one text, as written.
 pub fn fence_colours(ctx: &egui::Context, text: &str) -> Vec<CodeSpan> {
     let blocks = markdown::parse(text);
+    let grammars = grammars(ctx);
     let mut spans = Vec::new();
     let mut done = None;
     for block in &blocks {
@@ -806,7 +895,7 @@ pub fn fence_colours(ctx: &egui::Context, text: &str) -> Vec<CodeSpan> {
             continue;
         }
         done = Some(code.first_line);
-        let Some(grammar) = fence_grammar(code) else {
+        let Some(grammar) = fence_grammar(&grammars, code) else {
             continue;
         };
         let mut content = (code.first_line..=code.last_line)

@@ -90,6 +90,8 @@ Amended by #213: `list_notes` and `read_note` report the format of a Note's text
 
 Amended by obf-1036 (ADR 0054): `list_notes` and `read_note` report a Code text's language (`codeLanguage`, a grammar's scope or null), `list_code_languages` lists the grammars, and `set_code_language` sets the language of a Note whose text is code as a Pending Change through `Notes::set_code_language`, only to a grammar this Device knows or to none. It writes the Note's `language`, a field like the text's look, reviewed with the text changes.
 
+Amended by obf-1037 (ADR 0054): `list_code_languages` lists the person's grammars, the built-in ones and those the person added, one of a built-in scope in the built-in one's place, and `set_code_language` takes any of them. `read_settings` reports the added ones as `grammars`, each by name and scope. No tool adds or removes a grammar: its file is added in the apps' Settings only.
+
 ## Sets and Check fields (#264)
 
 Amended by #264 (ADR 0028): `read_note` reports a Tally's `bar` and `sets` and each field's `check` and `countsSets` instead of what it multiplies; `read_tally_entries` reports each entry's `sets`, a row of values per set, and what it counts per field, without factors. `make_tally` and the new `set_tally` take `bar` and `sets`, `add_tally_field` takes `check`; no tool sets `multiplies`. An AI Task may write `tally:bar`, `tally:sets` and a field's `kind`, no longer its `multiplies`.

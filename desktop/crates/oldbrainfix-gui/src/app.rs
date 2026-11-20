@@ -1497,11 +1497,11 @@ enum Action {
     SetTextFormat(&'static str),
     /// Colours the Note's Code text by the grammar of this scope, or by
     /// none (obf-1036).
-    SetCodeLanguage(Option<&'static str>),
+    SetCodeLanguage(Option<String>),
     /// A paste that looks like code into the Note's text: "Keep as code"
     /// under it (#213), with the language guessed for what was pasted
     /// (obf-1036), or, without, that offer closed.
-    OfferCode(bool, Option<&'static str>),
+    OfferCode(bool, Option<String>),
     /// "Keep as code": the Note's text made a Code text, in the language
     /// guessed for the paste, else for its whole text (obf-1036).
     KeepAsCode,
@@ -1670,6 +1670,11 @@ enum Action {
     Setting(Setting),
     /// Asks the system's dialog for the sound file Occurrences ring with.
     PickAlarmSound,
+    /// "Add grammar…" (obf-1037): asks the system's dialog for a grammar
+    /// file and adds it for the person.
+    AddGrammar,
+    /// Remove beside the person's grammar of this scope (obf-1037).
+    RemoveGrammar(String),
     Sync(SyncAction),
     /// Imports the bundle file dropped onto the window or handed over,
     /// or shows the preview of the Sent Item.
@@ -2010,7 +2015,7 @@ pub struct App {
     /// "Keep as code" waits under it (#213), and the scope of the
     /// language guessed for the paste (obf-1036).
     code_offer: Option<String>,
-    code_guess: Option<&'static str>,
+    code_guess: Option<String>,
     /// Whether the Lines of the Note opened next are to be typed in at
     /// once: a Checklist or Shopping List just made (#161), or opened from
     /// its group's heading on the Agenda (#276).
@@ -2259,6 +2264,12 @@ pub struct App {
     ask_fields: Option<AskFields>,
     /// Asks the system's dialog for an alarm sound file, titled as given.
     sound_picker: FolderPicker,
+    /// Asks the system's dialog for a grammar file, titled as given
+    /// (obf-1037).
+    grammar_picker: FolderPicker,
+    /// Why the grammar file picked last was not added, shown under "Add
+    /// grammar…" until one is added (obf-1037).
+    grammar_refused: Option<String>,
     /// The alarm sound file last looked at and whether it rings or the
     /// own chime rings in its place, decoded once per file chosen.
     sound_rung: Option<(String, Rung)>,
@@ -2741,6 +2752,10 @@ impl App {
             shown: true,
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
+            // Any file: a grammar's name ends in `.sublime-syntax`, but
+            // one saved under another is read all the same (obf-1037).
+            grammar_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_file()),
+            grammar_refused: None,
             sound_rung: None,
             note_windows: Vec::new(),
             alone: None,
@@ -2926,6 +2941,12 @@ impl App {
     /// dialog; tests hand in a path.
     pub fn set_sound_picker(&mut self, picker: FolderPicker) {
         self.sound_picker = picker;
+    }
+
+    /// Asks `picker` for the grammar file "Add grammar…" adds instead of
+    /// the system's dialog (obf-1037); tests hand in a path.
+    pub fn set_grammar_picker(&mut self, picker: FolderPicker) {
+        self.grammar_picker = picker;
     }
 
     /// Hands in the dialogs asking where to save a bundle and which one
@@ -5795,6 +5816,11 @@ impl App {
         // not egui's zoom, which stays that of "Bigger text and icons".
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
         theme::set_text_size(ctx, self.text_size);
+        // The person's grammars colour code (obf-1037), read anew as the
+        // log changes: one added, removed or arriving by sync.
+        if let Ok(grammars) = PersonSettings::new(&self.store).grammars() {
+            text_marks_view::set_grammars(ctx, grammars);
+        }
         // The zoom is set once (#224), so it does not undo a zoom set
         // from outside.
         if !std::mem::replace(&mut self.zoom_shown, true) {
@@ -7454,7 +7480,7 @@ impl App {
             Action::FormatText(None) => self.save_formatted()?,
             Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
             Action::SetTextFormat(format) => self.set_text_format(format)?,
-            Action::SetCodeLanguage(language) => self.set_code_language(language)?,
+            Action::SetCodeLanguage(language) => self.set_code_language(language.as_deref())?,
             Action::OfferCode(offer, guess) => {
                 self.code_offer = offer.then(|| self.text_of.clone()).flatten();
                 self.code_guess = guess.filter(|_| offer);
@@ -8005,6 +8031,14 @@ impl App {
                     let path = path.to_string_lossy().into_owned();
                     self.set(Setting::AlarmSound(Some(path)))?;
                 }
+            }
+            Action::AddGrammar => {
+                if let Some(path) = (self.grammar_picker)(self.t.grammar_add()) {
+                    self.add_grammar(&path)?;
+                }
+            }
+            Action::RemoveGrammar(scope) => {
+                PersonSettings::new(&self.store).remove_grammar(&scope)?
             }
             Action::Sync(SyncAction::Trust(trust)) => {
                 if self.sync.answer(&self.store, trust, &self.sync_name) {
@@ -10352,6 +10386,33 @@ impl App {
         Ok(())
     }
 
+    /// Adds the grammar in the file at `path` for the person (obf-1037):
+    /// one refused, or a file that does not read, says why under "Add
+    /// grammar…" and adds nothing; one added clears that.
+    fn add_grammar(&mut self, path: &std::path::Path) -> oldbrainfix_core::Result<()> {
+        use std::io::Read;
+        let name = path
+            .file_name()
+            .map_or_else(|| path.to_string_lossy(), |n| n.to_string_lossy())
+            .into_owned();
+        // One byte over the most a grammar may have is enough to refuse
+        // it: a huge file is never read whole.
+        let limit = oldbrainfix_core::person_settings::MAX_GRAMMAR_BYTES as u64 + 1;
+        let mut bytes = Vec::new();
+        let read = std::fs::File::open(path).and_then(|f| f.take(limit).read_to_end(&mut bytes));
+        let added = match read {
+            Ok(_) => PersonSettings::new(&self.store)
+                .add_grammar(&bytes)?
+                .map_err(|refused| refused.0),
+            Err(e) => Err(e.to_string()),
+        };
+        self.grammar_refused = match added {
+            Ok(_) => None,
+            Err(reason) => Some(self.t.grammar_refused(&name, &reason)),
+        };
+        Ok(())
+    }
+
     /// Colours the selected Note's Code text by the grammar of the scope
     /// `language`, or by none (obf-1036), at once.
     fn set_code_language(&mut self, language: Option<&str>) -> oldbrainfix_core::Result<()> {
@@ -10370,10 +10431,11 @@ impl App {
         self.set_text_format(text_format::CODE)?;
         let guess = pasted.or_else(|| {
             let typed = self.typed_text();
-            Grammars::built_in().guess(&typed).map(|g| g.scope.as_str())
+            let grammars = PersonSettings::new(&self.store).grammars().ok()?;
+            grammars.guess(&typed).map(|g| g.scope.clone())
         });
         match guess {
-            Some(scope) => self.set_code_language(Some(scope)),
+            Some(scope) => self.set_code_language(Some(&scope)),
             None => Ok(()),
         }
     }
@@ -13475,7 +13537,7 @@ impl App {
                     // none until another is picked.
                     if current == text_format::CODE {
                         let stored = note.code_language.as_deref().filter(|l| !l.is_empty());
-                        let grammars = Grammars::built_in();
+                        let grammars = text_marks_view::grammars(ui.ctx());
                         let shows = grammars.by_scope(stored).map(|g| g.scope.as_str());
                         let text = ui.visuals().text_color();
                         ui.label(RichText::new(t.code_language()).strong().color(text));
@@ -13490,6 +13552,7 @@ impl App {
                         // Too many for chips: one per line (#226).
                         if radio_column(ui, &mut language, options) {
                             if language != stored {
+                                let language = language.map(str::to_string);
                                 actions.push(Action::SetCodeLanguage(language));
                             }
                             actions.push(Action::Badge(None));
@@ -16691,6 +16754,8 @@ impl App {
         let trashes_done = PersonSettings::new(&self.store)
             .trashes_done_reminder()
             .unwrap_or(false);
+        let grammars = text_marks_view::grammars(ui.ctx());
+        let grammar_refused = self.grammar_refused.clone();
         let quick = self.view.capture_quick;
         let advanced = self.view.advanced;
         // The section an app link opened the Settings at (#261).
@@ -17081,6 +17146,50 @@ impl App {
                         actions.push(Action::Setting(Setting::Streaks(on)));
                     }
                     ui.label(RichText::new(t.show_streaks_detail()).small().color(weak));
+                });
+            }
+            // The person's own grammars (obf-1037), on all of their own
+            // Devices: each with what it replaces, or its scope, and
+            // Remove; then "Add grammar…" and, under it, why the file
+            // picked last was not added.
+            let [own_grammars] = settings_search::rows(
+                q,
+                Some(t.grammars_title()),
+                [&[t.grammars_hint(), t.grammar_add()]],
+            );
+            if own_grammars {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.grammars_title()).strong().color(text));
+                    ui.label(RichText::new(t.grammars_hint()).small().color(weak));
+                    for grammar in &grammars.added {
+                        let under = match Grammars::built_in().by_scope(Some(&grammar.scope)) {
+                            Some(built_in) => t.grammar_in_place_of(&built_in.name),
+                            None => grammar.scope.clone(),
+                        };
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.spacing_mut().item_spacing.y = 2.0;
+                                ui.label(RichText::new(&grammar.name).color(text));
+                                ui.label(RichText::new(under).small().color(weak));
+                            });
+                            if ui
+                                .button(RichText::new(t.grammar_remove()).color(text))
+                                .clicked()
+                            {
+                                actions.push(Action::RemoveGrammar(grammar.scope.clone()));
+                            }
+                        });
+                    }
+                    if ui
+                        .button(RichText::new(t.grammar_add()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::AddGrammar);
+                    }
+                    if let Some(refused) = &grammar_refused {
+                        ui.label(RichText::new(refused).color(ui.visuals().error_fg_color));
+                    }
                 });
             }
             // Simple or Advanced, the person's (#197), last, so the
@@ -21527,7 +21636,8 @@ fn edited_text(
         let code = ui.visuals().code_bg_color;
         let dark = ui.visuals().dark_mode;
         let small = FontId::proportional(13.0);
-        let grammar = Grammars::built_in().by_scope(edit.language);
+        let grammars = text_marks_view::grammars(ui.ctx());
+        let grammar = grammars.by_scope(edit.language);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(typed_size);
@@ -21588,7 +21698,7 @@ fn edited_text(
                         egui::Event::Paste(p)
                             if p.chars().nth(1).is_some() && text_format::looks_like_code(p) =>
                         {
-                            Some(Grammars::built_in().guess(p).map(|g| g.scope.as_str()))
+                            Some(grammars.guess(p).map(|g| g.scope.clone()))
                         }
                         _ => None,
                     })

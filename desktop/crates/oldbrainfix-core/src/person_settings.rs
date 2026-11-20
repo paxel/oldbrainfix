@@ -7,13 +7,16 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::sync::{Arc, OnceLock};
 
 use chrono::{DateTime, Utc};
+use parking_lot::Mutex;
 
 use serde_json::{Value, json};
 
 use crate::alarms::QuietDays;
 use crate::entry::{Entry, dart_iso};
+use crate::highlight::{Grammar, GrammarRefused, Grammars};
 use crate::places::{Area, Places};
 use crate::routines::skip_of;
 use crate::schedule::{Day, WallClock};
@@ -53,6 +56,44 @@ pub mod keys {
     pub fn quiet_day(day: crate::schedule::Day) -> String {
         format!("{QUIET_DAY_PREFIX}{day}")
     }
+
+    /// A grammar the person added (obf-1037): the field [`grammar`] of
+    /// its scope, holding the grammar's text, a Sublime syntax
+    /// definition; null once removed. A text that does not read, is over
+    /// [`super::MAX_GRAMMAR_BYTES`] or is of another scope counts for
+    /// nothing.
+    pub const GRAMMAR_PREFIX: &str = "grammar@";
+
+    /// The field of the person's grammar of `scope`.
+    pub fn grammar(scope: &str) -> String {
+        format!("{GRAMMAR_PREFIX}{scope}")
+    }
+}
+
+/// The largest grammar the person may add, in UTF-8 bytes (obf-1037).
+pub const MAX_GRAMMAR_BYTES: usize = 256 * 1024;
+
+/// The most grammars the person may add (obf-1037).
+pub const MAX_ADDED_GRAMMARS: usize = 32;
+
+/// The grammars read before, by their text, so a change of the log
+/// elsewhere reads none again; none for one refused.
+type ReadGrammars = HashMap<String, Option<Arc<Grammar>>>;
+
+fn read_grammar(source: &str) -> Option<Arc<Grammar>> {
+    static READ: OnceLock<Mutex<ReadGrammars>> = OnceLock::new();
+    let mut read = READ.get_or_init(Mutex::default).lock();
+    if read.len() > 2 * MAX_ADDED_GRAMMARS {
+        read.clear();
+    }
+    read.entry(source.to_string())
+        .or_insert_with(|| {
+            if source.len() > MAX_GRAMMAR_BYTES {
+                return None;
+            }
+            Grammar::parse(source).ok().map(Arc::new)
+        })
+        .clone()
 }
 
 /// The person's own settings in the log.
@@ -146,6 +187,100 @@ impl<'a> PersonSettings<'a> {
                 Some(&dart_iso(now)),
                 None,
             )
+            .map(drop)
+    }
+
+    /// The grammars code is coloured with for this person (obf-1037):
+    /// the built-in ones and those the person added, as the user's own
+    /// Devices wrote them, the newest entry of each scope winning. One
+    /// that does not read, is over [`MAX_GRAMMAR_BYTES`] or is kept under
+    /// another scope is left out, so the built-in one of its scope stays.
+    /// Another person's grammars never count here: they never reach this
+    /// Device, and what another person's Device wrote counts for nothing.
+    pub fn grammars(&self) -> Result<Arc<Grammars>> {
+        self.store
+            .worked_out("person_settings:grammars", || self.read_grammars())
+    }
+
+    fn read_grammars(&self) -> Result<Grammars> {
+        let mut own = HashMap::new();
+        let mut held: HashMap<String, Entry> = HashMap::new();
+        for e in self.store.logged_history(keys::ENTITY)? {
+            if !e.field.starts_with(keys::GRAMMAR_PREFIX)
+                || !self.store.written_by_own_in(&e.device, &mut own)?
+            {
+                continue;
+            }
+            let newer = held
+                .get(&e.field)
+                .is_none_or(|had| Store::latest_wins(&e, had) == Ordering::Greater);
+            if newer {
+                held.insert(e.field.clone(), e);
+            }
+        }
+        let mut added: Vec<Arc<Grammar>> = held
+            .into_iter()
+            .filter_map(|(field, e)| {
+                let grammar = read_grammar(e.value.as_deref()?)?;
+                (grammar.scope == field[keys::GRAMMAR_PREFIX.len()..]).then_some(grammar)
+            })
+            .collect();
+        added.sort_by(|a, b| utf16_cmp(&a.scope, &b.scope));
+        Ok(Grammars::with_added(added))
+    }
+
+    /// "Add grammar…" (obf-1037): adds the grammar in the file `bytes`
+    /// for all of the user's own Devices, in the place of the one of its
+    /// scope, built in or added before; the same again writes nothing.
+    /// Refused with what is wrong, adding nothing, when the file is over
+    /// [`MAX_GRAMMAR_BYTES`], is no UTF-8 text, does not read as a
+    /// grammar or goes beyond what the cores read, or when it would be
+    /// one more than [`MAX_ADDED_GRAMMARS`].
+    pub fn add_grammar(
+        &self,
+        bytes: &[u8],
+    ) -> Result<std::result::Result<Arc<Grammar>, GrammarRefused>> {
+        if bytes.len() > MAX_GRAMMAR_BYTES {
+            return Ok(Err(GrammarRefused("over 256 KiB".into())));
+        }
+        let Ok(source) = std::str::from_utf8(bytes) else {
+            return Ok(Err(GrammarRefused("not a UTF-8 text".into())));
+        };
+        let source = source.strip_prefix('\u{FEFF}').unwrap_or(source);
+        let grammar = match Grammar::parse(source) {
+            Ok(g) => Arc::new(g),
+            Err(refused) => return Ok(Err(refused)),
+        };
+        let grammars = self.grammars()?;
+        if grammars.added.iter().all(|g| g.scope != grammar.scope)
+            && grammars.added.len() >= MAX_ADDED_GRAMMARS
+        {
+            return Ok(Err(GrammarRefused("more than 32 grammars".into())));
+        }
+        let field = keys::grammar(&grammar.scope);
+        let held = self
+            .store
+            .own_current(keys::ENTITY, &field, &mut HashMap::new())?;
+        if held.as_deref() != Some(source) {
+            self.store
+                .append(keys::ENTITY, &field, Some(source), None)?;
+        }
+        Ok(Ok(grammar))
+    }
+
+    /// Remove (obf-1037): the person's grammar of `scope` is gone from
+    /// all of the user's own Devices, and the built-in one of its scope,
+    /// if any, colours again. Nothing when there is none.
+    pub fn remove_grammar(&self, scope: &str) -> Result<()> {
+        let field = keys::grammar(scope);
+        let held = self
+            .store
+            .own_current(keys::ENTITY, &field, &mut HashMap::new())?;
+        if held.is_none() {
+            return Ok(());
+        }
+        self.store
+            .append(keys::ENTITY, &field, None, None)
             .map(drop)
     }
 

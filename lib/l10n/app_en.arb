@@ -3593,5 +3593,17 @@
   "pdfPageOf": "Page {page} of {pages}",
   "@pdfPageOf": {"description": "At the top of an attached PDF shown full screen (#286): the page shown and how many there are.", "placeholders": {"page": {"type": "int"}, "pages": {"type": "int"}}},
   "openInOtherApp": "Open in another app",
-  "@openInOtherApp": {"description": "The entry in the ⋮ of an attached PDF shown full screen (#286) that opens it with the system's app for PDFs."}
+  "@openInOtherApp": {"description": "The entry in the ⋮ of an attached PDF shown full screen (#286) that opens it with the system's app for PDFs."},
+  "grammarsTitle": "Code languages",
+  "@grammarsTitle": {"description": "The heading of the Settings section of the person's own grammars (obf-1037): files that colour code in more languages."},
+  "grammarsHint": "Add a Sublime syntax file (.sublime-syntax) to colour code in another language. It colours code on all your Devices, only for you.",
+  "@grammarsHint": {"description": "The line under the heading of the Settings section of the person's own grammars (obf-1037)."},
+  "grammarAdd": "Add grammar…",
+  "@grammarAdd": {"description": "The button in Settings ▸ Code languages (obf-1037) that picks a grammar file with the system's picker and adds it."},
+  "grammarInPlaceOf": "Replaces the built-in grammar for {name}",
+  "@grammarInPlaceOf": {"description": "The line under an added grammar in Settings ▸ Code languages (obf-1037) whose scope is that of a built-in one, which it replaces until it is removed.", "placeholders": {"name": {"type": "String"}}},
+  "grammarRemove": "Remove",
+  "@grammarRemove": {"description": "The button beside an added grammar in Settings ▸ Code languages (obf-1037): the grammar is gone from all of the person's Devices, a built-in one of its language colours again."},
+  "grammarRefused": "{file} was not added: {reason}",
+  "@grammarRefused": {"description": "The red line under Add grammar… in Settings ▸ Code languages (obf-1037) when the picked file is refused; nothing was added. The reason is the core's own, in English.", "placeholders": {"file": {"type": "String"}, "reason": {"type": "String"}}}
 }
