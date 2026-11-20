@@ -313,7 +313,8 @@ typedef FieldAction = ({
 /// formats: its text shows in monospace, unwrapped, on the tint of
 /// code, and a one-finger drag moves it sideways. With [onCodePasted], a
 /// pasted text that looks like code ([TextFormats.looksLikeCode]) calls
-/// it, and the paste does not make the text formatted.
+/// it with what was pasted, and the paste does not make the text
+/// formatted.
 ///
 /// Without [bar] (Simple, #197) the bar has neither ☐ nor the formats;
 /// typing, pasting and tapping a formatted text work as with it.
@@ -349,7 +350,7 @@ class TwoRowTextField extends StatefulWidget {
   final bool lineFormats;
   final bool bar;
   final VoidCallback? onFormatted;
-  final VoidCallback? onCodePasted;
+  final ValueChanged<String>? onCodePasted;
   final List<FieldAction> actions;
   final FocusNode? focusNode;
   final VoidCallback? onNext;
@@ -631,7 +632,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     if (onCode != null &&
         inserted.length > 1 &&
         TextFormats.looksLikeCode(inserted)) {
-      onCode();
+      onCode(inserted);
       return;
     }
     if (controller == null) return;

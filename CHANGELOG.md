@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - "Quiet today" in the Agenda's menu keeps today quiet on your Devices: everything still shows, nothing rings, and what is left undone counts as skipped. ([obf-1044](https://github.com/paxel/oldbrainfix/issues/354))
 - A Note shows "Linked from" at its end, listing the Notes whose app links lead to it. ([obf-1035](https://github.com/paxel/oldbrainfix/issues/345))
 - Import also takes AsciiDoc, Org, reStructuredText and HTML files, each as a formatted Note, without running anything in them. ([obf-1038](https://github.com/paxel/oldbrainfix/issues/348))
+- Code is coloured by its language: a Code text by the one picked beside "Code", a code block by the one its first line names. ([obf-1036](https://github.com/paxel/oldbrainfix/issues/346))
 
 ### Changed
 

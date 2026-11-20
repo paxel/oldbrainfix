@@ -82,6 +82,7 @@ use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
 use oldbrainfix_core::checklists::keys as checklist_keys;
+use oldbrainfix_core::highlight::Grammars;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
@@ -1494,9 +1495,16 @@ enum Action {
     FormatText(Option<String>),
     /// Puts the Note's text, as typed, into this format (#213).
     SetTextFormat(&'static str),
+    /// Colours the Note's Code text by the grammar of this scope, or by
+    /// none (obf-1036).
+    SetCodeLanguage(Option<&'static str>),
     /// A paste that looks like code into the Note's text: "Keep as code"
-    /// under it (#213), or, without, that offer closed.
-    OfferCode(bool),
+    /// under it (#213), with the language guessed for what was pasted
+    /// (obf-1036), or, without, that offer closed.
+    OfferCode(bool, Option<&'static str>),
+    /// "Keep as code": the Note's text made a Code text, in the language
+    /// guessed for the paste, else for its whole text (obf-1036).
+    KeepAsCode,
     /// Asks for the address of a link on the bytes `start..end` of the
     /// edited text, of the Amend field's with `amend` or of the field of
     /// the Section `section` (#183), `url` the link's there is one
@@ -1999,8 +2007,10 @@ pub struct App {
     /// to show them where they were sorted once it brings them back.
     moved_on: Option<MovedOn>,
     /// The Note whose text took a paste that looks like code, while
-    /// "Keep as code" waits under it (#213).
+    /// "Keep as code" waits under it (#213), and the scope of the
+    /// language guessed for the paste (obf-1036).
     code_offer: Option<String>,
+    code_guess: Option<&'static str>,
     /// Whether the Lines of the Note opened next are to be typed in at
     /// once: a Checklist or Shopping List just made (#161), or opened from
     /// its group's heading on the Agenda (#276).
@@ -2596,6 +2606,7 @@ impl App {
             undo: None,
             moved_on: None,
             code_offer: None,
+            code_guess: None,
             start_lines: false,
             tally_whose: HashMap::new(),
             lines: TypedLines::default(),
@@ -7443,9 +7454,12 @@ impl App {
             Action::FormatText(None) => self.save_formatted()?,
             Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
             Action::SetTextFormat(format) => self.set_text_format(format)?,
-            Action::OfferCode(offer) => {
-                self.code_offer = offer.then(|| self.text_of.clone()).flatten()
+            Action::SetCodeLanguage(language) => self.set_code_language(language)?,
+            Action::OfferCode(offer, guess) => {
+                self.code_offer = offer.then(|| self.text_of.clone()).flatten();
+                self.code_guess = guess.filter(|_| offer);
             }
+            Action::KeepAsCode => self.keep_as_code()?,
             Action::AskLink {
                 start,
                 end,
@@ -10326,6 +10340,7 @@ impl App {
     fn set_text_format(&mut self, format: &str) -> oldbrainfix_core::Result<()> {
         self.save_text()?;
         self.code_offer = None;
+        self.code_guess = None;
         let Some(id) = self.text_of.clone() else {
             return Ok(());
         };
@@ -10335,6 +10350,32 @@ impl App {
             self.put_typed(now.text);
         }
         Ok(())
+    }
+
+    /// Colours the selected Note's Code text by the grammar of the scope
+    /// `language`, or by none (obf-1036), at once.
+    fn set_code_language(&mut self, language: Option<&str>) -> oldbrainfix_core::Result<()> {
+        let Some(id) = self.text_of.clone() else {
+            return Ok(());
+        };
+        Notes::new(&self.store).set_code_language(&id, language)
+    }
+
+    /// "Keep as code" (#213): the selected Note's text made a Code text,
+    /// coloured by the language guessed for the paste or, without one,
+    /// for its whole text (obf-1036); a language it has stays where none
+    /// is guessed.
+    fn keep_as_code(&mut self) -> oldbrainfix_core::Result<()> {
+        let pasted = self.code_guess.take();
+        self.set_text_format(text_format::CODE)?;
+        let guess = pasted.or_else(|| {
+            let typed = self.typed_text();
+            Grammars::built_in().guess(&typed).map(|g| g.scope.as_str())
+        });
+        match guess {
+            Some(scope) => self.set_code_language(Some(scope)),
+            None => Ok(()),
+        }
     }
 
     /// Keeps the selected Note's edited text as a formatted text, at
@@ -11549,7 +11590,12 @@ impl App {
                     let ticked = ticked_in(&note.boxes);
                     let ticks: (bool, &dyn Fn(&str) -> bool) =
                         (box_ticks.contains(&note.id), &ticked);
-                    let part = (note.id.as_str(), note.text.as_str(), &*note.text_format);
+                    let part = (
+                        note.id.as_str(),
+                        note.text.as_str(),
+                        &*note.text_format,
+                        note.code_language.as_deref(),
+                    );
                     let all = (0, note.text.len());
                     if kinded {
                         // Its name as a heading, by its kind while it has
@@ -11622,6 +11668,7 @@ impl App {
                             section.id.as_str(),
                             section.text.as_str(),
                             &*section.text_format,
+                            None,
                         );
                         if !section.text.trim().is_empty() {
                             let shown = ((0, section.text.len()), READ_SIZE);
@@ -13422,6 +13469,32 @@ impl App {
                         }
                         actions.push(Action::Badge(None));
                     }
+                    // A Code text's language beside it (obf-1036): none or
+                    // a grammar's, the current one picked; a pick colours
+                    // it at once and closes. One not known here shows as
+                    // none until another is picked.
+                    if current == text_format::CODE {
+                        let stored = note.code_language.as_deref().filter(|l| !l.is_empty());
+                        let grammars = Grammars::built_in();
+                        let shows = grammars.by_scope(stored).map(|g| g.scope.as_str());
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.code_language()).strong().color(text));
+                        let mut language = shows;
+                        let options = std::iter::once((None, t.code_language_none().to_string()))
+                            .chain(
+                                grammars
+                                    .all
+                                    .iter()
+                                    .map(|g| (Some(g.scope.as_str()), g.name.clone())),
+                            );
+                        // Too many for chips: one per line (#226).
+                        if radio_column(ui, &mut language, options) {
+                            if language != stored {
+                                actions.push(Action::SetCodeLanguage(language));
+                            }
+                            actions.push(Action::Badge(None));
+                        }
+                    }
                 })
             }
             // A Checklist's (#219) or a Shopping List's (#186) three ways.
@@ -14523,6 +14596,7 @@ impl App {
                                         stored: &section.text,
                                         formatted: section.text_format == text_format::MARKDOWN,
                                         code: false,
+                                        language: None,
                                         offers_code: false,
                                         bar: self.view.advanced,
                                         boxes: look,
@@ -14667,7 +14741,7 @@ impl App {
                                 read_text::shown(ui, |ui| {
                                     text_marks_view::code_text_label(
                                         ui,
-                                        &note.text,
+                                        (&note.text, note.code_language.as_deref()),
                                         all,
                                         look,
                                         (false, true),
@@ -14725,6 +14799,7 @@ impl App {
                             stored: &note.text,
                             formatted,
                             code,
+                            language: note.code_language.as_deref(),
                             // A paste that looks like code offers it (#213).
                             offers_code: !code,
                             bar: self.view.advanced,
@@ -20523,10 +20598,10 @@ fn code_offer(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
             .button(RichText::new(t.keep_as_code()).color(text))
             .clicked()
         {
-            actions.push(Action::SetTextFormat(text_format::CODE));
+            actions.push(Action::KeepAsCode);
         }
         if icon_button(ui, icons::CLOSE, t.close(), text).clicked() {
-            actions.push(Action::OfferCode(false));
+            actions.push(Action::OfferCode(false, None));
         }
     });
 }
@@ -21312,9 +21387,11 @@ struct EditedText<'a> {
     /// Its text as stored, and whether it is a formatted one.
     stored: &'a str,
     formatted: bool,
-    /// Whether it is a Code text (#213), and whether a paste that looks
-    /// like code offers it.
+    /// Whether it is a Code text (#213), the scope of the grammar it is
+    /// coloured by (obf-1036), and whether a paste that looks like code
+    /// offers it.
     code: bool,
+    language: Option<&'a str>,
     offers_code: bool,
     /// Whether the format bar shows above it: only in Advanced (#197);
     /// typed Markdown and Ctrl+B and Ctrl+I format either way.
@@ -21448,18 +21525,31 @@ fn edited_text(
         let accent = ui.visuals().hyperlink_color;
         let weak = ui.visuals().weak_text_color();
         let code = ui.visuals().code_bg_color;
+        let dark = ui.visuals().dark_mode;
         let small = FontId::proportional(13.0);
+        let grammar = Grammars::built_in().by_scope(edit.language);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(typed_size);
-            // A Code text as written in the fixed-width font, unwrapped.
+            // A Code text as written in the fixed-width font, unwrapped,
+            // coloured by its language (obf-1036).
             if as_code {
                 let format = egui::TextFormat::simple(FontId::monospace(typed_size * 0.9), written);
-                let job = egui::text::LayoutJob::single_section(typed.to_string(), format);
+                let mut job = egui::text::LayoutJob::single_section(typed.to_string(), format);
+                if let Some(grammar) = grammar {
+                    let colours = text_marks_view::code_colours(ui.ctx(), grammar, typed);
+                    text_marks_view::paint_code(&mut job, 0, &colours, dark);
+                }
                 return ui.fonts_mut(|f| f.layout_job(job));
             }
             let (job, lines) = if formatted {
-                text_marks_view::source_job(typed, font.clone(), (written, accent, weak, code))
+                let colours = (written, accent, weak, code);
+                let (mut job, lines) = text_marks_view::source_job(typed, font.clone(), colours);
+                // Its code blocks coloured by the language their fences
+                // name (obf-1036).
+                let fences = text_marks_view::fence_colours(ui.ctx(), typed);
+                text_marks_view::paint_code(&mut job, 0, &fences, dark);
+                (job, lines)
             } else {
                 let job = text_marks_view::tag_job(
                     typed,
@@ -21490,15 +21580,22 @@ fn edited_text(
         // Pasted, a text that looks like code offers it and formats
         // nothing (#213); else pasted with a format, a plain text
         // becomes a formatted one (ADR 0033).
-        let pasted_code = edit.offers_code
-            && focused
-            && ui.input(|i| {
-                i.events.iter().any(|e| {
-                    matches!(e, egui::Event::Paste(p)
-                        if p.chars().nth(1).is_some() && text_format::looks_like_code(p))
+        // With the language guessed for it (obf-1036).
+        let pasted_code = (edit.offers_code && focused)
+            .then(|| {
+                ui.input(|i| {
+                    i.events.iter().find_map(|e| match e {
+                        egui::Event::Paste(p)
+                            if p.chars().nth(1).is_some() && text_format::looks_like_code(p) =>
+                        {
+                            Some(Grammars::built_in().guess(p).map(|g| g.scope.as_str()))
+                        }
+                        _ => None,
+                    })
                 })
-            });
-        let pasted = !pasted_code
+            })
+            .flatten();
+        let pasted = pasted_code.is_none()
             && focused
             && ui.input(|i| {
                 i.events
@@ -21623,8 +21720,8 @@ fn edited_text(
             *editing = false;
             actions.push(Action::SaveText);
         }
-        if output.response.response.changed() && pasted_code {
-            actions.push(Action::OfferCode(true));
+        if let Some(guess) = pasted_code.filter(|_| output.response.response.changed()) {
+            actions.push(Action::OfferCode(true, guess));
         }
         // A shortcut typed makes a plain text a formatted
         // one, as the first format from the bar does.
@@ -21874,6 +21971,7 @@ fn kinded_text(
             stored: note_kinds::description(&note.text),
             formatted,
             code: false,
+            language: None,
             offers_code: false,
             bar: shown.bar,
             boxes: shown.boxes,
@@ -22058,8 +22156,9 @@ fn ticked_in(boxes: &[ShownBox]) -> impl Fn(&str) -> bool + '_ {
 const READ_SIZE: f32 = 18.0;
 
 /// What [`read_part`] draws, the text of a Note or Section: its id, its
-/// text and its format.
-type ReadPart<'a> = (&'a str, &'a str, &'a str);
+/// text, its format and the scope of the grammar a Code text is coloured
+/// by (obf-1036).
+type ReadPart<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 
 /// How the boxes of a [`ReadPart`] show and whether this Device may tick
 /// them, with which have been ticked.
@@ -22073,7 +22172,7 @@ type PartBoxes<'a> = (&'a BoxLook, (bool, &'a dyn Fn(&str) -> bool));
 fn read_part(
     ui: &mut Ui,
     t: &L10n,
-    (of, text, format): ReadPart<'_>,
+    (of, text, format, language): ReadPart<'_>,
     (range, size): ((usize, usize), f32),
     (boxes, ticks): PartBoxes<'_>,
     actions: &mut Vec<Action>,
@@ -22083,7 +22182,7 @@ fn read_part(
         let look = (Some(size), ui.visuals().text_color());
         if format == text_format::CODE {
             read_text::shown(ui, |ui| {
-                text_marks_view::code_text_label(ui, text, range, look, (false, true))
+                text_marks_view::code_text_label(ui, (text, language), range, look, (false, true))
             });
             return;
         }
@@ -22151,6 +22250,8 @@ struct Part<'a> {
     id: &'a str,
     text: &'a str,
     format: &'a str,
+    /// The scope of the grammar a Code text is coloured by (obf-1036).
+    language: Option<&'a str>,
     photos: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
     recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
 }
@@ -22161,6 +22262,7 @@ impl<'a> Part<'a> {
             id: &note.id,
             text: &note.text,
             format: &note.text_format,
+            language: note.code_language.as_deref(),
             photos: (&note.photos, &note.removed_photos, &note.photo_texts),
             recordings: (
                 &note.recordings,
@@ -22175,6 +22277,7 @@ impl<'a> Part<'a> {
             id: &section.id,
             text: &section.text,
             format: &section.text_format,
+            language: None,
             photos: (
                 &section.photos,
                 &section.removed_photos,
@@ -22199,7 +22302,7 @@ fn whole(
     (cache, store, transcribing): ShownMedia,
     (look, marks): (&BoxLook, &mut Spots),
 ) -> Vec<(String, egui::Rect)> {
-    card_text(ui, (part.text, part.format, look), marks);
+    card_text(ui, (part.text, part.format, look), part.language, marks);
     media_view::whole_media(
         ui,
         t,
@@ -22212,14 +22315,21 @@ fn whole(
 
 /// The whole text `text` of a Note or Section in `format` on a full
 /// card, its boxes as `look` says, where its boxes (ADR 0035), tags
-/// (#126) and links (#127) lie added to `marks`.
-fn card_text(ui: &mut Ui, (text, format, look): (&str, &str, &BoxLook), marks: &mut Spots) {
+/// (#126) and links (#127) lie added to `marks`; a Code text coloured by
+/// `language` (obf-1036).
+fn card_text(
+    ui: &mut Ui,
+    (text, format, look): (&str, &str, &BoxLook),
+    language: Option<&str>,
+    marks: &mut Spots,
+) {
     if !text.is_empty() {
         let colour = ui.visuals().text_color();
         let shown = (0, text.len());
-        marks.extend(text_marks_view::formatted_label(
+        marks.extend(text_marks_view::note_label(
             ui,
             (text, format, look),
+            language,
             shown,
             (Some(16.0), colour),
             false,
@@ -22544,6 +22654,8 @@ fn note_card(
                         note.text_format.as_str(),
                         look.boxes.look(&note.id),
                     );
+                    // A Code text coloured by its language (obf-1036).
+                    let language = note.code_language.as_deref();
                     if look.checklist.is_some()
                         || look.shopping.is_some()
                         || look.tally
@@ -22558,9 +22670,10 @@ fn note_card(
                             // A list without a name by its kind (#309).
                             ui.label(RichText::new(kind).size(20.0).color(text));
                         } else if named > 0 {
-                            marks = text_marks_view::formatted_label(
+                            marks = text_marks_view::note_label(
                                 ui,
                                 text_of,
+                                language,
                                 (0, named),
                                 (Some(20.0), text),
                                 true,
@@ -22579,18 +22692,20 @@ fn note_card(
                     if let Some(line) =
                         card_first_line(&note.text, note.text_format == text_format::MARKDOWN)
                     {
-                        marks = text_marks_view::formatted_label(
+                        marks = text_marks_view::note_label(
                             ui,
                             text_of,
+                            language,
                             line,
                             (Some(16.0), text),
                             true,
                         );
                         if look.glance.is_empty() {
                             if let Some(next) = next_lines(&note.text, line.1) {
-                                let more = text_marks_view::formatted_label(
+                                let more = text_marks_view::note_label(
                                     ui,
                                     text_of,
+                                    language,
                                     next,
                                     (Some(14.0), text),
                                     false,

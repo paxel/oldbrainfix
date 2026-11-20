@@ -790,6 +790,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// under the text (#213), until it is taken or closed.
   bool _offersCode = false;
 
+  /// What was pasted when [_offersCode] was offered: its first line may
+  /// name its language (obf-1036).
+  String _pastedCode = '';
+
   /// A Session Note's setup (#191), and its pool and count as its page
   /// edits them; null for any other Note.
   SessionSetup? _setup;
@@ -1220,6 +1224,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _text.markdown = markdown;
     _name.markdown = markdown;
     _text.code = !_named && note?.textFormat == TextFormats.code;
+    _text.codeLanguage = note?.codeLanguage;
     _setTyped(note?.text ?? '');
   }
 
@@ -1579,38 +1584,98 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// The text format badge's editor (#213): the formats the text may
-  /// take, a formatted text never plain again (ADR 0033).
+  /// take, a formatted text never plain again (ADR 0033); a Code text's
+  /// language under them (obf-1036), No language and each one the app
+  /// knows as radio buttons, a tap writing it and closing.
   Future<void> _editFormat() async {
-    final current = _placed?.note.textFormat;
-    if (current == null) return;
+    final note = _placed?.note;
+    if (note == null) return;
+    final current = note.textFormat;
     final t = context.t;
+    Widget formats(BuildContext context) => ChoiceChips<String>(
+      value: current,
+      options: [
+        for (final format in [
+          TextFormats.plain,
+          TextFormats.markdown,
+          TextFormats.code,
+        ])
+          if (format != TextFormats.plain || current != TextFormats.markdown)
+            RadioOption(
+              key: ValueKey('format-$format'),
+              value: format,
+              title: Text(textFormatName(t, format)),
+            ),
+      ],
+      onChanged: (picked) => Navigator.of(context).pop(picked),
+    );
     final picked = await showDialog<String>(
       context: context,
       builder: (context) => BadgeDialog(
         setting: t.badgeTextFormat,
         icon: textFormatBadgeIcon,
-        content: ChoiceChips<String>(
-          value: current,
-          options: [
-            for (final format in [
-              TextFormats.plain,
-              TextFormats.markdown,
-              TextFormats.code,
-            ])
-              if (format != TextFormats.plain ||
-                  current != TextFormats.markdown)
-                RadioOption(
-                  key: ValueKey('format-$format'),
-                  value: format,
-                  title: Text(textFormatName(t, format)),
-                ),
-          ],
-          onChanged: (picked) => Navigator.of(context).pop(picked),
-        ),
+        content: current != TextFormats.code
+            ? formats(context)
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  formats(context),
+                  const SizedBox(height: 16),
+                  Text(
+                    t.codeLanguage,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  // A language this Device does not know is kept: none
+                  // is marked until another is picked.
+                  RadioColumn<String>(
+                    value: note.codeLanguage ?? '',
+                    options: [
+                      RadioOption(
+                        key: const ValueKey('code-language-none'),
+                        value: '',
+                        title: Text(t.codeLanguageNone),
+                      ),
+                      for (final grammar in Grammars.builtIn.all)
+                        RadioOption(
+                          key: ValueKey('code-language-${grammar.scope}'),
+                          value: grammar.scope,
+                          title: Text(grammar.name),
+                        ),
+                    ],
+                    onChanged: (scope) {
+                      _setCodeLanguage(scope);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              ),
       ),
     );
     if (!mounted || picked == null || picked == current) return;
     _setFormat(picked);
+  }
+
+  /// Writes the language the Code text is coloured by, [scope] or none
+  /// for an empty one (obf-1036), and shows it so.
+  void _setCodeLanguage(String scope) {
+    widget.notes.setCodeLanguage(widget.noteId, scope);
+    setState(_load);
+    _text.codeLanguage = _placed?.note.codeLanguage;
+  }
+
+  /// "Keep as code" after a paste that looks like code: the whole text
+  /// becomes a Code text, in the language the paste's first line names,
+  /// such as a `#!/bin/bash`, or else the whole text's; without one the
+  /// language stays as it was (obf-1036).
+  void _keepAsCode() {
+    final guess =
+        Grammars.builtIn.guess(_pastedCode) ??
+        Grammars.builtIn.guess(_text.text);
+    if (guess != null) {
+      widget.notes.setCodeLanguage(widget.noteId, guess.scope);
+    }
+    _setFormat(TextFormats.code);
   }
 
   /// Puts the Note's text, as typed, into [format] (#213) and shows it
@@ -1778,7 +1843,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         Expanded(child: Text(t.codePasted)),
         TextButton(
           key: const ValueKey('keep-as-code'),
-          onPressed: () => _setFormat(TextFormats.code),
+          onPressed: _keepAsCode,
           child: Text(t.keepAsCode),
         ),
         IconButton(
@@ -3196,7 +3261,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                             editable &&
                                 _kind == NoteKind.plain &&
                                 note.textFormat != TextFormats.code
-                            ? () => setState(() => _offersCode = true)
+                            ? (pasted) => setState(() {
+                                _offersCode = true;
+                                _pastedCode = pasted;
+                              })
                             : null,
                         style: Theme.of(context).textTheme.bodyLarge,
                         decoration: const InputDecoration(

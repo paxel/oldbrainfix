@@ -285,6 +285,69 @@ fn the_text_format_is_read_and_set_as_a_pending_change() -> TestResult {
 }
 
 #[test]
+fn a_code_texts_language_is_listed_read_and_set_as_a_pending_change() -> TestResult {
+    let store = store();
+    let notes = Notes::new(&store);
+    let script = notes.capture("fn main() {}", None, None)?;
+    let task = store.open_ai_task()?;
+    let listed = call(&store, &task, "list_code_languages", &json!({}))?;
+    assert!(!listed.is_error, "{listed:?}");
+    assert!(format!("{listed:?}").contains(r#"\"scope\":\"source.rust\""#));
+    let language_of = |id: &str| -> std::result::Result<Value, Box<dyn std::error::Error>> {
+        let read = call(&store, &task, "read_note", &json!({"id": id}))?;
+        let [ToolContent::Text(text)] = &read.content[..] else {
+            return Err("a text".into());
+        };
+        let read: Value = serde_json::from_str(text)?;
+        Ok(read["codeLanguage"].clone())
+    };
+    assert_eq!(language_of(&script.id)?, Value::Null);
+    // Not while the text is plain.
+    let refused = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.rust"}),
+    )?;
+    assert!(refused.is_error);
+    call(
+        &store,
+        &task,
+        "set_text_format",
+        &json!({"id": script.id, "format": "code"}),
+    )?;
+    let set = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.rust"}),
+    )?;
+    assert!(!set.is_error, "{set:?}");
+    assert_eq!(language_of(&script.id)?, json!("source.rust"));
+    // No grammar of that scope.
+    let refused = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.cobol"}),
+    )?;
+    assert!(refused.is_error);
+    // Empty for none.
+    call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": ""}),
+    )?;
+    assert_eq!(language_of(&script.id)?, Value::Null);
+    let review = store.ai_review(&task)?;
+    assert!(review.groups.iter().any(|(kind, items)| {
+        *kind == crate::ai_task::AiChangeKind::NoteText && items[0].entity == script.id
+    }));
+    Ok(())
+}
+
+#[test]
 fn a_sections_text_is_edited_as_a_pending_change() -> TestResult {
     let store = store();
     let notes = Notes::new(&store);
@@ -992,6 +1055,7 @@ fn no_tool_writes_the_users_own_data() {
         "merge_notes",
         "set_importance",
         "set_text_format",
+        "set_code_language",
         "remove_captured",
         "trash_note",
         "restore_note",

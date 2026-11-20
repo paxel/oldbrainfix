@@ -5567,6 +5567,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get keepAsCode => 'Als Code behalten';
 
   @override
+  String get codeLanguage => 'Sprache';
+
+  @override
+  String get codeLanguageNone => 'Keine Sprache';
+
+  @override
   String get noteHistoryHint =>
       'Jede Änderung dieser Notiz, ihrer Ergänzungen und ihrer Zeilen, die neueste zuerst.';
 

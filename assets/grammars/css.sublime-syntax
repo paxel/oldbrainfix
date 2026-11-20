@@ -1,0 +1,116 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: CSS
+scope: source.css
+file_extensions: [css, scss, less]
+
+variables:
+  pre: '(?<![\w-])'
+  ident: '-?[A-Za-z_][\w-]*'
+
+contexts:
+  main:
+    - include: common
+    - match: '\{'
+      scope: punctuation.section.block.begin.css
+      push: block
+    - include: selectors
+
+  common:
+    - match: '/\*'
+      push: block_comment
+    - match: '(?<![^\s;{}])//.*'
+      scope: comment.line.double-slash.css
+    - match: '"'
+      push: double_string
+    - match: ''''
+      push: single_string
+    - match: '@[\w-]+'
+      scope: keyword.control.at-rule.css
+      push: at_rule
+    - match: '[$][\w-]+|--[\w-]+'
+      scope: variable.parameter.css
+
+  selectors:
+    - match: '\.{{ident}}'
+      scope: entity.other.attribute-name.class.css
+    - match: '#[\w-]+'
+      scope: entity.other.attribute-name.id.css
+    - match: '::?{{ident}}'
+      scope: entity.other.attribute-name.pseudo.css
+    - match: '(\[)\s*([\w-]+)'
+      captures:
+        1: punctuation.section.brackets.begin.css
+        2: entity.other.attribute-name.css
+    - match: '&|\*'
+      scope: entity.name.tag.css
+    - match: '{{pre}}[A-Za-z][\w-]*'
+      scope: entity.name.tag.css
+
+  at_rule:
+    - match: ';'
+      pop: true
+    - match: '(?=[{}])'
+      pop: true
+    - include: values
+
+  block:
+    - match: '\}'
+      scope: punctuation.section.block.end.css
+      pop: true
+    - match: '\{'
+      scope: punctuation.section.block.begin.css
+      push: block
+    - include: common
+    - match: '(?:^|(?<=[;{}]))\s*(?=[^\s@;{}](?:[^;{}#]|#(?!\{))*\{)'
+      push: nested_selector
+    - match: '{{pre}}-{0,2}[A-Za-z_][\w-]*(?=\s*:(?!:)[^;{}]*(?:;|\}|$))'
+      scope: support.type.property-name.css
+    - include: values
+
+  nested_selector:
+    - match: '(?=\{)'
+      pop: true
+    - include: selectors
+
+  values:
+    - match: '"'
+      push: double_string
+    - match: ''''
+      push: single_string
+    - match: '/\*'
+      push: block_comment
+    - match: '#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])'
+      scope: constant.other.color.css
+    - match: '{{pre}}[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][-+]?\d+)?(?:%|[A-Za-z]+)?'
+      scope: constant.numeric.css
+    - match: '(url)(\()([^)''"\n]*)(\))'
+      captures:
+        1: support.function.url.css
+        3: string.unquoted.url.css
+    - match: '{{pre}}[A-Za-z_-][\w-]*(?=\()'
+      scope: support.function.css
+    - match: '!\s*important\b'
+      scope: keyword.other.important.css
+    - match: '[$][\w-]+|--[\w-]+'
+      scope: variable.parameter.css
+
+  block_comment:
+    - meta_scope: comment.block.css
+    - match: '\*/'
+      pop: true
+
+  double_string:
+    - meta_scope: string.quoted.double.css
+    - match: '"|$'
+      pop: true
+    - match: '\\(?:[0-9a-fA-F]{1,6}|.)'
+      scope: constant.character.escape.css
+
+  single_string:
+    - meta_scope: string.quoted.single.css
+    - match: '''|$'
+      pop: true
+    - match: '\\(?:[0-9a-fA-F]{1,6}|.)'
+      scope: constant.character.escape.css

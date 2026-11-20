@@ -1612,6 +1612,7 @@ class _CompactNoteState extends State<_CompactNote> {
       boxes: note.boxes,
       source: note.text,
       ticking: widget.ticking,
+      language: note.codeLanguage,
     );
     final glance = [
       for (final (i, line) in _glance.indexed)
@@ -1840,6 +1841,7 @@ class _FullNoteState extends State<_FullNote> {
           boxes: note.boxes,
           ticking: widget.boxes?.call(note.id, note.boxes),
           format: note.textFormat,
+          language: note.codeLanguage,
           photos: note.photos,
           photoTexts: note.photoTexts,
           removedPhotos: note.removedPhotos,
@@ -1947,6 +1949,9 @@ class _Whole extends StatelessWidget {
   /// What a list without a name shows as its name ([untitledList]).
   final String? untitled;
 
+  /// The language a Code text is coloured by (obf-1036).
+  final String? language;
+
   const _Whole({
     required this.id,
     required this.text,
@@ -1968,6 +1973,7 @@ class _Whole extends StatelessWidget {
     this.onTable,
     this.named = false,
     this.untitled,
+    this.language,
   });
 
   @override
@@ -1997,6 +2003,7 @@ class _Whole extends StatelessWidget {
             source: source,
             ticking: ticking,
             tableEdit: onTable,
+            language: language,
           );
     final parts = <Widget>[
       if (list == null)

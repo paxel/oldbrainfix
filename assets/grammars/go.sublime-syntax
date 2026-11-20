@@ -1,0 +1,67 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: Go
+scope: source.go
+file_extensions: [go, golang]
+first_line_match: '^package\s+[A-Za-z_]\w*\s*$'
+
+variables:
+  ident: '[A-Za-z_]\w*'
+  esc: '\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[0-7]{3}|.)'
+
+contexts:
+  main:
+    - match: '//.*'
+      scope: comment.line.double-slash.go
+    - match: '/\*'
+      push: block_comment
+    - match: '`'
+      push: raw_string
+    - match: '"'
+      push: string
+    - match: '''(?:{{esc}}|[^\\''\n])'''
+      scope: string.quoted.single.rune.go
+    - match: '\b(func)\s+(?:\([^)\n]*\)\s*)?({{ident}})'
+      captures:
+        1: keyword.declaration.function.go
+        2: entity.name.function.go
+    - match: '\b(type)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.type.go
+        2: entity.name.type.go
+    - match: '\b(?:break|case|continue|default|defer|else|fallthrough|for|go|goto|if|import|package|range|return|select|switch)\b'
+      scope: keyword.control.go
+    - match: '\b(?:func|type|var|const|struct|interface|map|chan)\b'
+      scope: keyword.declaration.go
+    - match: '\b(?:true|false|nil|iota)\b'
+      scope: constant.language.go
+    - match: '\b(?:bool|byte|complex64|complex128|error|float32|float64|int|int8|int16|int32|int64|rune|string|uint|uint8|uint16|uint32|uint64|uintptr|any|comparable)\b'
+      scope: storage.type.go
+    - match: '\b(?:append|cap|clear|close|complex|copy|delete|imag|len|make|max|min|new|panic|print|println|real|recover)\b(?=\s*\()'
+      scope: support.function.builtin.go
+    - match: '\b(?:0[xX][0-9a-fA-F_]+|0[oO]?[0-7_]+|0[bB][01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\.\d[\d_]*(?:[eE][+-]?\d+)?)i?'
+      scope: constant.numeric.go
+    - match: '\b{{ident}}(?=\s*(?:\[[^\]\n]{0,80}\]\s*)?\()'
+      scope: variable.function.go
+    - match: ':=|<-|&&|\|\||\+\+|--|<<=?|>>=?|&\^=?|\.\.\.|[-+*/%<>=!&|^]=?'
+      scope: keyword.operator.go
+
+  block_comment:
+    - meta_scope: comment.block.go
+    - match: '\*/'
+      pop: true
+
+  raw_string:
+    - meta_scope: string.quoted.other.raw.go
+    - match: '`'
+      pop: true
+
+  string:
+    - meta_scope: string.quoted.double.go
+    - match: '"|$'
+      pop: true
+    - match: '{{esc}}'
+      scope: constant.character.escape.go
+    - match: '%[-+#0]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[vTtbcdoOqxXUeEfFgGsp%]'
+      scope: constant.other.placeholder.go

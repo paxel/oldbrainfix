@@ -1464,6 +1464,8 @@
   "textFormatCode": "Code",
   "codePasted": "Das sieht nach Code aus.",
   "keepAsCode": "Als Code behalten",
+  "codeLanguage": "Sprache",
+  "codeLanguageNone": "Keine Sprache",
   "noteHistoryHint": "Jede Änderung dieser Notiz, ihrer Ergänzungen und ihrer Zeilen, die neueste zuerst.",
   "noteHistoryCaptured": "Erfasst",
   "noteHistoryText": "Text geändert",

@@ -13,6 +13,7 @@ use oldbrainfix_core::ai_port::{Reach, bridged_client_config, claude_code_comman
 use oldbrainfix_core::ai_task::{AiChangeKind, AiFieldChange, AiReviewItem};
 use oldbrainfix_core::checklists::{keys as line_keys, parse_list_kind};
 use oldbrainfix_core::frogs::keys as frog_keys;
+use oldbrainfix_core::highlight::Grammars;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::routines::{heads_up_keys, keys as routine_keys};
@@ -252,6 +253,13 @@ fn change_line(
         return tally_change(store, t, entity, id, part, change);
     }
     match (ty, field) {
+        // A Code text's language (obf-1036) by its grammar's name; one not
+        // known here as stored.
+        (note_keys::TYPE_NOTE, note_keys::LANGUAGE) => {
+            return Ok(words(t.code_language().to_string(), &|v| {
+                language_text(t, v)
+            }));
+        }
         (note_keys::TYPE_NOTE, line_keys::KIND) => {
             return Ok(words(t.ai_field_kind().to_string(), &|v| {
                 list_text(t, v).to_string()
@@ -489,6 +497,17 @@ fn value_text(
             Err(_) => value.to_string(),
         },
     })
+}
+
+/// A Code text's language `scope` in words (obf-1036): its grammar's
+/// name, "No language" for none, and one not known here as stored.
+fn language_text(t: &L10n, scope: Option<&str>) -> String {
+    match scope.filter(|s| !s.is_empty()) {
+        None => t.code_language_none().to_string(),
+        Some(scope) => Grammars::built_in()
+            .by_scope(Some(scope))
+            .map_or_else(|| scope.to_string(), |g| g.name.clone()),
+    }
 }
 
 /// What a Note is by its `kind`: a Checklist, a Shopping List or a plain

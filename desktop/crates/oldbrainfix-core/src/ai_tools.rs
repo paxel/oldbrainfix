@@ -180,7 +180,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it) with a Code text's language (codeLanguage: a grammar's scope as list_code_languages names it, or null), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -218,6 +218,13 @@ pub fn tools() -> Vec<Value> {
         tool(
             "list_tags",
             "Lists the tags written in the Notes, words with # in front such as #garten, nested by a / as in #life/health/back, by their levels: each with its name and whole tag as written most often, how many Notes hold it or a tag under it, and the tags under it. Only Notes neither in the trash nor merged count, with their Sections; a tag in code, in a link's address or in a Code text is none. list_notes with a tag as its search finds the Notes holding it or a tag under it.",
+            true,
+            json!({}),
+            &[],
+        ),
+        tool(
+            "list_code_languages",
+            "Lists the languages a Code text and a fenced code block of a formatted text can be coloured by (obf-1036): each grammar's name, its scope (what set_code_language and read_note's codeLanguage use) and the names a fence may give it.",
             true,
             json!({}),
             &[],
@@ -325,6 +332,16 @@ pub fn tools() -> Vec<Value> {
                 "format": {"enum": ["plain", "markdown", "code"], "type": "string"},
             }),
             &["id", "format"],
+        ),
+        tool(
+            "set_code_language",
+            "Sets the language a Note's Code text is coloured by (obf-1036), as the text format badge picks it: one of the grammars list_code_languages names, by its scope such as source.rust, or an empty text for none. The text stays as written; only a Note whose text is code takes one.",
+            false,
+            json!({
+                "id": id("Note"),
+                "language": string("The grammar's scope, such as source.rust; empty for none"),
+            }),
+            &["id", "language"],
         ),
         tool(
             "remove_captured",
@@ -890,6 +907,7 @@ fn note_summary(note: &Note, kind: &NoteKind) -> Value {
         "sessions": kind.sessions,
         "text": note.text,
         "textFormat": note.text_format,
+        "codeLanguage": note.code_language,
         "trashed": note.is_trashed(),
         "unsorted": note.is_unsorted(),
     })
@@ -1656,6 +1674,20 @@ impl Store {
                 }
                 ToolOutput::json(&Value::Array(out))
             }
+            "list_code_languages" => {
+                let all: Vec<Value> = crate::highlight::Grammars::built_in()
+                    .all
+                    .iter()
+                    .map(|g| {
+                        json!({
+                            "fenceNames": g.file_extensions,
+                            "name": g.name,
+                            "scope": g.scope,
+                        })
+                    })
+                    .collect();
+                ToolOutput::json(&Value::Array(all))
+            }
             "list_tags" => {
                 fn node(n: &TagNode) -> Value {
                     json!({
@@ -2154,6 +2186,30 @@ impl Store {
                     return Err(Error::Invalid(format!("not a plain Note: {}", note.id)));
                 }
                 notes.set_format(&note.id, format)?;
+                note.id
+            }
+            "set_code_language" => {
+                let language = text_arg(args, "language")?;
+                let note = notes
+                    .by_id(id()?)?
+                    .ok_or_else(|| Error::Invalid(format!("not a Note: {}", id().unwrap_or(""))))?;
+                // As the badge: a Code text only, and a grammar known here.
+                if note.text_format != text_format::CODE {
+                    return Err(Error::Invalid(format!(
+                        "the text of {} is not code: set_text_format makes it code first",
+                        note.id
+                    )));
+                }
+                if !language.is_empty()
+                    && crate::highlight::Grammars::built_in()
+                        .by_scope(Some(language))
+                        .is_none()
+                {
+                    return Err(Error::Invalid(format!(
+                        "no code language {language}: list_code_languages names them"
+                    )));
+                }
+                notes.set_code_language(&note.id, Some(language))?;
                 note.id
             }
             "remove_captured" => {

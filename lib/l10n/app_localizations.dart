@@ -8834,6 +8834,18 @@ abstract class AppLocalizations {
   /// **'Keep as code'**
   String get keepAsCode;
 
+  /// The heading of the language choice in the text format badge's dialog while Code is picked (obf-1036): the language a Code text is coloured by.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get codeLanguage;
+
+  /// The choice of no language for a Code text (obf-1036): it shows in one colour.
+  ///
+  /// In en, this message translates to:
+  /// **'No language'**
+  String get codeLanguageNone;
+
   /// Line under the title of a Note's History page (#193).
   ///
   /// In en, this message translates to:

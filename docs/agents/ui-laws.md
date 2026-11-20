@@ -733,6 +733,20 @@ replace a law of Both apps where they say so. A desktop law marked
   moves sideways. **A paste that looks like code** into a Plain Note's
   text in the Note editor formats nothing and puts "Keep as code" under
   the text, with a cross that lets the paste be; Capture never asks.
+- **Code is coloured by its language** (obf-1036, ADR 0054): a Code text
+  with a language and a code block whose fence names a language a
+  grammar knows are drawn in the syntax colours wherever they show
+  (cards, read views, the editor's field), only the glyphs' colour
+  changing: font, size, tint and line room stay as above. Eleven colours
+  (comment, string, number, constant, keyword, operator, type, function,
+  tag, attribute, variable), the same values in both apps, one set for the
+  light look and one for the dark, each readable on the code tint.
+  Without a language, with one this Device does not know, or a fence
+  naming none, code stays in the text's colour. The text format badge's
+  dialog, while Code is picked, offers "Language": "No language" and the
+  grammars by name, and a pick is written at once; "Keep as code" picks
+  the language the first line names. Search, Share and Copy give the
+  text as written.
 
 ### Boxes
 

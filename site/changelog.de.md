@@ -10,6 +10,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - „Heute ruhig“ im Menü der Agenda hält den Tag auf deinen Geräten ruhig: Alles bleibt sichtbar, nichts klingelt, und Unerledigtes gilt als ausgelassen. ([obf-1044](https://github.com/paxel/oldbrainfix/issues/354))
 - Eine Notiz zeigt an ihrem Ende „Verlinkt von“ mit den Notizen, deren App-Links zu ihr führen. ([obf-1035](https://github.com/paxel/oldbrainfix/issues/345))
 - Der Import nimmt auch AsciiDoc-, Org-, reStructuredText- und HTML-Dateien, jede als formatierte Notiz, ohne etwas darin auszuführen. ([obf-1038](https://github.com/paxel/oldbrainfix/issues/348))
+- Code wird nach seiner Sprache eingefärbt: ein Code-Text nach der neben „Code“ gewählten, ein Codeblock nach der in seiner ersten Zeile genannten. ([obf-1036](https://github.com/paxel/oldbrainfix/issues/346))
 
 ### Geändert
 

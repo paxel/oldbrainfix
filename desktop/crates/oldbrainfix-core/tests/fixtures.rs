@@ -9766,3 +9766,83 @@ fn a_sent_shopping_list_goes_as_the_dart_core_sends_and_takes_it() -> TestResult
     assert_eq!(read_shopping_of(&ben, &got)?, expected["third"]);
     Ok(())
 }
+
+#[test]
+fn code_is_coloured_as_the_dart_core_colours_it() -> TestResult {
+    use oldbrainfix_core::highlight::{CodeRegex, CodeSpan, Grammar, Grammars};
+    let fixture = read_json(&fixtures().join("highlight.json"))?;
+    let grammars = Grammars::built_in();
+    // The built-in grammars, all read, in the same order.
+    let listed: Vec<Value> = grammars
+        .all
+        .iter()
+        .map(|g| json!({"name": g.name, "scope": g.scope, "fenceNames": g.file_extensions}))
+        .collect();
+    assert_eq!(Value::Array(listed), fixture["grammars"]);
+    assert_eq!(grammars.all.len(), 15);
+    // Spans in code points, as the fixture counts them.
+    let points = |text: &str, spans: Vec<CodeSpan>| -> Value {
+        let point = |byte: usize| text[..byte].chars().count();
+        Value::Array(
+            spans
+                .iter()
+                .map(|s| json!([point(s.start), point(s.end), s.colour.name()]))
+                .collect(),
+        )
+    };
+    for sample in fixture["samples"].as_array().ok_or("samples")? {
+        let scope = sample["scope"].as_str().ok_or("scope")?;
+        let text = sample["text"].as_str().ok_or("text")?;
+        let g = grammars.by_scope(Some(scope)).ok_or("the grammar")?;
+        assert!(
+            !sample["spans"].as_array().ok_or("spans")?.is_empty(),
+            "{scope}"
+        );
+        assert_eq!(points(text, g.colour(text)), sample["spans"], "{scope}");
+    }
+    for corner in fixture["corners"].as_array().ok_or("corners")? {
+        let g = Grammar::parse(corner["grammar"].as_str().ok_or("grammar")?)
+            .map_err(|e| format!("{e:?}"))?;
+        let text = corner["text"].as_str().ok_or("text")?;
+        assert_eq!(
+            points(text, g.colour(text)),
+            corner["spans"],
+            "{}",
+            corner["about"]
+        );
+    }
+    for fence in fixture["fences"].as_array().ok_or("fences")? {
+        let name = fence["name"].as_str().ok_or("name")?;
+        assert_eq!(
+            json!(grammars.for_fence(name).map(|g| &g.scope)),
+            fence["scope"],
+            "{name}"
+        );
+    }
+    for guess in fixture["guesses"].as_array().ok_or("guesses")? {
+        let text = guess["text"].as_str().ok_or("text")?;
+        assert_eq!(
+            json!(grammars.guess(text).map(|g| &g.scope)),
+            guess["scope"],
+            "{text}"
+        );
+    }
+    for refused in fixture["refused"].as_array().ok_or("refused")? {
+        let source = refused["grammar"].as_str().ok_or("grammar")?;
+        assert_eq!(
+            json!(Grammar::parse(source).is_err()),
+            refused["refused"],
+            "{}",
+            refused["about"]
+        );
+    }
+    for regex in fixture["regexes"].as_array().ok_or("regexes")? {
+        let source = regex["regex"].as_str().ok_or("regex")?;
+        assert_eq!(
+            json!(CodeRegex::parse(source).is_err()),
+            regex["refused"],
+            "{source}"
+        );
+    }
+    Ok(())
+}

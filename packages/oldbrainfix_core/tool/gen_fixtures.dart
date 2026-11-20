@@ -10454,6 +10454,339 @@ Map<String, Object?> _scheduleSentences() {
   };
 }
 
+/// Code coloured by its language (obf-1036): the built-in grammars, a
+/// text in each with its coloured parts, grammars made for the corners
+/// of the subset, fence names, guesses and what is refused. Offsets are
+/// code points.
+Map<String, Object?> _highlight() {
+  List<Object> spans(Grammar g, String text) => [
+    for (final s in g.colour(text))
+      [
+        text.substring(0, s.start).runes.length,
+        text.substring(0, s.end).runes.length,
+        s.colour.name,
+      ],
+  ];
+  const samples = <String, String>{
+    'source.shell':
+        '#!/bin/bash\n# greet\nname="wörld \$USER"\nif [ -n "\$1" ]; then\n'
+        '  echo \'hi\' \$((1 + 2)) | grep -c h # 😀\nfi\nfor f in *.txt; do cat "\$f"; done\n',
+    'source.python':
+        '#!/usr/bin/env python3\n"""Doc\nstring."""\nimport os\n\n'
+        '@cache\ndef add(a: int, b=2) -> int:\n    # sum 😀\n'
+        '    return a + b * 0x1F if a else None\n\nclass Foo(Base):\n'
+        '    s = f"x{a}" + r\'\\d\' + \'it\\\'s\'\n',
+    'source.js':
+        'import { a } from "./a.js";\n// note 😀\nconst x = 1_000n, y = 3.5e-2;\n'
+        'export async function f(p) {\n  return `v=\${p + 1}`;\n}\n'
+        'interface Point { x: number; readonly y?: string }\n/* block\n comment */ let z = null;\r\n',
+    'source.rust':
+        '//! Doc\nuse std::fmt;\n\n#[derive(Debug)]\npub struct Point<\'a> { x: i32, s: &\'a str }\n\n'
+        'fn main() {\n    let r = r#"raw "q""#;\n    println!("{} {}", 0xFF_u8, 1.5e3); // 😀\n'
+        '    /* nested? */ if true { return; }\n}\n',
+    'source.dart':
+        'import \'dart:io\';\n\n/// Doc.\nclass A extends B with C {\n'
+        '  final int x = 42;\n  @override\n  String toString() => \'A(\$x, \${x + 1})\';\n}\n'
+        'void main() async {\n  var s = r\'\\n\' + """multi\nline""";\n  print(s ?? null); // 😀\n}\n',
+    'source.kotlin':
+        'package demo\n\nimport kotlin.math.max\n\ndata class P(val x: Int, var y: String?)\n\n'
+        'fun main() {\n    val s = "x=\${max(1, 2)} \$name"\n    when (s) { is String -> println(s) }\n'
+        '    /* c */ val n = 0x1FL // 😀\n}\n',
+    'source.java':
+        'package a.b;\n\nimport java.util.List;\n\n@Deprecated\npublic final class Main {\n'
+        '    private static final int N = 10;\n    public static void main(String[] args) {\n'
+        '        String t = """\n            text block\n            """;\n'
+        '        System.out.println("n=" + N + \'c\'); // 😀\n    }\n}\n',
+    'source.c++':
+        '#include <stdio.h>\n#define N 10\n\n/* block */\nint main(void) {\n'
+        '    const char *s = "a\\tb";\n    for (int i = 0; i < N; ++i) printf("%d\\n", i);\n'
+        '    return 0; // 😀\n}\ntemplate <typename T> class V : public std::vector<T> {};\n',
+    'source.go':
+        'package main\n\nimport "fmt"\n\ntype T struct{ X int }\n\n'
+        'func (t *T) Add(n int) int {\n\treturn t.X + n // 😀\n}\n\n'
+        'func main() {\n\ts := `raw\nstring`\n\tfmt.Println(s, 3.14, true, nil)\n}\n',
+    'source.sql':
+        '-- report 😀\nSELECT id, COUNT(*) AS n\nFROM notes n\nwhere n.text LIKE \'%it\'\'s%\'\n'
+        '  AND n.made > 10\nGROUP BY id;\n/* block\n */ insert into t values (1, NULL);\n',
+    'source.json':
+        '{\n  "name": "Old Brain Fix",\n  "n": -1.5e3,\n  "ok": true,\n'
+        '  "none": null,\n  "list": [1, "two \\u00e9 😀", false]\n}\n',
+    'source.yaml':
+        '%YAML 1.2\n---\n# config 😀\nname: Old Brain Fix\nversion: 0.7.0\n'
+        'list:\n  - "quoted \\n"\n  - \'single\'\n  - &anchor 42\nref: *anchor\n'
+        'flag: true\nblock: |\n  text\n  more\n',
+    'text.xml':
+        '<?xml version="1.0"?>\n<!-- note 😀 -->\n<root a="1" b=\'2\'>\n'
+        '  <item>Tom &amp; Jerry</item>\n  <![CDATA[ <raw> ]]>\n  <br/>\n</root>\n',
+    'source.css':
+        '/* theme 😀 */\n@media (max-width: 600px) {\n  body > .main #id {\n'
+        '    color: #fff;\n    margin: 0 auto 1.5em;\n    font-family: "Inter", sans-serif;\n  }\n}\n',
+    'text.html.markdown':
+        '# Title\n\nSome *em* and **strong** text with `code` 😀.\n\n'
+        '> quoted\n\n- item\n1. first\n\n```rust\nfn x() {}\n```\n\n'
+        '[link](https://example.org) and ## not heading\n## Second\n',
+  };
+  final grammars = Grammars.builtIn;
+  // Grammars made for the subset's corners.
+  final corners = <(String, String, String)>[
+    (
+      'captures in alternatives, a prototype and meta scopes',
+      'name: Corners\nscope: source.corners\ncontexts:\n'
+          '  prototype:\n    - match: \'#.*\'\n      scope: comment.line\n'
+          '  main:\n'
+          '    - match: \'(?:(let)|(var))\\s+(\\w+)\'\n'
+          '      captures:\n        1: keyword.let\n        2: storage.type.var\n'
+          '        3: variable.parameter\n'
+          '    - match: \'"\'\n      push: string\n'
+          '  string:\n    - meta_scope: string.quoted\n'
+          '    - meta_content_scope: meta.inside\n'
+          '    - match: \'\\\\.\'\n      scope: constant.character.escape\n'
+          '    - match: \'"\'\n      pop: true\n',
+      'let a = "x\\"y" # c\nvar éb = 1\nlet\tc\n"open\nstill"',
+    ),
+    (
+      '(?i), (?x), \\b and . on non-ASCII, \$ before the break, set and anonymous contexts',
+      'name: Flags\nscope: source.flags\nvariables:\n  id: \'[a-z_]\\w*\'\n'
+          '  call: \'{{id}}(?=\\()\'\ncontexts:\n  main:\n'
+          '    - match: \'(?i)\\bselect\\b\'\n      scope: keyword.sql\n'
+          '    - match: |\n        (?x)\n        \\b (end) \\s* \\# \\s* (\\d+) # trailing\n'
+          '      captures:\n        1: keyword.end\n        2: constant.numeric\n'
+          '    - match: \'{{call}}\'\n      scope: variable.function\n'
+          '    - match: \'\\w+\$\'\n      scope: entity.name.type\n'
+          '    - match: \'<\'\n      set:\n        - meta_scope: entity.name.tag\n'
+          '        - match: \'>\'\n          set: main\n'
+          '    - match: \'(?<=:)\\d\'\n      scope: constant.numeric\n'
+          '    - match: \'.\\.\'\n      scope: keyword.operator\n',
+      'SeLeCt éselect selectx select\nEND # 42 f(x) g (y)\nlast word\r\n'
+          'tail\n<tag a> after\na:1 b:2 ä.x 😀.y\n',
+    ),
+    (
+      'empty matches that push and pop, and a line too long',
+      'name: Empty\nscope: source.empty\ncontexts:\n  main:\n'
+          '    - match: \'(?=[A-Z])\'\n      push: upper\n'
+          '    - match: \'\\d+\'\n      scope: constant.numeric\n'
+          '  upper:\n    - match: \'[A-Z]+\'\n      scope: support.type\n'
+          '    - match: \'(?=[^A-Z])\'\n      pop: true\n',
+      'ab CD 12 EFg\n${'1 ' * 2600}\nXY 7\n',
+    ),
+  ];
+  corners.add((
+    'a zero-width match never falls between the halves of a 😀',
+    'name: Pairs\nscope: source.pairs\ncontexts:\n  main:\n'
+        '    - match: \'"\'\n      push: string\n'
+        '    - match: \'(?<=😀)\'\n      push: after\n'
+        '  string:\n    - meta_scope: string.quoted\n'
+        '    - match: \'"|\$\'\n      pop: true\n'
+        '  after:\n    - match: \'\\w+\'\n      scope: keyword\n      pop: true\n',
+    '"a 😀 b" x 😀y 😀\n"😀😀\n',
+  ));
+  final cornerSamples = <Object>[];
+  for (final (about, source, text) in corners) {
+    final g = Grammar.parse(source);
+    cornerSamples.add({
+      'about': about,
+      'grammar': source,
+      'text': text,
+      'spans': spans(g, text),
+    });
+  }
+  const refusedGrammars = <(String, String)>[
+    ('not YAML', 'name: [x\n'),
+    ('no contexts', 'name: X\nscope: source.x\n'),
+    ('no main', 'name: X\nscope: source.x\ncontexts:\n  other: []\n'),
+    (
+      'embed',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: a\n      embed: scope:source.y\n      escape: b\n',
+    ),
+    (
+      'branch_point',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: a\n      branch_point: p\n      branch: [x]\n',
+    ),
+    (
+      'extends',
+      'name: X\nscope: source.x\nextends: Packages/Y.sublime-syntax\ncontexts:\n  main: []\n',
+    ),
+    (
+      'include of another grammar',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - include: scope:source.y\n',
+    ),
+    (
+      'pop: 2',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a\n      pop: 2\n',
+    ),
+    (
+      'a capture past the groups',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: (a)\n      captures:\n        2: keyword\n',
+    ),
+    (
+      'an unknown variable',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - match: \'{{nope}}\'\n',
+    ),
+    (
+      'a variable that refers to itself',
+      'name: X\nscope: source.x\nvariables:\n  a: \'{{a}}x\'\ncontexts:\n'
+          '  main:\n    - match: \'{{a}}\'\n',
+    ),
+    (
+      'a match that is a number',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - match: 12\n',
+    ),
+  ];
+  final refused = <Object>[
+    for (final (about, source) in refusedGrammars)
+      {'about': about, 'grammar': source, 'refused': _refuses(source)},
+  ];
+  const regexes = [
+    r'a*+',
+    r'a++',
+    r'a?+',
+    r'a{2}+',
+    r'(?>a)',
+    r'(?<n>a)',
+    r'(a)\1',
+    r'\k<n>',
+    r'(?i:a)',
+    r'a(?i)b',
+    r'(?s).',
+    r'(?m)^a',
+    r'\Ga',
+    r'\Aa',
+    r'a\z',
+    r'a\Z',
+    r'\h',
+    r'\p{L}',
+    r'[[:alpha:]]',
+    r'[a&&b]',
+    r'(?:(a))*',
+    r'(a)+',
+    r'(?=(a))',
+    r'(?<=(a))b',
+    r'^*',
+    r'\b+',
+    r'(?=a)*',
+    r'*a',
+    r'a{,2}',
+    r'a{3,2}',
+    r'(a',
+    r'a)',
+    r'[a',
+    r'[b-a]',
+    r'[\W]',
+    r'\q',
+    r'\x4',
+    r'\x{110000}',
+    r'\uD800',
+    r'(?#comment)',
+    r'(?(1)a|b)',
+    // and what is read
+    r'(?x) a b # c',
+    r'(?i)(?x)AbC',
+    r'(?xi)abc',
+    r'a{2}b{1,}c{1,3}?',
+    r'[]a]',
+    r'[^]a]',
+    r'[a-]',
+    r'\x41\x{1F600}\u00e9\e\a\t',
+    r'\.\(\)\[\]\{\}\/\-\#\ ',
+    r'a{b',
+    r'{',
+    r'(?<=ab|c)d(?<!x+)',
+    r'(?:(a)|(b))c',
+  ];
+  return {
+    'grammars': [
+      for (final g in grammars.all)
+        {'name': g.name, 'scope': g.scope, 'fenceNames': g.fileExtensions},
+    ],
+    'samples': [
+      for (final g in grammars.all)
+        {
+          'scope': g.scope,
+          'text': samples[g.scope] ?? '',
+          'spans': spans(g, samples[g.scope] ?? ''),
+        },
+    ],
+    'corners': cornerSamples,
+    'fences': [
+      for (final name in [
+        'rs',
+        'Rust',
+        'RUST',
+        'py',
+        'bash',
+        'sh',
+        'zsh',
+        'ts',
+        'tsx',
+        'javascript',
+        'c++',
+        'cpp',
+        'h',
+        'kt',
+        'yml',
+        'html',
+        'svg',
+        'md',
+        'jsonc',
+        'golang',
+        'dart',
+        'java',
+        'css',
+        'sql',
+        ' go ',
+        '',
+        'cobol',
+        'rust,ignore',
+      ])
+        {'name': name, 'scope': grammars.forFence(name)?.scope},
+    ],
+    'guesses': [
+      for (final text in [
+        '#!/bin/bash\necho hi',
+        '#!/usr/bin/env bash\n',
+        '#!/bin/sh -e\n',
+        '#!/usr/bin/env python3\nprint(1)',
+        '#!/usr/bin/python\n',
+        '#!/usr/bin/env node\n',
+        '\n\n  \npackage main\n\nfunc main() {}',
+        '<?xml version="1.0"?>\n<a/>',
+        '<!DOCTYPE html>\n<html>',
+        '%YAML 1.2\n---\n',
+        'fn main() {\n}\n',
+        'plain words\nmore words',
+        '',
+        '#!/bin/bash\r\necho',
+      ])
+        {'text': text, 'scope': grammars.guess(text)?.scope},
+    ],
+    'refused': refused,
+    'regexes': [
+      for (final r in regexes) {'regex': r, 'refused': _regexRefused(r)},
+    ],
+  };
+}
+
+bool _refuses(String source) {
+  try {
+    Grammar.parse(source);
+    return false;
+  } on GrammarRefused {
+    return true;
+  }
+}
+
+bool _regexRefused(String regex) {
+  try {
+    CodeRegex.parse(regex);
+    return false;
+  } on GrammarRefused {
+    return true;
+  }
+}
+
 /// Formatted text (ADR 0033): for each text its lines and their parts,
 /// what it reads as, whether it uses a format, how it is escaped, its
 /// tags, where a typed shortcut ends and the word at every offset; then
@@ -11806,6 +12139,16 @@ Future<void> main(List<String> args) async {
     'shebang, lines of code punctuation or indented, and lists, prose, '
     'Markdown and short texts that do not. Offsets are counted in '
     'code points.\n'
+    '- `highlight.json`: code coloured by its language (obf-1036, ADR '
+    '0054): the built-in grammars by name, scope and fence names; for '
+    'each a text with what each part is coloured, astral characters, '
+    'tabs and `\\r\\n` among them, and the same for grammars made for '
+    'the subset\'s corners (captures inside alternatives, `(?i)`, `(?x)`, '
+    'ASCII-only `\\w`, `\\b` and `.`, a `\$` before the line break, '
+    'push, set, pop, prototypes, meta scopes, anonymous contexts and '
+    'too long lines); which fence names and pasted first lines name '
+    'which grammar; and which grammars and regular expressions are '
+    'refused. Offsets are counted in code points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -12045,6 +12388,10 @@ Future<void> main(List<String> args) async {
     '${_json.convert(_fileTexts())}\n',
   );
   _write(File('${root.path}/markdown.json'), '${_json.convert(_markdown())}\n');
+  _write(
+    File('${root.path}/highlight.json'),
+    '${_json.convert(_highlight())}\n',
+  );
   _write(
     File('${root.path}/schedule_sentences.json'),
     '${_json.convert(_scheduleSentences())}\n',

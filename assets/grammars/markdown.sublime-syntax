@@ -1,0 +1,59 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: Markdown
+scope: text.html.markdown
+file_extensions: [md, markdown, mdown, mkd]
+
+contexts:
+  main:
+    - match: '^[ ]{0,3}```'
+      push: fence_backticks
+    - match: '^[ ]{0,3}~~~'
+      push: fence_tildes
+    - match: '^[ ]{0,3}#{1,6}(?=\s|$).*'
+      scope: markup.heading.markdown
+    - match: '^[ ]{0,3}=+[ \t]*$'
+      scope: markup.heading.setext.markdown
+    - match: '^[ ]{0,3}>.*'
+      scope: markup.quote.markdown
+    - match: '^[ ]{0,3}(\[[^\]\n]+\]:)[ \t]*(\S+)'
+      captures:
+        1: entity.name.reference.markdown
+        2: markup.underline.link.markdown
+    - match: '^\s*([-+*]|\d{1,9}[.)])(?=\s)'
+      captures:
+        1: keyword.other.list.markdown
+    - include: inline
+
+  inline:
+    - match: '\\[\\`*_{}\[\]()#+\-.!>|~<]'
+      scope: constant.character.escape.markdown
+    - match: '``.+?``'
+      scope: markup.raw.inline.markdown
+    - match: '`[^`\n]+`'
+      scope: markup.raw.inline.markdown
+    - match: '<!--'
+      push: html_comment
+    - match: '<(?:https?|ftp|mailto):[^>\s]+>'
+      scope: markup.underline.link.markdown
+    - match: '(\]\()([^)\s]+)'
+      captures:
+        2: markup.underline.link.markdown
+    - match: '\bhttps?://[^\s<>()\[\]]+'
+      scope: markup.underline.link.markdown
+
+  fence_backticks:
+    - meta_scope: markup.raw.block.markdown
+    - match: '^[ ]{0,3}```+[ \t]*$'
+      pop: true
+
+  fence_tildes:
+    - meta_scope: markup.raw.block.markdown
+    - match: '^[ ]{0,3}~~~+[ \t]*$'
+      pop: true
+
+  html_comment:
+    - meta_scope: comment.block.markdown
+    - match: '-->'
+      pop: true

@@ -45,10 +45,11 @@ pub const AI_TASK_KIND: &str = "ai-task";
 /// Profile, nor a photo or recording; and none of the user's own data: no
 /// check-off, Tally entry, tick of a Line or Box, Session pick nor eaten
 /// Frog.
-const NOTE_FIELDS: [&str; 15] = [
+const NOTE_FIELDS: [&str; 16] = [
     note_keys::TYPE,
     note_keys::CAPTURED,
     note_keys::TEXT,
+    note_keys::LANGUAGE,
     note_keys::PLACE,
     note_keys::IMPORTANCE,
     note_keys::TRASHED,
@@ -259,7 +260,7 @@ fn kind_of(ty: &str, made: bool, session: bool, field: &str, after: Option<&str>
             note_keys::MERGED if after.is_some() => AiChangeKind::NoteMerged,
             note_keys::TRASHED if after.is_some() => AiChangeKind::NoteTrashed,
             note_keys::TRASHED => AiChangeKind::NoteRestored,
-            note_keys::TEXT => AiChangeKind::NoteText,
+            note_keys::TEXT | note_keys::LANGUAGE => AiChangeKind::NoteText,
             note_keys::IMPORTANCE => AiChangeKind::NoteImportance,
             _ => AiChangeKind::Other,
         },

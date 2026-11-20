@@ -1,0 +1,128 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: XML / HTML
+scope: text.xml
+file_extensions: [xml, html, htm, xhtml, svg, xsd, xsl, plist]
+first_line_match: '(?i)^\s*<(?:\?xml|!DOCTYPE)'
+
+variables:
+  name: '[A-Za-z_:][\w:.-]*'
+
+contexts:
+  main:
+    - match: '<!--'
+      push: comment
+    - match: '<!\[CDATA\['
+      push: cdata
+    - match: '(<!)([A-Za-z]+)'
+      captures:
+        1: punctuation.definition.tag.begin.xml
+        2: keyword.declaration.doctype.xml
+      push: doctype
+    - match: '(<\?)({{name}})'
+      captures:
+        1: punctuation.definition.tag.begin.xml
+        2: entity.name.tag.xml
+      push: processing
+    - match: '(?i)(<)(script)(?![\w:.-])'
+      captures:
+        1: punctuation.definition.tag.begin.xml
+        2: entity.name.tag.xml
+      push: script_tag
+    - match: '(?i)(<)(style)(?![\w:.-])'
+      captures:
+        1: punctuation.definition.tag.begin.xml
+        2: entity.name.tag.xml
+      push: style_tag
+    - match: '(</?)({{name}})'
+      captures:
+        1: punctuation.definition.tag.begin.xml
+        2: entity.name.tag.xml
+      push: tag
+    - include: entity
+
+  entity:
+    - match: '&(?:[A-Za-z][A-Za-z0-9]*|#\d+|#[xX][0-9a-fA-F]+);'
+      scope: constant.character.entity.xml
+
+  comment:
+    - meta_scope: comment.block.xml
+    - match: '-->'
+      pop: true
+
+  cdata:
+    - meta_scope: string.unquoted.cdata.xml
+    - match: '\]\]>'
+      pop: true
+
+  doctype:
+    - match: '>'
+      scope: punctuation.definition.tag.end.xml
+      pop: true
+    - include: quoted
+
+  processing:
+    - match: '\?>'
+      scope: punctuation.definition.tag.end.xml
+      pop: true
+    - include: attributes
+
+  tag:
+    - match: '/?>'
+      scope: punctuation.definition.tag.end.xml
+      pop: true
+    - include: attributes
+
+  attributes:
+    - match: '(?<==)[^\s"''<>=`]+'
+      scope: string.unquoted.xml
+    - match: '{{name}}'
+      scope: entity.other.attribute-name.xml
+    - match: '='
+      scope: punctuation.separator.key-value.xml
+    - include: quoted
+
+  quoted:
+    - match: '"'
+      push: double_string
+    - match: ''''
+      push: single_string
+
+  double_string:
+    - meta_scope: string.quoted.double.xml
+    - match: '"'
+      pop: true
+    - include: entity
+
+  single_string:
+    - meta_scope: string.quoted.single.xml
+    - match: ''''
+      pop: true
+    - include: entity
+
+  script_tag:
+    - match: '/>'
+      scope: punctuation.definition.tag.end.xml
+      pop: true
+    - match: '>'
+      scope: punctuation.definition.tag.end.xml
+      set: script_body
+    - include: attributes
+
+  style_tag:
+    - match: '/>'
+      scope: punctuation.definition.tag.end.xml
+      pop: true
+    - match: '>'
+      scope: punctuation.definition.tag.end.xml
+      set: style_body
+    - include: attributes
+
+  script_body:
+    - match: '(?i)(?=</script(?![\w:.-]))'
+      pop: true
+
+  style_body:
+    - match: '(?i)(?=</style(?![\w:.-]))'
+      pop: true

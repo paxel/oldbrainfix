@@ -94,7 +94,8 @@
   tildes, <code>~~~</code>, each fence on a line of its own. It shows in a fixed-width font on a
   light tint, its lines exactly as written: nothing in it is a format, a table, a #tag or a box. A
   word after the opening fence, such as <code>```bash</code>, names the language; it is kept in the
-  text but does not show. A block ends only at a fence of the same character at least as long as
+  text but does not show. When the app knows that language, the block is coloured by its syntax
+  (see "Keep a script as code"); a block naming none or another stays in one colour. A block ends only at a fence of the same character at least as long as
   the one that opened it, so in a block opened with four backticks a line of three is a line of the
   block. Without a closing fence the block runs to the end of the text.
 </p>
@@ -165,11 +166,13 @@
 <li>Long-press the Note's card.</li>
 <li>Tap the <strong>Text format</strong> badge.</li>
 <li>Tap <strong>Code</strong>.</li>
+<li>Pick its language under <strong>Language</strong>.</li>
 </box-tab>
 <box-tab device="desktop" alt="The Note dialog of a backup script with the Text format dialog open: Plain text, Formatted text and Code, Code chosen">
 <li>Double-click the Note's card.</li>
 <li>Click the <strong>Text format</strong> badge.</li>
 <li>Click <strong>Code</strong>.</li>
+<li>Pick its language under <strong>Language</strong>.</li>
 </box-tab>
 <box-more>
 <p>
@@ -181,8 +184,9 @@
 <ul>
   <li>The <strong>Text format</strong> badge in the Note editor shows the text's format and switches it between <strong>Plain text</strong>, <strong>Formatted text</strong> and <strong>Code</strong>. A formatted text can become Code, its Markdown kept as written, but not plain again directly; a Code text can become plain or formatted. The badge shows for a Plain Note.</li>
   <li>When a text pasted into the Note's text looks like a script or code, the editor says "This looks like code." under the text with <strong>Keep as code</strong>; the cross lets the paste be. Such a paste does not format the text. A text looks like code when it starts with <code>#!/</code>, or when at least half of its three or more lines end in <code>;</code>, <code>{</code> or <code>}</code>, start with <code>}</code>, or are indented by a tab or four spaces without starting a list item. Capture never asks.</li>
+  <li>A Code text with a language is coloured by that language's syntax: keywords, strings, comments, numbers and the like each in a colour of their own, in the light and the dark look. The languages are Shell, Python, JavaScript/TypeScript, Rust, Dart, Kotlin, Java, C/C++, Go, SQL, JSON, YAML, XML/HTML, CSS and Markdown. The language is kept with the Note and syncs; <strong>No language</strong> shows it in one colour, and so does a Device that does not know the language. After <strong>Keep as code</strong> the language its first line names, such as <code>#!/bin/bash</code>, is already picked. The colours come from grammar files the app reads as data; nothing in them runs.</li>
   <li>A Code text has no format bar and no ☐. Its ☐ stays a character; a box of a text made Code keeps the state it shows as its character.</li>
-  <li>Search finds the words of a Code text as written. Share and Copy text give it as written.</li>
+  <li>Search finds the words of a Code text as written. Share and Copy text give it as written, without colours.</li>
   <li>A Note whose text is Code is no Checklist, Shopping List, Tally or Session; its <strong>Kind</strong> badge only shows it until the text format is changed back.</li>
   <li>The Note's History lists each change of the text format.</li>
 </ul>

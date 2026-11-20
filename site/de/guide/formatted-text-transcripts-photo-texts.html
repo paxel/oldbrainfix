@@ -99,7 +99,9 @@
   Tilden, <code>~~~</code>, jeder Zaun auf einer eigenen Zeile. Er erscheint in einer Schrift mit
   fester Breite auf heller Tönung, seine Zeilen genau so, wie sie geschrieben sind: Nichts darin ist
   ein Format, eine Tabelle, ein #Wort oder ein Statuskästchen. Ein Wort nach dem öffnenden Zaun, etwa
-  <code>```bash</code>, nennt die Sprache; es bleibt im Text, erscheint aber nicht. Ein Block endet
+  <code>```bash</code>, nennt die Sprache; es bleibt im Text, erscheint aber nicht. Kennt die App
+  diese Sprache, wird der Block nach ihrer Syntax eingefärbt (siehe „Ein Skript als Code
+  behalten“); ein Block, der keine oder eine andere nennt, bleibt einfarbig. Ein Block endet
   erst an einem Zaun aus demselben Zeichen, der mindestens so lang ist wie der öffnende, sodass in
   einem mit vier Backticks begonnenen Block eine Zeile aus drei eine Zeile des Blocks ist. Ohne
   schließenden Zaun reicht der Block bis zum Ende des Texts.
@@ -176,11 +178,13 @@
 <li>Drücke lange auf die Karte der Notiz.</li>
 <li>Tippe die Plakette <strong>Textformat</strong>.</li>
 <li>Tippe <strong>Code</strong>.</li>
+<li>Wähle seine Sprache unter <strong>Sprache</strong>.</li>
 </box-tab>
 <box-tab device="desktop" alt="Der Notiz-Dialog eines Sicherungsskripts mit offenem Dialog Textformat: Unformatierter Text, Formatierter Text und Code, Code gewählt">
 <li>Doppelklicke die Karte der Notiz.</li>
 <li>Klicke die Plakette <strong>Textformat</strong>.</li>
 <li>Klicke <strong>Code</strong>.</li>
+<li>Wähle seine Sprache unter <strong>Sprache</strong>.</li>
 </box-tab>
 <box-more>
 <p>
@@ -193,8 +197,9 @@
 <ul>
   <li>Die Plakette <strong>Textformat</strong> im Notiz-Editor zeigt das Format des Texts und wechselt es zwischen <strong>Unformatierter Text</strong>, <strong>Formatierter Text</strong> und <strong>Code</strong>. Ein formatierter Text kann Code werden, sein Markdown bleibt, wie es geschrieben ist, aber nicht direkt wieder unformatiert; ein Code-Text kann unformatiert oder formatiert werden. Die Plakette erscheint bei einer einfachen Notiz.</li>
   <li>Sieht ein Text, der in den Text der Notiz eingefügt wird, wie ein Skript oder Code aus, sagt der Editor unter dem Text „Das sieht nach Code aus.“ mit <strong>Als Code behalten</strong>; das Kreuz lässt das Einfügen, wie es ist. Ein solches Einfügen formatiert den Text nicht. Ein Text sieht wie Code aus, wenn er mit <code>#!/</code> beginnt oder wenn mindestens die Hälfte seiner drei oder mehr Zeilen auf <code>;</code>, <code>{</code> oder <code>}</code> endet, mit <code>}</code> beginnt oder mit einem Tab oder vier Leerzeichen eingerückt ist, ohne einen Listenpunkt zu beginnen. Das Erfassen fragt nie.</li>
+  <li>Ein Code-Text mit einer Sprache wird nach deren Syntax eingefärbt: Schlüsselwörter, Zeichenketten, Kommentare, Zahlen und Ähnliches je in einer eigenen Farbe, im hellen wie im dunklen Aussehen. Die Sprachen sind Shell, Python, JavaScript/TypeScript, Rust, Dart, Kotlin, Java, C/C++, Go, SQL, JSON, YAML, XML/HTML, CSS und Markdown. Die Sprache bleibt bei der Notiz und wird synchronisiert; <strong>Keine Sprache</strong> zeigt ihn einfarbig, ebenso ein Gerät, das die Sprache nicht kennt. Nach <strong>Als Code behalten</strong> ist die Sprache, die seine erste Zeile nennt, etwa <code>#!/bin/bash</code>, schon gewählt. Die Farben kommen aus Grammatikdateien, die die App als Daten liest; nichts darin wird ausgeführt.</li>
   <li>Ein Code-Text hat keine Formatleiste und kein ☐. Sein ☐ bleibt ein Zeichen; ein Statuskästchen eines Texts, der Code wird, behält den Zustand, den es zeigt, als sein Zeichen.</li>
-  <li>Die Suche findet die Wörter eines Code-Texts, wie sie geschrieben sind. Teilen und Text kopieren geben ihn, wie er geschrieben ist.</li>
+  <li>Die Suche findet die Wörter eines Code-Texts, wie sie geschrieben sind. Teilen und Text kopieren geben ihn, wie er geschrieben ist, ohne Farben.</li>
   <li>Eine Notiz mit Code-Text ist keine Checkliste, Einkaufsliste, Strichliste oder Einheit; ihre Plakette <strong>Art</strong> zeigt die Art nur, bis das Textformat zurückgestellt ist.</li>
   <li>Der Verlauf der Notiz nennt jede Änderung des Textformats.</li>
 </ul>

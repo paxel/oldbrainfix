@@ -1,0 +1,2718 @@
+{
+  "grammars": [
+    {
+      "name": "Shell",
+      "scope": "source.shell",
+      "fenceNames": [
+        "sh",
+        "bash",
+        "zsh",
+        "shell",
+        "ksh",
+        "console"
+      ]
+    },
+    {
+      "name": "Python",
+      "scope": "source.python",
+      "fenceNames": [
+        "py",
+        "python",
+        "pyw",
+        "pyi"
+      ]
+    },
+    {
+      "name": "JavaScript / TypeScript",
+      "scope": "source.js",
+      "fenceNames": [
+        "js",
+        "javascript",
+        "mjs",
+        "cjs",
+        "jsx",
+        "ts",
+        "typescript",
+        "tsx",
+        "mts",
+        "cts"
+      ]
+    },
+    {
+      "name": "Rust",
+      "scope": "source.rust",
+      "fenceNames": [
+        "rs",
+        "rust"
+      ]
+    },
+    {
+      "name": "Dart",
+      "scope": "source.dart",
+      "fenceNames": [
+        "dart"
+      ]
+    },
+    {
+      "name": "Kotlin",
+      "scope": "source.kotlin",
+      "fenceNames": [
+        "kt",
+        "kotlin",
+        "kts"
+      ]
+    },
+    {
+      "name": "Java",
+      "scope": "source.java",
+      "fenceNames": [
+        "java"
+      ]
+    },
+    {
+      "name": "C / C++",
+      "scope": "source.c++",
+      "fenceNames": [
+        "c",
+        "h",
+        "cpp",
+        "c++",
+        "cc",
+        "cxx",
+        "hpp",
+        "hh",
+        "hxx",
+        "cplusplus"
+      ]
+    },
+    {
+      "name": "Go",
+      "scope": "source.go",
+      "fenceNames": [
+        "go",
+        "golang"
+      ]
+    },
+    {
+      "name": "SQL",
+      "scope": "source.sql",
+      "fenceNames": [
+        "sql",
+        "psql",
+        "mysql",
+        "sqlite",
+        "pgsql"
+      ]
+    },
+    {
+      "name": "JSON",
+      "scope": "source.json",
+      "fenceNames": [
+        "json",
+        "jsonc",
+        "json5",
+        "geojson"
+      ]
+    },
+    {
+      "name": "YAML",
+      "scope": "source.yaml",
+      "fenceNames": [
+        "yaml",
+        "yml"
+      ]
+    },
+    {
+      "name": "XML / HTML",
+      "scope": "text.xml",
+      "fenceNames": [
+        "xml",
+        "html",
+        "htm",
+        "xhtml",
+        "svg",
+        "xsd",
+        "xsl",
+        "plist"
+      ]
+    },
+    {
+      "name": "CSS",
+      "scope": "source.css",
+      "fenceNames": [
+        "css",
+        "scss",
+        "less"
+      ]
+    },
+    {
+      "name": "Markdown",
+      "scope": "text.html.markdown",
+      "fenceNames": [
+        "md",
+        "markdown",
+        "mdown",
+        "mkd"
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "scope": "source.shell",
+      "text": "#!/bin/bash\n# greet\nname=\"wörld $USER\"\nif [ -n \"$1\" ]; then\n  echo 'hi' $((1 + 2)) | grep -c h # 😀\nfi\nfor f in *.txt; do cat \"$f\"; done\n",
+      "spans": [
+        [
+          0,
+          11,
+          "comment"
+        ],
+        [
+          12,
+          19,
+          "comment"
+        ],
+        [
+          20,
+          24,
+          "variable"
+        ],
+        [
+          25,
+          32,
+          "string"
+        ],
+        [
+          32,
+          37,
+          "variable"
+        ],
+        [
+          37,
+          38,
+          "string"
+        ],
+        [
+          39,
+          41,
+          "keyword"
+        ],
+        [
+          47,
+          48,
+          "string"
+        ],
+        [
+          48,
+          50,
+          "variable"
+        ],
+        [
+          50,
+          51,
+          "string"
+        ],
+        [
+          53,
+          54,
+          "operator"
+        ],
+        [
+          55,
+          59,
+          "keyword"
+        ],
+        [
+          62,
+          66,
+          "function"
+        ],
+        [
+          67,
+          71,
+          "string"
+        ],
+        [
+          75,
+          76,
+          "number"
+        ],
+        [
+          79,
+          80,
+          "number"
+        ],
+        [
+          83,
+          84,
+          "operator"
+        ],
+        [
+          95,
+          98,
+          "comment"
+        ],
+        [
+          99,
+          101,
+          "keyword"
+        ],
+        [
+          102,
+          105,
+          "keyword"
+        ],
+        [
+          108,
+          110,
+          "keyword"
+        ],
+        [
+          116,
+          117,
+          "operator"
+        ],
+        [
+          118,
+          120,
+          "keyword"
+        ],
+        [
+          125,
+          126,
+          "string"
+        ],
+        [
+          126,
+          128,
+          "variable"
+        ],
+        [
+          128,
+          129,
+          "string"
+        ],
+        [
+          129,
+          130,
+          "operator"
+        ],
+        [
+          131,
+          135,
+          "keyword"
+        ]
+      ]
+    },
+    {
+      "scope": "source.python",
+      "text": "#!/usr/bin/env python3\n\"\"\"Doc\nstring.\"\"\"\nimport os\n\n@cache\ndef add(a: int, b=2) -> int:\n    # sum 😀\n    return a + b * 0x1F if a else None\n\nclass Foo(Base):\n    s = f\"x{a}\" + r'\\d' + 'it\\'s'\n",
+      "spans": [
+        [
+          0,
+          22,
+          "comment"
+        ],
+        [
+          23,
+          40,
+          "string"
+        ],
+        [
+          41,
+          47,
+          "keyword"
+        ],
+        [
+          53,
+          58,
+          "function"
+        ],
+        [
+          59,
+          62,
+          "keyword"
+        ],
+        [
+          63,
+          66,
+          "function"
+        ],
+        [
+          70,
+          73,
+          "type"
+        ],
+        [
+          76,
+          77,
+          "operator"
+        ],
+        [
+          77,
+          78,
+          "number"
+        ],
+        [
+          80,
+          82,
+          "operator"
+        ],
+        [
+          83,
+          86,
+          "type"
+        ],
+        [
+          92,
+          99,
+          "comment"
+        ],
+        [
+          104,
+          110,
+          "keyword"
+        ],
+        [
+          113,
+          114,
+          "operator"
+        ],
+        [
+          117,
+          118,
+          "operator"
+        ],
+        [
+          119,
+          123,
+          "number"
+        ],
+        [
+          124,
+          126,
+          "keyword"
+        ],
+        [
+          129,
+          133,
+          "keyword"
+        ],
+        [
+          134,
+          138,
+          "constant"
+        ],
+        [
+          140,
+          145,
+          "keyword"
+        ],
+        [
+          146,
+          149,
+          "type"
+        ],
+        [
+          163,
+          164,
+          "operator"
+        ],
+        [
+          165,
+          168,
+          "string"
+        ],
+        [
+          168,
+          171,
+          "variable"
+        ],
+        [
+          171,
+          172,
+          "string"
+        ],
+        [
+          173,
+          174,
+          "operator"
+        ],
+        [
+          175,
+          180,
+          "string"
+        ],
+        [
+          181,
+          182,
+          "operator"
+        ],
+        [
+          183,
+          186,
+          "string"
+        ],
+        [
+          186,
+          188,
+          "constant"
+        ],
+        [
+          188,
+          190,
+          "string"
+        ]
+      ]
+    },
+    {
+      "scope": "source.js",
+      "text": "import { a } from \"./a.js\";\n// note 😀\nconst x = 1_000n, y = 3.5e-2;\nexport async function f(p) {\n  return `v=${p + 1}`;\n}\ninterface Point { x: number; readonly y?: string }\n/* block\n comment */ let z = null;\r\n",
+      "spans": [
+        [
+          0,
+          6,
+          "keyword"
+        ],
+        [
+          13,
+          17,
+          "keyword"
+        ],
+        [
+          18,
+          26,
+          "string"
+        ],
+        [
+          28,
+          37,
+          "comment"
+        ],
+        [
+          38,
+          43,
+          "keyword"
+        ],
+        [
+          46,
+          47,
+          "operator"
+        ],
+        [
+          48,
+          54,
+          "number"
+        ],
+        [
+          58,
+          59,
+          "operator"
+        ],
+        [
+          60,
+          66,
+          "number"
+        ],
+        [
+          68,
+          74,
+          "keyword"
+        ],
+        [
+          75,
+          80,
+          "keyword"
+        ],
+        [
+          81,
+          89,
+          "keyword"
+        ],
+        [
+          90,
+          91,
+          "function"
+        ],
+        [
+          99,
+          105,
+          "keyword"
+        ],
+        [
+          106,
+          109,
+          "string"
+        ],
+        [
+          109,
+          113,
+          "variable"
+        ],
+        [
+          113,
+          114,
+          "operator"
+        ],
+        [
+          114,
+          115,
+          "variable"
+        ],
+        [
+          115,
+          116,
+          "number"
+        ],
+        [
+          116,
+          117,
+          "variable"
+        ],
+        [
+          117,
+          118,
+          "string"
+        ],
+        [
+          122,
+          131,
+          "keyword"
+        ],
+        [
+          132,
+          137,
+          "type"
+        ],
+        [
+          143,
+          149,
+          "type"
+        ],
+        [
+          151,
+          159,
+          "keyword"
+        ],
+        [
+          164,
+          170,
+          "type"
+        ],
+        [
+          173,
+          193,
+          "comment"
+        ],
+        [
+          194,
+          197,
+          "keyword"
+        ],
+        [
+          200,
+          201,
+          "operator"
+        ],
+        [
+          202,
+          206,
+          "constant"
+        ]
+      ]
+    },
+    {
+      "scope": "source.rust",
+      "text": "//! Doc\nuse std::fmt;\n\n#[derive(Debug)]\npub struct Point<'a> { x: i32, s: &'a str }\n\nfn main() {\n    let r = r#\"raw \"q\"\"#;\n    println!(\"{} {}\", 0xFF_u8, 1.5e3); // 😀\n    /* nested? */ if true { return; }\n}\n",
+      "spans": [
+        [
+          0,
+          7,
+          "comment"
+        ],
+        [
+          8,
+          11,
+          "keyword"
+        ],
+        [
+          15,
+          17,
+          "operator"
+        ],
+        [
+          25,
+          31,
+          "function"
+        ],
+        [
+          40,
+          43,
+          "keyword"
+        ],
+        [
+          44,
+          50,
+          "keyword"
+        ],
+        [
+          51,
+          56,
+          "type"
+        ],
+        [
+          56,
+          57,
+          "operator"
+        ],
+        [
+          57,
+          59,
+          "keyword"
+        ],
+        [
+          59,
+          60,
+          "operator"
+        ],
+        [
+          66,
+          69,
+          "type"
+        ],
+        [
+          74,
+          75,
+          "operator"
+        ],
+        [
+          75,
+          77,
+          "keyword"
+        ],
+        [
+          78,
+          81,
+          "type"
+        ],
+        [
+          85,
+          87,
+          "keyword"
+        ],
+        [
+          88,
+          92,
+          "function"
+        ],
+        [
+          101,
+          104,
+          "keyword"
+        ],
+        [
+          107,
+          108,
+          "operator"
+        ],
+        [
+          109,
+          121,
+          "string"
+        ],
+        [
+          127,
+          135,
+          "function"
+        ],
+        [
+          136,
+          143,
+          "string"
+        ],
+        [
+          145,
+          152,
+          "number"
+        ],
+        [
+          154,
+          159,
+          "number"
+        ],
+        [
+          162,
+          166,
+          "comment"
+        ],
+        [
+          171,
+          184,
+          "comment"
+        ],
+        [
+          185,
+          187,
+          "keyword"
+        ],
+        [
+          188,
+          192,
+          "constant"
+        ],
+        [
+          195,
+          201,
+          "keyword"
+        ]
+      ]
+    },
+    {
+      "scope": "source.dart",
+      "text": "import 'dart:io';\n\n/// Doc.\nclass A extends B with C {\n  final int x = 42;\n  @override\n  String toString() => 'A($x, ${x + 1})';\n}\nvoid main() async {\n  var s = r'\\n' + \"\"\"multi\nline\"\"\";\n  print(s ?? null); // 😀\n}\n",
+      "spans": [
+        [
+          0,
+          6,
+          "keyword"
+        ],
+        [
+          7,
+          16,
+          "string"
+        ],
+        [
+          19,
+          27,
+          "comment"
+        ],
+        [
+          28,
+          33,
+          "keyword"
+        ],
+        [
+          34,
+          35,
+          "type"
+        ],
+        [
+          36,
+          43,
+          "keyword"
+        ],
+        [
+          46,
+          50,
+          "keyword"
+        ],
+        [
+          57,
+          62,
+          "keyword"
+        ],
+        [
+          63,
+          66,
+          "type"
+        ],
+        [
+          69,
+          70,
+          "operator"
+        ],
+        [
+          71,
+          73,
+          "number"
+        ],
+        [
+          77,
+          86,
+          "function"
+        ],
+        [
+          89,
+          95,
+          "type"
+        ],
+        [
+          96,
+          104,
+          "function"
+        ],
+        [
+          107,
+          109,
+          "operator"
+        ],
+        [
+          110,
+          113,
+          "string"
+        ],
+        [
+          113,
+          115,
+          "variable"
+        ],
+        [
+          115,
+          117,
+          "string"
+        ],
+        [
+          117,
+          121,
+          "variable"
+        ],
+        [
+          121,
+          122,
+          "operator"
+        ],
+        [
+          122,
+          123,
+          "variable"
+        ],
+        [
+          123,
+          124,
+          "number"
+        ],
+        [
+          124,
+          125,
+          "variable"
+        ],
+        [
+          125,
+          127,
+          "string"
+        ],
+        [
+          131,
+          135,
+          "type"
+        ],
+        [
+          136,
+          140,
+          "function"
+        ],
+        [
+          143,
+          148,
+          "keyword"
+        ],
+        [
+          153,
+          156,
+          "keyword"
+        ],
+        [
+          159,
+          160,
+          "operator"
+        ],
+        [
+          161,
+          166,
+          "string"
+        ],
+        [
+          167,
+          168,
+          "operator"
+        ],
+        [
+          169,
+          185,
+          "string"
+        ],
+        [
+          189,
+          194,
+          "function"
+        ],
+        [
+          197,
+          199,
+          "operator"
+        ],
+        [
+          200,
+          204,
+          "constant"
+        ],
+        [
+          207,
+          211,
+          "comment"
+        ]
+      ]
+    },
+    {
+      "scope": "source.kotlin",
+      "text": "package demo\n\nimport kotlin.math.max\n\ndata class P(val x: Int, var y: String?)\n\nfun main() {\n    val s = \"x=${max(1, 2)} $name\"\n    when (s) { is String -> println(s) }\n    /* c */ val n = 0x1FL // 😀\n}\n",
+      "spans": [
+        [
+          0,
+          7,
+          "keyword"
+        ],
+        [
+          14,
+          20,
+          "keyword"
+        ],
+        [
+          38,
+          42,
+          "keyword"
+        ],
+        [
+          43,
+          48,
+          "keyword"
+        ],
+        [
+          49,
+          50,
+          "type"
+        ],
+        [
+          51,
+          54,
+          "keyword"
+        ],
+        [
+          58,
+          61,
+          "type"
+        ],
+        [
+          63,
+          66,
+          "keyword"
+        ],
+        [
+          70,
+          76,
+          "type"
+        ],
+        [
+          80,
+          83,
+          "keyword"
+        ],
+        [
+          84,
+          88,
+          "function"
+        ],
+        [
+          97,
+          100,
+          "keyword"
+        ],
+        [
+          103,
+          104,
+          "operator"
+        ],
+        [
+          105,
+          108,
+          "string"
+        ],
+        [
+          108,
+          110,
+          "variable"
+        ],
+        [
+          110,
+          113,
+          "function"
+        ],
+        [
+          113,
+          114,
+          "variable"
+        ],
+        [
+          114,
+          115,
+          "number"
+        ],
+        [
+          115,
+          117,
+          "variable"
+        ],
+        [
+          117,
+          118,
+          "number"
+        ],
+        [
+          118,
+          120,
+          "variable"
+        ],
+        [
+          120,
+          121,
+          "string"
+        ],
+        [
+          121,
+          126,
+          "variable"
+        ],
+        [
+          126,
+          127,
+          "string"
+        ],
+        [
+          132,
+          136,
+          "keyword"
+        ],
+        [
+          143,
+          145,
+          "keyword"
+        ],
+        [
+          146,
+          152,
+          "type"
+        ],
+        [
+          153,
+          155,
+          "operator"
+        ],
+        [
+          156,
+          163,
+          "function"
+        ],
+        [
+          173,
+          180,
+          "comment"
+        ],
+        [
+          181,
+          184,
+          "keyword"
+        ],
+        [
+          187,
+          188,
+          "operator"
+        ],
+        [
+          189,
+          194,
+          "number"
+        ],
+        [
+          195,
+          199,
+          "comment"
+        ]
+      ]
+    },
+    {
+      "scope": "source.java",
+      "text": "package a.b;\n\nimport java.util.List;\n\n@Deprecated\npublic final class Main {\n    private static final int N = 10;\n    public static void main(String[] args) {\n        String t = \"\"\"\n            text block\n            \"\"\";\n        System.out.println(\"n=\" + N + 'c'); // 😀\n    }\n}\n",
+      "spans": [
+        [
+          0,
+          7,
+          "keyword"
+        ],
+        [
+          14,
+          20,
+          "keyword"
+        ],
+        [
+          31,
+          35,
+          "type"
+        ],
+        [
+          38,
+          49,
+          "function"
+        ],
+        [
+          50,
+          56,
+          "keyword"
+        ],
+        [
+          57,
+          62,
+          "keyword"
+        ],
+        [
+          63,
+          68,
+          "keyword"
+        ],
+        [
+          69,
+          73,
+          "type"
+        ],
+        [
+          80,
+          87,
+          "keyword"
+        ],
+        [
+          88,
+          94,
+          "keyword"
+        ],
+        [
+          95,
+          100,
+          "keyword"
+        ],
+        [
+          101,
+          104,
+          "type"
+        ],
+        [
+          107,
+          108,
+          "operator"
+        ],
+        [
+          109,
+          111,
+          "number"
+        ],
+        [
+          117,
+          123,
+          "keyword"
+        ],
+        [
+          124,
+          130,
+          "keyword"
+        ],
+        [
+          131,
+          135,
+          "type"
+        ],
+        [
+          136,
+          140,
+          "function"
+        ],
+        [
+          141,
+          147,
+          "type"
+        ],
+        [
+          166,
+          172,
+          "type"
+        ],
+        [
+          175,
+          176,
+          "operator"
+        ],
+        [
+          177,
+          219,
+          "string"
+        ],
+        [
+          229,
+          235,
+          "type"
+        ],
+        [
+          240,
+          247,
+          "function"
+        ],
+        [
+          248,
+          252,
+          "string"
+        ],
+        [
+          253,
+          254,
+          "operator"
+        ],
+        [
+          257,
+          258,
+          "operator"
+        ],
+        [
+          259,
+          262,
+          "string"
+        ],
+        [
+          265,
+          269,
+          "comment"
+        ]
+      ]
+    },
+    {
+      "scope": "source.c++",
+      "text": "#include <stdio.h>\n#define N 10\n\n/* block */\nint main(void) {\n    const char *s = \"a\\tb\";\n    for (int i = 0; i < N; ++i) printf(\"%d\\n\", i);\n    return 0; // 😀\n}\ntemplate <typename T> class V : public std::vector<T> {};\n",
+      "spans": [
+        [
+          0,
+          8,
+          "keyword"
+        ],
+        [
+          9,
+          18,
+          "string"
+        ],
+        [
+          19,
+          26,
+          "keyword"
+        ],
+        [
+          29,
+          31,
+          "number"
+        ],
+        [
+          33,
+          44,
+          "comment"
+        ],
+        [
+          45,
+          48,
+          "type"
+        ],
+        [
+          49,
+          53,
+          "function"
+        ],
+        [
+          54,
+          58,
+          "type"
+        ],
+        [
+          66,
+          71,
+          "keyword"
+        ],
+        [
+          72,
+          76,
+          "type"
+        ],
+        [
+          77,
+          78,
+          "operator"
+        ],
+        [
+          80,
+          81,
+          "operator"
+        ],
+        [
+          82,
+          84,
+          "string"
+        ],
+        [
+          84,
+          86,
+          "constant"
+        ],
+        [
+          86,
+          88,
+          "string"
+        ],
+        [
+          94,
+          97,
+          "keyword"
+        ],
+        [
+          99,
+          102,
+          "type"
+        ],
+        [
+          105,
+          106,
+          "operator"
+        ],
+        [
+          107,
+          108,
+          "number"
+        ],
+        [
+          112,
+          113,
+          "operator"
+        ],
+        [
+          117,
+          119,
+          "operator"
+        ],
+        [
+          122,
+          128,
+          "function"
+        ],
+        [
+          129,
+          132,
+          "string"
+        ],
+        [
+          132,
+          134,
+          "constant"
+        ],
+        [
+          134,
+          135,
+          "string"
+        ],
+        [
+          145,
+          151,
+          "keyword"
+        ],
+        [
+          152,
+          153,
+          "number"
+        ],
+        [
+          155,
+          159,
+          "comment"
+        ],
+        [
+          162,
+          170,
+          "keyword"
+        ],
+        [
+          171,
+          172,
+          "operator"
+        ],
+        [
+          172,
+          180,
+          "keyword"
+        ],
+        [
+          182,
+          183,
+          "operator"
+        ],
+        [
+          184,
+          189,
+          "keyword"
+        ],
+        [
+          190,
+          191,
+          "type"
+        ],
+        [
+          194,
+          200,
+          "keyword"
+        ],
+        [
+          201,
+          204,
+          "type"
+        ],
+        [
+          204,
+          206,
+          "operator"
+        ],
+        [
+          212,
+          213,
+          "operator"
+        ],
+        [
+          214,
+          215,
+          "operator"
+        ]
+      ]
+    },
+    {
+      "scope": "source.go",
+      "text": "package main\n\nimport \"fmt\"\n\ntype T struct{ X int }\n\nfunc (t *T) Add(n int) int {\n\treturn t.X + n // 😀\n}\n\nfunc main() {\n\ts := `raw\nstring`\n\tfmt.Println(s, 3.14, true, nil)\n}\n",
+      "spans": [
+        [
+          0,
+          7,
+          "keyword"
+        ],
+        [
+          14,
+          20,
+          "keyword"
+        ],
+        [
+          21,
+          26,
+          "string"
+        ],
+        [
+          28,
+          32,
+          "keyword"
+        ],
+        [
+          33,
+          34,
+          "type"
+        ],
+        [
+          35,
+          41,
+          "keyword"
+        ],
+        [
+          45,
+          48,
+          "type"
+        ],
+        [
+          52,
+          56,
+          "keyword"
+        ],
+        [
+          64,
+          67,
+          "function"
+        ],
+        [
+          70,
+          73,
+          "type"
+        ],
+        [
+          75,
+          78,
+          "type"
+        ],
+        [
+          82,
+          88,
+          "keyword"
+        ],
+        [
+          93,
+          94,
+          "operator"
+        ],
+        [
+          97,
+          101,
+          "comment"
+        ],
+        [
+          105,
+          109,
+          "keyword"
+        ],
+        [
+          110,
+          114,
+          "function"
+        ],
+        [
+          122,
+          124,
+          "operator"
+        ],
+        [
+          125,
+          137,
+          "string"
+        ],
+        [
+          143,
+          150,
+          "function"
+        ],
+        [
+          154,
+          158,
+          "number"
+        ],
+        [
+          160,
+          164,
+          "constant"
+        ],
+        [
+          166,
+          169,
+          "constant"
+        ]
+      ]
+    },
+    {
+      "scope": "source.sql",
+      "text": "-- report 😀\nSELECT id, COUNT(*) AS n\nFROM notes n\nwhere n.text LIKE '%it''s%'\n  AND n.made > 10\nGROUP BY id;\n/* block\n */ insert into t values (1, NULL);\n",
+      "spans": [
+        [
+          0,
+          11,
+          "comment"
+        ],
+        [
+          12,
+          18,
+          "keyword"
+        ],
+        [
+          23,
+          28,
+          "function"
+        ],
+        [
+          29,
+          30,
+          "operator"
+        ],
+        [
+          32,
+          34,
+          "keyword"
+        ],
+        [
+          37,
+          41,
+          "keyword"
+        ],
+        [
+          50,
+          55,
+          "keyword"
+        ],
+        [
+          58,
+          62,
+          "type"
+        ],
+        [
+          63,
+          67,
+          "keyword"
+        ],
+        [
+          68,
+          72,
+          "string"
+        ],
+        [
+          72,
+          74,
+          "constant"
+        ],
+        [
+          74,
+          77,
+          "string"
+        ],
+        [
+          80,
+          83,
+          "keyword"
+        ],
+        [
+          91,
+          92,
+          "operator"
+        ],
+        [
+          93,
+          95,
+          "number"
+        ],
+        [
+          96,
+          101,
+          "keyword"
+        ],
+        [
+          102,
+          104,
+          "keyword"
+        ],
+        [
+          109,
+          121,
+          "comment"
+        ],
+        [
+          122,
+          128,
+          "keyword"
+        ],
+        [
+          129,
+          133,
+          "keyword"
+        ],
+        [
+          136,
+          142,
+          "keyword"
+        ],
+        [
+          144,
+          145,
+          "number"
+        ],
+        [
+          147,
+          151,
+          "constant"
+        ]
+      ]
+    },
+    {
+      "scope": "source.json",
+      "text": "{\n  \"name\": \"Old Brain Fix\",\n  \"n\": -1.5e3,\n  \"ok\": true,\n  \"none\": null,\n  \"list\": [1, \"two \\u00e9 😀\", false]\n}\n",
+      "spans": [
+        [
+          4,
+          10,
+          "type"
+        ],
+        [
+          12,
+          27,
+          "string"
+        ],
+        [
+          31,
+          34,
+          "type"
+        ],
+        [
+          36,
+          42,
+          "number"
+        ],
+        [
+          46,
+          50,
+          "type"
+        ],
+        [
+          52,
+          56,
+          "constant"
+        ],
+        [
+          60,
+          66,
+          "type"
+        ],
+        [
+          68,
+          72,
+          "constant"
+        ],
+        [
+          76,
+          82,
+          "type"
+        ],
+        [
+          85,
+          86,
+          "number"
+        ],
+        [
+          88,
+          93,
+          "string"
+        ],
+        [
+          93,
+          99,
+          "constant"
+        ],
+        [
+          99,
+          102,
+          "string"
+        ],
+        [
+          104,
+          109,
+          "constant"
+        ]
+      ]
+    },
+    {
+      "scope": "source.yaml",
+      "text": "%YAML 1.2\n---\n# config 😀\nname: Old Brain Fix\nversion: 0.7.0\nlist:\n  - \"quoted \\n\"\n  - 'single'\n  - &anchor 42\nref: *anchor\nflag: true\nblock: |\n  text\n  more\n",
+      "spans": [
+        [
+          0,
+          9,
+          "keyword"
+        ],
+        [
+          10,
+          13,
+          "keyword"
+        ],
+        [
+          14,
+          24,
+          "comment"
+        ],
+        [
+          25,
+          29,
+          "tag"
+        ],
+        [
+          45,
+          52,
+          "tag"
+        ],
+        [
+          60,
+          64,
+          "tag"
+        ],
+        [
+          70,
+          78,
+          "string"
+        ],
+        [
+          78,
+          80,
+          "constant"
+        ],
+        [
+          80,
+          81,
+          "string"
+        ],
+        [
+          86,
+          94,
+          "string"
+        ],
+        [
+          99,
+          106,
+          "variable"
+        ],
+        [
+          107,
+          109,
+          "number"
+        ],
+        [
+          110,
+          113,
+          "tag"
+        ],
+        [
+          115,
+          122,
+          "variable"
+        ],
+        [
+          123,
+          127,
+          "tag"
+        ],
+        [
+          129,
+          133,
+          "constant"
+        ],
+        [
+          134,
+          139,
+          "tag"
+        ],
+        [
+          141,
+          142,
+          "operator"
+        ],
+        [
+          142,
+          157,
+          "string"
+        ]
+      ]
+    },
+    {
+      "scope": "text.xml",
+      "text": "<?xml version=\"1.0\"?>\n<!-- note 😀 -->\n<root a=\"1\" b='2'>\n  <item>Tom &amp; Jerry</item>\n  <![CDATA[ <raw> ]]>\n  <br/>\n</root>\n",
+      "spans": [
+        [
+          2,
+          5,
+          "tag"
+        ],
+        [
+          6,
+          13,
+          "attribute"
+        ],
+        [
+          14,
+          19,
+          "string"
+        ],
+        [
+          22,
+          37,
+          "comment"
+        ],
+        [
+          39,
+          43,
+          "tag"
+        ],
+        [
+          44,
+          45,
+          "attribute"
+        ],
+        [
+          46,
+          49,
+          "string"
+        ],
+        [
+          50,
+          51,
+          "attribute"
+        ],
+        [
+          52,
+          55,
+          "string"
+        ],
+        [
+          60,
+          64,
+          "tag"
+        ],
+        [
+          69,
+          74,
+          "constant"
+        ],
+        [
+          82,
+          86,
+          "tag"
+        ],
+        [
+          90,
+          109,
+          "string"
+        ],
+        [
+          113,
+          115,
+          "tag"
+        ],
+        [
+          120,
+          124,
+          "tag"
+        ]
+      ]
+    },
+    {
+      "scope": "source.css",
+      "text": "/* theme 😀 */\n@media (max-width: 600px) {\n  body > .main #id {\n    color: #fff;\n    margin: 0 auto 1.5em;\n    font-family: \"Inter\", sans-serif;\n  }\n}\n",
+      "spans": [
+        [
+          0,
+          13,
+          "comment"
+        ],
+        [
+          14,
+          20,
+          "keyword"
+        ],
+        [
+          33,
+          38,
+          "number"
+        ],
+        [
+          44,
+          48,
+          "tag"
+        ],
+        [
+          51,
+          56,
+          "attribute"
+        ],
+        [
+          57,
+          60,
+          "attribute"
+        ],
+        [
+          67,
+          72,
+          "type"
+        ],
+        [
+          74,
+          78,
+          "constant"
+        ],
+        [
+          84,
+          90,
+          "type"
+        ],
+        [
+          92,
+          93,
+          "number"
+        ],
+        [
+          99,
+          104,
+          "number"
+        ],
+        [
+          110,
+          121,
+          "type"
+        ],
+        [
+          123,
+          130,
+          "string"
+        ]
+      ]
+    },
+    {
+      "scope": "text.html.markdown",
+      "text": "# Title\n\nSome *em* and **strong** text with `code` 😀.\n\n> quoted\n\n- item\n1. first\n\n```rust\nfn x() {}\n```\n\n[link](https://example.org) and ## not heading\n## Second\n",
+      "spans": [
+        [
+          0,
+          7,
+          "keyword"
+        ],
+        [
+          44,
+          50,
+          "string"
+        ],
+        [
+          55,
+          63,
+          "comment"
+        ],
+        [
+          65,
+          66,
+          "keyword"
+        ],
+        [
+          72,
+          74,
+          "keyword"
+        ],
+        [
+          82,
+          103,
+          "string"
+        ],
+        [
+          112,
+          131,
+          "constant"
+        ],
+        [
+          152,
+          161,
+          "keyword"
+        ]
+      ]
+    }
+  ],
+  "corners": [
+    {
+      "about": "captures in alternatives, a prototype and meta scopes",
+      "grammar": "name: Corners\nscope: source.corners\ncontexts:\n  prototype:\n    - match: '#.*'\n      scope: comment.line\n  main:\n    - match: '(?:(let)|(var))\\s+(\\w+)'\n      captures:\n        1: keyword.let\n        2: storage.type.var\n        3: variable.parameter\n    - match: '\"'\n      push: string\n  string:\n    - meta_scope: string.quoted\n    - meta_content_scope: meta.inside\n    - match: '\\\\.'\n      scope: constant.character.escape\n    - match: '\"'\n      pop: true\n",
+      "text": "let a = \"x\\\"y\" # c\nvar éb = 1\nlet\tc\n\"open\nstill\"",
+      "spans": [
+        [
+          0,
+          3,
+          "keyword"
+        ],
+        [
+          4,
+          5,
+          "variable"
+        ],
+        [
+          8,
+          10,
+          "string"
+        ],
+        [
+          10,
+          12,
+          "constant"
+        ],
+        [
+          12,
+          14,
+          "string"
+        ],
+        [
+          15,
+          18,
+          "comment"
+        ],
+        [
+          30,
+          33,
+          "keyword"
+        ],
+        [
+          34,
+          35,
+          "variable"
+        ],
+        [
+          36,
+          48,
+          "string"
+        ]
+      ]
+    },
+    {
+      "about": "(?i), (?x), \\b and . on non-ASCII, $ before the break, set and anonymous contexts",
+      "grammar": "name: Flags\nscope: source.flags\nvariables:\n  id: '[a-z_]\\w*'\n  call: '{{id}}(?=\\()'\ncontexts:\n  main:\n    - match: '(?i)\\bselect\\b'\n      scope: keyword.sql\n    - match: |\n        (?x)\n        \\b (end) \\s* \\# \\s* (\\d+) # trailing\n      captures:\n        1: keyword.end\n        2: constant.numeric\n    - match: '{{call}}'\n      scope: variable.function\n    - match: '\\w+$'\n      scope: entity.name.type\n    - match: '<'\n      set:\n        - meta_scope: entity.name.tag\n        - match: '>'\n          set: main\n    - match: '(?<=:)\\d'\n      scope: constant.numeric\n    - match: '.\\.'\n      scope: keyword.operator\n",
+      "text": "SeLeCt éselect selectx select\nEND # 42 f(x) g (y)\nlast word\r\ntail\n<tag a> after\na:1 b:2 ä.x 😀.y\n",
+      "spans": [
+        [
+          0,
+          6,
+          "keyword"
+        ],
+        [
+          8,
+          14,
+          "keyword"
+        ],
+        [
+          23,
+          29,
+          "keyword"
+        ],
+        [
+          39,
+          40,
+          "function"
+        ],
+        [
+          61,
+          65,
+          "type"
+        ],
+        [
+          66,
+          72,
+          "tag"
+        ],
+        [
+          74,
+          79,
+          "type"
+        ],
+        [
+          82,
+          83,
+          "number"
+        ],
+        [
+          86,
+          87,
+          "number"
+        ],
+        [
+          88,
+          90,
+          "operator"
+        ],
+        [
+          92,
+          94,
+          "operator"
+        ],
+        [
+          94,
+          95,
+          "type"
+        ]
+      ]
+    },
+    {
+      "about": "empty matches that push and pop, and a line too long",
+      "grammar": "name: Empty\nscope: source.empty\ncontexts:\n  main:\n    - match: '(?=[A-Z])'\n      push: upper\n    - match: '\\d+'\n      scope: constant.numeric\n  upper:\n    - match: '[A-Z]+'\n      scope: support.type\n    - match: '(?=[^A-Z])'\n      pop: true\n",
+      "text": "ab CD 12 EFg\n1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 \nXY 7\n",
+      "spans": [
+        [
+          3,
+          5,
+          "type"
+        ],
+        [
+          6,
+          8,
+          "number"
+        ],
+        [
+          9,
+          11,
+          "type"
+        ],
+        [
+          5214,
+          5216,
+          "type"
+        ],
+        [
+          5217,
+          5218,
+          "number"
+        ]
+      ]
+    },
+    {
+      "about": "a zero-width match never falls between the halves of a 😀",
+      "grammar": "name: Pairs\nscope: source.pairs\ncontexts:\n  main:\n    - match: '\"'\n      push: string\n    - match: '(?<=😀)'\n      push: after\n  string:\n    - meta_scope: string.quoted\n    - match: '\"|$'\n      pop: true\n  after:\n    - match: '\\w+'\n      scope: keyword\n      pop: true\n",
+      "text": "\"a 😀 b\" x 😀y 😀\n\"😀😀\n",
+      "spans": [
+        [
+          0,
+          7,
+          "string"
+        ],
+        [
+          11,
+          12,
+          "keyword"
+        ]
+      ]
+    }
+  ],
+  "fences": [
+    {
+      "name": "rs",
+      "scope": "source.rust"
+    },
+    {
+      "name": "Rust",
+      "scope": "source.rust"
+    },
+    {
+      "name": "RUST",
+      "scope": "source.rust"
+    },
+    {
+      "name": "py",
+      "scope": "source.python"
+    },
+    {
+      "name": "bash",
+      "scope": "source.shell"
+    },
+    {
+      "name": "sh",
+      "scope": "source.shell"
+    },
+    {
+      "name": "zsh",
+      "scope": "source.shell"
+    },
+    {
+      "name": "ts",
+      "scope": "source.js"
+    },
+    {
+      "name": "tsx",
+      "scope": "source.js"
+    },
+    {
+      "name": "javascript",
+      "scope": "source.js"
+    },
+    {
+      "name": "c++",
+      "scope": "source.c++"
+    },
+    {
+      "name": "cpp",
+      "scope": "source.c++"
+    },
+    {
+      "name": "h",
+      "scope": "source.c++"
+    },
+    {
+      "name": "kt",
+      "scope": "source.kotlin"
+    },
+    {
+      "name": "yml",
+      "scope": "source.yaml"
+    },
+    {
+      "name": "html",
+      "scope": "text.xml"
+    },
+    {
+      "name": "svg",
+      "scope": "text.xml"
+    },
+    {
+      "name": "md",
+      "scope": "text.html.markdown"
+    },
+    {
+      "name": "jsonc",
+      "scope": "source.json"
+    },
+    {
+      "name": "golang",
+      "scope": "source.go"
+    },
+    {
+      "name": "dart",
+      "scope": "source.dart"
+    },
+    {
+      "name": "java",
+      "scope": "source.java"
+    },
+    {
+      "name": "css",
+      "scope": "source.css"
+    },
+    {
+      "name": "sql",
+      "scope": "source.sql"
+    },
+    {
+      "name": " go ",
+      "scope": "source.go"
+    },
+    {
+      "name": "",
+      "scope": null
+    },
+    {
+      "name": "cobol",
+      "scope": null
+    },
+    {
+      "name": "rust,ignore",
+      "scope": null
+    }
+  ],
+  "guesses": [
+    {
+      "text": "#!/bin/bash\necho hi",
+      "scope": "source.shell"
+    },
+    {
+      "text": "#!/usr/bin/env bash\n",
+      "scope": "source.shell"
+    },
+    {
+      "text": "#!/bin/sh -e\n",
+      "scope": "source.shell"
+    },
+    {
+      "text": "#!/usr/bin/env python3\nprint(1)",
+      "scope": "source.python"
+    },
+    {
+      "text": "#!/usr/bin/python\n",
+      "scope": "source.python"
+    },
+    {
+      "text": "#!/usr/bin/env node\n",
+      "scope": "source.js"
+    },
+    {
+      "text": "\n\n  \npackage main\n\nfunc main() {}",
+      "scope": "source.go"
+    },
+    {
+      "text": "<?xml version=\"1.0\"?>\n<a/>",
+      "scope": "text.xml"
+    },
+    {
+      "text": "<!DOCTYPE html>\n<html>",
+      "scope": "text.xml"
+    },
+    {
+      "text": "%YAML 1.2\n---\n",
+      "scope": "source.yaml"
+    },
+    {
+      "text": "fn main() {\n}\n",
+      "scope": null
+    },
+    {
+      "text": "plain words\nmore words",
+      "scope": null
+    },
+    {
+      "text": "",
+      "scope": null
+    },
+    {
+      "text": "#!/bin/bash\r\necho",
+      "scope": "source.shell"
+    }
+  ],
+  "refused": [
+    {
+      "about": "not YAML",
+      "grammar": "name: [x\n",
+      "refused": true
+    },
+    {
+      "about": "no contexts",
+      "grammar": "name: X\nscope: source.x\n",
+      "refused": true
+    },
+    {
+      "about": "no main",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  other: []\n",
+      "refused": true
+    },
+    {
+      "about": "embed",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a\n      embed: scope:source.y\n      escape: b\n",
+      "refused": true
+    },
+    {
+      "about": "branch_point",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a\n      branch_point: p\n      branch: [x]\n",
+      "refused": true
+    },
+    {
+      "about": "extends",
+      "grammar": "name: X\nscope: source.x\nextends: Packages/Y.sublime-syntax\ncontexts:\n  main: []\n",
+      "refused": true
+    },
+    {
+      "about": "include of another grammar",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  main:\n    - include: scope:source.y\n",
+      "refused": true
+    },
+    {
+      "about": "pop: 2",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a\n      pop: 2\n",
+      "refused": true
+    },
+    {
+      "about": "a capture past the groups",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  main:\n    - match: (a)\n      captures:\n        2: keyword\n",
+      "refused": true
+    },
+    {
+      "about": "an unknown variable",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  main:\n    - match: '{{nope}}'\n",
+      "refused": true
+    },
+    {
+      "about": "a variable that refers to itself",
+      "grammar": "name: X\nscope: source.x\nvariables:\n  a: '{{a}}x'\ncontexts:\n  main:\n    - match: '{{a}}'\n",
+      "refused": true
+    },
+    {
+      "about": "a match that is a number",
+      "grammar": "name: X\nscope: source.x\ncontexts:\n  main:\n    - match: 12\n",
+      "refused": true
+    }
+  ],
+  "regexes": [
+    {
+      "regex": "a*+",
+      "refused": true
+    },
+    {
+      "regex": "a++",
+      "refused": true
+    },
+    {
+      "regex": "a?+",
+      "refused": true
+    },
+    {
+      "regex": "a{2}+",
+      "refused": true
+    },
+    {
+      "regex": "(?>a)",
+      "refused": true
+    },
+    {
+      "regex": "(?<n>a)",
+      "refused": true
+    },
+    {
+      "regex": "(a)\\1",
+      "refused": true
+    },
+    {
+      "regex": "\\k<n>",
+      "refused": true
+    },
+    {
+      "regex": "(?i:a)",
+      "refused": true
+    },
+    {
+      "regex": "a(?i)b",
+      "refused": true
+    },
+    {
+      "regex": "(?s).",
+      "refused": true
+    },
+    {
+      "regex": "(?m)^a",
+      "refused": true
+    },
+    {
+      "regex": "\\Ga",
+      "refused": true
+    },
+    {
+      "regex": "\\Aa",
+      "refused": true
+    },
+    {
+      "regex": "a\\z",
+      "refused": true
+    },
+    {
+      "regex": "a\\Z",
+      "refused": true
+    },
+    {
+      "regex": "\\h",
+      "refused": true
+    },
+    {
+      "regex": "\\p{L}",
+      "refused": true
+    },
+    {
+      "regex": "[[:alpha:]]",
+      "refused": true
+    },
+    {
+      "regex": "[a&&b]",
+      "refused": true
+    },
+    {
+      "regex": "(?:(a))*",
+      "refused": true
+    },
+    {
+      "regex": "(a)+",
+      "refused": true
+    },
+    {
+      "regex": "(?=(a))",
+      "refused": true
+    },
+    {
+      "regex": "(?<=(a))b",
+      "refused": true
+    },
+    {
+      "regex": "^*",
+      "refused": true
+    },
+    {
+      "regex": "\\b+",
+      "refused": true
+    },
+    {
+      "regex": "(?=a)*",
+      "refused": true
+    },
+    {
+      "regex": "*a",
+      "refused": true
+    },
+    {
+      "regex": "a{,2}",
+      "refused": true
+    },
+    {
+      "regex": "a{3,2}",
+      "refused": true
+    },
+    {
+      "regex": "(a",
+      "refused": true
+    },
+    {
+      "regex": "a)",
+      "refused": true
+    },
+    {
+      "regex": "[a",
+      "refused": true
+    },
+    {
+      "regex": "[b-a]",
+      "refused": true
+    },
+    {
+      "regex": "[\\W]",
+      "refused": true
+    },
+    {
+      "regex": "\\q",
+      "refused": true
+    },
+    {
+      "regex": "\\x4",
+      "refused": true
+    },
+    {
+      "regex": "\\x{110000}",
+      "refused": true
+    },
+    {
+      "regex": "\\uD800",
+      "refused": true
+    },
+    {
+      "regex": "(?#comment)",
+      "refused": true
+    },
+    {
+      "regex": "(?(1)a|b)",
+      "refused": true
+    },
+    {
+      "regex": "(?x) a b # c",
+      "refused": false
+    },
+    {
+      "regex": "(?i)(?x)AbC",
+      "refused": false
+    },
+    {
+      "regex": "(?xi)abc",
+      "refused": false
+    },
+    {
+      "regex": "a{2}b{1,}c{1,3}?",
+      "refused": false
+    },
+    {
+      "regex": "[]a]",
+      "refused": false
+    },
+    {
+      "regex": "[^]a]",
+      "refused": false
+    },
+    {
+      "regex": "[a-]",
+      "refused": false
+    },
+    {
+      "regex": "\\x41\\x{1F600}\\u00e9\\e\\a\\t",
+      "refused": false
+    },
+    {
+      "regex": "\\.\\(\\)\\[\\]\\{\\}\\/\\-\\#\\ ",
+      "refused": false
+    },
+    {
+      "regex": "a{b",
+      "refused": false
+    },
+    {
+      "regex": "{",
+      "refused": false
+    },
+    {
+      "regex": "(?<=ab|c)d(?<!x+)",
+      "refused": false
+    },
+    {
+      "regex": "(?:(a)|(b))c",
+      "refused": false
+    }
+  ]
+}
