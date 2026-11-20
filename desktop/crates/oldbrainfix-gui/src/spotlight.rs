@@ -475,20 +475,23 @@ pub fn anchor(ui: &Ui, name: &'static str, rect: Rect) {
     }
     let ctx = ui.ctx();
     let shown = rect.intersect(ui.clip_rect());
+    // The ids first: a Context access inside another one deadlocks.
+    let (anchors, scroll) = (anchors_id(ctx), scroll_id(ctx));
     ctx.data_mut(|d| {
-        d.get_temp_mut_or_default::<Anchors>(anchors_id(ctx))
+        d.get_temp_mut_or_default::<Anchors>(anchors)
             .insert(name, Drawn { rect, shown });
     });
-    let wanted = ctx.data(|d| d.get_temp::<&'static str>(scroll_id(ctx)));
+    let wanted = ctx.data(|d| d.get_temp::<&'static str>(scroll));
     if wanted == Some(name) {
         ui.scroll_to_rect(rect, Some(Align::Center));
-        ctx.data_mut(|d| d.remove::<&'static str>(scroll_id(ctx)));
+        ctx.data_mut(|d| d.remove::<&'static str>(scroll));
     }
 }
 
 /// The elements drawn since the last call, taken.
 fn take_anchors(ctx: &Context) -> Anchors {
-    ctx.data_mut(|d| d.remove_temp::<Anchors>(anchors_id(ctx)))
+    let id = anchors_id(ctx);
+    ctx.data_mut(|d| d.remove_temp::<Anchors>(id))
         .unwrap_or_default()
 }
 
@@ -706,7 +709,8 @@ impl Spotlights {
             .get(tip.anchor)
             .is_some_and(|d| d.shown.width() < d.rect.width() || d.shown.height() < d.rect.height())
         {
-            ctx.data_mut(|d| d.insert_temp(scroll_id(ctx), tip.anchor));
+            let id = scroll_id(ctx);
+            ctx.data_mut(|d| d.insert_temp(id, tip.anchor));
         }
         ctx.request_repaint();
         true
