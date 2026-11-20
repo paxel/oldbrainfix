@@ -917,12 +917,11 @@ fn the_playback_speed_is_written_the_german_way_in_german() -> TestResult {
     let devices: Shared = Rc::default();
     let mut harness = window_in(store, &devices, "de");
     devices.borrow_mut().mic = true;
-    quick(&mut harness);
+    // Recorded in the Note dialog, as the quick note has no recorder (#352).
+    open_garage(&mut harness);
     harness.get_by_label("Sprache aufnehmen").click();
     harness.run();
     harness.get_by_label("Beenden").click();
-    harness.run();
-    harness.get_by_label("1 Std.").click();
     harness.run();
     open_newest(&mut harness);
     assert!(shows(&harness, "1,5×"));

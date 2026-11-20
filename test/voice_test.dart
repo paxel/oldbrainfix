@@ -286,7 +286,10 @@ void main() {
       await tap(tester, editorVoice);
       expect(voice.starts, 1);
 
-      final agenda = tester.element(find.byType(AgendaScreen));
+      // The Agenda lies under the editor, offstage.
+      final agenda = tester.element(
+        find.byType(AgendaScreen, skipOffstage: false),
+      );
       unawaited(captureNote(agenda, notes, voice: true, onChanged: () {}));
       await tester.pumpAndSettle();
       expect(voice.starts, 2);

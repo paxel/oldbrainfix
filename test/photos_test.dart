@@ -155,6 +155,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(fanEntry('gallery'));
       // The page is in; the pictures are still being read.
+      await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(find.byType(CaptureScreen), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('nudge10')));
