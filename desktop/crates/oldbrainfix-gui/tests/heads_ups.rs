@@ -103,7 +103,8 @@ fn listed<S>(harness: &Harness<'_, S>) -> Vec<String> {
     let mut rows: Vec<(f32, String)> = harness
         .query_all_by_role(Role::Label)
         .filter_map(|n| {
-            let label = n.accesskit_node().label()?;
+            // egui gives a Label its text as the value, not the label.
+            let label = n.accesskit_node().value()?;
             label.ends_with(" before").then(|| (n.rect().top(), label))
         })
         .collect();

@@ -254,8 +254,13 @@ void main() {
         find.text('Only a Manager of this Area can change this.'),
         findsOne,
       );
-      // The schedule is shown, not changed.
-      await tap(tester, find.text('Once'));
+      // The schedule is shown, not changed: a tap where its Once shows
+      // goes nowhere, as the locked schedule takes no touch.
+      final once = find.text('Once');
+      await tester.ensureVisible(once);
+      await tester.pumpAndSettle();
+      await tester.tapAt(tester.getCenter(once));
+      await tester.pumpAndSettle();
       expect(find.text('Starts'), findsOneWidget);
 
       await add(tester, 30);
