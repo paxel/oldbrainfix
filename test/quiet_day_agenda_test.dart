@@ -48,7 +48,7 @@ void main() {
   testWidgets('Quiet today shows the line, End takes it away again', (
     tester,
   ) async {
-    routines.create(
+    final pills = routines.create(
       'pills',
       Schedule(
         start: Day(2026, 10, 1),
@@ -71,7 +71,12 @@ void main() {
     expect(find.text('Quiet day until midnight'), findsOneWidget);
     expect(await offered(tester), isFalse);
     // Today's Occurrence stays on the Agenda, to be checked off.
-    expect(find.text('pills'), findsOneWidget);
+    final todays = find.byKey(ValueKey('row-${pills.id}@2026-10-24T18:00'));
+    expect(todays, findsOneWidget);
+    expect(
+      find.descendant(of: todays, matching: find.text('pills')),
+      findsOneWidget,
+    );
     expect(find.byType(Checkbox), findsWidgets);
     // First in the Agenda's order.
     expect(

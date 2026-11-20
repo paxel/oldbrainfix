@@ -110,6 +110,8 @@ void main() {
       });
 
       test('what began before it Re-nags again from midnight', () {
+        // Set up before Monday's 09:00, so that one was asked for.
+        now = DateTime.utc(2026, 1, 5, 7);
         final weekly = routines.spawn(
           notes.capture('stretch').id,
           Schedule(
@@ -118,6 +120,7 @@ void main() {
             rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO'),
           ),
         );
+        now = DateTime.utc(2026, 1, 6, 8);
         store.quietToday(europe);
         final alarm = alarms
             .plan(europe)
@@ -185,6 +188,8 @@ void main() {
 
     group('counts what is left undone as skipped', () {
       test('never Missed, and skipped in the history after midnight', () {
+        // Set up before today's 08:00, so that one was asked for.
+        now = DateTime.utc(2026, 1, 6, 6);
         final id = daily('pills', [at(8), at(14)]);
         store.quietToday(europe);
         now = DateTime.utc(2026, 1, 6, 15);
