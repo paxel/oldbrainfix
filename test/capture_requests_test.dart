@@ -13,6 +13,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_capture_requests.dart';
 import 'fake_photos.dart';
 import 'fake_voice.dart';
+import 'open_capture.dart';
 
 final recorded = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]);
 
@@ -153,8 +154,10 @@ void main() {
   testWidgets('a voice request while a recording goes on in the background '
       'ends and keeps that one first (#350)', (tester) async {
     await start(tester);
-    requests.request(CaptureMode.voice);
-    await tester.pumpAndSettle();
+    // Recording started in the app: a Capture a request opened keeps the
+    // next request waiting until it closes, as two never stack.
+    await openTextCapture(tester);
+    await tap(tester, find.byIcon(Icons.mic_none));
     expect(voice.starts, 1);
 
     // Out of the app, recording on, the tile asks for voice again.

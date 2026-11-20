@@ -410,15 +410,8 @@ void main() {
       await start(tester);
       await openCapture(tester);
       await tap(tester, mic);
-      for (final state in [
-        AppLifecycleState.inactive,
-        AppLifecycleState.hidden,
-        AppLifecycleState.inactive,
-        AppLifecycleState.resumed,
-      ]) {
-        tester.binding.handleAppLifecycleStateChanged(state);
-      }
-      await tester.pumpAndSettle();
+      // The background no longer ends a recording (#350): Stop does.
+      await tap(tester, stop);
       await tap(tester, find.byIcon(Icons.play_arrow));
       expect(voice.played, [first]);
 
