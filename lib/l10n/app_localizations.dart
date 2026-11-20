@@ -8072,6 +8072,12 @@ abstract class AppLocalizations {
   /// **'Not available here'**
   String get linkNotAvailable;
 
+  /// Heading of the part at a Note's end listing the Notes whose text or Sections hold an app link to it, one row per Note by its first line (obf-1035).
+  ///
+  /// In en, this message translates to:
+  /// **'Linked from'**
+  String get linkedFrom;
+
   /// Title of the one question before a file link opens (#261).
   ///
   /// In en, this message translates to:

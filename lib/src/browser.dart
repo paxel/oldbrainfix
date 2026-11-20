@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'card_glance.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -1018,6 +1019,16 @@ List<Widget> diaryCards(
   final hidden = notes.store.hiddenFromAiAmong([
     for (final placed in shown) placed.note.id,
   ]);
+  // The Notes linking to each full card's Note (obf-1035), from what the
+  // core keeps until the log changes; a closed locked Area's left out.
+  final backlinks = Backlinks(notes.store);
+  final lock = LockScope.of(context);
+  Set<String>? closed;
+  List<Note> linkedFrom(Note note) => backlinks.to(
+    note.id,
+    closed: closed ??= lock?.closedAreas ?? const <String>{},
+  );
+  bool full(Note note) => compact == switched.contains(note.id);
   return [
     for (final placed in shown)
       if (placed case (
@@ -1049,8 +1060,9 @@ List<Widget> diaryCards(
             onChanged,
             onEdit: () => onOpen(note),
           ),
-          full: compact == switched.contains(note.id),
+          full: full(note),
           sections: () => sectionsOf(note),
+          linkedFrom: full(note) ? linkedFrom(note) : const [],
           checklist: (read: () => checklistOf(note), lists: lists),
           shopping: (read: () => shoppingOf(note), lists: shopping),
           tally: notes,

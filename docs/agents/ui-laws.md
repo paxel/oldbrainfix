@@ -329,6 +329,17 @@ replace a law of Both apps where they say so. A desktop law marked
   line on the page. Everything a Section does stays: its text edited
   in place, its line's dialog, who edited it and when, its photos,
   recordings, files, Transcripts and Photo Texts.
+- **A Note shows the Notes that link to it** (obf-1035, Q22): at its
+  end, after its Sections, "Linked from" in the weak text colour, then
+  one row per Note whose text or Sections hold an App link to it, the
+  link icon before its first line with words as it reads (its capture
+  time where it has none), newest first; a tap or click opens that Note
+  as its link does. In the detailed view, the Note editor, the Note
+  dialog and a Note's own window, its reading view too; never on the
+  compact view, nor on a card in the trash, and only while a Note links
+  there. Only Notes this reader may see: none from the trash, merged
+  ones, a Shared Area they are no member of, or a closed locked Area.
+  On a desktop card a row takes its own click, not the card's.
 - **The compact view is a glance, by the Note's kind** (#189): a Plain
   Note its first line and the two lines after it, a Checklist its name
   and how many Lines are open ("3 of 7 open"), a Shopping List its name

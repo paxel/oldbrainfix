@@ -193,6 +193,7 @@ use crate::undo::Undo;
 use crate::unsorted_steps::{self, MovedOn, Sorting};
 use crate::vault_view::{self, VaultDone, VaultJob};
 use crate::window_sizes;
+use oldbrainfix_core::backlinks::Backlinks;
 use oldbrainfix_core::tag_tree::TagTree;
 
 /// What a place was left with (#278), for back and forward to show it
@@ -608,6 +609,10 @@ struct View {
     /// The Sections of each Note listed, oldest first, read in one pass
     /// for the full cards (#114).
     sections: BTreeMap<String, Vec<Section>>,
+    /// The Notes that link to each Note listed and to the one selected
+    /// (obf-1035), newest first, read once per read for the full cards,
+    /// the Note dialog and its window; a Note none links to is not in it.
+    linked_from: BTreeMap<String, Vec<Note>>,
     /// The Checklists of the Notes listed that are one, read in one pass
     /// for the cards as they show now, each with whether this Device may
     /// check its Lines (#120, #121).
@@ -6254,6 +6259,18 @@ impl App {
         } else {
             notes.sections_of(&listed)?
         };
+        // From what the core keeps until the log changes (obf-1035); the
+        // desktop has no Area Locks, so nothing is closed. A card in the
+        // trash shows none, as on the phone.
+        let backlinks = Backlinks::new(store);
+        let mut linked_from = BTreeMap::new();
+        let linked = listed.iter().filter(|_| self.selection != Selection::Trash);
+        for id in linked.chain(detail.as_ref().map(|(p, _)| &p.note.id)) {
+            let linking = backlinks.to(id, &HashSet::new())?;
+            if !linking.is_empty() {
+                linked_from.insert(id.clone(), linking);
+            }
+        }
         // A Note in the trash ticks nothing.
         let card_today = if listed.is_empty() || self.selection == Selection::Trash {
             HashMap::new()
@@ -6699,6 +6716,7 @@ impl App {
             notes: placed,
             table_ticking: self.table_ticking(&box_looks, &box_ticks)?,
             sections,
+            linked_from,
             checklists,
             shopping_lists,
             tallies,
@@ -11497,6 +11515,11 @@ impl App {
         };
         let t = self.t;
         let note = &placed.note;
+        let linked_from = self
+            .view
+            .linked_from
+            .get(&note.id)
+            .map_or(&[][..], Vec::as_slice);
         let no_boxes = BoxLook::default();
         let box_looks = &self.view.box_looks;
         let box_ticks = &self.view.box_ticks;
@@ -11607,6 +11630,8 @@ impl App {
                         let (of, photos) = (&section.id, &section.photos);
                         read_photos(ui, &t, (cache, store), of, photos, actions);
                     }
+                    // At its end, after the Sections (obf-1035).
+                    app_links::linked_from(ui, &t, &note.id, linked_from);
                     ui.add_space(24.0);
                 });
             });
@@ -14087,6 +14112,7 @@ impl App {
                         description: self.view.descriptions_unfolded.contains(id),
                     },
                     sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
+                    linked_from: self.view.linked_from.get(id).map_or(&[], Vec::as_slice),
                     checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                     shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
                     tally: self.view.tallies.contains(id),
@@ -14368,6 +14394,11 @@ impl App {
         let t = self.t;
         let note = &placed.note;
         let trashed = note.is_trashed();
+        let linked_from = self
+            .view
+            .linked_from
+            .get(&note.id)
+            .map_or(&[][..], Vec::as_slice);
         // "Keep as code" under a paste that looks like code (#213).
         let offers_code = self.code_offer.is_some()
             && self.code_offer == self.text_of
@@ -14840,6 +14871,8 @@ impl App {
                         .inner_margin(Margin::symmetric(16, 0))
                         .show(ui, |ui| draw_sections(ui, &mut *cache, actions));
                 }
+                // At the Note's end, after its Sections (obf-1035).
+                app_links::linked_from(ui, &t, &note.id, linked_from);
                 if trashed {
                     // Where it is now, to be restored at once.
                     ui.horizontal(|ui| {
@@ -20946,6 +20979,9 @@ struct CardLook<'a> {
     /// Which of its folds this Device keeps open (#189).
     folds: CardFolds,
     sections: &'a [Section],
+    /// The Notes that link to it, at the end of its detailed view
+    /// (obf-1035).
+    linked_from: &'a [Note],
     checklist: Option<(&'a Checklist, bool)>,
     shopping: Option<(&'a ShoppingList, bool)>,
     /// Whether the Note is a Tally, whose full card shows its name and
@@ -22246,7 +22282,8 @@ type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 /// Shopping List's Lines under its name and description (#188), checkable,
 /// a Shopping List's struck ones folded under its open ones, with every
 /// Section oldest first, each with its own line, its photos opening full
-/// screen on a click; or its compact view, a glance by its kind (#189): a
+/// screen on a click, then the Notes that link to it (obf-1035), a click
+/// on one opening it; or its compact view, a glance by its kind (#189): a
 /// plain Note's first line and the two lines after it or the `glance` of
 /// the Session it runs, a list's or a Tally's name with how many of its
 /// Lines are open or the Tally's `glance`, a Note without words its
@@ -22301,6 +22338,8 @@ fn note_card(
     let mut boxes = Vec::new();
     let mut marks = Spots::default();
     let mut section_marks: Vec<(&Section, Spots)> = Vec::new();
+    // The rows of "Linked from" on a full card (obf-1035).
+    let mut linked_rows = Vec::new();
     // Where the Tally or the Session of a full card lies, out of the
     // card's own click, and what was asked of it (#190, #191).
     let mut tally_rect = None;
@@ -22494,6 +22533,8 @@ fn note_card(
                                 capture_meta(ui, t, &line, edited.as_deref(), false);
                                 before = section.captured;
                             }
+                            // At its end, after the Sections (obf-1035).
+                            linked_rows = app_links::linked_from_rows(ui, t, look.linked_from);
                         });
                         return;
                     }
@@ -23015,6 +23056,11 @@ fn note_card(
         }
         tag = text_marks_view::tag_clicks(ui, t, of, &spots.tags).or(tag);
         text_marks_view::link_clicks(ui, of, &spots.links);
+    }
+    // A click on a Note linking to it opens that Note, and no card
+    // (obf-1035).
+    for row in &linked_rows {
+        app_links::linked_row_clicks(ui, &note.id, row);
     }
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),

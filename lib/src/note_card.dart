@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'app_links.dart' show LinkedFrom;
 import 'area_look.dart';
 import 'attachment_views.dart';
 import 'calendar_platform.dart';
@@ -266,7 +267,8 @@ List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
 /// full width with its Photo Text under it and every recording with its
 /// Transcript, both labelled and dimmed, its Capture Context as one line
 /// under its text (#170), then each of its [sections], oldest first, the
-/// same way; and under a separator its action row, icons only: file it,
+/// same way, then the Notes that link to it ([linkedFrom], obf-1035); and
+/// under a separator its action row, icons only: file it,
 /// spawn a Routine, Reminder, Frog or Session from it, merge it, a pencil
 /// opening the editor (#281) and ⋮ for the rest with words.
 class NoteCard extends StatelessWidget {
@@ -309,6 +311,11 @@ class NoteCard extends StatelessWidget {
   /// Reads the Note's Sections, oldest first, for [full]; once per Note
   /// read, never while building.
   final List<Section> Function()? sections;
+
+  /// The Notes that link to it (obf-1035), shown at the end of a [full]
+  /// card after its Sections under "Linked from"; nothing when empty, and
+  /// never on a compact one.
+  final List<Note> linkedFrom;
 
   /// What a tap on the card does: switch its view in a list (#189), pick
   /// it in "merge into…"; nothing when null.
@@ -399,6 +406,7 @@ class NoteCard extends StatelessWidget {
     this.actions,
     this.full = false,
     this.sections,
+    this.linkedFrom = const [],
     this.onTap,
     this.onEdit,
     this.footer,
@@ -622,6 +630,7 @@ class NoteCard extends StatelessWidget {
                   note: note,
                   when: when,
                   sections: sections,
+                  linkedFrom: linkedFrom,
                   list: lists(true),
                   kind: kind,
                   boxes: boxes,
@@ -1758,6 +1767,9 @@ class _FullNote extends StatefulWidget {
   final DateFormat when;
   final List<Section> Function()? sections;
 
+  /// The Notes that link to it, after its Sections (obf-1035).
+  final List<Note> linkedFrom;
+
   /// The Note's Checklist, under its text.
   final Widget? list;
 
@@ -1774,6 +1786,7 @@ class _FullNote extends StatefulWidget {
     required this.note,
     required this.when,
     this.sections,
+    this.linkedFrom = const [],
     this.list,
     this.kind,
     this.boxes,
@@ -1882,6 +1895,8 @@ class _FullNoteState extends State<_FullNote> {
               ),
             ],
           ),
+        // At its end, after the Sections (obf-1035).
+        LinkedFrom(linking: widget.linkedFrom),
       ],
     );
   }

@@ -123,6 +123,10 @@ _Avoid_: label, keyword, hashtag
 A link of a Formatted text whose address has the app's scheme, `oldbrainfix://`, such as `[Backups](oldbrainfix://settings/backups)`: it opens a Note, an Area or Topic, the Agenda, Unsorted, one of the app's pages or a Settings section, a page of the user guide, or a file of the shared folder (on the desktop the synced folder). It opens without asking, but a file only after one question naming it and the app that opens it, and never one outside that folder. "Link to…" in the Format bar picks its target, so nobody types an id; ids are the same on every Device, so it syncs and is shared with its text. Where its target cannot be seen it says "Not available here"; other Markdown apps show its words. German: App-Link.
 _Avoid_: deep link, internal link, URL scheme, file link (a file link is one kind of App link)
 
+**Linked from**:
+The part at a Note's end, after its Sections, that lists the Notes whose text or Sections hold an App link to it, one row per Note by its first line as it reads, a tap or click opening it (obf-1035). It shows in the detailed view, the Note editor, the Note dialog and a Note's own window, never on the compact view, and only while a Note links there. Only Notes this reader may see are listed: none from the trash, merged ones, a Shared Area they are no member of or a closed locked Area. Nothing is stored for it; it is read from the texts. Links to Areas, Topics, pages and files have none, nor have web links. German: Verlinkt von.
+_Avoid_: backlink, reference, mention
+
 ### Sorting
 
 **Area**:

@@ -1338,6 +1338,7 @@
   "linkToNothing": "Nichts gefunden.",
   "linkToGuide": "Anleitung",
   "linkNotAvailable": "Hier nicht verfügbar",
+  "linkedFrom": "Verlinkt von",
   "fileLinkTitle": "Diese Datei öffnen?",
   "fileLinkQuestion": "„{file}“ aus dem geteilten Ordner mit {app} öffnen?",
   "fileLinkSomeApp": "der App, die das System dafür wählt",

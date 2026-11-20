@@ -121,6 +121,10 @@ _Avoid_: Etikett, Schlagwort, Hashtag
 Ein Link in einem formatierten Text, dessen Adresse das Schema der App hat, `oldbrainfix://`, etwa `[Backups](oldbrainfix://settings/backups)`: Er öffnet eine Notiz, einen Bereich oder ein Thema, die Agenda, Unsortiert, eine Seite der App oder einen Abschnitt der Einstellungen, eine Seite der Anleitung oder eine Datei des geteilten Ordners (am Computer des synchronisierten Ordners). Er öffnet ohne Nachfrage, eine Datei aber erst nach einer Frage, die sie und die App nennt, die sie öffnet, und nie eine außerhalb dieses Ordners. „Link zu…“ in der Formatleiste wählt sein Ziel, sodass niemand eine ID tippt; die IDs sind auf jedem Gerät dieselben, sodass er synchronisiert und mit seinem Text geteilt wird. Wo sein Ziel nicht zu sehen ist, sagt er „Hier nicht verfügbar“; andere Markdown-Apps zeigen seine Wörter.
 _Avoid_: Deep Link, interner Link, URL-Schema, Dateilink (ein Dateilink ist eine Art App-Link)
 
+**Verlinkt von** [Linked from]:
+Der Teil am Ende einer Notiz, nach ihren Abschnitten, der die Notizen nennt, deren Text oder Abschnitte einen App-Link zu ihr enthalten, eine Zeile je Notiz mit ihrer ersten Zeile, wie sie sich liest; ein Tippen oder Klicken öffnet sie. Er steht in der Detailansicht, im Notiz-Editor, im Notiz-Dialog und im eigenen Fenster einer Notiz, nie in der Kompaktansicht, und nur, solange eine Notiz dorthin verlinkt. Genannt werden nur Notizen, die dieser Leser sehen darf: keine aus dem Papierkorb, keine zusammengeführten, keine eines geteilten Bereichs, dessen Mitglied er nicht ist, und keine eines gesperrten Bereichs, solange er zu ist. Dafür wird nichts gespeichert; es wird aus den Texten gelesen. Links zu Bereichen, Themen, Seiten und Dateien haben keines, Weblinks auch nicht.
+_Avoid_: Backlink, Rückverweis, Erwähnung
+
 ## Sortieren
 
 **Bereich** [Area]:

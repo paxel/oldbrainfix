@@ -9771,6 +9771,118 @@ Map<String, Object?> _tagTree() {
   }
 }
 
+/// The Notes that link to a Note (obf-1035): the Areas made, the Notes
+/// captured, each with its format, the Area it is filed into by its
+/// index, the one it is merged into and whether it is trashed, then its
+/// Amends once every Note is captured. In a text `{n}` is the app link to
+/// the `n`th Note, `{^n}` the same with its scheme in capitals and `{%n}`
+/// with the `:` of its id %-encoded; a Note's own text links only to
+/// those captured before it. Then for each Note the indexes of the Notes
+/// linking to it, with nothing closed and with the Areas of `closed`
+/// closed.
+Map<String, Object?> _backlinks() {
+  const areas = ['Locked', 'Open'];
+  const shut = ['Locked'];
+  const md = TextFormats.markdown;
+  const captured = [
+    {
+      'text': 'Ann',
+      'amends': [
+        {'text': 'Myself: [Ann]({0})', 'format': md},
+      ],
+    },
+    {'text': 'Call [Ann]({0})', 'format': md},
+    {
+      'text': 'Groceries',
+      'amends': [
+        {'text': '**[Ann]({0})** and [Bea]({3})', 'format': md},
+      ],
+    },
+    {'text': '| Who |\n| --- |\n| [Ann]({^0}) |', 'format': md},
+    {'text': 'Plain [Ann]({0})'},
+    {'text': '[Ann]({0})', 'format': TextFormats.code},
+    {'text': '`[Ann]({0})` and [Ann](https://example.org)', 'format': md},
+    {'text': 'Locked [Ann]({%0})', 'format': md, 'area': 0},
+    {'text': 'Gone [Ann]({0})', 'format': md, 'trashed': true},
+    {'text': 'Household', 'area': 1},
+    {'text': 'Merged [Bea]({3})', 'format': md, 'into': 9},
+    {'text': 'Twice [Ann]({0}) and *[Ann]({0})*', 'format': md, 'area': 1},
+    {'text': 'Into locked [Bea]({3})', 'format': md, 'into': 7},
+  ];
+  var at = DateTime.utc(2026, 11, 12, 8);
+  final store = Store.inMemory(
+    clock: () => at,
+    newKey: () => SigningKey.fromSeed(_seed),
+  );
+  try {
+    final notes = Notes(store);
+    final places = Places(store);
+    final areaIds = [for (final name in areas) places.addArea(name).id];
+    final ids = <String>[];
+    String written(String text) =>
+        text.replaceAllMapped(RegExp(r'\{([\^%]?)(\d+)\}'), (m) {
+          final id = ids[int.parse(m[2]!)];
+          final url = AppLink(AppLinkKind.note, id).url;
+          return switch (m[1]) {
+            '^' => url.replaceFirst(AppLink.scheme, 'OLDBRAINFIX://'),
+            '%' => '${AppLink.scheme}note/${id.replaceAll(':', '%3A')}',
+            _ => url,
+          };
+        });
+    for (final note in captured) {
+      at = at.add(const Duration(minutes: 1));
+      final place = switch (note['area']) {
+        final int i => areaIds[i],
+        _ => null,
+      };
+      ids.add(
+        notes
+            .capture(
+              written(note['text'] as String),
+              format: note['format'] as String? ?? TextFormats.plain,
+              place: place,
+            )
+            .id,
+      );
+    }
+    for (final (i, note) in captured.indexed) {
+      final amends = note['amends'] as List<Map<String, String>>? ?? const [];
+      for (final amend in amends) {
+        at = at.add(const Duration(minutes: 1));
+        notes.amend(
+          ids[i],
+          written(amend['text']!),
+          format: amend['format'] ?? TextFormats.plain,
+        );
+      }
+    }
+    for (final (i, note) in captured.indexed) {
+      if (note['into'] case final int into) notes.merge(ids[i], ids[into]);
+      if (note['trashed'] == true) notes.trash(ids[i]);
+    }
+    final closed = {
+      for (final (i, name) in areas.indexed)
+        if (shut.contains(name)) areaIds[i],
+    };
+    final backlinks = Backlinks(store);
+    List<List<int>> linking(Set<String> closed) => [
+      for (final id in ids)
+        [
+          for (final note in backlinks.to(id, closed: closed))
+            ids.indexOf(note.id),
+        ],
+    ];
+    return {
+      'areas': areas,
+      'closed': {'areas': shut, 'linking': linking(closed)},
+      'linking': linking(const {}),
+      'notes': captured,
+    };
+  } finally {
+    store.close();
+  }
+}
+
 /// Schedules as sentences (ADR 0044), on a held day: each schedule of
 /// the simple editor written in English and German and read back, more
 /// texts read as typed with the parts not understood, and the words
@@ -11441,6 +11553,13 @@ Future<void> main(List<String> args) async {
     'levels, each tag as written most often with its count of Notes, and '
     'the suggestions for what is typed; both again with one Area closed '
     '(`closed`), its Notes and those merged into them left out.\n'
+    '- `backlinks.json`: the Notes that link to a Note (obf-1035): Notes '
+    'captured in a fresh store, plain, formatted and as code, some filed '
+    'into two Areas, with Amends, Merges and one trashed, their texts '
+    'holding app links to other Notes and to themselves, in a table, in '
+    'bold, in code, with the scheme in capitals and an id %-encoded; for '
+    'each Note the Notes linking to it, newest first, and again with one '
+    'Area closed (`closed`).\n'
     '- `file_texts.json`: the texts of attached files (ADR 0047): for each '
     'file its name, media type and bytes, the kind it is and what reading '
     'it gives: Word documents, workbooks, OpenDocument texts and '
@@ -11712,6 +11831,10 @@ Future<void> main(List<String> args) async {
     '${_json.convert(_textTags())}\n',
   );
   _write(File('${root.path}/tag_tree.json'), '${_json.convert(_tagTree())}\n');
+  _write(
+    File('${root.path}/backlinks.json'),
+    '${_json.convert(_backlinks())}\n',
+  );
   _write(
     File('${root.path}/file_texts.json'),
     '${_json.convert(_fileTexts())}\n',

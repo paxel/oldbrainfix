@@ -1325,6 +1325,12 @@ pub fn take_app_link(ctx: &egui::Context) -> Option<AppLink> {
         .flatten()
 }
 
+/// Hands the app link `link` to the window, as a click on one in a text
+/// does: [`take_app_link`] gives it once.
+pub fn hand_app_link(ctx: &egui::Context, link: AppLink) {
+    ctx.data_mut(|d| d.insert_temp(app_link_id(), Some(link)));
+}
+
 /// Takes the links `spots` of the text `of`, by id, as links over what
 /// was drawn under them; a click opens a web or e-mail address in the
 /// system's browser or mail program, and hands an app link (ADR 0046) to
@@ -1343,10 +1349,7 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
                 && markdown::may_open(&spot.url)
             {
                 match app_link::parse(&spot.url) {
-                    Some(link) => {
-                        ui.ctx()
-                            .data_mut(|d| d.insert_temp(app_link_id(), Some(link)));
-                    }
+                    Some(link) => hand_app_link(ui.ctx(), link),
                     None => ui.ctx().open_url(egui::OpenUrl::new_tab(&spot.url)),
                 }
             }

@@ -2745,6 +2745,8 @@
   "@linkToGuide": {"description": "The user guide's start page on the website, as a page of the Link to… picker (#261)."},
   "linkNotAvailable": "Not available here",
   "@linkNotAvailable": {"description": "Said when an app link's target cannot be seen on this Device (#261): a Note or Area deleted, in the trash, in a closed locked Area or never synced here, or a file not in the shared folder."},
+  "linkedFrom": "Linked from",
+  "@linkedFrom": {"description": "Heading of the part at a Note's end listing the Notes whose text or Sections hold an app link to it, one row per Note by its first line (obf-1035)."},
   "fileLinkTitle": "Open this file?",
   "@fileLinkTitle": {"description": "Title of the one question before a file link opens (#261)."},
   "fileLinkQuestion": "Open \"{file}\" from the shared folder with {app}?",

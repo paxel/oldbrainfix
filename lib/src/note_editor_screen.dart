@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'app_links.dart' show LinkedFrom;
 import 'app_lock.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
@@ -708,6 +709,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final _lines = TypedLines();
   PlacedNote? _placed;
   List<Section> _sections = const [];
+
+  /// The Notes that link to this one (obf-1035), but a closed locked
+  /// Area's, shown at its end.
+  List<Note> _linkedFrom = const [];
   List<Routine> _routines = const [];
 
   /// What the Note asks to check off now (#215): of each of its Routines
@@ -1040,6 +1045,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       NoteKind.session => {if (listed) NoteKind.plain},
     };
     _sections = widget.notes.sections(widget.noteId);
+    _linkedFrom = Backlinks(widget.notes.store).to(
+      widget.noteId,
+      closed: LockScope.of(context)?.closedAreas ?? const <String>{},
+    );
     _routines = _routineBook.ofNote(widget.noteId);
     _open = note == null || note.isTrashed
         ? const []
@@ -3338,6 +3347,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     children: _sectionPart(i, section, note, when),
                   ),
                 ),
+            // At the Note's end, after its Sections (obf-1035).
+            LinkedFrom(linking: _linkedFrom),
             const SizedBox(height: 24),
             if (amends)
               Align(

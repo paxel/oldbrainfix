@@ -8396,6 +8396,111 @@ fn the_tag_tree_is_read_as_the_dart_core_reads_it() -> TestResult {
     Ok(())
 }
 
+/// The generator's `written`: `{n}` the app link to the `n`th Note,
+/// `{^n}` with its scheme in capitals, `{%n}` with its id's `:` encoded.
+fn backlink_text(text: &str, ids: &[String]) -> Result<String, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::app_link::{AppLink, SCHEME};
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(open) = rest.find('{') {
+        out.push_str(&rest[..open]);
+        let close = rest[open..].find('}').ok_or("unclosed")? + open;
+        let inner = &rest[open + 1..close];
+        let (mark, n) = match inner.chars().next() {
+            Some(c @ ('^' | '%')) => (Some(c), &inner[1..]),
+            _ => (None, inner),
+        };
+        let id = ids.get(n.parse::<usize>()?).ok_or("no such Note")?;
+        let url = AppLink::Note(id.clone()).url();
+        out.push_str(&match mark {
+            Some('^') => url.replacen(SCHEME, "OLDBRAINFIX://", 1),
+            Some(_) => format!("{SCHEME}note/{}", id.replace(':', "%3A")),
+            None => url,
+        });
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
+#[test]
+fn backlinks_are_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::Backlinks;
+    let fixture = read_json(&fixtures().join("backlinks.json"))?;
+    let captured = fixture["notes"].as_array().ok_or("notes")?;
+    let at = std::sync::Arc::new(std::sync::Mutex::new(parse_time(
+        "2026-11-12T08:00:00.000Z",
+    )?));
+    let clock = at.clone();
+    let store = Store::in_memory(
+        Box::new(move || clock.lock().map(|t| *t).unwrap_or_default()),
+        || Ok(SigningKey::from_seed([9; 32])),
+    )?;
+    let tick = || {
+        if let Ok(mut t) = at.lock() {
+            *t += chrono::Duration::minutes(1);
+        }
+    };
+    let notes = Notes::new(&store);
+    let places = Places::new(&store);
+    let mut area_ids = Vec::new();
+    for name in fixture["areas"].as_array().ok_or("areas")? {
+        area_ids.push(places.add_area(name.as_str().ok_or("area")?)?.id);
+    }
+    let mut ids: Vec<String> = Vec::new();
+    for note in captured {
+        tick();
+        let text = backlink_text(note["text"].as_str().ok_or("text")?, &ids)?;
+        let format = note["format"].as_str().unwrap_or("plain");
+        let place = match note["area"].as_u64() {
+            Some(i) => Some(area_ids.get(usize::try_from(i)?).ok_or("area")?.as_str()),
+            None => None,
+        };
+        ids.push(notes.capture_as(&text, format, place, None)?.id);
+    }
+    for (i, note) in captured.iter().enumerate() {
+        for amend in note["amends"].as_array().into_iter().flatten() {
+            tick();
+            let text = backlink_text(amend["text"].as_str().ok_or("amend")?, &ids)?;
+            let format = amend["format"].as_str().unwrap_or("plain");
+            notes.amend_as(&ids[i], &text, format)?;
+        }
+    }
+    for (i, note) in captured.iter().enumerate() {
+        if let Some(into) = note["into"].as_u64() {
+            notes.merge(&ids[i], &ids[usize::try_from(into)?])?;
+        }
+        if note["trashed"].as_bool() == Some(true) {
+            notes.trash(&ids[i])?;
+        }
+    }
+    let mut closed = std::collections::HashSet::new();
+    let areas = fixture["areas"].as_array().ok_or("areas")?;
+    for shut in fixture["closed"]["areas"].as_array().ok_or("closed")? {
+        let i = areas.iter().position(|a| a == shut).ok_or("closed area")?;
+        closed.insert(area_ids.get(i).ok_or("area")?.clone());
+    }
+    assert!(!closed.is_empty());
+    let backlinks = Backlinks::new(&store);
+    for (shut, wanted) in [
+        (std::collections::HashSet::new(), &fixture["linking"]),
+        (closed, &fixture["closed"]["linking"]),
+    ] {
+        let mut ours = Vec::new();
+        for id in &ids {
+            let linking: Vec<usize> = backlinks
+                .to(id, &shut)?
+                .iter()
+                .filter_map(|n| ids.iter().position(|i| *i == n.id))
+                .collect();
+            ours.push(json!(linking));
+        }
+        assert_eq!(&json!(ours), wanted);
+    }
+    assert_ne!(fixture["linking"], fixture["closed"]["linking"]);
+    Ok(())
+}
+
 // --------------------------------------------------- Schedule sentences
 
 /// `repeat` as the generator writes it.

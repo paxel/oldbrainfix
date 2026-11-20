@@ -5026,6 +5026,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get linkNotAvailable => 'Not available here';
 
   @override
+  String get linkedFrom => 'Linked from';
+
+  @override
   String get fileLinkTitle => 'Open this file?';
 
   @override

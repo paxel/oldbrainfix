@@ -5091,6 +5091,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get linkNotAvailable => 'Hier nicht verfügbar';
 
   @override
+  String get linkedFrom => 'Verlinkt von';
+
+  @override
   String get fileLinkTitle => 'Diese Datei öffnen?';
 
   @override
