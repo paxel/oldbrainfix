@@ -837,11 +837,16 @@ class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
             bottom: BorderSide(color: theme.colorScheme.outlineVariant),
           ),
         ),
-        child: Focus(
-          canRequestFocus: false,
-          skipTraversal: true,
-          onFocusChange: (focused) => setState(() => _focused = focused),
-          child: widget.child,
+        // Room under the bar, so its line runs along the band's bottom and
+        // not along the field's edge (#351, obf-1041).
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Focus(
+            canRequestFocus: false,
+            skipTraversal: true,
+            onFocusChange: (focused) => setState(() => _focused = focused),
+            child: widget.child,
+          ),
         ),
       ),
     );
