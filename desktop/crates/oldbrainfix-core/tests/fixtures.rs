@@ -1217,9 +1217,14 @@ fn note_histories_come_to_what_the_dart_core_says() -> TestResult {
         assert_eq!(json!({ "notes": out }), read_json(&path)?, "{scenario}");
         checked += 1;
     }
-    assert_eq!(checked, SCENARIOS.len());
+    // A scenario without a Note has no History to compare.
+    assert_eq!(checked, SCENARIOS.len() - WITHOUT_NOTES.len());
     Ok(())
 }
+
+/// The scenarios whose log holds no Note, so the generator writes no
+/// `note_history.json` for them.
+const WITHOUT_NOTES: [&str; 1] = ["added-grammars"];
 
 #[test]
 fn boxes_show_and_tick_as_the_dart_core_does() -> TestResult {
