@@ -5618,11 +5618,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Tap + and Text, type a task, tap More, then the + badge and Remind me…; set its time and tap Save.';
+      'Type a task in +, tap More, then + and Remind me…; set its time and tap Save.';
 
   @override
   String get helpQuickStart4 =>
-      'Tap + and Text, type a habit, tap More, then the + badge and Remind me…; tap Every …, choose when it repeats and tap Save.';
+      'Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.';
 
   @override
   String get helpQuickStart5 =>

@@ -5684,11 +5684,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Tippe auf + und Text, schreib eine Aufgabe, tippe auf „Mehr“, dann auf die Plakette + und Erinnere mich …, stell die Zeit ein und tippe auf Speichern.';
+      'Schreib unter + eine Aufgabe, tippe „Mehr“, dann + und Erinnere mich …; stell die Zeit ein und speichere.';
 
   @override
   String get helpQuickStart4 =>
-      'Tippe auf + und Text, schreib eine Gewohnheit, tippe auf „Mehr“, dann auf die Plakette + und Erinnere mich …, tippe auf Alle …, wähl, wann sie sich wiederholt, und tippe auf Speichern.';
+      'Schreib unter + eine Gewohnheit, tippe „Mehr“, dann + und Erinnere mich …; wähl Alle …, wann, und Speichern.';
 
   @override
   String get helpQuickStart5 =>

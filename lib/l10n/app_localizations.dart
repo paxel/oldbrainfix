@@ -9053,13 +9053,13 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStart3.
   ///
   /// In en, this message translates to:
-  /// **'Tap + and Text, type a task, tap More, then the + badge and Remind me…; set its time and tap Save.'**
+  /// **'Type a task in +, tap More, then + and Remind me…; set its time and tap Save.'**
   String get helpQuickStart3;
 
   /// No description provided for @helpQuickStart4.
   ///
   /// In en, this message translates to:
-  /// **'Tap + and Text, type a habit, tap More, then the + badge and Remind me…; tap Every …, choose when it repeats and tap Save.'**
+  /// **'Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.'**
   String get helpQuickStart4;
 
   /// No description provided for @helpQuickStart5.
