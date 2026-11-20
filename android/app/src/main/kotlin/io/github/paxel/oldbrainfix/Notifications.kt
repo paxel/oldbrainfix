@@ -23,6 +23,7 @@ import android.os.Build
  */
 object Notifications {
     private const val ESCALATED_CHANNEL = "escalated"
+    private const val QUIET_CHANNEL = "quiet"
     private const val RING_CHANNEL = "ringing"
     private const val NUDGE_CHANNEL = "nudges"
     private val CATCH_UP_ID = "catch-up".hashCode()
@@ -42,10 +43,11 @@ object Notifications {
     /**
      * The notification of a due Occurrence. An [urgent] one escalated but
      * cannot ring full screen: it comes on its own channel, with the
-     * phone's alarm sound.
+     * phone's alarm sound. A [silent] one fires in the Quiet Hours
+     * (obf-1045): it comes on its own channel, without sound or vibration.
      */
-    fun show(context: Context, alarm: Alarm, urgent: Boolean = false) {
-        post(context, alarm, alarm.body, doneAndSnooze(context, alarm), alertOnce = false, urgent = urgent)
+    fun show(context: Context, alarm: Alarm, urgent: Boolean = false, silent: Boolean = false) {
+        post(context, alarm, alarm.body, doneAndSnooze(context, alarm), alertOnce = false, urgent = urgent, silent = silent)
     }
 
     /**
@@ -268,9 +270,14 @@ object Notifications {
         actions: List<Notification.Action>,
         alertOnce: Boolean,
         urgent: Boolean = false,
+        silent: Boolean = false,
     ) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        val notification = (if (urgent) escalatedBuilder(context) else builder(context))
+        val notification = when {
+            urgent -> escalatedBuilder(context)
+            silent -> quietBuilder(context)
+            else -> builder(context)
+        }
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(alarm.title)
             .setContentText(text)
@@ -297,6 +304,32 @@ object Notifications {
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setSound(Uri.parse(sound), SoundChannel.attributes)
                 .setDefaults(Notification.DEFAULT_VIBRATE or Notification.DEFAULT_LIGHTS)
+        }
+
+    /**
+     * The channel of an Occurrence firing in the Quiet Hours (obf-1045):
+     * shown as any other, on the lock screen too, but without sound or
+     * vibration.
+     */
+    private fun quietBuilder(context: Context): Notification.Builder =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(
+                    QUIET_CHANNEL,
+                    Scheduler.label(context, "quietChannel"),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply {
+                    setSound(null, null)
+                    enableVibration(false)
+                },
+            )
+            Notification.Builder(context, QUIET_CHANNEL)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context)
+                .setPriority(Notification.PRIORITY_DEFAULT)
+                .setSound(null)
+                .setVibrate(null)
         }
 
     /** The high-priority channel an escalated alarm falls back to, with the alarm sound. */

@@ -161,7 +161,8 @@ enum AlarmKind {
 /// One alarm that should exist. While its Occurrence is not Done it
 /// fires at [at] and then Re-nags every [renag], up to [endsAt], when
 /// the Occurrence counts as Missed. With [escalation] on, every firing
-/// from [escalatesAt] on is a full-screen alarm with sound.
+/// from [escalatesAt] on is a full-screen alarm with sound. A firing in
+/// [quiet] shows without sound ([silentAt]).
 class PlannedAlarm {
   final AlarmKind kind;
   final String routineId;
@@ -187,6 +188,11 @@ class PlannedAlarm {
   final WallMoment ends;
   final DateTime endsAt;
 
+  /// The Quiet Hours its firings show without sound or vibration in
+  /// (obf-1045); null when they are off or its Routine escalates, which
+  /// rings with sound from its first ring.
+  final QuietHours? quiet;
+
   /// The text of the Note the Routine links back to as it reads without
   /// its marks ([Note.visibleText]); null when it is gone.
   final String? text;
@@ -208,6 +214,7 @@ class PlannedAlarm {
     this.escalation,
     required this.ends,
     required this.endsAt,
+    this.quiet,
     required this.text,
     this.wordless = Wordless.photo,
     this.wordlessName = '',
@@ -238,11 +245,18 @@ class PlannedAlarm {
     return first.isBefore(endsAt) ? first : null;
   }
 
+  /// Whether it fires at [firing] without sound or vibration: [firing]
+  /// lies in [quiet] on [wallClock]. The platform's alarm layer follows
+  /// the same rule.
+  bool silentAt(DateTime firing, WallClock wallClock) =>
+      quiet?.holds(firing, wallClock) ?? false;
+
   @override
   String toString() =>
       '$id at ${at.toIso8601String()} every ${renag.inMinutes} min '
       'until ${endsAt.toIso8601String()}'
-      '${escalation == null ? '' : ' escalating after $escalation'}';
+      '${escalation == null ? '' : ' escalating after $escalation'}'
+      '${quiet == null ? '' : ' silent in $quiet'}';
 }
 
 /// The key a snooze of [occurrence] of the Routine [routineId] is kept
@@ -260,8 +274,9 @@ String snoozeKey(String routineId, Occurrence occurrence) =>
 /// interval, else at [renag], and escalates as its Routine says. An
 /// all-day Occurrence rings from [allDayFrom] (#201), or once [quiet]
 /// ends when they hold that time, and has no alarm when they last
-/// until it counts as Missed. [snoozes] are this Device's (ADR 0008),
-/// keyed by [snoozeKey].
+/// until it counts as Missed. Every other firing in [quiet] shows
+/// without sound, but for a Routine that escalates (obf-1045).
+/// [snoozes] are this Device's (ADR 0008), keyed by [snoozeKey].
 List<PlannedAlarm> alarmPlan({
   required List<(Routine, Note?)> routines,
   required Map<String, DateTime> snoozes,
@@ -312,6 +327,8 @@ List<PlannedAlarm> alarmPlan({
           escalation: routine.escalation,
           ends: t.ends,
           endsAt: t.endsAt,
+          // Escalation is the only way through Quiet Hours.
+          quiet: routine.escalation == null ? quiet : null,
           text: note?.visibleText,
           wordless: note?.wordless ?? Wordless.photo,
           wordlessName: note?.wordlessName ?? '',
@@ -503,7 +520,8 @@ class Alarms {
   /// The Nudge at the store's now over the Unsorted Notes, with this
   /// Device's snooze, repeat interval and Quiet Hours; null when nothing
   /// is Unsorted. Of the Occurrences of [plan], Quiet Hours hold back
-  /// only the first ring of an all-day one.
+  /// only the first ring of an all-day one; in them the rest ring
+  /// without sound.
   PlannedNudge? nudge(WallClock wallClock) => nudgePlan(
     unsorted: Notes(store).unsorted(),
     snooze: nudgeSnooze,

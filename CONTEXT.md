@@ -146,7 +146,7 @@ The reminder that Unsorted Notes are waiting. Its time is chosen at Capture (10 
 _Avoid_: reminder (that is a different thing), nag (that is Re-nag)
 
 **Quiet Hours**:
-A daily window in which Nudges and the Changes Nudge wait. Routines and Reminders are not affected, but for the first ring of an all-day Occurrence, which waits until the window ends (#201).
+A daily window in which Nudges and the Changes Nudge wait, and in which Routines and Reminders show without sound or vibration, their Re-nags too, unless the Routine has Escalation on, which is the only way through (obf-1045). The first ring of an all-day Occurrence waits until the window ends (#201).
 
 **Starter Set**:
 The Areas and Topics offered on first start; the user picks which ones to keep.

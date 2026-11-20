@@ -4565,6 +4565,12 @@ Map<String, Object?> _alarms(Store store) {
                   'text': a.text,
                   'wordless': a.wordless.name,
                   'firesAfterNow': a.firesAfter(now)?.toUtc().toIso8601String(),
+                  // Quiet Hours silence it unless it escalates (obf-1045).
+                  'quiet': a.quiet?.toString(),
+                  'silentAfterNow': switch (a.firesAfter(now)) {
+                    final fires? => a.silentAt(fires, _europe),
+                    null => null,
+                  },
                 },
             ],
             'missed': {

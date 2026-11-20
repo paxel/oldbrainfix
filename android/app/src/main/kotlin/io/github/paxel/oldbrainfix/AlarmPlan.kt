@@ -9,7 +9,8 @@ import java.util.TimeZone
  * snooze waits a fixed time and keeps its instant in [at]. While
  * ignored it Re-nags every [renagMs] until [end], when its Occurrence
  * counts as Missed; with [escalate] set, it rings full screen once the
- * first ring and that many Re-nags went ignored.
+ * first ring and that many Re-nags went ignored. A firing in [quiet]
+ * shows without sound or vibration (obf-1045).
  */
 data class Alarm(
     val id: String,
@@ -27,6 +28,12 @@ data class Alarm(
     val end: List<Int>? = null,
     /** After how many ignored Re-nags it escalates; 0 never does. */
     val escalate: Int = 0,
+    /**
+     * The Quiet Hours it keeps quiet in, [startHour, startMinute,
+     * endHour, endMinute] on the wall clock; null while they are off or
+     * its Routine escalates.
+     */
+    val quiet: List<Int>? = null,
 )
 
 /** Done, a snooze or Not today tapped on a notification, kept until the app applied it. */
@@ -142,6 +149,7 @@ object AlarmPlan {
                     renagMs = was?.renagMs ?: 0,
                     end = was?.end,
                     escalate = was?.escalate ?: 0,
+                    quiet = was?.quiet,
                 )
             }
         val planned = (kept + added).map { it.routine to it.occurrence }.toMutableSet()
@@ -242,6 +250,29 @@ object AlarmPlan {
         if (now < first || now >= endOf(alarm, zone)) return false
         return (now - first) / alarm.renagMs >= alarm.escalate + 1L
     }
+
+    /**
+     * Whether [alarm], firing at [now], shows without sound or vibration:
+     * [now] lies in its Quiet Hours on [zone]'s clock. The same rule as
+     * the core's `PlannedAlarm.silentAt`.
+     */
+    fun silent(alarm: Alarm, zone: TimeZone, now: Long): Boolean =
+        alarm.quiet?.let { inQuiet(it, zone, now) } ?: false
+
+    /**
+     * Whether [at] lies in the Quiet Hours [quiet] ([startHour,
+     * startMinute, endHour, endMinute]) on [zone]'s clock: from their
+     * start, up to their end, over midnight when the start is later.
+     */
+    fun inQuiet(quiet: List<Int>, zone: TimeZone, at: Long): Boolean {
+        if (quiet.size != 4) return false
+        val start = quiet[0] * 60 + quiet[1]
+        val end = quiet[2] * 60 + quiet[3]
+        val minute = (((at + zone.getOffset(at)) % DAY_MS + DAY_MS) % DAY_MS / 60_000L).toInt()
+        return if (start <= end) minute in start until end else minute >= start || minute < end
+    }
+
+    private const val DAY_MS = 24 * 60 * 60 * 1000L
 
     /**
      * When a full-screen alarm of [alarm] starting at [now] stops: after

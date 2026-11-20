@@ -972,6 +972,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get escalatedChannel => 'Escalated alarms';
 
   @override
+  String get quietChannel => 'Routines and Reminders in the Quiet Hours';
+
+  @override
   String get escalationHeading => 'Escalation';
 
   @override
@@ -1057,7 +1060,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nudgeSettingsExplain =>
-      'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.';
+      'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders show on time but without sound, unless Escalation is on for them; only an all-day one waits until they end.';
 
   @override
   String get nudgeRepeat => 'Nudge again after';
@@ -1643,7 +1646,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get allDayFromDetail =>
-      'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.';
+      'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win: it waits until they end, and in them it Re-nags without sound unless Escalation is on.';
 
   @override
   String get alarmSound => 'Alarm sound';

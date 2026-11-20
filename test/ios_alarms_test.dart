@@ -160,6 +160,11 @@ void main() {
     expect(first['occurrence'], '2026-10-24T20:00');
     expect(first['local'], [2026, 10, 24, 20, 0]);
     expect(first['escalate'], 2);
+    expect(
+      first.containsKey('quiet'),
+      isFalse,
+      reason: 'an escalating Routine rings through the Quiet Hours',
+    );
     expect(first['title'], 'pills');
     final labels = arm['labels'] as Map<Object?, Object?>;
     expect(labels['done'], 'Done');
@@ -167,6 +172,20 @@ void main() {
       [labels['snooze10'], labels['snooze30'], labels['snooze60']],
       ['10 min', '30 min', '1 h'],
     );
+    expect(labels['quietChannel'], 'Routines and Reminders in the Quiet Hours');
+  });
+
+  testWidgets('an alarm hands over the Quiet Hours it keeps quiet in', (
+    tester,
+  ) async {
+    routines.create('pills', daily([at(20)]));
+    await start(tester);
+
+    final arm = named('arm').last.arguments as Map<Object?, Object?>;
+    final first =
+        (arm['alarms'] as List<Object?>).first as Map<Object?, Object?>;
+    // 22:00 to 08:00 unless changed (obf-1045).
+    expect(first['quiet'], [22, 0, 8, 0]);
   });
 
   testWidgets('a Done and a snooze tapped on the lock screen reach the log '

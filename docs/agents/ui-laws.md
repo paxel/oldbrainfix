@@ -930,6 +930,11 @@ replace a law of Both apps where they say so. A desktop law marked
   or later. Neither changes the schedule. Done moves a Plain Note with
   its only Reminder to the trash where the person chose so (#211,
   "Agenda").
+- **Quiet Hours are quiet** (obf-1045): in them an Occurrence's
+  notification and its Re-nags show on time without sound or vibration,
+  never full screen; a Routine with Escalation on rings with sound from
+  its first ring, as Escalation is the only way through. An all-day
+  Occurrence's first ring still waits until they end (#201).
 
 ## Phone
 
@@ -1468,7 +1473,8 @@ replace a law of Both apps where they say so. A desktop law marked
     own alarm screen replaces the page: its Stop answers Done, and its
     one Snooze waits 10 min, as there is room for one only. Without the
     Alarms permission it comes as a time-sensitive notification.
-  - An Occurrence's notification is time-sensitive and offers Done, the
+  - An Occurrence's notification is time-sensitive, in the Quiet Hours
+    a normal one without sound (obf-1045), and offers Done, the
     three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h"),
     Skip and Tomorrow at once, not Snooze and Not today and then their
     choices (#269); a Re-nag after midnight of an earlier day's

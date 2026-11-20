@@ -251,11 +251,33 @@ class AlarmPlanTests: XCTestCase {
         "title": "pills", "body": "08:00",
       ],
       ["id": "broken"],
+      [
+        "id": "occurrence:q@2026-10-24T08:00", "routine": "q", "occurrence": "2026-10-24T08:00",
+        "local": [2026, 10, 24, 8, 0], "quiet": [22, 0, 8, 0], "title": "quiet", "body": "08:00",
+      ],
     ] as [[String: Any]])
-    XCTAssertEqual(alarms.count, 1)
+    XCTAssertEqual(alarms.count, 2)
+    XCTAssertNil(alarms.first?.quiet)
+    XCTAssertEqual(alarms.last?.quiet, [22, 0, 8, 0])
     XCTAssertEqual(alarms.first?.renagMs, 15 * minute)
     XCTAssertEqual(alarms.first?.escalate, 3)
     XCTAssertEqual(alarms.first?.end, [2026, 10, 24, 20, 0])
+  }
+
+  func testRingsInTheQuietHoursAreSilent() {
+    // Re-nags every 10 minutes; quiet from 08:20 to 09:00 (obf-1045).
+    var pills = alarm("pills", renag: 10, end: [2026, 10, 24, 9, 30])
+    pills.quiet = [8, 20, 9, 0]
+    let rings = AlarmPlan.window(
+      alarms: [pills], nudge: nil, changes: nil, zone: berlin, now: eight - minute)
+    XCTAssertEqual(
+      rings.map { $0.silent }, [false, false, true, true, true, true, false, false, false])
+    // Over midnight; none while off.
+    pills.quiet = [22, 0, 8, 30]
+    XCTAssertTrue(AlarmPlan.silent(pills, zone: berlin, now: eight))
+    XCTAssertFalse(AlarmPlan.silent(pills, zone: berlin, now: eight + 30 * minute))
+    pills.quiet = nil
+    XCTAssertFalse(AlarmPlan.silent(pills, zone: berlin, now: eight + 30 * minute))
   }
 
   func testTheAlarmKitUsageTextIsThere() {

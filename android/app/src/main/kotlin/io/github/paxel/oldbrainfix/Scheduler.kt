@@ -158,6 +158,7 @@ object Scheduler {
      * and arms the next one. An escalated one rings full screen; without
      * the full-screen permission, or when Android does not let the
      * ringing start, it shows as a high-priority notification instead.
+     * One firing in its Quiet Hours shows without sound or vibration.
      */
     fun fired(context: Context, armed: Long) {
         val now = System.currentTimeMillis()
@@ -167,7 +168,13 @@ object Scheduler {
         val ring = AlarmPlan.toRing(due, zone, now, Permissions.fullScreenAllowed(context))
         for (alarm in due) {
             if (alarm == ring && RingService.start(context, alarm, AlarmPlan.ringUntil(alarm, zone, now))) continue
-            Notifications.show(context, alarm, urgent = AlarmPlan.escalates(alarm, zone, now))
+            // In the Quiet Hours without sound or vibration (obf-1045).
+            Notifications.show(
+                context,
+                alarm,
+                urgent = AlarmPlan.escalates(alarm, zone, now),
+                silent = AlarmPlan.silent(alarm, zone, now),
+            )
         }
         nudge(context)?.let { if (NudgePlan.due(it, zone, armed, lastFired, now)) Notifications.showNudge(context, it) }
         changes(context)?.let { (changes, public) ->
@@ -202,6 +209,7 @@ object Scheduler {
         renagMs = json.optLong("renag") * 60_000L,
         end = json.optJSONArray("end")?.let { end -> (0 until end.length()).map { end.getInt(it) } },
         escalate = json.optInt("escalate"),
+        quiet = json.optJSONArray("quiet")?.let { quiet -> (0 until quiet.length()).map { quiet.getInt(it) } },
     )
 
     private fun nudge(json: JSONObject): Nudge {

@@ -431,4 +431,30 @@ class AlarmPlanTest {
             AlarmPlan.keepsRinging(AlarmPlan.effective(listOf(alarm), listOf(done)), "routine:r", "2026-10-24T08:00"),
         )
     }
+
+    @Test
+    fun aFiringInTheQuietHoursShowsWithoutSound() {
+        // Quiet from 08:20 to 09:00 on Berlin's clock (06:20 to 07:00 UTC).
+        val alarm = nagging().copy(quiet = listOf(8, 20, 9, 0))
+        assertFalse(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 6, 10)))
+        assertTrue(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 6, 20)))
+        assertTrue(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 6, 50)))
+        assertFalse(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 7)))
+        // Over midnight; and none while off or escalating.
+        val night = nagging().copy(quiet = listOf(22, 0, 8, 0))
+        assertTrue(AlarmPlan.silent(night, berlin, utc(2026, 10, 24, 5, 59)))
+        assertFalse(AlarmPlan.silent(night, berlin, utc(2026, 10, 24, 6)))
+        assertTrue(AlarmPlan.silent(night, berlin, utc(2026, 10, 24, 20)))
+        assertFalse(AlarmPlan.silent(nagging(), berlin, utc(2026, 10, 24, 6, 30)))
+    }
+
+    @Test
+    fun aSnoozeKeepsTheQuietHoursOfItsOccurrence() {
+        val until = utc(2026, 10, 24, 6, 30)
+        val tapped = Action(1, "snooze", "routine:r", "2026-10-24T08:00", 0, until, "pills", "08:00")
+        val alarm = nagging().copy(quiet = listOf(8, 20, 9, 0))
+        val snoozed = AlarmPlan.effective(listOf(alarm), listOf(tapped)).single()
+        assertEquals(listOf(8, 20, 9, 0), snoozed.quiet)
+        assertTrue(AlarmPlan.silent(snoozed, berlin, until))
+    }
 }

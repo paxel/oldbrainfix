@@ -190,7 +190,8 @@ impl AlarmKind {
 /// One alarm that should exist. While its Occurrence is not Done it fires
 /// at `at` and then Re-nags every `renag`, up to `ends_at`, when the
 /// Occurrence counts as Missed. With `escalation` on, every firing from
-/// [`PlannedAlarm::escalates_at`] on is escalated.
+/// [`PlannedAlarm::escalates_at`] on is escalated. A firing in `quiet`
+/// shows without sound ([`PlannedAlarm::silent_at`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlannedAlarm {
     pub kind: AlarmKind,
@@ -205,6 +206,10 @@ pub struct PlannedAlarm {
     pub escalation: Option<i64>,
     pub ends: WallMoment,
     pub ends_at: DateTime<Utc>,
+    /// The Quiet Hours its firings show without sound or vibration in
+    /// (obf-1045); `None` when they are off or its Routine escalates,
+    /// which rings with sound from its first ring.
+    pub quiet: Option<QuietHours>,
     /// The text of the Note the Routine links back to as it reads without
     /// its marks ([`Note::visible_text`]); `None` when gone.
     pub text: Option<String>,
@@ -246,6 +251,12 @@ impl PlannedAlarm {
         let first = self.at + self.renag * (after as i32 + 1);
         (first < self.ends_at).then_some(first)
     }
+
+    /// Whether it fires at `firing` without sound or vibration: `firing`
+    /// lies in `quiet` on `wall`.
+    pub fn silent_at(&self, firing: DateTime<Utc>, wall: &WallClock) -> bool {
+        self.quiet.is_some_and(|q| q.holds(firing, wall))
+    }
 }
 
 /// The key a snooze of `occurrence` of the Routine `routine_id` is kept
@@ -262,7 +273,9 @@ pub fn snooze_key(routine_id: &str, occurrence: &Occurrence) -> String {
 /// the Occurrence counts as Missed is dropped. Each Re-nags at its
 /// Routine's interval, else at `renag`. An all-day Occurrence rings from
 /// `all_day_from` (#201), or once `quiet` ends when they hold that time,
-/// and has no alarm when they last until it counts as Missed.
+/// and has no alarm when they last until it counts as Missed. Every other
+/// firing in `quiet` shows without sound, but for a Routine that
+/// escalates (obf-1045).
 pub fn alarm_plan(
     routines: &[(Routine, Option<Note>)],
     snoozes: &BTreeMap<String, DateTime<Utc>>,
@@ -327,6 +340,8 @@ pub fn alarm_plan(
                 escalation: routine.escalation,
                 ends: t.ends,
                 ends_at: t.ends_at,
+                // Escalation is the only way through Quiet Hours.
+                quiet: quiet.filter(|_| routine.escalation.is_none()),
                 text: note.as_ref().map(Note::visible_text),
                 wordless: note.as_ref().map(Note::wordless).unwrap_or_default(),
                 wordless_name: note.as_ref().map(Note::wordless_name).unwrap_or_default(),

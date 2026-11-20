@@ -977,6 +977,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get escalatedChannel => 'Eskalierte Alarme';
 
   @override
+  String get quietChannel => 'Routinen und Erinnerungen in der Ruhezeit';
+
+  @override
   String get escalationHeading => 'Eskalation';
 
   @override
@@ -1064,7 +1067,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nudgeSettingsExplain =>
-      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich; nur eine ganztägige wartet, bis sie endet.';
+      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen erscheinen pünktlich, aber ohne Ton, außer mit Eskalation; nur eine ganztägige wartet, bis sie endet.';
 
   @override
   String get nudgeRepeat => 'Erneut stupsen nach';
@@ -1653,7 +1656,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get allDayFromDetail =>
-      'Vorher steht eine ganztägige Routine oder Erinnerung nur auf der Agenda. Ab dieser Uhrzeit klingelt sie und erinnert erneut. Die Ruhezeit geht vor.';
+      'Vorher steht eine ganztägige Routine oder Erinnerung nur auf der Agenda. Ab dieser Uhrzeit klingelt sie und erinnert erneut. Die Ruhezeit geht vor: Die Routine oder Erinnerung wartet, bis sie endet, und erinnert darin ohne Ton erneut, außer mit Eskalation.';
 
   @override
   String get alarmSound => 'Alarmton';

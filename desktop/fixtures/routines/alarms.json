@@ -343,7 +343,9 @@
           "endsAt": "2026-03-31T07:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T21:40:00.000Z"
+          "firesAfterNow": "2026-03-28T21:40:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000003@2026-03-01",
@@ -359,7 +361,9 @@
           "endsAt": "2026-04-04T22:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T21:40:00.000Z"
+          "firesAfterNow": "2026-03-28T21:40:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000010@2026-03-26T07:30",
@@ -375,7 +379,9 @@
           "endsAt": "2026-04-06T05:30:00.000Z",
           "text": "Stretch",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T21:40:00.000Z"
+          "firesAfterNow": "2026-03-28T21:40:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-03-26T23:00",
@@ -391,7 +397,9 @@
           "endsAt": "2026-03-28T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T21:40:00.000Z"
+          "firesAfterNow": "2026-03-28T21:40:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-03-28T07:00",
@@ -407,7 +415,9 @@
           "endsAt": "2026-03-29T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T21:40:00.000Z"
+          "firesAfterNow": "2026-03-28T21:40:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-03-28",
@@ -423,7 +433,9 @@
           "endsAt": "2026-03-28T23:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T21:40:00.000Z"
+          "firesAfterNow": "2026-03-28T21:40:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "snooze:routine:00000000000000000000000000000002@2026-03-28T20:00",
@@ -439,7 +451,9 @@
           "endsAt": "2026-03-29T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T21:45:00.000Z"
+          "firesAfterNow": "2026-03-28T21:45:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-03-28T23:00",
@@ -455,7 +469,9 @@
           "endsAt": "2026-03-30T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-28T22:00:00.000Z"
+          "firesAfterNow": "2026-03-28T22:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000007@2026-03-29T02:30",
@@ -471,7 +487,9 @@
           "endsAt": "2026-03-29T22:00:00.000Z",
           "text": "Dentist",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T01:00:00.000Z"
+          "firesAfterNow": "2026-03-29T01:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-03-29T07:00",
@@ -487,7 +505,9 @@
           "endsAt": "2026-03-30T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T05:00:00.000Z"
+          "firesAfterNow": "2026-03-29T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-29T08:00",
@@ -503,7 +523,9 @@
           "endsAt": "2026-03-29T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T06:00:00.000Z"
+          "firesAfterNow": "2026-03-29T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-29T14:00",
@@ -519,7 +541,9 @@
           "endsAt": "2026-03-29T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T12:00:00.000Z"
+          "firesAfterNow": "2026-03-29T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-03-29",
@@ -535,7 +559,9 @@
           "endsAt": "2026-04-03T22:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T13:00:00.000Z"
+          "firesAfterNow": "2026-03-29T13:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-29T20:00",
@@ -551,7 +577,9 @@
           "endsAt": "2026-03-30T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T18:00:00.000Z"
+          "firesAfterNow": "2026-03-29T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-03-30T07:00",
@@ -567,7 +595,9 @@
           "endsAt": "2026-03-31T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T05:00:00.000Z"
+          "firesAfterNow": "2026-03-30T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-30T08:00",
@@ -583,7 +613,9 @@
           "endsAt": "2026-03-30T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T06:00:00.000Z"
+          "firesAfterNow": "2026-03-30T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-30T14:00",
@@ -599,7 +631,9 @@
           "endsAt": "2026-03-30T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T12:00:00.000Z"
+          "firesAfterNow": "2026-03-30T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-30T20:00",
@@ -615,7 +649,9 @@
           "endsAt": "2026-03-31T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T18:00:00.000Z"
+          "firesAfterNow": "2026-03-30T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-03-30T23:00",
@@ -631,7 +667,9 @@
           "endsAt": "2026-04-01T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T21:00:00.000Z"
+          "firesAfterNow": "2026-03-30T21:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-03-31T07:00",
@@ -647,7 +685,9 @@
           "endsAt": "2026-04-01T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T05:00:00.000Z"
+          "firesAfterNow": "2026-03-31T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-31T08:00",
@@ -663,7 +703,9 @@
           "endsAt": "2026-03-31T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T06:00:00.000Z"
+          "firesAfterNow": "2026-03-31T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-03-31T09:00",
@@ -679,7 +721,9 @@
           "endsAt": "2026-03-31T16:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T07:00:00.000Z"
+          "firesAfterNow": "2026-03-31T07:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-31T14:00",
@@ -695,7 +739,9 @@
           "endsAt": "2026-03-31T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T12:00:00.000Z"
+          "firesAfterNow": "2026-03-31T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-03-31T18:00",
@@ -711,7 +757,9 @@
           "endsAt": "2026-04-30T07:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T16:00:00.000Z"
+          "firesAfterNow": "2026-03-31T16:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-31T20:00",
@@ -727,7 +775,9 @@
           "endsAt": "2026-04-01T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T18:00:00.000Z"
+          "firesAfterNow": "2026-03-31T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-04-01T07:00",
@@ -743,7 +793,9 @@
           "endsAt": "2026-04-02T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T05:00:00.000Z"
+          "firesAfterNow": "2026-04-01T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-01T08:00",
@@ -759,7 +811,9 @@
           "endsAt": "2026-04-01T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T06:00:00.000Z"
+          "firesAfterNow": "2026-04-01T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000014@2026-04-01T10:00",
@@ -775,7 +829,9 @@
           "endsAt": "2026-04-01T22:00:00.000Z",
           "text": "Flyer for the fair",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T08:00:00.000Z"
+          "firesAfterNow": "2026-04-01T08:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-01T14:00",
@@ -791,7 +847,9 @@
           "endsAt": "2026-04-01T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T12:00:00.000Z"
+          "firesAfterNow": "2026-04-01T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-01T20:00",
@@ -807,7 +865,9 @@
           "endsAt": "2026-04-02T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T18:00:00.000Z"
+          "firesAfterNow": "2026-04-01T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-04-01T23:00",
@@ -823,7 +883,9 @@
           "endsAt": "2026-04-03T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T21:00:00.000Z"
+          "firesAfterNow": "2026-04-01T21:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-04-02T07:00",
@@ -839,7 +901,9 @@
           "endsAt": "2026-04-03T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T05:00:00.000Z"
+          "firesAfterNow": "2026-04-02T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-02T08:00",
@@ -855,7 +919,9 @@
           "endsAt": "2026-04-02T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T06:00:00.000Z"
+          "firesAfterNow": "2026-04-02T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-02T14:00",
@@ -871,7 +937,9 @@
           "endsAt": "2026-04-02T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T12:00:00.000Z"
+          "firesAfterNow": "2026-04-02T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-02T20:00",
@@ -887,7 +955,9 @@
           "endsAt": "2026-04-03T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T18:00:00.000Z"
+          "firesAfterNow": "2026-04-02T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-04-03T07:00",
@@ -903,7 +973,9 @@
           "endsAt": "2026-04-04T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T05:00:00.000Z"
+          "firesAfterNow": "2026-04-03T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-03T08:00",
@@ -919,7 +991,9 @@
           "endsAt": "2026-04-03T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T06:00:00.000Z"
+          "firesAfterNow": "2026-04-03T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-03T14:00",
@@ -935,7 +1009,9 @@
           "endsAt": "2026-04-03T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T12:00:00.000Z"
+          "firesAfterNow": "2026-04-03T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-03T20:00",
@@ -951,7 +1027,9 @@
           "endsAt": "2026-04-04T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T18:00:00.000Z"
+          "firesAfterNow": "2026-04-03T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-04-03T23:00",
@@ -967,7 +1045,9 @@
           "endsAt": "2026-04-05T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T21:00:00.000Z"
+          "firesAfterNow": "2026-04-03T21:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         }
       ],
       "missed": {
@@ -1277,7 +1357,9 @@
           "endsAt": "2026-03-31T07:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T07:20:00.000Z"
+          "firesAfterNow": "2026-03-29T07:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000003@2026-03-01",
@@ -1293,7 +1375,9 @@
           "endsAt": "2026-04-04T22:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T07:20:00.000Z"
+          "firesAfterNow": "2026-03-29T07:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000010@2026-03-26T07:30",
@@ -1309,7 +1393,9 @@
           "endsAt": "2026-04-06T05:30:00.000Z",
           "text": "Stretch",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T07:10:00.000Z"
+          "firesAfterNow": "2026-03-29T07:10:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-03-28T23:00",
@@ -1325,7 +1411,9 @@
           "endsAt": "2026-03-30T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T07:20:00.000Z"
+          "firesAfterNow": "2026-03-29T07:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000007@2026-03-29T02:30",
@@ -1341,7 +1429,9 @@
           "endsAt": "2026-03-29T22:00:00.000Z",
           "text": "Dentist",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T07:20:00.000Z"
+          "firesAfterNow": "2026-03-29T07:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-03-29T07:00",
@@ -1357,7 +1447,9 @@
           "endsAt": "2026-03-30T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T07:20:00.000Z"
+          "firesAfterNow": "2026-03-29T07:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-29T08:00",
@@ -1373,7 +1465,9 @@
           "endsAt": "2026-03-29T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T07:05:00.000Z"
+          "firesAfterNow": "2026-03-29T07:05:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-29T14:00",
@@ -1389,7 +1483,9 @@
           "endsAt": "2026-03-29T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T12:00:00.000Z"
+          "firesAfterNow": "2026-03-29T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-03-29",
@@ -1405,7 +1501,9 @@
           "endsAt": "2026-04-03T22:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T13:00:00.000Z"
+          "firesAfterNow": "2026-03-29T13:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-29T20:00",
@@ -1421,7 +1519,9 @@
           "endsAt": "2026-03-30T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-29T18:00:00.000Z"
+          "firesAfterNow": "2026-03-29T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-03-30T07:00",
@@ -1437,7 +1537,9 @@
           "endsAt": "2026-03-31T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T05:00:00.000Z"
+          "firesAfterNow": "2026-03-30T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-30T08:00",
@@ -1453,7 +1555,9 @@
           "endsAt": "2026-03-30T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T06:00:00.000Z"
+          "firesAfterNow": "2026-03-30T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-30T14:00",
@@ -1469,7 +1573,9 @@
           "endsAt": "2026-03-30T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T12:00:00.000Z"
+          "firesAfterNow": "2026-03-30T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-30T20:00",
@@ -1485,7 +1591,9 @@
           "endsAt": "2026-03-31T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T18:00:00.000Z"
+          "firesAfterNow": "2026-03-30T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-03-30T23:00",
@@ -1501,7 +1609,9 @@
           "endsAt": "2026-04-01T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-30T21:00:00.000Z"
+          "firesAfterNow": "2026-03-30T21:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-03-31T07:00",
@@ -1517,7 +1627,9 @@
           "endsAt": "2026-04-01T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T05:00:00.000Z"
+          "firesAfterNow": "2026-03-31T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-31T08:00",
@@ -1533,7 +1645,9 @@
           "endsAt": "2026-03-31T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T06:00:00.000Z"
+          "firesAfterNow": "2026-03-31T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-03-31T09:00",
@@ -1549,7 +1663,9 @@
           "endsAt": "2026-03-31T16:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T07:00:00.000Z"
+          "firesAfterNow": "2026-03-31T07:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-31T14:00",
@@ -1565,7 +1681,9 @@
           "endsAt": "2026-03-31T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T12:00:00.000Z"
+          "firesAfterNow": "2026-03-31T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-03-31T18:00",
@@ -1581,7 +1699,9 @@
           "endsAt": "2026-04-30T07:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T16:00:00.000Z"
+          "firesAfterNow": "2026-03-31T16:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-03-31T20:00",
@@ -1597,7 +1717,9 @@
           "endsAt": "2026-04-01T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-03-31T18:00:00.000Z"
+          "firesAfterNow": "2026-03-31T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-04-01T07:00",
@@ -1613,7 +1735,9 @@
           "endsAt": "2026-04-02T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T05:00:00.000Z"
+          "firesAfterNow": "2026-04-01T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-01T08:00",
@@ -1629,7 +1753,9 @@
           "endsAt": "2026-04-01T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T06:00:00.000Z"
+          "firesAfterNow": "2026-04-01T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000014@2026-04-01T10:00",
@@ -1645,7 +1771,9 @@
           "endsAt": "2026-04-01T22:00:00.000Z",
           "text": "Flyer for the fair",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T08:00:00.000Z"
+          "firesAfterNow": "2026-04-01T08:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-01T14:00",
@@ -1661,7 +1789,9 @@
           "endsAt": "2026-04-01T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T12:00:00.000Z"
+          "firesAfterNow": "2026-04-01T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-01T20:00",
@@ -1677,7 +1807,9 @@
           "endsAt": "2026-04-02T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T18:00:00.000Z"
+          "firesAfterNow": "2026-04-01T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-04-01T23:00",
@@ -1693,7 +1825,9 @@
           "endsAt": "2026-04-03T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-01T21:00:00.000Z"
+          "firesAfterNow": "2026-04-01T21:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-04-02T07:00",
@@ -1709,7 +1843,9 @@
           "endsAt": "2026-04-03T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T05:00:00.000Z"
+          "firesAfterNow": "2026-04-02T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-02T08:00",
@@ -1725,7 +1861,9 @@
           "endsAt": "2026-04-02T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T06:00:00.000Z"
+          "firesAfterNow": "2026-04-02T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-02T14:00",
@@ -1741,7 +1879,9 @@
           "endsAt": "2026-04-02T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T12:00:00.000Z"
+          "firesAfterNow": "2026-04-02T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-02T20:00",
@@ -1757,7 +1897,9 @@
           "endsAt": "2026-04-03T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-02T18:00:00.000Z"
+          "firesAfterNow": "2026-04-02T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-04-03T07:00",
@@ -1773,7 +1915,9 @@
           "endsAt": "2026-04-04T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T05:00:00.000Z"
+          "firesAfterNow": "2026-04-03T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-03T08:00",
@@ -1789,7 +1933,9 @@
           "endsAt": "2026-04-03T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T06:00:00.000Z"
+          "firesAfterNow": "2026-04-03T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-03T14:00",
@@ -1805,7 +1951,9 @@
           "endsAt": "2026-04-03T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T12:00:00.000Z"
+          "firesAfterNow": "2026-04-03T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-03T20:00",
@@ -1821,7 +1969,9 @@
           "endsAt": "2026-04-04T06:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T18:00:00.000Z"
+          "firesAfterNow": "2026-04-03T18:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-04-03T23:00",
@@ -1837,7 +1987,9 @@
           "endsAt": "2026-04-05T21:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-03T21:00:00.000Z"
+          "firesAfterNow": "2026-04-03T21:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-04-04T07:00",
@@ -1853,7 +2005,9 @@
           "endsAt": "2026-04-05T05:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-04T05:00:00.000Z"
+          "firesAfterNow": "2026-04-04T05:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-04T08:00",
@@ -1869,7 +2023,9 @@
           "endsAt": "2026-04-04T12:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-04T06:00:00.000Z"
+          "firesAfterNow": "2026-04-04T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-04-04T14:00",
@@ -1885,7 +2041,9 @@
           "endsAt": "2026-04-04T18:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-04T12:00:00.000Z"
+          "firesAfterNow": "2026-04-04T12:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-04-04",
@@ -1901,7 +2059,9 @@
           "endsAt": "2026-04-04T22:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-04-04T13:00:00.000Z"
+          "firesAfterNow": "2026-04-04T13:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         }
       ],
       "missed": {
@@ -2751,7 +2911,9 @@
           "endsAt": "2026-10-31T08:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T00:50:00.000Z"
+          "firesAfterNow": "2026-10-25T00:50:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000003@2026-10-04",
@@ -2767,7 +2929,9 @@
           "endsAt": "2026-10-31T23:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T00:50:00.000Z"
+          "firesAfterNow": "2026-10-25T00:50:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000010@2026-10-22T07:30",
@@ -2783,7 +2947,9 @@
           "endsAt": "2026-11-02T06:30:00.000Z",
           "text": "Stretch",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T00:50:00.000Z"
+          "firesAfterNow": "2026-10-25T00:50:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-24T07:00",
@@ -2799,7 +2965,9 @@
           "endsAt": "2026-10-25T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T00:50:00.000Z"
+          "firesAfterNow": "2026-10-25T00:50:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-24T20:00",
@@ -2815,7 +2983,9 @@
           "endsAt": "2026-10-25T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T00:50:00.000Z"
+          "firesAfterNow": "2026-10-25T00:50:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-24T23:00",
@@ -2831,7 +3001,9 @@
           "endsAt": "2026-10-26T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T00:50:00.000Z"
+          "firesAfterNow": "2026-10-25T00:50:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000008@2026-10-25T02:30",
@@ -2847,7 +3019,9 @@
           "endsAt": "2026-10-25T23:00:00.000Z",
           "text": "Dentist",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T00:50:00.000Z"
+          "firesAfterNow": "2026-10-25T00:50:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-25T07:00",
@@ -2863,7 +3037,9 @@
           "endsAt": "2026-10-26T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T06:00:00.000Z"
+          "firesAfterNow": "2026-10-25T06:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-25T08:00",
@@ -2879,7 +3055,9 @@
           "endsAt": "2026-10-25T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T07:00:00.000Z"
+          "firesAfterNow": "2026-10-25T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-25T14:00",
@@ -2895,7 +3073,9 @@
           "endsAt": "2026-10-25T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T13:00:00.000Z"
+          "firesAfterNow": "2026-10-25T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-10-25",
@@ -2911,7 +3091,9 @@
           "endsAt": "2026-10-30T23:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T14:00:00.000Z"
+          "firesAfterNow": "2026-10-25T14:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-25T20:00",
@@ -2927,7 +3109,9 @@
           "endsAt": "2026-10-26T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T19:00:00.000Z"
+          "firesAfterNow": "2026-10-25T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-26T07:00",
@@ -2943,7 +3127,9 @@
           "endsAt": "2026-10-27T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T06:00:00.000Z"
+          "firesAfterNow": "2026-10-26T06:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-26T08:00",
@@ -2959,7 +3145,9 @@
           "endsAt": "2026-10-26T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T07:00:00.000Z"
+          "firesAfterNow": "2026-10-26T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-26T14:00",
@@ -2975,7 +3163,9 @@
           "endsAt": "2026-10-26T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T13:00:00.000Z"
+          "firesAfterNow": "2026-10-26T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-26T20:00",
@@ -2991,7 +3181,9 @@
           "endsAt": "2026-10-27T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T19:00:00.000Z"
+          "firesAfterNow": "2026-10-26T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-26T23:00",
@@ -3007,7 +3199,9 @@
           "endsAt": "2026-10-28T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T22:00:00.000Z"
+          "firesAfterNow": "2026-10-26T22:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-27T07:00",
@@ -3023,7 +3217,9 @@
           "endsAt": "2026-10-28T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T06:00:00.000Z"
+          "firesAfterNow": "2026-10-27T06:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-27T08:00",
@@ -3039,7 +3235,9 @@
           "endsAt": "2026-10-27T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T07:00:00.000Z"
+          "firesAfterNow": "2026-10-27T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-27T14:00",
@@ -3055,7 +3253,9 @@
           "endsAt": "2026-10-27T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T13:00:00.000Z"
+          "firesAfterNow": "2026-10-27T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-27T20:00",
@@ -3071,7 +3271,9 @@
           "endsAt": "2026-10-28T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T19:00:00.000Z"
+          "firesAfterNow": "2026-10-27T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-28T07:00",
@@ -3087,7 +3289,9 @@
           "endsAt": "2026-10-29T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T06:00:00.000Z"
+          "firesAfterNow": "2026-10-28T06:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-28T08:00",
@@ -3103,7 +3307,9 @@
           "endsAt": "2026-10-28T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T07:00:00.000Z"
+          "firesAfterNow": "2026-10-28T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-28T14:00",
@@ -3119,7 +3325,9 @@
           "endsAt": "2026-10-28T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T13:00:00.000Z"
+          "firesAfterNow": "2026-10-28T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-28T20:00",
@@ -3135,7 +3343,9 @@
           "endsAt": "2026-10-29T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T19:00:00.000Z"
+          "firesAfterNow": "2026-10-28T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-28T23:00",
@@ -3151,7 +3361,9 @@
           "endsAt": "2026-10-30T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T22:00:00.000Z"
+          "firesAfterNow": "2026-10-28T22:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-29T07:00",
@@ -3167,7 +3379,9 @@
           "endsAt": "2026-10-30T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T06:00:00.000Z"
+          "firesAfterNow": "2026-10-29T06:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-29T08:00",
@@ -3183,7 +3397,9 @@
           "endsAt": "2026-10-29T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T07:00:00.000Z"
+          "firesAfterNow": "2026-10-29T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-29T14:00",
@@ -3199,7 +3415,9 @@
           "endsAt": "2026-10-29T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T13:00:00.000Z"
+          "firesAfterNow": "2026-10-29T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-29T20:00",
@@ -3215,7 +3433,9 @@
           "endsAt": "2026-10-30T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T19:00:00.000Z"
+          "firesAfterNow": "2026-10-29T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-30T07:00",
@@ -3231,7 +3451,9 @@
           "endsAt": "2026-10-31T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T06:00:00.000Z"
+          "firesAfterNow": "2026-10-30T06:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-30T08:00",
@@ -3247,7 +3469,9 @@
           "endsAt": "2026-10-30T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T07:00:00.000Z"
+          "firesAfterNow": "2026-10-30T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-30T14:00",
@@ -3263,7 +3487,9 @@
           "endsAt": "2026-10-30T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T13:00:00.000Z"
+          "firesAfterNow": "2026-10-30T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-30T20:00",
@@ -3279,7 +3505,9 @@
           "endsAt": "2026-10-31T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T19:00:00.000Z"
+          "firesAfterNow": "2026-10-30T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-30T23:00",
@@ -3295,7 +3523,9 @@
           "endsAt": "2026-11-01T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T22:00:00.000Z"
+          "firesAfterNow": "2026-10-30T22:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-31T07:00",
@@ -3311,7 +3541,9 @@
           "endsAt": "2026-11-01T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T06:00:00.000Z"
+          "firesAfterNow": "2026-10-31T06:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-31T08:00",
@@ -3327,7 +3559,9 @@
           "endsAt": "2026-10-31T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T07:00:00.000Z"
+          "firesAfterNow": "2026-10-31T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-10-31T09:00",
@@ -3343,7 +3577,9 @@
           "endsAt": "2026-10-31T17:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T08:00:00.000Z"
+          "firesAfterNow": "2026-10-31T08:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-31T14:00",
@@ -3359,7 +3595,9 @@
           "endsAt": "2026-10-31T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T13:00:00.000Z"
+          "firesAfterNow": "2026-10-31T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-10-31",
@@ -3375,7 +3613,9 @@
           "endsAt": "2026-10-31T23:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T14:00:00.000Z"
+          "firesAfterNow": "2026-10-31T14:00:00.000Z",
+          "quiet": "23:30-06:15",
+          "silentAfterNow": false
         }
       ],
       "missed": {
@@ -3657,7 +3897,9 @@
           "endsAt": "2026-10-31T08:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T12:10:00.000Z"
+          "firesAfterNow": "2026-10-25T12:10:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000003@2026-10-04",
@@ -3673,7 +3915,9 @@
           "endsAt": "2026-10-31T23:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T12:10:00.000Z"
+          "firesAfterNow": "2026-10-25T12:10:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000010@2026-10-22T07:30",
@@ -3689,7 +3933,9 @@
           "endsAt": "2026-11-02T06:30:00.000Z",
           "text": "Stretch",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T12:10:00.000Z"
+          "firesAfterNow": "2026-10-25T12:10:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-24T23:00",
@@ -3705,7 +3951,9 @@
           "endsAt": "2026-10-26T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T12:10:00.000Z"
+          "firesAfterNow": "2026-10-25T12:10:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000008@2026-10-25T02:30",
@@ -3721,7 +3969,9 @@
           "endsAt": "2026-10-25T23:00:00.000Z",
           "text": "Dentist",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T12:10:00.000Z"
+          "firesAfterNow": "2026-10-25T12:10:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-25T07:00",
@@ -3737,7 +3987,9 @@
           "endsAt": "2026-10-26T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T12:10:00.000Z"
+          "firesAfterNow": "2026-10-25T12:10:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-25T08:00",
@@ -3753,7 +4005,9 @@
           "endsAt": "2026-10-25T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T12:05:00.000Z"
+          "firesAfterNow": "2026-10-25T12:05:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "snooze:routine:00000000000000000000000000000002@2026-10-25T14:00",
@@ -3769,7 +4023,9 @@
           "endsAt": "2026-10-25T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T13:20:00.000Z"
+          "firesAfterNow": "2026-10-25T13:20:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-25T20:00",
@@ -3785,7 +4041,9 @@
           "endsAt": "2026-10-26T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-25T19:00:00.000Z"
+          "firesAfterNow": "2026-10-25T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "snooze:routine:00000000000000000000000000000005@2026-10-25",
@@ -3801,7 +4059,9 @@
           "endsAt": "2026-10-30T23:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T03:00:00.000Z"
+          "firesAfterNow": "2026-10-26T03:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-26T07:00",
@@ -3817,7 +4077,9 @@
           "endsAt": "2026-10-27T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T06:00:00.000Z"
+          "firesAfterNow": "2026-10-26T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-26T08:00",
@@ -3833,7 +4095,9 @@
           "endsAt": "2026-10-26T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T07:00:00.000Z"
+          "firesAfterNow": "2026-10-26T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-26T14:00",
@@ -3849,7 +4113,9 @@
           "endsAt": "2026-10-26T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T13:00:00.000Z"
+          "firesAfterNow": "2026-10-26T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-26T20:00",
@@ -3865,7 +4131,9 @@
           "endsAt": "2026-10-27T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T19:00:00.000Z"
+          "firesAfterNow": "2026-10-26T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-26T23:00",
@@ -3881,7 +4149,9 @@
           "endsAt": "2026-10-28T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-26T22:00:00.000Z"
+          "firesAfterNow": "2026-10-26T22:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-27T07:00",
@@ -3897,7 +4167,9 @@
           "endsAt": "2026-10-28T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T06:00:00.000Z"
+          "firesAfterNow": "2026-10-27T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-27T08:00",
@@ -3913,7 +4185,9 @@
           "endsAt": "2026-10-27T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T07:00:00.000Z"
+          "firesAfterNow": "2026-10-27T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-27T14:00",
@@ -3929,7 +4203,9 @@
           "endsAt": "2026-10-27T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T13:00:00.000Z"
+          "firesAfterNow": "2026-10-27T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-27T20:00",
@@ -3945,7 +4221,9 @@
           "endsAt": "2026-10-28T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-27T19:00:00.000Z"
+          "firesAfterNow": "2026-10-27T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-28T07:00",
@@ -3961,7 +4239,9 @@
           "endsAt": "2026-10-29T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T06:00:00.000Z"
+          "firesAfterNow": "2026-10-28T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-28T08:00",
@@ -3977,7 +4257,9 @@
           "endsAt": "2026-10-28T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T07:00:00.000Z"
+          "firesAfterNow": "2026-10-28T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-28T14:00",
@@ -3993,7 +4275,9 @@
           "endsAt": "2026-10-28T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T13:00:00.000Z"
+          "firesAfterNow": "2026-10-28T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-28T20:00",
@@ -4009,7 +4293,9 @@
           "endsAt": "2026-10-29T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T19:00:00.000Z"
+          "firesAfterNow": "2026-10-28T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-28T23:00",
@@ -4025,7 +4311,9 @@
           "endsAt": "2026-10-30T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-28T22:00:00.000Z"
+          "firesAfterNow": "2026-10-28T22:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-29T07:00",
@@ -4041,7 +4329,9 @@
           "endsAt": "2026-10-30T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T06:00:00.000Z"
+          "firesAfterNow": "2026-10-29T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-29T08:00",
@@ -4057,7 +4347,9 @@
           "endsAt": "2026-10-29T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T07:00:00.000Z"
+          "firesAfterNow": "2026-10-29T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-29T14:00",
@@ -4073,7 +4365,9 @@
           "endsAt": "2026-10-29T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T13:00:00.000Z"
+          "firesAfterNow": "2026-10-29T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-29T20:00",
@@ -4089,7 +4383,9 @@
           "endsAt": "2026-10-30T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-29T19:00:00.000Z"
+          "firesAfterNow": "2026-10-29T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-30T07:00",
@@ -4105,7 +4401,9 @@
           "endsAt": "2026-10-31T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T06:00:00.000Z"
+          "firesAfterNow": "2026-10-30T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-30T08:00",
@@ -4121,7 +4419,9 @@
           "endsAt": "2026-10-30T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T07:00:00.000Z"
+          "firesAfterNow": "2026-10-30T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-30T14:00",
@@ -4137,7 +4437,9 @@
           "endsAt": "2026-10-30T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T13:00:00.000Z"
+          "firesAfterNow": "2026-10-30T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-30T20:00",
@@ -4153,7 +4455,9 @@
           "endsAt": "2026-10-31T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T19:00:00.000Z"
+          "firesAfterNow": "2026-10-30T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-30T23:00",
@@ -4169,7 +4473,9 @@
           "endsAt": "2026-11-01T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-30T22:00:00.000Z"
+          "firesAfterNow": "2026-10-30T22:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-31T07:00",
@@ -4185,7 +4491,9 @@
           "endsAt": "2026-11-01T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T06:00:00.000Z"
+          "firesAfterNow": "2026-10-31T06:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-31T08:00",
@@ -4201,7 +4509,9 @@
           "endsAt": "2026-10-31T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T07:00:00.000Z"
+          "firesAfterNow": "2026-10-31T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-10-31T09:00",
@@ -4217,7 +4527,9 @@
           "endsAt": "2026-10-31T17:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T08:00:00.000Z"
+          "firesAfterNow": "2026-10-31T08:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-31T14:00",
@@ -4233,7 +4545,9 @@
           "endsAt": "2026-10-31T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T13:00:00.000Z"
+          "firesAfterNow": "2026-10-31T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-10-31",
@@ -4249,7 +4563,9 @@
           "endsAt": "2026-10-31T23:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T14:00:00.000Z"
+          "firesAfterNow": "2026-10-31T14:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-10-31T18:00",
@@ -4265,7 +4581,9 @@
           "endsAt": "2026-11-30T08:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T17:00:00.000Z"
+          "firesAfterNow": "2026-10-31T17:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-31T20:00",
@@ -4281,7 +4599,9 @@
           "endsAt": "2026-11-01T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T19:00:00.000Z"
+          "firesAfterNow": "2026-10-31T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         }
       ],
       "missed": {
@@ -4563,7 +4883,9 @@
           "endsAt": "2026-10-31T23:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T22:20:00.000Z"
+          "firesAfterNow": "2026-10-31T22:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000010@2026-10-22T07:30",
@@ -4579,7 +4901,9 @@
           "endsAt": "2026-11-02T06:30:00.000Z",
           "text": "Stretch",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T22:20:00.000Z"
+          "firesAfterNow": "2026-10-31T22:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-10-30T23:00",
@@ -4595,7 +4919,9 @@
           "endsAt": "2026-11-01T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T22:20:00.000Z"
+          "firesAfterNow": "2026-10-31T22:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-10-31T07:00",
@@ -4611,7 +4937,9 @@
           "endsAt": "2026-11-01T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T22:20:00.000Z"
+          "firesAfterNow": "2026-10-31T22:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-10-31",
@@ -4627,7 +4955,9 @@
           "endsAt": "2026-10-31T23:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T22:20:00.000Z"
+          "firesAfterNow": "2026-10-31T22:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000c@2026-10-31T18:00",
@@ -4643,7 +4973,9 @@
           "endsAt": "2026-11-30T08:00:00.000Z",
           "text": "Pay the rent",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T22:20:00.000Z"
+          "firesAfterNow": "2026-10-31T22:20:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-10-31T20:00",
@@ -4659,7 +4991,9 @@
           "endsAt": "2026-11-01T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-10-31T22:15:00.000Z"
+          "firesAfterNow": "2026-10-31T22:15:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-11-01T07:00",
@@ -4675,7 +5009,9 @@
           "endsAt": "2026-11-02T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-01T06:00:00.000Z"
+          "firesAfterNow": "2026-11-01T06:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-01T08:00",
@@ -4691,7 +5027,9 @@
           "endsAt": "2026-11-01T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-01T07:00:00.000Z"
+          "firesAfterNow": "2026-11-01T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-01T14:00",
@@ -4707,7 +5045,9 @@
           "endsAt": "2026-11-01T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-01T13:00:00.000Z"
+          "firesAfterNow": "2026-11-01T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000003@2026-11-01",
@@ -4723,7 +5063,9 @@
           "endsAt": "2026-12-05T23:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-01T14:00:00.000Z"
+          "firesAfterNow": "2026-11-01T14:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000005@2026-11-01",
@@ -4739,7 +5081,9 @@
           "endsAt": "2026-11-06T23:00:00.000Z",
           "text": "Water the plants",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-01T14:00:00.000Z"
+          "firesAfterNow": "2026-11-01T14:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-01T20:00",
@@ -4755,7 +5099,9 @@
           "endsAt": "2026-11-02T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-01T19:00:00.000Z"
+          "firesAfterNow": "2026-11-01T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-11-01T23:00",
@@ -4771,7 +5117,9 @@
           "endsAt": "2026-11-03T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-01T22:00:00.000Z"
+          "firesAfterNow": "2026-11-01T22:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-11-02T07:00",
@@ -4787,7 +5135,9 @@
           "endsAt": "2026-11-03T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-02T06:00:00.000Z"
+          "firesAfterNow": "2026-11-02T06:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000010@2026-11-02T07:30",
@@ -4803,7 +5153,9 @@
           "endsAt": "2026-11-05T06:30:00.000Z",
           "text": "Stretch",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-02T06:30:00.000Z"
+          "firesAfterNow": "2026-11-02T06:30:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-02T08:00",
@@ -4819,7 +5171,9 @@
           "endsAt": "2026-11-02T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-02T07:00:00.000Z"
+          "firesAfterNow": "2026-11-02T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-02T14:00",
@@ -4835,7 +5189,9 @@
           "endsAt": "2026-11-02T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-02T13:00:00.000Z"
+          "firesAfterNow": "2026-11-02T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-02T20:00",
@@ -4851,7 +5207,9 @@
           "endsAt": "2026-11-03T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-02T19:00:00.000Z"
+          "firesAfterNow": "2026-11-02T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-11-03T07:00",
@@ -4867,7 +5225,9 @@
           "endsAt": "2026-11-04T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-03T06:00:00.000Z"
+          "firesAfterNow": "2026-11-03T06:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-03T08:00",
@@ -4883,7 +5243,9 @@
           "endsAt": "2026-11-03T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-03T07:00:00.000Z"
+          "firesAfterNow": "2026-11-03T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-03T14:00",
@@ -4899,7 +5261,9 @@
           "endsAt": "2026-11-03T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-03T13:00:00.000Z"
+          "firesAfterNow": "2026-11-03T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-03T20:00",
@@ -4915,7 +5279,9 @@
           "endsAt": "2026-11-04T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-03T19:00:00.000Z"
+          "firesAfterNow": "2026-11-03T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-11-03T23:00",
@@ -4931,7 +5297,9 @@
           "endsAt": "2026-11-05T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-03T22:00:00.000Z"
+          "firesAfterNow": "2026-11-03T22:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-11-04T07:00",
@@ -4947,7 +5315,9 @@
           "endsAt": "2026-11-05T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-04T06:00:00.000Z"
+          "firesAfterNow": "2026-11-04T06:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-04T08:00",
@@ -4963,7 +5333,9 @@
           "endsAt": "2026-11-04T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-04T07:00:00.000Z"
+          "firesAfterNow": "2026-11-04T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-04T14:00",
@@ -4979,7 +5351,9 @@
           "endsAt": "2026-11-04T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-04T13:00:00.000Z"
+          "firesAfterNow": "2026-11-04T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-04T20:00",
@@ -4995,7 +5369,9 @@
           "endsAt": "2026-11-05T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-04T19:00:00.000Z"
+          "firesAfterNow": "2026-11-04T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-11-05T07:00",
@@ -5011,7 +5387,9 @@
           "endsAt": "2026-11-06T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-05T06:00:00.000Z"
+          "firesAfterNow": "2026-11-05T06:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000010@2026-11-05T07:30",
@@ -5027,7 +5405,9 @@
           "endsAt": "2026-11-16T06:30:00.000Z",
           "text": "Stretch",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-05T06:30:00.000Z"
+          "firesAfterNow": "2026-11-05T06:30:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-05T08:00",
@@ -5043,7 +5423,9 @@
           "endsAt": "2026-11-05T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-05T07:00:00.000Z"
+          "firesAfterNow": "2026-11-05T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-05T14:00",
@@ -5059,7 +5441,9 @@
           "endsAt": "2026-11-05T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-05T13:00:00.000Z"
+          "firesAfterNow": "2026-11-05T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-05T20:00",
@@ -5075,7 +5459,9 @@
           "endsAt": "2026-11-06T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-05T19:00:00.000Z"
+          "firesAfterNow": "2026-11-05T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:0000000000000000000000000000000a@2026-11-05T23:00",
@@ -5091,7 +5477,9 @@
           "endsAt": "2026-11-07T22:00:00.000Z",
           "text": "Night meds",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-05T22:00:00.000Z"
+          "firesAfterNow": "2026-11-05T22:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-11-06T07:00",
@@ -5107,7 +5495,9 @@
           "endsAt": "2026-11-07T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-06T06:00:00.000Z"
+          "firesAfterNow": "2026-11-06T06:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-06T08:00",
@@ -5123,7 +5513,9 @@
           "endsAt": "2026-11-06T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-06T07:00:00.000Z"
+          "firesAfterNow": "2026-11-06T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-06T14:00",
@@ -5139,7 +5531,9 @@
           "endsAt": "2026-11-06T19:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-06T13:00:00.000Z"
+          "firesAfterNow": "2026-11-06T13:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-06T20:00",
@@ -5155,7 +5549,9 @@
           "endsAt": "2026-11-07T07:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-06T19:00:00.000Z"
+          "firesAfterNow": "2026-11-06T19:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000012@2026-11-07T07:00",
@@ -5171,7 +5567,9 @@
           "endsAt": "2026-11-08T06:00:00.000Z",
           "text": "Walk the dog",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-07T06:00:00.000Z"
+          "firesAfterNow": "2026-11-07T06:00:00.000Z",
+          "quiet": "22:00-08:00",
+          "silentAfterNow": true
         },
         {
           "id": "occurrence:routine:00000000000000000000000000000002@2026-11-07T08:00",
@@ -5187,7 +5585,9 @@
           "endsAt": "2026-11-07T13:00:00.000Z",
           "text": "Take the pills",
           "wordless": "photo",
-          "firesAfterNow": "2026-11-07T07:00:00.000Z"
+          "firesAfterNow": "2026-11-07T07:00:00.000Z",
+          "quiet": null,
+          "silentAfterNow": false
         }
       ],
       "missed": {

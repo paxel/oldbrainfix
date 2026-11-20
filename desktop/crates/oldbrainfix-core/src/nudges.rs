@@ -13,9 +13,9 @@ use crate::notes::Note;
 use crate::schedule::{ClockTime, Day, WallClock};
 use crate::{Error, Result};
 
-/// A daily window in which Nudges wait (CONTEXT.md). It runs over
-/// midnight when `start` is later than `end`; with both the same it is
-/// empty.
+/// A daily window in which Nudges wait and alarms keep quiet (CONTEXT.md,
+/// obf-1045). It runs over midnight when `start` is later than `end`;
+/// with both the same it is empty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct QuietHours {
     pub start: ClockTime,
@@ -31,6 +31,17 @@ impl QuietHours {
         } else {
             t >= s || t < e
         }
+    }
+
+    /// Whether `instant` lies in the window on `wall`: an alarm firing
+    /// then shows without sound (obf-1045), and so does whatever else is
+    /// to keep quiet in it.
+    pub fn holds(&self, instant: DateTime<Utc>, wall: &WallClock) -> bool {
+        let shown = wall(instant);
+        self.contains(ClockTime {
+            hour: shown.hour(),
+            minute: shown.minute(),
+        })
     }
 
     /// When a Nudge due at `instant` fires: at `instant`, or at the end of

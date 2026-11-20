@@ -1,6 +1,10 @@
 use super::*;
 use oldbrainfix_core::alarms::{AlarmKind, WallMoment};
-use oldbrainfix_core::{ClockTime, Day, Wordless, parse_time};
+use oldbrainfix_core::{ClockTime, Day, QuietHours, Wordless, parse_time};
+
+fn utc_wall(utc: DateTime<Utc>) -> chrono::NaiveDateTime {
+    utc.naive_utc()
+}
 
 fn alarm(at: &str, ends: &str, escalation: Option<i64>) -> oldbrainfix_core::Result<PlannedAlarm> {
     let day = Day::new(2026, 1, 1);
@@ -18,6 +22,7 @@ fn alarm(at: &str, ends: &str, escalation: Option<i64>) -> oldbrainfix_core::Res
         escalation,
         ends: moment,
         ends_at: parse_time(ends)?,
+        quiet: None,
         text: Some("Pills".into()),
         wordless: Wordless::Photo,
         wordless_name: String::new(),
@@ -106,9 +111,9 @@ fn an_alarm_of_a_note_without_words_names_what_it_holds() -> oldbrainfix_core::R
         wordless_name: "Mietvertrag.pdf".into(),
         ..voice.clone()
     };
-    assert!(alerts.show_alarm(&voice, now));
-    assert!(alerts.show_alarm(&photo, now));
-    assert!(alerts.show_alarm(&file, now));
+    assert!(alerts.show_alarm(&voice, now, &utc_wall));
+    assert!(alerts.show_alarm(&photo, now, &utc_wall));
+    assert!(alerts.show_alarm(&file, now, &utc_wall));
     let titles: Vec<String> = notifier
         .take()
         .into_iter()
@@ -131,8 +136,8 @@ fn an_escalated_alarm_leaves_its_sound_to_the_system() -> oldbrainfix_core::Resu
         "2026-01-01T12:00:00.000Z",
         Some(2),
     )?;
-    assert!(alerts.show_alarm(&a, parse_time("2026-01-01T09:00:00.000Z")?));
-    assert!(!alerts.show_alarm(&a, parse_time("2026-01-01T09:30:00.000Z")?));
+    assert!(alerts.show_alarm(&a, parse_time("2026-01-01T09:00:00.000Z")?, &utc_wall));
+    assert!(!alerts.show_alarm(&a, parse_time("2026-01-01T09:30:00.000Z")?, &utc_wall));
     let sounds: Vec<(bool, bool)> = notifier
         .take()
         .into_iter()
@@ -143,6 +148,42 @@ fn an_escalated_alarm_leaves_its_sound_to_the_system() -> oldbrainfix_core::Resu
         .collect();
     // Silent while the app rings; urgent with the system's sound.
     assert_eq!(sounds, [(false, true), (true, false)]);
+    Ok(())
+}
+
+#[test]
+fn an_alarm_in_the_quiet_hours_shows_without_any_sound() -> oldbrainfix_core::Result<()> {
+    let notifier = crate::notify::RecordingNotifier::default();
+    let changed = Arc::new(AtomicU64::new(0));
+    let mut alerts = Alerts::new(Box::new(notifier.clone()), L10n::new("en"), changed);
+    // Quiet from 09:20 to 10:00 on the wall clock (UTC here).
+    let a = PlannedAlarm {
+        quiet: Some(QuietHours {
+            start: ClockTime {
+                hour: 9,
+                minute: 20,
+            },
+            end: ClockTime {
+                hour: 10,
+                minute: 0,
+            },
+        }),
+        ..alarm("2026-01-01T09:00:00.000Z", "2026-01-01T12:00:00.000Z", None)?
+    };
+    let t = |s: &str| parse_time(s);
+    // Before the window the app rings; in it nothing does; after it again.
+    assert!(alerts.show_alarm(&a, t("2026-01-01T09:10:00.000Z")?, &utc_wall));
+    assert!(!alerts.show_alarm(&a, t("2026-01-01T09:30:00.000Z")?, &utc_wall));
+    assert!(alerts.show_alarm(&a, t("2026-01-01T10:00:00.000Z")?, &utc_wall));
+    let sounds: Vec<(bool, bool)> = notifier
+        .take()
+        .into_iter()
+        .filter_map(|r| match r {
+            crate::notify::Recorded::Shown(notice) => Some((notice.urgent, notice.silent)),
+            crate::notify::Recorded::Closed(_) => None,
+        })
+        .collect();
+    assert_eq!(sounds, [(false, true), (false, true), (false, true)]);
     Ok(())
 }
 

@@ -19,6 +19,7 @@ fn alarm(at: &str, renag: i64, ends: &str) -> Result<PlannedAlarm> {
         escalation: Some(2),
         ends: moment,
         ends_at: parse_time(ends)?,
+        quiet: None,
         text: None,
         wordless: Wordless::Photo,
         wordless_name: String::new(),
@@ -201,6 +202,39 @@ fn quiet_hours_win_over_the_all_day_time() -> Result<()> {
         end: ClockTime { hour: 8, minute: 0 },
     })?;
     assert!(Alarms::new(&store).plan(&utc_wall)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn an_alarm_rings_silent_in_the_quiet_hours_unless_it_escalates() -> Result<()> {
+    let store = crate::store::tests::store();
+    let quiet = QuietHours {
+        start: ClockTime {
+            hour: 17,
+            minute: 0,
+        },
+        end: ClockTime {
+            hour: 18,
+            minute: 0,
+        },
+    };
+    DeviceSettings::new(&store).set_quiet_hours(quiet)?;
+    let plan = all_day_today(&store)?;
+    assert_eq!(plan[0].quiet, Some(quiet));
+    let t = |s: &str| parse_time(s);
+    assert!(!plan[0].silent_at(t("2026-01-01T15:00:00.000Z")?, &utc_wall));
+    assert!(plan[0].silent_at(t("2026-01-01T17:00:00.000Z")?, &utc_wall));
+    assert!(!plan[0].silent_at(t("2026-01-01T18:00:00.000Z")?, &utc_wall));
+    // Escalation is the only way through.
+    let routines = Routines::new(&store);
+    routines.set_escalation(&plan[0].routine_id, Some(3))?;
+    let escalating = Alarms::new(&store).plan(&utc_wall)?;
+    assert_eq!(escalating[0].quiet, None);
+    assert!(!escalating[0].silent_at(t("2026-01-01T17:00:00.000Z")?, &utc_wall));
+    // Off, nothing is silent.
+    routines.set_escalation(&plan[0].routine_id, None)?;
+    DeviceSettings::new(&store).set_quiet_hours_on(false)?;
+    assert_eq!(Alarms::new(&store).plan(&utc_wall)?[0].quiet, None);
     Ok(())
 }
 

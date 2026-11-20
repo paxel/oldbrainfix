@@ -9,9 +9,9 @@ import 'alarms.dart';
 import 'notes.dart';
 import 'schedule.dart';
 
-/// A daily window in which Nudges wait (CONTEXT.md). It runs over
-/// midnight when [start] is later than [end]; with both the same it is
-/// empty.
+/// A daily window in which Nudges wait and alarms keep quiet (CONTEXT.md,
+/// obf-1045). It runs over midnight when [start] is later than [end];
+/// with both the same it is empty.
 class QuietHours {
   final ClockTime start;
   final ClockTime end;
@@ -22,6 +22,14 @@ class QuietHours {
   bool contains(ClockTime time) {
     final (s, e, t) = (_minutes(start), _minutes(end), _minutes(time));
     return s <= e ? s <= t && t < e : t >= s || t < e;
+  }
+
+  /// Whether [instant] lies in the window on [wallClock]: an alarm firing
+  /// then shows without sound (obf-1045), and so does whatever else is to
+  /// keep quiet in it.
+  bool holds(DateTime instant, WallClock wallClock) {
+    final wall = wallClock(instant.toUtc());
+    return contains(ClockTime(wall.hour, wall.minute));
   }
 
   /// When a Nudge due at [instant] fires: at [instant], or at the end of

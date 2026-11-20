@@ -419,6 +419,7 @@ class AlarmSync extends ChangeNotifier {
         catchUpMany: t.catchUpMany('{count}'),
         ringChannel: t.ringChannel,
         escalatedChannel: t.escalatedChannel,
+        quietChannel: t.quietChannel,
         nudgeChannel: t.nudgeChannel,
       ),
       done: done,

@@ -2917,6 +2917,9 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
             "text": a.text,
             "wordless": a.wordless.name(),
             "firesAfterNow": iso(a.fires_after(now)),
+            // Quiet Hours silence it unless it escalates (obf-1045).
+            "quiet": a.quiet.map(|q| q.to_string()),
+            "silentAfterNow": a.fires_after(now).map(|f| a.silent_at(f, &berlin)),
         })).collect::<Vec<_>>(),
         "missed": {
             "count": missed.count(),

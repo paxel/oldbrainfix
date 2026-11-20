@@ -1604,6 +1604,12 @@ abstract class AppLocalizations {
   /// **'Escalated alarms'**
   String get escalatedChannel;
 
+  /// No description provided for @quietChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Routines and Reminders in the Quiet Hours'**
+  String get quietChannel;
+
   /// No description provided for @escalationHeading.
   ///
   /// In en, this message translates to:
@@ -1715,7 +1721,7 @@ abstract class AppLocalizations {
   /// No description provided for @nudgeSettingsExplain.
   ///
   /// In en, this message translates to:
-  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.'**
+  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders show on time but without sound, unless Escalation is on for them; only an all-day one waits until they end.'**
   String get nudgeSettingsExplain;
 
   /// No description provided for @nudgeRepeat.
@@ -2675,7 +2681,7 @@ abstract class AppLocalizations {
   /// No description provided for @allDayFromDetail.
   ///
   /// In en, this message translates to:
-  /// **'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.'**
+  /// **'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win: it waits until they end, and in them it Re-nags without sound unless Escalation is on.'**
   String get allDayFromDetail;
 
   /// No description provided for @alarmSound.

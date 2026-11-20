@@ -200,7 +200,8 @@ final class AlarmNotifications: NSObject, UNUserNotificationCenterDelegate {
 /// Hands the alarm plan to iOS. The whole plan is kept, and the next
 /// `AlarmPlan.windowSize` rings of it are handed over: escalated ones as
 /// AlarmKit alarms where allowed, the others as time-sensitive
-/// notifications, the Nudges as normal ones. Every plan, tap and answer
+/// notifications, or in the Quiet Hours as normal ones without sound
+/// (obf-1045), the Nudges as normal ones. Every plan, tap and answer
 /// hands them over anew. Used on the main thread only.
 final class AlarmScheduler {
   static let shared = AlarmScheduler()
@@ -507,7 +508,15 @@ final class AlarmScheduler {
         AlarmPlan.offersTomorrow(alarm.occurrence, today: Self.dayText(ring.at))
         ? NotificationAnswer.alarmCategory : NotificationAnswer.pastAlarmCategory
       content.threadIdentifier = alarm.key
-      content.interruptionLevel = .timeSensitive
+      if ring.silent {
+        // In the Quiet Hours (obf-1045): shown, but without sound, and
+        // not through a Focus. An escalating Routine is never silent, so
+        // AlarmKit's alarms, which always ring, are not needed for these.
+        content.sound = nil
+        content.interruptionLevel = .active
+      } else {
+        content.interruptionLevel = .timeSensitive
+      }
       content.userInfo = [
         "routine": alarm.routine, "occurrence": alarm.occurrence, "title": alarm.title,
         "body": alarm.body,

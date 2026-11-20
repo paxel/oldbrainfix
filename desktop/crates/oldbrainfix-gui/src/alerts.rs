@@ -17,8 +17,10 @@
 //! window on Unsorted, as the phone's Nudge screen, and a click on the
 //! Changes Nudge asks the window to send each person waiting their
 //! bundle (#109). Quiet
-//! Hours only hold back the Nudge and the Changes Nudge; with alerts off
-//! on this Device nothing shows (ADR 0008).
+//! Hours hold back the Nudge and the Changes Nudge, and an Occurrence
+//! firing in them shows silent with no alarm sound rung, but for one
+//! that escalates (obf-1045); with alerts off on this Device nothing
+//! shows (ADR 0008).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -402,7 +404,7 @@ impl Alerts {
         let mut showed = false;
         let mut ring = false;
         for alarm in due(&plan, after, now) {
-            ring |= self.show_alarm(alarm, now);
+            ring |= self.show_alarm(alarm, now, wall);
             showed = true;
         }
         if ring && let Some(ringer) = &mut self.ringer {
@@ -486,8 +488,9 @@ impl Alerts {
 
     /// Shows `alarm`'s notification; true when the app is to ring its
     /// alarm sound for it, false when it escalated and the system's
-    /// alarm sound rings.
-    fn show_alarm(&mut self, alarm: &PlannedAlarm, now: DateTime<Utc>) -> bool {
+    /// alarm sound rings, or when it fires in the Quiet Hours and stays
+    /// silent (obf-1045).
+    fn show_alarm(&mut self, alarm: &PlannedAlarm, now: DateTime<Utc>, wall: &WallClock) -> bool {
         let t = self.t;
         let title = first_line(alarm.text.as_deref()).unwrap_or_else(|| {
             if alarm.text.is_none() {
@@ -506,7 +509,7 @@ impl Alerts {
             silent: !urgent,
             actions: occurrence_buttons(&t),
         });
-        !urgent
+        !urgent && !alarm.silent_at(now, wall)
     }
 
     fn show_nudge(&mut self, nudge: &PlannedNudge) {

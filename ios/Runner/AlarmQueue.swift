@@ -236,7 +236,8 @@ enum PlanCodec {
       body: map["body"] as? String ?? "",
       renagMs: (int64(map["renag"]) ?? 0) * 60_000,
       end: ints(map["end"]),
-      escalate: Int(int64(map["escalate"]) ?? 0)
+      escalate: Int(int64(map["escalate"]) ?? 0),
+      quiet: ints(map["quiet"]).flatMap { $0.count == 4 ? $0 : nil }
     )
   }
 

@@ -93,6 +93,10 @@ class AlarmLabels {
   final String ringChannel;
   final String escalatedChannel;
 
+  /// The channel of an Occurrence firing in the Quiet Hours, without
+  /// sound or vibration (obf-1045).
+  final String quietChannel;
+
   /// The channel of the Nudge.
   final String nudgeChannel;
 
@@ -113,6 +117,7 @@ class AlarmLabels {
     required this.catchUpMany,
     required this.ringChannel,
     required this.escalatedChannel,
+    required this.quietChannel,
     required this.nudgeChannel,
   });
 
@@ -133,6 +138,7 @@ class AlarmLabels {
     'catchUpMany': catchUpMany,
     'ringChannel': ringChannel,
     'escalatedChannel': escalatedChannel,
+    'quietChannel': quietChannel,
     'nudgeChannel': nudgeChannel,
   };
 }
@@ -485,6 +491,15 @@ class AndroidAlarms implements AlarmPlatform {
               'at': alarm.at.millisecondsSinceEpoch,
             'renag': alarm.renag.inMinutes,
             'escalate': ?alarm.escalation,
+            // On the wall clock, like the Nudge's: a firing in them shows
+            // without sound (obf-1045).
+            if (alarm.quiet case final quiet?)
+              'quiet': [
+                quiet.start.hour,
+                quiet.start.minute,
+                quiet.end.hour,
+                quiet.end.minute,
+              ],
             // On the wall clock as well, like 'local'.
             'end': [
               alarm.ends.day.year,
