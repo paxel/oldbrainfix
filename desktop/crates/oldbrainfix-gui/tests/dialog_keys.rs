@@ -655,7 +655,7 @@ fn ctrl_enter_takes_a_page_of_the_popup_and_file_intos_naming_step() -> TestResu
         .get_by_role_and_label(Role::Button, "Routine, Reminder, Frog or Session")
         .click();
     harness.run();
-    click(&mut harness, "Reminder");
+    click(&mut harness, "Remind me…");
     assert!(harness.state().popup.page_open());
     ctrl(&mut harness, Key::Enter);
     assert!(!harness.state().popup.page_open());

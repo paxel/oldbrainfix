@@ -79,6 +79,15 @@ fn click<S>(harness: &mut Harness<'_, S>, label: &str) {
     harness.run();
 }
 
+/// Sets the Routine editor open to repeat "Every …", as Remind me…
+/// opens it as a Reminder (#344).
+fn repeat_every<S>(harness: &mut Harness<'_, S>) {
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Every …")
+        .click();
+    harness.run();
+}
+
 /// Whether the button `label` can be clicked.
 fn enabled<S>(harness: &Harness<'_, S>, label: &str) -> bool {
     !harness
@@ -191,20 +200,22 @@ fn the_default_window_capture_shows_only_the_text_the_nudge_buttons_and_to_full_
 }
 
 #[test]
-fn the_alarm_clock_offers_a_routine_or_reminder_in_both() -> TestResult {
+fn the_alarm_clock_offers_one_remind_me_in_both() -> TestResult {
     let (store, _) = store()?;
+    let offered = ["Remind me…"];
+    let not = ["Routine", "Reminder", "Frog", "Session"];
     let mut harness = popup(&store);
     open_clock(&mut harness);
-    offers(&harness, &["Routine", "Reminder"], &["Frog", "Session"]);
+    offers(&harness, &offered, &not);
     let mut harness = window(&store, Selection::Agenda);
     type_in_window(&mut harness, "Buy stamps");
     open_clock(&mut harness);
-    offers(&harness, &["Routine", "Reminder"], &["Frog", "Session"]);
+    offers(&harness, &offered, &not);
     // In Simple too (#197).
     PersonSettings::new(&store).set_advanced(false)?;
     let mut harness = popup(&store);
     open_clock(&mut harness);
-    offers(&harness, &["Routine", "Reminder"], &["Frog", "Session"]);
+    offers(&harness, &offered, &not);
     Ok(())
 }
 
@@ -214,7 +225,8 @@ fn a_routine_set_up_in_the_window_is_saved_with_the_note_by_ctrl_enter() -> Test
     let mut harness = window(&store, Selection::Agenda);
     type_in_window(&mut harness, "Water the plants");
     open_clock(&mut harness);
-    click(&mut harness, "Routine");
+    click(&mut harness, "Remind me…");
+    repeat_every(&mut harness);
     // Its editor opens over the quick note, which stays.
     assert!(harness.state().routine_editor().is_some());
     assert!(harness.state().quick_note_open());
@@ -252,7 +264,7 @@ fn a_reminder_set_up_in_the_popup_is_saved_with_the_note() -> TestResult {
     let mut harness = popup(&store);
     type_in_popup(&mut harness, "Call the dentist");
     open_clock(&mut harness);
-    click(&mut harness, "Reminder");
+    click(&mut harness, "Remind me…");
     assert!(harness.state().popup.page_open());
     click(&mut harness, "Save");
     assert!(!harness.state().popup.page_open());
@@ -276,7 +288,7 @@ fn a_quick_note_left_empty_leaves_no_routine_behind() -> TestResult {
     let mut harness = window(&store, Selection::Agenda);
     type_in_window(&mut harness, "x");
     open_clock(&mut harness);
-    click(&mut harness, "Reminder");
+    click(&mut harness, "Remind me…");
     click(&mut harness, "Cancel");
     assert!(harness.state().routine_editor().is_none());
     assert!(
@@ -286,7 +298,7 @@ fn a_quick_note_left_empty_leaves_no_routine_behind() -> TestResult {
             .is_none()
     );
     open_clock(&mut harness);
-    click(&mut harness, "Reminder");
+    click(&mut harness, "Remind me…");
     click(&mut harness, "Save");
     assert!(
         harness
@@ -306,7 +318,7 @@ fn a_quick_note_left_empty_leaves_no_routine_behind() -> TestResult {
     // The same in the popup.
     let mut harness = popup(&store);
     open_clock(&mut harness);
-    click(&mut harness, "Routine");
+    click(&mut harness, "Remind me…");
     click(&mut harness, "Save");
     harness.key_press(egui::Key::Escape);
     harness.run();
@@ -348,7 +360,7 @@ fn each_switch_brings_its_control_back_and_takes_it_away_again() -> TestResult {
     drop(harness);
     let mut harness = popup(&store);
     open_clock(&mut harness);
-    offers(&harness, &["Routine", "Reminder", "Frog", "Session"], &[]);
+    offers(&harness, &["Remind me…", "Frog", "Session"], &[]);
     drop(harness);
     settings.set_quick_note_shows(QuickNoteControl::Schedule, false)?;
     // The Importance alone is in "More" too.

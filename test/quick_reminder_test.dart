@@ -73,7 +73,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'call the plumber');
     await tap(tester, find.text('Save'));
     await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
-    await tap(tester, find.text('Reminder'));
+    await tap(tester, find.text('Remind me…'));
     expect(find.text('New Reminder'), findsOneWidget);
   }
 
@@ -182,7 +182,7 @@ void main() {
           matching: find.byIcon(Icons.alarm_add_outlined),
         ),
       );
-      await tap(tester, find.text('Reminder').last);
+      await tap(tester, find.text('Remind me…').last);
       await tap(tester, chip('tonight'));
       await tap(tester, save);
       await tap(tester, find.byKey(const ValueKey('captureSave')));

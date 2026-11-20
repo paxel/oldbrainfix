@@ -467,10 +467,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get reminder => 'Erinnerung';
 
   @override
-  String get spawnRoutine => 'Routine …';
-
-  @override
-  String get spawnReminder => 'Erinnerung …';
+  String get remindMe => 'Erinnere mich …';
 
   @override
   String get spawnSession => 'Einheit …';

@@ -42,7 +42,7 @@ Future<bool> spawnFromNote(
       notes: notes,
       places: places,
       noteId: note.id,
-      reminder: spawn == Spawn.reminder,
+      reminder: spawn == Spawn.remind,
       // Only a plain Note becomes a Session (ADR 0039): a Session Note's
       // new Routine runs it as it is, and one of another kind runs plain.
       session:
@@ -69,7 +69,7 @@ Future<ScheduleChoice?> chooseSchedule(
       notes: notes,
       places: places,
       capture: draft,
-      reminder: spawn == Spawn.reminder,
+      reminder: spawn == Spawn.remind,
       session: spawn == Spawn.session,
     ),
   ),

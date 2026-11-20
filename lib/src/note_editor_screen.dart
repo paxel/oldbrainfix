@@ -1673,10 +1673,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
-  /// The "+" badge's menu at the finger [at]: Routine, Reminder, Frog and
+  /// The "+" badge's menu at the finger [at]: Remind me…, Frog and
   /// Session, each spawned as the card's menu does; on a Session Note no
   /// Session, as a Routine of it runs it already (#191); no Frog while
-  /// one is open (#259); in Simple only Routine and Reminder (#197).
+  /// one is open (#259); in Simple only Remind me… (#197, #344).
   Future<void> _addMenu(Offset at) async {
     final t = context.t;
     final advanced = widget.notes.store.advanced;
@@ -1691,12 +1691,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       ),
       items: [
         for (final (spawn, icon, label) in [
-          (Spawn.routine, const Icon(Icons.repeat), t.routine),
-          (
-            Spawn.reminder,
-            const Icon(Icons.notifications_outlined),
-            t.reminder,
-          ),
+          // One way in for a Routine or Reminder, starting as a
+          // Reminder (#344).
+          (Spawn.remind, const Icon(Icons.notifications_outlined), t.remindMe),
           // Frogs and Sessions are made only in Advanced (#197); a Note
           // has one open Frog at a time (#259).
           if (advanced && (_frog?.isDone ?? true))

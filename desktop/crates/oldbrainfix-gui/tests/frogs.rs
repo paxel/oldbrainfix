@@ -333,7 +333,7 @@ fn the_note_editor_makes_a_frog() -> TestResult {
     // One open Frog at a time: the entry goes while it is open.
     harness.get_by_label(add).click();
     harness.run();
-    assert!(shows(&harness, t.reminder()));
+    assert!(shows(&harness, t.remind_me()));
     assert!(
         harness
             .query_all_by_role_and_label(Role::Button, t.frog())
@@ -370,7 +370,7 @@ fn frog_badge(t: &L10n, value: &str) -> String {
 fn plus_offers_frog(harness: &mut Harness<'_, App>, t: &L10n) -> bool {
     harness.get_by_label(t.routine_or_reminder()).click();
     harness.run();
-    assert!(shows(harness, t.reminder()));
+    assert!(shows(harness, t.remind_me()));
     let offers = harness
         .query_all_by_role_and_label(Role::Button, t.frog())
         .next()

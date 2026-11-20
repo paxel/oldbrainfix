@@ -3,7 +3,7 @@
 //! trash act on the selection together, or on the card alone outside
 //! it, and Restore in the trash; one Ctrl+Z takes back the trash or the
 //! Merge of all of them, and a Note this Device may not change stays.
-//! The same menu offers Routine…, Reminder…, in Advanced Frog and
+//! The same menu offers Remind me… (#344), in Advanced Frog and
 //! Session… for the card alone, to who may set them up (#281).
 
 use std::collections::HashMap;
@@ -292,7 +292,7 @@ fn the_cards_selected_in_the_trash_are_restored_together() -> TestResult {
     harness.run();
     assert!(harness.query_by_label("Move to trash").is_none());
     assert!(harness.query_by_label("Merge into…").is_none());
-    assert!(harness.query_by_label("Reminder…").is_none());
+    assert!(harness.query_by_label("Remind me…").is_none());
     harness.key_press(egui::Key::Escape);
     harness.run();
     right_pick(&mut harness, PLUMBER, "Restore")?;
@@ -599,15 +599,14 @@ fn menu_of(harness: &mut Harness<'_, App>, text: &str, labels: &[&str]) -> Vec<S
         .collect()
 }
 
-const SPAWNS: [&str; 4] = ["Routine…", "Reminder…", "Frog", "Session…"];
+const SPAWNS: [&str; 3] = ["Remind me…", "Frog", "Session…"];
 
 #[test]
 fn a_cards_menu_offers_its_routines_after_file_into_and_before_merge_into() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let order = [
         "File into…",
-        "Routine…",
-        "Reminder…",
+        "Remind me…",
         "Frog",
         "Session…",
         // On an Unsorted Note's card (#308).
@@ -636,10 +635,7 @@ fn frog_and_session_are_offered_only_in_advanced() -> TestResult {
     let store = store()?;
     PersonSettings::new(&store).set_advanced(false)?;
     let mut harness = harness(store, Selection::All);
-    assert_eq!(
-        menu_of(&mut harness, MILK, &SPAWNS),
-        ["Routine…", "Reminder…"]
-    );
+    assert_eq!(menu_of(&mut harness, MILK, &SPAWNS), ["Remind me…"]);
     Ok(())
 }
 
@@ -658,7 +654,7 @@ fn a_checklist_has_no_session_and_a_frog_open_no_second() -> TestResult {
     let mut harness = harness(store, Selection::All);
     assert_eq!(
         menu_of(&mut harness, ROSES, &SPAWNS),
-        ["Routine…", "Reminder…", "Frog"]
+        ["Remind me…", "Frog"]
     );
     harness.key_press(egui::Key::Escape);
     harness.run();
@@ -671,7 +667,7 @@ fn a_checklist_has_no_session_and_a_frog_open_no_second() -> TestResult {
     assert_eq!(frogs.len(), 1);
     assert_eq!(
         menu_of(&mut harness, MILK, &SPAWNS),
-        ["Routine…", "Reminder…", "Session…"]
+        ["Remind me…", "Session…"]
     );
     Ok(())
 }
@@ -687,11 +683,11 @@ fn a_member_sets_up_nothing_for_another_persons_note() -> TestResult {
 }
 
 #[test]
-fn reminder_sets_one_up_for_the_card_alone() -> TestResult {
+fn remind_me_sets_up_a_reminder_for_the_card_alone() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, ROSES, "Reminder…")?;
+    right_pick(&mut harness, ROSES, "Remind me…")?;
     harness.run();
     let roses = note(&harness, &ids, ROSES)?.id;
     let editor = harness.state().routine_editor().ok_or("the editor")?;

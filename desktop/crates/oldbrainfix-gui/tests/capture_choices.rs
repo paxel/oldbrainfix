@@ -155,7 +155,7 @@ fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
     let (store, _, _) = store()?;
     let mut harness = popup(&store);
     type_in_popup(&mut harness, "Call the dentist");
-    spawn(&mut harness, "Reminder");
+    spawn(&mut harness, "Remind me…");
     assert!(harness.state().popup.page_open());
     assert!(shows(&harness, "New Reminder"));
     // The Note it is for, by the text typed so far.
@@ -181,7 +181,7 @@ fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
     harness.run();
     assert!(harness.state().popup.choices().schedules.is_empty());
     assert!(shows(&harness, "10 min"));
-    spawn(&mut harness, "Reminder");
+    spawn(&mut harness, "Remind me…");
     harness.key_press(Key::Escape);
     harness.run();
     assert!(!harness.state().popup.page_open());
@@ -189,14 +189,14 @@ fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
     assert!(harness.state().popup.choices().schedules.is_empty());
     // Alt+Left goes back from the page the same way, once the cursor
     // left the When line it starts in (#277), where Alt+Left rests.
-    spawn(&mut harness, "Reminder");
+    spawn(&mut harness, "Remind me…");
     harness.key_press(Key::Tab);
     harness.run();
     harness.key_press_modifiers(egui::Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert!(!harness.state().popup.page_open());
     assert!(harness.state().popup.choices().schedules.is_empty());
-    spawn(&mut harness, "Reminder");
+    spawn(&mut harness, "Remind me…");
     click(&mut harness, "Save");
     click(&mut harness, "Save");
     assert!(harness.state().closed);
@@ -569,7 +569,7 @@ fn a_list_kind_offers_no_add_to_note_tally_or_session() -> TestResult {
     click(&mut harness, "More");
     harness.get_by_role_and_label(Role::Button, CLOCK).click();
     harness.run();
-    assert!(shows(&harness, "Routine"));
+    assert!(shows(&harness, "Remind me…"));
     assert!(!shows(&harness, "Session"));
     harness.get_by_role_and_label(Role::Button, CLOCK).click();
     harness.run();

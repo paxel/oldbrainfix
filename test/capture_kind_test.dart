@@ -210,7 +210,7 @@ void main() {
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();
       await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
-      expect(find.text('Routine'), findsOneWidget);
+      expect(find.text('Remind me…'), findsOneWidget);
       expect(find.text('Session'), findsNothing);
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();

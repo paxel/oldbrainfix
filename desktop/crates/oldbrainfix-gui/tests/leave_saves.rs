@@ -589,14 +589,15 @@ fn popup(store: &Arc<Store>) -> Harness<'static, Popup> {
     harness
 }
 
-/// The popup's page of a new Routine, from the alarm clock's menu.
+/// The popup's page of a new Routine or Reminder, from the alarm clock's
+/// menu (#344).
 fn routine_page(harness: &mut Harness<'_, Popup>, t: &L10n) {
     harness
         .get_by_role_and_label(Role::Button, "Routine, Reminder, Frog or Session")
         .click();
     harness.run();
     harness
-        .get_by_role_and_label(Role::Button, t.routine())
+        .get_by_role_and_label(Role::Button, t.remind_me())
         .click_accesskit();
     harness.run();
     assert!(harness.state().popup.page_open());

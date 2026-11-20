@@ -521,17 +521,15 @@ fn a_routine_saved_from_the_note_dialog_in_unsorted_opens_the_next_note() -> Tes
         .click();
     harness.run();
     harness
-        .get_all_by_label("Routine")
+        .get_all_by_label("Remind me…")
         .last()
-        .ok_or("Routine")?
+        .ok_or("Remind me…")?
         .click();
     harness.run();
     assert!(harness.state().routine_editor().is_some());
     // Not saved yet: the Note is still Unsorted and still open.
     assert_eq!(open_text(&harness)?.as_deref(), Some(MILK));
-    // The time its field holds, then Save.
-    harness.get_by_label("Add a time").click();
-    harness.run();
+    // A Reminder at its next full hour (#344), then Save.
     harness.get_by_label("Save").click_accesskit();
     harness.run();
     assert!(!note(&harness, MILK)?.is_unsorted());

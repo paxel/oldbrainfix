@@ -1624,8 +1624,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       onSchedule: onSchedule,
       spawns: [
         for (final spawn in Spawn.values)
-          if (spawn == Spawn.routine ||
-              spawn == Spawn.reminder ||
+          if (spawn == Spawn.remind ||
               // Frogs and Sessions are made only in Advanced (#197), and
               // only once switched on.
               (schedule &&

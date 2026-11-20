@@ -81,8 +81,7 @@ void main() {
 
       await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
       expect(find.byType(BottomSheet), findsNothing);
-      expect(find.text('Routine'), findsOneWidget);
-      expect(find.text('Reminder'), findsOneWidget);
+      expect(find.text('Remind me…'), findsOneWidget);
       await tap(tester, find.text('Frog'));
 
       final made = frogs.open().single;
@@ -145,7 +144,7 @@ void main() {
       expect(value(tester), 'Open');
       expect(tester.getSemantics(key('badge-frog')).label, 'Frog: Open');
       await tap(tester, key('badge-add'));
-      expect(key('spawn-routine'), findsOneWidget);
+      expect(key('spawn-remind'), findsOneWidget);
       expect(key('spawn-frog'), findsNothing);
     });
 
@@ -208,7 +207,7 @@ void main() {
       await tap(tester, key('frog-eat-now'));
       expect(frogs.byId(made.id)?.isDone, isTrue);
       await tap(tester, key('badge-add'));
-      expect(key('spawn-reminder'), findsOneWidget);
+      expect(key('spawn-remind'), findsOneWidget);
       expect(key('spawn-frog'), findsNothing);
     });
 

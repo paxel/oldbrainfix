@@ -175,8 +175,9 @@ pub struct CaptureChoices {
 /// Something on the capture's buttons or its choices to spawn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Spawn {
-    Routine,
-    Reminder,
+    /// A Routine or Reminder, by one "Remind me…" whose editor starts as
+    /// a Reminder (#344).
+    Remind,
     Frog,
     Session,
 }
@@ -333,7 +334,7 @@ impl CaptureChoices {
             Ask::Spawn(Spawn::Frog) => self.frog = true,
             Ask::Spawn(spawn) => {
                 return Ok(Some(Opens::Schedule {
-                    reminder: spawn == Spawn::Reminder,
+                    reminder: spawn == Spawn::Remind,
                     session: spawn == Spawn::Session,
                 }));
             }
@@ -831,8 +832,7 @@ pub fn action_row(
             let clock = icon_button(ui, icons::ADD_ALARM, t.routine_or_reminder(), text);
             egui::Popup::menu(&clock).show(|ui| {
                 let offered = [
-                    (Spawn::Routine, icons::REPEAT, t.routine()),
-                    (Spawn::Reminder, icons::REMINDER, t.reminder()),
+                    (Spawn::Remind, icons::REMINDER, t.remind_me()),
                     (Spawn::Frog, icons::FROG, t.frog()),
                     (Spawn::Session, icons::SESSION, t.session()),
                 ];

@@ -329,7 +329,7 @@ replace a law of Both apps where they say so. A desktop law marked
   this week" over all of them (#191); a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
   the card** (File into, Routine, Merge, the pencil); **its ⋮ sits top
-  right** and offers after Edit File into…, Routine…, Reminder…, in
+  right** and offers after Edit File into…, Remind me… (#344), in
   Advanced Frog and Session… (#197), and Merge into…, as far as the
   action row would (#281): the spawns only for who may set them up
   (ADR 0013) and Session… only on a plain Note. **On an Unsorted Note's
@@ -491,7 +491,7 @@ replace a law of Both apps where they say so. A desktop law marked
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value" in words, an icon's value
   too. The row ends with "+",
-  whose menu at the finger offers Routine, Reminder, Frog and Session,
+  whose menu at the finger offers Remind me…, Frog and Session,
   there only for who may set them up; no Frog while the Note has an open
   one (#259); on a Session it offers no
   Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and
@@ -1158,7 +1158,7 @@ replace a law of Both apps where they say so. A desktop law marked
   Kind choice above the text field (#310, no switch in Settings), the
   text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
   **To full editor**, **Add to Note…** (#308) and the alarm clock beside them (#223), whose menu
-  offers Routine and Reminder as the Note editor's "+" does, in Simple
+  offers Remind me… as the Note editor's "+" does, in Simple
   too; nothing else that sorts and no other chips. The Routine or Reminder
   editor opens over the quick note and comes back to it with the choice
   at the top, written only with the Note. To full editor
@@ -1838,7 +1838,7 @@ replace a law of Both apps where they say so. A desktop law marked
   Important, Normal or Unimportant, and Move to trash last, each only on
   a card this Device may change; a card in the Trash has no ⋮, and its
   right-click offers Restore alone. Between File into… and Merge into…
-  stand Routine… and Reminder…, in Advanced Frog while the Note has no
+  stand Remind me…, in Advanced Frog while the Note has no
   open Frog and Session… on a plain Note, as in the phone's compact ⋮
   (#281), only for who may set them up (ADR 0013) and for that card
   alone, selected or not; the ⋮ and the right-click are one menu in
@@ -1919,7 +1919,7 @@ replace a law of Both apps where they say so. A desktop law marked
   text as radio pills (#310), the text, Record voice, Paste
   (the dialog also From file…), the Nudge buttons, To full editor, Add
   to Note… (#308), a dialog over the quick note dialog or a page of the
-  popup, and the alarm clock, whose menu offers Routine and Reminder (#223), its
+  popup, and the alarm clock, whose menu offers Remind me… (#223, #344), its
   editor a dialog over the quick note dialog or a page of the popup;
   switched on, File into…, Frog and Session in the clock's menu, and
   More with the Importance, Make it a Tally and Add to a Shopping List

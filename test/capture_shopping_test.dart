@@ -312,7 +312,7 @@ void main() {
     await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), 'water the plants');
     await tap(tester, find.byIcon(Icons.alarm_add_outlined));
-    await tap(tester, find.text('Routine').last);
+    await tap(tester, find.text('Remind me…').last);
     await tap(
       tester,
       find.descendant(

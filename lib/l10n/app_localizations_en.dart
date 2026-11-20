@@ -463,10 +463,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reminder => 'Reminder';
 
   @override
-  String get spawnRoutine => 'Routine…';
-
-  @override
-  String get spawnReminder => 'Reminder…';
+  String get remindMe => 'Remind me…';
 
   @override
   String get spawnSession => 'Session…';

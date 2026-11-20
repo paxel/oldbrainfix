@@ -91,25 +91,27 @@ void main() {
       expect(find.byType(TwoRowTextField), findsNothing);
     });
 
-    testWidgets('the alarm clock offers Routine and Reminder, as the Note '
-        'editor\'s "+" does, without Frog or Session (#223)', (tester) async {
+    testWidgets('the alarm clock offers Remind me…, as the Note '
+        'editor\'s "+" does, without Frog or Session (#223, #344)', (
+      tester,
+    ) async {
       await start(tester);
       await openTextCapture(tester);
       await tap(tester, spawnMenu);
-      expect(find.text('Routine'), findsOneWidget);
-      expect(find.text('Reminder'), findsOneWidget);
+      expect(find.text('Remind me…'), findsOneWidget);
+      expect(find.text('Routine'), findsNothing);
+      expect(find.text('Reminder'), findsNothing);
       expect(find.text('Frog'), findsNothing);
       expect(find.text('Session'), findsNothing);
     });
 
-    testWidgets('in Simple the alarm clock offers Routine and Reminder too '
-        '(#197, #223)', (tester) async {
+    testWidgets('in Simple the alarm clock offers Remind me… too '
+        '(#197, #223, #344)', (tester) async {
       store.advanced = false;
       await start(tester);
       await openTextCapture(tester);
       await tap(tester, spawnMenu);
-      expect(find.text('Routine'), findsOneWidget);
-      expect(find.text('Reminder'), findsOneWidget);
+      expect(find.text('Remind me…'), findsOneWidget);
       expect(find.text('Frog'), findsNothing);
     });
 
@@ -119,7 +121,7 @@ void main() {
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'ring the plumber');
       await tap(tester, spawnMenu);
-      await tap(tester, find.text('Reminder').last);
+      await tap(tester, find.text('Remind me…').last);
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       await tap(
         tester,
@@ -147,7 +149,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tap(tester, spawnMenu);
-      await tap(tester, find.text('Routine').last);
+      await tap(tester, find.text('Remind me…').last);
       await tap(
         tester,
         find.descendant(
@@ -155,7 +157,7 @@ void main() {
           matching: find.widgetWithText(TextButton, 'Save'),
         ),
       );
-      expect(find.textContaining('Routine: '), findsOneWidget);
+      expect(find.textContaining('Reminder: '), findsOneWidget);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -305,7 +307,7 @@ void main() {
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();
       await tap(tester, spawnMenu);
-      for (final kind in ['Routine', 'Reminder', 'Frog', 'Session']) {
+      for (final kind in ['Remind me…', 'Frog', 'Session']) {
         expect(find.text(kind), findsOneWidget, reason: kind);
       }
     });
@@ -320,7 +322,7 @@ void main() {
       expect(find.byKey(const ValueKey('quickNote-fileInto')), findsOneWidget);
     });
 
-    testWidgets('in Simple the menu offers Routine and Reminder only, no '
+    testWidgets('in Simple the menu offers Remind me… only, no '
         '"Make it a Tally" and no format bar (#197)', (tester) async {
       store
         ..setQuickNoteShows(QuickNoteControl.schedule, true)
@@ -331,8 +333,7 @@ void main() {
       expect(more, findsNothing);
       expect(find.byKey(const ValueKey('format-bold')), findsNothing);
       await tap(tester, spawnMenu);
-      expect(find.text('Routine'), findsOneWidget);
-      expect(find.text('Reminder'), findsOneWidget);
+      expect(find.text('Remind me…'), findsOneWidget);
       expect(find.text('Frog'), findsNothing);
       expect(find.text('Session'), findsNothing);
     });

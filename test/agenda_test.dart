@@ -482,7 +482,7 @@ void main() {
       expect(find.byType(NoteCard), findsOneWidget);
       await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
       expect(find.byType(BottomSheet), findsNothing);
-      await tap(tester, find.text('Reminder'));
+      await tap(tester, find.text('Remind me…'));
 
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(find.text('New Reminder'), findsOneWidget);
@@ -547,39 +547,69 @@ void main() {
       await tester.pumpAndSettle();
 
       await tap(tester, find.byKey(const ValueKey('badge-add')));
-      await tap(tester, find.byKey(const ValueKey('spawn-reminder')));
+      await tap(tester, find.byKey(const ValueKey('spawn-remind')));
       await tap(tester, find.text('Save'));
       await tap(tester, find.byKey(const ValueKey('badge-add')));
-      await tap(tester, find.byKey(const ValueKey('spawn-routine')));
+      await tap(tester, find.byKey(const ValueKey('spawn-remind')));
+      // It starts as a Reminder; Every … makes it a Routine (#344).
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
       expect(find.text('New Routine'), findsOneWidget);
       await tap(tester, find.text('Save'));
 
       expect(find.byType(NoteEditorScreen), findsOneWidget);
-      expect(find.text('Every day · All day'), findsOneWidget);
+      // The Routine keeps the Reminder's time it started with (#344).
+      expect(find.text('Every day · 10:00'), findsOneWidget);
       expect(find.textContaining('Once, '), findsOneWidget);
       final spawned = routines.ofNote(dentist.id);
       expect(spawned, hasLength(2));
       expect(spawned.where((r) => r.isReminder), hasLength(1));
 
-      await tap(tester, find.text('Every day · All day'));
+      await tap(tester, find.text('Every day · 10:00'));
       expect(find.text('From the Note'), findsOneWidget);
       await tap(tester, find.text('dentist'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
     });
 
-    testWidgets('a browser card offers a Routine from a menu at the finger', (
-      tester,
-    ) async {
+    testWidgets('a browser card offers a Routine from a menu at the finger: '
+        'Remind me… switched to repeating (#344)', (tester) async {
       notes.capture('water the plants');
       await start(tester);
       await tap(tester, find.byTooltip('Search and browse'));
       await tap(tester, find.byTooltip('All Notes'));
       await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
       expect(find.byType(BottomSheet), findsNothing);
-      await tap(tester, find.text('Routine').last);
+      await tap(tester, find.text('Remind me…').last);
+      expect(find.text('New Reminder'), findsOneWidget);
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
+      expect(find.text('New Routine'), findsOneWidget);
       await tap(tester, find.text('Save'));
-      expect(routines.all().single.isReminder, isFalse);
+      final routine = routines.all().single;
+      expect(routine.isReminder, isFalse);
+      // The time the Reminder started with is kept.
+      expect(routine.schedule.times, [at(10)]);
       expect(notes.all().single.isUnsorted, isFalse);
+    });
+
+    testWidgets('Remind me… switched to repeating and back to Once keeps '
+        'its day and time (#344)', (tester) async {
+      notes.capture('water the plants');
+      await start(tester);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byTooltip('All Notes'));
+      await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
+      await tap(tester, find.text('Remind me…').last);
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
+      expect(find.text('New Routine'), findsOneWidget);
+      await tester.ensureVisible(find.text('Once'));
+      await tap(tester, find.text('Once'));
+      expect(find.text('New Reminder'), findsOneWidget);
+      await tap(tester, find.text('Save'));
+      final reminder = routines.all().single;
+      expect(reminder.isReminder, isTrue);
+      expect(reminder.schedule.on(today), [Occurrence(today, at(10))]);
     });
 
     testWidgets('a Routine made directly makes its Note, not Unsorted', (

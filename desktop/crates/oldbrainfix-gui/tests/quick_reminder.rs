@@ -134,7 +134,7 @@ fn reminder(
     harness.run();
     harness.get_by_label(CLOCK).click();
     harness.run();
-    click(&mut harness, "Reminder")?;
+    click(&mut harness, "Remind me…")?;
     assert!(harness.state().routine_editor().is_some());
     Ok((harness, note))
 }
@@ -319,7 +319,7 @@ fn the_quick_notes_alarm_clock_takes_a_chip_with_the_note() -> TestResult {
     harness.run();
     harness.get_by_role_and_label(Role::Button, CLOCK).click();
     harness.run();
-    click(&mut harness, "Reminder")?;
+    click(&mut harness, "Remind me…")?;
     click(&mut harness, "Tonight 19:00")?;
     click(&mut harness, "Save")?;
     assert!(harness.state().routine_editor().is_none());
@@ -375,7 +375,7 @@ fn the_popups_alarm_clock_takes_a_chip_with_the_note() -> TestResult {
     harness.run();
     harness.get_by_role_and_label(Role::Button, CLOCK).click();
     harness.run();
-    click(&mut harness, "Reminder")?;
+    click(&mut harness, "Remind me…")?;
     assert_eq!(chips(&harness).len(), 4);
     click(&mut harness, "Tomorrow 08:00")?;
     click(&mut harness, "Save")?;

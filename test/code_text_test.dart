@@ -257,7 +257,7 @@ void main() {
       expect(tester.widget<SettingBadge>(key('badge-kind')).onTap, isNull);
       await tester.tap(key('badge-add'));
       await tester.pumpAndSettle();
-      expect(key('spawn-routine'), findsOneWidget);
+      expect(key('spawn-remind'), findsOneWidget);
       expect(key('spawn-session'), findsNothing);
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();

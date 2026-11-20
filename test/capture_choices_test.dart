@@ -113,13 +113,16 @@ void main() {
   }
 
   /// Sets up a Routine as its editor opens, with what it proposes.
-  Future<void> addRoutine(
-    WidgetTester tester, {
-    String kind = 'Routine',
-  }) async {
+  /// A Routine, or a Reminder when not [repeating], by Remind me…, whose
+  /// editor starts as a Reminder (#344).
+  Future<void> addRoutine(WidgetTester tester, {bool repeating = true}) async {
     await tap(tester, spawnMenu);
-    await tap(tester, find.text(kind).last);
+    await tap(tester, find.text('Remind me…').last);
     expect(find.byType(RoutineEditorScreen), findsOneWidget);
+    if (repeating) {
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
+    }
     await tap(
       tester,
       find.descendant(
@@ -203,7 +206,9 @@ void main() {
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'water the plants');
       await tap(tester, spawnMenu);
-      await tap(tester, find.text('Routine').last);
+      await tap(tester, find.text('Remind me…').last);
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
 
       // The editor shows the Note being captured.
       expect(
@@ -242,7 +247,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'call the vet');
-      await addRoutine(tester, kind: 'Reminder');
+      await addRoutine(tester, repeating: false);
 
       expect(find.textContaining('Reminder: '), findsOneWidget);
       await tap(tester, save);
@@ -528,7 +533,7 @@ void main() {
         findsNothing,
       );
 
-      await addRoutine(tester, kind: 'Reminder');
+      await addRoutine(tester, repeating: false);
       await tap(tester, save);
       expect(notes.all(), hasLength(1));
       expect(Routines(store).ofNote(note.id), hasLength(2));
@@ -690,13 +695,13 @@ void main() {
       expect(row, findsOneWidget);
       expect(fileInto, findsNothing);
       await tap(tester, spawnMenu);
-      expect(find.text('Routine'), findsWidgets);
+      expect(find.text('Remind me…'), findsOneWidget);
       expect(find.text('Session'), findsNothing);
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'buy stamps');
-      await addRoutine(tester, kind: 'Reminder');
+      await addRoutine(tester, repeating: false);
       await back(tester);
       expect(Routines(store).all().single.isReminder, isTrue);
     });

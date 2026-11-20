@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Changed
 
 - On the phone the search field of the Areas list, an Area and a Topic sits on a band that shares a colour set off from the page with the top bar, with a line under it, so the cards go under it when they scroll or the list is pulled down. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))
+- One "Remind me…" sets up a Routine or a Reminder wherever a Note offered "Routine…" and "Reminder…" apart, on the phone and the desktop: a card's alarm clock and ⋮, the Note editor's "+", the quick note's alarm clock, the Note dialog's "+", the Note menu and a card's right-click. Its editor starts as a Reminder, and picking a repeat makes it a Routine, keeping what was set. ([obf-1034](https://github.com/paxel/oldbrainfix/issues/344))
 
 ### Fixed
 

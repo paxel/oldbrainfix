@@ -29,8 +29,9 @@ import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
 /// What a Note's card spawns from it: "Routine, Reminder, Frog or
-/// Session".
-enum Spawn { routine, reminder, frog, session }
+/// Session", a Routine or Reminder by one "Remind me…" (#344), whose
+/// editor starts as a Reminder.
+enum Spawn { remind, frog, session }
 
 /// A Note with the Area and Topic it is filed in, read once per change.
 /// A Note with where it is filed, what this Device may do to it in a
@@ -797,8 +798,7 @@ class NoteActionRow extends StatelessWidget {
                     PopupMenuItem(
                       value: spawn,
                       child: Text(switch (spawn) {
-                        Spawn.routine => t.routine,
-                        Spawn.reminder => t.reminder,
+                        Spawn.remind => t.remindMe,
                         Spawn.frog => t.frog,
                         Spawn.session => t.session,
                       }),
@@ -838,12 +838,12 @@ class NoteActionRow extends StatelessWidget {
 /// Sessions only in Advanced (#197).
 List<Spawn> offeredSpawns(List<Spawn> spawns, {required bool advanced}) => [
   for (final spawn in spawns)
-    if (advanced || spawn == Spawn.routine || spawn == Spawn.reminder) spawn,
+    if (advanced || spawn == Spawn.remind) spawn,
 ];
 
 /// The ⋮ of a card's action row, or of a compact card's top right: a menu
 /// at the button with words. It leads with Edit, then on a compact card
-/// File into…, Routine…, Reminder…, in Advanced Frog and Session…, and
+/// File into…, Remind me…, in Advanced Frog and Session…, and
 /// Merge into… (#189, #281), then, for a Note being captured, its Importance as radio
 /// buttons, the one it has marked, then Show ticks while it has boxes, then
 /// "Share…", which opens a small menu at the button of sending, sharing,
@@ -858,7 +858,7 @@ class _MoreButton extends StatelessWidget {
   final Importance importance;
   final NoteActions actions;
 
-  /// "File into…", the Routine, Reminder, Frog and Session of
+  /// "File into…", the Remind me…, Frog and Session of
   /// [spawnsNow] and "Merge into…" after Edit, for a compact card, which
   /// has no action row (#189, #281); left out when null.
   final VoidCallback? onFile;
@@ -948,14 +948,12 @@ class _MoreButton extends StatelessWidget {
               drawn(
                 'note-spawn-${spawn.name}',
                 switch (spawn) {
-                  Spawn.routine => const Icon(Icons.repeat),
-                  Spawn.reminder => const Icon(Icons.notifications_outlined),
+                  Spawn.remind => const Icon(Icons.notifications_outlined),
                   Spawn.frog => const FrogIcon(size: 24),
                   Spawn.session => const Icon(Icons.event_repeat),
                 },
                 switch (spawn) {
-                  Spawn.routine => t.spawnRoutine,
-                  Spawn.reminder => t.spawnReminder,
+                  Spawn.remind => t.remindMe,
                   // A Frog is made at once, nothing asked.
                   Spawn.frog => t.frog,
                   Spawn.session => t.spawnSession,

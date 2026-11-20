@@ -7,6 +7,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Geändert
 
 - Auf dem Handy liegt das Suchfeld der Bereichsliste, eines Bereichs und eines Themas auf einem Streifen, der mit der oberen Leiste eine von der Seite abgesetzte Farbe teilt, mit einer Linie darunter, sodass die Karten beim Scrollen und beim Herunterziehen der Liste unter ihm durchlaufen. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))
+- Ein „Erinnere mich …“ richtet eine Routine oder eine Erinnerung ein, überall dort, wo eine Notiz bisher „Routine …“ und „Erinnerung …“ getrennt anbot, auf dem Handy und am Desktop: am Wecker und im ⋮ einer Karte, im „+“ des Notiz-Editors, am Wecker der Schnellnotiz, im „+“ des Notiz-Dialogs, im Menü Notiz und im Rechtsklick einer Karte. Sein Editor beginnt als Erinnerung, und eine Wiederholung macht sie zur Routine und behält, was eingestellt war. ([obf-1034](https://github.com/paxel/oldbrainfix/issues/344))
 
 ### Behoben
 

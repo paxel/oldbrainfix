@@ -8796,7 +8796,7 @@ impl App {
     }
 
     /// What a card's menu offers of the Note `note`'s Routines (#281), as
-    /// the Note menu and the "+" badge do: Routine… and Reminder… for who
+    /// the Note menu and the "+" badge do: Remind me… (#344) for who
     /// may set them up (ADR 0013), in Advanced also Frog while it has none
     /// open and Session… on a plain Note without Code text (#197, #213).
     fn card_spawns(&self, note: &Note) -> oldbrainfix_core::Result<CardSpawns> {
@@ -12857,26 +12857,17 @@ impl App {
                         }
                     });
                 });
-                let items = [
-                    (
-                        t.menu_routine(),
-                        None,
-                        may(|n| n.schedules),
-                        Action::NewRoutine {
-                            note: Some(id.clone()),
-                            reminder: false,
-                        },
-                    ),
-                    (
-                        t.menu_reminder(),
-                        None,
-                        may(|n| n.schedules),
-                        Action::NewRoutine {
-                            note: Some(id.clone()),
-                            reminder: true,
-                        },
-                    ),
-                ];
+                // One way in for a Routine or Reminder, starting as a
+                // Reminder (#344).
+                let items = [(
+                    t.remind_me(),
+                    None,
+                    may(|n| n.schedules),
+                    Action::NewRoutine {
+                        note: Some(id.clone()),
+                        reminder: true,
+                    },
+                )];
                 menu_entries(ui, items, actions);
                 // Frogs, Sessions and Tallies are made only in Advanced
                 // (#197).
@@ -20559,7 +20550,7 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 /// opening its editor, and those a newer version saved, only shown; its
 /// Frog, open or eaten today or yesterday, offering Eat now and Remove
 /// the Frog (#259); a Session's rule and weekdays' counts (#191); Show on the
-/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog while none is
+/// Agenda; Show ticks; and "+" with Remind me… (#344), Frog while none is
 /// open and, on a plain Note, Session, for who may set them up. A setting that does not
 /// apply has no badge; one this Device may not change only shows.
 fn note_badges(
@@ -20747,24 +20738,16 @@ fn note_badges(
         let id = note.id.clone();
         let text = ui.visuals().text_color();
         egui::Popup::menu(&add).show(|ui| {
-            let mut entries = vec![
-                (
-                    icons::REPEAT,
-                    t.routine(),
-                    Action::NewRoutine {
-                        note: Some(id.clone()),
-                        reminder: false,
-                    },
-                ),
-                (
-                    icons::REMINDER,
-                    t.reminder(),
-                    Action::NewRoutine {
-                        note: Some(id.clone()),
-                        reminder: true,
-                    },
-                ),
-            ];
+            // One way in for a Routine or Reminder, starting as a
+            // Reminder (#344).
+            let mut entries = vec![(
+                icons::REMINDER,
+                t.remind_me(),
+                Action::NewRoutine {
+                    note: Some(id.clone()),
+                    reminder: true,
+                },
+            )];
             // A Note has one open Frog at a time; Frogs and Sessions are
             // made only in Advanced (#197).
             let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
@@ -21024,8 +21007,8 @@ struct CardLook<'a> {
     place: bool,
 }
 
-/// What a card's menu offers of the Note's Routines (#281): Routine…
-/// and Reminder… with `schedules`, Frog with `frog` and Session… with
+/// What a card's menu offers of the Note's Routines (#281): Remind me…
+/// (#344) with `schedules`, Frog with `frog` and Session… with
 /// `session`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CardSpawns {
@@ -22839,15 +22822,10 @@ fn note_card(
             let id = || Some(note.id.clone());
             let mut entries = Vec::new();
             if spawns.schedules {
+                // One way in for a Routine or Reminder, starting as a
+                // Reminder (#344).
                 entries.push((
-                    t.spawn_routine(),
-                    Action::NewRoutine {
-                        note: id(),
-                        reminder: false,
-                    },
-                ));
-                entries.push((
-                    t.spawn_reminder(),
+                    t.remind_me(),
                     Action::NewRoutine {
                         note: id(),
                         reminder: true,

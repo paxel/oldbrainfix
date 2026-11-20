@@ -419,7 +419,7 @@ fn a_lists_kind_badge_goes_back_to_a_plain_note_and_its_agenda_badge_switches() 
 }
 
 #[test]
-fn plus_badge_offers_routine_reminder_frog_and_session() -> TestResult {
+fn plus_badge_offers_remind_me_frog_and_session() -> TestResult {
     let (store, _) = store()?;
     let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
     let mut harness = window(&store, Selection::All);
@@ -429,7 +429,7 @@ fn plus_badge_offers_routine_reminder_frog_and_session() -> TestResult {
         .get_by_label("Routine, Reminder, Frog or Session")
         .click();
     harness.run();
-    for label in ["Routine", "Reminder", "Frog", "Session"] {
+    for label in ["Remind me…", "Frog", "Session"] {
         assert!(shows(&harness, label), "{label}");
     }
     click(&mut harness, "Frog");
@@ -439,14 +439,14 @@ fn plus_badge_offers_routine_reminder_frog_and_session() -> TestResult {
         .get_by_label("Routine, Reminder, Frog or Session")
         .click();
     harness.run();
-    assert!(shows(&harness, "Reminder"));
+    assert!(shows(&harness, "Remind me…"));
     assert_eq!(
         harness
             .query_all_by_role_and_label(Role::Button, "Frog")
             .count(),
         0
     );
-    click(&mut harness, "Reminder");
+    click(&mut harness, "Remind me…");
     let editor = harness.state().routine_editor().ok_or("the editor")?;
     assert!(editor.once());
     // The editor over the Note goes back to it.

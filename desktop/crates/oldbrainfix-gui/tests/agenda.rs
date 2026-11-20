@@ -366,14 +366,37 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
         .click();
     harness.run();
     harness
-        .get_all_by_label("Routine")
+        .get_all_by_label("Remind me…")
         .last()
-        .ok_or("Routine")?
+        .ok_or("Remind me…")?
+        .click();
+    harness.run();
+    // A Reminder at first; Every … makes it a Routine and keeps its time
+    // (#344).
+    assert!(shows(&harness, "New Reminder"));
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Every …")
+        .click();
+    harness.run();
+    assert!(shows(&harness, "New Routine"));
+    assert!(shows(&harness, "Remove 13:00"));
+    // Once and back to Every … keep it too.
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Once")
+        .click();
+    harness.run();
+    assert!(shows(&harness, "New Reminder"));
+    assert!(shows(&harness, "Remove 13:00"));
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Every …")
         .click();
     harness.run();
     assert!(shows(&harness, "New Routine"));
     assert!(shows(&harness, "From the Note"));
-    // All day to start with; the time field holds the current time,
+    assert!(shows(&harness, "Remove 13:00"));
+    harness.get_by_label("Remove 13:00").click();
+    harness.run();
+    // All day without it; the time field holds the current time,
     // 12:00 in Berlin, which is typed over with 20:00 and added.
     assert!(all_day(&harness) > behind);
     type_over(&mut harness, "12:00", "20:00");
@@ -446,9 +469,9 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
         .click();
     harness.run();
     harness
-        .get_all_by_label("Reminder")
+        .get_all_by_label("Remind me…")
         .last()
-        .ok_or("Reminder")?
+        .ok_or("Remind me…")?
         .click();
     harness.run();
     assert!(shows(&harness, "New Reminder"));
