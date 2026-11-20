@@ -77,6 +77,7 @@ class AlarmSync extends ChangeNotifier {
   Ringing? _ringing;
   var _nudgeOpened = false;
   var _changesOpened = false;
+  var _catchUpOpened = false;
   var _unsortedOpened = false;
   WidgetPick? _pickOpened;
   OpenedOccurrence? _occurrenceOpened;
@@ -138,6 +139,15 @@ class AlarmSync extends ChangeNotifier {
   bool takeChangesOpened() {
     final opened = _changesOpened;
     _changesOpened = false;
+    return opened;
+  }
+
+  /// Whether the Catch-up Notification was tapped and the Agenda with
+  /// its Missed Summary is still to show; taking it clears it
+  /// (obf-1039).
+  bool takeCatchUpOpened() {
+    final opened = _catchUpOpened;
+    _catchUpOpened = false;
     return opened;
   }
 
@@ -222,12 +232,14 @@ class AlarmSync extends ChangeNotifier {
     final ringing = await platform.ringing();
     final nudgeOpened = await platform.nudgeOpened();
     final changesOpened = await platform.changesOpened();
+    final catchUpOpened = await platform.catchUpOpened();
     final unsortedOpened = await platform.unsortedOpened();
     final pickOpened = await platform.pickOpened();
     final occurrenceOpened = await platform.occurrenceOpened();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
     if (changesOpened) _changesOpened = true;
+    if (catchUpOpened) _catchUpOpened = true;
     if (unsortedOpened) _unsortedOpened = true;
     if (pickOpened != null) _pickOpened = pickOpened;
     if (occurrenceOpened != null) _occurrenceOpened = occurrenceOpened;
@@ -241,6 +253,7 @@ class AlarmSync extends ChangeNotifier {
         ringingChanged ||
         nudgeOpened ||
         changesOpened ||
+        catchUpOpened ||
         unsortedOpened ||
         pickOpened != null ||
         occurrenceOpened != null) {

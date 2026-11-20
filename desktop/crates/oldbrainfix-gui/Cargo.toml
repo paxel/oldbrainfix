@@ -90,6 +90,12 @@ windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Ide
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
 zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
 
+# A macOS notification that waits for its click (obf-1039), which
+# notify-rust 4.18 does not ask for without buttons; the version
+# notify-rust already brings.
+[target.'cfg(target_os = "macos")'.dependencies]
+mac-notification-sys = "0.6"
+
 [build-dependencies]
 oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.7.0" }
 

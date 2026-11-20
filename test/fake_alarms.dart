@@ -162,6 +162,21 @@ class FakeAlarms implements AlarmPlatform {
     return tapped;
   }
 
+  var _catchUpTapped = false;
+
+  /// The Catch-up Notification is tapped while the app runs (obf-1039).
+  void tapCatchUp() {
+    _catchUpTapped = true;
+    _actions.add(null);
+  }
+
+  @override
+  Future<bool> catchUpOpened() async {
+    final tapped = _catchUpTapped;
+    _catchUpTapped = false;
+    return tapped;
+  }
+
   /// The Agenda widget's snapshots, in the order they were handed over.
   final agendas = <AgendaSnapshot>[];
 

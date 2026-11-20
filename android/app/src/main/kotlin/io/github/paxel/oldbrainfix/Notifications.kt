@@ -146,7 +146,7 @@ object Notifications {
                 .setContentText(text)
                 .setCategory(Notification.CATEGORY_REMINDER)
                 .setAutoCancel(true)
-                .setContentIntent(openApp(context))
+                .setContentIntent(openCatchUp(context))
                 .build(),
         )
     }
@@ -322,9 +322,11 @@ object Notifications {
                 .setSound(RingService.alarmSound(), AudioManager.STREAM_ALARM)
         }
 
-    private fun openApp(context: Context): PendingIntent = PendingIntent.getActivity(
-        context, 0,
+    /** Opens the app on the Agenda with the Missed Summary (obf-1039), from whatever it showed. */
+    private fun openCatchUp(context: Context): PendingIntent = PendingIntent.getActivity(
+        context, CATCH_UP_ID,
         Intent(context, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_CATCH_UP, true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )

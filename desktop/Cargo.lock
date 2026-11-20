@@ -3356,6 +3356,7 @@ dependencies = [
  "image",
  "ksni",
  "libc",
+ "mac-notification-sys",
  "ndarray",
  "notify-rust",
  "oldbrainfix-core",

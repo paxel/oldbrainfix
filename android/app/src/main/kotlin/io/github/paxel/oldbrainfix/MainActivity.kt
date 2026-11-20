@@ -103,6 +103,7 @@ class MainActivity : FlutterActivity() {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_CHANGES, false) == true) changesOpened = true
+        if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_CATCH_UP, false) == true) catchUpOpened = true
         if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
         if (savedInstanceState == null) pickOf(intent)?.let { pickOpened = it }
         if (savedInstanceState == null) occurrenceOf(intent)?.let { occurrenceOpened = it }
@@ -113,9 +114,10 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * The full-screen alarm, the Nudge, the Changes Nudge, an
-     * Occurrence's notification, the Agenda widget's Unsorted count or a
-     * pick on it opened the running app: the app shows it.
+     * The full-screen alarm, the Nudge, the Changes Nudge, the Catch-up
+     * Notification, an Occurrence's notification, the Agenda widget's
+     * Unsorted count or a pick on it opened the running app: the app
+     * shows it.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -126,6 +128,10 @@ class MainActivity : FlutterActivity() {
         }
         if (intent.getBooleanExtra(EXTRA_CHANGES, false)) {
             changesOpened = true
+            actionsArrived()
+        }
+        if (intent.getBooleanExtra(EXTRA_CATCH_UP, false)) {
+            catchUpOpened = true
             actionsArrived()
         }
         if (opensUnsorted(intent)) {
@@ -593,6 +599,10 @@ class MainActivity : FlutterActivity() {
                     "changesOpened" -> {
                         result.success(changesOpened)
                         changesOpened = false
+                    }
+                    "catchUpOpened" -> {
+                        result.success(catchUpOpened)
+                        catchUpOpened = false
                     }
                     "unsortedOpened" -> {
                         result.success(unsortedOpened)
@@ -1229,6 +1239,9 @@ class MainActivity : FlutterActivity() {
         /** Marks the launch from the Changes Nudge's notification. */
         const val EXTRA_CHANGES = "oldbrainfix.changes"
 
+        /** Marks the launch from the Catch-up Notification (obf-1039). */
+        const val EXTRA_CATCH_UP = "oldbrainfix.catchUp"
+
         /** How long the app waits, back from the share chooser, for it to tell of the app picked. */
         private const val SHARE_SETTLE_MS = 500L
 
@@ -1251,6 +1264,9 @@ class MainActivity : FlutterActivity() {
 
         /** The Changes Nudge was tapped and the app has not sent the changes yet. */
         private var changesOpened = false
+
+        /** The Catch-up Notification was tapped and the app has not shown the Agenda yet. */
+        private var catchUpOpened = false
 
         /** The Agenda widget's Unsorted count was tapped and the app has not shown the list yet. */
         private var unsortedOpened = false

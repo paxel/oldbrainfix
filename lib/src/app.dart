@@ -712,6 +712,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_ringChanged);
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_changesOpened);
+    widget.alarms.addListener(_catchUpOpened);
     widget.alarms.addListener(_unsortedOpened);
     widget.alarms.addListener(_pickOpened);
     widget.alarms.addListener(_occurrenceOpened);
@@ -854,6 +855,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_ringChanged);
     widget.alarms.removeListener(_nudgeOpened);
     widget.alarms.removeListener(_changesOpened);
+    widget.alarms.removeListener(_catchUpOpened);
     widget.alarms.removeListener(_unsortedOpened);
     widget.alarms.removeListener(_pickOpened);
     widget.alarms.removeListener(_occurrenceOpened);
@@ -1015,6 +1017,17 @@ class _HomeState extends State<_Home> {
         ),
       ),
     );
+  }
+
+  /// Shows the Agenda with its Missed Summary when the Catch-up
+  /// Notification was tapped (obf-1039), from whatever page the app
+  /// showed, as an app link to the Agenda does. Behind the App Lock the
+  /// lock has put the Agenda under it already.
+  void _catchUpOpened() {
+    if (!mounted || !widget.alarms.takeCatchUpOpened()) return;
+    if (widget.lock.locked) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    _pager.jumpToAgenda();
   }
 
   /// Sends the waiting changes when the Changes Nudge's notification was

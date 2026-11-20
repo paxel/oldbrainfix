@@ -314,6 +314,10 @@ abstract interface class AlarmPlatform {
   /// last asked; asking clears it.
   Future<bool> changesOpened();
 
+  /// Whether the Catch-up Notification was tapped since this was last
+  /// asked; asking clears it (obf-1039).
+  Future<bool> catchUpOpened();
+
   /// Hands the home-screen Agenda widget what it shows from now on.
   Future<void> showAgenda(AgendaSnapshot snapshot);
 
@@ -386,6 +390,9 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Future<bool> changesOpened() async => false;
+
+  @override
+  Future<bool> catchUpOpened() async => false;
 
   @override
   Future<void> showAgenda(AgendaSnapshot snapshot) async {}
@@ -554,6 +561,10 @@ class AndroidAlarms implements AlarmPlatform {
   @override
   Future<bool> changesOpened() async =>
       await _call(() => _channel.invokeMethod<bool>('changesOpened')) ?? false;
+
+  @override
+  Future<bool> catchUpOpened() async =>
+      await _call(() => _channel.invokeMethod<bool>('catchUpOpened')) ?? false;
 
   @override
   Future<void> showAgenda(AgendaSnapshot snapshot) =>
