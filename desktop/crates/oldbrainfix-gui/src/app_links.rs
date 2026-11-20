@@ -232,8 +232,10 @@ pub fn linked_from_rows(ui: &mut Ui, t: &L10n, linking: &[Note]) -> Vec<LinkedRo
 /// Takes the click on the row `row` of "Linked from" on the Note `of`,
 /// registered over what lies there and named as a link by its Note: it
 /// hands the link to its Note to the window, as a link in a text does.
+/// Its id holds the layer it lies on, so the card behind a dialog and the
+/// dialog showing the same Note never share one.
 pub fn linked_row_clicks(ui: &mut Ui, of: &str, row: &LinkedRow) {
-    let id = Id::new(("linked from", of, row.link.url()));
+    let id = Id::new(("linked from", ui.layer_id(), of, row.link.url()));
     let click = ui.interact(row.rect, id, egui::Sense::click());
     click.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Link, true, &row.name));
     if click

@@ -19,7 +19,7 @@ use chrono::{DateTime, Duration, Utc};
 use egui::Key;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{Queryable, by};
 use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::text_format::MARKDOWN;
 use oldbrainfix_core::{Notes, OwnProfile, SigningKey, Store};
@@ -72,9 +72,12 @@ fn window(store: &Arc<Store>, note: Option<&str>) -> Harness<'static, App> {
     harness
 }
 
-/// How often "Linked from" shows: a label's text is its value.
+/// How often "Linked from" shows: a label's text is its value. Only the
+/// Label counts, not the TextRun a selectable label holds under it.
 fn headings(harness: &Harness<'_, App>) -> usize {
-    harness.query_all_by_value(LINKED_FROM).count()
+    harness
+        .query_all(by().role(Role::Label).value(LINKED_FROM))
+        .count()
 }
 
 fn click_row(harness: &mut Harness<'_, App>, name: &str) -> TestResult {
