@@ -498,6 +498,7 @@ class _AreasScreenState extends State<AreasScreen>
               title: selecting
                   ? t.notesSelected(selected.length)
                   : t.areasTitle,
+              background: searchHeaderColour(context),
               onBack: widget.onBack,
               actions: selecting
                   ? noteSelectionActions(
@@ -926,6 +927,7 @@ class _AreaScreenState extends State<AreaScreen>
             title: selecting
                 ? t.notesSelected(selected.length)
                 : areaName(t, area),
+            background: searchHeaderColour(context),
             actions: selecting
                 ? noteSelectionActions(
                     context,
@@ -1170,6 +1172,7 @@ class _TopicScreenState extends State<TopicScreen>
             title: selecting
                 ? t.notesSelected(selected.length)
                 : topicName(t, topic),
+            background: searchHeaderColour(context),
             actions: selecting
                 ? noteSelectionActions(
                     context,

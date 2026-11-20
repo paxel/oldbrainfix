@@ -758,13 +758,22 @@ class BrowserSearchField extends StatelessWidget {
   }
 }
 
+/// The fill of the header of a page with a [SearchHeaderSliver], its bar
+/// and the band under it (#351, obf-1041): set off from the page's ground
+/// in the light and the dark look.
+Color searchHeaderColour(BuildContext context) =>
+    Theme.of(context).colorScheme.surfaceContainer;
+
 /// The header of a list page with a search field, the Areas list, an
 /// Area and a Topic (#336, Q749): the first sliver of the list, it scrolls
 /// away with it and comes back over it, the list staying where it is, as
 /// soon as the list is scrolled up a little; one half shown at the end of
 /// a scroll snaps shown or gone. While [child]'s field has the focus or
 /// [controller] holds a search it stays, so a search being typed or shown
-/// never goes away. Filled like the page bar, so no card shows through.
+/// never goes away. It sits on a band of [searchHeaderColour], which its
+/// page's bar takes too, with a line along its bottom (#351, obf-1041):
+/// bar and band read as one header set off from the page, and the cards
+/// go under it, shown over the list or with the list pulled down.
 class SearchHeaderSliver extends StatefulWidget {
   /// The field's text: a search in it keeps the header.
   final TextEditingController controller;
@@ -821,8 +830,13 @@ class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
     final theme = Theme.of(context);
     final header = KeyedSubtree(
       key: _kept,
-      child: ColoredBox(
-        color: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: searchHeaderColour(context),
+          border: Border(
+            bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+        ),
         child: Focus(
           canRequestFocus: false,
           skipTraversal: true,

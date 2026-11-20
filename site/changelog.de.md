@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.7.0]
 
+### Geändert
+
+- Auf dem Handy liegt das Suchfeld der Bereichsliste, eines Bereichs und eines Themas auf einem Streifen, der mit der oberen Leiste eine von der Seite abgesetzte Farbe teilt, mit einer Linie darunter, sodass die Karten beim Scrollen und beim Herunterziehen der Liste unter ihm durchlaufen. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))
+
 ### Behoben
 
 - Auf dem Mac öffnet ein Klick auf eine Benachrichtigung von Old Brain Fix das Fenster mit dem, worum es geht: bei einer Fälligkeit den Notiz-Dialog mit seiner Zeile „Fällig“, beim Stupser Unsortiert. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))

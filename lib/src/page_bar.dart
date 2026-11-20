@@ -103,13 +103,16 @@ class _BarMore extends StatelessWidget {
 /// [titleIcon], at most 36 wide, stands before the title. The [SyncLine]
 /// runs along its bottom while this Device syncs (#225). [onBack] is the
 /// way back of a page that is no route of its own, the Areas list beside
-/// the Agenda (#258).
+/// the Agenda (#258). [background], where given, fills the bar instead of
+/// the theme's colour: the pages with a search bar set their header off
+/// from the page with it (#351, obf-1041).
 AppBar pageBar(
   BuildContext context, {
   required String title,
   Widget? titleIcon,
   List<Widget> actions = const [],
   VoidCallback? onBack,
+  Color? background,
 }) {
   // Only whether it can go back, not the whole route: a page coming on
   // top does not build this page again (#210).
@@ -130,6 +133,7 @@ AppBar pageBar(
               ],
             ),
       actions: actions,
+      backgroundColor: background,
       flexibleSpace: const SyncLine(),
     );
   }
@@ -174,6 +178,7 @@ AppBar pageBar(
   return AppBar(
     leading: leading,
     actions: barActions(actions, (room / slot).floor()),
+    backgroundColor: background,
     flexibleSpace: const SyncLine(),
     bottom: PreferredSize(
       preferredSize: Size.fromHeight(height),

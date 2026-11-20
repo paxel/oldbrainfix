@@ -1450,7 +1450,12 @@ replace a law of Both apps where they say so. A desktop law marked
   with the list and come back over it, the list staying still, once it
   is scrolled up a little; half shown, it snaps. While the field has the
   focus or a search it stays; otherwise no edge under the bar cuts the
-  list.
+  list. The bar sits on a band (#351, obf-1041), and the page's top bar
+  takes the band's fill, the theme's surface container, set off from the
+  page's ground in the light and the dark look, so top bar and band read
+  as one header with one line under the band only; shown over the list,
+  and with the list pulled down, the cards go under it. Pages without
+  the search bar keep their top bar in the ground's colour.
 
 ### Settings
 

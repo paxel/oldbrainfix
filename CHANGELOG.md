@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [0.7.0]
 
+### Changed
+
+- On the phone the search field of the Areas list, an Area and a Topic sits on a band that shares a colour set off from the page with the top bar, with a line under it, so the cards go under it when they scroll or the list is pulled down. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))
+
 ### Fixed
 
 - On macOS a click on an Old Brain Fix notification brings the window up on what it is about: an Occurrence's Note dialog with its Due line, Unsorted for a Nudge. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
