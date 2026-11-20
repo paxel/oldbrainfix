@@ -312,6 +312,8 @@
   "recordVoice": "Sprache aufnehmen",
   "recording": "Aufnahme läuft …",
   "stopRecording": "Beenden",
+  "recordingNotice": "Sprachnotiz wird aufgenommen",
+  "recordingChannel": "Aufnahme",
   "voiceRecording": "Sprachaufnahme",
   "playRecording": "Sprachaufnahme abspielen",
   "stopPlaying": "Anhalten",

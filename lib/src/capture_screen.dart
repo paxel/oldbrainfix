@@ -270,8 +270,10 @@ void announceUntranscribable(
 /// the text with the recording; the Nudge buttons and Back end it and
 /// save; there is no hold-to-talk and no stop on
 /// silence (UI laws, "Capture"). The first time, while the microphone is
-/// not allowed yet, it explains why and asks. The app going to the
-/// background ends the recording and keeps it. Text typed before goes
+/// not allowed yet, it explains why and asks. The screen stays on while
+/// recording, and the recording goes on with the app in the background
+/// and the phone locked (#350), until Stop here, Back, a Nudge button or
+/// Stop on its notification ends and keeps it. Text typed before goes
 /// into the same Note.
 class CaptureScreen extends StatefulWidget {
   final Notes notes;
@@ -360,6 +362,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
   late final Future<Coordinates?> _here;
   late final Future<ContextExtras> _extras;
   late final AppLifecycleListener _lifecycle;
+
+  /// Stop tapped on the recording's notification (#350).
+  late final StreamSubscription<void> _stopAsked;
+
+  /// The capture screen whose recording runs, if one does. A recording
+  /// goes on in the background (#350), so another voice Capture, as from
+  /// a tile or widget, can open meanwhile: it ends and keeps that one
+  /// first, as the microphone records one at a time.
+  static _CaptureScreenState? _recorder;
 
   /// The Note once written: by leaving, by a photo, or when the app went
   /// to the background meanwhile, after which typing changes the same
@@ -489,10 +500,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
           _write(null);
           // What was written shows as such.
           if (mounted) setState(() {});
-          // Recording stops in the background: what is there is kept.
-          unawaited(_stopRecording());
+          // A recording goes on in the background (#350).
         }
       },
+    );
+    _stopAsked = widget.voice.stopAsked.listen(
+      (_) => unawaited(_stopRecording()),
     );
     if (widget.startVoice) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openVoice());
@@ -534,6 +547,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
     _lock?.removeListener(_lockChanged);
     _ticker?.cancel();
     _lifecycle.dispose();
+    unawaited(_stopAsked.cancel());
+    // Closed from elsewhere while recording, as by a notification's tap:
+    // the recording ends, so the screen times out again, and is kept.
+    if (_recording != null) unawaited(_stopRecording());
     _text.removeListener(_textChanged);
     _text.dispose();
     super.dispose();
@@ -1041,12 +1058,24 @@ class _CaptureScreenState extends State<CaptureScreen> {
     // Recording ends any playing, and the play buttons show it.
     await VoiceScope.playbackOf(context)?.stop();
     if (!mounted || _leaving) return;
-    final recording = _recording = voice.start();
+    final running = _recorder;
+    if (running != null && running != this) await running._stopRecording();
+    if (!mounted || _leaving || _recording != null) return;
+    final t = context.t;
+    final recording = _recording = voice.start(
+      RecordingNotice(
+        channel: t.recordingChannel,
+        title: t.recordingNotice,
+        stop: t.stopRecording,
+      ),
+    );
+    _recorder = this;
     final started = await recording;
-    // Stopped meanwhile, by Back or the background: nothing to count.
+    // Stopped meanwhile, by Back or the notification: nothing to count.
     if (!mounted || _recording != recording) return;
     if (!started) {
       _recording = null;
+      if (_recorder == this) _recorder = null;
       setState(() => _micMissing = true);
       return;
     }
@@ -1061,6 +1090,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final recording = _recording;
     if (recording != null) {
       _recording = null;
+      if (_recorder == this) _recorder = null;
       _ticker?.cancel();
       _stopping = _keep(recording);
     }

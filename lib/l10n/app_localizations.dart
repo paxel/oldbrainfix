@@ -1910,11 +1910,23 @@ abstract class AppLocalizations {
   /// **'Recording…'**
   String get recording;
 
-  /// The big button that ends a voice recording on the capture screen; the screen stays.
+  /// The big button that ends a voice recording on the capture screen; the screen stays. Also the button on the Android notification a recording runs under (#350).
   ///
   /// In en, this message translates to:
   /// **'Stop'**
   String get stopRecording;
+
+  /// The title of the Android notification a voice recording runs under while the phone is locked (#350); a tap opens the app, its Stop ends the recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording a voice note'**
+  String get recordingNotice;
+
+  /// The name of the Android notification channel of a voice recording running (#350), shown in Android's notification settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get recordingChannel;
 
   /// No description provided for @voiceRecording.
   ///

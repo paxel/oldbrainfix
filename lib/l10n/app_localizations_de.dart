@@ -1184,6 +1184,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get stopRecording => 'Beenden';
 
   @override
+  String get recordingNotice => 'Sprachnotiz wird aufgenommen';
+
+  @override
+  String get recordingChannel => 'Aufnahme';
+
+  @override
   String get voiceRecording => 'Sprachaufnahme';
 
   @override

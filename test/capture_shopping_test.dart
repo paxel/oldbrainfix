@@ -417,6 +417,34 @@ void main() {
       expect(notes.trashed(), isEmpty);
     });
 
+    testWidgets('recorded on with the phone locked and stopped from the '
+        'notification, still becomes the Lines said (#350)', (tester) async {
+      speech.transcripts[1] = 'Butter und Eier';
+      final groceries = shopping('Groceries');
+      await start(tester);
+      await openTextCapture(tester);
+      await pick(tester, groceries);
+      await tap(tester, find.byKey(const ValueKey('captureVoice')));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pumpAndSettle();
+      expect(voice.recording, isTrue);
+
+      voice.askStop();
+      await tester.pumpAndSettle();
+      expect(voice.recording, isFalse);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      await tap(tester, save);
+
+      expect(find.byType(CaptureScreen), findsNothing);
+      expect(shown(groceries), ['Butter', 'Eier']);
+      expect(voiceNote(groceries).mergedInto, groceries);
+    });
+
     testWidgets('whose Transcript is not ready yet leaves at once and gets '
         'its Lines once it is', (tester) async {
       speech

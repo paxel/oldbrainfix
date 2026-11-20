@@ -150,6 +150,50 @@ void main() {
     expect(notes.all(), hasLength(1));
   });
 
+  testWidgets('a voice request while a recording goes on in the background '
+      'ends and keeps that one first (#350)', (tester) async {
+    await start(tester);
+    requests.request(CaptureMode.voice);
+    await tester.pumpAndSettle();
+    expect(voice.starts, 1);
+
+    // Out of the app, recording on, the tile asks for voice again.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    requests.request(CaptureMode.voice);
+    await tester.pumpAndSettle();
+
+    expect(voice.stops, 1);
+    expect(voice.starts, 2);
+    expect(voice.recording, isTrue);
+    expect(notes.all().single.recordings, hasLength(1));
+    await tap(tester, stop.last);
+    expect(notes.all(), hasLength(2));
+    expect(notes.all().every((n) => n.recordings.length == 1), isTrue);
+  });
+
+  testWidgets('Capture closed from elsewhere while recording ends and keeps '
+      'the recording (#350)', (tester) async {
+    await start(tester);
+    requests.request(CaptureMode.voice);
+    await tester.pumpAndSettle();
+    expect(voice.recording, isTrue);
+
+    final navigator = tester.state<NavigatorState>(
+      find.byType(Navigator).first,
+    );
+    navigator.popUntil((route) => route.isFirst);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CaptureScreen), findsNothing);
+    expect(voice.recording, isFalse);
+    expect(notes.all().single.recordings, hasLength(1));
+  });
+
   testWidgets('a request opens once: coming back does not open it again', (
     tester,
   ) async {

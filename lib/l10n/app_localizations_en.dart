@@ -1177,6 +1177,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stopRecording => 'Stop';
 
   @override
+  String get recordingNotice => 'Recording a voice note';
+
+  @override
+  String get recordingChannel => 'Recording';
+
+  @override
   String get voiceRecording => 'Voice recording';
 
   @override

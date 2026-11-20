@@ -8,6 +8,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 - Auf dem Mac öffnet ein Klick auf eine Benachrichtigung von Old Brain Fix das Fenster mit dem, worum es geht: bei einer Fälligkeit den Notiz-Dialog mit seiner Zeile „Fällig“, beim Stupser Unsortiert. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
 - Auf Android zeigt ein Tippen auf die Nachhol-Benachrichtigung die Agenda mit der Verpasst-Übersicht, egal welche Seite die App gerade zeigte. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
+- Eine Sprachaufnahme, auch eine in eine Einkaufsliste gesprochene, endet nicht mehr, wenn sich das Handy sperrt: Der Bildschirm bleibt während der Aufnahme an, und wird er trotzdem gesperrt, läuft die Aufnahme weiter, bis sie beendet wird, auf Android auch aus ihrer Benachrichtigung, und wird wie bisher behalten und transkribiert. ([obf-1040](https://github.com/paxel/oldbrainfix/issues/350))
 
 ## [0.6.1] - 2026-11-19
 

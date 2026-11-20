@@ -247,9 +247,47 @@ void main() {
       expect(notes.all().single.recordings, hasLength(1));
     });
 
-    testWidgets('the app going to the background keeps the recording', (
+    testWidgets('the recording goes on in the background and with the '
+        'phone locked, and shows as running back in the app (#350)', (
       tester,
     ) async {
+      await start(tester);
+      await openCapture(tester);
+      await tap(tester, mic);
+      await tester.pump(const Duration(seconds: 2));
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pump(const Duration(seconds: 3));
+
+      expect(voice.stops, 0);
+      expect(voice.recording, isTrue);
+
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pump();
+      // Still recording, the time counted on.
+      expect(stop, findsOneWidget);
+      expect(find.text('Recording…'), findsOneWidget);
+      expect(elapsed(tester), '0:05');
+      await tap(tester, stop);
+
+      expect(voice.stops, 1);
+      final note = notes.all().single;
+      expect(note.recordings, [store.putAudio(first)]);
+    });
+
+    testWidgets("Stop on the notification ends the recording and keeps it, "
+        "as the screen's Stop does (#350)", (tester) async {
       await start(tester);
       await openCapture(tester);
       await tap(tester, mic);
@@ -260,13 +298,13 @@ void main() {
       ]) {
         tester.binding.handleAppLifecycleStateChanged(state);
       }
+      voice.askStop();
       await tester.pumpAndSettle();
 
-      // Stopped once, written at once.
       expect(voice.stops, 1);
       expect(voice.recording, isFalse);
       final captured = notes.all().single;
-      expect(captured.recordings, hasLength(1));
+      expect(captured.recordings, [store.putAudio(first)]);
 
       for (final state in [
         AppLifecycleState.hidden,
@@ -277,6 +315,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       // Back on the text field with the recording; words can follow.
+      expect(stop, findsNothing);
       expect(find.byType(RecordingButton), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'for the car');
       await tap(tester, find.text('Save'));
@@ -288,19 +327,24 @@ void main() {
       expect(voice.stops, 1);
     });
 
+    testWidgets("the notification is in the app's words", (tester) async {
+      await start(tester);
+      await openCapture(tester);
+      await tap(tester, mic);
+
+      expect(voice.notice?.toMap(), {
+        'channel': 'Recording',
+        'title': 'Recording a voice note',
+        'stop': 'Stop',
+      });
+      await tap(tester, stop);
+    });
+
     testWidgets('a second recording goes into the same Note', (tester) async {
       await start(tester);
       await openCapture(tester);
       await tap(tester, mic);
-      for (final state in [
-        AppLifecycleState.inactive,
-        AppLifecycleState.hidden,
-        AppLifecycleState.inactive,
-        AppLifecycleState.resumed,
-      ]) {
-        tester.binding.handleAppLifecycleStateChanged(state);
-      }
-      await tester.pumpAndSettle();
+      await tap(tester, stop);
       voice.nextRecording = second;
       await tap(tester, mic);
       await tap(tester, stop);
