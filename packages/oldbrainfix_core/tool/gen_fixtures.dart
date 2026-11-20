@@ -988,7 +988,9 @@ final _scenarios = <Scenario>[
         'at a given time and unchecked; a Routine trashed, another trashed '
         'and restored; Notes trashed with their Routines and restored, '
         'trashed without them, and trashed with them for good; Unsorted '
-        'Notes for the Nudge.',
+        'Notes for the Nudge; Heads-ups, timed, all-day with an offset of '
+        'no whole days, a day back across the switch to summer time, of a '
+        'Reminder Done ahead, and as a modified app might write them.',
     build: (store) {
       final notes = Notes(store);
       final routines = Routines(store);
@@ -1021,7 +1023,7 @@ final _scenarios = <Scenario>[
       final weekend = routines.spawn(plants.id, weekends);
       routines.reschedule(weekend.id, weekends);
       final dentist = notes.capture('Dentist');
-      routines.spawn(
+      final skippedHour = routines.spawn(
         dentist.id,
         Schedule(start: Day(2026, 3, 29), times: [_at(2, 30)]),
       );
@@ -1102,6 +1104,31 @@ final _scenarios = <Scenario>[
       routines.trashNote(car.id);
       notes.capture('Unsorted thought', nudgeIn: const Duration(minutes: 10));
       notes.capture('Another thought');
+      // Heads-ups (obf-1046): the medication's, one snoozed in a check;
+      // the weekends' in whole days only; the Reminder's on the hour the
+      // clock skips; a day back across the switch to summer time; those
+      // of a Reminder Done ahead; and as a modified app might write them.
+      // The new Reminders lie in spring, away from the autumn days the
+      // desktop's tests ring this log on.
+      routines.setHeadsUps(medication.id, [1440, 20]);
+      routines.setHeadsUps(weekend.id, [30, 1440, 2880]);
+      routines.setHeadsUps(skippedHour.id, [20, 60]);
+      final train = routines.create(
+        'Night train',
+        Schedule(start: Day(2026, 3, 29), times: [_at(23)]),
+      );
+      routines.setHeadsUps(train.id, [1440]);
+      final haircut = routines.create(
+        'Haircut',
+        Schedule(start: Day(2026, 4, 2), times: [_at(9)]),
+      );
+      routines.setHeadsUps(haircut.id, [2880, 1440]);
+      routines.markDone(haircut.id, Occurrence(Day(2026, 4, 2), _at(9)));
+      store.append(
+        HeadsUpKeys.of(night.id),
+        HeadsUpKeys.headsUps,
+        '0020,abc,15,+5, 5,43201,1440,15,-3,',
+      );
     },
   ),
   (
@@ -4522,6 +4549,8 @@ Map<String, Object?> _alarms(Store store) {
     ],
     'all': [for (final r in routines.all()) r.id],
     'trashed': [for (final r in routines.trashed()) r.id],
+    // Each person's own Heads-ups, as read (obf-1046).
+    'headsUpsOf': {for (final id in ids) id: routines.headsUps(id)},
     'ofNote': {
       for (final note in Notes(store).all())
         note.id: [for (final r in routines.ofNote(note.id)) r.id],
@@ -4538,6 +4567,7 @@ Map<String, Object?> _alarms(Store store) {
           final plan = alarms.plan(_europe);
           final missed = alarms.missed(_europe);
           final nudge = alarms.nudge(_europe);
+          final headsUps = alarms.headsUps(_europe);
           final later = now.add(const Duration(hours: 3));
           return {
             'now': now.toIso8601String(),
@@ -4571,6 +4601,24 @@ Map<String, Object?> _alarms(Store store) {
                     final fires? => a.silentAt(fires, _europe),
                     null => null,
                   },
+                },
+            ],
+            // Heads-ups before the Occurrences (obf-1046).
+            'headsUpCount': headsUps.length,
+            'headsUps': [
+              for (final h in headsUps.take(_alarmsShown))
+                {
+                  'id': h.id,
+                  'routine': h.routineId,
+                  'occurrence': h.occurrence.key,
+                  'minutes': h.minutes,
+                  'at': h.at.toUtc().toIso8601String(),
+                  'wall': _wall(h.wall),
+                  'start': _wall(h.start),
+                  'text': h.text,
+                  'wordless': h.wordless.name,
+                  'quiet': h.quiet?.toString(),
+                  'silent': h.silentAt(_europe),
                 },
             ],
             'missed': {
@@ -10990,8 +11038,9 @@ Future<void> main(List<String> args) async {
     'ends by COUNT and UNTIL, timed and all-day events and titles that '
     'need escaping and folding; the list of all of them by name, and '
     'names as typed in that order.\n'
-    '- `routines/alarms.json`: the Agenda, alarm plan, Missed Summary and '
-    'Nudge of the `routines` log at held moments with this Device\'s '
+    '- `routines/alarms.json`: the Agenda, alarm plan, Heads-ups, Missed '
+    'Summary and Nudge of the `routines` log at held moments with this '
+    'Device\'s '
     'settings, and of each Note the Occurrence due or Missed of each of '
     'its Routines and what its card ticks today, on the same clock.\n'
     '- `not-today/not_today.json`: what the Routines of the `not-today` '

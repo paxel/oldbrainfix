@@ -31,7 +31,7 @@ use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::nudges::QuietHours;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::question_marks::{self, SHAPES};
-use oldbrainfix_core::routines::routines_by_name;
+use oldbrainfix_core::routines::{heads_up_keys, routines_by_name};
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
@@ -2752,7 +2752,7 @@ fn write_routines(store: &Store) -> Built {
     let weekend = routines.spawn(&plants.id, &weekends)?;
     routines.reschedule(&weekend.id, &weekends)?;
     let dentist = notes.capture("Dentist", None, None)?;
-    routines.spawn(
+    let skipped_hour = routines.spawn(
         &dentist.id,
         &schedule(day(2026, 3, 29), &[at(2, 30)?], None)?,
     )?;
@@ -2820,6 +2820,25 @@ fn write_routines(store: &Store) -> Built {
     routines.trash_note(&car.id)?;
     notes.capture("Unsorted thought", None, Some(Duration::minutes(10)))?;
     notes.capture("Another thought", None, None)?;
+    // Heads-ups (obf-1046), as the generator sets them.
+    routines.set_heads_ups(&medication.id, &[1440, 20])?;
+    routines.set_heads_ups(&weekend.id, &[30, 1440, 2880])?;
+    routines.set_heads_ups(&skipped_hour.id, &[20, 60])?;
+    // In spring, away from the autumn days the GUI's tests ring this log on.
+    let train = routines.create(
+        "Night train",
+        &schedule(day(2026, 3, 29), &[at(23, 0)?], None)?,
+    )?;
+    routines.set_heads_ups(&train.id, &[1440])?;
+    let haircut = routines.create("Haircut", &schedule(day(2026, 4, 2), &[at(9, 0)?], None)?)?;
+    routines.set_heads_ups(&haircut.id, &[2880, 1440])?;
+    routines.mark_done(&haircut.id, &o(day(2026, 4, 2), Some(at(9, 0)?)), None)?;
+    store.append(
+        &heads_up_keys::of(&night.id),
+        heads_up_keys::HEADS_UPS,
+        Some("0020,abc,15,+5, 5,43201,1440,15,-3,"),
+        None,
+    )?;
     Ok(())
 }
 
@@ -2878,6 +2897,7 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
     let plan = alarms.plan(&berlin)?;
     let missed = alarms.missed(&berlin)?;
     let nudge = alarms.nudge(&berlin)?;
+    let heads_ups = alarms.heads_ups(&berlin)?;
     let later = now + Duration::hours(3);
     let mut open_of = serde_json::Map::new();
     for note in Notes::new(store).all()? {
@@ -2920,6 +2940,21 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
             // Quiet Hours silence it unless it escalates (obf-1045).
             "quiet": a.quiet.map(|q| q.to_string()),
             "silentAfterNow": a.fires_after(now).map(|f| a.silent_at(f, &berlin)),
+        })).collect::<Vec<_>>(),
+        // Heads-ups before the Occurrences (obf-1046).
+        "headsUpCount": heads_ups.len(),
+        "headsUps": heads_ups.iter().take(40).map(|h| json!({
+            "id": h.id(),
+            "routine": h.routine_id,
+            "occurrence": h.occurrence.key(),
+            "minutes": h.minutes,
+            "at": dart_iso(h.at),
+            "wall": wall(&h.wall),
+            "start": wall(&h.start),
+            "text": h.text,
+            "wordless": h.wordless.name(),
+            "quiet": h.quiet.map(|q| q.to_string()),
+            "silent": h.silent_at(&berlin),
         })).collect::<Vec<_>>(),
         "missed": {
             "count": missed.count(),
@@ -2965,6 +3000,11 @@ fn routines_and_their_alarms_come_to_what_the_dart_core_says() -> TestResult {
     assert_eq!(json!(all), expected["all"]);
     let trashed: Vec<String> = routines.trashed()?.into_iter().map(|r| r.id).collect();
     assert_eq!(json!(trashed), expected["trashed"]);
+    let mut heads_ups_of = serde_json::Map::new();
+    for id in &ids {
+        heads_ups_of.insert(id.clone(), json!(routines.heads_ups(id)?));
+    }
+    assert_eq!(Value::Object(heads_ups_of), expected["headsUpsOf"]);
     let mut of_note = serde_json::Map::new();
     for note in Notes::new(&store).all()? {
         let ids: Vec<String> = routines
@@ -2985,6 +3025,8 @@ fn routines_and_their_alarms_come_to_what_the_dart_core_says() -> TestResult {
             "agenda",
             "alarmCount",
             "alarms",
+            "headsUpCount",
+            "headsUps",
             "missed",
             "nudge",
             "recentlyDone",

@@ -92,6 +92,9 @@ pub struct ScheduleChoice {
     pub escalation: Option<i64>,
     /// The Session's part; `None` for a plain Routine or Reminder.
     pub session: Option<SessionChoice>,
+    /// The person's own Heads-ups, in minutes before an Occurrence
+    /// (obf-1046); none for none.
+    pub heads_ups: Vec<i64>,
 }
 
 impl ScheduleChoice {
@@ -104,6 +107,7 @@ impl ScheduleChoice {
         };
         routines.set_renag(&id, self.renag)?;
         routines.set_escalation(&id, self.escalation)?;
+        routines.set_heads_ups(&id, &self.heads_ups)?;
         Ok(id)
     }
 }

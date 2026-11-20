@@ -146,7 +146,7 @@ The reminder that Unsorted Notes are waiting. Its time is chosen at Capture (10 
 _Avoid_: reminder (that is a different thing), nag (that is Re-nag)
 
 **Quiet Hours**:
-A daily window in which Nudges and the Changes Nudge wait, and in which Routines and Reminders show without sound or vibration, their Re-nags too, unless the Routine has Escalation on, which is the only way through (obf-1045). The first ring of an all-day Occurrence waits until the window ends (#201).
+A daily window in which Nudges and the Changes Nudge wait, and in which Routines and Reminders show without sound or vibration, their Re-nags too, unless the Routine has Escalation on, which is the only way through (obf-1045). The first ring of an all-day Occurrence waits until the window ends (#201). A Heads-up in the window shows without sound too (obf-1046).
 
 **Starter Set**:
 The Areas and Topics offered on first start; the user picks which ones to keep.
@@ -192,6 +192,10 @@ _Avoid_: dismiss, cancel, Missed
 **Re-nag**:
 Firing an ignored Occurrence again at a fixed interval until it is Done, snoozed, skipped, or the next Occurrence starts.
 _Avoid_: repeat, reminder
+
+**Heads-up**:
+One notification before an Occurrence, such as "Dentist in 20 min" at 09:40 for 10:00, so the user has time to set off: no Re-nag, nothing to check off, and the Occurrence still rings at its time. A Routine or Reminder has any number of them, each an offset before its start, such as "1 day before" and "20 min before"; an all-day one takes whole days only, rung on that day when its all-day ring would ring. Done, Skip or a snooze of the Occurrence before a Heads-up cancels it. They are the person's own, kept on their own Devices as an Override is, so in a Shared Area each person sets their own for a shared Routine, nobody else gets them, and a Member needs no right to change the Routine for it (obf-1046). German: Vorwarnung.
+_Avoid_: reminder (that is a Routine that happens once), pre-alarm, Nudge
 
 **Escalation**:
 An opt-in step where an Occurrence ignored for several Re-nags turns into a full-screen alarm with sound. The full-screen alarm is phone-only; on the desktop Escalation makes the notification urgent, with the system's alarm sound.

@@ -92,7 +92,7 @@ pub(crate) fn base32_symbol(alphabet: &[u8; 32], value: u64) -> char {
     char::from(symbol)
 }
 
-pub use alarms::{Alarms, MissedSummary, OpenOccurrence, PlannedAlarm};
+pub use alarms::{Alarms, MissedSummary, OpenOccurrence, PlannedAlarm, PlannedHeadsUp};
 pub use boxes::Boxes;
 pub use cards::{CardOpened, CardTaken};
 pub use checklists::{

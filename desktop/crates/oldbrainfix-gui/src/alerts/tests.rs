@@ -221,3 +221,104 @@ fn snooze_buttons_wait_what_they_say() {
     assert_eq!(first_line(Some("  \n")), None);
     assert_eq!(first_line(Some(" Pills \n and more")), Some("Pills".into()));
 }
+
+fn heads_up(at: &str, quiet: Option<QuietHours>) -> oldbrainfix_core::Result<PlannedHeadsUp> {
+    let day = Day::new(2026, 1, 1);
+    let start = WallMoment {
+        day,
+        time: ClockTime {
+            hour: 10,
+            minute: 0,
+        },
+    };
+    let at = parse_time(at)?;
+    Ok(PlannedHeadsUp {
+        routine_id: "routine:a".into(),
+        occurrence: Occurrence::new(day, ClockTime::new(10, 0)),
+        minutes: 20,
+        at,
+        wall: WallMoment {
+            day,
+            time: ClockTime {
+                hour: 9,
+                minute: 40,
+            },
+        },
+        start,
+        quiet,
+        text: Some("Dentist\nBring the card".into()),
+        wordless: Wordless::Photo,
+        wordless_name: String::new(),
+    })
+}
+
+#[test]
+fn a_heads_up_is_one_plain_notification_in_its_occurrences_place() -> oldbrainfix_core::Result<()> {
+    let notifier = crate::notify::RecordingNotifier::default();
+    let changed = Arc::new(AtomicU64::new(0));
+    let mut alerts = Alerts::new(Box::new(notifier.clone()), L10n::new("en"), changed);
+    let plain = heads_up("2026-01-01T09:40:00.000Z", None)?;
+    // Quiet until 10:00 on the wall clock (UTC here).
+    let quiet = heads_up(
+        "2026-01-01T09:40:00.000Z",
+        Some(QuietHours {
+            start: ClockTime {
+                hour: 22,
+                minute: 0,
+            },
+            end: ClockTime {
+                hour: 10,
+                minute: 0,
+            },
+        }),
+    )?;
+    alerts.show_heads_up(&plain, &utc_wall);
+    alerts.show_heads_up(&quiet, &utc_wall);
+    let shown: Vec<Notice> = notifier
+        .take()
+        .into_iter()
+        .filter_map(|r| match r {
+            crate::notify::Recorded::Shown(notice) => Some(notice),
+            crate::notify::Recorded::Closed(_) => None,
+        })
+        .collect();
+    let key = occurrence_key("routine:a", &plain.occurrence);
+    assert_eq!(shown.len(), 2);
+    for notice in &shown {
+        // Under its Occurrence's key, so the ring takes its place.
+        assert_eq!(notice.key, key);
+        assert_eq!(notice.title, "Dentist");
+        assert_eq!(notice.body, "in 20 min");
+        assert!(!notice.urgent);
+        // Nothing to check off: only the click that opens it.
+        let ids: Vec<&str> = notice.actions.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(ids, [OPEN]);
+    }
+    // With the notification's own sound, but in the Quiet Hours.
+    assert!(!shown[0].silent);
+    assert!(shown[1].silent);
+    Ok(())
+}
+
+#[test]
+fn a_heads_up_of_a_note_without_words_names_what_it_holds() -> oldbrainfix_core::Result<()> {
+    let notifier = crate::notify::RecordingNotifier::default();
+    let changed = Arc::new(AtomicU64::new(0));
+    let mut alerts = Alerts::new(Box::new(notifier.clone()), L10n::new("de"), changed);
+    let photo = PlannedHeadsUp {
+        text: Some(String::new()),
+        minutes: 1440,
+        ..heads_up("2026-01-01T09:40:00.000Z", None)?
+    };
+    alerts.show_heads_up(&photo, &utc_wall);
+    let shown: Vec<(String, String)> = notifier
+        .take()
+        .into_iter()
+        .filter_map(|r| match r {
+            crate::notify::Recorded::Shown(notice) => Some((notice.title, notice.body)),
+            crate::notify::Recorded::Closed(_) => None,
+        })
+        .collect();
+    assert_eq!(shown, [("Foto".to_string(), "in 1 Tag".to_string())]);
+    Ok(())
+}

@@ -8,6 +8,9 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 class FakeAlarms implements AlarmPlatform {
   /// What was armed last.
   List<ArmedAlarm> armed = [];
+
+  /// The Heads-ups armed last (obf-1046).
+  List<ArmedHeadsUp> headsUps = [];
   AlarmLabels? labels;
 
   /// How often the plan was handed over.
@@ -71,11 +74,13 @@ class FakeAlarms implements AlarmPlatform {
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    List<ArmedHeadsUp> headsUps = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
     String? sound,
   }) async {
     armed = alarms;
+    this.headsUps = headsUps;
     this.sound = sound;
     this.nudge = nudge;
     this.changes = changes;

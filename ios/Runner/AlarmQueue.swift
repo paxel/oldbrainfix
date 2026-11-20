@@ -160,6 +160,8 @@ enum NotificationAnswer: Equatable {
   static let pastAlarmCategory = "obf.alarm.past"
   static let nudgeCategory = "obf.nudge"
   static let changesCategory = "obf.changes"
+  /// A Heads-up (obf-1046): nothing to answer, a tap opens its Note.
+  static let headsUpCategory = "obf.headsUp"
   static let doneAction = "obf.done"
   static let skipAction = "obf.skip"
   static let tomorrowAction = "obf.tomorrow"
@@ -185,6 +187,8 @@ enum NotificationAnswer: Equatable {
       }
     case changesCategory:
       if action == defaultAction { return .openChanges }
+    case headsUpCategory:
+      if action == defaultAction { return .openOccurrence }
     default:
       break
     }

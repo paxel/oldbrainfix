@@ -34,6 +34,21 @@ class ArmedAlarm {
   });
 }
 
+/// One planned Heads-up (obf-1046) with the texts its notification
+/// shows: the Note's title, as its Occurrence's, and how long until it
+/// starts.
+class ArmedHeadsUp {
+  final PlannedHeadsUp headsUp;
+  final String title;
+  final String body;
+
+  const ArmedHeadsUp({
+    required this.headsUp,
+    required this.title,
+    required this.body,
+  });
+}
+
 /// The planned Nudge with the texts its notification shows.
 class ArmedNudge {
   final PlannedNudge nudge;
@@ -97,6 +112,9 @@ class AlarmLabels {
   /// sound or vibration (obf-1045).
   final String quietChannel;
 
+  /// The channel of the Heads-ups (obf-1046), with sound.
+  final String headsUpChannel;
+
   /// The channel of the Nudge.
   final String nudgeChannel;
 
@@ -118,6 +136,7 @@ class AlarmLabels {
     required this.ringChannel,
     required this.escalatedChannel,
     required this.quietChannel,
+    required this.headsUpChannel,
     required this.nudgeChannel,
   });
 
@@ -139,6 +158,7 @@ class AlarmLabels {
     'ringChannel': ringChannel,
     'escalatedChannel': escalatedChannel,
     'quietChannel': quietChannel,
+    'headsUpChannel': headsUpChannel,
     'nudgeChannel': nudgeChannel,
   };
 }
@@ -298,15 +318,16 @@ abstract interface class AlarmPlatform {
   /// setup asks for them; the others do not exist here.
   List<AlarmPermission> get steps;
 
-  /// Arms exactly [alarms], the [nudge] and the Changes Nudge
-  /// [changes], replacing everything armed before, and takes away the
-  /// notifications of the Occurrences in [done], given as Routine id and
-  /// Occurrence, and the Nudge's or the Changes Nudge's when there is
+  /// Arms exactly [alarms], the [headsUps], the [nudge] and the Changes
+  /// Nudge [changes], replacing everything armed before, and takes away
+  /// the notifications of the Occurrences in [done], given as Routine id
+  /// and Occurrence, and the Nudge's or the Changes Nudge's when there is
   /// none. Occurrences ring with [sound], null for the app's own.
   Future<void> arm(
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    List<ArmedHeadsUp> headsUps = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
     String? sound,
@@ -386,6 +407,7 @@ class NoAlarms implements AlarmPlatform {
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    List<ArmedHeadsUp> headsUps = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
     String? sound,
@@ -466,6 +488,7 @@ class AndroidAlarms implements AlarmPlatform {
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    List<ArmedHeadsUp> headsUps = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
     String? sound,
@@ -508,6 +531,35 @@ class AndroidAlarms implements AlarmPlatform {
               alarm.ends.time.hour,
               alarm.ends.time.minute,
             ],
+            'title': title,
+            'body': body,
+          },
+      ],
+      // Apart from the alarms (obf-1046): one plain notification each,
+      // in its Occurrence's, never Re-nagging.
+      'headsUps': [
+        for (final ArmedHeadsUp(:headsUp, :title, :body) in headsUps)
+          {
+            'id': headsUp.id,
+            'routine': headsUp.routineId,
+            'occurrence': headsUp.occurrence.key,
+            // On the wall clock, like an alarm's 'local'.
+            'local': [
+              headsUp.wall.day.year,
+              headsUp.wall.day.month,
+              headsUp.wall.day.day,
+              headsUp.wall.time.hour,
+              headsUp.wall.time.minute,
+            ],
+            'minutes': headsUp.minutes,
+            // Without sound in them, whether the Routine escalates or not.
+            if (headsUp.quiet case final quiet?)
+              'quiet': [
+                quiet.start.hour,
+                quiet.start.minute,
+                quiet.end.hour,
+                quiet.end.minute,
+              ],
             'title': title,
             'body': body,
           },

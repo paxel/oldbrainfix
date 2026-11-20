@@ -186,6 +186,44 @@ void main() {
         (arm['alarms'] as List<Object?>).first as Map<Object?, Object?>;
     // 22:00 to 08:00 unless changed (obf-1045).
     expect(first['quiet'], [22, 0, 8, 0]);
+    expect(arm['headsUps'], isEmpty);
+  });
+
+  testWidgets('the Heads-ups reach the channel apart from the alarms, on '
+      'the wall clock, with how long until the start (obf-1046)', (
+    tester,
+  ) async {
+    final pills = routines.create('pills', daily([at(20)]));
+    routines.setHeadsUps(pills.id, [20, 1440]);
+    await start(tester);
+
+    final arm = named('arm').last.arguments as Map<Object?, Object?>;
+    final headsUps = [
+      for (final h in arm['headsUps'] as List<Object?>)
+        h as Map<Object?, Object?>,
+    ];
+    // At 09:00: 19:40 for tonight, 20:00 for tomorrow's; yesterday's
+    // 20:00 for tonight has passed.
+    final [soon, day, ...] = headsUps;
+    expect(soon['routine'], pills.id);
+    expect(soon['occurrence'], '2026-10-24T20:00');
+    expect(soon['local'], [2026, 10, 24, 19, 40]);
+    expect(soon['minutes'], 20);
+    expect(soon['id'], startsWith('headsUp:20:'));
+    expect(soon['title'], 'pills');
+    expect(soon['body'], 'in 20 min');
+    expect(soon['quiet'], [22, 0, 8, 0]);
+    expect(day['occurrence'], '2026-10-25T20:00');
+    expect(day['local'], [2026, 10, 24, 20, 0]);
+    expect(day['body'], 'in 1 day');
+    expect(soon.containsKey('renag'), isFalse, reason: 'it never Re-nags');
+    // None of them among the alarms.
+    expect([
+      for (final a in arm['alarms'] as List<Object?>)
+        (a as Map<Object?, Object?>)['id'],
+    ], everyElement(isNot(startsWith('headsUp:'))));
+    final labels = arm['labels'] as Map<Object?, Object?>;
+    expect(labels['headsUpChannel'], 'Heads-ups');
   });
 
   testWidgets('a Done and a snooze tapped on the lock screen reach the log '

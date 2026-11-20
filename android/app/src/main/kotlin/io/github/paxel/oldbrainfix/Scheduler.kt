@@ -27,6 +27,7 @@ import java.util.TimeZone
 object Scheduler {
     private const val PREFS = "oldbrainfix_alarms"
     private const val KEY_PLAN = "plan"
+    private const val KEY_HEADS_UPS = "headsUps"
     private const val KEY_LABELS = "labels"
     private const val KEY_LAST_FIRED = "lastFired"
     private const val KEY_LAST_ARMED = "lastArmed"
@@ -36,9 +37,9 @@ object Scheduler {
     const val EXTRA_ARMED = "oldbrainfix.armed"
 
     /**
-     * Keeps [plan], the [nudge], the Changes Nudge [changes], the
-     * notification [labels] and the [sound] Occurrences ring with (null
-     * for the app's own), and arms them. The notifications of what is
+     * Keeps [plan], the Heads-ups [headsUps] (obf-1046), the [nudge], the
+     * Changes Nudge [changes], the notification [labels] and the [sound]
+     * Occurrences ring with (null for the app's own), and arms them. The notifications of what is
      * [done] go away, and so does a full-screen alarm the plan no longer
      * escalates, the Nudge's once nothing is Unsorted, and the Changes
      * Nudge's once nobody waits for changes.
@@ -48,6 +49,7 @@ object Scheduler {
         plan: JSONArray,
         labels: JSONObject,
         done: JSONArray,
+        headsUps: JSONArray?,
         nudge: JSONObject?,
         changes: JSONObject?,
         sound: String?,
@@ -55,6 +57,11 @@ object Scheduler {
         val edit = prefs(context).edit()
             .putString(KEY_PLAN, plan.toString())
             .putString(KEY_LABELS, labels.toString())
+        if (headsUps == null || headsUps.length() == 0) {
+            edit.remove(KEY_HEADS_UPS)
+        } else {
+            edit.putString(KEY_HEADS_UPS, headsUps.toString())
+        }
         if (nudge == null) edit.remove(KEY_NUDGE) else edit.putString(KEY_NUDGE, nudge.toString())
         if (changes == null) edit.remove(KEY_CHANGES) else edit.putString(KEY_CHANGES, changes.toString())
         edit.commit()
@@ -87,7 +94,15 @@ object Scheduler {
     private fun alarms(context: Context): List<Alarm> =
         AlarmPlan.effective(planOf(Stored.text(prefs(context), KEY_PLAN)), EventQueue.pending(context))
 
-    /** The alarms of the [plan] handed over that read, in order. */
+    /**
+     * The Heads-ups with the taps not applied yet (obf-1046): plain
+     * notifications, each firing once at its [Alarm.local], kept apart
+     * from [alarms].
+     */
+    private fun headsUps(context: Context): List<Alarm> =
+        AlarmPlan.headsUpsLeft(planOf(Stored.text(prefs(context), KEY_HEADS_UPS)), EventQueue.pending(context))
+
+    /** The alarms of the [plan] handed over that read, in order; the Heads-ups read the same way. */
     internal fun planOf(plan: String?): List<Alarm> = Stored.listOf(plan) { alarm(it) }
 
     /** The Nudge with the snooze tapped and not applied yet; null while nothing is Unsorted. */
@@ -137,6 +152,7 @@ object Scheduler {
         val zone = TimeZone.getDefault()
         val next = listOfNotNull(
             AlarmPlan.next(alarms(context), zone, lastFired, now),
+            AlarmPlan.next(headsUps(context), zone, lastFired, now),
             nudge(context)?.let { NudgePlan.next(it, zone, lastFired, now) },
             changes(context)?.let { (changes, _) -> NudgePlan.next(changes, zone, lastFired, now) },
         ).minOrNull()
@@ -158,13 +174,20 @@ object Scheduler {
      * and arms the next one. An escalated one rings full screen; without
      * the full-screen permission, or when Android does not let the
      * ringing start, it shows as a high-priority notification instead.
-     * One firing in its Quiet Hours shows without sound or vibration.
+     * One firing in its Quiet Hours shows without sound or vibration. A
+     * Heads-up due shows as a plain notification (obf-1046), none of an
+     * Occurrence ringing by now.
      */
     fun fired(context: Context, armed: Long) {
         val now = System.currentTimeMillis()
         val zone = TimeZone.getDefault()
         val lastFired = Stored.long(prefs(context), KEY_LAST_FIRED)
-        val due = AlarmPlan.due(alarms(context), zone, armed, lastFired, now)
+        val plan = alarms(context)
+        for (headsUp in AlarmPlan.dueHeadsUps(headsUps(context), plan, zone, armed, lastFired, now)) {
+            // In the Quiet Hours without sound, whether it escalates or not.
+            Notifications.showHeadsUp(context, headsUp, silent = AlarmPlan.silent(headsUp, zone, now))
+        }
+        val due = AlarmPlan.due(plan, zone, armed, lastFired, now)
         val ring = AlarmPlan.toRing(due, zone, now, Permissions.fullScreenAllowed(context))
         for (alarm in due) {
             if (alarm == ring && RingService.start(context, alarm, AlarmPlan.ringUntil(alarm, zone, now))) continue

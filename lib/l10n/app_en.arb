@@ -594,6 +594,97 @@
   "ringChannel": "Full-screen alarms",
   "escalatedChannel": "Escalated alarms",
   "quietChannel": "Routines and Reminders in the Quiet Hours",
+  "headsUpChannel": "Heads-ups",
+  "@headsUpChannel": {"description": "The Android notification channel of the Heads-ups (obf-1046)."},
+  "headsUpsHeading": "Heads-ups",
+  "addHeadsUp": "Add heads-up",
+  "removeHeadsUp": "Remove heads-up",
+  "headsUpMinutesBefore": "{minutes} min before",
+  "@headsUpMinutesBefore": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpHoursBefore": "{hours} h before",
+  "@headsUpHoursBefore": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpHoursMinutesBefore": "{hours} h {minutes} min before",
+  "@headsUpHoursMinutesBefore": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpDaysBefore": "{days, plural, =1{1 day before} other{{days} days before}}",
+  "@headsUpDaysBefore": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpWeeksBefore": "{weeks, plural, =1{1 week before} other{{weeks} weeks before}}",
+  "@headsUpWeeksBefore": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInMinutes": "in {minutes} min",
+  "@headsUpInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInHours": "in {hours} h",
+  "@headsUpInHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInHoursMinutes": "in {hours} h {minutes} min",
+  "@headsUpInHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInDays": "{days, plural, =1{in 1 day} other{in {days} days}}",
+  "@headsUpInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInWeeks": "{weeks, plural, =1{in 1 week} other{in {weeks} weeks}}",
+  "@headsUpInWeeks": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
   "escalationHeading": "Escalation",
   "escalationOff": "Off: it only Re-nags",
   "escalationSummary": "{count, plural, =1{Full-screen alarm after 1 ignored Re-nag} other{Full-screen alarm after {count} ignored Re-nags}}",

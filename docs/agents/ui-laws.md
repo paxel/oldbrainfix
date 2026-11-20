@@ -612,6 +612,16 @@ replace a law of Both apps where they say so. A desktop law marked
   "tonight" at 19:00, against the store's clock. On an Advanced schedule
   it is read-only, the schedule's summary with "Switch to Simple to
   type". The sentence is never stored.
+- **The Routine editor lists the Heads-ups** (obf-1046): under the
+  schedule, "Heads-ups" lists each one set ("20 min before", "1 day
+  before"), earliest warning first, each with its remove ✕, and "Add
+  heads-up" offers 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days and
+  1 week before; an all-day schedule offers and keeps whole days only
+  (1, 2 and 3 days, 1 week). They are the person's own, on their own
+  Devices: in a Shared Area a Member who may not change the Routine
+  still sets their own, and nobody else sees them: the editor opens for
+  them with everything else shown, not edited, and its Save keeps only
+  the Heads-ups. Saved with the editor's Save.
 - **A new Reminder offers its chips** (#271): on the phone and the
   desktop, a new Reminder, or a new Routine set to Once in Simple, shows
   a wrapping row of chips under the When line: In 1 h, Tonight (until
@@ -935,6 +945,14 @@ replace a law of Both apps where they say so. A desktop law marked
   never full screen; a Routine with Escalation on rings with sound from
   its first ring, as Escalation is the only way through. An all-day
   Occurrence's first ring still waits until they end (#201).
+- **A Heads-up is one plain notification before its Occurrence**
+  (obf-1046): the Note's title with how long until it starts ("in
+  20 min", "in 1 day"), no Done, Snooze or Not today, no Re-nag, never
+  full screen, without sound in the Quiet Hours whether or not the
+  Routine escalates. It shows in its Occurrence's notification, so the
+  ring replaces it; on the iPhone, which cannot replace a delivered
+  notification, it sits in the Occurrence's group beside the ring. Done, Skip or Snooze before it cancels it; the
+  Occurrence still rings at its time.
 
 ## Phone
 

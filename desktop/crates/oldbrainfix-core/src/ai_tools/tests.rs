@@ -863,6 +863,55 @@ fn a_checklists_agenda_choice_is_set_once_accepted() -> TestResult {
 }
 
 #[test]
+fn a_routines_heads_ups_are_set_once_accepted() -> TestResult {
+    use crate::routines::heads_up_keys;
+    let store = store();
+    let note = Notes::new(&store).capture("Dentist", None, None)?.id;
+    let schedule = Schedule::new(Day::new(2026, 3, 1), &[], None).ok_or("a schedule")?;
+    let routine = Routines::new(&store).spawn(&note, &schedule)?.id;
+    let task = store.open_ai_task()?;
+    let set = |id: &str, minutes: Value| {
+        call(
+            &store,
+            &task,
+            "set_heads_ups",
+            &json!({"id": id, "minutes": minutes}),
+        )
+    };
+    assert!(
+        set("routine:none", json!([20]))?.is_error,
+        "no such Routine"
+    );
+    assert!(set(&routine, json!("20"))?.is_error, "no list");
+    assert!(set(&routine, json!([20, "x"]))?.is_error, "no number");
+    let logged = store.all_entries()?.len();
+    assert!(!set(&routine, json!([1440, 20, 20, 0, 99999]))?.is_error);
+    assert_eq!(store.all_entries()?.len(), logged, "the log waits");
+    let entity = heads_up_keys::of(&routine);
+    assert_eq!(
+        store.current(&entity, heads_up_keys::HEADS_UPS)?.as_deref(),
+        Some("20,1440")
+    );
+    let review = store.ai_review(&task)?;
+    let items: Vec<&crate::ai_task::AiReviewItem> =
+        review.groups.iter().flat_map(|(_, i)| i).collect();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].kind, crate::ai_task::AiChangeKind::Routine);
+    assert_eq!(items[0].note.as_deref(), Some(note.as_str()));
+    // Read from the user's own entries in the log alone, they ring once
+    // accepted.
+    let listed = json_of(&call(&store, &task, "list_routines", &json!({}))?)?;
+    assert_eq!(listed[0]["headsUpMinutes"], json!([]));
+    assert!(Routines::new(&store).heads_ups(&routine)?.is_empty());
+    store.accept_pending(&task)?;
+    assert_eq!(Routines::new(&store).heads_ups(&routine)?, [20, 1440]);
+    let task = store.open_ai_task()?;
+    let out = json_of(&call(&store, &task, "list_routines", &json!({}))?)?;
+    assert_eq!(out[0]["headsUpMinutes"], json!([20, 1440]));
+    Ok(())
+}
+
+#[test]
 fn a_shopping_lists_agenda_choice_is_set_once_accepted() -> TestResult {
     let store = store();
     let shop = shopping_list(&store, "Shop\nMilk")?;
@@ -942,6 +991,7 @@ fn no_tool_writes_the_users_own_data() {
         "reschedule_routine",
         "set_renag",
         "set_escalation",
+        "set_heads_ups",
         "trash_routine",
         "restore_routine",
         "make_tally",

@@ -980,6 +980,92 @@ class AppLocalizationsDe extends AppLocalizations {
   String get quietChannel => 'Routinen und Erinnerungen in der Ruhezeit';
 
   @override
+  String get headsUpChannel => 'Vorwarnungen';
+
+  @override
+  String get headsUpsHeading => 'Vorwarnungen';
+
+  @override
+  String get addHeadsUp => 'Vorwarnung hinzufügen';
+
+  @override
+  String get removeHeadsUp => 'Vorwarnung entfernen';
+
+  @override
+  String headsUpMinutesBefore(int minutes) {
+    return '$minutes Min. vorher';
+  }
+
+  @override
+  String headsUpHoursBefore(int hours) {
+    return '$hours Std. vorher';
+  }
+
+  @override
+  String headsUpHoursMinutesBefore(int hours, int minutes) {
+    return '$hours Std. $minutes Min. vorher';
+  }
+
+  @override
+  String headsUpDaysBefore(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days Tage vorher',
+      one: '1 Tag vorher',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpWeeksBefore(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks Wochen vorher',
+      one: '1 Woche vorher',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpInMinutes(int minutes) {
+    return 'in $minutes Min.';
+  }
+
+  @override
+  String headsUpInHours(int hours) {
+    return 'in $hours Std.';
+  }
+
+  @override
+  String headsUpInHoursMinutes(int hours, int minutes) {
+    return 'in $hours Std. $minutes Min.';
+  }
+
+  @override
+  String headsUpInDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'in $days Tagen',
+      one: 'in 1 Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpInWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'in $weeks Wochen',
+      one: 'in 1 Woche',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get escalationHeading => 'Eskalation';
 
   @override

@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.7.0]
 
+### Neu
+
+- Vorwarnungen: Eine Routine oder Erinnerung kann vor ihrer Fälligkeit warnen, etwa „Zahnarzt in 20 Min.“, mit so vielen wie gewünscht, eingestellt in ihrem Editor, bei einer ganztägigen nur ganze Tage, auf Android, dem iPhone und am Desktop. Eine Vorwarnung ist eine Benachrichtigung ohne erneutes Erinnern, in der Ruhezeit ohne Ton; Erledigt, Auslassen oder „Später“ davor hebt sie auf, und die Fälligkeit klingelt weiter zu ihrer Zeit. In einem geteilten Bereich stellt jede Person ihre eigenen für eine geteilte Routine ein, nur auf ihren eigenen Geräten. ([obf-1046](https://github.com/paxel/oldbrainfix/issues/356))
+
 ### Geändert
 
 - Auf dem Handy liegt das Suchfeld der Bereichsliste, eines Bereichs und eines Themas auf einem Streifen, der mit der oberen Leiste eine von der Seite abgesetzte Farbe teilt, mit einer Linie darunter, sodass die Karten beim Scrollen und beim Herunterziehen der Liste unter ihm durchlaufen. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))

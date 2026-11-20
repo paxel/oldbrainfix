@@ -201,7 +201,8 @@ final class AlarmNotifications: NSObject, UNUserNotificationCenterDelegate {
 /// `AlarmPlan.windowSize` rings of it are handed over: escalated ones as
 /// AlarmKit alarms where allowed, the others as time-sensitive
 /// notifications, or in the Quiet Hours as normal ones without sound
-/// (obf-1045), the Nudges as normal ones. Every plan, tap and answer
+/// (obf-1045), the Nudges and the Heads-ups (obf-1046) as normal ones,
+/// a Heads-up in the Quiet Hours without sound. Every plan, tap and answer
 /// hands them over anew. Used on the main thread only.
 final class AlarmScheduler {
   static let shared = AlarmScheduler()
@@ -340,10 +341,13 @@ final class AlarmScheduler {
     let plan = AlarmPlan.effective(PlanCodec.alarms(stored["alarms"]), queued: queued)
     let nudge = PlanCodec.nudge(stored["nudge"]).map { AlarmPlan.effective($0, queued: queued) }
     let changes = PlanCodec.nudge(stored["changes"])
+    // Apart from the alarms, in the same shape (obf-1046).
+    let headsUps = AlarmPlan.headsUpsLeft(PlanCodec.alarms(stored["headsUps"]), queued: queued)
     let labels = stored["labels"] as? [String: Any] ?? [:]
     let now = Int64(Date().timeIntervalSince1970 * 1000)
     let rings = AlarmPlan.window(
-      alarms: plan, nudge: nudge, changes: changes, zone: TimeZone.current, now: now)
+      alarms: plan, nudge: nudge, changes: changes, headsUps: headsUps, zone: TimeZone.current,
+      now: now)
     let alarmKit = AlarmManager.shared.authorizationState == .authorized
 
     let center = UNUserNotificationCenter.current()
@@ -491,7 +495,13 @@ final class AlarmScheduler {
       intentIdentifiers: [],
       hiddenPreviewsBodyPlaceholder: changes?.publicText ?? "",
       options: [])
-    return [alarm, pastAlarm, nudge, changesCategory]
+    // A Heads-up has nothing to check off (obf-1046): a tap opens its Note.
+    let headsUp = UNNotificationCategory(
+      identifier: NotificationAnswer.headsUpCategory,
+      actions: [],
+      intentIdentifiers: [],
+      options: [])
+    return [alarm, pastAlarm, nudge, changesCategory, headsUp]
   }
 
   private func request(_ ring: Ring, nudge: PlannedNudge?, changes: PlannedNudge?)
@@ -533,6 +543,22 @@ final class AlarmScheduler {
       content.body = changes.body
       content.categoryIdentifier = NotificationAnswer.changesCategory
       content.threadIdentifier = NotificationAnswer.changesCategory
+    case .headsUp:
+      guard let headsUp = ring.alarm else { return nil }
+      content.title = headsUp.title
+      content.body = headsUp.body
+      content.categoryIdentifier = NotificationAnswer.headsUpCategory
+      // With its Occurrence's notifications; a Done takes it away with
+      // them (`removeDelivered(keys:)` reads the routine and occurrence).
+      content.threadIdentifier = headsUp.key
+      // A plain notification, never through a Focus; in the Quiet Hours
+      // without sound, whether the Routine escalates or not.
+      if ring.silent { content.sound = nil }
+      content.interruptionLevel = .active
+      content.userInfo = [
+        "routine": headsUp.routine, "occurrence": headsUp.occurrence, "title": headsUp.title,
+        "body": headsUp.body,
+      ]
     }
     let date = Date(timeIntervalSince1970: Double(ring.at) / 1000)
     // On the wall clock, so it keeps its local time in a new time zone.

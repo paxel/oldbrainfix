@@ -213,6 +213,11 @@ fn what_is_on_a_hidden_note_or_in_a_hidden_area_is_hidden() -> TestResult {
     assert_eq!(ann.hidden_from_ai_by(&line)?, std::slice::from_ref(&list));
     let agenda = format!("{}{list}", line_keys::AGENDA_PREFIX);
     assert_eq!(ann.hidden_from_ai_by(&agenda)?, std::slice::from_ref(&list));
+    let heads_ups = crate::routines::heads_up_keys::of(&routine);
+    assert_eq!(
+        ann.hidden_from_ai_by(&heads_ups)?,
+        std::slice::from_ref(&alone)
+    );
     assert!(!ann.is_hidden_from_ai(&open)?);
     notes.file(&in_area, &places.add_area("Work")?.id)?;
     assert!(!ann.is_hidden_from_ai(&in_area)?);
@@ -777,6 +782,7 @@ fn writes_cannot_reach_what_is_hidden() -> TestResult {
             "reschedule_routine",
             json!({"id": routine, "start": "2026-01-02", "times": ["09:00"]}),
         ),
+        ("set_heads_ups", json!({"id": routine, "minutes": [20]})),
         ("trash_routine", json!({"id": routine})),
         (
             "make_tally",

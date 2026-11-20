@@ -20,7 +20,10 @@
 //! Hours hold back the Nudge and the Changes Nudge, and an Occurrence
 //! firing in them shows silent with no alarm sound rung, but for one
 //! that escalates (obf-1045); with alerts off on this Device nothing
-//! shows (ADR 0008).
+//! shows (ADR 0008). A Heads-up shows once in its Occurrence's
+//! notification, which the ring then takes over: the Note's title with
+//! how long until it starts, a click opening the Note, nothing to check
+//! off, without sound in the Quiet Hours (obf-1046).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -28,16 +31,16 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
-use oldbrainfix_core::alarms::{PlannedAlarm, alarm_plan};
+use oldbrainfix_core::alarms::{PlannedAlarm, alarm_plan, heads_up_plan};
 use oldbrainfix_core::{
-    Alarms, Day, DeviceSettings, Occurrence, PlannedChangesNudge, PlannedNudge, Routines, Store,
-    WallClock,
+    Alarms, Day, DeviceSettings, Occurrence, PlannedChangesNudge, PlannedHeadsUp, PlannedNudge,
+    Routines, Store, WallClock, Wordless,
 };
 
 use crate::l10n::{L10n, names_text, wordless};
 use crate::profile_view::display_name;
 use crate::ring::{Ringer, alarm_sound};
-use crate::schedule_text::occurrence_time;
+use crate::schedule_text::{heads_up_in, occurrence_time};
 
 /// An alarm that came due this long before a tick still shows; older
 /// ones wait for their next Re-nag (the phone's `GRACE_MS`).
@@ -229,6 +232,60 @@ fn first_line(text: Option<&str>) -> Option<String> {
     (!line.is_empty()).then(|| line.to_string())
 }
 
+/// What an Occurrence's notification is titled: the first line of its
+/// Note's `text`, what the Note holds while it has no words, or that the
+/// Note is gone.
+fn ring_title(t: &L10n, text: Option<&str>, kind: Wordless, name: &str) -> String {
+    first_line(text).unwrap_or_else(|| {
+        if text.is_none() {
+            t.note_gone().to_string()
+        } else {
+            wordless(t, kind, name)
+        }
+    })
+}
+
+/// The Heads-ups that should exist at `at` (obf-1046), as
+/// [`Alarms::heads_ups`] reads them at the store's now: from the log
+/// alone, each one's offsets as the user's own Devices set them, with
+/// this Device's snoozes, all-day time and Quiet Hours. Read at the last
+/// tick, it holds those that came due since, with Done, Skip and Snooze
+/// read anew.
+pub fn heads_ups_at(
+    store: &Store,
+    wall: &WallClock,
+    at: DateTime<Utc>,
+) -> oldbrainfix_core::Result<Vec<PlannedHeadsUp>> {
+    let routines = store.log_only(|| -> oldbrainfix_core::Result<Vec<_>> {
+        let read = Routines::new(store);
+        let mut out = Vec::new();
+        for (routine, note) in read.all_with_notes()? {
+            let minutes = read.heads_ups(&routine.id)?;
+            if !minutes.is_empty() {
+                out.push((routine, note, minutes));
+            }
+        }
+        Ok(out)
+    })?;
+    if routines.is_empty() {
+        return Ok(Vec::new());
+    }
+    let settings = DeviceSettings::new(store);
+    let quiet = if settings.quiet_hours_on()? {
+        Some(settings.quiet_hours()?)
+    } else {
+        None
+    };
+    Ok(heads_up_plan(
+        &routines,
+        &Alarms::new(store).snoozes()?,
+        at,
+        wall,
+        settings.all_day_from()?,
+        quiet,
+    ))
+}
+
 /// The alarm layer's state between ticks.
 pub struct Alerts {
     notifier: Box<dyn Notifier>,
@@ -253,6 +310,9 @@ pub struct Alerts {
     /// Plays the alarm sound of an Occurrence that rings; without one
     /// nothing plays.
     ringer: Option<Box<dyn Ringer>>,
+    /// The Heads-ups shown, by id, with when each fired: each shows once,
+    /// also when the clock is set back.
+    heads_ups_fired: BTreeMap<String, DateTime<Utc>>,
 }
 
 impl Alerts {
@@ -268,6 +328,7 @@ impl Alerts {
             unsorted_wanted: Arc::new(AtomicBool::new(false)),
             changes_wanted: Arc::new(AtomicBool::new(false)),
             ringer: None,
+            heads_ups_fired: BTreeMap::new(),
         }
     }
 
@@ -402,6 +463,21 @@ impl Alerts {
         };
         let after = fired.filter(|f| *f <= now).map_or(after, |f| after.max(f));
         let mut showed = false;
+        // Before the rings, so one of the same Occurrence takes over its
+        // notification.
+        let heads_ups = heads_ups_at(store, wall, after)?;
+        for heads_up in heads_ups.iter().filter(|h| h.at <= now) {
+            if self
+                .heads_ups_fired
+                .insert(heads_up.id(), heads_up.at)
+                .is_none()
+            {
+                self.show_heads_up(heads_up, wall);
+                showed = true;
+            }
+        }
+        self.heads_ups_fired
+            .retain(|_, at| *at > now - Duration::days(1));
         let mut ring = false;
         for alarm in due(&plan, after, now) {
             ring |= self.show_alarm(alarm, now, wall);
@@ -430,6 +506,9 @@ impl Alerts {
             settings.set_last_fired(now)?;
         }
         let mut next = next(&plan, now).unwrap_or(now + longest_wait());
+        if let Some(at) = heads_ups.iter().map(|h| h.at).filter(|at| *at > now).min() {
+            next = next.min(at);
+        }
         if let Some(nudge) = &nudge {
             next = next.min(nudge.fires_after(now, wall));
         }
@@ -492,13 +571,12 @@ impl Alerts {
     /// silent (obf-1045).
     fn show_alarm(&mut self, alarm: &PlannedAlarm, now: DateTime<Utc>, wall: &WallClock) -> bool {
         let t = self.t;
-        let title = first_line(alarm.text.as_deref()).unwrap_or_else(|| {
-            if alarm.text.is_none() {
-                t.note_gone().to_string()
-            } else {
-                wordless(&t, alarm.wordless, &alarm.wordless_name)
-            }
-        });
+        let title = ring_title(
+            &t,
+            alarm.text.as_deref(),
+            alarm.wordless,
+            &alarm.wordless_name,
+        );
         let key = occurrence_key(&alarm.routine_id, &alarm.occurrence);
         let urgent = escalates(alarm, now);
         self.show(Notice {
@@ -510,6 +588,28 @@ impl Alerts {
             actions: occurrence_buttons(&t),
         });
         !urgent && !alarm.silent_at(now, wall)
+    }
+
+    /// Shows `heads_up` in its Occurrence's notification (obf-1046): the
+    /// Note's title with how long until it starts, nothing but a click to
+    /// open the Note, with the notification's own sound but in the Quiet
+    /// Hours; the app rings no alarm sound for it.
+    fn show_heads_up(&mut self, heads_up: &PlannedHeadsUp, wall: &WallClock) {
+        let t = self.t;
+        let title = ring_title(
+            &t,
+            heads_up.text.as_deref(),
+            heads_up.wordless,
+            &heads_up.wordless_name,
+        );
+        self.show(Notice {
+            key: occurrence_key(&heads_up.routine_id, &heads_up.occurrence),
+            title,
+            body: heads_up_in(&t, heads_up.minutes),
+            urgent: false,
+            silent: heads_up.silent_at(wall),
+            actions: vec![(OPEN.into(), t.tray_open().into())],
+        });
     }
 
     fn show_nudge(&mut self, nudge: &PlannedNudge) {

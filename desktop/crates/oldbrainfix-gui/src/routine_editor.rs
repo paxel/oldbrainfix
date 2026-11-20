@@ -17,7 +17,10 @@
 //! capture for the Note not written yet (#113), Save hands back what was
 //! set up instead ([`RoutineEditor::choice`]), as the phone's
 //! `chooseSchedule`. A saved Routine has History beside its heading, as
-//! in the phone's bar (Q400).
+//! in the phone's bar (Q400). Under the schedule it lists the person's
+//! own Heads-ups, each removable, and offers more (obf-1046); a Member
+//! who may not change the Routine sees the rest without editing it, and
+//! Save keeps only the Heads-ups ([`RoutineEditor::heads_ups_only`]).
 
 use std::collections::BTreeSet;
 
@@ -41,7 +44,8 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
 use crate::schedule_text::{
-    clock_text, day_text, occurrence_time, schedule_text, weekday_long, weekday_text,
+    clock_text, day_text, heads_up_before, occurrence_time, schedule_text, weekday_long,
+    weekday_text,
 };
 use crate::session_editor::{SessionDraft, SessionIntent};
 use crate::theme::{self, Tones};
@@ -51,6 +55,14 @@ pub const RENAG_CHOICES: [i64; 5] = [5, 10, 15, 30, 60];
 
 /// The numbers of ignored Re-nags offered before Escalation.
 pub const ESCALATION_CHOICES: [i64; 5] = [1, 2, 3, 5, 10];
+
+/// The Heads-ups offered on a schedule with times, in minutes before an
+/// Occurrence: 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days, 1 week.
+pub const HEADS_UP_CHOICES: [i64; 9] = [5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
+
+/// The Heads-ups offered on an all-day schedule, whole days only: 1, 2
+/// and 3 days, 1 week.
+pub const HEADS_UP_DAY_CHOICES: [i64; 4] = [1440, 2880, 4320, 10080];
 
 /// How many coming Occurrences the editor shows.
 const PREVIEW: usize = 3;
@@ -181,6 +193,14 @@ pub struct RoutineEditor {
     /// and said when missing, which `name_missing` holds.
     named: bool,
     name_missing: bool,
+    /// The person's own Heads-ups in minutes before an Occurrence,
+    /// ascending (obf-1046); on an all-day schedule only the whole days
+    /// among them count ([`RoutineEditor::kept_heads_ups`]), the others
+    /// kept for a time set again.
+    pub heads_ups: Vec<i64>,
+    /// Whether only the Heads-ups are edited, the rest shown as it is: a
+    /// Routine this Device may not change (obf-1046).
+    locked: bool,
     /// What Save writes, as the editor opened, to tell on leaving whether
     /// anything changed (#275).
     opened: Edited,
@@ -198,6 +218,7 @@ struct Edited {
     escalation: Option<i64>,
     text: String,
     session: Option<SessionChoice>,
+    heads_ups: Vec<i64>,
 }
 
 impl RoutineEditor {
@@ -270,6 +291,8 @@ impl RoutineEditor {
             place: None,
             named: false,
             name_missing: false,
+            heads_ups: Vec::new(),
+            locked: false,
             opened: Edited::default(),
         };
         editor.update();
@@ -420,6 +443,8 @@ impl RoutineEditor {
             place: None,
             named: false,
             name_missing: false,
+            heads_ups: Vec::new(),
+            locked: false,
             opened: Edited::default(),
         };
         match SimpleRepeat::of(schedule.rule.as_ref()) {
@@ -428,6 +453,64 @@ impl RoutineEditor {
         }
         editor.update();
         editor.opened_now()
+    }
+
+    /// With the person's own Heads-ups `minutes` (obf-1046), as it
+    /// opens.
+    pub fn with_heads_ups(mut self, minutes: &[i64]) -> RoutineEditor {
+        self.heads_ups = minutes.to_vec();
+        self.heads_ups.sort_unstable();
+        self.heads_ups.dedup();
+        self.opened_now()
+    }
+
+    /// Only its Heads-ups edited (obf-1046): of a Routine this Device may
+    /// not change, the rest shown as it is, and Save keeping only them.
+    pub fn heads_ups_only(mut self) -> RoutineEditor {
+        self.locked = true;
+        // No field to type in takes the keyboard.
+        self.focus_first = false;
+        self.opened_now()
+    }
+
+    /// Whether only its Heads-ups are edited.
+    pub fn locked(&self) -> bool {
+        self.locked
+    }
+
+    /// The Heads-ups Save writes: those set, ascending, on an all-day
+    /// schedule only the whole days among them.
+    pub fn kept_heads_ups(&self) -> Vec<i64> {
+        let all_day = self.times.is_empty();
+        self.heads_ups
+            .iter()
+            .copied()
+            .filter(|m| !all_day || m % 1440 == 0)
+            .collect()
+    }
+
+    /// The Heads-ups offered to add: those of the schedule's kind not set
+    /// yet.
+    pub fn heads_up_choices(&self) -> Vec<i64> {
+        let offered: &[i64] = if self.times.is_empty() {
+            &HEADS_UP_DAY_CHOICES
+        } else {
+            &HEADS_UP_CHOICES
+        };
+        let kept = self.kept_heads_ups();
+        offered
+            .iter()
+            .copied()
+            .filter(|m| !kept.contains(m))
+            .collect()
+    }
+
+    /// Adds the Heads-up `minutes` before an Occurrence.
+    pub fn add_heads_up(&mut self, minutes: i64) {
+        if !self.heads_ups.contains(&minutes) {
+            self.heads_ups.push(minutes);
+            self.heads_ups.sort_unstable();
+        }
     }
 
     /// What Save writes of it now.
@@ -442,6 +525,7 @@ impl RoutineEditor {
             escalation: self.escalation,
             text: self.text.trim().to_string(),
             session: self.session.as_ref().map(SessionDraft::choice),
+            heads_ups: self.kept_heads_ups(),
         }
     }
 
@@ -738,6 +822,7 @@ impl RoutineEditor {
             renag: self.renag.map(Duration::minutes),
             escalation: self.escalation,
             session: self.session.as_ref().map(SessionDraft::choice),
+            heads_ups: self.kept_heads_ups(),
         })
     }
 
@@ -745,6 +830,13 @@ impl RoutineEditor {
     /// fixing first, which then says so under its fields and writes
     /// nothing.
     pub fn save(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<String>> {
+        if self.locked {
+            let Some(id) = &self.routine else {
+                return Err(oldbrainfix_core::Error::Invalid("no Routine".into()));
+            };
+            Routines::new(store).set_heads_ups(id, &self.kept_heads_ups())?;
+            return Ok(Some(id.clone()));
+        }
         self.name_missing = self.named && self.text.trim().is_empty();
         if self.session_to_fix() || self.name_missing {
             return Ok(None);
@@ -787,6 +879,7 @@ impl RoutineEditor {
         };
         routines.set_renag(&id, self.renag.map(Duration::minutes))?;
         routines.set_escalation(&id, self.escalation)?;
+        routines.set_heads_ups(&id, &self.kept_heads_ups())?;
         Ok(Some(id))
     }
 
@@ -918,7 +1011,9 @@ impl RoutineEditor {
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
                         intent = Some(Intent::Close);
                     }
-                    if self.routine.is_some() && theme::destructive(ui, true, t.delete()).clicked()
+                    if self.routine.is_some()
+                        && !self.locked
+                        && theme::destructive(ui, true, t.delete()).clicked()
                     {
                         intent = Some(Intent::Delete);
                     }
@@ -939,8 +1034,9 @@ impl RoutineEditor {
     }
 
     /// The schedule's panels: the repeat with its start and end, the
-    /// times of day, the next Occurrences, Re-nag and Escalation; whether
-    /// the schedule changed.
+    /// times of day, the next Occurrences, the Heads-ups, Re-nag and
+    /// Escalation, all but the Heads-ups not editable while
+    /// [`RoutineEditor::locked`]; whether the schedule changed.
     fn schedule_panels(
         &mut self,
         ui: &mut Ui,
@@ -949,31 +1045,34 @@ impl RoutineEditor {
         (once, shown_now, now): (bool, NaiveDateTime, &SentenceNow),
     ) -> bool {
         let text = ui.visuals().text_color();
+        let open = !self.locked;
         let mut changed = false;
-        embossed(ui, tones, false, None, |ui| {
-            changed |= self.sentence_line(ui, t, now);
-            changed |= self.quick_line(ui, t, now);
-            let mut advanced = self.advanced;
-            let modes = [
-                (false, t.schedule_simple().to_string()),
-                (true, t.schedule_advanced().to_string()),
-            ];
-            if chip_row(ui, &mut advanced, modes) && advanced != self.advanced {
-                self.switch_mode(advanced);
-                changed = true;
-            }
-            if self.advanced {
-                changed |= self.advanced_editor(ui, t);
-            } else {
-                changed |= self.simple_editor(ui, t, tones);
-            }
-            changed |= self.start_editor(ui, t, once);
-            if !self.advanced && self.kind != RepeatKind::Once {
-                changed |= self.end_editor(ui, t);
-            }
-        });
-        embossed(ui, tones, false, None, |ui| {
-            changed |= self.times_editor(ui, t, tones, once, shown_now);
+        ui.add_enabled_ui(open, |ui| {
+            embossed(ui, tones, false, None, |ui| {
+                changed |= self.sentence_line(ui, t, now);
+                changed |= self.quick_line(ui, t, now);
+                let mut advanced = self.advanced;
+                let modes = [
+                    (false, t.schedule_simple().to_string()),
+                    (true, t.schedule_advanced().to_string()),
+                ];
+                if chip_row(ui, &mut advanced, modes) && advanced != self.advanced {
+                    self.switch_mode(advanced);
+                    changed = true;
+                }
+                if self.advanced {
+                    changed |= self.advanced_editor(ui, t);
+                } else {
+                    changed |= self.simple_editor(ui, t, tones);
+                }
+                changed |= self.start_editor(ui, t, once);
+                if !self.advanced && self.kind != RepeatKind::Once {
+                    changed |= self.end_editor(ui, t);
+                }
+            });
+            embossed(ui, tones, false, None, |ui| {
+                changed |= self.times_editor(ui, t, tones, once, shown_now);
+            });
         });
         embossed(ui, tones, false, None, |ui| {
             ui.label(RichText::new(t.next_occurrences()).strong().color(text));
@@ -985,9 +1084,56 @@ impl RoutineEditor {
                 ui.label(RichText::new(line).color(text));
             }
         });
-        embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
-        embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
+        embossed(ui, tones, false, None, |ui| self.heads_ups_editor(ui, t));
+        ui.add_enabled_ui(open, |ui| {
+            embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
+            embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
+        });
         changed
+    }
+
+    /// The person's own Heads-ups (obf-1046): each set, the earliest
+    /// warning first, with its ✕, and "Add heads-up" offering those not
+    /// set yet, whole days only on an all-day schedule.
+    fn heads_ups_editor(&mut self, ui: &mut Ui, t: &L10n) {
+        let text = ui.visuals().text_color();
+        ui.label(RichText::new(t.heads_ups_heading()).strong().color(text));
+        let mut removed = None;
+        for minutes in self.kept_heads_ups().into_iter().rev() {
+            // Its own id: every ✕ says the same.
+            ui.push_id(("heads-up", minutes), |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(heads_up_before(t, minutes)).color(text));
+                    if icon_button(ui, icons::CLOSE, t.remove_heads_up(), text).clicked() {
+                        removed = Some(minutes);
+                    }
+                });
+            });
+        }
+        if let Some(gone) = removed {
+            self.heads_ups.retain(|m| *m != gone);
+        }
+        let offered = self.heads_up_choices();
+        if offered.is_empty() {
+            return;
+        }
+        let add = ui.button(RichText::new(t.add_heads_up()).color(text));
+        let mut picked = None;
+        egui::Popup::menu(&add).show(|ui| {
+            let text = ui.visuals().text_color();
+            for minutes in offered {
+                if ui
+                    .button(RichText::new(heads_up_before(t, minutes)).color(text))
+                    .clicked()
+                {
+                    picked = Some(minutes);
+                    ui.close();
+                }
+            }
+        });
+        if let Some(minutes) = picked {
+            self.add_heads_up(minutes);
+        }
     }
 
     /// The line at the top of the schedule (#227): the schedule as a

@@ -344,6 +344,201 @@ List<PlannedAlarm> alarmPlan({
   return alarms.length > alarmLimit ? alarms.sublist(0, alarmLimit) : alarms;
 }
 
+/// One Heads-up that should exist (obf-1046): a single notification
+/// [minutes] before [occurrence] of the Routine [routineId] starts, at
+/// [at], with no Re-nag and nothing to check off. A Heads-up in [quiet]
+/// shows without sound ([silentAt]).
+class PlannedHeadsUp {
+  final String routineId;
+  final Occurrence occurrence;
+
+  /// How long before the Occurrence's start it warns, in minutes.
+  final int minutes;
+
+  /// When it fires, in UTC.
+  final DateTime at;
+
+  /// The wall-clock moment it fires at, so the platform re-arms it at the
+  /// same local time after a time-zone change.
+  final WallMoment wall;
+
+  /// When the Occurrence starts on the wall clock ([startOf]).
+  final WallMoment start;
+
+  /// This Device's Quiet Hours when they are on; null when they are off.
+  /// A Heads-up never escalates, so its Routine's Escalation changes
+  /// nothing.
+  final QuietHours? quiet;
+
+  /// The text of the Note the Routine links back to as it reads without
+  /// its marks ([Note.visibleText]); null when it is gone.
+  final String? text;
+
+  /// What that Note is titled as while [text] is blank ([Note.wordless]).
+  final Wordless wordless;
+
+  /// The name of the file it goes by as [Wordless.file]
+  /// ([Note.wordlessName]); empty otherwise.
+  final String wordlessName;
+
+  const PlannedHeadsUp({
+    required this.routineId,
+    required this.occurrence,
+    required this.minutes,
+    required this.at,
+    required this.wall,
+    required this.start,
+    this.quiet,
+    required this.text,
+    this.wordless = Wordless.photo,
+    this.wordlessName = '',
+  });
+
+  /// Names the Heads-up for good: one per offset and Occurrence.
+  String get id => 'headsUp:$minutes:${snoozeKey(routineId, occurrence)}';
+
+  /// Whether it fires without sound or vibration: [at] lies in [quiet] on
+  /// [wallClock]. The platform's alarm layer follows the same rule.
+  bool silentAt(WallClock wallClock) => quiet?.holds(at, wallClock) ?? false;
+
+  @override
+  String toString() =>
+      '$id at ${at.toIso8601String()}'
+      '${quiet == null ? '' : ' silent in $quiet'}';
+}
+
+/// When something placed in time fires.
+typedef _Firing = ({DateTime at, WallMoment wall});
+
+/// [minutes] before [day] at [time] on the calendar, daylight saving
+/// left out, so a day before 10:00 is 10:00 the day before, placed on
+/// [wallClock].
+_Firing _timedBefore(
+  Day day,
+  ClockTime time,
+  int minutes,
+  WallClock wallClock,
+) {
+  final shifted = DateTime.utc(
+    day.year,
+    day.month,
+    day.day,
+    time.hour,
+    time.minute,
+  ).subtract(Duration(minutes: minutes));
+  final WallMoment wall = (
+    day: Day.of(shifted),
+    time: ClockTime(shifted.hour, shifted.minute),
+  );
+  return (at: instantOf(wall.day, wall.time, wallClock), wall: wall);
+}
+
+/// When something all-day rings on [day]: at [allDayFrom], or once
+/// [quiet] ends when they hold that time, as the first ring of an all-day
+/// Occurrence in [alarmPlan] (#201). The Heads-ups of an all-day
+/// Occurrence ring so on their day (obf-1046).
+_Firing _allDayRing(
+  Day day,
+  ClockTime allDayFrom,
+  QuietHours? quiet,
+  WallClock wallClock,
+) {
+  final at = instantOf(day, allDayFrom, wallClock);
+  if (quiet != null) {
+    final deferred = quiet.defer(at, wallClock);
+    if (deferred != at) {
+      return (
+        at: deferred,
+        wall: (day: Day.of(wallClock(deferred)), time: quiet.end),
+      );
+    }
+  }
+  return (at: at, wall: (day: day, time: allDayFrom));
+}
+
+/// The Heads-ups that should exist at [now] (obf-1046): for each Routine
+/// its offsets ([Routines.headsUps]) before each Occurrence the alarm
+/// plan looks at that is neither Done nor skipped nor snoozed, so Done,
+/// Skip or a snooze before a Heads-up cancels it. A timed Occurrence's
+/// Heads-up is its wall-clock start that many minutes earlier on the
+/// calendar; an all-day one takes whole days only, rung on that day as
+/// its all-day ring would ring ([allDayFrom], or once [quiet] ends). Each
+/// lies after [now] and before its Occurrence rings; at most
+/// [alarmsPerRoutine] per Routine, the soonest first and at most
+/// [alarmLimit]. In [quiet] they show without sound, whether the Routine
+/// escalates or not. [snoozes] are this Device's (ADR 0008), keyed by
+/// [snoozeKey].
+List<PlannedHeadsUp> headsUpPlan({
+  required List<(Routine, Note?, List<int>)> routines,
+  required Map<String, DateTime> snoozes,
+  required DateTime now,
+  required WallClock wallClock,
+  ClockTime? allDayFrom,
+  QuietHours? quiet,
+}) {
+  final from = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
+  final today = Day.today(now, wallClock);
+  final headsUps = <PlannedHeadsUp>[];
+  for (final (routine, note, minutes) in routines) {
+    if (minutes.isEmpty) continue;
+    var planned = 0;
+    final timed = _timed(
+      routine,
+      today.addDays(-alarmHorizonDays),
+      today.addDays(alarmHorizonDays),
+      wallClock,
+      from,
+    );
+    for (final t in timed) {
+      if (planned >= alarmsPerRoutine) break;
+      final occurrence = t.occurrence;
+      if (routine.doneAt(occurrence) != null) continue;
+      if (routine.skippedAt(occurrence) != null) continue;
+      if (snoozes.containsKey(snoozeKey(routine.id, occurrence))) continue;
+      final rings = occurrence.time == null
+          ? _allDayRing(occurrence.day, from, quiet, wallClock).at
+          : t.start;
+      for (final offset in minutes) {
+        if (planned >= alarmsPerRoutine) break;
+        final time = occurrence.time;
+        // An all-day one takes whole days only.
+        if (time == null && offset % 1440 != 0) continue;
+        final (:at, :wall) = time == null
+            ? _allDayRing(
+                occurrence.day.addDays(-(offset ~/ 1440)),
+                from,
+                quiet,
+                wallClock,
+              )
+            : _timedBefore(occurrence.day, time, offset, wallClock);
+        if (!at.isAfter(now) || !at.isBefore(rings)) continue;
+        headsUps.add(
+          PlannedHeadsUp(
+            routineId: routine.id,
+            occurrence: occurrence,
+            minutes: offset,
+            at: at,
+            wall: wall,
+            start: startOf(occurrence, from),
+            quiet: quiet,
+            text: note?.visibleText,
+            wordless: note?.wordless ?? Wordless.photo,
+            wordlessName: note?.wordlessName ?? '',
+          ),
+        );
+        planned++;
+      }
+    }
+  }
+  headsUps.sort((a, b) {
+    final byTime = a.at.compareTo(b.at);
+    return byTime != 0 ? byTime : a.id.compareTo(b.id);
+  });
+  return headsUps.length > alarmLimit
+      ? headsUps.sublist(0, alarmLimit)
+      : headsUps;
+}
+
 /// One Missed Occurrence and when it became Missed.
 typedef MissedOccurrence = ({Occurrence occurrence, DateTime missedAt});
 
@@ -512,6 +707,28 @@ class Alarms {
       now: store.clock(),
       wallClock: wallClock,
       renag: store.renagInterval,
+      allDayFrom: store.allDayFrom,
+      quiet: store.quietHoursOn ? store.quietHours : null,
+    );
+  }
+
+  /// The Heads-ups at the store's now, on [wallClock] (obf-1046): of each
+  /// Routine the offsets the user's own Devices set ([Routines.headsUps]),
+  /// with this Device's snoozes, all-day time and Quiet Hours; over
+  /// [routines] when the caller has read [Routines.all] already.
+  List<PlannedHeadsUp> headsUps(
+    WallClock wallClock, {
+    List<Routine>? routines,
+  }) {
+    final read = Routines(store);
+    return headsUpPlan(
+      routines: [
+        for (final r in routines ?? read.all())
+          (r, read.note(r), read.headsUps(r.id)),
+      ],
+      snoozes: snoozes,
+      now: store.clock(),
+      wallClock: wallClock,
       allDayFrom: store.allDayFrom,
       quiet: store.quietHoursOn ? store.quietHours : null,
     );

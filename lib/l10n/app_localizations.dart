@@ -1610,6 +1610,90 @@ abstract class AppLocalizations {
   /// **'Routines and Reminders in the Quiet Hours'**
   String get quietChannel;
 
+  /// The Android notification channel of the Heads-ups (obf-1046).
+  ///
+  /// In en, this message translates to:
+  /// **'Heads-ups'**
+  String get headsUpChannel;
+
+  /// No description provided for @headsUpsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Heads-ups'**
+  String get headsUpsHeading;
+
+  /// No description provided for @addHeadsUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Add heads-up'**
+  String get addHeadsUp;
+
+  /// No description provided for @removeHeadsUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove heads-up'**
+  String get removeHeadsUp;
+
+  /// No description provided for @headsUpMinutesBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min before'**
+  String headsUpMinutesBefore(int minutes);
+
+  /// No description provided for @headsUpHoursBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h before'**
+  String headsUpHoursBefore(int hours);
+
+  /// No description provided for @headsUpHoursMinutesBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h {minutes} min before'**
+  String headsUpHoursMinutesBefore(int hours, int minutes);
+
+  /// No description provided for @headsUpDaysBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{1 day before} other{{days} days before}}'**
+  String headsUpDaysBefore(int days);
+
+  /// No description provided for @headsUpWeeksBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{1 week before} other{{weeks} weeks before}}'**
+  String headsUpWeeksBefore(int weeks);
+
+  /// No description provided for @headsUpInMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'in {minutes} min'**
+  String headsUpInMinutes(int minutes);
+
+  /// No description provided for @headsUpInHours.
+  ///
+  /// In en, this message translates to:
+  /// **'in {hours} h'**
+  String headsUpInHours(int hours);
+
+  /// No description provided for @headsUpInHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'in {hours} h {minutes} min'**
+  String headsUpInHoursMinutes(int hours, int minutes);
+
+  /// No description provided for @headsUpInDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{in 1 day} other{in {days} days}}'**
+  String headsUpInDays(int days);
+
+  /// No description provided for @headsUpInWeeks.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{in 1 week} other{in {weeks} weeks}}'**
+  String headsUpInWeeks(int weeks);
+
   /// No description provided for @escalationHeading.
   ///
   /// In en, this message translates to:

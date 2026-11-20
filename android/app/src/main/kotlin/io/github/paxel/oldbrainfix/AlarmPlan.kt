@@ -161,6 +161,40 @@ object AlarmPlan {
         return kept + added + tomorrow
     }
 
+    /**
+     * The Heads-ups (obf-1046) with the taps the app has not applied yet:
+     * those of an Occurrence tapped Done, Skip, Tomorrow or a snooze are
+     * gone, as the app will plan them. They are kept apart from the
+     * alarms, so nothing keyed on an Occurrence's alarm sees them.
+     */
+    fun headsUpsLeft(headsUps: List<Alarm>, queued: List<Action>): List<Alarm> {
+        val answered = queued
+            .filter { it.kind in ANSWERED || it.kind == "snooze" }
+            .map { it.routine to it.occurrence }
+            .toSet()
+        return headsUps.filter { (it.routine to it.occurrence) !in answered }
+    }
+
+    /**
+     * The Heads-ups to show when the alarm armed for [armed] fires at
+     * [now]: those due from then to now that did not fire yet, as [due]
+     * finds them, one per Occurrence, the one nearest its start. None of
+     * an Occurrence whose own alarm in [alarms] came due by now as well:
+     * it rings in the same notification, which a Heads-up must not take.
+     */
+    fun dueHeadsUps(
+        headsUps: List<Alarm>,
+        alarms: List<Alarm>,
+        zone: TimeZone,
+        armed: Long,
+        lastFired: Long,
+        now: Long,
+    ): List<Alarm> {
+        val rung = alarms.filter { instantOf(it, zone) <= now }.map { it.routine to it.occurrence }.toSet()
+        return due(headsUps.sortedByDescending { instantOf(it, zone) }, zone, armed, lastFired, now)
+            .filter { (it.routine to it.occurrence) !in rung }
+    }
+
     /** The kinds of tap after which an Occurrence rings no more. */
     private val ANSWERED = setOf("done", EventQueue.KIND_SKIP, EventQueue.KIND_TOMORROW)
 

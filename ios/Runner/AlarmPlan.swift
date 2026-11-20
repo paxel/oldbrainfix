@@ -57,6 +57,9 @@ enum RingKind: Equatable {
   case escalated
   case nudge
   case changes
+  /// A Heads-up before an Occurrence (obf-1046): one plain notification,
+  /// never time-sensitive.
+  case headsUp
 }
 
 /// One ring handed to iOS: when, what, and the Occurrence it rings for.
@@ -83,6 +86,10 @@ enum AlarmPlan {
 
   /// The snooze choices of a notification, in minutes, as on Android.
   static let snoozeMinutes = [10, 30, 60]
+
+  /// At most this many of the window's rings are Heads-ups (obf-1046),
+  /// so they never crowd out the rings and Re-nags themselves.
+  static let headsUpShare = 16
 
   /// The instant `local` shows on `zone`'s clock. A time the clock shows
   /// twice fires once, at the first; a time it skips fires at the next
@@ -252,6 +259,18 @@ enum AlarmPlan {
   }
 
 
+  /// The Heads-ups (obf-1046) with the taps the app has not applied yet:
+  /// those of an Occurrence tapped Done, Skip, Tomorrow or a snooze are
+  /// gone, as the app will plan them. They are kept apart from the alarms,
+  /// so nothing keyed on an Occurrence's alarm sees them.
+  static func headsUpsLeft(_ headsUps: [PlannedAlarm], queued: [QueuedAction]) -> [PlannedAlarm] {
+    let answered: Set<String> = [
+      QueuedAction.done, QueuedAction.snooze, QueuedAction.skip, QueuedAction.tomorrow,
+    ]
+    let gone = Set(queued.filter { answered.contains($0.kind) }.map { $0.key })
+    return headsUps.filter { !gone.contains($0.key) }
+  }
+
   /// The Nudge with the latest snooze tapped on its notification and not
   /// applied by the app yet.
   static func effective(_ nudge: PlannedNudge, queued: [QueuedAction]) -> PlannedNudge {
@@ -287,10 +306,14 @@ enum AlarmPlan {
   /// and the Changes Nudge `changes` after now, soonest first, at most
   /// `limit` of them. An Occurrence's ring past its Escalation is
   /// `.escalated`; one in its Quiet Hours is `silent`. Rings past the window are handed over by the next plan.
+  /// The `headsUps` (obf-1046) after now join them, each once, at most
+  /// `headsUpShare` of them: a ring comes first at the same moment, and a
+  /// Heads-up only ever takes the place of the latest rings.
   static func window(
     alarms: [PlannedAlarm],
     nudge: PlannedNudge?,
     changes: PlannedNudge?,
+    headsUps: [PlannedAlarm] = [],
     zone: TimeZone,
     now: Int64,
     limit: Int = windowSize
@@ -320,7 +343,22 @@ enum AlarmPlan {
     let sorted = rings.enumerated().sorted { a, b in
       a.element.at != b.element.at ? a.element.at < b.element.at : a.offset < b.offset
     }
-    return sorted.prefix(limit).map { $0.element }
+    let kept = sorted.prefix(limit).map { $0.element }
+    let coming: [(at: Int64, headsUp: PlannedAlarm)] = headsUps
+      .map { headsUp in (at: instantOf(headsUp, zone: zone), headsUp: headsUp) }
+      .filter { $0.at > now }
+      .sorted { a, b in a.at != b.at ? a.at < b.at : a.headsUp.id < b.headsUp.id }
+    let warned: [Ring] = coming.prefix(min(headsUpShare, limit)).map { one in
+      Ring(
+        at: one.at, kind: .headsUp, alarm: one.headsUp,
+        silent: silent(one.headsUp, zone: zone, now: one.at))
+    }
+    if warned.isEmpty { return kept }
+    // The rings before the Heads-ups, so a ring wins at the same moment.
+    let merged = (kept + warned).enumerated().sorted { a, b in
+      a.element.at != b.element.at ? a.element.at < b.element.at : a.offset < b.offset
+    }
+    return merged.prefix(limit).map { $0.element }
   }
 
   /// The notification request of `ring`: one per ring, so each Re-nag is
@@ -330,6 +368,7 @@ enum AlarmPlan {
     case .alarm, .escalated: return "obf.alarm.\(ring.alarm?.key ?? "").\(ring.at)"
     case .nudge: return "obf.nudge.\(ring.at)"
     case .changes: return "obf.changes.\(ring.at)"
+    case .headsUp: return "obf.headsUp.\(ring.alarm?.key ?? "").\(ring.at)"
     }
   }
 

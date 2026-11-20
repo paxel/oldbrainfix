@@ -7711,21 +7711,22 @@ impl App {
             Action::OpenRoutine(id) => {
                 self.save_text()?;
                 let routines = Routines::new(&self.store);
-                // What only a Manager may change shows its Note instead.
-                if !self.store.may_change_routine(&id)? {
-                    if let Some(routine) = routines.by_id(&id)? {
-                        self.editor = None;
-                        self.selected_note = Some(routine.note_id);
-                    }
-                    return Ok(());
-                }
                 if let Some(routine) = routines.by_id(&id)? {
                     let note = routines.note(&routine)?;
                     let today = Day::today(self.store.now(), &*self.wall);
                     let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                    let heads_ups = routines.heads_ups(&id)?;
                     // A Routine of a Session Note only schedules it: the
                     // setup lies on the Note, on its page (#191).
-                    self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
+                    let editor = RoutineEditor::edit(&routine, note, today, renag)
+                        .with_heads_ups(&heads_ups);
+                    // What only a Manager may change is shown as it is,
+                    // the person's own Heads-ups editable (obf-1046).
+                    self.editor = Some(if self.store.may_change_routine(&id)? {
+                        editor
+                    } else {
+                        editor.heads_ups_only()
+                    });
                     self.tally_form = None;
                 }
             }

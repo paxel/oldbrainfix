@@ -386,11 +386,12 @@ class AlarmSync extends ChangeNotifier {
       _escalating = plan.escalating;
       notifyListeners();
     }
-    final AlarmPlanRead(:armed, :done, :nudge, :changes) = plan;
+    final AlarmPlanRead(:armed, :headsUps, :done, :nudge, :changes) = plan;
     final sound = store.alarmSound;
     final signature = [
       'sound $sound',
       for (final a in armed) '${a.alarm}|${a.title}|${a.body}',
+      for (final h in headsUps) '${h.headsUp}|${h.title}|${h.body}',
       for (final (routine, occurrence) in done) 'done $routine@$occurrence',
       if (nudge != null) '${nudge.nudge}|${nudge.title}|${nudge.body}',
       if (changes != null)
@@ -420,9 +421,11 @@ class AlarmSync extends ChangeNotifier {
         ringChannel: t.ringChannel,
         escalatedChannel: t.escalatedChannel,
         quietChannel: t.quietChannel,
+        headsUpChannel: t.headsUpChannel,
         nudgeChannel: t.nudgeChannel,
       ),
       done: done,
+      headsUps: headsUps,
       nudge: nudge,
       changes: changes,
       sound: sound,

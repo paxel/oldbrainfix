@@ -975,6 +975,92 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quietChannel => 'Routines and Reminders in the Quiet Hours';
 
   @override
+  String get headsUpChannel => 'Heads-ups';
+
+  @override
+  String get headsUpsHeading => 'Heads-ups';
+
+  @override
+  String get addHeadsUp => 'Add heads-up';
+
+  @override
+  String get removeHeadsUp => 'Remove heads-up';
+
+  @override
+  String headsUpMinutesBefore(int minutes) {
+    return '$minutes min before';
+  }
+
+  @override
+  String headsUpHoursBefore(int hours) {
+    return '$hours h before';
+  }
+
+  @override
+  String headsUpHoursMinutesBefore(int hours, int minutes) {
+    return '$hours h $minutes min before';
+  }
+
+  @override
+  String headsUpDaysBefore(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days before',
+      one: '1 day before',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpWeeksBefore(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks weeks before',
+      one: '1 week before',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpInMinutes(int minutes) {
+    return 'in $minutes min';
+  }
+
+  @override
+  String headsUpInHours(int hours) {
+    return 'in $hours h';
+  }
+
+  @override
+  String headsUpInHoursMinutes(int hours, int minutes) {
+    return 'in $hours h $minutes min';
+  }
+
+  @override
+  String headsUpInDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'in $days days',
+      one: 'in 1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpInWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'in $weeks weeks',
+      one: 'in 1 week',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get escalationHeading => 'Escalation';
 
   @override

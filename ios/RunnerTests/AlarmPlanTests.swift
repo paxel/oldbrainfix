@@ -280,6 +280,75 @@ class AlarmPlanTests: XCTestCase {
     XCTAssertFalse(AlarmPlan.silent(pills, zone: berlin, now: eight + 30 * minute))
   }
 
+  /// A Heads-up of `minutes` before `routine`'s 08:00 Occurrence, firing
+  /// at `local` (obf-1046).
+  private func headsUp(_ routine: String, minutes: Int, at local: [Int]) -> PlannedAlarm {
+    PlannedAlarm(
+      id: "headsUp:\(minutes):\(routine)@2026-10-24T08:00", routine: routine,
+      occurrence: "2026-10-24T08:00", local: local, at: nil, title: routine,
+      body: "in \(minutes) min")
+  }
+
+  func testAHeadsUpRingsOnceAsAPlainNotification() {
+    let soon = headsUp("pills", minutes: 20, at: [2026, 10, 24, 7, 40])
+    let rings = AlarmPlan.window(
+      alarms: [alarm("pills")], nudge: nil, changes: nil, headsUps: [soon], zone: berlin,
+      now: eight - 60 * minute)
+    XCTAssertEqual(rings.map { $0.kind }, [.headsUp, .alarm])
+    XCTAssertEqual(rings.first?.at, eight - 20 * minute)
+    XCTAssertEqual(rings.first?.alarm?.key, "pills@2026-10-24T08:00")
+    XCTAssertEqual(
+      AlarmPlan.requestId(rings[0]), "obf.headsUp.pills@2026-10-24T08:00.\(eight - 20 * minute)")
+    // Past, it is gone.
+    XCTAssertEqual(
+      AlarmPlan.window(
+        alarms: [], nudge: nil, changes: nil, headsUps: [soon], zone: berlin,
+        now: eight - 10 * minute
+      ).count, 0)
+  }
+
+  func testHeadsUpsNeverCrowdOutTheRings() {
+    // 120 rings, more than the window holds, and 30 Heads-ups among them.
+    let pills = alarm("pills", renag: 5, end: [2026, 10, 24, 18, 0])
+    let warnings = (0..<30).map { n in
+      headsUp("water\(n)", minutes: 20, at: [2026, 10, 24, 8, n])
+    }
+    let rings = AlarmPlan.window(
+      alarms: [pills], nudge: nil, changes: nil, headsUps: warnings, zone: berlin,
+      now: eight - minute)
+    XCTAssertEqual(rings.count, AlarmPlan.windowSize)
+    XCTAssertEqual(rings.filter { $0.kind == .headsUp }.count, AlarmPlan.headsUpShare)
+    XCTAssertEqual(rings.map { $0.at }, rings.map { $0.at }.sorted())
+    // A ring first at the same moment: 08:00 and 08:05 have both.
+    XCTAssertEqual(rings.first?.kind, .alarm)
+    XCTAssertEqual(rings.filter { $0.kind != .headsUp }.count, AlarmPlan.windowSize - AlarmPlan.headsUpShare)
+  }
+
+  func testATapOnAnOccurrenceDropsItsHeadsUps() {
+    let soon = headsUp("pills", minutes: 20, at: [2026, 10, 24, 7, 40])
+    let other = headsUp("water", minutes: 20, at: [2026, 10, 24, 7, 40])
+    for kind in [QueuedAction.done, QueuedAction.snooze, QueuedAction.skip, QueuedAction.tomorrow] {
+      let tap = QueuedAction(
+        seq: 1, kind: kind, routine: "pills", occurrence: "2026-10-24T08:00", at: 0,
+        until: eight, title: "pills", body: "08:00")
+      XCTAssertEqual(AlarmPlan.headsUpsLeft([soon, other], queued: [tap]), [other], kind)
+    }
+  }
+
+  func testAHeadsUpInTheQuietHoursIsSilentAndATapOpensItsNote() {
+    var soon = headsUp("pills", minutes: 20, at: [2026, 10, 24, 7, 40])
+    soon.quiet = [7, 0, 7, 50]
+    let rings = AlarmPlan.window(
+      alarms: [], nudge: nil, changes: nil, headsUps: [soon], zone: berlin, now: eight - 60 * minute)
+    XCTAssertEqual(rings.map { $0.silent }, [true])
+    XCTAssertEqual(
+      NotificationAnswer.of(
+        category: NotificationAnswer.headsUpCategory, action: NotificationAnswer.defaultAction),
+      .openOccurrence)
+    XCTAssertEqual(
+      NotificationAnswer.of(category: NotificationAnswer.headsUpCategory, action: "obf.done"), .open)
+  }
+
   func testTheAlarmKitUsageTextIsThere() {
     let text = Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") as? String
     XCTAssertFalse((text ?? "").isEmpty)

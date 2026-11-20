@@ -351,6 +351,8 @@
   "@aiFieldKind": {"description": "On the review page: whether a Note is a Checklist, a Shopping List or a plain Note."},
   "aiPlainNote": "Plain Note",
   "@aiPlainNote": {"description": "On the review page: a value meaning the Note is neither a Checklist nor a Shopping List."},
+  "aiFieldHeadsUps": "Heads-ups",
+  "@aiFieldHeadsUps": {"description": "On the review page: the user's own Heads-ups of a Routine, minutes before its start."},
   "aiFieldLine": "Line",
   "@aiFieldLine": {"description": "On the review page: the text of a Line of a Checklist or Shopping List."},
   "aiFieldLineOrder": "Place in the list",

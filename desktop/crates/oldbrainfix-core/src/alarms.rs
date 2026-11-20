@@ -4,10 +4,10 @@
 //! Summary; and this Device's snoozes and "seen" mark in its local
 //! settings, never synced (ADR 0008).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
-use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Timelike, Utc};
 
 use crate::entry::{dart_iso, parse_time};
 use crate::notes::{Note, Notes, Wordless};
@@ -354,6 +354,201 @@ pub fn alarm_plan(
     alarms
 }
 
+/// One Heads-up that should exist (obf-1046): a single notification
+/// `minutes` before `occurrence` of the Routine `routine_id` starts, at
+/// `at`, with no Re-nag and nothing to check off. A Heads-up in `quiet`
+/// shows without sound ([`PlannedHeadsUp::silent_at`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedHeadsUp {
+    pub routine_id: String,
+    pub occurrence: Occurrence,
+    /// How long before the Occurrence's start it warns, in minutes.
+    pub minutes: i64,
+    /// When it fires.
+    pub at: DateTime<Utc>,
+    /// The wall-clock moment it fires at, so the platform re-arms it at
+    /// the same local time after a time-zone change.
+    pub wall: WallMoment,
+    /// When the Occurrence starts on the wall clock ([`start_of`]).
+    pub start: WallMoment,
+    /// This Device's Quiet Hours when they are on; `None` when they are
+    /// off. A Heads-up never escalates, so its Routine's Escalation
+    /// changes nothing.
+    pub quiet: Option<QuietHours>,
+    /// The text of the Note the Routine links back to as it reads without
+    /// its marks ([`Note::visible_text`]); `None` when gone.
+    pub text: Option<String>,
+    /// What that Note is titled as while `text` is blank
+    /// ([`Note::wordless`]).
+    pub wordless: Wordless,
+    /// The name of the file it goes by as [`Wordless::File`]
+    /// ([`Note::wordless_name`]); empty otherwise.
+    pub wordless_name: String,
+}
+
+impl PlannedHeadsUp {
+    /// Names the Heads-up for good: one per offset and Occurrence.
+    pub fn id(&self) -> String {
+        format!(
+            "headsUp:{}:{}",
+            self.minutes,
+            snooze_key(&self.routine_id, &self.occurrence)
+        )
+    }
+
+    /// Whether it fires without sound or vibration: `at` lies in `quiet`
+    /// on `wall`.
+    pub fn silent_at(&self, wall: &WallClock) -> bool {
+        self.quiet.is_some_and(|q| q.holds(self.at, wall))
+    }
+}
+
+impl fmt::Display for PlannedHeadsUp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} at {}", self.id(), dart_iso(self.at))?;
+        if let Some(quiet) = self.quiet {
+            write!(f, " silent in {quiet}")?;
+        }
+        Ok(())
+    }
+}
+
+/// When something placed in time fires, as an instant and on the wall.
+type Firing = (DateTime<Utc>, WallMoment);
+
+/// `minutes` before `day` at `time` on the calendar, daylight saving left
+/// out, so a day before 10:00 is 10:00 the day before, placed on `wall`.
+fn timed_before(day: Day, time: ClockTime, minutes: i64, wall: &WallClock) -> Firing {
+    let shifted = (utc_at(day, time) - Duration::minutes(minutes)).naive_utc();
+    let moment = WallMoment {
+        day: Day::of(shifted),
+        time: ClockTime {
+            hour: shifted.hour(),
+            minute: shifted.minute(),
+        },
+    };
+    (instant_of(moment.day, moment.time, wall), moment)
+}
+
+/// When something all-day rings on `day`: at `all_day_from`, or once
+/// `quiet` ends when they hold that time, as the first ring of an all-day
+/// Occurrence in [`alarm_plan`] (#201). The Heads-ups of an all-day
+/// Occurrence ring so on their day (obf-1046).
+fn all_day_ring(
+    day: Day,
+    all_day_from: ClockTime,
+    quiet: Option<QuietHours>,
+    wall: &WallClock,
+) -> Firing {
+    let at = instant_of(day, all_day_from, wall);
+    if let Some(quiet) = quiet {
+        let deferred = quiet.defer(at, wall);
+        if deferred != at {
+            let moment = WallMoment {
+                day: Day::of(wall(deferred)),
+                time: quiet.end,
+            };
+            return (deferred, moment);
+        }
+    }
+    (
+        at,
+        WallMoment {
+            day,
+            time: all_day_from,
+        },
+    )
+}
+
+/// The Heads-ups that should exist at `now` (obf-1046): for each Routine
+/// its offsets ([`Routines::heads_ups`]) before each Occurrence the alarm
+/// plan looks at that is neither Done nor skipped nor snoozed, so Done,
+/// Skip or a snooze before a Heads-up cancels it. A timed Occurrence's
+/// Heads-up is its wall-clock start that many minutes earlier on the
+/// calendar; an all-day one takes whole days only, rung on that day as
+/// its all-day ring would ring (`all_day_from`, or once `quiet` ends).
+/// Each lies after `now` and before its Occurrence rings; at most
+/// [`ALARMS_PER_ROUTINE`] per Routine, the soonest first and at most
+/// [`ALARM_LIMIT`]. In `quiet` they show without sound, whether the
+/// Routine escalates or not.
+pub fn heads_up_plan(
+    routines: &[(Routine, Option<Note>, Vec<i64>)],
+    snoozes: &BTreeMap<String, DateTime<Utc>>,
+    now: DateTime<Utc>,
+    wall: &WallClock,
+    all_day_from: ClockTime,
+    quiet: Option<QuietHours>,
+) -> Vec<PlannedHeadsUp> {
+    let today = Day::today(now, wall);
+    let mut heads_ups = Vec::new();
+    for (routine, note, minutes) in routines {
+        if minutes.is_empty() {
+            continue;
+        }
+        let mut planned = 0;
+        let placed = timed(
+            routine,
+            today.add_days(-ALARM_HORIZON_DAYS),
+            today.add_days(ALARM_HORIZON_DAYS),
+            wall,
+            all_day_from,
+        );
+        'occurrences: for t in placed {
+            if planned >= ALARMS_PER_ROUTINE {
+                break;
+            }
+            let occurrence = t.occurrence;
+            if routine.done_at(&occurrence).is_some()
+                || routine.skipped_at(&occurrence).is_some()
+                || snoozes.contains_key(&snooze_key(&routine.id, &occurrence))
+            {
+                continue;
+            }
+            let rings = match occurrence.time {
+                Some(_) => t.start,
+                None => all_day_ring(occurrence.day, all_day_from, quiet, wall).0,
+            };
+            for &offset in minutes {
+                if planned >= ALARMS_PER_ROUTINE {
+                    break 'occurrences;
+                }
+                // An all-day one takes whole days only.
+                if occurrence.time.is_none() && offset % 1440 != 0 {
+                    continue;
+                }
+                let (at, moment) = match occurrence.time {
+                    Some(time) => timed_before(occurrence.day, time, offset, wall),
+                    None => all_day_ring(
+                        occurrence.day.add_days(-(offset / 1440)),
+                        all_day_from,
+                        quiet,
+                        wall,
+                    ),
+                };
+                if at <= now || at >= rings {
+                    continue;
+                }
+                heads_ups.push(PlannedHeadsUp {
+                    routine_id: routine.id.clone(),
+                    occurrence,
+                    minutes: offset,
+                    at,
+                    wall: moment,
+                    start: start_of(&occurrence, all_day_from),
+                    quiet,
+                    text: note.as_ref().map(Note::visible_text),
+                    wordless: note.as_ref().map(Note::wordless).unwrap_or_default(),
+                    wordless_name: note.as_ref().map(Note::wordless_name).unwrap_or_default(),
+                });
+                planned += 1;
+            }
+        }
+    }
+    heads_ups.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| utf16_cmp(&a.id(), &b.id())));
+    heads_ups.truncate(ALARM_LIMIT);
+    heads_ups
+}
+
 /// One Missed Occurrence and when it became Missed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MissedOccurrence {
@@ -552,6 +747,37 @@ impl<'a> Alarms<'a> {
             self.store.now(),
             wall,
             settings.renag_interval()?,
+            settings.all_day_from()?,
+            quiet,
+        ))
+    }
+
+    /// The Heads-ups at the store's now, on `wall` (obf-1046): of each
+    /// Routine the offsets the user's own Devices set
+    /// ([`Routines::heads_ups`]), with this Device's snoozes, all-day time
+    /// and Quiet Hours; from the log alone, as [`Alarms::plan`].
+    pub fn heads_ups(&self, wall: &WallClock) -> Result<Vec<PlannedHeadsUp>> {
+        let routines = self.store.log_only(|| -> Result<Vec<_>> {
+            let read = Routines::new(self.store);
+            let mut own = HashMap::new();
+            let mut out = Vec::new();
+            for (routine, note) in read.all_with_notes()? {
+                let minutes = read.heads_ups_by_own(&routine.id, &mut own)?;
+                out.push((routine, note, minutes));
+            }
+            Ok(out)
+        })?;
+        let settings = DeviceSettings::new(self.store);
+        let quiet = if settings.quiet_hours_on()? {
+            Some(settings.quiet_hours()?)
+        } else {
+            None
+        };
+        Ok(heads_up_plan(
+            &routines,
+            &self.snoozes()?,
+            self.store.now(),
+            wall,
             settings.all_day_from()?,
             quiet,
         ))

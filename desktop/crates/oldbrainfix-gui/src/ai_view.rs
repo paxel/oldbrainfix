@@ -15,7 +15,7 @@ use oldbrainfix_core::checklists::{keys as line_keys, parse_list_kind};
 use oldbrainfix_core::frogs::keys as frog_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
-use oldbrainfix_core::routines::keys as routine_keys;
+use oldbrainfix_core::routines::{heads_up_keys, keys as routine_keys};
 use oldbrainfix_core::sessions::keys as session_keys;
 use oldbrainfix_core::shopping_lists::{Reappear, keys as shopping_keys};
 use oldbrainfix_core::tallies::keys as tally_keys;
@@ -421,6 +421,9 @@ fn change_line(
         (_, routine_keys::NOTE) => t.note_title(),
         (routine_keys::TYPE_ROUTINE, routine_keys::RENAG) => t.renag_heading(),
         (routine_keys::TYPE_ROUTINE, routine_keys::ESCALATION) => t.escalation_heading(),
+        // The user's own Heads-ups of a Routine (obf-1046), on the entity
+        // `headsups:<routine id>`, as stored: minutes joined by commas.
+        (_, heads_up_keys::HEADS_UPS) => t.ai_field_heads_ups(),
         (place_keys::TYPE_AREA, place_keys::NAME) => t.conflict_area_name(),
         (place_keys::TYPE_TOPIC, place_keys::NAME) => t.conflict_topic_name(),
         (place_keys::TYPE_AREA, place_keys::COLOUR) => t.colour_heading(),

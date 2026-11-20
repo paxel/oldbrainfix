@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [0.7.0]
 
+### Added
+
+- Heads-ups: a Routine or Reminder can warn ahead of its Occurrence, such as "Dentist in 20 min", with as many as wanted, set in its editor, whole days only for an all-day one, on Android, the iPhone and the desktop. A heads-up is one notification without Re-nag, silent in Quiet Hours; Done, Skip or Snooze before it cancels it, and the Occurrence still rings at its time. In a Shared Area each person sets their own for a shared Routine, kept on their own Devices only. ([obf-1046](https://github.com/paxel/oldbrainfix/issues/356))
+
 ### Changed
 
 - On the phone the search field of the Areas list, an Area and a Topic sits on a band that shares a colour set off from the page with the top bar, with a line under it, so the cards go under it when they scroll or the list is pulled down. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))

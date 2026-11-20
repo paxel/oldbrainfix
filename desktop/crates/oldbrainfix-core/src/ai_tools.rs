@@ -427,6 +427,13 @@ pub fn tools() -> Vec<Value> {
             &["id", "after"],
         ),
         tool(
+            "set_heads_ups",
+            "Sets the user's own Heads-ups of a Routine or Reminder, on their own Devices only: one notification each, so many minutes before an Occurrence starts, from 1 to 43200; an empty list clears them. An all-day Occurrence takes whole days only (multiples of 1440). Done, Skip or a snooze before a Heads-up cancels it.",
+            false,
+            json!({"id": id("Routine"), "minutes": {"items": {"type": "integer"}, "type": "array"}}),
+            &["id", "minutes"],
+        ),
+        tool(
             "trash_routine",
             "Moves a Routine or Reminder to the trash; its Note stays.",
             false,
@@ -1343,6 +1350,11 @@ impl Store {
     /// pool, count and picking rule.
     fn routine_value(&self, routine: &Routine) -> Result<Value> {
         let mut out = routine_json(routine);
+        // The user's own Heads-ups (obf-1046), as they ring here.
+        let heads_ups = Routines::new(self).heads_ups(&routine.id)?;
+        if let Some(all) = out.as_object_mut() {
+            all.insert("headsUpMinutes".into(), json!(heads_ups));
+        }
         if let (Some(session), Some(all)) =
             (Sessions::new(self).by_id(&routine.id)?, out.as_object_mut())
         {
@@ -2221,6 +2233,20 @@ impl Store {
             }
             "set_escalation" => {
                 routines.set_escalation(id()?, optional_number(args, "after")?)?;
+                id()?.to_string()
+            }
+            "set_heads_ups" => {
+                let minutes = args
+                    .get("minutes")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| Error::Invalid("minutes needs a list".into()))?
+                    .iter()
+                    .map(|m| {
+                        m.as_i64()
+                            .ok_or_else(|| Error::Invalid(format!("not a number of minutes: {m}")))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                routines.set_heads_ups(id()?, &minutes)?;
                 id()?.to_string()
             }
             "trash_routine" => {

@@ -144,7 +144,7 @@ Die Erinnerung, dass unsortierte Notizen warten. Ihre Zeit wird beim Erfassen ge
 _Avoid_: Erinnerung (das ist etwas anderes), Nörgeln (das ist Erneut erinnern)
 
 **Ruhezeit** [Quiet Hours]:
-Ein tägliches Zeitfenster, in dem Stupser warten und Routinen und Erinnerungen ohne Ton und Vibration erscheinen, auch wenn sie erneut erinnern, außer die Routine hat Eskalation an. Das erste Klingeln einer ganztägigen Fälligkeit wartet, bis das Zeitfenster endet.
+Ein tägliches Zeitfenster, in dem Stupser warten und Routinen und Erinnerungen ohne Ton und Vibration erscheinen, auch wenn sie erneut erinnern, außer die Routine hat Eskalation an. Das erste Klingeln einer ganztägigen Fälligkeit wartet, bis das Zeitfenster endet. Eine Vorwarnung im Zeitfenster erscheint ebenfalls ohne Ton.
 
 **Startauswahl** [Starter Set]:
 Die Bereiche und Themen, die beim ersten Start angeboten werden; du wählst, welche du behältst.
@@ -190,6 +190,10 @@ _Avoid_: Verwerfen, Abbrechen, Verpasst
 **Erneut erinnern** [Re-nag]:
 Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledigt ist, verschoben oder ausgelassen wird oder die nächste Fälligkeit beginnt.
 _Avoid_: Wiederholen, Erinnerung
+
+**Vorwarnung** [Heads-up]:
+Eine Benachrichtigung vor einer Fälligkeit, etwa „Zahnarzt in 20 Min.“ um 9:40 für 10:00, damit Zeit bleibt, loszugehen: ohne erneutes Erinnern, ohne etwas abzuhaken, und die Fälligkeit klingelt weiter zu ihrer Zeit. Eine Routine oder Erinnerung hat beliebig viele, jede ein Abstand vor ihrem Beginn, etwa „1 Tag vorher“ und „20 Min. vorher“; eine ganztägige nur ganze Tage, an dem Tag zu der Zeit, zu der ihr ganztägiges Klingeln klingeln würde. Erledigt, Auslassen oder „Später“ an der Fälligkeit vor einer Vorwarnung hebt sie auf. Sie gehören dir, auf deinen eigenen Geräten wie eine eigene Anzeige, sodass in einem geteilten Bereich jede Person ihre eigenen für eine geteilte Routine einstellt, niemand sonst sie bekommt und ein Mitglied dafür die Routine nicht ändern dürfen muss.
+_Avoid_: Erinnerung (das ist eine Routine, die einmal stattfindet), Voralarm, Stupser
 
 **Eskalation** [Escalation]:
 Ein Schritt, den du einschalten kannst: eine Fälligkeit, die mehrmals unbeachtet wieder geklingelt hat, wird zu einem Vollbild-Alarm mit Ton. Den Vollbild-Alarm gibt es nur auf dem Telefon; auf dem Desktop wird die Benachrichtigung dringend, mit dem Alarmton des Systems.

@@ -27,7 +27,7 @@ use crate::frogs::keys as frog_keys;
 use crate::notes::keys as note_keys;
 use crate::pending::{GiveWay, PendingDraft};
 use crate::places::keys as place_keys;
-use crate::routines::keys as routine_keys;
+use crate::routines::{Routines, heads_up_keys, keys as routine_keys};
 use crate::sessions::{Sessions, keys as session_keys};
 use crate::shopping_lists::{ShoppingLists, keys as shopping_keys};
 use crate::store::Store;
@@ -39,11 +39,12 @@ pub const AI_TASK_KIND: &str = "ai-task";
 
 /// The fields an AI Task may write, by the type of the entity: what the
 /// user can do with Notes, Areas, Topics, Merges, the trash, Importance,
-/// Routines and Reminders, and the set-up of Tallies, Sessions,
-/// Checklists, Shopping Lists and Frogs (#168). Not a role, a block, an
-/// Override, a Sent Item's link, a Profile, nor a photo or recording; and
-/// none of the user's own data: no check-off, Tally entry, tick of a Line
-/// or Box, Session pick nor eaten Frog.
+/// Routines and Reminders with the user's own Heads-ups (obf-1046), and
+/// the set-up of Tallies, Sessions, Checklists, Shopping Lists and Frogs
+/// (#168). Not a role, a block, an Override, a Sent Item's link, a
+/// Profile, nor a photo or recording; and none of the user's own data: no
+/// check-off, Tally entry, tick of a Line or Box, Session pick nor eaten
+/// Frog.
 const NOTE_FIELDS: [&str; 15] = [
     note_keys::TYPE,
     note_keys::CAPTURED,
@@ -116,6 +117,11 @@ const AGENDA_TYPE: &str = "agenda";
 /// Shopping List (#186) or a Checklist without a Routine (#219) shows
 /// there.
 const AGENDA_FIELDS: [&str; 2] = [shopping_keys::AGENDA, line_keys::AGENDA];
+/// The type of the user's own Heads-ups of a Routine, the entity
+/// `headsups:<routine id>` ([`heads_up_keys::PREFIX`], obf-1046).
+const HEADS_UPS_TYPE: &str = "headsups";
+/// The user's own Heads-ups of a Routine: its offsets.
+const HEADS_UPS_FIELDS: [&str; 1] = [heads_up_keys::HEADS_UPS];
 
 /// The fields of a Note's or Section's Capture Context, which an AI Task
 /// only ever removes (ADR 0037): it never says where or when something
@@ -261,6 +267,7 @@ fn kind_of(ty: &str, made: bool, session: bool, field: &str, after: Option<&str>
         "routine" if session => AiChangeKind::Session,
         "routine" => AiChangeKind::Routine,
         line_keys::TYPE_LINE | AGENDA_TYPE => AiChangeKind::List,
+        HEADS_UPS_TYPE => AiChangeKind::Routine,
         frog_keys::TYPE_FROG => AiChangeKind::Frog,
         "area" | "topic" => AiChangeKind::Place,
         _ => AiChangeKind::Other,
@@ -403,6 +410,7 @@ impl Store {
             line_keys::TYPE_LINE => &LINE_FIELDS,
             frog_keys::TYPE_FROG => &FROG_FIELDS,
             AGENDA_TYPE => &AGENDA_FIELDS,
+            HEADS_UPS_TYPE => &HEADS_UPS_FIELDS,
             _ => &[],
         };
         let context = matches!(ty, "note" | "section") && CONTEXT_FIELDS.contains(&field);
@@ -477,6 +485,12 @@ impl Store {
                     _ => ShoppingLists::new(self).making(note)?.is_some(),
                 }
             }
+            // The user's own too (obf-1046): of a Routine it can read,
+            // whatever their role in its Area.
+            HEADS_UPS_TYPE => {
+                let routine = entity.split_once(':').map_or("", |(_, routine)| routine);
+                Routines::new(self).by_id(routine)?.is_some()
+            }
             "area" => made || self.may_manage(Some(entity))?,
             "topic" => {
                 (made || self.may_manage(self.area_of(entity)?.as_deref())?)
@@ -540,6 +554,10 @@ impl Store {
                     self.current(entity, note_keys::NOTE)?
                 }
                 AGENDA_TYPE => entity.split_once(':').map(|(_, note)| note.to_string()),
+                HEADS_UPS_TYPE => match entity.split_once(':') {
+                    Some((_, routine)) => self.current(routine, routine_keys::NOTE)?,
+                    None => None,
+                },
                 _ => None,
             };
             let session = ty == "routine" && Sessions::new(self).is_session(entity)?;

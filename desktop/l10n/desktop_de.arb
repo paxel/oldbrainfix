@@ -199,6 +199,7 @@
   "aiTallyField": "Feld {field}: {part}",
   "aiFieldKind": "Art der Notiz",
   "aiPlainNote": "Einfache Notiz",
+  "aiFieldHeadsUps": "Vorwarnungen",
   "aiFieldLine": "Zeile",
   "aiFieldLineOrder": "Platz in der Liste",
   "aiFieldLineGroup": "Gruppe",
