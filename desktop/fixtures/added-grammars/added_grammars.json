@@ -1,0 +1,351 @@
+{
+  "reads": [
+    {
+      "entries": 0,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown"
+      ],
+      "added": [],
+      "fences": [
+        null,
+        "source.rust",
+        "source.rust",
+        null
+      ]
+    },
+    {
+      "entries": 1,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.cobol"
+      ],
+      "added": [
+        "COBOL"
+      ],
+      "fences": [
+        "source.cobol",
+        "source.cobol",
+        "source.rust",
+        null
+      ]
+    },
+    {
+      "entries": 1,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.cobol"
+      ],
+      "added": [
+        "COBOL"
+      ],
+      "fences": [
+        "source.cobol",
+        "source.cobol",
+        "source.rust",
+        null
+      ]
+    },
+    {
+      "entries": 1,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.cobol"
+      ],
+      "added": [
+        "COBOL"
+      ],
+      "fences": [
+        "source.cobol",
+        "source.cobol",
+        "source.rust",
+        null
+      ]
+    },
+    {
+      "entries": 2,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.cobol"
+      ],
+      "added": [
+        "COBOL",
+        "My Rust"
+      ],
+      "fences": [
+        "source.cobol",
+        "source.cobol",
+        null,
+        null
+      ]
+    },
+    {
+      "entries": 3,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.cobol"
+      ],
+      "added": [
+        "COBOL 85",
+        "My Rust"
+      ],
+      "fences": [
+        "source.cobol",
+        "source.cobol",
+        null,
+        null
+      ]
+    },
+    {
+      "entries": 5,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.cobol",
+        "source.ä",
+        "source.😀"
+      ],
+      "added": [
+        "COBOL 85",
+        "My Rust",
+        "Ä",
+        "ZZ"
+      ],
+      "fences": [
+        "source.cobol",
+        "source.cobol",
+        null,
+        "source.😀"
+      ]
+    },
+    {
+      "entries": 7,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.cobol",
+        "source.ä",
+        "source.😀"
+      ],
+      "added": [
+        "COBOL 85",
+        "My Rust",
+        "Ä",
+        "ZZ"
+      ],
+      "fences": [
+        "source.cobol",
+        "source.cobol",
+        null,
+        "source.😀"
+      ]
+    },
+    {
+      "entries": 8,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.ä",
+        "source.😀"
+      ],
+      "added": [
+        "My Rust",
+        "Ä",
+        "ZZ"
+      ],
+      "fences": [
+        "source.rust",
+        "source.rust",
+        null,
+        "source.😀"
+      ]
+    },
+    {
+      "entries": 8,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.ä",
+        "source.😀"
+      ],
+      "added": [
+        "My Rust",
+        "Ä",
+        "ZZ"
+      ],
+      "fences": [
+        "source.rust",
+        "source.rust",
+        null,
+        "source.😀"
+      ]
+    },
+    {
+      "entries": 9,
+      "all": [
+        "source.shell",
+        "source.python",
+        "source.js",
+        "source.rust",
+        "source.dart",
+        "source.kotlin",
+        "source.java",
+        "source.c++",
+        "source.go",
+        "source.sql",
+        "source.json",
+        "source.yaml",
+        "text.xml",
+        "source.css",
+        "text.html.markdown",
+        "source.ä",
+        "source.😀"
+      ],
+      "added": [
+        "Ä",
+        "ZZ"
+      ],
+      "fences": [
+        "source.ä",
+        "source.ä",
+        "source.rust",
+        "source.😀"
+      ]
+    }
+  ]
+}

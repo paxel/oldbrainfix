@@ -9,9 +9,9 @@ import 'alarms.dart';
 import 'notes.dart';
 import 'schedule.dart';
 
-/// A daily window in which Nudges wait (CONTEXT.md). It runs over
-/// midnight when [start] is later than [end]; with both the same it is
-/// empty.
+/// A daily window in which Nudges wait and alarms keep quiet (CONTEXT.md,
+/// obf-1045). It runs over midnight when [start] is later than [end];
+/// with both the same it is empty.
 class QuietHours {
   final ClockTime start;
   final ClockTime end;
@@ -22,6 +22,14 @@ class QuietHours {
   bool contains(ClockTime time) {
     final (s, e, t) = (_minutes(start), _minutes(end), _minutes(time));
     return s <= e ? s <= t && t < e : t >= s || t < e;
+  }
+
+  /// Whether [instant] lies in the window on [wallClock]: an alarm firing
+  /// then shows without sound (obf-1045), and so does whatever else is to
+  /// keep quiet in it.
+  bool holds(DateTime instant, WallClock wallClock) {
+    final wall = wallClock(instant.toUtc());
+    return contains(ClockTime(wall.hour, wall.minute));
   }
 
   /// When a Nudge due at [instant] fires: at [instant], or at the end of
@@ -187,7 +195,9 @@ DateTime? _nextFiring(
 /// The Nudge at [now] over the [unsorted] Notes, null when there are
 /// none. It repeats every [repeat] while ignored and waits out [quiet]
 /// (null when Quiet Hours are off); [snooze] is this Device's latest
-/// (ADR 0008).
+/// (ADR 0008). On a quiet day it waits until [quietUntil], the end of
+/// the quiet stretch [now] lies in (obf-1044): no own time and no snooze
+/// comes before it.
 PlannedNudge? nudgePlan({
   required List<Note> unsorted,
   required NudgeSnooze? snooze,
@@ -195,6 +205,7 @@ PlannedNudge? nudgePlan({
   required WallClock wallClock,
   required Duration repeat,
   QuietHours? quiet,
+  DateTime? quietUntil,
 }) {
   if (unsorted.isEmpty) return null;
   if (repeat.inMinutes < 1) {
@@ -204,11 +215,17 @@ PlannedNudge? nudgePlan({
     ..sort((a, b) => a.captured.compareTo(b.captured));
   final anchors = [
     for (final note in notes)
-      (due: note.nudgeAt.toUtc(), captured: note.captured.toUtc()),
+      (
+        due: _waitedOut(note.nudgeAt.toUtc(), quietUntil),
+        captured: note.captured.toUtc(),
+      ),
   ];
   final snoozed = snooze == null
       ? null
-      : (at: snooze.at.toUtc(), until: snooze.until.toUtc());
+      : (
+          at: snooze.at.toUtc(),
+          until: _waitedOut(snooze.until.toUtc(), quietUntil),
+        );
   final (:last, :next) = _firings(
     anchors,
     snoozed,
@@ -227,6 +244,12 @@ PlannedNudge? nudgePlan({
     since: last,
     at: next,
   );
+}
+
+/// [at], or [quietUntil] when that is later (obf-1044).
+DateTime _waitedOut(DateTime at, DateTime? quietUntil) {
+  final until = quietUntil?.toUtc();
+  return until != null && at.isBefore(until) ? until : at;
 }
 
 /// How long after the first change a person lacks the Changes Nudge
@@ -297,13 +320,15 @@ class PlannedChangesNudge {
 /// The Changes Nudge at [now] for the people [waiting], by Profile id
 /// with the time of the first change each lacks; null when nobody
 /// waits. It repeats every [repeat] while they wait and waits out
-/// [quiet] (null when Quiet Hours are off).
+/// [quiet] (null when Quiet Hours are off). On a quiet day it waits until
+/// [quietUntil], the end of the quiet stretch [now] lies in (obf-1044).
 PlannedChangesNudge? changesNudgePlan({
   required Map<String, DateTime> waiting,
   required DateTime now,
   required WallClock wallClock,
   required Duration repeat,
   QuietHours? quiet,
+  DateTime? quietUntil,
 }) {
   if (waiting.isEmpty) return null;
   if (repeat.inMinutes < 1) {
@@ -320,7 +345,10 @@ PlannedChangesNudge? changesNudgePlan({
   final people = [for (final (person, _) in firsts) person];
   final anchors = [
     for (final (_, first) in firsts)
-      (due: first.add(changesNudgeDelay), captured: first),
+      (
+        due: _waitedOut(first.add(changesNudgeDelay), quietUntil),
+        captured: first,
+      ),
   ];
   final (:last, :next) = _firings(
     anchors,

@@ -127,7 +127,7 @@ void main() {
     expect(find.text('1 KB'), findsOneWidget);
     // The copies on this Device go once attached.
     expect(dir.listSync().whereType<File>(), isEmpty);
-    await tap(tester, find.text('Save'));
+    await saveCapture(tester);
     await settle(tester);
 
     final read = notes.byId(note.id)!;

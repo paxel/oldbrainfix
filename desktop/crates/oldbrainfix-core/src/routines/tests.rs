@@ -599,3 +599,61 @@ fn by_name_lowers_as_dart_does_and_compares_utf16() {
         ]
     );
 }
+
+#[test]
+fn heads_ups_are_each_persons_own() -> crate::checklists::tests::TestResult {
+    use crate::checklists::tests::{exchange, invite};
+    use crate::signing::{ImportReport, SigningKey};
+    let device = |seed: u8, name: &str| -> std::result::Result<Store, Box<dyn std::error::Error>> {
+        let store = Store::in_memory(crate::store::tests::ticking(), move || {
+            Ok(SigningKey::from_seed([seed; 32]))
+        })?;
+        crate::OwnProfile::new(&store).apply_defaults(name, None)?;
+        Ok(store)
+    };
+    let ann = device(1, "Ann")?;
+    let ben = device(2, "Ben")?;
+    let house = crate::Places::new(&ann).add_area("Household")?;
+    let area = ann.share(&house.id)?;
+    invite(&ann, &ben, &area)?;
+    let note = Notes::new(&ann).capture("Dentist", Some(&area), None)?;
+    let id = Routines::new(&ann).spawn(&note.id, &daily_at_eight())?.id;
+    exchange(&ben, &ann)?;
+    let kept = |store: &Store| -> Result<usize> {
+        Ok(store
+            .all_entries()?
+            .iter()
+            .filter(|e| e.entity.starts_with(heads_up_keys::PREFIX))
+            .count())
+    };
+    let utc = |t: DateTime<Utc>| t.naive_utc();
+    // A Member sets their own, without the right to change the Routine.
+    assert!(!ben.may_change_routine(&id)?);
+    Routines::new(&ben).set_heads_ups(&id, &[20])?;
+    assert_eq!(Routines::new(&ben).heads_ups(&id)?, [20]);
+    assert!(!crate::Alarms::new(&ben).heads_ups(&utc)?.is_empty());
+    exchange(&ben, &ann)?;
+    exchange(&ann, &ben)?;
+    assert_eq!(kept(&ann)?, 0, "nobody else gets them");
+    // As a modified app would: Ben slips Heads-ups into Ann's log.
+    let forged = ben.append(
+        &heads_up_keys::of(&id),
+        heads_up_keys::HEADS_UPS,
+        Some("20"),
+        None,
+    )?;
+    ann.apply_entries(
+        &[forged.wire()],
+        &[],
+        Some(&ben.device_id()?),
+        &mut ImportReport::default(),
+    )?;
+    assert_eq!(kept(&ann)?, 1);
+    assert!(Routines::new(&ann).heads_ups(&id)?.is_empty());
+    assert!(crate::Alarms::new(&ann).heads_ups(&utc)?.is_empty());
+    // Nor does it stop her setting her own.
+    Routines::new(&ann).set_heads_ups(&id, &[20])?;
+    assert_eq!(Routines::new(&ann).heads_ups(&id)?, [20]);
+    assert!(!crate::Alarms::new(&ann).heads_ups(&utc)?.is_empty());
+    Ok(())
+}

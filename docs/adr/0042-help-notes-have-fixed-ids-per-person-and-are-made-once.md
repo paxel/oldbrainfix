@@ -59,6 +59,10 @@ A Quick start already made stays as it was: it is made once per person (above), 
 
 The Quick start and What the icons mean are written as formatted texts from 0.5.0, so their app links open (ADR 0046): the Quick start's Description begins with a numbered link to each step's place, before the desktop's way, and What the icons mean ends with a link to the user guide. A Quick start or What the icons mean made before stays as it was, plain and without links, as above.
 
+## Amendment: Spotlights in place of the first two (obf-1043, #353, C3b (a))
+
+From 0.7.0 the Quick start and What the icons mean are no longer made, neither on a fresh start nor on an update: Spotlights explain each screen instead (ADR 0055). What's new in X.Y.Z is made as above. Those already made stay as the user has them, with their ids, the Quick start's Agenda row and their links. The sections above on their words, pictures and links describe the Notes made up to 0.6.1.
+
 ## Considered
 
 - Ids by version only, as the Starter Set's (rejected: a help Note filed into a Shared Area would mix with another person's).

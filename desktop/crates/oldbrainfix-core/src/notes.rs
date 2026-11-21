@@ -32,6 +32,9 @@ pub mod keys {
     pub const PLACE: &str = "place";
     /// The Note's Importance by name; absent means normal.
     pub const IMPORTANCE: &str = "importance";
+    /// The language of its Code text (obf-1036): the scope of its
+    /// grammar, `source.rust`; absent or empty when it has none.
+    pub const LANGUAGE: &str = "language";
     /// When the Note was moved to the trash; absent while it is not there.
     pub const TRASHED: &str = "trashed";
     /// The Note this one was merged into; absent while it stands alone,
@@ -302,6 +305,9 @@ pub struct Note {
     /// Whether this version may change `text`: never one in a format it
     /// does not know, which it shows as its source text (ADR 0018).
     pub text_editable: bool,
+    /// The language its text is coloured by while it is a Code text, the
+    /// scope of a grammar (`source.rust`, obf-1036), or `None`.
+    pub code_language: Option<String>,
     pub captured: DateTime<Utc>,
     /// Where it was captured and what else was true then.
     pub context: CaptureContext,
@@ -1756,6 +1762,23 @@ impl<'a> Notes<'a> {
     }
 
     /// Sets the Importance of the Note `note_id`.
+    /// Sets the language the Code text of the Note `note_id` is coloured
+    /// by (obf-1036): the scope of a grammar, `source.rust`, or `None` or
+    /// empty for none. Nothing is written when it is the same; it stays
+    /// with the Note while its text is plain or formatted.
+    pub fn set_code_language(&self, note_id: &str, language: Option<&str>) -> Result<()> {
+        let Some(note) = self.by_id(note_id)? else {
+            return Err(Error::Invalid(format!("not a Note: {note_id}")));
+        };
+        let value = language.filter(|l| !l.is_empty());
+        if note.code_language.as_deref() == value {
+            return Ok(());
+        }
+        self.store
+            .append(note_id, keys::LANGUAGE, value, None)
+            .map(drop)
+    }
+
     pub fn set_importance(&self, note_id: &str, importance: Importance) -> Result<()> {
         self.require_note(note_id)?;
         self.store
@@ -1887,6 +1910,10 @@ impl<'a> Notes<'a> {
             text_format: text.format,
             text_version: text.version,
             text_editable: text.editable,
+            code_language: fields
+                .get(keys::LANGUAGE)
+                .filter(|l| !l.is_empty())
+                .map(str::to_string),
             captured: parse_time(captured)?,
             context: self.context(&fields)?,
             place,

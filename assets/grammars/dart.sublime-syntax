@@ -1,0 +1,121 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: Dart
+scope: source.dart
+file_extensions: [dart]
+
+variables:
+  pre: '(?<![\w$])'
+  post: '(?![\w$])'
+  ident: '[A-Za-z_$][\w$]*'
+
+contexts:
+  main:
+    - match: '//.*'
+      scope: comment.line.double-slash.dart
+    - match: '/\*'
+      push: block_comment
+    - match: '\br"""'
+      push: raw_triple_double
+    - match: "\\br'''"
+      push: raw_triple_single
+    - match: '\br"'
+      push: raw_double
+    - match: "\\br'"
+      push: raw_single
+    - match: '"""'
+      push: triple_double
+    - match: "'''"
+      push: triple_single
+    - match: '"'
+      push: double
+    - match: "'"
+      push: single
+    - match: '@{{ident}}(?:\.{{ident}})?'
+      scope: variable.function.annotation.dart
+    - match: '{{pre}}(class|enum|mixin|extension|typedef)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.dart
+        2: entity.name.class.dart
+    - match: '{{pre}}(?:if|else|for|while|do|switch|case|default|break|continue|return|throw|rethrow|try|catch|finally|on|new|is|as|in|await|async|sync|yield|assert|import|export|library|part|of|show|hide|deferred|when|with|extends|implements)(?![\w$])'
+      scope: keyword.control.dart
+    - match: '{{pre}}(?:var|final|const|late|class|enum|mixin|extension|typedef|get|set|operator|factory)(?![\w$])'
+      scope: keyword.declaration.dart
+    - match: '{{pre}}(?:abstract|base|interface|sealed|static|external|covariant|required)(?![\w$])'
+      scope: storage.modifier.dart
+    - match: '{{pre}}(?:true|false|null)(?![\w$])'
+      scope: constant.language.dart
+    - match: '{{pre}}(?:this|super)(?![\w$])'
+      scope: variable.language.dart
+    - match: '{{pre}}(?:void|dynamic|int|double|num|bool|Function|Never|Null)(?![\w$])'
+      scope: storage.type.dart
+    - match: '{{pre}}[A-Z][a-z]\w*'
+      scope: support.class.dart
+    - match: '{{pre}}(?:0[xX][0-9a-fA-F_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\.\d[\d_]*(?:[eE][+-]?\d+)?)'
+      scope: constant.numeric.dart
+    - match: '{{pre}}{{ident}}(?=\s*(?:<[\w$<>, ?]{0,80}>\s*)?\()'
+      scope: variable.function.dart
+    - match: '=>|\.\.\.?\??|\?\?=?|\?\.|&&|\|\||~/=?|[-+*/%<>=!&|^~]=?'
+      scope: keyword.operator.dart
+
+  block_comment:
+    - meta_scope: comment.block.dart
+    - match: '\*/'
+      pop: true
+    - match: '/\*'
+      push: block_comment
+
+  inside:
+    - match: '\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|u\{[0-9a-fA-F]{1,6}\}|.)'
+      scope: constant.character.escape.dart
+    - match: '\$[A-Za-z_]\w*'
+      scope: variable.parameter.interpolation.dart
+    - match: '\$\{'
+      push: interpolation
+
+  interpolation:
+    - meta_scope: meta.interpolation.dart variable.parameter.interpolation.dart
+    - match: '\}'
+      pop: true
+    - match: '\{'
+      push: interpolation
+    - include: main
+
+  triple_double:
+    - meta_scope: string.quoted.double.block.dart
+    - match: '"""'
+      pop: true
+    - include: inside
+  triple_single:
+    - meta_scope: string.quoted.single.block.dart
+    - match: "'''"
+      pop: true
+    - include: inside
+  double:
+    - meta_scope: string.quoted.double.dart
+    - match: '"|$'
+      pop: true
+    - include: inside
+  single:
+    - meta_scope: string.quoted.single.dart
+    - match: "'|$"
+      pop: true
+    - include: inside
+
+  raw_triple_double:
+    - meta_scope: string.quoted.double.block.raw.dart
+    - match: '"""'
+      pop: true
+  raw_triple_single:
+    - meta_scope: string.quoted.single.block.raw.dart
+    - match: "'''"
+      pop: true
+  raw_double:
+    - meta_scope: string.quoted.double.raw.dart
+    - match: '"|$'
+      pop: true
+  raw_single:
+    - meta_scope: string.quoted.single.raw.dart
+    - match: "'|$"
+      pop: true

@@ -62,9 +62,10 @@ class RunnerTests: XCTestCase {
       "\(services)")
   }
 
-  /// The background sync's app refresh task (#240).
-  func testBackgroundFetchIsOn() {
-    XCTAssertEqual(info("UIBackgroundModes") as? [String], ["fetch"])
+  /// The background sync's app refresh task (#240), and a voice
+  /// recording going on while the iPhone is locked (#350).
+  func testBackgroundFetchAndAudioAreOn() {
+    XCTAssertEqual(info("UIBackgroundModes") as? [String], ["fetch", "audio"])
   }
 
   /// iPhone only (#236, #244): no iPad, so the App Store asks for no

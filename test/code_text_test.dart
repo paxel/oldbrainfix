@@ -146,7 +146,7 @@ void main() {
       String text = '',
       bool code = false,
       bool twoRows = true,
-      VoidCallback? onCodePasted,
+      ValueChanged<String>? onCodePasted,
     }) async {
       final controller = TagTextController(text: text, hideMarks: twoRows)
         ..code = code;
@@ -201,7 +201,10 @@ void main() {
     testWidgets('a paste that looks like code offers it and does not '
         'format the text; any other paste does as before', (tester) async {
       var offered = 0;
-      final controller = await pumpField(tester, onCodePasted: () => offered++);
+      final controller = await pumpField(
+        tester,
+        onCodePasted: (_) => offered++,
+      );
       await paste(tester, '# heading\nint a;\nint b;');
       expect(offered, 1);
       expect(controller.markdown, isFalse);
@@ -257,7 +260,7 @@ void main() {
       expect(tester.widget<SettingBadge>(key('badge-kind')).onTap, isNull);
       await tester.tap(key('badge-add'));
       await tester.pumpAndSettle();
-      expect(key('spawn-routine'), findsOneWidget);
+      expect(key('spawn-remind'), findsOneWidget);
       expect(key('spawn-session'), findsNothing);
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();

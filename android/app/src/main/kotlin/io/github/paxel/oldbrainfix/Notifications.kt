@@ -23,6 +23,8 @@ import android.os.Build
  */
 object Notifications {
     private const val ESCALATED_CHANNEL = "escalated"
+    private const val QUIET_CHANNEL = "quiet"
+    private const val HEADS_UP_CHANNEL = "headsUps"
     private const val RING_CHANNEL = "ringing"
     private const val NUDGE_CHANNEL = "nudges"
     private val CATCH_UP_ID = "catch-up".hashCode()
@@ -42,10 +44,34 @@ object Notifications {
     /**
      * The notification of a due Occurrence. An [urgent] one escalated but
      * cannot ring full screen: it comes on its own channel, with the
-     * phone's alarm sound.
+     * phone's alarm sound. A [silent] one fires in the Quiet Hours
+     * (obf-1045): it comes on its own channel, without sound or vibration.
      */
-    fun show(context: Context, alarm: Alarm, urgent: Boolean = false) {
-        post(context, alarm, alarm.body, doneAndSnooze(context, alarm), alertOnce = false, urgent = urgent)
+    fun show(context: Context, alarm: Alarm, urgent: Boolean = false, silent: Boolean = false) {
+        post(context, alarm, alarm.body, doneAndSnooze(context, alarm), alertOnce = false, urgent = urgent, silent = silent)
+    }
+
+    /**
+     * A Heads-up (obf-1046): one plain notification before its
+     * Occurrence, its Note's title and "in 20 min", without actions or a
+     * full screen. It is the Occurrence's own notification, so its ring
+     * replaces it and Done takes it away; tapping it opens the Note, as
+     * the ring's does. A [silent] one fires in the Quiet Hours: on their
+     * channel, without sound or vibration.
+     */
+    fun showHeadsUp(context: Context, headsUp: Alarm, silent: Boolean = false) {
+        val notification = (if (silent) quietBuilder(context) else headsUpBuilder(context))
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(headsUp.title)
+            .setContentText(headsUp.body)
+            .setCategory(Notification.CATEGORY_REMINDER)
+            // As its ring shows.
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setContentIntent(openNote(context, headsUp))
+            .build()
+        context.getSystemService(NotificationManager::class.java)
+            .notify(AlarmPlan.notificationId(headsUp.routine, headsUp.occurrence), notification)
     }
 
     /**
@@ -146,7 +172,7 @@ object Notifications {
                 .setContentText(text)
                 .setCategory(Notification.CATEGORY_REMINDER)
                 .setAutoCancel(true)
-                .setContentIntent(openApp(context))
+                .setContentIntent(openCatchUp(context))
                 .build(),
         )
     }
@@ -268,9 +294,14 @@ object Notifications {
         actions: List<Notification.Action>,
         alertOnce: Boolean,
         urgent: Boolean = false,
+        silent: Boolean = false,
     ) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        val notification = (if (urgent) escalatedBuilder(context) else builder(context))
+        val notification = when {
+            urgent -> escalatedBuilder(context)
+            silent -> quietBuilder(context)
+            else -> builder(context)
+        }
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(alarm.title)
             .setContentText(text)
@@ -299,6 +330,48 @@ object Notifications {
                 .setDefaults(Notification.DEFAULT_VIBRATE or Notification.DEFAULT_LIGHTS)
         }
 
+    /**
+     * The channel of an Occurrence firing in the Quiet Hours (obf-1045):
+     * shown as any other, on the lock screen too, but without sound or
+     * vibration.
+     */
+    private fun quietBuilder(context: Context): Notification.Builder =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(
+                    QUIET_CHANNEL,
+                    Scheduler.label(context, "quietChannel"),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply {
+                    setSound(null, null)
+                    enableVibration(false)
+                },
+            )
+            Notification.Builder(context, QUIET_CHANNEL)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context)
+                .setPriority(Notification.PRIORITY_DEFAULT)
+                .setSound(null)
+                .setVibrate(null)
+        }
+
+    /** The channel of the Heads-ups (obf-1046), with the phone's notification sound. */
+    private fun headsUpBuilder(context: Context): Notification.Builder =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(
+                    HEADS_UP_CHANNEL,
+                    Scheduler.label(context, "headsUpChannel"),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ),
+            )
+            Notification.Builder(context, HEADS_UP_CHANNEL)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context).setDefaults(Notification.DEFAULT_ALL)
+        }
+
     /** The high-priority channel an escalated alarm falls back to, with the alarm sound. */
     private fun escalatedBuilder(context: Context): Notification.Builder =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -322,9 +395,11 @@ object Notifications {
                 .setSound(RingService.alarmSound(), AudioManager.STREAM_ALARM)
         }
 
-    private fun openApp(context: Context): PendingIntent = PendingIntent.getActivity(
-        context, 0,
+    /** Opens the app on the Agenda with the Missed Summary (obf-1039), from whatever it showed. */
+    private fun openCatchUp(context: Context): PendingIntent = PendingIntent.getActivity(
+        context, CATCH_UP_ID,
         Intent(context, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_CATCH_UP, true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )

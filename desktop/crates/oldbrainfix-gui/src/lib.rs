@@ -78,6 +78,7 @@ pub mod settings_search;
 pub mod share_note;
 pub mod shopping_view;
 pub mod speech;
+pub mod spotlight;
 pub mod starter_set_view;
 pub mod store_needs_update;
 pub mod sync_line;

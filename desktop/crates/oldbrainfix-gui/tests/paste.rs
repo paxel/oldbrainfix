@@ -1,10 +1,11 @@
 //! Paste in the capture (#130), in the window and the capture popup,
-//! driven headless by egui_kittest with a fake clipboard: the Paste
-//! button and Ctrl+V in the empty field take the clipboard's text into
-//! the field and its picture onto it, both saved together into one Note
-//! with Save or on leaving, nothing before; a clipboard with neither
-//! leaves a grey line, no announcement. The real clipboard is
-//! device-only.
+//! driven headless by egui_kittest with a fake clipboard: Ctrl+V in the
+//! empty field takes the clipboard's text into the field and its picture
+//! onto it, both saved together into one Note with Save or on leaving,
+//! nothing before; a clipboard with neither leaves a grey line, no
+//! announcement. The quick note has no Paste button (#352): the Note
+//! dialog's puts the text into its Note's text and the picture onto it
+//! as its photo. The real clipboard is device-only.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -118,14 +119,27 @@ fn ctrl_v_released<S>(harness: &mut Harness<'_, S>) {
     harness.run();
 }
 
+/// Ctrl+V in the quick note's empty field, the window bringing `text`.
+fn ctrl_v<S>(harness: &mut Harness<'_, S>, text: &str) {
+    harness.event(Event::Paste(text.into()));
+    harness.run();
+    ctrl_v_released(harness);
+}
+
 #[test]
-fn paste_puts_the_text_into_the_field_without_saving_it() -> TestResult {
+fn the_quick_note_has_no_paste_button_and_ctrl_v_text_is_kept_as_typed() -> TestResult {
     let store = empty_store()?;
     let board: Shared = Rc::default();
     board.borrow_mut().text = Some("Call the dentist".into());
     let mut harness = window(store.clone(), &board);
-    harness.get_by_label(t().paste()).click();
-    harness.run();
+    // Paste is the Note dialog's (#352).
+    assert!(
+        harness
+            .query_by_role_and_label(Role::Button, t().paste())
+            .is_none()
+    );
+    focus(&mut harness);
+    ctrl_v(&mut harness, "Call the dentist");
     assert_eq!(typed(&harness).as_deref(), Some("Call the dentist"));
     assert!(Notes::new(&store).all()?.is_empty());
     assert_eq!(harness.state().notice(), None);
@@ -139,16 +153,16 @@ fn paste_puts_the_text_into_the_field_without_saving_it() -> TestResult {
 }
 
 #[test]
-fn paste_with_text_and_a_picture_keeps_both_in_one_note() -> TestResult {
+fn ctrl_v_with_text_and_a_picture_keeps_both_in_one_note() -> TestResult {
     let store = empty_store()?;
     let board: Shared = Rc::default();
     let photo = photo()?;
     board.borrow_mut().text = Some("Parking spot".into());
     board.borrow_mut().photo = Some(photo.clone());
     let mut harness = window(store.clone(), &board);
-    harness.get_by_label(t().paste()).click();
-    harness.run();
-    // Held on the field until it is saved (UI laws, "Capture").
+    focus(&mut harness);
+    ctrl_v(&mut harness, "Parking spot");
+    // Held above the text until it is saved (UI laws, "Capture").
     assert!(Notes::new(&store).all()?.is_empty());
     assert_eq!(typed(&harness).as_deref(), Some("Parking spot"));
     assert!(shows(&harness, t().photo()));
@@ -163,28 +177,13 @@ fn paste_with_text_and_a_picture_keeps_both_in_one_note() -> TestResult {
 }
 
 #[test]
-fn pasted_text_goes_after_what_is_typed_at_the_cursor() -> TestResult {
-    let store = empty_store()?;
-    let board: Shared = Rc::default();
-    board.borrow_mut().text = Some("milk".into());
-    let mut harness = window(store, &board);
-    focus(&mut harness);
-    harness.get_by(|n| n.is_focused()).type_text("Buy ");
-    harness.run();
-    harness.get_by_label(t().paste()).click();
-    harness.run();
-    assert_eq!(typed(&harness).as_deref(), Some("Buy milk"));
-    Ok(())
-}
-
-#[test]
 fn pasted_markdown_makes_the_note_a_formatted_one() -> TestResult {
     let store = empty_store()?;
     let board: Shared = Rc::default();
     board.borrow_mut().text = Some("# Shop\n- milk\n- eggs".into());
     let mut harness = window(store.clone(), &board);
-    harness.get_by_label(t().paste()).click();
-    harness.run();
+    focus(&mut harness);
+    ctrl_v(&mut harness, "# Shop\n- milk\n- eggs");
     harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
     harness.run();
     let notes = Notes::new(&store).all()?;
@@ -199,15 +198,75 @@ fn an_empty_clipboard_leaves_a_grey_line_until_something_is_typed() -> TestResul
     let store = empty_store()?;
     let board: Shared = Rc::default();
     let mut harness = window(store.clone(), &board);
-    harness.get_by_label(t().paste()).click();
-    harness.run();
+    focus(&mut harness);
+    ctrl_v_released(&mut harness);
     assert!(shows(&harness, t().paste_empty()));
     assert_eq!(harness.state().notice(), None);
     assert!(Notes::new(&store).all()?.is_empty());
-    focus(&mut harness);
     harness.get_by(|n| n.is_focused()).type_text("T");
     harness.run();
     assert!(!shows(&harness, t().paste_empty()));
+    Ok(())
+}
+
+/// The window over `store` with the fake clipboard `board`, the Note
+/// `note` open in the Note dialog.
+fn note_dialog(store: Arc<Store>, board: &Shared, note: &str) -> Harness<'static, App> {
+    let mut app = App::new(store, "en");
+    app.set_clipboard(Box::new(FakeClipboard(board.clone())));
+    app.select(Selection::All);
+    app.select_note(note);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    harness
+}
+
+#[test]
+fn the_note_dialogs_paste_adds_the_text_and_the_picture_to_its_note() -> TestResult {
+    let store = empty_store()?;
+    let note = Notes::new(&store).capture("Buy", None, None)?.id;
+    let board: Shared = Rc::default();
+    let photo = photo()?;
+    board.borrow_mut().text = Some("milk".into());
+    board.borrow_mut().photo = Some(photo.clone());
+    let mut harness = note_dialog(store.clone(), &board, &note);
+    harness
+        .get_by_role_and_label(Role::Button, t().paste())
+        .click();
+    harness.run();
+    // The text on a line of its own at the end, the picture its photo.
+    let pasted = Notes::new(&store).by_id(&note)?.ok_or("the Note")?;
+    assert_eq!(pasted.text, "Buy\nmilk");
+    assert_eq!(pasted.photos.len(), 1);
+    assert_eq!(store.photo(&pasted.photos[0]), Some(photo));
+    assert_eq!(Notes::new(&store).all()?.len(), 1);
+    assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn the_note_dialogs_paste_with_an_empty_clipboard_leaves_a_grey_line() -> TestResult {
+    let store = empty_store()?;
+    let note = Notes::new(&store).capture("Buy", None, None)?.id;
+    let board: Shared = Rc::default();
+    let mut harness = note_dialog(store.clone(), &board, &note);
+    harness
+        .get_by_role_and_label(Role::Button, t().paste())
+        .click();
+    harness.run();
+    assert!(shows(&harness, t().paste_empty()));
+    assert_eq!(harness.state().notice(), None);
+    let kept = Notes::new(&store).by_id(&note)?.ok_or("the Note")?;
+    assert_eq!(kept.text, "Buy");
+    assert!(kept.photos.is_empty());
     Ok(())
 }
 
@@ -296,8 +355,13 @@ fn the_popup_holds_what_is_pasted_until_it_is_left() -> TestResult {
     board.borrow_mut().text = Some("Receipt".into());
     board.borrow_mut().photo = Some(photo()?);
     let mut harness = popup(store.clone(), &board);
-    harness.get_by_label(t().paste()).click();
-    harness.run();
+    // No Paste button (#352): Ctrl+V in the empty field.
+    assert!(
+        harness
+            .query_by_role_and_label(Role::Button, t().paste())
+            .is_none()
+    );
+    ctrl_v(&mut harness, "Receipt");
     assert_eq!(harness.state().popup.text(), "Receipt");
     assert!(shows(&harness, t().photo()));
     // All of it still fits the popup's window.

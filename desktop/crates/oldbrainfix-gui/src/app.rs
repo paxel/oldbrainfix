@@ -82,6 +82,7 @@ use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
 use oldbrainfix_core::checklists::keys as checklist_keys;
+use oldbrainfix_core::highlight::Grammars;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
@@ -98,10 +99,10 @@ use oldbrainfix_core::{
     CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
     ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
-    OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuickNoteControl,
-    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions,
-    ShoppingLine, ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies,
-    TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
+    OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuietHours, Routine,
+    RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
+    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, TextSize, ThemeChoice,
+    Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -119,9 +120,7 @@ use crate::backup_view::{
     self, BackupAction, BackupNotes, BackupNotesAction, Passphrase, Welcome, WelcomeAction,
 };
 use crate::backups;
-use crate::capture_choices::{
-    self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
-};
+use crate::capture_choices::{self, CaptureChoices, Captured, Held, ListTitle, QuickNote};
 use crate::card_glance;
 use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
@@ -174,6 +173,7 @@ use crate::settings_search;
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
+use crate::spotlight::{self, Spotlights};
 use crate::starter_set_view;
 use crate::sync_line;
 use crate::sync_view::{
@@ -195,6 +195,7 @@ use crate::undo::Undo;
 use crate::unsorted_steps::{self, MovedOn, Sorting};
 use crate::vault_view::{self, VaultDone, VaultJob};
 use crate::window_sizes;
+use oldbrainfix_core::backlinks::Backlinks;
 use oldbrainfix_core::tag_tree::TagTree;
 
 /// What a place was left with (#278), for back and forward to show it
@@ -453,6 +454,9 @@ struct AgendaView {
     /// through (#217): the rows shown as Done are left out already; the
     /// checked Lines and the picks with an entry go as they are drawn.
     hides_checked: bool,
+    /// Whether today is a quiet day now (obf-1044): its line shows on
+    /// top, and the Agenda's ⋮ offers no "Quiet today".
+    quiet: bool,
 }
 
 /// The Agenda read on a thread of its own (#207): the window draws on
@@ -607,6 +611,10 @@ struct View {
     /// The Sections of each Note listed, oldest first, read in one pass
     /// for the full cards (#114).
     sections: BTreeMap<String, Vec<Section>>,
+    /// The Notes that link to each Note listed and to the one selected
+    /// (obf-1035), newest first, read once per read for the full cards,
+    /// the Note dialog and its window; a Note none links to is not in it.
+    linked_from: BTreeMap<String, Vec<Note>>,
     /// The Checklists of the Notes listed that are one, read in one pass
     /// for the cards as they show now, each with whether this Device may
     /// check its Lines (#120, #121).
@@ -675,8 +683,6 @@ struct View {
     descriptions_unfolded: HashSet<String>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
-    /// Whether the Note being captured may spawn where it goes (#113).
-    capture_spawns: bool,
     /// Whether this Device may set up Sessions and Frogs where the list
     /// shows, for what "+" offers (#161).
     list_manages: bool,
@@ -685,8 +691,8 @@ struct View {
     advanced: bool,
     /// What this Device's quick note shows (#142).
     capture_quick: QuickNote,
-    /// The Shopping Lists the Note being captured can go into, by their
-    /// Note's id with their title (#124).
+    /// The Shopping Lists a Note open in the Note dialog can go into, by
+    /// their Note's id with their title (#124, #352).
     capture_lists: Vec<ListTitle>,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
@@ -823,13 +829,12 @@ struct UpdateNotice {
     details: String,
 }
 
-/// What File into… files (#272): these Notes, or the Note being
-/// captured; and what Add to Note… adds (#308), also the question and
-/// answer at this place of the Ask panel (#316).
+/// What File into… files (#272): these Notes; and what Add to Note…
+/// adds (#308), also the question and answer at this place of the Ask
+/// panel (#316).
 #[derive(Debug, Clone, PartialEq)]
 enum Filing {
     Notes(Vec<String>),
-    Capture,
     Answer(usize),
 }
 
@@ -1038,7 +1043,7 @@ enum Dialog {
     /// Whether the Google Takeout export to import from Google Keep is
     /// still its zip or a folder unpacked from it (ADR 0036).
     ImportKeep,
-    /// File ▸ Import… (#145): a folder of Markdown or text files, or a
+    /// File ▸ Import… (#145): a folder of Markdown, text and other documents, or a
     /// Google Keep export, each with what it does, or that it reads
     /// while it runs.
     Import,
@@ -1405,6 +1410,12 @@ enum Action {
     /// detailed one and keeps the choice for that list on this Device
     /// (#114, #189).
     Compact(bool),
+    /// "Quiet today" in the Agenda's ⋮ (obf-1044): today shows as it
+    /// is, nothing notifies until midnight, on all of the user's own
+    /// Devices.
+    QuietToday,
+    /// End on the quiet day's line: today's quiet day ends now.
+    EndQuietDay,
     /// Shows the theme chosen in View ▸ Theme at once and keeps it on
     /// this Device (#147).
     Theme(ThemeChoice),
@@ -1427,26 +1438,25 @@ enum Action {
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
-    /// Something asked of the capture's buttons or its choices (#113).
-    CaptureChoice(Ask),
-    /// "To full editor" (#142): captures as leaving does and opens the
-    /// Note in the Note dialog (#146), its text taking the keyboard.
+    /// More (#142, #352): captures as leaving does and opens the Note in
+    /// the Note dialog (#146), its text taking the keyboard.
     CaptureToEditor,
-    /// "Add to Note…" in the quick note (#308): asks which Note the
-    /// capture goes into.
-    CaptureAddToNote,
-    /// Starts recording voice into the Note being captured.
+    /// Record voice in the Note dialog (#352): starts recording voice
+    /// into the Note open there.
     Record,
-    /// Ends the recording and holds it on the capture field.
+    /// Ends the recording and adds it to the Note it was started on.
     StopRecording,
+    /// Paste in the Note dialog (#352): the clipboard's text into the
+    /// Note's text, its picture as the Note's photo.
+    PasteOntoNote,
+    /// Add to a Shopping List in the Note dialog (#352): the Note's lines
+    /// become Lines of the list of this Note's id and the Note goes.
+    PourIntoShopping(String),
     /// Plays the voice recording with this hash, or stops it playing.
     Play(String),
     /// Plays recordings at this speed from now on, the one playing
     /// included, and keeps it on this Device.
     Speed(f64),
-    /// Asks the system's dialog for files of any kind and holds them on
-    /// the capture field.
-    PickFiles,
     /// "Attach a file…" (#267): asks the system's dialog for files and
     /// does with them what a drop does.
     AttachFiles,
@@ -1486,9 +1496,16 @@ enum Action {
     FormatText(Option<String>),
     /// Puts the Note's text, as typed, into this format (#213).
     SetTextFormat(&'static str),
+    /// Colours the Note's Code text by the grammar of this scope, or by
+    /// none (obf-1036).
+    SetCodeLanguage(Option<String>),
     /// A paste that looks like code into the Note's text: "Keep as code"
-    /// under it (#213), or, without, that offer closed.
-    OfferCode(bool),
+    /// under it (#213), with the language guessed for what was pasted
+    /// (obf-1036), or, without, that offer closed.
+    OfferCode(bool, Option<String>),
+    /// "Keep as code": the Note's text made a Code text, in the language
+    /// guessed for the paste, else for its whole text (obf-1036).
+    KeepAsCode,
     /// Asks for the address of a link on the bytes `start..end` of the
     /// edited text, of the Amend field's with `amend` or of the field of
     /// the Section `section` (#183), `url` the link's there is one
@@ -1654,6 +1671,14 @@ enum Action {
     Setting(Setting),
     /// Asks the system's dialog for the sound file Occurrences ring with.
     PickAlarmSound,
+    /// "Add grammar…" (obf-1037): asks the system's dialog for a grammar
+    /// file and adds it for the person.
+    AddGrammar,
+    /// Remove beside the person's grammar of this scope (obf-1037).
+    RemoveGrammar(String),
+    /// "Show tips again" (obf-1043): every screen shows its tips again on
+    /// this Device.
+    ShowTipsAgain,
     Sync(SyncAction),
     /// Imports the bundle file dropped onto the window or handed over,
     /// or shows the preview of the Sent Item.
@@ -1842,8 +1867,6 @@ enum Setting {
     /// Simple or Advanced: the person's, on all of their own Devices
     /// (#197).
     Advanced(bool),
-    /// Whether the quick note shows this control (#142).
-    QuickNote(QuickNoteControl, bool),
     /// Whether the quick note shows the three Nudge buttons (#142).
     QuickNoteNudgeButtons(bool),
     /// The main switch "AI (experimental)" (#334).
@@ -1993,8 +2016,10 @@ pub struct App {
     /// to show them where they were sorted once it brings them back.
     moved_on: Option<MovedOn>,
     /// The Note whose text took a paste that looks like code, while
-    /// "Keep as code" waits under it (#213).
+    /// "Keep as code" waits under it (#213), and the scope of the
+    /// language guessed for the paste (obf-1036).
     code_offer: Option<String>,
+    code_guess: Option<String>,
     /// Whether the Lines of the Note opened next are to be typed in at
     /// once: a Checklist or Shopping List just made (#161), or opened from
     /// its group's heading on the Agenda (#276).
@@ -2042,6 +2067,13 @@ pub struct App {
     /// The recordings that ended, held on the capture field until its
     /// Note is saved.
     recorded: Vec<Vec<u8>>,
+    /// The Note the recording running was started on in the Note dialog
+    /// (#352), which it goes onto as it ends; `None` for one held on the
+    /// capture field.
+    recording_into: Option<String>,
+    /// Whether the Note dialog's last Paste found nothing, said in grey
+    /// under its button until the Note dialog closes (#352).
+    note_paste_empty: bool,
     /// The pictures pasted, chosen or dropped, held on the capture field
     /// until its Note is saved.
     held_photos: Vec<Vec<u8>>,
@@ -2212,6 +2244,9 @@ pub struct App {
     /// The version the help Notes are made for (#180); none in tests, so
     /// no Area "Old Brain Fix" appears there unless a test asks.
     help_version: Option<String>,
+    /// The tips explaining each screen (obf-1043): off unless the
+    /// desktop binary switches them on, so tests see none.
+    spotlights: Spotlights,
     /// The AI port while it is open (#112, ADR 0026): closed by "Done,
     /// review" or when the window goes.
     ai_port: Option<AiPort>,
@@ -2236,6 +2271,12 @@ pub struct App {
     ask_fields: Option<AskFields>,
     /// Asks the system's dialog for an alarm sound file, titled as given.
     sound_picker: FolderPicker,
+    /// Asks the system's dialog for a grammar file, titled as given
+    /// (obf-1037).
+    grammar_picker: FolderPicker,
+    /// Why the grammar file picked last was not added, shown under "Add
+    /// grammar…" until one is added (obf-1037).
+    grammar_refused: Option<String>,
     /// The alarm sound file last looked at and whether it rings or the
     /// own chime rings in its place, decoded once per file chosen.
     sound_rung: Option<(String, Rung)>,
@@ -2583,6 +2624,7 @@ impl App {
             undo: None,
             moved_on: None,
             code_offer: None,
+            code_guess: None,
             start_lines: false,
             tally_whose: HashMap::new(),
             lines: TypedLines::default(),
@@ -2604,6 +2646,8 @@ impl App {
             playing: None,
             speed,
             recorded: Vec::new(),
+            recording_into: None,
+            note_paste_empty: false,
             held_photos: Vec::new(),
             held_files: Vec::new(),
             held_problems: Vec::new(),
@@ -2706,6 +2750,7 @@ impl App {
             backup_notes: None,
             profile_defaults: Box::new(login::apply_system_defaults),
             help_version: None,
+            spotlights: Spotlights::default(),
             ai_port: None,
             ask: AskPanel::default(),
             ask_run: None,
@@ -2715,6 +2760,10 @@ impl App {
             shown: true,
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
+            // Any file: a grammar's name ends in `.sublime-syntax`, but
+            // one saved under another is read all the same (obf-1037).
+            grammar_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_file()),
+            grammar_refused: None,
             sound_rung: None,
             note_windows: Vec::new(),
             alone: None,
@@ -2900,6 +2949,12 @@ impl App {
     /// dialog; tests hand in a path.
     pub fn set_sound_picker(&mut self, picker: FolderPicker) {
         self.sound_picker = picker;
+    }
+
+    /// Asks `picker` for the grammar file "Add grammar…" adds instead of
+    /// the system's dialog (obf-1037); tests hand in a path.
+    pub fn set_grammar_picker(&mut self, picker: FolderPicker) {
+        self.grammar_picker = picker;
     }
 
     /// Hands in the dialogs asking where to save a bundle and which one
@@ -3232,9 +3287,9 @@ impl App {
         backup_view::restore_answered(&self.store)?;
         self.welcome = None;
         (self.profile_defaults)(&self.store)?;
-        // Right after the first start: the help Notes never made for this
-        // person, and no What's new (#180). Without them the start goes
-        // on, as at launch.
+        // Right after the first start: no What's new (#180), only the
+        // version recorded. When that fails the start goes on, as at
+        // launch.
         if let Err(e) = self.help_due(true) {
             eprintln!("help Notes: {e}");
         }
@@ -3250,6 +3305,60 @@ impl App {
             return Ok(());
         }
         self.help_due(false)
+    }
+
+    /// Switches the tips explaining each screen (obf-1043) on or off. On,
+    /// it first counts, once per Device, the tips of what an earlier
+    /// version had as shown, unless the first start is due; so it comes
+    /// before the first start's view is answered and before the help
+    /// Notes.
+    pub fn set_spotlights(&mut self, on: bool) -> oldbrainfix_core::Result<()> {
+        self.spotlights.set_on(on);
+        if on {
+            spotlight::seed(&self.store, self.welcoming())?;
+        }
+        Ok(())
+    }
+
+    /// The id of the tip showing (obf-1043).
+    pub fn spotlight_showing(&self) -> Option<&'static str> {
+        self.spotlights.showing()
+    }
+
+    /// The screen whose tips may show now (obf-1043), by its manifest id,
+    /// with what makes a new visit of it: the dialog on top or the list
+    /// shown, none while a dialog, menu, photo or table lies over it, the
+    /// window is hidden or the first start's view shows.
+    fn spotlight_screen(&self, ctx: &egui::Context) -> Option<(&'static str, String)> {
+        if !self.spotlights.on()
+            || self.welcome.is_some()
+            || self.alone.is_some()
+            || self.dialog.is_some()
+            || self.badge.is_some()
+            || self.viewer.is_some()
+            || self.table.is_some()
+            || egui::Popup::is_any_open(ctx)
+            || !self.drawn(ctx)
+        {
+            return None;
+        }
+        let screen = match self.top_dialog() {
+            Some(TopDialog::Editor) if self.editor.is_some() => spotlight::ROUTINE_EDITOR,
+            Some(TopDialog::QuickNote) => spotlight::QUICK_NOTE,
+            Some(TopDialog::Page) if self.page() == Some(Page::Settings) => spotlight::SETTINGS,
+            Some(TopDialog::Note) => {
+                let note = self.view.detail.as_ref().map(|(p, _)| p.note.id.clone());
+                return Some((spotlight::NOTE_DIALOG, note.unwrap_or_default()));
+            }
+            Some(_) => return None,
+            None => match &self.selection {
+                Selection::Agenda => spotlight::AGENDA,
+                Selection::Unsorted => spotlight::UNSORTED,
+                Selection::Place(id) => return Some((spotlight::LIST, id.clone())),
+                _ => return None,
+            },
+        };
+        Some((screen, String::new()))
     }
 
     /// The help Notes due now, once the own Profile exists; `fresh` right
@@ -5769,6 +5878,11 @@ impl App {
         // not egui's zoom, which stays that of "Bigger text and icons".
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
         theme::set_text_size(ctx, self.text_size);
+        // The person's grammars colour code (obf-1037), read anew as the
+        // log changes: one added, removed or arriving by sync.
+        if let Ok(grammars) = PersonSettings::new(&self.store).grammars() {
+            text_marks_view::set_grammars(ctx, grammars);
+        }
         // The zoom is set once (#224), so it does not undo a zoom set
         // from outside.
         if !std::mem::replace(&mut self.zoom_shown, true) {
@@ -5967,16 +6081,6 @@ impl App {
         }
         if self.view.detail.is_none() {
             self.badge = None;
-        }
-        // An Area or Topic deleted meanwhile is no place to capture into.
-        if let Some(place) = &self.capture_choices.place
-            && self.view.area(place).is_none()
-            && self.view.topic(place).is_none()
-        {
-            self.capture_choices.place = None;
-            let place = self.capture_place();
-            self.view.capture_spawns =
-                capture_choices::may_spawn(&self.store, place.as_deref()).unwrap_or(true);
         }
         self.read_at = self.store.now();
         // A Note window (#287) leaves what is announced to the main one.
@@ -6254,6 +6358,18 @@ impl App {
         } else {
             notes.sections_of(&listed)?
         };
+        // From what the core keeps until the log changes (obf-1035); the
+        // desktop has no Area Locks, so nothing is closed. A card in the
+        // trash shows none, as on the phone.
+        let backlinks = Backlinks::new(store);
+        let mut linked_from = BTreeMap::new();
+        let linked = listed.iter().filter(|_| self.selection != Selection::Trash);
+        for id in linked.chain(detail.as_ref().map(|(p, _)| &p.note.id)) {
+            let linking = backlinks.to(id, &HashSet::new())?;
+            if !linking.is_empty() {
+                linked_from.insert(id.clone(), linking);
+            }
+        }
         // A Note in the trash ticks nothing.
         let card_today = if listed.is_empty() || self.selection == Selection::Trash {
             HashMap::new()
@@ -6699,6 +6815,7 @@ impl App {
             notes: placed,
             table_ticking: self.table_ticking(&box_looks, &box_ticks)?,
             sections,
+            linked_from,
             checklists,
             shopping_lists,
             tallies,
@@ -6726,10 +6843,6 @@ impl App {
             struck_shown,
             descriptions_unfolded,
             detail,
-            capture_spawns: capture_choices::may_spawn(
-                &self.store,
-                self.capture_place().as_deref(),
-            )?,
             list_manages: capture_choices::may_spawn(&self.store, self.list_place().as_deref())?,
             advanced: PersonSettings::new(&self.store).advanced()?,
             capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
@@ -6895,6 +7008,10 @@ impl App {
     fn apply(&mut self, action: Action) {
         let sorting = self.sorting_now();
         let done = self.act(action);
+        // A recording into a Note that is no longer open, whatever closed
+        // it, goes onto it (#352).
+        let left = self.recording_left();
+        let done = done.and(left);
         // One place per Note (#287): a Note open in its own window comes
         // forward there, not in the dialog.
         if let Some(id) = &self.selected_note
@@ -7137,24 +7254,14 @@ impl App {
             Action::Capture(nudge_in) => {
                 // A running recording is ended and kept first; held
                 // until it is, so a failed save loses nothing.
-                if let Some(r) = &mut self.recorder
-                    && r.recording()
-                    && let Some(bytes) = r.stop()
-                {
-                    self.recorded.push(bytes);
-                }
+                self.end_recording()?;
                 self.capture_note(nudge_in, &[], &[])?;
                 // Saved, the quick note's dialog goes (#146).
                 self.quick_open = false;
                 self.capture_focus = false;
             }
             Action::CaptureToEditor => {
-                if let Some(r) = &mut self.recorder
-                    && r.recording()
-                    && let Some(bytes) = r.stop()
-                {
-                    self.recorded.push(bytes);
-                }
+                self.end_recording()?;
                 // The quick note goes and the Note dialog opens on the Note
                 // saved, its text taking the keyboard (#142, #146).
                 if let Some(id) = self.capture_note(Notes::default_nudge(), &[], &[])? {
@@ -7164,22 +7271,6 @@ impl App {
                     self.edit_wanted = Some(id);
                 }
             }
-            Action::CaptureChoice(asked) => self.capture_choice(asked)?,
-            Action::CaptureAddToNote => {
-                // A running recording is ended and held with the rest, so
-                // it goes with them.
-                if let Some(r) = &mut self.recorder
-                    && r.recording()
-                    && let Some(bytes) = r.stop()
-                {
-                    self.recorded.push(bytes);
-                }
-                let picker = NotePicker::read(&self.store, &self.t, &[])?;
-                self.dialog = Some(Dialog::AddToNote {
-                    adding: Filing::Capture,
-                    picker: Box::new(picker),
-                });
-            }
             Action::AskAddToNote(ids) => {
                 let picker = NotePicker::read(&self.store, &self.t, &ids)?;
                 self.dialog = Some(Dialog::AddToNote {
@@ -7188,12 +7279,20 @@ impl App {
                 });
             }
             Action::AddToNotePicked(asked) => self.add_to_note_picked(asked)?,
-            Action::StopRecording => {
-                if let Some(bytes) = self.recorder.as_mut().and_then(|r| r.stop()) {
-                    self.recorded.push(bytes);
-                }
-            }
+            Action::StopRecording => self.end_recording()?,
             Action::Record => {
+                // Onto the Note open in the window's Note dialog (#352),
+                // where this Device may change it.
+                let on_top = self.alone.is_none()
+                    && self.top_dialog() == Some(TopDialog::Note)
+                    && self.dialog.is_none();
+                let Some(into) = self
+                    .note_menu()
+                    .filter(|n| n.changes && on_top)
+                    .map(|n| n.id)
+                else {
+                    return Ok(());
+                };
                 if let Some(player) = &mut self.player {
                     player.stop();
                 }
@@ -7204,7 +7303,10 @@ impl App {
                     self.announce_refusal(t.microphone_missing(), "record: no microphone");
                     return Ok(());
                 }
+                self.recording_into = Some(into);
             }
+            Action::PasteOntoNote => self.paste_onto_note()?,
+            Action::PourIntoShopping(list) => self.pour_into_shopping(&list)?,
             Action::Play(hash) => {
                 let Some(player) = &mut self.player else {
                     return Ok(());
@@ -7224,11 +7326,6 @@ impl App {
                     player.set_speed(speed);
                 }
                 DeviceSettings::new(&self.store).set_playback_speed(speed)?;
-            }
-            Action::PickFiles => {
-                let paths = (self.files_picker)(self.t.from_file_title());
-                let read = self.read_files(&paths);
-                self.hold_files(read);
             }
             Action::AttachFiles => {
                 let paths = (self.files_picker)(self.t.attach_file_title());
@@ -7413,6 +7510,8 @@ impl App {
                     DeviceSettings::new(&self.store).set_text_size(size)?;
                 }
             }
+            Action::QuietToday => PersonSettings::new(&self.store).quiet_today(&*self.wall)?,
+            Action::EndQuietDay => PersonSettings::new(&self.store).end_quiet_day(&*self.wall)?,
             Action::Compact(on) => {
                 if let Some(key) = self.cards_key() {
                     // Nothing kept means full, the default.
@@ -7443,9 +7542,12 @@ impl App {
             Action::FormatText(None) => self.save_formatted()?,
             Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
             Action::SetTextFormat(format) => self.set_text_format(format)?,
-            Action::OfferCode(offer) => {
-                self.code_offer = offer.then(|| self.text_of.clone()).flatten()
+            Action::SetCodeLanguage(language) => self.set_code_language(language.as_deref())?,
+            Action::OfferCode(offer, guess) => {
+                self.code_offer = offer.then(|| self.text_of.clone()).flatten();
+                self.code_guess = guess.filter(|_| offer);
             }
+            Action::KeepAsCode => self.keep_as_code()?,
             Action::AskLink {
                 start,
                 end,
@@ -7740,21 +7842,22 @@ impl App {
             Action::OpenRoutine(id) => {
                 self.save_text()?;
                 let routines = Routines::new(&self.store);
-                // What only a Manager may change shows its Note instead.
-                if !self.store.may_change_routine(&id)? {
-                    if let Some(routine) = routines.by_id(&id)? {
-                        self.editor = None;
-                        self.selected_note = Some(routine.note_id);
-                    }
-                    return Ok(());
-                }
                 if let Some(routine) = routines.by_id(&id)? {
                     let note = routines.note(&routine)?;
                     let today = Day::today(self.store.now(), &*self.wall);
                     let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                    let heads_ups = routines.heads_ups(&id)?;
                     // A Routine of a Session Note only schedules it: the
                     // setup lies on the Note, on its page (#191).
-                    self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
+                    let editor = RoutineEditor::edit(&routine, note, today, renag)
+                        .with_heads_ups(&heads_ups);
+                    // What only a Manager may change is shown as it is,
+                    // the person's own Heads-ups editable (obf-1046).
+                    self.editor = Some(if self.store.may_change_routine(&id)? {
+                        editor
+                    } else {
+                        editor.heads_ups_only()
+                    });
                     self.tally_form = None;
                 }
             }
@@ -7990,6 +8093,18 @@ impl App {
                     let path = path.to_string_lossy().into_owned();
                     self.set(Setting::AlarmSound(Some(path)))?;
                 }
+            }
+            Action::AddGrammar => {
+                if let Some(path) = (self.grammar_picker)(self.t.grammar_add()) {
+                    self.add_grammar(&path)?;
+                }
+            }
+            Action::RemoveGrammar(scope) => {
+                PersonSettings::new(&self.store).remove_grammar(&scope)?
+            }
+            Action::ShowTipsAgain => {
+                spotlight::show_again(&self.store)?;
+                self.notice = Some(self.t.settings_show_tips_done().to_string());
             }
             Action::Sync(SyncAction::Trust(trust)) => {
                 if self.sync.answer(&self.store, trust, &self.sync_name) {
@@ -8796,7 +8911,7 @@ impl App {
     }
 
     /// What a card's menu offers of the Note `note`'s Routines (#281), as
-    /// the Note menu and the "+" badge do: Routine… and Reminder… for who
+    /// the Note menu and the "+" badge do: Remind me… (#344) for who
     /// may set them up (ADR 0013), in Advanced also Frog while it has none
     /// open and Session… on a plain Note without Code text (#197, #213).
     fn card_spawns(&self, note: &Note) -> oldbrainfix_core::Result<CardSpawns> {
@@ -9460,60 +9575,102 @@ impl App {
         !self.recorded.is_empty() || !self.held_photos.is_empty() || !self.held_files.is_empty()
     }
 
-    /// The Shopping Lists the Note being captured can go into: none while
-    /// it holds a photo; a recording goes with a speech model or without
-    /// (#311).
-    fn capture_lists(&self) -> &[ListTitle] {
-        // No Line holds a file either (#267).
-        let photo = !self.held_photos.is_empty() || !self.held_files.is_empty();
-        capture_choices::shopping_offer(&self.view.capture_lists, photo)
-    }
-
-    /// Where the Note being captured goes: the Area or Topic picked with
-    /// "File into…", else the one shown, as the phone's "Note here";
-    /// Unsorted without either.
-    fn capture_place(&self) -> Option<String> {
-        self.capture_choices
-            .place
-            .clone()
-            .or_else(|| match &self.selection {
-                Selection::Place(id) => Some(id.clone()),
-                _ => None,
-            })
-    }
-
-    /// Does what was asked of the capture's buttons or its choices: a
-    /// Routine, Reminder, Session or Tally opens its page in a dialog over
-    /// the quick note, which hands its choice back to the capture (#113),
-    /// and File into… its dialog (#272).
-    fn capture_choice(&mut self, asked: Ask) -> oldbrainfix_core::Result<()> {
-        let place = self.capture_place();
-        match self.capture_choices.take(asked, &self.store)? {
-            None => {}
-            Some(Opens::Schedule { reminder, session }) => {
-                self.save_text()?;
-                let renag = DeviceSettings::new(&self.store).renag_interval()?;
-                let now = self.store.now();
-                let mut editor =
-                    RoutineEditor::choose(&self.capture, reminder, now, &*self.wall, renag);
-                if session {
-                    // The Tallies of where it goes; while Unsorted, any.
-                    let entity = place.as_deref().unwrap_or("");
-                    let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
-                    editor = editor.with_session(draft);
-                }
-                self.tally_form = None;
-                self.editor = Some(editor);
+    /// Ends the recording running and keeps it: onto the Note it was
+    /// started on in the Note dialog (#352), else held on the capture
+    /// field for the Note being captured. One the Note can no longer take
+    /// is held on the capture field instead, so it is never lost, and the
+    /// failure is told.
+    fn end_recording(&mut self) -> oldbrainfix_core::Result<()> {
+        let into = self.recording_into.take();
+        let Some(bytes) = self
+            .recorder
+            .as_mut()
+            .filter(|r| r.recording())
+            .and_then(|r| r.stop())
+        else {
+            return Ok(());
+        };
+        let Some(note) = into else {
+            self.recorded.push(bytes);
+            return Ok(());
+        };
+        match Notes::new(&self.store).add_recording(&note, &bytes) {
+            Ok(_) => {
+                self.kick();
+                Ok(())
             }
-            Some(Opens::FileInto) => self.ask_file_into(Filing::Capture)?,
-            Some(Opens::Tally) => {
-                self.save_text()?;
-                self.editor = None;
-                let system = self.unit_system()?;
-                self.tally_form = Some(TallyForm::Field(FieldForm::choose(system, &self.t)));
+            Err(e) => {
+                self.recorded.push(bytes);
+                Err(e)
             }
         }
+    }
+
+    /// Ends a recording into a Note no longer open in the Note dialog
+    /// onto it (#352), however the dialog closed.
+    fn recording_left(&mut self) -> oldbrainfix_core::Result<()> {
+        match &self.recording_into {
+            Some(note) if self.selected_note.as_ref() != Some(note) => self.end_recording(),
+            _ => Ok(()),
+        }
+    }
+
+    /// Paste in the Note dialog (#352): the clipboard's text into the
+    /// Note's text, on a line of its own at the end, where this Device
+    /// may write it, and its picture as the Note's photo; with neither,
+    /// the grey line under the button says so.
+    fn paste_onto_note(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(note) = self.note_menu().filter(|n| n.changes).map(|n| n.id) else {
+            return Ok(());
+        };
+        let Some(clipboard) = self.clipboard.as_deref_mut() else {
+            return Ok(());
+        };
+        let pasted = paste::take(clipboard, None);
+        self.note_paste_empty = pasted.is_empty();
+        let writes = self.view.detail.as_ref().is_some_and(|(placed, _)| {
+            placed.note.text_editable && self.text_of.as_deref() == Some(note.as_str())
+        });
+        if let Some(text) = pasted.text.filter(|_| writes) {
+            if !self.text.trim().is_empty() && !self.text.ends_with('\n') {
+                self.text.push('\n');
+            }
+            self.text.push_str(&text);
+        }
+        self.save_text()?;
+        if let Some(photo) = pasted.photo {
+            Notes::new(&self.store).add_photo(&note, &photo)?;
+            self.kick();
+        }
         Ok(())
+    }
+
+    /// Add to a Shopping List in the Note dialog (#352): what is typed
+    /// kept and a recording running ended onto the Note first, its lines
+    /// go into the list `list` and the Note dialog closes, as the phone's
+    /// editor does it. A list that can no longer be added to keeps the
+    /// Note, said at the top.
+    fn pour_into_shopping(&mut self, list: &str) -> oldbrainfix_core::Result<()> {
+        let Some(note) = self.note_menu().filter(|n| n.changes).map(|n| n.id) else {
+            return Ok(());
+        };
+        self.leave_note()?;
+        if !capture_choices::pour_into_shopping(&self.store, &note, list, &*self.wall)? {
+            let t = self.t;
+            let details = format!("shopping list {list}: it can no longer be added to");
+            self.announce_done(t.capture_shopping_gone(), details);
+            self.selected_note = Some(note);
+        }
+        Ok(())
+    }
+
+    /// Where the Note being captured goes: the Area or Topic shown, as
+    /// the phone's "Note here"; Unsorted elsewhere.
+    fn capture_place(&self) -> Option<String> {
+        match &self.selection {
+            Selection::Place(id) => Some(id.clone()),
+            _ => None,
+        }
     }
 
     /// The user's Done on `occurrence` of the Routine `routine`, from the
@@ -9676,6 +9833,9 @@ impl App {
         if self.selected_note.is_none() {
             return Ok(());
         }
+        self.note_paste_empty = false;
+        // A recording running goes onto the Note first (#352).
+        self.end_recording()?;
         self.save_text()?;
         if !self.amend.trim().is_empty() && self.view.may.amends {
             self.act(Action::Amend)?;
@@ -10119,7 +10279,6 @@ impl App {
                 PersonSettings::new(&self.store).set_trashes_done_reminder(on)?;
             }
             Setting::Advanced(on) => PersonSettings::new(&self.store).set_advanced(on)?,
-            Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
             Setting::AiOn(on) => {
                 self.store.set_ai_on(on)?;
@@ -10281,6 +10440,7 @@ impl App {
     fn set_text_format(&mut self, format: &str) -> oldbrainfix_core::Result<()> {
         self.save_text()?;
         self.code_offer = None;
+        self.code_guess = None;
         let Some(id) = self.text_of.clone() else {
             return Ok(());
         };
@@ -10290,6 +10450,60 @@ impl App {
             self.put_typed(now.text);
         }
         Ok(())
+    }
+
+    /// Adds the grammar in the file at `path` for the person (obf-1037):
+    /// one refused, or a file that does not read, says why under "Add
+    /// grammar…" and adds nothing; one added clears that.
+    fn add_grammar(&mut self, path: &std::path::Path) -> oldbrainfix_core::Result<()> {
+        use std::io::Read;
+        let name = path
+            .file_name()
+            .map_or_else(|| path.to_string_lossy(), |n| n.to_string_lossy())
+            .into_owned();
+        // One byte over the most a grammar may have is enough to refuse
+        // it: a huge file is never read whole.
+        let limit = oldbrainfix_core::person_settings::MAX_GRAMMAR_BYTES as u64 + 1;
+        let mut bytes = Vec::new();
+        let read = std::fs::File::open(path).and_then(|f| f.take(limit).read_to_end(&mut bytes));
+        let added = match read {
+            Ok(_) => PersonSettings::new(&self.store)
+                .add_grammar(&bytes)?
+                .map_err(|refused| refused.0),
+            Err(e) => Err(e.to_string()),
+        };
+        self.grammar_refused = match added {
+            Ok(_) => None,
+            Err(reason) => Some(self.t.grammar_refused(&name, &reason)),
+        };
+        Ok(())
+    }
+
+    /// Colours the selected Note's Code text by the grammar of the scope
+    /// `language`, or by none (obf-1036), at once.
+    fn set_code_language(&mut self, language: Option<&str>) -> oldbrainfix_core::Result<()> {
+        let Some(id) = self.text_of.clone() else {
+            return Ok(());
+        };
+        Notes::new(&self.store).set_code_language(&id, language)
+    }
+
+    /// "Keep as code" (#213): the selected Note's text made a Code text,
+    /// coloured by the language guessed for the paste or, without one,
+    /// for its whole text (obf-1036); a language it has stays where none
+    /// is guessed.
+    fn keep_as_code(&mut self) -> oldbrainfix_core::Result<()> {
+        let pasted = self.code_guess.take();
+        self.set_text_format(text_format::CODE)?;
+        let guess = pasted.or_else(|| {
+            let typed = self.typed_text();
+            let grammars = PersonSettings::new(&self.store).grammars().ok()?;
+            grammars.guess(&typed).map(|g| g.scope.clone())
+        });
+        match guess {
+            Some(scope) => self.set_code_language(Some(&scope)),
+            None => Ok(()),
+        }
     }
 
     /// Keeps the selected Note's edited text as a formatted text, at
@@ -10768,7 +10982,10 @@ impl App {
         if !files.is_empty() {
             actions.push(Action::Files(files));
         }
-        if self.viewer.is_none() && self.table.is_some() {
+        if self.spotlights.keys(ui.ctx(), &self.store) {
+            // A tip shows (obf-1043): Esc and back end its tour, and
+            // nothing goes back behind it.
+        } else if self.viewer.is_none() && self.table.is_some() {
             // Back closes the table shown full screen, the cell being
             // edited written; Alt+Left rests while a cell is typed into.
             let typing = ui.ctx().text_edit_focused();
@@ -10967,6 +11184,7 @@ impl App {
             .min_size(window_sizes::MIN_SIDEBAR)
             .show(ui, |ui| self.places_pane(ui, tones, &mut actions));
         self.sidebar_shown = sidebar.response.rect.width();
+        spotlight::anchor(ui, "sidebar", sidebar.response.rect);
         // Kept once its border is let go, as egui names the border.
         let border = ui
             .ctx()
@@ -11034,6 +11252,11 @@ impl App {
         if let Some(link) = text_marks_view::take_app_link(ui.ctx()) {
             actions.push(Action::FollowLink(link));
         }
+        // The tip showing over all of it, or the screen's tour starting
+        // (obf-1043).
+        let screen = self.spotlight_screen(ui.ctx());
+        self.spotlights
+            .show(ui.ctx(), (&self.store, &self.t, tones), screen);
         for action in actions {
             if let Some(action) = self.tick_later(ui.ctx(), action) {
                 self.apply(action);
@@ -11470,6 +11693,11 @@ impl App {
         };
         let t = self.t;
         let note = &placed.note;
+        let linked_from = self
+            .view
+            .linked_from
+            .get(&note.id)
+            .map_or(&[][..], Vec::as_slice);
         let no_boxes = BoxLook::default();
         let box_looks = &self.view.box_looks;
         let box_ticks = &self.view.box_ticks;
@@ -11499,7 +11727,12 @@ impl App {
                     let ticked = ticked_in(&note.boxes);
                     let ticks: (bool, &dyn Fn(&str) -> bool) =
                         (box_ticks.contains(&note.id), &ticked);
-                    let part = (note.id.as_str(), note.text.as_str(), &*note.text_format);
+                    let part = (
+                        note.id.as_str(),
+                        note.text.as_str(),
+                        &*note.text_format,
+                        note.code_language.as_deref(),
+                    );
                     let all = (0, note.text.len());
                     if kinded {
                         // Its name as a heading, by its kind while it has
@@ -11572,6 +11805,7 @@ impl App {
                             section.id.as_str(),
                             section.text.as_str(),
                             &*section.text_format,
+                            None,
                         );
                         if !section.text.trim().is_empty() {
                             let shown = ((0, section.text.len()), READ_SIZE);
@@ -11580,6 +11814,8 @@ impl App {
                         let (of, photos) = (&section.id, &section.photos);
                         read_photos(ui, &t, (cache, store), of, photos, actions);
                     }
+                    // At its end, after the Sections (obf-1035).
+                    app_links::linked_from(ui, &t, &note.id, linked_from);
                     ui.add_space(24.0);
                 });
             });
@@ -12109,9 +12345,8 @@ impl App {
 
     /// Does what Add to Note… asked (#308): the Notes found again for
     /// what is typed, or the Note picked, kept as added to last, gets the
-    /// capture as a Section, the quick note going as a save makes it go,
-    /// or has the Notes from the card merged into it, as Merge into…
-    /// merges them.
+    /// Ask panel's answer as a Section, or has the Notes from the card
+    /// merged into it, as Merge into… merges them.
     fn add_to_note_picked(&mut self, asked: NoteAsk) -> oldbrainfix_core::Result<()> {
         let into = match asked {
             NoteAsk::Find => {
@@ -12133,13 +12368,6 @@ impl App {
             }) => {
                 add_to_note::picked(&self.store, &into)?;
                 self.merge_picked(notes, into)?;
-            }
-            Some(Dialog::AddToNote {
-                adding: Filing::Capture,
-                ..
-            }) => {
-                add_to_note::picked(&self.store, &into)?;
-                self.capture_into_note(&into)?;
             }
             Some(Dialog::AddToNote {
                 adding: Filing::Answer(at),
@@ -12181,28 +12409,6 @@ impl App {
         Ok(())
     }
 
-    /// Adds what the quick note holds to the Note `into` at once as a
-    /// Section (#308); emptied, the quick note goes as a save makes it go.
-    /// A failure keeps all of it there.
-    fn capture_into_note(&mut self, into: &str) -> oldbrainfix_core::Result<()> {
-        let held = (
-            &self.held_photos[..],
-            &self.recorded[..],
-            &self.held_files[..],
-        );
-        capture_choices::add_to_note(&self.store, &self.capture, into, held)?;
-        self.capture.clear();
-        self.recorded.clear();
-        self.held_photos.clear();
-        self.held_files.clear();
-        // Added to what still waits to be clicked, so none goes unsaid.
-        self.untranscribable.append(&mut self.held_problems);
-        self.capture_choices = CaptureChoices::default();
-        self.quick_open = false;
-        self.capture_focus = false;
-        Ok(())
-    }
-
     /// Files what File into… was for into the place picked, a new one
     /// made first, which stays even when a Note captured is not saved.
     fn file_into_picked(&mut self, picked: Picked) -> oldbrainfix_core::Result<()> {
@@ -12221,13 +12427,6 @@ impl App {
             }) => {
                 let done = self.file_notes(&notes, &place);
                 self.unless_hidden(done, None, Action::File { notes, place })?;
-            }
-            Some(Dialog::FileInto {
-                into: Filing::Capture,
-                ..
-            }) => {
-                self.capture_choice(Ask::FileInto(place))?;
-                self.capture_focus = true;
             }
             other => self.dialog = other,
         }
@@ -12857,26 +13056,17 @@ impl App {
                         }
                     });
                 });
-                let items = [
-                    (
-                        t.menu_routine(),
-                        None,
-                        may(|n| n.schedules),
-                        Action::NewRoutine {
-                            note: Some(id.clone()),
-                            reminder: false,
-                        },
-                    ),
-                    (
-                        t.menu_reminder(),
-                        None,
-                        may(|n| n.schedules),
-                        Action::NewRoutine {
-                            note: Some(id.clone()),
-                            reminder: true,
-                        },
-                    ),
-                ];
+                // One way in for a Routine or Reminder, starting as a
+                // Reminder (#344).
+                let items = [(
+                    t.remind_me(),
+                    None,
+                    may(|n| n.schedules),
+                    Action::NewRoutine {
+                        note: Some(id.clone()),
+                        reminder: true,
+                    },
+                )];
                 menu_entries(ui, items, actions);
                 // Frogs, Sessions and Tallies are made only in Advanced
                 // (#197).
@@ -13052,7 +13242,7 @@ impl App {
         let t = self.t;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        ui.horizontal(|ui| {
+        let row = ui.horizontal(|ui| {
             let arrows = [
                 (
                     self.nav.can_go_back(),
@@ -13091,6 +13281,7 @@ impl App {
                 }
             }
         });
+        spotlight::anchor(ui, "nav", row.response.rect);
         ui.add_space(4.0);
     }
 
@@ -13278,11 +13469,13 @@ impl App {
                                         // Beside the list, in a window of
                                         // its own (#287).
                                         let open = t.note_window_open();
-                                        if let Some(id) = &windowed
-                                            && icon_button(ui, icons::OPEN_IN_NEW, open, text)
-                                                .clicked()
-                                        {
-                                            actions.push(Action::OpenWindow(id.clone()));
+                                        if let Some(id) = &windowed {
+                                            let button =
+                                                icon_button(ui, icons::OPEN_IN_NEW, open, text);
+                                            spotlight::anchor(ui, "note-window", button.rect);
+                                            if button.clicked() {
+                                                actions.push(Action::OpenWindow(id.clone()));
+                                            }
                                         }
                                     },
                                 );
@@ -13415,6 +13608,33 @@ impl App {
                             actions.push(Action::SetTextFormat(picked));
                         }
                         actions.push(Action::Badge(None));
+                    }
+                    // A Code text's language beside it (obf-1036): none or
+                    // a grammar's, the current one picked; a pick colours
+                    // it at once and closes. One not known here shows as
+                    // none until another is picked.
+                    if current == text_format::CODE {
+                        let stored = note.code_language.as_deref().filter(|l| !l.is_empty());
+                        let grammars = text_marks_view::grammars(ui.ctx());
+                        let shows = grammars.by_scope(stored).map(|g| g.scope.as_str());
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.code_language()).strong().color(text));
+                        let mut language = shows;
+                        let options = std::iter::once((None, t.code_language_none().to_string()))
+                            .chain(
+                                grammars
+                                    .all
+                                    .iter()
+                                    .map(|g| (Some(g.scope.as_str()), g.name.clone())),
+                            );
+                        // Too many for chips: one per line (#226).
+                        if radio_column(ui, &mut language, options) {
+                            if language != stored {
+                                let language = language.map(str::to_string);
+                                actions.push(Action::SetCodeLanguage(language));
+                            }
+                            actions.push(Action::Badge(None));
+                        }
                     }
                 })
             }
@@ -13790,37 +14010,22 @@ impl App {
     }
 
     /// The quick note's content (UI laws, "Capture"), in its dialog
-    /// (#146): it never asks anything.
-    /// Once something is typed, "To full editor" shows (#142) and beside
-    /// it what of the Note card's buttons (#113) this Device switched on
-    /// in Settings ▸ Quick note, whose choices show at the top, not saved
-    /// yet, and under them the Nudge times, Ctrl+Enter taking the 1 h
-    /// one and Ctrl+1 to 3 each of them (#277); a Note filed or with something set up, or where the Nudge
-    /// buttons are switched off, gets one Save instead, nudging only an
-    /// Unsorted Note. With a Shopping List picked in "More", the lines go
-    /// into it instead of a Note (#124). Above the field the Kind choice,
-    /// Text, Checklist or Shopping List, makes the Note that Kind as it is
-    /// saved (#310). The format bar shows over the field where it is
-    /// switched on.
+    /// (#146): it never asks anything. The text, and once something is
+    /// typed or held, More (#352), which saves the Note and opens it in
+    /// the Note dialog, and under it the Nudge times, Ctrl+Enter taking
+    /// the 1 h one and Ctrl+1 to 3 each of them (#277); a Note filed by a
+    /// list's "+", or where the Nudge buttons are switched off, gets one
+    /// Save instead, nudging only an Unsorted Note. What the files
+    /// dropped, File ▸ Attach file… and Ctrl+V brought shows above the
+    /// text; everything else is the Note dialog's.
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let place = self.capture_place();
         let sorted = self.capture_choices.sorted(place.as_deref());
-        // The Area shown is where it goes, not a choice to drop.
-        let place_chip = self.capture_choices.place.as_ref().and_then(|id| {
-            capture_choices::place_name(&t, &self.view.areas, id).map(|name| (name, true))
-        });
-        let spawns = self.view.capture_spawns;
         let quick = self.view.capture_quick;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let id = Id::new("capture");
-        let recording = self
-            .recorder
-            .as_ref()
-            .filter(|r| r.recording())
-            .map(|r| r.elapsed());
-        let has_recorder = self.recorder.is_some();
         let has_clipboard = self.clipboard.is_some();
         embossed(ui, tones, false, None, |ui| {
             // Ctrl+Enter saves, and Ctrl+1 to 3 with the Nudge buttons'
@@ -13831,73 +14036,18 @@ impl App {
             {
                 actions.push(Action::Capture(nudge_in));
             }
-            // Announcements and choices go to the top (UI laws).
-            let shown = (place_chip, self.view.capture_lists.as_slice());
-            if let Some(asked) = capture_choices::chips(ui, &t, &self.capture_choices, shown) {
-                actions.push(Action::CaptureChoice(asked));
-            }
             // Ctrl+V in the empty field takes text and picture alike,
             // before the field takes the text alone (#130).
             let blank = self.capture.trim().is_empty();
-            if has_clipboard
-                && recording.is_none()
-                && let Some(text) = paste::ctrl_v(ui, id, blank, &mut self.paste_held)
+            if has_clipboard && let Some(text) = paste::ctrl_v(ui, id, blank, &mut self.paste_held)
             {
                 self.paste(ui, id, text);
             }
             if self.paste_empty {
                 paste::empty_line(ui, &t);
             }
-            // The Kind it is made, above the field (#310); a pick hands the
-            // cursor back to the field, to type on.
-            if recording.is_none()
-                && let Some(kind) = capture_choices::kind_choice(ui, &t, &self.capture_choices)
-            {
-                actions.push(Action::CaptureChoice(kind));
-                self.capture_focus = true;
-            }
-            if quick.format_bar {
-                format_bar::capture_bar(ui, &t, id, &mut self.capture, (text, tones.accent));
-            }
-            let field = ui.add(
-                TextEdit::multiline(&mut self.capture)
-                    .id(id)
-                    .hint_text(t.capture_hint())
-                    .text_color(text)
-                    // The text typed at the Device's text size (#326).
-                    .font(FontId::proportional(theme::content(ui, 16.0)))
-                    .desired_rows(2)
-                    .desired_width(f32::INFINITY)
-                    .frame(Frame::NONE),
-            );
-            // Its right-click menu, with the bar's formats while the
-            // bar shows (#253); Paste as the capture's Paste (#130).
-            let formats: &[Format] = if quick.format_bar {
-                &Format::CAPTURE
-            } else {
-                &[]
-            };
-            match text_menu::menu(ui, &t, &field, &self.capture, formats) {
-                Some(MenuPick::Format(format)) => {
-                    format_bar::put(ui, id, &mut self.capture, format)
-                }
-                Some(MenuPick::Paste) if has_clipboard => self.paste(ui, id, None),
-                Some(pick) => text_menu::apply(ui, id, &self.capture, pick),
-                None => {}
-            }
-            name_field(ui, &field, t.capture_field_name());
-            // File ▸ New Note: after the field, so the menu's click does
-            // not take it out again; asked again past the dialog's first,
-            // sizing pass, which drops it.
-            if self.capture_focus {
-                field.request_focus();
-                self.capture_focus = ui.is_sizing_pass() || !field.has_focus();
-            }
-            if field.changed() {
-                self.paste_empty = false;
-            }
-            // A stopped recording, a picture pasted and the files chosen
-            // or dropped stay here until the Note is saved.
+            // A recording, a picture pasted and the files dropped stay
+            // here, above the text, until the Note is saved (#352).
             for _ in &self.recorded {
                 ui.horizontal(|ui| {
                     icons::show(ui, icons::MIC, 18.0, text);
@@ -13917,42 +14067,44 @@ impl App {
                     ui.label(RichText::new(&file.name).color(text));
                 });
             }
-            if has_recorder {
-                match media_view::voice_button(ui, &t, recording) {
-                    Some(Voice::Record) => actions.push(Action::Record),
-                    Some(Voice::Stop) => actions.push(Action::StopRecording),
-                    None => {}
-                }
+            let field = ui.add(
+                TextEdit::multiline(&mut self.capture)
+                    .id(id)
+                    .hint_text(t.capture_hint())
+                    .text_color(text)
+                    // The text typed at the Device's text size (#326).
+                    .font(FontId::proportional(theme::content(ui, 16.0)))
+                    .desired_rows(2)
+                    .desired_width(f32::INFINITY)
+                    .frame(Frame::NONE),
+            );
+            spotlight::anchor(ui, "quick-text", field.rect);
+            // Its right-click menu; Paste as Ctrl+V's (#130).
+            match text_menu::menu(ui, &t, &field, &self.capture, &[]) {
+                Some(MenuPick::Paste) if has_clipboard => self.paste(ui, id, None),
+                Some(pick) => text_menu::apply(ui, id, &self.capture, pick),
+                None => {}
             }
-            if has_clipboard && recording.is_none() {
-                if paste::button(ui, &t) {
-                    self.paste(ui, id, None);
-                }
-                ui.label(RichText::new(t.photos_hint()).small().color(weak));
+            name_field(ui, &field, t.capture_field_name());
+            // File ▸ New Note: after the field, so the menu's click does
+            // not take it out again; asked again past the dialog's first,
+            // sizing pass, which drops it.
+            if self.capture_focus {
+                field.request_focus();
+                self.capture_focus = ui.is_sizing_pass() || !field.has_focus();
             }
-            if recording.is_none() {
-                ui.horizontal(|ui| {
-                    icons::show(ui, icons::FOLDER_OPEN, 20.0, text);
-                    if ui
-                        .button(RichText::new(t.from_file()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::PickFiles);
-                    }
-                });
-                ui.label(RichText::new(t.from_file_hint()).small().color(weak));
+            if field.changed() {
+                self.paste_empty = false;
             }
-            if self.capture.trim().is_empty() && recording.is_none() && !self.holds_media() {
+            if self.capture.trim().is_empty() && !self.recording() && !self.holds_media() {
                 return;
             }
             ui.add_space(4.0);
-            let offer = (spawns, self.capture_lists());
-            let row = (&quick, true);
-            match capture_choices::action_row(ui, &t, &self.capture_choices, offer, row) {
-                Some(RowAsk::Choice(asked)) => actions.push(Action::CaptureChoice(asked)),
-                Some(RowAsk::ToEditor) => actions.push(Action::CaptureToEditor),
-                Some(RowAsk::AddToNote) => actions.push(Action::CaptureAddToNote),
-                None => {}
+            // Saves as leaving does and opens the Note dialog (#352).
+            let more = ui.button(RichText::new(t.more()).color(text));
+            spotlight::anchor(ui, "quick-more", more.rect);
+            if more.clicked() {
+                actions.push(Action::CaptureToEditor);
             }
             ui.add_space(4.0);
             if sorted || !quick.nudge_buttons {
@@ -13970,7 +14122,7 @@ impl App {
                 return;
             }
             ui.label(RichText::new(t.nudge_heading()).strong().color(text));
-            ui.horizontal(|ui| {
+            let nudges = ui.horizontal(|ui| {
                 let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
                 for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times()) {
                     if ui.button(RichText::new(label).color(text)).clicked() {
@@ -13978,6 +14130,7 @@ impl App {
                     }
                 }
             });
+            spotlight::anchor(ui, "quick-nudges", nudges.response.rect);
             ui.label(
                 RichText::new(t.capture_nudge_keys_hint())
                     .small()
@@ -14042,7 +14195,8 @@ impl App {
         }
         let text = ui.visuals().text_color();
         ui.horizontal(|ui| {
-            ui.heading(RichText::new(self.title()).color(text));
+            let heading = ui.heading(RichText::new(self.title()).color(text));
+            spotlight::anchor(ui, "heading", heading.rect);
             // Every Note list but the trash has its compact/detailed switch.
             if self.cards_key().is_some() && compact_button(ui, tones, &self.t, self.view.compact) {
                 actions.push(Action::Compact(!self.view.compact));
@@ -14081,6 +14235,7 @@ impl App {
                         .text_color(text)
                         .desired_width(ui.available_width() - 32.0),
                 );
+                spotlight::anchor(ui, "search", field.rect);
                 text_menu::show(ui, &self.t, &field, &self.query);
                 // Edit ▸ Find: after the field, so the menu's click does
                 // not take it out again.
@@ -14177,6 +14332,7 @@ impl App {
                         description: self.view.descriptions_unfolded.contains(id),
                     },
                     sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
+                    linked_from: self.view.linked_from.get(id).map_or(&[], Vec::as_slice),
                     checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                     shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
                     tally: self.view.tallies.contains(id),
@@ -14213,6 +14369,9 @@ impl App {
                 );
                 if scroll_to.as_deref() == Some(id.as_str()) {
                     clicks.card.scroll_to_me(None);
+                }
+                if order.first() == Some(id) {
+                    spotlight::anchor(ui, "first-card", clicks.card.rect);
                 }
                 // Dragged, the card takes the cards selected with it when
                 // it is one of them (#148).
@@ -14458,6 +14617,11 @@ impl App {
         let t = self.t;
         let note = &placed.note;
         let trashed = note.is_trashed();
+        let linked_from = self
+            .view
+            .linked_from
+            .get(&note.id)
+            .map_or(&[][..], Vec::as_slice);
         // "Keep as code" under a paste that looks like code (#213).
         let offers_code = self.code_offer.is_some()
             && self.code_offer == self.text_of
@@ -14504,6 +14668,42 @@ impl App {
         let today = Day::today(store.now(), &*self.wall);
         // Its one Reminder goes with it, where this Device moves it.
         let trashes = may.changes && linked.len() == 1;
+        // Record voice and Paste onto it (#352), while a microphone and
+        // a clipboard are there; Record voice only in the window's Note
+        // dialog, as a Note's own window only borrows the microphone
+        // while it draws (#287).
+        let alone = self.alone.is_some();
+        let recording = self
+            .recorder
+            .as_ref()
+            .filter(|r| r.recording())
+            .map(|r| r.elapsed());
+        let has_recorder = self.recorder.is_some() && !alone;
+        let has_clipboard = self.clipboard.is_some();
+        let paste_empty = self.note_paste_empty;
+        // Add to a Shopping List (#352): a Plain Note with nothing that
+        // needs it, as a capture sorted into a list makes no Note.
+        let pours = may.changes
+            && !alone
+            && !trashed
+            && !kinded
+            && !note.is_merged()
+            && !note.spawned
+            && note_frog.is_none()
+            && session_setup.is_none()
+            && sections.is_empty()
+            && note.photos.is_empty()
+            && note.attachments.is_empty();
+        let lists: Vec<ListTitle> = if pours {
+            self.view
+                .capture_lists
+                .iter()
+                .filter(|(id, _)| *id != note.id)
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        };
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
@@ -14546,6 +14746,7 @@ impl App {
                                         stored: &section.text,
                                         formatted: section.text_format == text_format::MARKDOWN,
                                         code: false,
+                                        language: None,
                                         offers_code: false,
                                         bar: self.view.advanced,
                                         boxes: look,
@@ -14690,7 +14891,7 @@ impl App {
                                 read_text::shown(ui, |ui| {
                                     text_marks_view::code_text_label(
                                         ui,
-                                        &note.text,
+                                        (&note.text, note.code_language.as_deref()),
                                         all,
                                         look,
                                         (false, true),
@@ -14748,6 +14949,7 @@ impl App {
                             stored: &note.text,
                             formatted,
                             code,
+                            language: note.code_language.as_deref(),
                             // A paste that looks like code offers it (#213).
                             offers_code: !code,
                             bar: self.view.advanced,
@@ -14860,15 +15062,31 @@ impl App {
                         );
                     });
                 }
-                // Files of any kind onto this Note, as a drop on the dialog
-                // brings them (#267).
+                // A recording, the clipboard and files of any kind onto
+                // this Note (#352), as a drop on the dialog brings them
+                // (#267); a recording running ends by one big stop button.
                 if may.changes && !trashed {
-                    let attach = ui.horizontal(|ui| {
-                        icons::show(ui, icons::ATTACH_FILE, 20.0, text);
-                        ui.button(RichText::new(t.attach_file_menu()).color(text))
+                    if has_recorder {
+                        match media_view::voice_button(ui, &t, recording) {
+                            Some(Voice::Record) => actions.push(Action::Record),
+                            Some(Voice::Stop) => actions.push(Action::StopRecording),
+                            None => {}
+                        }
+                    }
+                    ui.horizontal_wrapped(|ui| {
+                        if has_clipboard && recording.is_none() && paste::button(ui, &t) {
+                            actions.push(Action::PasteOntoNote);
+                        }
+                        let attach = ui.horizontal(|ui| {
+                            icons::show(ui, icons::ATTACH_FILE, 20.0, text);
+                            ui.button(RichText::new(t.attach_file_menu()).color(text))
+                        });
+                        if attach.inner.clicked() {
+                            actions.push(Action::AttachFiles);
+                        }
                     });
-                    if attach.inner.clicked() {
-                        actions.push(Action::AttachFiles);
+                    if paste_empty {
+                        paste::empty_line(ui, &t);
                     }
                 }
                 // On the page, their text where the boxes' text begins and
@@ -14878,6 +15096,8 @@ impl App {
                         .inner_margin(Margin::symmetric(16, 0))
                         .show(ui, |ui| draw_sections(ui, &mut *cache, actions));
                 }
+                // At the Note's end, after its Sections (obf-1035).
+                app_links::linked_from(ui, &t, &note.id, linked_from);
                 if trashed {
                     // Where it is now, to be restored at once.
                     ui.horizontal(|ui| {
@@ -15074,6 +15294,18 @@ impl App {
                         .clicked()
                     {
                         actions.push(Action::StartMerge);
+                    }
+                    // Its lines into a Shopping List there is (#352), the
+                    // one used last at the top (#276).
+                    if !lists.is_empty() {
+                        let label = RichText::new(t.add_to_shopping_list()).color(text);
+                        ui.menu_button(label, |ui| {
+                            if let Some(list) =
+                                capture_choices::shopping_picker(ui, &t, None, &lists)
+                            {
+                                actions.push(Action::PourIntoShopping(list));
+                            }
+                        });
                     }
                     if theme::destructive(ui, true, t.move_to_trash()).clicked() {
                         actions.push(Action::Trash);
@@ -15730,14 +15962,21 @@ impl App {
                 actions.push(Action::NewNote);
             }
             // Room for the buttons at the end: 24 wide and 8 apart, and
-            // New Session only in Advanced (#197, #246).
+            // New Session only in Advanced (#197, #246); ⋮ while it has
+            // "Quiet today" to offer, once the Agenda is read (obf-1044).
             let advanced = self.view.advanced;
-            let room = if advanced { 92.0 } else { 60.0 };
+            let menu = self.view.agenda.as_ref().is_some_and(|a| !a.quiet);
+            let buttons = 2 + usize::from(advanced) + usize::from(menu);
+            let room = buttons as f32 * 32.0 - 4.0;
             ui.add_space((ui.available_width() - room).max(0.0));
-            if icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text).clicked() {
+            let all = icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text);
+            spotlight::anchor(ui, "all-routines", all.rect);
+            if all.clicked() {
                 actions.push(Action::Select(Selection::AllRoutines));
             }
-            if icon_button(ui, icons::ADD_ALARM, t.new_routine_tooltip(), text).clicked() {
+            let new = icon_button(ui, icons::ADD_ALARM, t.new_routine_tooltip(), text);
+            spotlight::anchor(ui, "new-routine", new.rect);
+            if new.clicked() {
                 actions.push(Action::NewRoutine {
                     note: None,
                     reminder: false,
@@ -15746,6 +15985,24 @@ impl App {
             // Filed into no Area, so this Device may always set one up.
             if advanced && icon_button(ui, icons::SESSION, t.new_session(), text).clicked() {
                 actions.push(Action::NewSession(None));
+            }
+            // The Agenda's menu, the phone's ⋮ in its bar.
+            if menu {
+                let more = icon_button(
+                    ui,
+                    icons::MORE_VERT,
+                    &t.occurrence_menu(t.agenda_title()),
+                    text,
+                );
+                spotlight::anchor(ui, "agenda-menu", more.rect);
+                egui::Popup::menu(&more).show(|ui| {
+                    if ui
+                        .button(RichText::new(t.quiet_today()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::QuietToday);
+                    }
+                });
             }
         });
         ui.add_space(8.0);
@@ -15757,6 +16014,10 @@ impl App {
             // Tighter than 0.3.1's 12 (#208).
             ui.spacing_mut().item_spacing.y = 6.0;
             ui.add_space(4.0);
+            // First of all while today is quiet (obf-1044).
+            if agenda.quiet {
+                quiet_day_line(ui, &t, tones, actions);
+            }
             if !agenda.missed.is_empty() {
                 missed_card(ui, &t, tones, &agenda.missed, actions);
             }
@@ -16549,6 +16810,7 @@ impl App {
                     .text_color(text)
                     .desired_width(ui.available_width() - 32.0),
             );
+            spotlight::anchor(ui, "settings-search", field.rect);
             name_field(ui, &field, t.settings_search_hint());
             text_menu::show(ui, &t, &field, &self.settings_query);
             if std::mem::take(&mut self.settings_find) {
@@ -16585,6 +16847,8 @@ impl App {
         let trashes_done = PersonSettings::new(&self.store)
             .trashes_done_reminder()
             .unwrap_or(false);
+        let grammars = text_marks_view::grammars(ui.ctx());
+        let grammar_refused = self.grammar_refused.clone();
         let quick = self.view.capture_quick;
         let advanced = self.view.advanced;
         // The section an app link opened the Settings at (#261).
@@ -16630,6 +16894,7 @@ impl App {
                         t.text_size_larger(),
                         t.text_size_largest(),
                     ],
+                    &[t.settings_show_tips()],
                 ],
             );
             if shows.contains(&true) {
@@ -16694,6 +16959,15 @@ impl App {
                                 .color(weak),
                         );
                     }
+                    // The tips of every screen back on this computer
+                    // (obf-1043).
+                    if shows[4] {
+                        let again = ui.button(RichText::new(t.settings_show_tips()).color(text));
+                        spotlight::anchor(ui, "settings-show-tips", again.rect);
+                        if again.clicked() {
+                            actions.push(Action::ShowTipsAgain);
+                        }
+                    }
                 });
             }
             // Every AI setting is on a page of its own (#335): one row
@@ -16751,12 +17025,11 @@ impl App {
                     );
                 });
             }
-            let rows = quick_note_rows(&t, &quick);
-            let shows = quick_note_shows(q, &t, &rows);
+            let shows = quick_note_shows(q, &t);
             if shows.contains(&true) {
                 found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    quick_note_card(ui, &t, (&quick, &rows, &shows), actions);
+                    quick_note_card(ui, &t, (&quick, &shows), actions);
                 });
             }
             if let Some(speech) = speech {
@@ -16978,6 +17251,49 @@ impl App {
                     ui.label(RichText::new(t.show_streaks_detail()).small().color(weak));
                 });
             }
+            // The person's own grammars (obf-1037), on all of their own
+            // Devices: each with what it replaces, or its scope, and
+            // Remove; then "Add grammar…" and, under it, why the file
+            // picked last was not added.
+            let [own_grammars] = settings_search::rows(
+                q,
+                Some(t.grammars_title()),
+                [&[t.grammars_hint(), t.grammar_add()]],
+            );
+            if own_grammars {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.grammars_title()).strong().color(text));
+                    ui.label(RichText::new(t.grammars_hint()).small().color(weak));
+                    for grammar in &grammars.added {
+                        let under = match Grammars::built_in().by_scope(Some(&grammar.scope)) {
+                            Some(built_in) => t.grammar_in_place_of(&built_in.name),
+                            None => grammar.scope.clone(),
+                        };
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.spacing_mut().item_spacing.y = 2.0;
+                                ui.label(RichText::new(&grammar.name).color(text));
+                                ui.label(RichText::new(under).small().color(weak));
+                            });
+                            if ui
+                                .button(RichText::new(t.grammar_remove()).color(text))
+                                .clicked()
+                            {
+                                actions.push(Action::RemoveGrammar(grammar.scope.clone()));
+                            }
+                        });
+                    }
+                    let add = ui.button(RichText::new(t.grammar_add()).color(text));
+                    spotlight::anchor(ui, "settings-grammar", add.rect);
+                    if add.clicked() {
+                        actions.push(Action::AddGrammar);
+                    }
+                    if let Some(refused) = &grammar_refused {
+                        ui.label(RichText::new(refused).color(ui.visuals().error_fg_color));
+                    }
+                });
+            }
             // Simple or Advanced, the person's (#197), last, so the
             // settings of this computer come first; found by its options.
             let [features] = settings_search::rows(
@@ -16993,13 +17309,14 @@ impl App {
             );
             if features {
                 found = true;
-                embossed(ui, tones, false, None, |ui| {
+                let card = embossed(ui, tones, false, None, |ui| {
                     heading(ui, t.features(), "features");
                     let mut picked = advanced;
                     if starter_set_view::features_choice(ui, &t, &mut picked) {
                         actions.push(Action::Setting(Setting::Advanced(picked)));
                     }
                 });
+                spotlight::anchor(ui, "settings-features", card.rect);
             }
             if !found {
                 ui.label(RichText::new(t.settings_search_nothing(&typed)).color(text));
@@ -18464,6 +18781,27 @@ fn count_banner(ui: &mut Ui, tones: Tones, (id, icon): (Id, char), said: &str) -
     })
 }
 
+/// The quiet day's line on top of the Agenda (obf-1044), a card as "x
+/// Sent Items waiting" but not clicked as a whole: "Quiet day until
+/// midnight" and End, which ends it now.
+fn quiet_day_line(ui: &mut Ui, t: &L10n, tones: Tones, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    embossed(ui, tones, false, None, |ui| {
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::NOTIFICATIONS_OFF, 20.0, tones.accent);
+            ui.label(RichText::new(t.quiet_day_line()).color(text));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .button(RichText::new(t.quiet_day_end()).color(text))
+                    .clicked()
+                {
+                    actions.push(Action::EndQuietDay);
+                }
+            });
+        });
+    });
+}
+
 /// An embossed card holding `content` that is clicked as a whole, a
 /// button with `id` labelled `label`; whether it was clicked.
 pub(crate) fn clickable_card(
@@ -18879,95 +19217,43 @@ fn quick_capture_card(
     ui.label(RichText::new(t.capture_command()).small().color(weak));
 }
 
-/// A switch of the quick note's card: what it shows and its label.
-type QuickNoteSwitch = (QuickNoteControl, bool, &'static str);
-
-/// The switches of the Settings' card on the quick note (#142) offered
-/// here, one for each of the Note card's buttons and the format bar.
-fn quick_note_rows(t: &L10n, quick: &QuickNote) -> Vec<QuickNoteSwitch> {
-    let switches = [
-        (QuickNoteControl::FileInto, quick.file_into, t.file_into()),
-        (
-            QuickNoteControl::Schedule,
-            quick.schedule,
-            t.quick_note_schedule(),
-        ),
-        (
-            QuickNoteControl::Shopping,
-            quick.shopping,
-            t.add_to_shopping_list(),
-        ),
-        (
-            QuickNoteControl::Importance,
-            quick.importance,
-            t.importance(),
-        ),
-        (
-            QuickNoteControl::FormatBar,
-            quick.format_bar,
-            t.quick_note_format_bar(),
-        ),
-    ];
-    // The format bar, Frogs, Sessions and Tallies are offered only in
-    // Advanced (#197); the alarm clock offers a Routine or Reminder
-    // without the switch (#223).
-    switches
-        .into_iter()
-        .filter(|(control, _, _)| {
-            quick.advanced
-                || !matches!(
-                    control,
-                    QuickNoteControl::FormatBar | QuickNoteControl::Schedule
-                )
-        })
-        .collect()
-}
-
 /// Which rows of the quick note's card the search `query` shows (#282):
-/// its detail line, each of `switches` and the Nudge buttons, in order.
-fn quick_note_shows(query: &str, t: &L10n, switches: &[QuickNoteSwitch]) -> Vec<bool> {
+/// its detail line and the Nudge buttons, in order.
+fn quick_note_shows(query: &str, t: &L10n) -> [bool; 2] {
     let whole = settings_search::heading_matches(query, Some(t.settings_quick_note()));
     let shows = |words: &[&str]| whole || settings_search::matches(words, query);
-    let mut rows = vec![shows(&[t.settings_quick_note_detail_device()])];
-    rows.extend(switches.iter().map(|(_, _, label)| shows(&[label])));
-    rows.push(shows(&[
-        t.quick_note_nudge_buttons(),
-        t.quick_note_nudge_buttons_detail(),
-    ]));
-    rows
+    [
+        shows(&[t.settings_quick_note_detail_device()]),
+        shows(&[
+            t.quick_note_nudge_buttons(),
+            t.quick_note_nudge_buttons_detail(),
+        ]),
+    ]
 }
 
 /// The Settings' card on what the quick note, its dialog in the window
-/// and the popup, shows besides its text (#142): one switch for each of
-/// the Note card's `switches`, off until switched on, and the Nudge
-/// buttons, on until switched off; of them the rows `shows` (#282).
+/// and the popup, shows besides its text and More (#142, #352): the
+/// Nudge buttons, on until switched off; of it the rows `shows` (#282).
+/// The switches for File into…, the Frog and Session, Add to a Shopping
+/// List, the Importance and the format bar went with those controls
+/// into the Note dialog; what they stored stays, unused.
 fn quick_note_card(
     ui: &mut Ui,
     t: &L10n,
-    (quick, switches, shows): (&QuickNote, &[QuickNoteSwitch], &[bool]),
+    (quick, shows): (&QuickNote, &[bool; 2]),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let shown = |row: usize| shows.get(row).copied().unwrap_or(true);
     ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
-    if shown(0) {
+    if shows[0] {
         ui.label(
             RichText::new(t.settings_quick_note_detail_device())
                 .small()
                 .color(weak),
         );
     }
-    for (row, &(control, on, label)) in switches.iter().enumerate() {
-        if !shown(row + 1) {
-            continue;
-        }
-        let mut on = on;
-        if theme::checkbox(ui, &mut on, RichText::new(label).color(text)).changed() {
-            actions.push(Action::Setting(Setting::QuickNote(control, on)));
-        }
-    }
-    if !shown(switches.len() + 1) {
+    if !shows[1] {
         return;
     }
     let mut on = quick.nudge_buttons;
@@ -19445,6 +19731,7 @@ fn read_agenda(
             frogs: Some(today),
             frog_rows,
             hides_checked,
+            quiet: PersonSettings::new(store).quiet_until(wall)?.is_some(),
         },
         seq,
     ))
@@ -20523,10 +20810,10 @@ fn code_offer(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
             .button(RichText::new(t.keep_as_code()).color(text))
             .clicked()
         {
-            actions.push(Action::SetTextFormat(text_format::CODE));
+            actions.push(Action::KeepAsCode);
         }
         if icon_button(ui, icons::CLOSE, t.close(), text).clicked() {
-            actions.push(Action::OfferCode(false));
+            actions.push(Action::OfferCode(false, None));
         }
     });
 }
@@ -20559,7 +20846,7 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 /// opening its editor, and those a newer version saved, only shown; its
 /// Frog, open or eaten today or yesterday, offering Eat now and Remove
 /// the Frog (#259); a Session's rule and weekdays' counts (#191); Show on the
-/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog while none is
+/// Agenda; Show ticks; and "+" with Remind me… (#344), Frog while none is
 /// open and, on a plain Note, Session, for who may set them up. A setting that does not
 /// apply has no badge; one this Device may not change only shows.
 fn note_badges(
@@ -20584,7 +20871,9 @@ fn note_badges(
             BadgeValue::Text(name)
         });
         let kind = (icons::KIND, None);
-        if badge(ui, look, kind, t.badge_kind(), value, choosing).clicked() {
+        let kind = badge(ui, look, kind, t.badge_kind(), value, choosing);
+        spotlight::anchor(ui, "note-kind", kind.rect);
+        if kind.clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
         }
         let importance = match note.importance {
@@ -20602,16 +20891,16 @@ fn note_badges(
         let area = placed.area.as_ref();
         let colour = area.and_then(|a| area_colour(a.colour.as_deref()));
         let place = place_line(t, placed).unwrap_or_else(|| t.unsorted().to_string());
-        if badge(
+        let place = badge(
             ui,
             look,
             (icons::NO_AREA_ICON, colour),
             t.badge_place(),
             Some(BadgeValue::Text(&place)),
             changes,
-        )
-        .clicked()
-        {
+        );
+        spotlight::anchor(ui, "note-place", place.rect);
+        if place.clicked() {
             actions.push(Action::AskFileInto(vec![note.id.clone()]));
         }
         let captured = when(t, note.captured);
@@ -20663,7 +20952,12 @@ fn note_badges(
             let (icon, name) = text_format_look(t, &note.text_format);
             let value = Some(BadgeValue::Icon(icon, name));
             let setting = (icons::TEXT_FORMAT, None);
-            if badge(ui, look, setting, t.badge_text_format(), value, changes).clicked() {
+            let format = badge(ui, look, setting, t.badge_text_format(), value, changes);
+            // Its small editor picks a Code text's language (obf-1036).
+            if changes && note.text_format == text_format::CODE {
+                spotlight::anchor(ui, "note-format-code", format.rect);
+            }
+            if format.clicked() {
                 actions.push(Action::Badge(Some(NoteBadge::Format)));
             }
         }
@@ -20744,27 +21038,21 @@ fn note_badges(
             None,
             true,
         );
+        // Its menu holds Remind me… (obf-1034).
+        spotlight::anchor(ui, "note-add-badge", add.rect);
         let id = note.id.clone();
         let text = ui.visuals().text_color();
         egui::Popup::menu(&add).show(|ui| {
-            let mut entries = vec![
-                (
-                    icons::REPEAT,
-                    t.routine(),
-                    Action::NewRoutine {
-                        note: Some(id.clone()),
-                        reminder: false,
-                    },
-                ),
-                (
-                    icons::REMINDER,
-                    t.reminder(),
-                    Action::NewRoutine {
-                        note: Some(id.clone()),
-                        reminder: true,
-                    },
-                ),
-            ];
+            // One way in for a Routine or Reminder, starting as a
+            // Reminder (#344).
+            let mut entries = vec![(
+                icons::REMINDER,
+                t.remind_me(),
+                Action::NewRoutine {
+                    note: Some(id.clone()),
+                    reminder: true,
+                },
+            )];
             // A Note has one open Frog at a time; Frogs and Sessions are
             // made only in Advanced (#197).
             let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
@@ -20987,6 +21275,9 @@ struct CardLook<'a> {
     /// Which of its folds this Device keeps open (#189).
     folds: CardFolds,
     sections: &'a [Section],
+    /// The Notes that link to it, at the end of its detailed view
+    /// (obf-1035).
+    linked_from: &'a [Note],
     checklist: Option<(&'a Checklist, bool)>,
     shopping: Option<(&'a ShoppingList, bool)>,
     /// Whether the Note is a Tally, whose full card shows its name and
@@ -21024,8 +21315,8 @@ struct CardLook<'a> {
     place: bool,
 }
 
-/// What a card's menu offers of the Note's Routines (#281): Routine…
-/// and Reminder… with `schedules`, Frog with `frog` and Session… with
+/// What a card's menu offers of the Note's Routines (#281): Remind me…
+/// (#344) with `schedules`, Frog with `frog` and Session… with
 /// `session`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CardSpawns {
@@ -21260,9 +21551,11 @@ fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
     let text = ui.visuals().text_color();
     if let [kind] = kinds {
         let add = icon_button(ui, icons::ADD, t.menu_new_note(), text);
+        spotlight::anchor(ui, "add", add.rect);
         return add.clicked().then_some(*kind);
     }
     let add = icon_button(ui, icons::ADD, t.add_here(), text);
+    spotlight::anchor(ui, "add", add.rect);
     let mut picked = None;
     egui::Popup::menu(&add).show(|ui| {
         for kind in kinds {
@@ -21294,6 +21587,7 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
         (icons::NOTES_FULL, t.show_notes_compact())
     };
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
+    spotlight::anchor(ui, "compact", rect);
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
     // The hover under the tint, so the selected look stays.
     theme::icon_button_back(ui, &resp, rect);
@@ -21317,9 +21611,11 @@ struct EditedText<'a> {
     /// Its text as stored, and whether it is a formatted one.
     stored: &'a str,
     formatted: bool,
-    /// Whether it is a Code text (#213), and whether a paste that looks
-    /// like code offers it.
+    /// Whether it is a Code text (#213), the scope of the grammar it is
+    /// coloured by (obf-1036), and whether a paste that looks like code
+    /// offers it.
     code: bool,
+    language: Option<&'a str>,
     offers_code: bool,
     /// Whether the format bar shows above it: only in Advanced (#197);
     /// typed Markdown and Ctrl+B and Ctrl+I format either way.
@@ -21453,18 +21749,32 @@ fn edited_text(
         let accent = ui.visuals().hyperlink_color;
         let weak = ui.visuals().weak_text_color();
         let code = ui.visuals().code_bg_color;
+        let dark = ui.visuals().dark_mode;
         let small = FontId::proportional(13.0);
+        let grammars = text_marks_view::grammars(ui.ctx());
+        let grammar = grammars.by_scope(edit.language);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(typed_size);
-            // A Code text as written in the fixed-width font, unwrapped.
+            // A Code text as written in the fixed-width font, unwrapped,
+            // coloured by its language (obf-1036).
             if as_code {
                 let format = egui::TextFormat::simple(FontId::monospace(typed_size * 0.9), written);
-                let job = egui::text::LayoutJob::single_section(typed.to_string(), format);
+                let mut job = egui::text::LayoutJob::single_section(typed.to_string(), format);
+                if let Some(grammar) = grammar {
+                    let colours = text_marks_view::code_colours(ui.ctx(), grammar, typed);
+                    text_marks_view::paint_code(&mut job, 0, &colours, dark);
+                }
                 return ui.fonts_mut(|f| f.layout_job(job));
             }
             let (job, lines) = if formatted {
-                text_marks_view::source_job(typed, font.clone(), (written, accent, weak, code))
+                let colours = (written, accent, weak, code);
+                let (mut job, lines) = text_marks_view::source_job(typed, font.clone(), colours);
+                // Its code blocks coloured by the language their fences
+                // name (obf-1036).
+                let fences = text_marks_view::fence_colours(ui.ctx(), typed);
+                text_marks_view::paint_code(&mut job, 0, &fences, dark);
+                (job, lines)
             } else {
                 let job = text_marks_view::tag_job(
                     typed,
@@ -21495,15 +21805,22 @@ fn edited_text(
         // Pasted, a text that looks like code offers it and formats
         // nothing (#213); else pasted with a format, a plain text
         // becomes a formatted one (ADR 0033).
-        let pasted_code = edit.offers_code
-            && focused
-            && ui.input(|i| {
-                i.events.iter().any(|e| {
-                    matches!(e, egui::Event::Paste(p)
-                        if p.chars().nth(1).is_some() && text_format::looks_like_code(p))
+        // With the language guessed for it (obf-1036).
+        let pasted_code = (edit.offers_code && focused)
+            .then(|| {
+                ui.input(|i| {
+                    i.events.iter().find_map(|e| match e {
+                        egui::Event::Paste(p)
+                            if p.chars().nth(1).is_some() && text_format::looks_like_code(p) =>
+                        {
+                            Some(grammars.guess(p).map(|g| g.scope.clone()))
+                        }
+                        _ => None,
+                    })
                 })
-            });
-        let pasted = !pasted_code
+            })
+            .flatten();
+        let pasted = pasted_code.is_none()
             && focused
             && ui.input(|i| {
                 i.events
@@ -21628,8 +21945,8 @@ fn edited_text(
             *editing = false;
             actions.push(Action::SaveText);
         }
-        if output.response.response.changed() && pasted_code {
-            actions.push(Action::OfferCode(true));
+        if let Some(guess) = pasted_code.filter(|_| output.response.response.changed()) {
+            actions.push(Action::OfferCode(true, guess));
         }
         // A shortcut typed makes a plain text a formatted
         // one, as the first format from the bar does.
@@ -21879,6 +22196,7 @@ fn kinded_text(
             stored: note_kinds::description(&note.text),
             formatted,
             code: false,
+            language: None,
             offers_code: false,
             bar: shown.bar,
             boxes: shown.boxes,
@@ -22063,8 +22381,9 @@ fn ticked_in(boxes: &[ShownBox]) -> impl Fn(&str) -> bool + '_ {
 const READ_SIZE: f32 = 18.0;
 
 /// What [`read_part`] draws, the text of a Note or Section: its id, its
-/// text and its format.
-type ReadPart<'a> = (&'a str, &'a str, &'a str);
+/// text, its format and the scope of the grammar a Code text is coloured
+/// by (obf-1036).
+type ReadPart<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 
 /// How the boxes of a [`ReadPart`] show and whether this Device may tick
 /// them, with which have been ticked.
@@ -22078,7 +22397,7 @@ type PartBoxes<'a> = (&'a BoxLook, (bool, &'a dyn Fn(&str) -> bool));
 fn read_part(
     ui: &mut Ui,
     t: &L10n,
-    (of, text, format): ReadPart<'_>,
+    (of, text, format, language): ReadPart<'_>,
     (range, size): ((usize, usize), f32),
     (boxes, ticks): PartBoxes<'_>,
     actions: &mut Vec<Action>,
@@ -22088,7 +22407,7 @@ fn read_part(
         let look = (Some(size), ui.visuals().text_color());
         if format == text_format::CODE {
             read_text::shown(ui, |ui| {
-                text_marks_view::code_text_label(ui, text, range, look, (false, true))
+                text_marks_view::code_text_label(ui, (text, language), range, look, (false, true))
             });
             return;
         }
@@ -22156,6 +22475,8 @@ struct Part<'a> {
     id: &'a str,
     text: &'a str,
     format: &'a str,
+    /// The scope of the grammar a Code text is coloured by (obf-1036).
+    language: Option<&'a str>,
     photos: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
     recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
 }
@@ -22166,6 +22487,7 @@ impl<'a> Part<'a> {
             id: &note.id,
             text: &note.text,
             format: &note.text_format,
+            language: note.code_language.as_deref(),
             photos: (&note.photos, &note.removed_photos, &note.photo_texts),
             recordings: (
                 &note.recordings,
@@ -22180,6 +22502,7 @@ impl<'a> Part<'a> {
             id: &section.id,
             text: &section.text,
             format: &section.text_format,
+            language: None,
             photos: (
                 &section.photos,
                 &section.removed_photos,
@@ -22204,7 +22527,7 @@ fn whole(
     (cache, store, transcribing): ShownMedia,
     (look, marks): (&BoxLook, &mut Spots),
 ) -> Vec<(String, egui::Rect)> {
-    card_text(ui, (part.text, part.format, look), marks);
+    card_text(ui, (part.text, part.format, look), part.language, marks);
     media_view::whole_media(
         ui,
         t,
@@ -22217,14 +22540,21 @@ fn whole(
 
 /// The whole text `text` of a Note or Section in `format` on a full
 /// card, its boxes as `look` says, where its boxes (ADR 0035), tags
-/// (#126) and links (#127) lie added to `marks`.
-fn card_text(ui: &mut Ui, (text, format, look): (&str, &str, &BoxLook), marks: &mut Spots) {
+/// (#126) and links (#127) lie added to `marks`; a Code text coloured by
+/// `language` (obf-1036).
+fn card_text(
+    ui: &mut Ui,
+    (text, format, look): (&str, &str, &BoxLook),
+    language: Option<&str>,
+    marks: &mut Spots,
+) {
     if !text.is_empty() {
         let colour = ui.visuals().text_color();
         let shown = (0, text.len());
-        marks.extend(text_marks_view::formatted_label(
+        marks.extend(text_marks_view::note_label(
             ui,
             (text, format, look),
+            language,
             shown,
             (Some(16.0), colour),
             false,
@@ -22287,7 +22617,8 @@ type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 /// Shopping List's Lines under its name and description (#188), checkable,
 /// a Shopping List's struck ones folded under its open ones, with every
 /// Section oldest first, each with its own line, its photos opening full
-/// screen on a click; or its compact view, a glance by its kind (#189): a
+/// screen on a click, then the Notes that link to it (obf-1035), a click
+/// on one opening it; or its compact view, a glance by its kind (#189): a
 /// plain Note's first line and the two lines after it or the `glance` of
 /// the Session it runs, a list's or a Tally's name with how many of its
 /// Lines are open or the Tally's `glance`, a Note without words its
@@ -22342,6 +22673,8 @@ fn note_card(
     let mut boxes = Vec::new();
     let mut marks = Spots::default();
     let mut section_marks: Vec<(&Section, Spots)> = Vec::new();
+    // The rows of "Linked from" on a full card (obf-1035).
+    let mut linked_rows = Vec::new();
     // Where the Tally or the Session of a full card lies, out of the
     // card's own click, and what was asked of it (#190, #191).
     let mut tally_rect = None;
@@ -22535,6 +22868,8 @@ fn note_card(
                                 capture_meta(ui, t, &line, edited.as_deref(), false);
                                 before = section.captured;
                             }
+                            // At its end, after the Sections (obf-1035).
+                            linked_rows = app_links::linked_from_rows(ui, t, look.linked_from);
                         });
                         return;
                     }
@@ -22544,6 +22879,8 @@ fn note_card(
                         note.text_format.as_str(),
                         look.boxes.look(&note.id),
                     );
+                    // A Code text coloured by its language (obf-1036).
+                    let language = note.code_language.as_deref();
                     if look.checklist.is_some()
                         || look.shopping.is_some()
                         || look.tally
@@ -22558,9 +22895,10 @@ fn note_card(
                             // A list without a name by its kind (#309).
                             ui.label(RichText::new(kind).size(20.0).color(text));
                         } else if named > 0 {
-                            marks = text_marks_view::formatted_label(
+                            marks = text_marks_view::note_label(
                                 ui,
                                 text_of,
+                                language,
                                 (0, named),
                                 (Some(20.0), text),
                                 true,
@@ -22579,18 +22917,20 @@ fn note_card(
                     if let Some(line) =
                         card_first_line(&note.text, note.text_format == text_format::MARKDOWN)
                     {
-                        marks = text_marks_view::formatted_label(
+                        marks = text_marks_view::note_label(
                             ui,
                             text_of,
+                            language,
                             line,
                             (Some(16.0), text),
                             true,
                         );
                         if look.glance.is_empty() {
                             if let Some(next) = next_lines(&note.text, line.1) {
-                                let more = text_marks_view::formatted_label(
+                                let more = text_marks_view::note_label(
                                     ui,
                                     text_of,
+                                    language,
                                     next,
                                     (Some(14.0), text),
                                     false,
@@ -22839,15 +23179,10 @@ fn note_card(
             let id = || Some(note.id.clone());
             let mut entries = Vec::new();
             if spawns.schedules {
+                // One way in for a Routine or Reminder, starting as a
+                // Reminder (#344).
                 entries.push((
-                    t.spawn_routine(),
-                    Action::NewRoutine {
-                        note: id(),
-                        reminder: false,
-                    },
-                ));
-                entries.push((
-                    t.spawn_reminder(),
+                    t.remind_me(),
                     Action::NewRoutine {
                         note: id(),
                         reminder: true,
@@ -23061,6 +23396,11 @@ fn note_card(
         }
         tag = text_marks_view::tag_clicks(ui, t, of, &spots.tags).or(tag);
         text_marks_view::link_clicks(ui, of, &spots.links);
+    }
+    // A click on a Note linking to it opens that Note, and no card
+    // (obf-1035).
+    for row in &linked_rows {
+        app_links::linked_row_clicks(ui, &note.id, row);
     }
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),

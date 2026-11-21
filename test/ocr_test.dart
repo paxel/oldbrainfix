@@ -85,8 +85,7 @@ void main() {
         ..texts[onePixelPng.length] = 'Level 3, row F'
         ..readGate = Completer<void>();
       await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, find.byIcon(Icons.photo_camera_outlined));
+      await openCaptureBy(tester, 'photo');
       await tap(tester, find.byKey(const ValueKey('nudge10')));
 
       // Saved and back on the Agenda while RustO still reads.
@@ -106,7 +105,7 @@ void main() {
       await start(tester);
       photos.share(SharedItem(photos: [otherPng]));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       expect(notes.all().single.photoTexts.values, ['Invoice 42']);
     });
@@ -115,9 +114,8 @@ void main() {
       ocr.texts[otherPng.length] = 'Parking P4';
       photos.nextPicked = [otherPng];
       await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, find.byKey(const ValueKey('captureGallery')));
-      await tap(tester, find.text('Save'));
+      await openCaptureBy(tester, 'gallery');
+      await saveCapture(tester);
 
       expect(notes.all().single.photoTexts.values, ['Parking P4']);
     });

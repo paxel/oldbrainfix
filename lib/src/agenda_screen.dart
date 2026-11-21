@@ -45,6 +45,7 @@ import 'routine_history_screen.dart';
 import 'schedule_text.dart';
 import 'session_view.dart';
 import 'setup_screen.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
 import 'text_marks_view.dart';
@@ -211,6 +212,10 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   /// How many strangers' Sent Items wait (#91).
   var _waiting = 0;
   var _offers = 0;
+
+  /// When today's quiet day ends, read with the rows; null while today
+  /// is not quiet (obf-1044).
+  DateTime? _quietUntil;
 
   /// The Note captured last from here, shown on top until it is let go.
   String? _capturedId;
@@ -477,6 +482,9 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
     _offers = widget.notes.store.pendingSets
         .where((s) => s.kind == areaOfferPendingKind)
         .length;
+    // Read again after every change, a synced one too, and just after
+    // midnight, when the quiet day is over (obf-1044).
+    _quietUntil = widget.notes.store.quietUntil(deviceWallClock);
     _armTimer();
     final captured = _capturedId == null
         ? null
@@ -727,6 +735,20 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   }
 
   Future<void> _openAsk() => openAsk(context, widget.notes.store);
+
+  /// "Quiet today" (obf-1044): nothing notifies until midnight; the line
+  /// on top shows it at once, so nothing is announced. The log's change
+  /// reads the rows again, which stay as they are.
+  void _quietToday() {
+    final store = widget.notes.store..quietToday(deviceWallClock);
+    setState(() => _quietUntil = store.quietUntil(deviceWallClock));
+  }
+
+  /// End on the quiet day's line: what is still to come rings again.
+  void _endQuietDay() {
+    final store = widget.notes.store..endQuietDay(deviceWallClock);
+    setState(() => _quietUntil = store.quietUntil(deviceWallClock));
+  }
 
   Future<void> _openAllRoutines() async {
     await openAllRoutines(context, widget.notes, widget.places);
@@ -1391,11 +1413,14 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
           ),
           actions: [
             // The Areas list, first in the bar (#221).
-            IconButton(
-              key: const ValueKey('browse'),
-              tooltip: t.browseTooltip,
-              onPressed: _browse,
-              icon: const Icon(Icons.folder_outlined),
+            Spotlight(
+              id: 'agenda-browse',
+              child: IconButton(
+                key: const ValueKey('browse'),
+                tooltip: t.browseTooltip,
+                onPressed: _browse,
+                icon: const Icon(Icons.folder_outlined),
+              ),
             ),
             // What does not fit goes into ⋮ from the end, the folder
             // and the Profile picture never (UI laws, "The bar").
@@ -1436,13 +1461,26 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
                 onPressed: _newSession,
                 icon: Icons.event_repeat,
               ),
+            // Offered while today is not quiet; End on the line ends it
+            // (obf-1044).
+            if (_quietUntil == null)
+              BarAction(
+                key: const ValueKey('quietToday'),
+                spotlight: 'agenda-quiet',
+                label: t.quietToday,
+                onPressed: _quietToday,
+                icon: Icons.notifications_off_outlined,
+              ),
             // The Profile picture, where the settings gear was: Settings,
             // Sync and Backups are reached through the Profile page.
-            IconButton(
-              key: const ValueKey('profile'),
-              tooltip: t.profileTitle,
-              onPressed: _openProfile,
-              icon: OwnProfileAvatar(model: widget.profile),
+            Spotlight(
+              id: 'agenda-profile',
+              child: IconButton(
+                key: const ValueKey('profile'),
+                tooltip: t.profileTitle,
+                onPressed: _openProfile,
+                icon: OwnProfileAvatar(model: widget.profile),
+              ),
             ),
           ],
         ),
@@ -1452,6 +1490,8 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             const EdgeInsets.only(top: 8),
           ),
           children: [
+            // First in the Agenda's order (obf-1044).
+            if (_quietUntil != null) _QuietDayLine(onEnd: _endQuietDay),
             if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
             if (!_missed.isEmpty)
               MissedSummaryCard(
@@ -1466,11 +1506,14 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
                 onSeen: _seen,
               ),
             if (_unsorted > 0)
-              _CountBanner(
-                bannerKey: const ValueKey('unsortedBanner'),
-                icon: Icons.move_to_inbox,
-                text: t.unsortedBanner(_unsorted),
-                onTap: _openUnsorted,
+              Spotlight(
+                id: 'agenda-unsorted',
+                child: _CountBanner(
+                  bannerKey: const ValueKey('unsortedBanner'),
+                  icon: Icons.move_to_inbox,
+                  text: t.unsortedBanner(_unsorted),
+                  onTap: _openUnsorted,
+                ),
               ),
             if (_waiting > 0)
               _CountBanner(
@@ -1538,7 +1581,7 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             // Nothing of the days before their first read is in (#207):
             // no "Nothing planned" that is not so.
             if (_days != null) ...[
-              _Heading(t.agendaToday),
+              Spotlight(id: 'agenda-today', child: _Heading(t.agendaToday)),
               if (_today.isEmpty)
                 BrowserEmpty(text: t.nothingToday)
               else
@@ -1600,11 +1643,14 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             ],
           ],
         ),
-        floatingActionButton: CapturePlus(
-          plusKey: _plus,
-          heroTag: 'capture',
-          onPressed: _capture,
-          onLongPress: _captureText,
+        floatingActionButton: Spotlight(
+          id: 'agenda-plus',
+          child: CapturePlus(
+            plusKey: _plus,
+            heroTag: 'capture',
+            onPressed: _capture,
+            onLongPress: _captureText,
+          ),
         ),
       ),
     );
@@ -1643,6 +1689,51 @@ class _AlarmsBanner extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Quiet day until midnight" while today is quiet, with End (obf-1044);
+/// drawn as the count lines are.
+class _QuietDayLine extends StatelessWidget {
+  final VoidCallback onEnd;
+
+  const _QuietDayLine({required this.onEnd});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        key: const ValueKey('quietDayLine'),
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 8, 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.notifications_off_outlined,
+                color: scheme.onSecondaryContainer,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  t.quietDayLine,
+                  style: TextStyle(color: scheme.onSecondaryContainer),
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('quietDayEnd'),
+                onPressed: onEnd,
+                child: Text(t.quietDayEnd),
+              ),
+            ],
           ),
         ),
       ),

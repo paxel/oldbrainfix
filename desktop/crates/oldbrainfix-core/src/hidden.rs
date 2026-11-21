@@ -18,7 +18,7 @@ use crate::entry::Entry;
 use crate::frogs::keys as frog_keys;
 use crate::notes::{Notes, keys as note_keys};
 use crate::places::{Places, keys as place_keys};
-use crate::routines::keys as routine_keys;
+use crate::routines::{heads_up_keys, keys as routine_keys};
 use crate::sessions::keys as session_keys;
 use crate::store::{Store, utf16_cmp};
 use crate::tallies::keys as tally_keys;
@@ -150,8 +150,9 @@ impl Store {
     /// The marked Notes and Areas that hide `entity` from the AI, sorted:
     /// its own mark, its Area's through its Topic, those of the Note it
     /// is merged into, and for a Section, Routine, Frog, Tally entry,
-    /// Line or an own choice on a Note, those of the Note. Empty when it
-    /// is not hidden. As the Dart core's `hiddenFromAiBy`.
+    /// Line or an own choice on a Note, those of the Note, for a Routine's
+    /// Heads-ups those of its Routine. Empty when it is not hidden. As the
+    /// Dart core's `hiddenFromAiBy`.
     pub fn hidden_from_ai_by(&self, entity: &str) -> Result<Vec<String>> {
         let marks = self.hidden_from_ai_marks()?;
         self.hidden_by(entity, &marks)
@@ -320,6 +321,9 @@ impl Store {
         }
         let one = if id.starts_with(line_keys::AGENDA_PREFIX) {
             after(line_keys::AGENDA_PREFIX, &NOTE)
+        } else if id.starts_with(heads_up_keys::PREFIX) {
+            // A Routine's Heads-ups lie under it, and so under its Note.
+            after(heads_up_keys::PREFIX, &["routine:"])
         } else if id.starts_with(keys::PREFIX) {
             after(keys::PREFIX, &["note:", "area:"])
         } else {

@@ -1,7 +1,8 @@
 //! The help Notes on the desktop (#180, ADR 0042): what the phone's
-//! `help_notes.dart` hands the core, in the same words and with the same
-//! pictures, so either app makes the same Notes. The pictures and the
-//! What's new are the phone's assets, bundled at build time.
+//! `help_notes.dart` hands the core, in the same words, so either app
+//! makes the same Notes. The What's new is the phone's asset, bundled at
+//! build time. The Quick start's and the icons' words and pictures below
+//! no longer go into a Note (obf-1043, ADR 0055).
 
 use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::markdown;
@@ -181,16 +182,12 @@ pub fn pictures(t: &L10n) -> Vec<&'static [u8]> {
         .collect()
 }
 
-/// Makes the help Notes due on this Device in `t`'s language, running
-/// `version`; `fresh` right after the first start. Returns the ids made.
+/// Makes the What's new due on this Device in `t`'s language, running
+/// `version`; `fresh` right after the first start, which makes none.
+/// Returns the ids made.
 pub fn make_due(store: &Store, t: &L10n, version: &str, fresh: bool) -> Result<Vec<String>> {
     let texts = HelpTexts {
         area_name: t.help_area_name().to_string(),
-        quick_start_title: t.help_quick_start_title().to_string(),
-        quick_start_lines: quick_start_lines(t),
-        quick_start_description: quick_start_description(t),
-        icons_text: icons_text(t),
-        icon_pictures: pictures(t),
         whats_new_title: Box::new(|v| t.help_whats_new_title(v)),
     };
     HelpNotes::new(store).make_due(

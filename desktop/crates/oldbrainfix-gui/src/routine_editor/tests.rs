@@ -101,3 +101,33 @@ fn a_new_monthly_repeat_starts_from_the_start_day() {
     assert_eq!(RoutineEditor::ordinal_of(Day::new(2026, 10, 31)), -1);
     assert_eq!(RoutineEditor::ordinal_of(Day::new(2026, 10, 28)), 4);
 }
+
+#[test]
+fn an_all_day_schedule_offers_and_keeps_whole_days_only() {
+    let editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10))
+        .with_heads_ups(&[30, 1440, 30]);
+    assert!(editor.times.is_empty());
+    assert_eq!(editor.heads_ups, [30, 1440]);
+    assert_eq!(editor.kept_heads_ups(), [1440]);
+    assert_eq!(editor.heads_up_choices(), [2880, 4320, 10080]);
+    assert!(!editor.changed());
+    // With a time again the 30 min count once more: nothing was lost.
+    let mut timed = editor.clone();
+    timed.times = ClockTime::new(10, 0).into_iter().collect();
+    assert_eq!(timed.kept_heads_ups(), [30, 1440]);
+    assert_eq!(timed.heads_up_choices(), [5, 10, 15, 60, 120, 2880, 10080]);
+}
+
+#[test]
+fn a_heads_up_added_or_removed_is_a_change() {
+    let mut editor = RoutineEditor::new(None, true, now(), &utc_wall, Duration::minutes(10));
+    assert!(!editor.changed());
+    editor.add_heads_up(20);
+    editor.add_heads_up(20);
+    assert_eq!(editor.heads_ups, [20]);
+    assert!(editor.changed());
+    editor.heads_ups.clear();
+    assert!(!editor.changed());
+    assert!(!editor.locked());
+    assert!(editor.clone().heads_ups_only().locked());
+}

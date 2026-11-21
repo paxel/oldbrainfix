@@ -1,0 +1,163 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: YAML
+scope: source.yaml
+file_extensions: [yaml, yml]
+first_line_match: '^%YAML'
+
+variables:
+  start: '(?<![^\s\[{,:])'
+  end: '(?=[ \t]*(?:#|$|[,\]}]))'
+
+contexts:
+  main:
+    - match: '^([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        1: entity.name.tag.yaml
+        3: keyword.operator.block-scalar.yaml
+      push: block_0
+    - match: '^ {2}([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        1: entity.name.tag.yaml
+        3: keyword.operator.block-scalar.yaml
+      push: block_2
+    - match: '^(-) ([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        2: entity.name.tag.yaml
+        4: keyword.operator.block-scalar.yaml
+      push: block_2
+    - match: '^ {4}([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        1: entity.name.tag.yaml
+        3: keyword.operator.block-scalar.yaml
+      push: block_4
+    - match: '^ {2}(-) ([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        2: entity.name.tag.yaml
+        4: keyword.operator.block-scalar.yaml
+      push: block_4
+    - match: '^ {6}([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        1: entity.name.tag.yaml
+        3: keyword.operator.block-scalar.yaml
+      push: block_6
+    - match: '^ {4}(-) ([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        2: entity.name.tag.yaml
+        4: keyword.operator.block-scalar.yaml
+      push: block_6
+    - match: '^ {8}([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        1: entity.name.tag.yaml
+        3: keyword.operator.block-scalar.yaml
+      push: block_8
+    - match: '^ {6}(-) ([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        2: entity.name.tag.yaml
+        4: keyword.operator.block-scalar.yaml
+      push: block_8
+    - match: '^ {10}([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        1: entity.name.tag.yaml
+        3: keyword.operator.block-scalar.yaml
+      push: block_10
+    - match: '^ {8}(-) ([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        2: entity.name.tag.yaml
+        4: keyword.operator.block-scalar.yaml
+      push: block_10
+    - match: '^ {12}([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        1: entity.name.tag.yaml
+        3: keyword.operator.block-scalar.yaml
+      push: block_12
+    - match: '^ {10}(-) ([^\s#''"-][^:\n]{0,120}?)(:)[ \t]+([|>][1-9]?[-+]?[1-9]?)(?=[ \t]*(?:#.*)?$)'
+      captures:
+        2: entity.name.tag.yaml
+        4: keyword.operator.block-scalar.yaml
+      push: block_12
+    - match: '(?<!\S)#.*'
+      scope: comment.line.number-sign.yaml
+    - match: '^%.*'
+      scope: keyword.other.directive.yaml
+    - match: '^(?:---|\.\.\.)(?=\s|$)'
+      scope: keyword.other.document.yaml
+    - match: '^\s*(-)(?=\s|$)'
+      captures:
+        1: punctuation.definition.list.yaml
+    - match: '(?<![^\s\[{,-])[A-Za-z0-9_$.\/][\w .\/$-]{0,120}?(?=:(?:\s|$))'
+      scope: entity.name.tag.yaml
+    - match: '{{start}}"'
+      push: double_string
+    - match: '{{start}}'''
+      push: single_string
+    - match: '(?<=\s)[|>][1-9]?[-+]?[1-9]?(?=[ \t]*(?:#.*)?$)'
+      scope: keyword.operator.block-scalar.yaml
+      push: block_scalar
+    - match: '{{start}}&[^\s,\[\]{}]+'
+      scope: variable.parameter.anchor.yaml
+    - match: '{{start}}\*[^\s,\[\]{}]+'
+      scope: variable.parameter.alias.yaml
+    - match: '{{start}}!!?[\w\/.-]*'
+      scope: storage.type.tag.yaml
+    - match: '{{start}}(?:true|True|TRUE|false|False|FALSE|null|Null|NULL|~){{end}}'
+      scope: constant.language.yaml
+    - match: '{{start}}[-+]?(?:0x[0-9a-fA-F]+|0o[0-7]+|\d[\d_]*(?:\.\d*)?(?:[eE][-+]?\d+)?|\.\d+(?:[eE][-+]?\d+)?|\.(?:inf|Inf|INF|nan|NaN|NAN)){{end}}'
+      scope: constant.numeric.yaml
+
+  double_string:
+    - meta_scope: string.quoted.double.yaml
+    - match: '"'
+      pop: true
+    - match: '\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)'
+      scope: constant.character.escape.yaml
+
+  single_string:
+    - meta_scope: string.quoted.single.yaml
+    - match: ''''''
+      scope: constant.character.escape.yaml
+    - match: ''''
+      pop: true
+
+  block_scalar:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?=\S)'
+      pop: true
+    - match: '^(?=\s*[\w"''-][\w .\/"''-]*:(?:\s|$))'
+      pop: true
+
+  block_0:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?=\S)'
+      pop: true
+
+  block_2:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?= {0,2}\S)'
+      pop: true
+
+  block_4:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?= {0,4}\S)'
+      pop: true
+
+  block_6:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?= {0,6}\S)'
+      pop: true
+
+  block_8:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?= {0,8}\S)'
+      pop: true
+
+  block_10:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?= {0,10}\S)'
+      pop: true
+
+  block_12:
+    - meta_content_scope: string.unquoted.block.yaml
+    - match: '^(?= {0,12}\S)'
+      pop: true

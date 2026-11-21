@@ -59,6 +59,12 @@ oldbrainfix-pdf = { path = "../oldbrainfix-pdf" }
 # The Ask panel's provider (#267, ADR 0051) over HTTPS, the client the
 # speech model's download already uses.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
+# Code coloured by its language (obf-1036, ADR 0054): the grammars are
+# Sublime syntax definitions, YAML, whose regular expressions are run by
+# a backtracking engine with lookaround, as Dart's RegExp runs them.
+# yaml-rust2 MIT OR Apache-2.0, fancy-regex MIT.
+yaml-rust2 = { version = "0.13", default-features = false }
+fancy-regex = "0.20"
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

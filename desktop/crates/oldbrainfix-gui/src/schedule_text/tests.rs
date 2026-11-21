@@ -59,3 +59,49 @@ fn days_and_schedules_read_in_the_apps_language() {
     let (odd, _) = repeat("FREQ=MONTHLY;BYDAY=1MO,2TU");
     assert!(odd.contains("FREQ=MONTHLY;BYDAY=1MO,2TU"));
 }
+
+#[test]
+fn a_heads_up_reads_in_its_largest_whole_unit_as_on_the_phone() {
+    let en = L10n::new("en");
+    let de = L10n::new("de");
+    let before = |t: &L10n| [20, 60, 90, 1440, 2880, 10080].map(|m| heads_up_before(t, m));
+    assert_eq!(
+        before(&en),
+        [
+            "20 min before",
+            "1 h before",
+            "1 h 30 min before",
+            "1 day before",
+            "2 days before",
+            "1 week before"
+        ]
+    );
+    assert_eq!(
+        before(&de),
+        [
+            "20 Min. vorher",
+            "1 Std. vorher",
+            "1 Std. 30 Min. vorher",
+            "1 Tag vorher",
+            "2 Tage vorher",
+            "1 Woche vorher"
+        ]
+    );
+    let within = |t: &L10n| [20, 60, 1440, 2880, 10080].map(|m| heads_up_in(t, m));
+    assert_eq!(
+        within(&en),
+        ["in 20 min", "in 1 h", "in 1 day", "in 2 days", "in 1 week"]
+    );
+    assert_eq!(
+        within(&de),
+        [
+            "in 20 Min.",
+            "in 1 Std.",
+            "in 1 Tag",
+            "in 2 Tagen",
+            "in 1 Woche"
+        ]
+    );
+    assert_eq!(heads_up_in(&en, 90), "in 1 h 30 min");
+    assert_eq!(heads_up_in(&de, 90), "in 1 Std. 30 Min.");
+}

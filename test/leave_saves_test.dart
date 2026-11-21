@@ -37,6 +37,23 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Scrolls the Routine editor until [finder] is built: its list builds
+  /// only what is near the screen, and the Heads-ups (obf-1046) push the
+  /// folded sections below.
+  Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+    await tester.scrollUntilVisible(
+      finder,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(RoutineEditorScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+  }
+
   /// Starts the app on a tall phone; a context to open pages from.
   Future<BuildContext> start(WidgetTester tester) async {
     tester.view.physicalSize = const Size(2400, 3600);
@@ -83,6 +100,7 @@ void main() {
       final context = await start(tester);
       final done = openRoutine(context, notes, places, pills);
       await tester.pumpAndSettle();
+      await scrollTo(tester, key('escalation'));
       await tap(tester, key('escalation'));
       await tap(tester, key('escalationOn'));
       await barBack(tester);

@@ -744,3 +744,92 @@ fn the_changes_nudge_waits_out_quiet_hours_and_speaks_german() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_heads_up_shows_once_before_its_occurrence_and_done_cancels_it() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let pills = pills(&store)?;
+    // 20 min before each of 08:00, 14:00 and 20:00, set on this Device.
+    Routines::new(&store).set_heads_ups(&pills, &[20])?;
+    let monday = Day::new(2026, 10, 26);
+    let at = |hour| Occurrence::new(monday, ClockTime::new(hour, 0));
+    let eight = occurrence_key(&pills, &at(8));
+    // 07:39 in Europe: nothing yet, but the tick wakes for it.
+    clock.set("2026-10-26T06:39:00.000Z")?;
+    let next = alerts.tick(&store, &berlin)?;
+    assert!(shown(&record.take()).iter().all(|n| n.key != eight));
+    assert!(next <= oldbrainfix_core::parse_time("2026-10-26T06:40:00.000Z")?);
+    // 07:40: one plain notification in the Occurrence's place, silent
+    // in the Quiet Hours until 08:00.
+    clock.set("2026-10-26T06:40:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let record_now = record.take();
+    let notice = shown(&record_now)
+        .into_iter()
+        .find(|n| n.key == eight)
+        .cloned()
+        .ok_or("the heads-up")?;
+    assert_eq!(notice.title, "Take the pills");
+    assert_eq!(notice.body, "in 20 min");
+    assert_eq!(
+        notice.actions,
+        [(OPEN.to_string(), "Open Old Brain Fix".to_string())]
+    );
+    assert!(notice.silent && !notice.urgent);
+    // Once only.
+    clock.set("2026-10-26T06:40:30.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    assert!(shown(&record.take()).iter().all(|n| n.key != eight));
+    // The Occurrence still rings at 08:00, in its place.
+    clock.set("2026-10-26T07:00:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let rang = record.take();
+    let ring = shown(&rang)
+        .into_iter()
+        .find(|n| n.key == eight)
+        .ok_or("the ring")?;
+    assert_eq!(ring.actions.len(), 4);
+    // Done before 13:40 cancels the one of 14:00.
+    let two = at(14);
+    let done = clock.set("2026-10-26T12:00:00.000Z")?;
+    oldbrainfix_core::Alarms::new(&store).apply_done(&pills, &two.key(), done)?;
+    alerts.tick(&store, &berlin)?;
+    record.take();
+    clock.set("2026-10-26T12:40:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let key = occurrence_key(&pills, &two);
+    assert!(shown(&record.take()).iter().all(|n| n.key != key));
+    // 19:40, out of the Quiet Hours: with the notification's own sound.
+    clock.set("2026-10-26T18:39:30.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    record.take();
+    clock.set("2026-10-26T18:40:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let key = occurrence_key(&pills, &at(20));
+    let record_now = record.take();
+    let evening = shown(&record_now)
+        .into_iter()
+        .find(|n| n.key == key)
+        .ok_or("the evening's heads-up")?;
+    assert!(!evening.silent);
+    Ok(())
+}
+
+#[test]
+fn a_heads_up_missed_while_not_running_never_shows_late() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let pills = pills(&store)?;
+    Routines::new(&store).set_heads_ups(&pills, &[20])?;
+    let key = occurrence_key(
+        &pills,
+        &Occurrence::new(Day::new(2026, 10, 26), ClockTime::new(20, 0)),
+    );
+    // Started at 19:43 in Europe, three minutes after 19:40.
+    clock.set("2026-10-26T18:43:00.000Z")?;
+    alerts(&record).tick(&store, &berlin)?;
+    assert!(shown(&record.take()).iter().all(|n| n.key != key));
+    Ok(())
+}

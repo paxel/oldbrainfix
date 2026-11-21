@@ -14,7 +14,8 @@ import org.w3c.dom.Element
  * opens the app. Clear-text traffic is off, the one exported receiver
  * hears only the system's broadcasts (#235), and a Tally's shortcut lands
  * where no other app reaches (#284). The print service only the system
- * binds, in the app's own process (#293).
+ * binds, in the app's own process (#293). A recording goes on in a
+ * microphone service of the app's own (#350).
  */
 class ManifestTest {
     private val android = "http://schemas.android.com/apk/res/android"
@@ -125,5 +126,20 @@ class ManifestTest {
         assertEquals("android.printservice", meta.getAttributeNS(android, "name"))
         assertEquals("@xml/print_service", meta.getAttributeNS(android, "resource"))
         assertTrue(File("src/main/res/xml/print_service.xml").isFile)
+    }
+
+    @Test
+    fun aRecordingGoesOnInAMicrophoneServiceNoOtherAppStarts() {
+        val service = elements(manifest.documentElement, "service")
+            .single { it.getAttributeNS(android, "name") == ".RecordingService" }
+        assertEquals("false", service.getAttributeNS(android, "exported"))
+        assertEquals("microphone", service.getAttributeNS(android, "foregroundServiceType"))
+        // In the app's own process, where the recorder is.
+        assertEquals("", service.getAttributeNS(android, "process"))
+        val permissions = elements(manifest.documentElement, "uses-permission")
+            .map { it.getAttributeNS(android, "name") }
+        assertTrue(permissions.contains("android.permission.FOREGROUND_SERVICE"))
+        assertTrue(permissions.contains("android.permission.FOREGROUND_SERVICE_MICROPHONE"))
+        assertTrue(permissions.contains("android.permission.RECORD_AUDIO"))
     }
 }

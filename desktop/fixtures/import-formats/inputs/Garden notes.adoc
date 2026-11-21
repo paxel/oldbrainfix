@@ -1,0 +1,37 @@
+= Garden notes
+:author: Ada
+
+== Planting
+Plant *tomatoes* and _basil_ in `bed 2`, see https://example.org/garden_plan[the plan^].
+Water **every**morning +
+and [.line-through]#never# at noon, Grüße 😀.
+
+* Seeds
+** Carrots
+. First
+. Second
+
+[source,python]
+----
+print("**not bold**")
+----
+
+____
+A quote with *bold*.
+____
+
+include::secret.adoc[]
+image::https://example.org/photo.png[A photo]
+
+NOTE: Keep the hose coiled.
+
+|===
+|Plant |Month
+
+|Tomato
+|May
+|Basil |June
+|===
+
+=== Deeper
+// a comment

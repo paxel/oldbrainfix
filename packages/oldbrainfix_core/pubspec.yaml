@@ -28,6 +28,9 @@ dependencies:
   pointycastle: ^4.0.0
   qr: ^4.0.0
   sqlite3: ^3.7.1
+  # The grammars Code is coloured by (obf-1036, ADR 0054) are Sublime
+  # syntax definitions, YAML; already in the lock through `test`. MIT.
+  yaml: ^3.1.3
 
 dev_dependencies:
   # tool/no_null_assertions.dart (#230) reads the syntax tree; already in

@@ -8,6 +8,7 @@ import 'agenda_rows.dart';
 import 'agenda_widget.dart';
 import 'alarm_platform.dart';
 import 'app_lock.dart';
+import 'heads_up_text.dart';
 import 'l10n.dart';
 import 'profile.dart';
 import 'schedule_text.dart';
@@ -48,6 +49,9 @@ class AlarmPlanRead {
   /// Whether any Routine escalates.
   final bool escalating;
   final List<ArmedAlarm> armed;
+
+  /// The Heads-ups (obf-1046), apart from the alarms.
+  final List<ArmedHeadsUp> headsUps;
   final List<(String, Occurrence)> done;
   final ArmedNudge? nudge;
   final ArmedChangesNudge? changes;
@@ -56,6 +60,7 @@ class AlarmPlanRead {
   const AlarmPlanRead({
     required this.escalating,
     required this.armed,
+    this.headsUps = const [],
     required this.done,
     required this.nudge,
     required this.changes,
@@ -246,18 +251,23 @@ AlarmPlanRead planAlarms(
   final locks = AreaLocks(store);
   final masked = <String, bool>{};
   final alarms = Alarms(store);
-  String title(PlannedAlarm alarm) {
-    final routine = byId[alarm.routineId];
+  // An alarm's and a Heads-up's alike.
+  String title(
+    String routineId,
+    Occurrence occurrence,
+    String? text,
+    Wordless wordless,
+    String wordlessName,
+  ) {
+    final routine = byId[routineId];
     // From a locked Area set to Masked, on the lock screen too.
     if (routine != null &&
         masked.putIfAbsent(routine.id, () => locks.masks(routine))) {
-      return maskedText(t, locale, routine, alarm.occurrence);
+      return maskedText(t, locale, routine, occurrence);
     }
     // A photo, voice or file Note without words is still there.
-    return _title(alarm.text) ??
-        (alarm.text == null
-            ? t.noteGone
-            : wordlessTitle(t, alarm.wordless, alarm.wordlessName));
+    return _title(text) ??
+        (text == null ? t.noteGone : wordlessTitle(t, wordless, wordlessName));
   }
 
   final planned = alarms.nudge(wallClock);
@@ -268,8 +278,28 @@ AlarmPlanRead planAlarms(
       for (final alarm in alarms.plan(wallClock, routines: routines))
         ArmedAlarm(
           alarm: alarm,
-          title: title(alarm),
+          title: title(
+            alarm.routineId,
+            alarm.occurrence,
+            alarm.text,
+            alarm.wordless,
+            alarm.wordlessName,
+          ),
           body: occurrenceTime(t, locale, alarm.occurrence),
+        ),
+    ],
+    headsUps: [
+      for (final headsUp in alarms.headsUps(wallClock, routines: routines))
+        ArmedHeadsUp(
+          headsUp: headsUp,
+          title: title(
+            headsUp.routineId,
+            headsUp.occurrence,
+            headsUp.text,
+            headsUp.wordless,
+            headsUp.wordlessName,
+          ),
+          body: headsUpIn(t, headsUp.minutes),
         ),
     ],
     done: alarms.recentlyDone(wallClock, routines: routines),

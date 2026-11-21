@@ -2,6 +2,7 @@ import 'checklists.dart';
 import 'note_kinds.dart';
 import 'notes.dart';
 import 'person_settings.dart';
+import 'profiles.dart';
 import 'schedule.dart';
 import 'sessions.dart';
 import 'shared_areas.dart';
@@ -70,6 +71,51 @@ abstract final class RoutineKeys {
 
   /// The fields that make up the schedule.
   static const scheduleFields = [start, times, rule, scheduleVersion];
+}
+
+/// Where a person's own Heads-ups of a Routine lie (obf-1046, ADR
+/// 0052): the entity `headsups:<routine id>`, outside every Area like an
+/// Override, so it is sealed under the personal key, goes only to the
+/// user's own Devices, and only what they wrote counts.
+abstract final class HeadsUpKeys {
+  /// The id prefix, before the Routine's id.
+  static const prefix = 'headsups:';
+
+  /// The entity holding the Heads-ups of the Routine [routineId].
+  static String of(String routineId) => '$prefix$routineId';
+
+  /// On that entity: the offsets before the Occurrence's start in whole
+  /// minutes, as decimal numbers joined by `,`, ascending, without
+  /// duplicates; absent or null for none.
+  static const headsUps = 'headsUps';
+
+  /// The largest offset: 30 days, as far as the alarm plan looks ahead.
+  static const maxMinutes = 43200;
+
+  /// The offsets [value] holds, ascending and each once: a part that is
+  /// not a number from 1 to [maxMinutes] in plain digits, without a sign
+  /// or a leading zero, is left out.
+  static List<int> read(String? value) {
+    if (value == null) return const [];
+    final minutes = <int>{};
+    for (final part in value.split(',')) {
+      if (part.isEmpty || part.length > 5 || part.startsWith('0')) continue;
+      if (!part.codeUnits.every((c) => c >= 0x30 && c <= 0x39)) continue;
+      final n = int.parse(part);
+      if (n <= maxMinutes) minutes.add(n);
+    }
+    return minutes.toList()..sort();
+  }
+
+  /// [minutes] as [headsUps] holds them: those from 1 to [maxMinutes],
+  /// ascending and each once; null for none.
+  static String? write(Iterable<int> minutes) {
+    final kept = {
+      for (final m in minutes)
+        if (m >= 1 && m <= maxMinutes) m,
+    }.toList()..sort();
+    return kept.isEmpty ? null : kept.join(',');
+  }
 }
 
 /// Something to be done on a schedule, spawned from a Note (CONTEXT.md).
@@ -375,6 +421,30 @@ class Routines {
       throw ArgumentError.value(after, 'after', 'at least one Re-nag');
     }
     store.append(id, RoutineKeys.escalation, after?.toString());
+  }
+
+  /// The Heads-ups of the Routine [routineId] for this person (obf-1046):
+  /// the offsets before an Occurrence's start in whole minutes,
+  /// ascending, as one of the user's own Devices set them last. What
+  /// another person's Device wrote counts for nothing, so in a Shared
+  /// Area each person has their own.
+  List<int> headsUps(String routineId) => HeadsUpKeys.read(
+    store.currentByOwn(HeadsUpKeys.of(routineId), HeadsUpKeys.headsUps),
+  );
+
+  /// Sets the Heads-ups of the Routine [routineId] for this person alone
+  /// (obf-1046), kept like an Override: on the user's own Devices only,
+  /// whatever their role in its Area. Offsets outside 1 to
+  /// [HeadsUpKeys.maxMinutes] are left out; none clears them; the same
+  /// again writes nothing. Throws an [ArgumentError] for an id that is no
+  /// Routine.
+  void setHeadsUps(String routineId, List<int> minutes) {
+    if (byId(routineId) == null) {
+      throw ArgumentError.value(routineId, 'routineId', 'not a Routine');
+    }
+    final value = HeadsUpKeys.write(minutes);
+    if (value == HeadsUpKeys.write(headsUps(routineId))) return;
+    store.append(HeadsUpKeys.of(routineId), HeadsUpKeys.headsUps, value);
   }
 
   /// Moves the Routine [id] to the trash: it leaves the Agenda, fires

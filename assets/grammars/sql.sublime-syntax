@@ -1,0 +1,59 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: SQL
+scope: source.sql
+file_extensions: [sql, psql, mysql, sqlite, pgsql]
+
+contexts:
+  main:
+    - match: '--.*'
+      scope: comment.line.double-dash.sql
+    - match: '/\*'
+      push: block_comment
+    - match: '(?i)\b[enbx]'''
+      push: single_string
+    - match: ''''
+      push: single_string
+    - match: '"'
+      push: double_string
+    - match: '`'
+      push: backtick_string
+    - match: '(?i)\b(?:select|from|where|insert|into|values|update|set|delete|create|table|drop|alter|add|column|index|view|join|inner|left|right|outer|full|cross|natural|on|using|group|by|order|having|limit|offset|fetch|as|distinct|union|intersect|except|all|any|some|exists|in|between|like|ilike|case|when|then|else|end|primary|key|foreign|references|unique|default|check|constraint|begin|commit|rollback|savepoint|transaction|with|recursive|returning|if|replace|trigger|function|procedure|returns|language|database|schema|grant|revoke|asc|desc|nulls|first|last|over|partition|window|cascade|restrict|temporary|temp|explain|analyze|vacuum|pragma|conflict|do|nothing|cast|collate|escape|is|not|and|or)\b'
+      scope: keyword.other.sql
+    - match: '(?i)\b(?:null|true|false|current_date|current_time|current_timestamp)\b'
+      scope: constant.language.sql
+    - match: '(?i)\b(?:int|integer|bigint|smallint|tinyint|serial|bigserial|text|varchar|char|character|varying|boolean|bool|date|time|timestamp|timestamptz|interval|numeric|decimal|real|float|double|precision|blob|bytea|json|jsonb|uuid|money)\b'
+      scope: storage.type.sql
+    - match: '\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b'
+      scope: constant.numeric.sql
+    - match: '\b[A-Za-z_]\w*(?=\()'
+      scope: variable.function.sql
+    - match: '[$:@?][A-Za-z_0-9]\w*|\?'
+      scope: variable.parameter.sql
+    - match: '<>|!=|<=|>=|\|\||::|[-+*/%<>=]'
+      scope: keyword.operator.sql
+
+  block_comment:
+    - meta_scope: comment.block.sql
+    - match: '\*/'
+      pop: true
+
+  single_string:
+    - meta_scope: string.quoted.single.sql
+    - match: ''''''
+      scope: constant.character.escape.sql
+    - match: ''''
+      pop: true
+
+  double_string:
+    - meta_scope: string.quoted.double.sql
+    - match: '""'
+      scope: constant.character.escape.sql
+    - match: '"'
+      pop: true
+
+  backtick_string:
+    - meta_scope: string.quoted.other.backtick.sql
+    - match: '`'
+      pop: true

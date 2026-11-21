@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'alarm_sync.dart';
@@ -411,6 +412,59 @@ class _LinkToScreenState extends State<LinkToScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The Notes that link to a Note (obf-1035, ADR 0046), at its end after
+/// the Sections: under "Linked from" one row per Note by its first line
+/// with words as it reads, its capture time where it has none; a tap
+/// opens it as its app link does. Nothing while [linking] is empty.
+class LinkedFrom extends StatelessWidget {
+  final List<Note> linking;
+
+  const LinkedFrom({super.key, required this.linking});
+
+  /// The first line with words of [note] as it reads, without the spaces
+  /// around it; empty when it has none.
+  static String nameOf(Note note) => note.visibleText
+      .split('\n')
+      .map((line) => line.trim())
+      .firstWhere((line) => line.isNotEmpty, orElse: () => '');
+
+  @override
+  Widget build(BuildContext context) {
+    if (linking.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final weak = theme.colorScheme.onSurfaceVariant;
+    final when = DateFormat.yMd(Localizations.localeOf(context).toString())
+        .add_Hm();
+    return Column(
+      key: const ValueKey('linked-from'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          context.t.linkedFrom,
+          style: theme.textTheme.labelLarge?.copyWith(color: weak),
+        ),
+        for (final note in linking)
+          ListTile(
+            key: ValueKey('linked-from:${note.id}'),
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.link, color: weak),
+            title: Text(
+              switch (nameOf(note)) {
+                '' => when.format(note.captured.toLocal()),
+                final name => name,
+              },
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onTap: () =>
+                followAppLink(context, AppLink(AppLinkKind.note, note.id)),
+          ),
+      ],
     );
   }
 }

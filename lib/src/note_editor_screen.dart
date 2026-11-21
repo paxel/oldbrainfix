@@ -7,10 +7,13 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'app_links.dart' show LinkedFrom;
+import 'app_lock.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'attachment_views.dart';
 import 'box_ids.dart';
+import 'capture_screen.dart' show insertAtCursor, pourIntoShopping;
 import 'calendar_platform.dart';
 import 'checklist_view.dart';
 import 'context_platform.dart';
@@ -31,6 +34,7 @@ import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
+import 'photo_platform.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
 import 'profile.dart' show profileDisplayName;
@@ -42,8 +46,10 @@ import 'session_note.dart';
 import 'setting_badges.dart';
 import 'share_note.dart';
 import 'shopping_list_view.dart';
+import 'shopping_pick_screen.dart';
 import 'sorting_unsorted.dart';
 import 'speech_platform.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 import 'tally_entry_screen.dart';
 import 'tally_field_screen.dart';
@@ -52,6 +58,7 @@ import 'tally_view.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
 import 'voice_platform.dart';
+import 'voice_recorder.dart';
 
 /// Opens the editor of [note]; returns once the user left it, or once it
 /// moved on to the next of [sorting]. With [typeLines] the cursor starts
@@ -612,7 +619,12 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// Session from it, as the card's menu does; the calendar button adds it,
 /// or its Routines and Reminders, to the calendar; the send button sends
 /// it as a Sent Item; "merge into…" merges it into another Note; the
-/// trash button deletes it. A photo or recording with a text, of the
+/// trash button deletes it. Photo, Voice, Gallery and Paste, where the
+/// Device has them, take a photo, record on a page with the big stop
+/// button ([recordInto]), pick pictures or read the clipboard into the
+/// Note, as the quick note did before (#352); "Add to a Shopping List"
+/// makes the lines of a plain Note the Lines of a list and the Note goes
+/// (#124). A photo or recording with a text, of the
 /// Note or a Section, has a button under it that removes it and keeps the
 /// text (ADR 0020).
 ///
@@ -698,6 +710,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final _lines = TypedLines();
   PlacedNote? _placed;
   List<Section> _sections = const [];
+
+  /// The Notes that link to this one (obf-1035), but a closed locked
+  /// Area's, shown at its end.
+  List<Note> _linkedFrom = const [];
   List<Routine> _routines = const [];
 
   /// What the Note asks to check off now (#215): of each of its Routines
@@ -775,6 +791,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// under the text (#213), until it is taken or closed.
   bool _offersCode = false;
 
+  /// What was pasted when [_offersCode] was offered: its first line may
+  /// name its language (obf-1036).
+  String _pastedCode = '';
+
   /// A Session Note's setup (#191), and its pool and count as its page
   /// edits them; null for any other Note.
   SessionSetup? _setup;
@@ -787,6 +807,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// How a Shopping List (#186) or a Checklist without a Routine (#219)
   /// shows on this person's Agenda; null for any other Note.
   ListOnAgendaChoice? _onAgenda;
+
+  /// Whether the last Paste found nothing to paste, said above the text
+  /// until the user types or pastes again.
+  final _pasteEmpty = ValueNotifier(false);
+
+  /// The App Lock, whose closed locked Areas keep their Shopping Lists
+  /// out of Add to a Shopping List.
+  AppLock? _lock;
+
+  /// The Shopping Lists the Note's lines could go into (#124), read with
+  /// the Note.
+  List<Note> _toShopping = const [];
 
   @override
   void initState() {
@@ -810,6 +842,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final lock = LockScope.of(context);
+    if (lock != _lock) {
+      _lock = lock;
+      _readShopping();
+    }
     final announcements = AnnouncementsScope.of(context);
     if (announcements == _announcements) return;
     _announcements?.undone.removeListener(_undone);
@@ -832,6 +869,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _text.dispose();
     _name.dispose();
     _descriptionFocus.dispose();
+    _pasteEmpty.dispose();
     _sessionDraft?.dispose();
     for (final field in _sectionTexts.values) {
       field.dispose();
@@ -849,6 +887,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _typed() {
+    _pasteEmpty.value = false;
     _draftTimer?.cancel();
     _draftTimer = Timer(NoteEditorScreen.draftPause, _writeDraft);
   }
@@ -962,6 +1001,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void _load() {
     final note = widget.notes.byId(widget.noteId);
     _placed = note == null ? null : placeNote(widget.places, note);
+    _readShopping();
     _amends = widget.notes.store.mayWriteIn(widget.noteId);
     final lists = Checklists(widget.notes.store);
     final shopping = ShoppingLists(widget.notes.store);
@@ -1010,6 +1050,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       NoteKind.session => {if (listed) NoteKind.plain},
     };
     _sections = widget.notes.sections(widget.noteId);
+    _linkedFrom = Backlinks(widget.notes.store).to(
+      widget.noteId,
+      closed: LockScope.of(context)?.closedAreas ?? const <String>{},
+    );
     _routines = _routineBook.ofNote(widget.noteId);
     _open = note == null || note.isTrashed
         ? const []
@@ -1181,6 +1225,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _text.markdown = markdown;
     _name.markdown = markdown;
     _text.code = !_named && note?.textFormat == TextFormats.code;
+    _text.codeLanguage = note?.codeLanguage;
     _setTyped(note?.text ?? '');
   }
 
@@ -1540,38 +1585,100 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// The text format badge's editor (#213): the formats the text may
-  /// take, a formatted text never plain again (ADR 0033).
+  /// take, a formatted text never plain again (ADR 0033); a Code text's
+  /// language under them (obf-1036), No language and each one the app
+  /// knows, the person's own too (obf-1037), as radio buttons, a tap
+  /// writing it and closing.
   Future<void> _editFormat() async {
-    final current = _placed?.note.textFormat;
-    if (current == null) return;
+    final note = _placed?.note;
+    if (note == null) return;
+    final current = note.textFormat;
     final t = context.t;
+    final grammars = widget.notes.store.grammars;
+    Widget formats(BuildContext context) => ChoiceChips<String>(
+      value: current,
+      options: [
+        for (final format in [
+          TextFormats.plain,
+          TextFormats.markdown,
+          TextFormats.code,
+        ])
+          if (format != TextFormats.plain || current != TextFormats.markdown)
+            RadioOption(
+              key: ValueKey('format-$format'),
+              value: format,
+              title: Text(textFormatName(t, format)),
+            ),
+      ],
+      onChanged: (picked) => Navigator.of(context).pop(picked),
+    );
     final picked = await showDialog<String>(
       context: context,
       builder: (context) => BadgeDialog(
         setting: t.badgeTextFormat,
         icon: textFormatBadgeIcon,
-        content: ChoiceChips<String>(
-          value: current,
-          options: [
-            for (final format in [
-              TextFormats.plain,
-              TextFormats.markdown,
-              TextFormats.code,
-            ])
-              if (format != TextFormats.plain ||
-                  current != TextFormats.markdown)
-                RadioOption(
-                  key: ValueKey('format-$format'),
-                  value: format,
-                  title: Text(textFormatName(t, format)),
-                ),
-          ],
-          onChanged: (picked) => Navigator.of(context).pop(picked),
-        ),
+        content: current != TextFormats.code
+            ? formats(context)
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  formats(context),
+                  const SizedBox(height: 16),
+                  Text(
+                    t.codeLanguage,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  // A language this Device does not know is kept: none
+                  // is marked until another is picked.
+                  RadioColumn<String>(
+                    value: note.codeLanguage ?? '',
+                    options: [
+                      RadioOption(
+                        key: const ValueKey('code-language-none'),
+                        value: '',
+                        title: Text(t.codeLanguageNone),
+                      ),
+                      for (final grammar in grammars.all)
+                        RadioOption(
+                          key: ValueKey('code-language-${grammar.scope}'),
+                          value: grammar.scope,
+                          title: Text(grammar.name),
+                        ),
+                    ],
+                    onChanged: (scope) {
+                      _setCodeLanguage(scope);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              ),
       ),
     );
     if (!mounted || picked == null || picked == current) return;
     _setFormat(picked);
+  }
+
+  /// Writes the language the Code text is coloured by, [scope] or none
+  /// for an empty one (obf-1036), and shows it so.
+  void _setCodeLanguage(String scope) {
+    widget.notes.setCodeLanguage(widget.noteId, scope);
+    setState(_load);
+    _text.codeLanguage = _placed?.note.codeLanguage;
+  }
+
+  /// "Keep as code" after a paste that looks like code: the whole text
+  /// becomes a Code text, in the language the paste's first line names,
+  /// such as a `#!/bin/bash`, or else the whole text's; without one the
+  /// language stays as it was (obf-1036).
+  void _keepAsCode() {
+    // The person's own grammars too (obf-1037).
+    final grammars = widget.notes.store.grammars;
+    final guess = grammars.guess(_pastedCode) ?? grammars.guess(_text.text);
+    if (guess != null) {
+      widget.notes.setCodeLanguage(widget.noteId, guess.scope);
+    }
+    _setFormat(TextFormats.code);
   }
 
   /// Puts the Note's text, as typed, into [format] (#213) and shows it
@@ -1673,10 +1780,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
-  /// The "+" badge's menu at the finger [at]: Routine, Reminder, Frog and
+  /// The "+" badge's menu at the finger [at]: Remind me…, Frog and
   /// Session, each spawned as the card's menu does; on a Session Note no
   /// Session, as a Routine of it runs it already (#191); no Frog while
-  /// one is open (#259); in Simple only Routine and Reminder (#197).
+  /// one is open (#259); in Simple only Remind me… (#197, #344).
   Future<void> _addMenu(Offset at) async {
     final t = context.t;
     final advanced = widget.notes.store.advanced;
@@ -1691,12 +1798,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       ),
       items: [
         for (final (spawn, icon, label) in [
-          (Spawn.routine, const Icon(Icons.repeat), t.routine),
-          (
-            Spawn.reminder,
-            const Icon(Icons.notifications_outlined),
-            t.reminder,
-          ),
+          // One way in for a Routine or Reminder, starting as a
+          // Reminder (#344).
+          (Spawn.remind, const Icon(Icons.notifications_outlined), t.remindMe),
           // Frogs and Sessions are made only in Advanced (#197); a Note
           // has one open Frog at a time (#259).
           if (advanced && (_frog?.isDone ?? true))
@@ -1742,7 +1846,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         Expanded(child: Text(t.codePasted)),
         TextButton(
           key: const ValueKey('keep-as-code'),
-          onPressed: () => _setFormat(TextFormats.code),
+          onPressed: _keepAsCode,
           child: Text(t.keepAsCode),
         ),
         IconButton(
@@ -1810,13 +1914,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       children: [
         // Every Note has a kind (#188), first and in words (#310), with ▾
         // while there is another to change it to; else it only shows it.
-        SettingBadge(
-          key: const ValueKey('badge-kind'),
-          setting: t.badgeKind,
-          icon: kindBadgeIcon,
-          value: kindName(t, _kind),
-          dropDown: true,
-          onTap: _kinds.isEmpty ? null : (_) => _editKind(),
+        Spotlight(
+          id: 'editor-kind',
+          child: SettingBadge(
+            key: const ValueKey('badge-kind'),
+            setting: t.badgeKind,
+            icon: kindBadgeIcon,
+            value: kindName(t, _kind),
+            dropDown: true,
+            onTap: _kinds.isEmpty ? null : (_) => _editKind(),
+          ),
         ),
         SettingBadge(
           key: const ValueKey('badge-importance'),
@@ -1831,13 +1938,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           onTap: changes ? (_) => _editImportance() : null,
         ),
         // Area and Topic in one: File into… picks both at once.
-        SettingBadge(
-          key: const ValueKey('badge-place'),
-          setting: t.badgePlace,
-          icon: _placeIcon,
-          iconColour: colour,
-          value: place,
-          onTap: changes ? (_) => _file() : null,
+        Spotlight(
+          id: 'editor-place',
+          child: SettingBadge(
+            key: const ValueKey('badge-place'),
+            setting: t.badgePlace,
+            icon: _placeIcon,
+            iconColour: colour,
+            value: place,
+            onTap: changes ? (_) => _file() : null,
+          ),
         ),
         SettingBadge(
           key: const ValueKey('badge-captured'),
@@ -1878,13 +1988,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         if (_frog case final frog?) _frogBadge(frog),
         // A Plain Note's text is plain, formatted or code (#213).
         if (_kind == NoteKind.plain && note.textEditable)
-          SettingBadge(
-            key: const ValueKey('badge-format'),
-            setting: t.badgeTextFormat,
-            icon: textFormatBadgeIcon,
-            value: textFormatName(t, note.textFormat),
-            valueIcon: textFormatIcon(note.textFormat),
-            onTap: changes ? (_) => _editFormat() : null,
+          _codeLanguageSpot(
+            note,
+            changes,
+            SettingBadge(
+              key: const ValueKey('badge-format'),
+              setting: t.badgeTextFormat,
+              icon: textFormatBadgeIcon,
+              value: textFormatName(t, note.textFormat),
+              valueIcon: textFormatIcon(note.textFormat),
+              onTap: changes ? (_) => _editFormat() : null,
+            ),
           ),
         // A Session's rule and weekdays' counts (#191).
         if (_setup case final setup?)
@@ -1939,16 +2053,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         // In a Shared Area only a Manager sets them up (ADR 0013).
         if (schedules)
-          SettingBadge(
-            key: const ValueKey('badge-add'),
-            setting: t.routineOrReminder,
-            icon: Icons.add,
-            value: null,
-            onTap: _addMenu,
+          Spotlight(
+            id: 'editor-remind',
+            child: SettingBadge(
+              key: const ValueKey('badge-add'),
+              setting: t.routineOrReminder,
+              icon: Icons.add,
+              value: null,
+              onTap: _addMenu,
+            ),
           ),
       ],
     );
   }
+
+  /// The text format badge [badge], with the tip of the code language
+  /// (obf-1043) while its format dialog offers one: a Code text this
+  /// Device may change.
+  Widget _codeLanguageSpot(Note note, bool changes, Widget badge) =>
+      changes && note.textFormat == TextFormats.code
+      ? Spotlight(id: 'editor-code-language', child: badge)
+      : badge;
 
   /// The Frog's badge (#259): the frog, then Open, or Eaten today or
   /// yesterday; a tap offers what this Device may do to it.
@@ -2351,6 +2476,146 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // Written also when the editor was left meanwhile: nothing is lost.
     attachFiles(widget.notes, widget.noteId, read.files);
     if (mounted) _reload();
+  }
+
+  /// Takes a photo with the camera into the Note (#352), as the quick
+  /// note's Photo did; closing the camera changes nothing.
+  Future<void> _takePhoto() async {
+    _saveText();
+    final bytes = await PhotoScope.of(context).takePhoto();
+    if (bytes == null) return;
+    // Written also when the editor was left meanwhile: nothing is lost.
+    widget.notes.addPhoto(widget.noteId, bytes);
+    if (mounted) _reload();
+  }
+
+  /// Picks pictures with the system's picker into the Note (#352),
+  /// several at once; picking none changes nothing.
+  Future<void> _pickPhotos() async {
+    _saveText();
+    final picked = await PhotoScope.of(context).pickPhotos();
+    if (picked.isEmpty) return;
+    for (final bytes in picked) {
+      widget.notes.addPhoto(widget.noteId, bytes);
+    }
+    if (mounted) _reload();
+  }
+
+  /// Reads the clipboard, only on this tap (#352): its text goes into the
+  /// text at the cursor, its pictures into the Note as photos, and a
+  /// clipboard with neither is said in a line above the text.
+  Future<void> _paste() async {
+    final pasted = await PhotoScope.of(context).takeClipboard();
+    if (!mounted) return;
+    if (pasted == null) {
+      _pasteEmpty.value = true;
+      return;
+    }
+    if (pasted.text.trim().isNotEmpty) insertAtCursor(_text, pasted.text);
+    _saveText();
+    for (final bytes in pasted.photos) {
+      widget.notes.addPhoto(widget.noteId, bytes);
+    }
+    _reload();
+  }
+
+  /// Records a voice recording into the Note (#352) on a page with the
+  /// big stop button, as the quick note's Voice did ([recordInto]).
+  Future<void> _record() async {
+    _saveText();
+    await recordInto(context, widget.notes, widget.noteId);
+    if (mounted) _reload();
+  }
+
+  /// Reads the Shopping Lists the Note's lines could go into.
+  void _readShopping() => _toShopping = [
+    for (final list in shoppingListsToAddTo(widget.notes.store, _lock))
+      if (list.id != widget.noteId) list,
+  ];
+
+  /// "Add to a Shopping List" (#124, #352), as the quick note offered it:
+  /// for a plain Note this Device may change, in the lists, with no
+  /// photo or file, which no Line holds, no Section and nothing spawned
+  /// from it, while there is a list to add to. With one list it names it,
+  /// "Add to Weekly", and adds at once (#276).
+  BarAction? _shoppingAction(AppLocalizations t, Note note, bool changes) {
+    final lists = _toShopping;
+    if (!changes ||
+        lists.isEmpty ||
+        _kind != NoteKind.plain ||
+        !note.textEditable ||
+        note.isTrashed ||
+        note.isMerged ||
+        note.spawned ||
+        note.photos.isNotEmpty ||
+        note.attachments.isNotEmpty ||
+        _sections.isNotEmpty) {
+      return null;
+    }
+    final only = lists.length == 1 ? lists.single : null;
+    return BarAction(
+      key: const ValueKey('add-to-shopping'),
+      label: only == null
+          ? t.addToShoppingList
+          : t.addToNamedShoppingList(shoppingTitle(t, only)),
+      onPressed: () => unawaited(_addToShopping(only?.id)),
+      icon: Icons.add_shopping_cart,
+    );
+  }
+
+  /// Makes each line of the Note's text a Line of the Shopping List
+  /// [listId], or of the one picked when it is null, and the Note goes
+  /// (#124); a Note with a recording stays on the list as a Section,
+  /// the items said in its Transcript added as Lines (#311). The editor
+  /// then closes, or opened from Unsorted moves on (#313). What cannot go
+  /// stays the Note, said at the top.
+  Future<void> _addToShopping(String? listId) async {
+    _saveText();
+    final store = widget.notes.store;
+    final picked =
+        listId ??
+        await Navigator.of(context).push(
+          MaterialPageRoute<String>(
+            builder: (_) => ShoppingPickScreen(store: store),
+          ),
+        );
+    if (!mounted || picked == null) return;
+    _saveText();
+    final notes = widget.notes;
+    final before = _sortingBefore();
+    var added = false;
+    if (notes.byId(widget.noteId)?.recordings.isNotEmpty ?? false) {
+      try {
+        ShoppingLists(store)
+            .addVoiceCapture(picked, widget.noteId, deviceWallClock);
+        added = true;
+      } on StateError {
+        // The list can no longer be added to: the Note stays.
+      } on ArgumentError {
+        // The same.
+      } on HiddenFromAiRefused {
+        // Hidden from AI, it goes into no Shared Area (#267).
+      }
+    } else {
+      added = pourIntoShopping(notes, widget.noteId, picked) == true;
+    }
+    if (!added) {
+      final t = context.t;
+      announceFailure(
+        context,
+        t.captureShoppingGone,
+        title: t.captureShoppingNotAddedTitle,
+        cause: t.captureShoppingGoneCause,
+        fix: t.captureShoppingKeptFix,
+        details: 'editor into a Shopping List: the Note could not go there',
+      );
+      _reload();
+      return;
+    }
+    // The list used last goes to the top of the pick (#276).
+    store.lastShoppingList = picked;
+    if (_movedOn(before)) return;
+    Navigator.of(context).pop();
   }
 
   /// Reads the photo ([photo]) or transcribes the recording [hash] of the
@@ -2917,6 +3182,35 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               icon: Icons.history,
             ),
             if (changes) ...[
+              // What the quick note offered before (#352).
+              if (PhotoScope.of(context).available)
+                BarAction(
+                  key: const ValueKey('editor-photo'),
+                  label: t.photo,
+                  onPressed: () => unawaited(_takePhoto()),
+                  icon: Icons.photo_camera_outlined,
+                ),
+              if (VoiceScope.of(context).available)
+                BarAction(
+                  key: const ValueKey('editor-voice'),
+                  label: t.voice,
+                  onPressed: () => unawaited(_record()),
+                  icon: Icons.mic_none,
+                ),
+              if (PhotoScope.of(context).pickable)
+                BarAction(
+                  key: const ValueKey('editor-gallery'),
+                  label: t.gallery,
+                  onPressed: () => unawaited(_pickPhotos()),
+                  icon: Icons.photo_library_outlined,
+                ),
+              if (PhotoScope.of(context).pasteable && editable)
+                BarAction(
+                  key: const ValueKey('editor-paste'),
+                  label: t.paste,
+                  onPressed: () => unawaited(_paste()),
+                  icon: Icons.content_paste,
+                ),
               if (FileScope.of(context).pickable)
                 BarAction(
                   key: const ValueKey('attach-file'),
@@ -2929,6 +3223,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onPressed: _merge,
                 icon: Icons.call_merge,
               ),
+              ?_shoppingAction(t, note, changes),
               BarAction(
                 label: t.moveToTrash,
                 onPressed: _trash,
@@ -2945,6 +3240,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               const SizedBox(height: 8),
             ],
             ..._openLines(t, changes),
+            ValueListenableBuilder(
+              valueListenable: _pasteEmpty,
+              builder: (context, empty, _) => empty
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        t.pasteEmpty,
+                        key: const ValueKey('paste-empty'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             // The Note's text and its Sections read on as one text, each
             // Section under a tear line, in no box of its own (#307).
             Embossed(
@@ -2975,7 +3285,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                             editable &&
                                 _kind == NoteKind.plain &&
                                 note.textFormat != TextFormats.code
-                            ? () => setState(() => _offersCode = true)
+                            ? (pasted) => setState(() {
+                                _offersCode = true;
+                                _pastedCode = pasted;
+                              })
                             : null,
                         style: Theme.of(context).textTheme.bodyLarge,
                         decoration: const InputDecoration(
@@ -3126,6 +3439,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     children: _sectionPart(i, section, note, when),
                   ),
                 ),
+            // At the Note's end, after its Sections (obf-1035).
+            if (_linkedFrom.isEmpty)
+              LinkedFrom(linking: _linkedFrom)
+            else
+              Spotlight(
+                id: 'editor-linked-from',
+                child: LinkedFrom(linking: _linkedFrom),
+              ),
             const SizedBox(height: 24),
             if (amends)
               Align(

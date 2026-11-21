@@ -102,53 +102,54 @@ replace a law of Both apps where they say so. A desktop law marked
 - Voice recording starts at once and **ends by tapping one big stop
   button**. No hold-to-talk, no stop on silence. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
-  with the recording or photo on it, the buttons and room to type.
-  Leaving saves.
-- Every capture screen shows three buttons at the bottom: remind me in
-  **10 min, 30 min, 1 h**. Leaving without tapping one means 1 h.
-  The three are actions, not a choice of value: a tap saves the Note
-  with that Nudge time, so the single-choice law does not apply to them.
-  Where the Device switched the Nudge buttons off (Settings ▸ Quick
-  note), one Save takes their place, and it nudges in 1 h as leaving does.
-- **Capture offers the Kind above the field** (#310, Q715): Text,
-  Checklist and Shopping List as choice chips, Text picked at first, on
-  every text capture screen, in Simple too, behind the App Lock too. A
-  Checklist or Shopping List makes the Note that list as it is saved, each
-  typed line a Line unless the first is a heading, which is then its Name
-  (#309); Text keeps it a Plain Note. **The Kind applies to the typed text
-  only**: a recording's Transcript, a photo and a file stay on the Note as
-  its own and never become Lines, and with nothing typed the Note stays a
-  Plain Note. The list needs the Note itself: while one is chosen, Add to
-  Note…, "Make it a Tally" and the Session are not offered, and a Tally or
-  Session set up hides the choice until its chip is dropped. The Kind is
-  made only on leaving; a Note written before, as the app went to the
-  background, waits as a Plain Note with its Nudge. The Kind "Shopping
-  List" makes a new list; Add to a Shopping List adds to one there is.
-- **Add to a Shopping List** makes each line of the capture a Line of
-  the list picked, and keeps no Note. While a list is picked, the other
-  choices wait unshown. It is not offered with a photo on the screen, a
-  photo taken afterwards drops it, and behind the App Lock it is not
-  offered. **A voice capture is offered it with a speech model or
-  without** (#311, Q716): the capture, its text and recording, stays on
-  the list as a Section under a tear line, so a misheard item can be
-  listened to, and the typed lines become Lines at once. The items said
+  with the recording or photo on it and room to type. Leaving saves.
+- **The quick note is the text, three Nudge buttons and More, nothing
+  else** (#352): the text field at the top, under it remind me in
+  **10 min, 30 min, 1 h**, and More, which saves the Note as leaving
+  does and opens it in the full editor in its place (on the desktop the
+  Note dialog). Simple and Advanced alike, on the phone, in the desktop's
+  quick note dialog and in the capture popup. No Save and no Back on
+  top: Android's system Back saves, the iPhone keeps a back arrow top
+  left that saves, the desktop's Esc and the dialog's cross save, each
+  as the 1 h button does; an empty text saves nothing. Everything else,
+  Photo, Voice, Gallery, Paste, File, the Kind, Add to Note… (there Merge
+  into…), Remind me…, File into…, the Frog, the Importance and the format bar, lives
+  in the full editor and the Note dialog. An entry point that starts
+  with something, voice, the camera, a picker, the clipboard, a share or
+  a list's "+", still opens the quick note with it: what it brought
+  shows above the text, and More takes it on.
+- Leaving without tapping a Nudge button means 1 h. The three are
+  actions, not a choice of value: a tap saves the Note with that Nudge
+  time, so the single-choice law does not apply to them. Where the
+  Device switched the Nudge buttons off (Settings ▸ Quick note), one
+  Save takes their place, and it nudges in 1 h as leaving does.
+- **The Kind is the full editor's** (#352): the quick note makes a Plain
+  Note; its kind badge, in the Note editor and the Note dialog, makes it a
+  Checklist, a Shopping List, a Tally or a Session, each line a Line
+  unless the first is a heading, which is then its Name (#309).
+- **Add to a Shopping List**, in the Note editor and the Note dialog
+  (#352), makes each line of a Plain Note a Line of the list picked, and
+  keeps no Note. It is offered only for a Note that holds no photo, file
+  or Section and has nothing spawned from it. **A Note with a recording
+  is offered it with a speech model or without** (#311, Q716): it stays
+  on the list as a Section under a tear line, so a misheard item can be
+  listened to, and its typed lines become Lines at once. The items said
   in the recording's Transcript become Lines too, split at commas, at
   "und" and "and" and at the pauses Whisper marks; at once when it is
   transcribed already, else as soon as it is, on this Device or another,
   also when the speech model is downloaded later. They are added once:
   transcribing again adds nothing.
 - **Everything is saved together** when the user leaves the screen or
-  taps a save button. Nothing is half-saved: for an empty Note nothing
-  is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs
-  on an empty Note.
-- **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, a
-  Routine, Reminder, Frog, Session or Tally is set up, or a Checklist or
-  Shopping List is chosen as its Kind (#310), the three Nudge buttons
+  taps a Nudge button, Save or More. Nothing is half-saved: for an
+  empty Note nothing is saved.
+- **A sorted Note needs no Nudge.** Opened from an Area's or Topic's
+  "+", the quick note files the Note there: the three Nudge buttons
   become one Save and no Nudge is set; leaving saves too.
 
 ### Agenda
 
-- Order: the Missed Summary card, then the "x Unsorted" banner, then
+- Order: the quiet day's line while today is quiet (obf-1044), then
+  the Missed Summary card, then the "x Unsorted" banner, then
   the "x Sent Items waiting" line while a stranger's Sent Item waits for
   "Show", then the "x shared Areas waiting" line while an offered Area
   waits for Accept or Decline, then today's all-day Occurrences, then the
@@ -216,6 +217,17 @@ replace a law of Both apps where they say so. A desktop law marked
   as it is.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
+- **A quiet day shows everything and rings nothing** (obf-1044, ADR
+  0053): **Quiet today** in the Agenda's menu, offered while today is
+  not quiet (on the phone a bar action with a bell, in ⋮ when the bar
+  is full; on the desktop in a ⋮ last in the Agenda's bar), makes today quiet on all of the person's own Devices,
+  without an announcement. While it holds, the Agenda's first line reads
+  "Quiet day until midnight" with **End**; End ends it at once and the
+  menu offers Quiet today again; at midnight the line goes by itself.
+  Today's rows stay as they are, each checked off on its own; nothing
+  notifies, no ring, Re-nag, Heads-up, Escalation, Nudge or Changes
+  Nudge, and what is left undone counts as skipped from midnight, never
+  as Missed. After End what is still to come rings, not what passed.
 - **Checked off today, there all day.** An Occurrence checked off today
   stays on the Agenda for the day as Done, box checked and title struck
   through; the box unchecks it. Checking off opens nothing. **A skipped
@@ -317,6 +329,17 @@ replace a law of Both apps where they say so. A desktop law marked
   line on the page. Everything a Section does stays: its text edited
   in place, its line's dialog, who edited it and when, its photos,
   recordings, files, Transcripts and Photo Texts.
+- **A Note shows the Notes that link to it** (obf-1035, Q22): at its
+  end, after its Sections, "Linked from" in the weak text colour, then
+  one row per Note whose text or Sections hold an App link to it, the
+  link icon before its first line with words as it reads (its capture
+  time where it has none), newest first; a tap or click opens that Note
+  as its link does. In the detailed view, the Note editor, the Note
+  dialog and a Note's own window, its reading view too; never on the
+  compact view, nor on a card in the trash, and only while a Note links
+  there. Only Notes this reader may see: none from the trash, merged
+  ones, a Shared Area they are no member of, or a closed locked Area.
+  On a desktop card a row takes its own click, not the card's.
 - **The compact view is a glance, by the Note's kind** (#189): a Plain
   Note its first line and the two lines after it, a Checklist its name
   and how many Lines are open ("3 of 7 open"), a Shopping List its name
@@ -329,7 +352,7 @@ replace a law of Both apps where they say so. A desktop law marked
   this week" over all of them (#191); a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
   the card** (File into, Routine, Merge, the pencil); **its ⋮ sits top
-  right** and offers after Edit File into…, Routine…, Reminder…, in
+  right** and offers after Edit File into…, Remind me… (#344), in
   Advanced Frog and Session… (#197), and Merge into…, as far as the
   action row would (#281): the spawns only for who may set them up
   (ADR 0013) and Session… only on a plain Note. **On an Unsorted Note's
@@ -491,7 +514,7 @@ replace a law of Both apps where they say so. A desktop law marked
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value" in words, an icon's value
   too. The row ends with "+",
-  whose menu at the finger offers Routine, Reminder, Frog and Session,
+  whose menu at the finger offers Remind me…, Frog and Session,
   there only for who may set them up; no Frog while the Note has an open
   one (#259); on a Session it offers no
   Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and
@@ -612,6 +635,16 @@ replace a law of Both apps where they say so. A desktop law marked
   "tonight" at 19:00, against the store's clock. On an Advanced schedule
   it is read-only, the schedule's summary with "Switch to Simple to
   type". The sentence is never stored.
+- **The Routine editor lists the Heads-ups** (obf-1046): under the
+  schedule, "Heads-ups" lists each one set ("20 min before", "1 day
+  before"), earliest warning first, each with its remove ✕, and "Add
+  heads-up" offers 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days and
+  1 week before; an all-day schedule offers and keeps whole days only
+  (1, 2 and 3 days, 1 week). They are the person's own, on their own
+  Devices: in a Shared Area a Member who may not change the Routine
+  still sets their own, and nobody else sees them: the editor opens for
+  them with everything else shown, not edited, and its Save keeps only
+  the Heads-ups. Saved with the editor's Save.
 - **A new Reminder offers its chips** (#271): on the phone and the
   desktop, a new Reminder, or a new Routine set to Once in Simple, shows
   a wrapping row of chips under the When line: In 1 h, Tonight (until
@@ -700,6 +733,32 @@ replace a law of Both apps where they say so. A desktop law marked
   moves sideways. **A paste that looks like code** into a Plain Note's
   text in the Note editor formats nothing and puts "Keep as code" under
   the text, with a cross that lets the paste be; Capture never asks.
+- **Code is coloured by its language** (obf-1036, ADR 0054): a Code text
+  with a language and a code block whose fence names a language a
+  grammar knows are drawn in the syntax colours wherever they show
+  (cards, read views, the editor's field), only the glyphs' colour
+  changing: font, size, tint and line room stay as above. Eleven colours
+  (comment, string, number, constant, keyword, operator, type, function,
+  tag, attribute, variable), the same values in both apps, one set for the
+  light look and one for the dark, each readable on the code tint.
+  Without a language, with one this Device does not know, or a fence
+  naming none, code stays in the text's colour. The text format badge's
+  dialog, while Code is picked, offers "Language": "No language" and the
+  grammars by name, and a pick is written at once; "Keep as code" picks
+  the language the first line names. Search, Share and Copy give the
+  text as written.
+- **Grammars of one's own in Settings ▸ Code languages** (obf-1037):
+  the section's line says what a grammar is, then each grammar the
+  person added by name, with "Replaces the built-in grammar for …"
+  under it when it takes a built-in one's place (else its scope), and
+  Remove beside it, which removes it at once; under them "Add
+  grammar…" opens the system's file picker, any file shown. A file
+  refused says so red under the button, with the file's name and what
+  is wrong, and nothing is added; the next add clears it. A setting of
+  the person, the same on all of their own Devices, in Simple and
+  Advanced, on the phone and the desktop alike. An added grammar's
+  language is offered in the text format badge's Language after the
+  built-in ones, one replacing a built-in one in its place.
 
 ### Boxes
 
@@ -831,6 +890,35 @@ replace a law of Both apps where they say so. A desktop law marked
   "More…".
 - Errors name the cause and the fix in one sentence each.
 
+### Spotlights
+
+- **Each screen explains itself** (obf-1043, ADR 0055): on a person's
+  first visit to a screen its Spotlights show one after another, and
+  from then on only a new thing on it gets its Spotlight, once. Each
+  screen has its manifest of tips, in the order they show (phone:
+  `spotlightManifest` in `spotlight.dart`; desktop: `spotlight.rs`); a
+  ticket that adds something to a screen adds its tip there, in English
+  and German.
+- **The look**: the whole window dims, black at 60 %, with the element
+  cut out of the dim, a little larger than it and with rounded
+  corners. A card of the theme beside it, on the side with room, over
+  it only where a tall element leaves no room elsewhere, at most
+  400 wide and 24 from the window's edges, holds one sentence of at
+  most 15 words, what the element does for the person, without "tap" or
+  "click" where it can do without, then Skip and Next at its bottom
+  right, Next reading "Got it" on the screen's last tip.
+- **It never traps input**: Skip is always on the card; Skip, a tap or
+  click outside the card, Esc and Back end the screen's tour and count
+  its other tips as shown. A tip is counted as shown before it shows.
+- A tour starts only once the screen is on top, its page transition
+  settled, with no dialog, menu or other page over it; an element below
+  the fold is scrolled into sight first. A tip whose element is not on
+  the screen (Advanced only in Simple, Linked from without a link)
+  waits for a visit where it is.
+- The marks are this Device's (local settings), and "Show tips again"
+  in the Settings brings every tip back on it. Tests, kittests and the
+  screenshot generators show none; no guide frame shows a tip.
+
 ### Look
 
 - Light mode: a light teal background. Dark mode: anthracite. The
@@ -930,6 +1018,19 @@ replace a law of Both apps where they say so. A desktop law marked
   or later. Neither changes the schedule. Done moves a Plain Note with
   its only Reminder to the trash where the person chose so (#211,
   "Agenda").
+- **Quiet Hours are quiet** (obf-1045): in them an Occurrence's
+  notification and its Re-nags show on time without sound or vibration,
+  never full screen; a Routine with Escalation on rings with sound from
+  its first ring, as Escalation is the only way through. An all-day
+  Occurrence's first ring still waits until they end (#201).
+- **A Heads-up is one plain notification before its Occurrence**
+  (obf-1046): the Note's title with how long until it starts ("in
+  20 min", "in 1 day"), no Done, Snooze or Not today, no Re-nag, never
+  full screen, without sound in the Quiet Hours whether or not the
+  Routine escalates. It shows in its Occurrence's notification, so the
+  ring replaces it; on the iPhone, which cannot replace a delivered
+  notification, it sits in the Occurrence's group beside the ring. Done, Skip or Snooze before it cancels it; the
+  Occurrence still rings at its time.
 
 ## Phone
 
@@ -1154,53 +1255,28 @@ replace a law of Both apps where they say so. A desktop law marked
   Settings ▸ Capture ▸ "Print to Old Brain Fix", in Simple and Advanced,
   says whether Android has the service on and opens Android's print
   settings, where only the user turns it on; the iPhone has no row.
-- **The quick note is uncluttered** (#142): by default it shows the
-  Kind choice above the text field (#310, no switch in Settings), the
-  text field, Photo, Voice, Gallery, Paste and File, the Nudge buttons,
-  **To full editor**, **Add to Note…** (#308) and the alarm clock beside them (#223), whose menu
-  offers Routine and Reminder as the Note editor's "+" does, in Simple
-  too; nothing else that sorts and no other chips. The Routine or Reminder
-  editor opens over the quick note and comes back to it with the choice
-  at the top, written only with the Note. To full editor
-  saves the Note at once, Unsorted with the default Nudge, and opens the
-  Note editor on it in place of the capture screen; leaving the editor
-  returns to where Capture was opened from. It waits while there is
-  nothing to save and is not offered behind the App Lock or while a
-  Shopping List is picked.
-- **Add to Note… adds the capture to another Note at once** (#308,
-  Q713): it picks the Note in Add to Note…, a running recording ended
-  and kept first, and the text, recording, photos and files become one
-  Section of it with their Capture Context, the capture written where
-  that Note lies (so in a Shared Area for its people), with no Nudge,
-  and merged into it, so nothing waits in Unsorted; Capture then closes,
-  on the phone back where it was opened from, which shows that Note.
-  Back in the picker leaves the capture as it was. It waits as To full
-  editor does and is not offered behind the App Lock, while a Shopping
-  List is picked, nor once a Routine, Reminder, Session, Frog or Tally
-  is set up or a Checklist or Shopping List is chosen as its Kind
-  (#310), which need the Note itself; a place picked gives way to
-  the Note's.
-- **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
-  all off by default, for File into…, Frog, Session or Tally (only in
-  Advanced, #197), Add to a Shopping List, the Importance and the format
-  bar (only in Advanced),
-  and the switch Nudge buttons, on by default. What is switched on shows
-  in the Note card's action row beside To full editor, on every capture
+- **The quick note is the text, the Nudge buttons and More** (#142,
+  #352): nothing else, in Simple and Advanced alike, on every capture
   path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
-  shortcut, also one a phone key or gesture starts): File into…, Frog
-  and Session in the alarm clock's menu, and ⋮ with the Importance, Make
-  it a Tally (with the Frog, Session or Tally switch) and Add to a
-  Shopping List. Each opens its usual
-  page (Add to a Shopping List none while there is one list to add to:
-  its entry names it, "Add to Weekly", and picks it at once, #276) and
-  comes back to the capture screen with the choice shown at the
-  top ("→ Household"), not saved yet; the user can keep typing or add
-  more. All of it is optional. With the format bar on, it rides on the
-  keyboard; where the room is small the buttons under the text scroll
-  and the text keeps two lines.
-- Behind the App Lock, the row offers neither File into… nor the
-  Session, which would show the Areas and the Tallies. File into… lists
-  a closed locked Area without its Topics.
+  shortcut, also one a phone key or gesture starts). What a path brought
+  in, a recording, photos or files, shows above the text. **More** saves
+  the Note at once, Unsorted with the default Nudge, and opens the Note
+  editor on it in place of the capture screen; leaving the editor
+  returns to where Capture was opened from. It waits while there is
+  nothing to save and is not offered behind the App Lock.
+- **The Note editor holds what the quick note no longer shows** (#352):
+  in its bar Photo, Voice, Gallery, Paste and Add to a Shopping List
+  beside Attach file (on a phone-wide bar mostly in ⋮); its badges the
+  Kind, the place (File into…), the Importance and "+" with Remind me…,
+  in Advanced Frog and Session; Merge into… adds it to another Note; the
+  format bar rides on the keyboard. Voice records on a page of its own
+  with the big stop button; Stop, Back and Stop on the notification keep
+  the recording on the Note.
+- **Settings ▸ Quick note** (per Device, ADR 0008) keeps only the switch
+  Nudge buttons, on by default. The switches that once added File
+  into…, Frog, Session or Tally, Add to a Shopping List, the Importance
+  and the format bar to the quick note are hidden (#352); what they
+  stored stays and has no effect.
 - After saving, the new Note's card shows with the same options, for
   whatever was not done while capturing (merging into another Note
   among them): in its detailed view, a tap switching it to compact. Enriching is never required; a Note left without an
@@ -1211,7 +1287,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **The Agenda's bar**, in this order: All Routines and Reminders,
   Calendar, new Routine, New Session (only in Advanced, #246), then the
   Profile picture in the corner; the desktop's has the same without
-  Calendar. When the phone's bar is full, the last of All Routines,
+  Calendar, and a ⋮ last with Quiet today while today is not quiet
+  (#354). When the phone's bar is full, the last of All Routines,
   Calendar, new Routine and New Session go into ⋮, after the Profile
   picture (see The bar); the folder and the Profile picture never do. All
   Routines and Reminders lists every one alphabetically by name, also
@@ -1450,7 +1527,12 @@ replace a law of Both apps where they say so. A desktop law marked
   with the list and come back over it, the list staying still, once it
   is scrolled up a little; half shown, it snaps. While the field has the
   focus or a search it stays; otherwise no edge under the bar cuts the
-  list.
+  list. The bar sits on a band (#351, obf-1041), and the page's top bar
+  takes the band's fill, the theme's surface container, set off from the
+  page's ground in the light and the dark look, so top bar and band read
+  as one header with one line under the band only; shown over the list,
+  and with the list pulled down, the cards go under it. Pages without
+  the search bar keep their top bar in the ground's colour.
 
 ### Settings
 
@@ -1488,7 +1570,8 @@ replace a law of Both apps where they say so. A desktop law marked
     own alarm screen replaces the page: its Stop answers Done, and its
     one Snooze waits 10 min, as there is room for one only. Without the
     Alarms permission it comes as a time-sensitive notification.
-  - An Occurrence's notification is time-sensitive and offers Done, the
+  - An Occurrence's notification is time-sensitive, in the Quiet Hours
+    a normal one without sound (obf-1045), and offers Done, the
     three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h"),
     Skip and Tomorrow at once, not Snooze and Not today and then their
     choices (#269); a Re-nag after midnight of an earlier day's
@@ -1833,7 +1916,7 @@ replace a law of Both apps where they say so. A desktop law marked
   Important, Normal or Unimportant, and Move to trash last, each only on
   a card this Device may change; a card in the Trash has no ⋮, and its
   right-click offers Restore alone. Between File into… and Merge into…
-  stand Routine… and Reminder…, in Advanced Frog while the Note has no
+  stand Remind me…, in Advanced Frog while the Note has no
   open Frog and Session… on a plain Note, as in the phone's compact ⋮
   (#281), only for who may set them up (ADR 0013) and for that card
   alone, selected or not; the ⋮ and the right-click are one menu in
@@ -1909,32 +1992,28 @@ replace a law of Both apps where they say so. A desktop law marked
 
 - **On the desktop** the capture popup and the window's quick note
   dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
-  quick note and follow the same switches (desktop Settings ▸ Quick
-  note, beside Quick capture): by default the Kind choice above the
-  text as radio pills (#310), the text, Record voice, Paste
-  (the dialog also From file…), the Nudge buttons, To full editor, Add
-  to Note… (#308), a dialog over the quick note dialog or a page of the
-  popup, and the alarm clock, whose menu offers Routine and Reminder (#223), its
-  editor a dialog over the quick note dialog or a page of the popup;
-  switched on, File into…, Frog and Session in the clock's menu, and
-  More with the Importance, Make it a Tally and Add to a Shopping List
-  (its lists as radio buttons, the one used last at the top; with one
-  list a single entry naming it, "Add to Weekly", #276),
-  and the format bar over the field, without ☐, link and table. Files
-  dropped onto the window open the dialog and wait in it (#267): a
-  picture as a photo, a sound file as a voice recording, any other file
-  as an Attachment, each named on its own line; From file… picks files
-  of any kind the same way. **A file dropped onto the Note dialog goes
-  onto its Note** while nothing lies over the dialog, a picture as its
-  photo, a sound file as its recording, any other as its Attachment;
-  onto a Note's own window the same. A file larger than 256 MB, or one
-  that cannot be read, is told by its size before it is read, not
-  attached and announced; the others are. Leaving the
-  dialog by its cross, Esc, Alt+Left, the mouse's back button or a click
-  beside it keeps what is typed, nudged in 1 h. To full editor in the
-  window opens the Note in the Note dialog in its place; in the popup it
-  closes the popup and opens the Note there in the window, brought back
-  from the tray.
+  quick note (#352): the text, then, once something is typed or held,
+  More and the Nudge buttons, nothing else; desktop Settings ▸ Quick
+  note keeps only Nudge buttons. More saves the Note and opens it in the
+  window's Note dialog in place of the dialog; in the popup it closes
+  the popup and opens the Note there in the window, brought back from
+  the tray. The Note dialog holds Record voice, Paste (in a row with
+  Attach a file…), Add to a Shopping List (at the bottom, between Merge
+  into… and Move to trash; its lists as radio buttons, the one used last
+  at the top; with one list a single entry naming it, "Add to Weekly",
+  #276), the badges and the format bar. Files dropped onto the window,
+  and File ▸ Attach a file… with no Note open, open the quick note
+  dialog and wait in it above the text (#267): a picture as a photo, a
+  sound file as a voice recording, any other file as an Attachment, each
+  named on its own line; Ctrl+V in the empty field holds a pasted
+  picture the same way. **A file dropped onto the Note dialog goes onto
+  its Note** while nothing lies over the dialog, a picture as its photo,
+  a sound file as its recording, any other as its Attachment; onto a
+  Note's own window the same. A file larger than 256 MB, or one that
+  cannot be read, is told by its size before it is read, not attached
+  and announced; the others are. Leaving the dialog by its cross, Esc,
+  Alt+Left, the mouse's back button or a click beside it keeps what is
+  typed, nudged in 1 h.
 
 ### Text editor and Lines
 

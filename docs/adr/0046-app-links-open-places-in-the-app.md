@@ -34,8 +34,17 @@ The HTML handed to another app (#129) writes an app link as its label alone: ano
 
 From 0.5.0 the Quick start and What the icons mean are formatted texts (ADR 0042, amended here): the Quick start's Description first lists, numbered as the Lines are, a link to each step's place (the Agenda, Unsorted, All Routines and Reminders twice, "Here, in this Checklist." for ticking a Line, the Agenda, Backups, Sync), then the desktop's way; What the icons mean ends with a link to the guide's start page. A Checklist's Lines are plain, so the links go into the Description, not into the Lines. Both apps write these texts from the same strings through `Markdown.link`, so the bytes are the same; the fixture `help` holds a link. Help Notes made before stay as they are (ADR 0042).
 
+## Linked from (amended for obf-1035)
+
+A Note shows the Notes that link to it, "Linked from" (#345, Q12, Q21, Q22): the Notes neither in the trash nor merged whose text, or the text of one of their Sections, holds an app link `note/<id>` to it, in a formatted text as it is drawn, a link inside bold, a quote or a table's cell too, the scheme in any case and the id %-encoded or not. A plain or Code text has no links, and a link to an Area, a Topic, a page or a file, or a web link, has none. Each Note is listed once, newest capture first and by id within one capture time, never under itself; a Note merged into another links from there, as its text is a Section of it. Both cores read them alike (`Backlinks`, `backlinks.dart`, `backlinks.rs`; the fixture `backlinks.json`).
+
+Nothing new is stored. The cores read the links from the texts and keep them until the log changes (`workedOut`, `worked_out`), and the full-text index (ADR 0048) names the Notes and Sections whose text ever held the scheme, so a change reads only those and what they were merged into, never every Note; where the index cannot answer, every Note is read. A page asks for one Note's at a time, once per read and not per frame (#339).
+
+It is the part at a Note's end, after its Sections, in the detailed view, the Note editor (the phone), the Note dialog and a Note's own window, its reading view too (the desktop): "Linked from", then one row per Note by its first line with words as it reads, its capture time where it has none. A tap or click opens it as its app link does. The compact view shows none, and a Note none links to shows nothing. Only Notes this reader may see are listed: what a store reads leaves out a Shared Area's Notes for who is no member of it (ADR 0013), and the phone leaves out the Notes of a locked Area while it is closed (Area Locks); the desktop has none. A card in the trash shows none. The AI port lists none (ADR 0026, ADR 0049): `read_note` is as it was.
+
 ## Considered
 
+- Storing the links beside the text, or an index table of them (rejected, #345: nothing new is stored, and they would have to follow every edit, Merge, trash and role, while read from the texts they never go stale).
 - `file://` links to a path (rejected: a path differs between Devices, the phone's shared folder has no path at all, and an absolute path could name anything on the disk).
 - File links with no question (rejected, Q598: a link may come from another person, and opening a file starts another app).
 - Typing ids into the Link dialog (rejected, Q596: nobody knows an id).

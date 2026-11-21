@@ -8,10 +8,12 @@ use std::process::{Command, Stdio};
 
 use egui::{Id, RichText, ScrollArea, TextEdit, Ui};
 use oldbrainfix_core::app_link::AppLink;
-use oldbrainfix_core::{Notes, PersonSettings, Places, Result, Store};
+use oldbrainfix_core::{Note, Notes, PersonSettings, Places, Result, Store};
 
+use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
+use crate::text_marks_view;
 
 /// What the picker groups its targets under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -175,6 +177,89 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
         picked = Some(Picked::Cancel);
     }
     picked
+}
+
+/// One row of "Linked from" as drawn: where it lies, the Note it names
+/// and its name.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkedRow {
+    pub rect: egui::Rect,
+    pub link: AppLink,
+    pub name: String,
+}
+
+/// The Notes that link to the Note `of` (obf-1035, ADR 0046), at its end
+/// after its Sections, as the phone's `LinkedFrom`: under "Linked from"
+/// one row per Note, the link icon before its first line with words as
+/// it reads, its capture time where it has none. Nothing while `linking`
+/// is empty. A click on a row opens its Note as its app link does.
+pub fn linked_from(ui: &mut Ui, t: &L10n, of: &str, linking: &[Note]) {
+    let rows = linked_from_rows(ui, t, linking);
+    // Where a tip points at it (obf-1043): the rows together.
+    if let Some(all) = rows.iter().map(|row| row.rect).reduce(|a, b| a.union(b)) {
+        crate::spotlight::anchor(ui, "note-linked-from", all);
+    }
+    for row in rows {
+        linked_row_clicks(ui, of, &row);
+    }
+}
+
+/// The rows of [`linked_from`] drawn under its heading, not yet taking
+/// clicks: a card, which takes the clicks over it, has them take theirs
+/// after its own with [`linked_row_clicks`].
+pub fn linked_from_rows(ui: &mut Ui, t: &L10n, linking: &[Note]) -> Vec<LinkedRow> {
+    if linking.is_empty() {
+        return Vec::new();
+    }
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.add_space(8.0);
+    ui.label(RichText::new(t.linked_from()).strong().color(weak));
+    let mut rows = Vec::new();
+    for note in linking {
+        let name = match name_of(note) {
+            name if name.is_empty() => crate::app::when(t, note.captured),
+            name => name,
+        };
+        let drawn = ui.horizontal(|ui| {
+            icons::show(ui, icons::LINK, 16.0, weak);
+            ui.label(RichText::new(&name).color(text));
+        });
+        rows.push(LinkedRow {
+            rect: drawn.response.rect,
+            link: AppLink::Note(note.id.clone()),
+            name,
+        });
+    }
+    rows
+}
+
+/// Takes the click on the row `row` of "Linked from" on the Note `of`,
+/// registered over what lies there and named as a link by its Note: it
+/// hands the link to its Note to the window, as a link in a text does.
+/// Its id holds the layer it lies on, so the card behind a dialog and the
+/// dialog showing the same Note never share one.
+pub fn linked_row_clicks(ui: &mut Ui, of: &str, row: &LinkedRow) {
+    let id = Id::new(("linked from", ui.layer_id(), of, row.link.url()));
+    let click = ui.interact(row.rect, id, egui::Sense::click());
+    click.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Link, true, &row.name));
+    if click
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .clicked()
+    {
+        text_marks_view::hand_app_link(ui.ctx(), row.link.clone());
+    }
+}
+
+/// The first line with words of `note` as it reads, without the spaces
+/// around it; empty when it has none.
+pub fn name_of(note: &Note) -> String {
+    note.visible_text()
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// The file at `path` inside the synced `folder`, its names separated by

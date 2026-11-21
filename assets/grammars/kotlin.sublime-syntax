@@ -1,0 +1,87 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: Kotlin
+scope: source.kotlin
+file_extensions: [kt, kotlin, kts]
+
+variables:
+  ident: '[A-Za-z_]\w*'
+
+contexts:
+  main:
+    - match: '//.*'
+      scope: comment.line.double-slash.kotlin
+    - match: '/\*'
+      push: block_comment
+    - match: '"""'
+      push: raw_string
+    - match: '"'
+      push: string
+    - match: '''(?:\\(?:u[0-9a-fA-F]{4}|.)|[^\\''\n])'''
+      scope: string.quoted.single.char.kotlin
+    - match: '@{{ident}}(?:\.{{ident}})*|\b{{ident}}@'
+      scope: variable.function.annotation.kotlin
+    - match: '\b(fun)\s+(?:<[^>\n]{0,80}>\s*)?(?:{{ident}}(?:<[^>\n]{0,80}>)?\??\.)?({{ident}})'
+      captures:
+        1: keyword.declaration.function.kotlin
+        2: entity.name.function.kotlin
+    - match: '\b(class|interface|object|typealias)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.kotlin
+        2: entity.name.class.kotlin
+    - match: '\b(?:if|else|when|for|while|do|try|catch|finally|return|break|continue|throw|is|in|as|import|package|by|where|init|constructor|get|set)\b'
+      scope: keyword.control.kotlin
+    - match: '\b(?:fun|val|var|class|interface|object|typealias|companion)\b'
+      scope: keyword.declaration.kotlin
+    - match: '\b(?:public|private|protected|internal|open|final|abstract|override|sealed|data|enum|inner|lateinit|const|suspend|inline|vararg|noinline|crossinline|reified|external|annotation|tailrec|operator|infix|expect|actual|value|out)\b'
+      scope: storage.modifier.kotlin
+    - match: '\b(?:true|false|null)\b'
+      scope: constant.language.kotlin
+    - match: '\b(?:this|super|it)\b'
+      scope: variable.language.kotlin
+    - match: '\b(?:Int|Long|Short|Byte|Double|Float|Boolean|Char|String|Unit|Any|Nothing|Array|List|MutableList|Map|MutableMap|Set|MutableSet)\b'
+      scope: storage.type.kotlin
+    - match: '\b[A-Z][a-z]\w*'
+      scope: support.class.kotlin
+    - match: '\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)(?:[fFL]|[uU]L?)?\b'
+      scope: constant.numeric.kotlin
+    - match: '\b{{ident}}(?=\s*(?:<[\w<>, ?*]{0,80}>\s*)?[({])'
+      scope: variable.function.kotlin
+    - match: '->|::|\.\.<?|\?:|\?\.|!!|&&|\|\||[-+*/%<>=!]=?=?'
+      scope: keyword.operator.kotlin
+
+  block_comment:
+    - meta_scope: comment.block.kotlin
+    - match: '\*/'
+      pop: true
+    - match: '/\*'
+      push: block_comment
+
+  template:
+    - match: '\$\{'
+      push: template_expr
+    - match: '\${{ident}}'
+      scope: variable.parameter.interpolation.kotlin
+
+  template_expr:
+    - meta_scope: meta.interpolation.kotlin variable.parameter.interpolation.kotlin
+    - match: '\}'
+      pop: true
+    - match: '\{'
+      push: template_expr
+    - include: main
+
+  string:
+    - meta_scope: string.quoted.double.kotlin
+    - match: '"|$'
+      pop: true
+    - match: '\\(?:u[0-9a-fA-F]{4}|.)'
+      scope: constant.character.escape.kotlin
+    - include: template
+
+  raw_string:
+    - meta_scope: string.quoted.triple.kotlin
+    - match: '"""'
+      pop: true
+    - include: template

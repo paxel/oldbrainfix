@@ -146,7 +146,7 @@ fn the_file_menu_reaches_new_note_quick_note_import_and_quit() -> TestResult {
     assert!(shows(&harness, "Google Keep…"));
     assert!(shows(
         &harness,
-        "Each Markdown or text file in it becomes a Note"
+        "Each Markdown, text, AsciiDoc, Org, reStructuredText or HTML file in it becomes a Note"
     ));
     harness.get_by_label("Close").click();
     harness.run();
@@ -258,8 +258,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "File into… Ctrl+M",
         "Merge into… Ctrl+Shift+M",
         "Importance ⏵",
-        "Routine…",
-        "Reminder…",
+        "Remind me…",
         "Make it a Checklist",
         "Send to a person",
         "Export as Pack…",
@@ -276,8 +275,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "File into… Ctrl+M",
         "Merge into… Ctrl+Shift+M",
         "Importance ⏵",
-        "Routine…",
-        "Reminder…",
+        "Remind me…",
         "Frog",
         "Session",
         "Make it a Checklist",
@@ -303,9 +301,17 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         .ok_or("the Note")?;
     assert_eq!(filed.place.as_deref(), Some(household.as_str()));
 
-    pick(&mut harness, "Note", "Routine…");
+    // One Remind me… (#344), its editor a Reminder at first.
+    open(&mut harness, "Note");
+    for gone in ["Routine…", "Reminder…"] {
+        assert!(harness.query_by_label(gone).is_none(), "{gone}");
+    }
+    bar(&harness, "Note").click();
+    harness.run();
+    pick(&mut harness, "Note", "Remind me…");
     harness.run();
     assert!(harness.state().routine_editor().is_some());
+    assert!(shows(&harness, "New Reminder"));
     // Its dialog over the Note's, back to it with Esc.
     harness.key_press(Key::Escape);
     harness.run();

@@ -166,5 +166,57 @@ pub fn repeat_text(t: &L10n, schedule: &Schedule) -> String {
     repeat
 }
 
+/// A Heads-up's offset of `minutes` (obf-1046) in the largest unit it is
+/// a whole number of, past an hour and not a whole one in hours and
+/// minutes, as the phone's `heads_up_text.dart` reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeadsUpSpan {
+    Weeks(i64),
+    Days(i64),
+    Hours(i64),
+    HoursMinutes(i64, i64),
+    Minutes(i64),
+}
+
+impl HeadsUpSpan {
+    pub fn of(minutes: i64) -> HeadsUpSpan {
+        if minutes % 10080 == 0 {
+            HeadsUpSpan::Weeks(minutes / 10080)
+        } else if minutes % 1440 == 0 {
+            HeadsUpSpan::Days(minutes / 1440)
+        } else if minutes % 60 == 0 {
+            HeadsUpSpan::Hours(minutes / 60)
+        } else if minutes > 60 {
+            HeadsUpSpan::HoursMinutes(minutes / 60, minutes % 60)
+        } else {
+            HeadsUpSpan::Minutes(minutes)
+        }
+    }
+}
+
+/// A Heads-up `minutes` before its Occurrence as the Routine editor lists
+/// it: "20 min before", "1 day before" (obf-1046).
+pub fn heads_up_before(t: &L10n, minutes: i64) -> String {
+    match HeadsUpSpan::of(minutes) {
+        HeadsUpSpan::Weeks(n) => t.heads_up_weeks_before(n),
+        HeadsUpSpan::Days(n) => t.heads_up_days_before(n),
+        HeadsUpSpan::Hours(n) => t.heads_up_hours_before(n),
+        HeadsUpSpan::HoursMinutes(h, m) => t.heads_up_hours_minutes_before(h, m),
+        HeadsUpSpan::Minutes(n) => t.heads_up_minutes_before(n),
+    }
+}
+
+/// How long until the Occurrence starts as a Heads-up `minutes` before it
+/// says in its notification: "in 20 min", "in 1 day" (obf-1046).
+pub fn heads_up_in(t: &L10n, minutes: i64) -> String {
+    match HeadsUpSpan::of(minutes) {
+        HeadsUpSpan::Weeks(n) => t.heads_up_in_weeks(n),
+        HeadsUpSpan::Days(n) => t.heads_up_in_days(n),
+        HeadsUpSpan::Hours(n) => t.heads_up_in_hours(n),
+        HeadsUpSpan::HoursMinutes(h, m) => t.heads_up_in_hours_minutes(h, m),
+        HeadsUpSpan::Minutes(n) => t.heads_up_in_minutes(n),
+    }
+}
+
 #[cfg(test)]
 mod tests;

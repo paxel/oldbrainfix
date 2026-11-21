@@ -16,7 +16,7 @@ Organising
 • A Note can become a Checklist, a Shopping List whose items come back, a Tally or a Session. Its text can be formatted with headings, lists, tables, boxes to tick and links that open other Notes and places in the app.
 
 Routines and Reminders
-• Any Note can have Reminders (one time) and Routines (repeating by a recurrence rule, several times a day if needed).
+• Any Note can have Reminders (one time) and Routines (repeating by a recurrence rule, several times a day if needed). Heads-ups can warn ahead of time.
 • They come as time-sensitive notifications with Done and Snooze.
 • A notification that is neither Done nor snoozed comes again at a set interval (Re-nag, default 10 minutes). Optionally, after a set number of Re-nags it rings as an iPhone alarm, through silent mode and Focus.
 • The Agenda lists today's Routines and Reminders, missed ones and the number of Unsorted Notes. It is also a home-screen widget, whose boxes tick without opening the app.

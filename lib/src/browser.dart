@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'card_glance.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -758,13 +759,22 @@ class BrowserSearchField extends StatelessWidget {
   }
 }
 
+/// The fill of the header of a page with a [SearchHeaderSliver], its bar
+/// and the band under it (#351, obf-1041): set off from the page's ground
+/// in the light and the dark look.
+Color searchHeaderColour(BuildContext context) =>
+    Theme.of(context).colorScheme.surfaceContainer;
+
 /// The header of a list page with a search field, the Areas list, an
 /// Area and a Topic (#336, Q749): the first sliver of the list, it scrolls
 /// away with it and comes back over it, the list staying where it is, as
 /// soon as the list is scrolled up a little; one half shown at the end of
 /// a scroll snaps shown or gone. While [child]'s field has the focus or
 /// [controller] holds a search it stays, so a search being typed or shown
-/// never goes away. Filled like the page bar, so no card shows through.
+/// never goes away. It sits on a band of [searchHeaderColour], which its
+/// page's bar takes too, with a line along its bottom (#351, obf-1041):
+/// bar and band read as one header set off from the page, and the cards
+/// go under it, shown over the list or with the list pulled down.
 class SearchHeaderSliver extends StatefulWidget {
   /// The field's text: a search in it keeps the header.
   final TextEditingController controller;
@@ -821,13 +831,23 @@ class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
     final theme = Theme.of(context);
     final header = KeyedSubtree(
       key: _kept,
-      child: ColoredBox(
-        color: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
-        child: Focus(
-          canRequestFocus: false,
-          skipTraversal: true,
-          onFocusChange: (focused) => setState(() => _focused = focused),
-          child: widget.child,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: searchHeaderColour(context),
+          border: Border(
+            bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+        ),
+        // Room under the bar, so its line runs along the band's bottom and
+        // not along the field's edge (#351, obf-1041).
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Focus(
+            canRequestFocus: false,
+            skipTraversal: true,
+            onFocusChange: (focused) => setState(() => _focused = focused),
+            child: widget.child,
+          ),
         ),
       ),
     );
@@ -999,6 +1019,16 @@ List<Widget> diaryCards(
   final hidden = notes.store.hiddenFromAiAmong([
     for (final placed in shown) placed.note.id,
   ]);
+  // The Notes linking to each full card's Note (obf-1035), from what the
+  // core keeps until the log changes; a closed locked Area's left out.
+  final backlinks = Backlinks(notes.store);
+  final lock = LockScope.of(context);
+  Set<String>? closed;
+  List<Note> linkedFrom(Note note) => backlinks.to(
+    note.id,
+    closed: closed ??= lock?.closedAreas ?? const <String>{},
+  );
+  bool full(Note note) => compact == switched.contains(note.id);
   return [
     for (final placed in shown)
       if (placed case (
@@ -1030,8 +1060,9 @@ List<Widget> diaryCards(
             onChanged,
             onEdit: () => onOpen(note),
           ),
-          full: compact == switched.contains(note.id),
+          full: full(note),
           sections: () => sectionsOf(note),
+          linkedFrom: full(note) ? linkedFrom(note) : const [],
           checklist: (read: () => checklistOf(note), lists: lists),
           shopping: (read: () => shoppingOf(note), lists: shopping),
           tally: notes,

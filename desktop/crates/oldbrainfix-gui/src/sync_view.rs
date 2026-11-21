@@ -68,7 +68,7 @@ pub enum SyncAction {
     SaveBundle(Option<String>),
     /// Import a bundle chosen with the system's dialog.
     OpenBundle,
-    /// Import a folder of Markdown or text files chosen with the
+    /// Import a folder of Markdown, text and other documents chosen with the
     /// system's dialog (ADR 0036).
     ImportFolder,
     /// Import a Google Keep export, a zip or a folder, as the dialog

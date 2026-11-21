@@ -13,16 +13,17 @@ use oldbrainfix_core::ai_port::{Reach, bridged_client_config, claude_code_comman
 use oldbrainfix_core::ai_task::{AiChangeKind, AiFieldChange, AiReviewItem};
 use oldbrainfix_core::checklists::{keys as line_keys, parse_list_kind};
 use oldbrainfix_core::frogs::keys as frog_keys;
+use oldbrainfix_core::highlight::Grammars;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
-use oldbrainfix_core::routines::keys as routine_keys;
+use oldbrainfix_core::routines::{heads_up_keys, keys as routine_keys};
 use oldbrainfix_core::sessions::keys as session_keys;
 use oldbrainfix_core::shopping_lists::{Reappear, keys as shopping_keys};
 use oldbrainfix_core::tallies::keys as tally_keys;
 use oldbrainfix_core::tally_units::{self, UnitSystem};
 use oldbrainfix_core::{
-    Checklists, DeviceSettings, Importance, ListOnAgenda, Notes, Places, Routines, SessionRule,
-    ShoppingOnAgenda, Store, StoredText, parse_time,
+    Checklists, DeviceSettings, Importance, ListOnAgenda, Notes, PersonSettings, Places, Routines,
+    SessionRule, ShoppingOnAgenda, Store, StoredText, parse_time,
 };
 
 use crate::app::{clickable_card, embossed, list_scroll, row_title, when};
@@ -252,6 +253,14 @@ fn change_line(
         return tally_change(store, t, entity, id, part, change);
     }
     match (ty, field) {
+        // A Code text's language (obf-1036) by its grammar's name; one not
+        // known here as stored.
+        (note_keys::TYPE_NOTE, note_keys::LANGUAGE) => {
+            let grammars = PersonSettings::new(store).grammars()?;
+            return Ok(words(t.code_language().to_string(), &|v| {
+                language_text(t, &grammars, v)
+            }));
+        }
         (note_keys::TYPE_NOTE, line_keys::KIND) => {
             return Ok(words(t.ai_field_kind().to_string(), &|v| {
                 list_text(t, v).to_string()
@@ -421,6 +430,9 @@ fn change_line(
         (_, routine_keys::NOTE) => t.note_title(),
         (routine_keys::TYPE_ROUTINE, routine_keys::RENAG) => t.renag_heading(),
         (routine_keys::TYPE_ROUTINE, routine_keys::ESCALATION) => t.escalation_heading(),
+        // The user's own Heads-ups of a Routine (obf-1046), on the entity
+        // `headsups:<routine id>`, as stored: minutes joined by commas.
+        (_, heads_up_keys::HEADS_UPS) => t.ai_field_heads_ups(),
         (place_keys::TYPE_AREA, place_keys::NAME) => t.conflict_area_name(),
         (place_keys::TYPE_TOPIC, place_keys::NAME) => t.conflict_topic_name(),
         (place_keys::TYPE_AREA, place_keys::COLOUR) => t.colour_heading(),
@@ -486,6 +498,18 @@ fn value_text(
             Err(_) => value.to_string(),
         },
     })
+}
+
+/// A Code text's language `scope` in words (obf-1036): its grammar's
+/// name among the person's `grammars` (obf-1037), "No language" for
+/// none, and one not known here as stored.
+fn language_text(t: &L10n, grammars: &Grammars, scope: Option<&str>) -> String {
+    match scope.filter(|s| !s.is_empty()) {
+        None => t.code_language_none().to_string(),
+        Some(scope) => grammars
+            .by_scope(Some(scope))
+            .map_or_else(|| scope.to_string(), |g| g.name.clone()),
+    }
 }
 
 /// What a Note is by its `kind`: a Checklist, a Shopping List or a plain

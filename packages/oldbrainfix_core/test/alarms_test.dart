@@ -253,6 +253,43 @@ void main() {
       });
     });
 
+    group('Quiet Hours keep alarms quiet (obf-1045)', () {
+      String lateToday() => routines
+          .spawn(
+            notes.capture('night pills').id,
+            Schedule(start: Day(2026, 10, 24), times: [at(21, 50)]),
+          )
+          .id;
+
+      test('a firing in them is silent, the ones around them are not', () {
+        final id = lateToday();
+        final [alarm] = alarms.plan(europe);
+        expect(alarm.quiet, QuietHours(at(22), at(8)));
+        // 21:50 in summer time is 19:50 UTC.
+        expect(alarm.at, DateTime.utc(2026, 10, 24, 19, 50));
+        expect(alarm.silentAt(alarm.at, europe), isFalse);
+        expect(
+          alarm.silentAt(DateTime.utc(2026, 10, 24, 20), europe),
+          isTrue,
+          reason: 'the Re-nag at 22:00 keeps quiet',
+        );
+        expect(alarm.toString(), contains('silent in 22:00-08:00'));
+        routines.setEscalation(id, 3);
+        final escalating = alarms.plan(europe).single;
+        expect(escalating.quiet, isNull, reason: 'Escalation goes through');
+        expect(
+          escalating.silentAt(DateTime.utc(2026, 10, 24, 20), europe),
+          isFalse,
+        );
+      });
+
+      test('switched off, nothing is silent', () {
+        store.quietHoursOn = false;
+        lateToday();
+        expect(alarms.plan(europe).single.quiet, isNull);
+      });
+    });
+
     test('an Occurrence in the skipped hour rings once the clock jumps', () {
       now = DateTime.utc(2026, 3, 28, 12);
       routines.spawn(

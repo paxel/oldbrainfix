@@ -467,10 +467,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get reminder => 'Erinnerung';
 
   @override
-  String get spawnRoutine => 'Routine …';
-
-  @override
-  String get spawnReminder => 'Erinnerung …';
+  String get remindMe => 'Erinnere mich …';
 
   @override
   String get spawnSession => 'Einheit …';
@@ -980,6 +977,104 @@ class AppLocalizationsDe extends AppLocalizations {
   String get escalatedChannel => 'Eskalierte Alarme';
 
   @override
+  String get quietChannel => 'Routinen und Erinnerungen in der Ruhezeit';
+
+  @override
+  String get quietToday => 'Heute ruhig';
+
+  @override
+  String get quietDayLine => 'Ruhiger Tag bis Mitternacht';
+
+  @override
+  String get quietDayEnd => 'Beenden';
+
+  @override
+  String get headsUpChannel => 'Vorwarnungen';
+
+  @override
+  String get headsUpsHeading => 'Vorwarnungen';
+
+  @override
+  String get addHeadsUp => 'Vorwarnung hinzufügen';
+
+  @override
+  String get removeHeadsUp => 'Vorwarnung entfernen';
+
+  @override
+  String headsUpMinutesBefore(int minutes) {
+    return '$minutes Min. vorher';
+  }
+
+  @override
+  String headsUpHoursBefore(int hours) {
+    return '$hours Std. vorher';
+  }
+
+  @override
+  String headsUpHoursMinutesBefore(int hours, int minutes) {
+    return '$hours Std. $minutes Min. vorher';
+  }
+
+  @override
+  String headsUpDaysBefore(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days Tage vorher',
+      one: '1 Tag vorher',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpWeeksBefore(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks Wochen vorher',
+      one: '1 Woche vorher',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpInMinutes(int minutes) {
+    return 'in $minutes Min.';
+  }
+
+  @override
+  String headsUpInHours(int hours) {
+    return 'in $hours Std.';
+  }
+
+  @override
+  String headsUpInHoursMinutes(int hours, int minutes) {
+    return 'in $hours Std. $minutes Min.';
+  }
+
+  @override
+  String headsUpInDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'in $days Tagen',
+      one: 'in 1 Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String headsUpInWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'in $weeks Wochen',
+      one: 'in 1 Woche',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get escalationHeading => 'Eskalation';
 
   @override
@@ -1067,7 +1162,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nudgeSettingsExplain =>
-      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich; nur eine ganztägige wartet, bis sie endet.';
+      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen erscheinen pünktlich, aber ohne Ton, außer mit Eskalation; nur eine ganztägige wartet, bis sie endet.';
 
   @override
   String get nudgeRepeat => 'Erneut stupsen nach';
@@ -1182,6 +1277,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get stopRecording => 'Beenden';
+
+  @override
+  String get recordingNotice => 'Sprachnotiz wird aufgenommen';
+
+  @override
+  String get recordingChannel => 'Aufnahme';
 
   @override
   String get voiceRecording => 'Sprachaufnahme';
@@ -1650,7 +1751,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get allDayFromDetail =>
-      'Vorher steht eine ganztägige Routine oder Erinnerung nur auf der Agenda. Ab dieser Uhrzeit klingelt sie und erinnert erneut. Die Ruhezeit geht vor.';
+      'Vorher steht eine ganztägige Routine oder Erinnerung nur auf der Agenda. Ab dieser Uhrzeit klingelt sie und erinnert erneut. Die Ruhezeit geht vor: Die Routine oder Erinnerung wartet, bis sie endet, und erinnert darin ohne Ton erneut, außer mit Eskalation.';
 
   @override
   String get alarmSound => 'Alarmton';
@@ -4990,6 +5091,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get linkNotAvailable => 'Hier nicht verfügbar';
 
   @override
+  String get linkedFrom => 'Verlinkt von';
+
+  @override
   String get fileLinkTitle => 'Diese Datei öffnen?';
 
   @override
@@ -5135,7 +5239,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, Datei, „Zum vollen Editor“, „Zu einer Notiz hinzufügen …“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, die drei Stupser-Knöpfe und „Mehr“, das den vollen Editor öffnet. Foto, Sprache, Galerie, Einfügen, Datei und alles, was die Notiz einsortiert, gibt es im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';
@@ -5220,7 +5324,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get importFolderDetail =>
-      'Jede Markdown- oder Textdatei darin wird eine Notiz in einem neuen Bereich, datiert auf die letzte Änderung der Datei.';
+      'Jede Markdown-, Text-, AsciiDoc-, Org-, reStructuredText- oder HTML-Datei darin wird eine Notiz in einem neuen Bereich, datiert auf die letzte Änderung der Datei.';
 
   @override
   String get importReading => 'Der Ordner wird gelesen …';
@@ -5259,14 +5363,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get importOpenArea => 'Bereich öffnen';
 
   @override
-  String get importNothing => 'Keine Markdown- oder Textdatei gefunden.';
+  String get importNothing => 'Keine Datei zum Importieren gefunden.';
 
   @override
   String get importNothingTitle => 'Nichts importiert';
 
   @override
   String get importNothingCause =>
-      'Der Ordner und seine Unterordner enthalten keine Markdown-Datei (.md, .markdown) und keine Textdatei (.txt), die sich übernehmen ließ; andere Dateien und zu große werden übersprungen.';
+      'Der Ordner und seine Unterordner enthalten keine Markdown-Datei (.md, .markdown), Textdatei (.txt), AsciiDoc-Datei (.adoc, .asciidoc, .asc), Org-Datei (.org), reStructuredText-Datei (.rst) und HTML-Datei (.html, .htm), die sich übernehmen ließ; andere Dateien und zu große werden übersprungen.';
 
   @override
   String get importNothingFix =>
@@ -5274,7 +5378,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String importSkippedDetails(String folder, int notText, int tooLarge) {
-    return 'Ordner: $folder\nKein Markdown oder Text: $notText\nZu groß: $tooLarge';
+    return 'Ordner: $folder\nAndere Dateien: $notText\nZu groß: $tooLarge';
   }
 
   @override
@@ -5463,6 +5567,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get keepAsCode => 'Als Code behalten';
 
   @override
+  String get codeLanguage => 'Sprache';
+
+  @override
+  String get codeLanguageNone => 'Keine Sprache';
+
+  @override
   String get noteHistoryHint =>
       'Jede Änderung dieser Notiz, ihrer Ergänzungen und ihrer Zeilen, die neueste zuerst.';
 
@@ -5574,11 +5684,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Tippe auf + und Text, schreib eine Aufgabe, tippe auf den Wecker und Erinnerung, stell die Zeit ein, zweimal Speichern.';
+      'Schreib unter + eine Aufgabe, tippe „Mehr“, dann + und Erinnere mich …; stell die Zeit ein und speichere.';
 
   @override
   String get helpQuickStart4 =>
-      'Tippe auf + und Text, schreib eine Gewohnheit, tippe auf den Wecker und Routine, wähl, wann sie sich wiederholt, zweimal Speichern.';
+      'Schreib unter + eine Gewohnheit, tippe „Mehr“, dann + und Erinnere mich …; wähl Alle …, wann, und Speichern.';
 
   @override
   String get helpQuickStart5 =>
@@ -5610,10 +5720,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop3 =>
-      'Erinnerung: in der Schnellnotiz auf den Wecker klicken, dann Erinnerung; die Zeit einstellen, Speichern klicken, dann Strg+Enter.';
+      'Erinnerung: in der Schnellnotiz schreiben, Mehr klicken, dann + und Erinnere mich …; die Zeit einstellen und Speichern klicken.';
 
   @override
-  String get helpQuickStartDesktop4 => 'Routine: genauso, mit Routine.';
+  String get helpQuickStartDesktop4 =>
+      'Routine: genauso, dann Alle … und wann sie sich wiederholt.';
 
   @override
   String get helpQuickStartDesktop5 =>
@@ -6639,4 +6750,141 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get openInOtherApp => 'In anderer App öffnen';
+
+  @override
+  String get grammarsTitle => 'Codesprachen';
+
+  @override
+  String get grammarsHint =>
+      'Füge eine Sublime-Syntaxdatei (.sublime-syntax) hinzu, um Code in einer weiteren Sprache einzufärben. Sie färbt Code auf all deinen Geräten, nur für dich.';
+
+  @override
+  String get grammarAdd => 'Grammatik hinzufügen …';
+
+  @override
+  String grammarInPlaceOf(String name) {
+    return 'Ersetzt die eingebaute Grammatik für $name';
+  }
+
+  @override
+  String get grammarRemove => 'Entfernen';
+
+  @override
+  String grammarRefused(String file, String reason) {
+    return '$file wurde nicht hinzugefügt: $reason';
+  }
+
+  @override
+  String get spotNext => 'Weiter';
+
+  @override
+  String get spotSkip => 'Überspringen';
+
+  @override
+  String get spotDone => 'Verstanden';
+
+  @override
+  String get settingsShowTips => 'Tipps wieder zeigen';
+
+  @override
+  String get settingsShowTipsDone => 'Jede Seite zeigt ihre Tipps wieder.';
+
+  @override
+  String get spotAgendaPlus =>
+      '„+“ erfasst eine Notiz; halte es gedrückt, um sofort zu schreiben.';
+
+  @override
+  String get spotAgendaToday =>
+      'Unter Heute steht, was fällig ist; hake es ab, sobald es erledigt ist.';
+
+  @override
+  String get spotAgendaUnsorted =>
+      'Noch nicht abgelegte Notizen warten hier unsortiert, bis du sie sortierst.';
+
+  @override
+  String get spotAgendaBrowse =>
+      'Der Ordner öffnet deine Bereiche und Themen mit den abgelegten Notizen.';
+
+  @override
+  String get spotAgendaQuiet =>
+      'Heute ruhig: Bis Mitternacht klingelt nichts, und alles bleibt zu sehen.';
+
+  @override
+  String get spotAgendaProfile =>
+      'Dein Bild öffnet dein Profil, mit Einstellungen, Synchronisieren und Sicherungen.';
+
+  @override
+  String get spotCaptureNudge =>
+      'Jeder Knopf speichert die Notiz, und dann erinnert dich ein Stupser ans Sortieren.';
+
+  @override
+  String get spotCaptureMore =>
+      '„Mehr“ speichert die Notiz und öffnet sie im vollen Editor.';
+
+  @override
+  String get spotEditorKind =>
+      'Die Art macht aus dieser Notiz eine Checkliste, eine Einkaufsliste und mehr.';
+
+  @override
+  String get spotEditorPlace =>
+      'Hier legst du die Notiz in einem Bereich oder Thema ab.';
+
+  @override
+  String get spotEditorRemind =>
+      'Unter „+“ richtet „Erinnere mich …“ eine Erinnerung oder Routine für diese Notiz ein.';
+
+  @override
+  String get spotEditorCodeLanguage =>
+      'Hier wählst du auch die Sprache, nach der dieser Code-Text eingefärbt wird.';
+
+  @override
+  String get spotEditorLinkedFrom =>
+      '„Verlinkt von“ nennt die Notizen, deren Links zu dieser führen.';
+
+  @override
+  String get spotAreaSearch => 'Die Suche findet die hier abgelegten Notizen.';
+
+  @override
+  String get spotAreaAdd =>
+      '„+“ legt eine neue Notiz oder Liste an, gleich hier abgelegt.';
+
+  @override
+  String get spotCardsView =>
+      'Dies schaltet die Karten zwischen Kompaktansicht und Detailansicht um.';
+
+  @override
+  String get spotUnsortedCard =>
+      'Sortiere jede Notiz: ablegen, zusammenführen oder eine Erinnerung geben.';
+
+  @override
+  String get spotRoutineSentence =>
+      'Schreib, wann sie fällig ist, etwa „jeden Montag um 08:00“.';
+
+  @override
+  String get spotRoutineTimes =>
+      'Füge eine Uhrzeit hinzu; ohne eine ist sie den ganzen Tag fällig.';
+
+  @override
+  String get spotRoutineHeadsUps =>
+      'Eine Vorwarnung meldet sich vorher, etwa 20 Min. davor.';
+
+  @override
+  String get spotRoutineSave =>
+      'Speichern behält den Zeitplan; Zurück speichert ihn auch.';
+
+  @override
+  String get spotSettingsSearch =>
+      'Die Suche findet jede Einstellung über ein Wort darin.';
+
+  @override
+  String get spotSettingsShowTips =>
+      '„Tipps wieder zeigen“ holt auf diesem Gerät alle Tipps zurück.';
+
+  @override
+  String get spotSettingsFeatures =>
+      'Einfach oder Erweitert: Erweitert legt auch Strichlisten, Einheiten, Frösche und Themen an.';
+
+  @override
+  String get spotSettingsGrammar =>
+      '„Grammatik hinzufügen …“ färbt Code in einer weiteren Sprache ein, auf all deinen Geräten.';
 }

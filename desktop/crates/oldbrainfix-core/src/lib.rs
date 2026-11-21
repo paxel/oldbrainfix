@@ -16,6 +16,7 @@ pub mod ai_tools;
 pub mod alarms;
 pub mod app_link;
 pub mod ask;
+pub mod backlinks;
 pub mod backup;
 pub mod blobs;
 pub mod blocks;
@@ -34,8 +35,10 @@ pub mod folder;
 pub mod frogs;
 pub mod help_notes;
 pub mod hidden;
+pub mod highlight;
 pub mod history;
 pub mod ics;
+pub mod import_formats;
 pub mod imports;
 pub mod join;
 pub mod keys;
@@ -92,7 +95,10 @@ pub(crate) fn base32_symbol(alphabet: &[u8; 32], value: u64) -> char {
     char::from(symbol)
 }
 
-pub use alarms::{Alarms, MissedSummary, OpenOccurrence, PlannedAlarm};
+pub use alarms::{
+    Alarms, MissedSummary, OpenOccurrence, PlannedAlarm, PlannedHeadsUp, QuietDays, QuietStretch,
+};
+pub use backlinks::Backlinks;
 pub use boxes::Boxes;
 pub use cards::{CardOpened, CardTaken};
 pub use checklists::{

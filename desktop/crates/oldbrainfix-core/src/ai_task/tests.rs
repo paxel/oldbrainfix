@@ -242,6 +242,36 @@ fn an_ai_task_does_only_what_the_role_in_a_shared_area_allows() -> TestResult {
 }
 
 #[test]
+fn an_ai_task_sets_a_members_own_heads_ups_of_a_shared_routine() -> TestResult {
+    use crate::routines::heads_up_keys;
+    let (_ann, ben, _area, _milk, reminder) = member()?;
+    let task = ben.open_ai_task()?;
+    let routines = Routines::new(&ben);
+    let later = at_ten(3)?;
+    // Not a Member's Reminder to change, but their own Heads-ups of it.
+    assert!(
+        ben.drafting(&task, || routines.reschedule(&reminder, &later))
+            .is_err()
+    );
+    ben.drafting(&task, || routines.set_heads_ups(&reminder, &[20]))?;
+    // Of a Routine there is none, or on a field no app writes: refused.
+    assert!(
+        ben.drafting(&task, || routines.set_heads_ups("routine:none", &[20]))
+            .is_err()
+    );
+    assert!(
+        ben.drafting(&task, || {
+            ben.append(&heads_up_keys::of(&reminder), "other", Some("x"), None)
+                .map(drop)
+        })
+        .is_err()
+    );
+    ben.accept_pending(&task)?;
+    assert_eq!(routines.heads_ups(&reminder)?, [20]);
+    Ok(())
+}
+
+#[test]
 fn an_ai_task_writes_none_of_the_users_own_data() -> TestResult {
     use crate::boxes::Boxes;
     use crate::checklists::Checklists;

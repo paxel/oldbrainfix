@@ -10,6 +10,7 @@ import 'changes_nudges.dart';
 import 'device_settings.dart';
 import 'notes.dart';
 import 'nudges.dart';
+import 'person_settings.dart';
 import 'routines.dart';
 import 'schedule.dart';
 import 'shared_areas.dart';
@@ -149,6 +150,59 @@ _Timed _place(
   );
 }
 
+/// A stretch of time from [from] up to, not including, [until].
+typedef QuietStretch = ({DateTime from, DateTime until});
+
+/// The person's quiet days (obf-1044, CONTEXT.md, Quiet day): each Day
+/// made quiet, with when End was tapped on it, or null while it lasts to
+/// midnight. On a quiet day nothing notifies: what starts on it rings,
+/// Re-nags and warns ahead nowhere, and what is still undone at its
+/// midnight counts as skipped. Each Device ends it at midnight on its own
+/// wall clock.
+class QuietDays {
+  /// End of each quiet Day: the moment End was tapped, or null.
+  final Map<Day, DateTime?> ends;
+
+  const QuietDays([this.ends = const {}]);
+
+  /// No quiet day at all.
+  static const none = QuietDays();
+
+  /// The quiet stretch of [day] on [wallClock]: from the start of the day
+  /// to midnight after it, or to End when that came first; null when
+  /// [day] is not quiet or End came before it began.
+  QuietStretch? stretchOf(Day day, WallClock wallClock) {
+    if (!ends.containsKey(day)) return null;
+    final from = instantOf(day, ClockTime(0, 0), wallClock);
+    final midnight = instantOf(day.addDays(1), ClockTime(0, 0), wallClock);
+    final end = ends[day]?.toUtc();
+    final until = end != null && end.isBefore(midnight) ? end : midnight;
+    return until.isAfter(from) ? (from: from, until: until) : null;
+  }
+
+  /// The quiet stretch [instant] lies in on [wallClock]; null when none.
+  QuietStretch? holding(DateTime instant, WallClock wallClock) {
+    final stretch = stretchOf(Day.today(instant, wallClock), wallClock);
+    if (stretch == null) return null;
+    final at = instant.toUtc();
+    return !at.isBefore(stretch.from) && at.isBefore(stretch.until)
+        ? stretch
+        : null;
+  }
+
+  /// When what starts at [start] counts as skipped unless it is Done: at
+  /// midnight after its quiet day, on [wallClock]; null when [start] lies
+  /// in no quiet stretch, so it rings as ever.
+  DateTime? settlesAt(DateTime start, WallClock wallClock) =>
+      holding(start, wallClock) == null
+      ? null
+      : instantOf(
+          Day.today(start, wallClock).addDays(1),
+          ClockTime(0, 0),
+          wallClock,
+        );
+}
+
 /// Why an alarm fires.
 enum AlarmKind {
   /// An Occurrence is due.
@@ -161,7 +215,8 @@ enum AlarmKind {
 /// One alarm that should exist. While its Occurrence is not Done it
 /// fires at [at] and then Re-nags every [renag], up to [endsAt], when
 /// the Occurrence counts as Missed. With [escalation] on, every firing
-/// from [escalatesAt] on is a full-screen alarm with sound.
+/// from [escalatesAt] on is a full-screen alarm with sound. A firing in
+/// [quiet] shows without sound ([silentAt]).
 class PlannedAlarm {
   final AlarmKind kind;
   final String routineId;
@@ -187,6 +242,11 @@ class PlannedAlarm {
   final WallMoment ends;
   final DateTime endsAt;
 
+  /// The Quiet Hours its firings show without sound or vibration in
+  /// (obf-1045); null when they are off or its Routine escalates, which
+  /// rings with sound from its first ring.
+  final QuietHours? quiet;
+
   /// The text of the Note the Routine links back to as it reads without
   /// its marks ([Note.visibleText]); null when it is gone.
   final String? text;
@@ -208,6 +268,7 @@ class PlannedAlarm {
     this.escalation,
     required this.ends,
     required this.endsAt,
+    this.quiet,
     required this.text,
     this.wordless = Wordless.photo,
     this.wordlessName = '',
@@ -238,11 +299,18 @@ class PlannedAlarm {
     return first.isBefore(endsAt) ? first : null;
   }
 
+  /// Whether it fires at [firing] without sound or vibration: [firing]
+  /// lies in [quiet] on [wallClock]. The platform's alarm layer follows
+  /// the same rule.
+  bool silentAt(DateTime firing, WallClock wallClock) =>
+      quiet?.holds(firing, wallClock) ?? false;
+
   @override
   String toString() =>
       '$id at ${at.toIso8601String()} every ${renag.inMinutes} min '
       'until ${endsAt.toIso8601String()}'
-      '${escalation == null ? '' : ' escalating after $escalation'}';
+      '${escalation == null ? '' : ' escalating after $escalation'}'
+      '${quiet == null ? '' : ' silent in $quiet'}';
 }
 
 /// The key a snooze of [occurrence] of the Routine [routineId] is kept
@@ -260,8 +328,12 @@ String snoozeKey(String routineId, Occurrence occurrence) =>
 /// interval, else at [renag], and escalates as its Routine says. An
 /// all-day Occurrence rings from [allDayFrom] (#201), or once [quiet]
 /// ends when they hold that time, and has no alarm when they last
-/// until it counts as Missed. [snoozes] are this Device's (ADR 0008),
-/// keyed by [snoozeKey].
+/// until it counts as Missed. Every other firing in [quiet] shows
+/// without sound, but for a Routine that escalates (obf-1045).
+/// [snoozes] are this Device's (ADR 0008), keyed by [snoozeKey]. An
+/// Occurrence that starts on one of the [quietDays] has no alarm, and
+/// one that began before the quiet stretch [now] lies in Re-nags again
+/// from its end, at the first Re-nag after it (obf-1044).
 List<PlannedAlarm> alarmPlan({
   required List<(Routine, Note?)> routines,
   required Map<String, DateTime> snoozes,
@@ -270,9 +342,11 @@ List<PlannedAlarm> alarmPlan({
   Duration renag = DeviceSettings.defaultRenag,
   ClockTime? allDayFrom,
   QuietHours? quiet,
+  QuietDays quietDays = QuietDays.none,
 }) {
   final from = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
   final today = Day.today(now, wallClock);
+  final quietNow = quietDays.holding(now, wallClock);
   final alarms = <PlannedAlarm>[];
   for (final (routine, note) in routines) {
     var planned = 0;
@@ -291,6 +365,8 @@ List<PlannedAlarm> alarmPlan({
       if (!t.endsAt.isAfter(now)) continue;
       final snoozed = snoozes[snoozeKey(routine.id, occurrence)]?.toUtc();
       if (snoozed != null && !snoozed.isBefore(t.endsAt)) continue;
+      // A quiet day rings nothing of its own (obf-1044).
+      if (quietDays.holding(t.start, wallClock) != null) continue;
       var start = t.start;
       WallMoment? wall = startOf(occurrence, from);
       if (snoozed == null && occurrence.time == null && quiet != null) {
@@ -301,17 +377,38 @@ List<PlannedAlarm> alarmPlan({
           wall = (day: Day.of(wallClock(start)), time: quiet.end);
         }
       }
+      final every = routine.renag ?? renag;
+      var at = snoozed ?? start;
+      if (snoozed != null) wall = null;
+      if (quietNow != null && at.isBefore(quietNow.until)) {
+        // Begun before today's quiet stretch: it waits the stretch out
+        // and Re-nags again from the first Re-nag after it.
+        final step = every.inMilliseconds;
+        if (step <= 0) continue;
+        final waited = quietNow.until.difference(at).inMilliseconds;
+        at = at.add(Duration(milliseconds: (waited + step - 1) ~/ step * step));
+        if (!at.isBefore(t.endsAt)) continue;
+        if (wall != null) {
+          final shown = wallClock(at);
+          wall = (
+            day: Day.of(shown),
+            time: ClockTime(shown.hour, shown.minute),
+          );
+        }
+      }
       alarms.add(
         PlannedAlarm(
           kind: snoozed == null ? AlarmKind.occurrence : AlarmKind.snooze,
           routineId: routine.id,
           occurrence: occurrence,
-          at: snoozed ?? start,
-          wall: snoozed == null ? wall : null,
-          renag: routine.renag ?? renag,
+          at: at,
+          wall: wall,
+          renag: every,
           escalation: routine.escalation,
           ends: t.ends,
           endsAt: t.endsAt,
+          // Escalation is the only way through Quiet Hours.
+          quiet: routine.escalation == null ? quiet : null,
           text: note?.visibleText,
           wordless: note?.wordless ?? Wordless.photo,
           wordlessName: note?.wordlessName ?? '',
@@ -325,6 +422,205 @@ List<PlannedAlarm> alarmPlan({
     return byTime != 0 ? byTime : a.id.compareTo(b.id);
   });
   return alarms.length > alarmLimit ? alarms.sublist(0, alarmLimit) : alarms;
+}
+
+/// One Heads-up that should exist (obf-1046): a single notification
+/// [minutes] before [occurrence] of the Routine [routineId] starts, at
+/// [at], with no Re-nag and nothing to check off. A Heads-up in [quiet]
+/// shows without sound ([silentAt]).
+class PlannedHeadsUp {
+  final String routineId;
+  final Occurrence occurrence;
+
+  /// How long before the Occurrence's start it warns, in minutes.
+  final int minutes;
+
+  /// When it fires, in UTC.
+  final DateTime at;
+
+  /// The wall-clock moment it fires at, so the platform re-arms it at the
+  /// same local time after a time-zone change.
+  final WallMoment wall;
+
+  /// When the Occurrence starts on the wall clock ([startOf]).
+  final WallMoment start;
+
+  /// This Device's Quiet Hours when they are on; null when they are off.
+  /// A Heads-up never escalates, so its Routine's Escalation changes
+  /// nothing.
+  final QuietHours? quiet;
+
+  /// The text of the Note the Routine links back to as it reads without
+  /// its marks ([Note.visibleText]); null when it is gone.
+  final String? text;
+
+  /// What that Note is titled as while [text] is blank ([Note.wordless]).
+  final Wordless wordless;
+
+  /// The name of the file it goes by as [Wordless.file]
+  /// ([Note.wordlessName]); empty otherwise.
+  final String wordlessName;
+
+  const PlannedHeadsUp({
+    required this.routineId,
+    required this.occurrence,
+    required this.minutes,
+    required this.at,
+    required this.wall,
+    required this.start,
+    this.quiet,
+    required this.text,
+    this.wordless = Wordless.photo,
+    this.wordlessName = '',
+  });
+
+  /// Names the Heads-up for good: one per offset and Occurrence.
+  String get id => 'headsUp:$minutes:${snoozeKey(routineId, occurrence)}';
+
+  /// Whether it fires without sound or vibration: [at] lies in [quiet] on
+  /// [wallClock]. The platform's alarm layer follows the same rule.
+  bool silentAt(WallClock wallClock) => quiet?.holds(at, wallClock) ?? false;
+
+  @override
+  String toString() =>
+      '$id at ${at.toIso8601String()}'
+      '${quiet == null ? '' : ' silent in $quiet'}';
+}
+
+/// When something placed in time fires.
+typedef _Firing = ({DateTime at, WallMoment wall});
+
+/// [minutes] before [day] at [time] on the calendar, daylight saving
+/// left out, so a day before 10:00 is 10:00 the day before, placed on
+/// [wallClock].
+_Firing _timedBefore(
+  Day day,
+  ClockTime time,
+  int minutes,
+  WallClock wallClock,
+) {
+  final shifted = DateTime.utc(
+    day.year,
+    day.month,
+    day.day,
+    time.hour,
+    time.minute,
+  ).subtract(Duration(minutes: minutes));
+  final WallMoment wall = (
+    day: Day.of(shifted),
+    time: ClockTime(shifted.hour, shifted.minute),
+  );
+  return (at: instantOf(wall.day, wall.time, wallClock), wall: wall);
+}
+
+/// When something all-day rings on [day]: at [allDayFrom], or once
+/// [quiet] ends when they hold that time, as the first ring of an all-day
+/// Occurrence in [alarmPlan] (#201). The Heads-ups of an all-day
+/// Occurrence ring so on their day (obf-1046).
+_Firing _allDayRing(
+  Day day,
+  ClockTime allDayFrom,
+  QuietHours? quiet,
+  WallClock wallClock,
+) {
+  final at = instantOf(day, allDayFrom, wallClock);
+  if (quiet != null) {
+    final deferred = quiet.defer(at, wallClock);
+    if (deferred != at) {
+      return (
+        at: deferred,
+        wall: (day: Day.of(wallClock(deferred)), time: quiet.end),
+      );
+    }
+  }
+  return (at: at, wall: (day: day, time: allDayFrom));
+}
+
+/// The Heads-ups that should exist at [now] (obf-1046): for each Routine
+/// its offsets ([Routines.headsUps]) before each Occurrence the alarm
+/// plan looks at that is neither Done nor skipped nor snoozed, so Done,
+/// Skip or a snooze before a Heads-up cancels it. A timed Occurrence's
+/// Heads-up is its wall-clock start that many minutes earlier on the
+/// calendar; an all-day one takes whole days only, rung on that day as
+/// its all-day ring would ring ([allDayFrom], or once [quiet] ends). Each
+/// lies after [now] and before its Occurrence rings; at most
+/// [alarmsPerRoutine] per Routine, the soonest first and at most
+/// [alarmLimit]. In [quiet] they show without sound, whether the Routine
+/// escalates or not. [snoozes] are this Device's (ADR 0008), keyed by
+/// [snoozeKey]. None warns of an Occurrence that starts on one of the
+/// [quietDays], nor fires on one (obf-1044).
+List<PlannedHeadsUp> headsUpPlan({
+  required List<(Routine, Note?, List<int>)> routines,
+  required Map<String, DateTime> snoozes,
+  required DateTime now,
+  required WallClock wallClock,
+  ClockTime? allDayFrom,
+  QuietHours? quiet,
+  QuietDays quietDays = QuietDays.none,
+}) {
+  final from = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
+  final today = Day.today(now, wallClock);
+  final headsUps = <PlannedHeadsUp>[];
+  for (final (routine, note, minutes) in routines) {
+    if (minutes.isEmpty) continue;
+    var planned = 0;
+    final timed = _timed(
+      routine,
+      today.addDays(-alarmHorizonDays),
+      today.addDays(alarmHorizonDays),
+      wallClock,
+      from,
+    );
+    for (final t in timed) {
+      if (planned >= alarmsPerRoutine) break;
+      final occurrence = t.occurrence;
+      if (routine.doneAt(occurrence) != null) continue;
+      if (routine.skippedAt(occurrence) != null) continue;
+      if (snoozes.containsKey(snoozeKey(routine.id, occurrence))) continue;
+      if (quietDays.holding(t.start, wallClock) != null) continue;
+      final rings = occurrence.time == null
+          ? _allDayRing(occurrence.day, from, quiet, wallClock).at
+          : t.start;
+      for (final offset in minutes) {
+        if (planned >= alarmsPerRoutine) break;
+        final time = occurrence.time;
+        // An all-day one takes whole days only.
+        if (time == null && offset % 1440 != 0) continue;
+        final (:at, :wall) = time == null
+            ? _allDayRing(
+                occurrence.day.addDays(-(offset ~/ 1440)),
+                from,
+                quiet,
+                wallClock,
+              )
+            : _timedBefore(occurrence.day, time, offset, wallClock);
+        if (!at.isAfter(now) || !at.isBefore(rings)) continue;
+        if (quietDays.holding(at, wallClock) != null) continue;
+        headsUps.add(
+          PlannedHeadsUp(
+            routineId: routine.id,
+            occurrence: occurrence,
+            minutes: offset,
+            at: at,
+            wall: wall,
+            start: startOf(occurrence, from),
+            quiet: quiet,
+            text: note?.visibleText,
+            wordless: note?.wordless ?? Wordless.photo,
+            wordlessName: note?.wordlessName ?? '',
+          ),
+        );
+        planned++;
+      }
+    }
+  }
+  headsUps.sort((a, b) {
+    final byTime = a.at.compareTo(b.at);
+    return byTime != 0 ? byTime : a.id.compareTo(b.id);
+  });
+  return headsUps.length > alarmLimit
+      ? headsUps.sublist(0, alarmLimit)
+      : headsUps;
 }
 
 /// One Missed Occurrence and when it became Missed.
@@ -368,13 +664,16 @@ class MissedSummary {
 
 /// The Missed Summary at [now]: every Occurrence neither Done nor skipped
 /// that became Missed after [seen] (or within [alarmHorizonDays] when never seen, and
-/// never further back than that), by Routine.
+/// never further back than that), by Routine. One that starts on one of
+/// the [quietDays] is never Missed: left undone, it counts as skipped
+/// (obf-1044).
 MissedSummary missedSummary({
   required List<(Routine, Note?)> routines,
   required DateTime? seen,
   required DateTime now,
   required WallClock wallClock,
   ClockTime? allDayFrom,
+  QuietDays quietDays = QuietDays.none,
 }) {
   final today = Day.today(now, wallClock);
   final from = today.addDays(-alarmHorizonDays);
@@ -387,6 +686,7 @@ MissedSummary missedSummary({
       if (routine.doneAt(t.occurrence) != null) continue;
       // A skip is a decision, not a lapse (CONTEXT.md, Skip).
       if (routine.skippedAt(t.occurrence) != null) continue;
+      if (quietDays.holding(t.start, wallClock) != null) continue;
       if (t.endsAt.isAfter(now)) {
         if (nextChange == null || t.endsAt.isBefore(nextChange)) {
           nextChange = t.endsAt;
@@ -424,12 +724,15 @@ typedef OpenOccurrence = ({
 /// Missed, else the latest Missed one, whether the Missed Summary was
 /// "seen" or not, within [alarmHorizonDays]; none when neither is open.
 /// What is Done, from its check-off, its entries or its Lines, asks for
-/// nothing, nor does what is skipped.
+/// nothing, nor does what is skipped. One that starts on one of the
+/// [quietDays] asks while it is due on its day, and is never Missed
+/// (obf-1044).
 List<OpenOccurrence> openOccurrences({
   required List<Routine> routines,
   required DateTime now,
   required WallClock wallClock,
   ClockTime? allDayFrom,
+  QuietDays quietDays = QuietDays.none,
 }) {
   final today = Day.today(now, wallClock);
   final from = today.addDays(-alarmHorizonDays);
@@ -442,6 +745,10 @@ List<OpenOccurrence> openOccurrences({
       if (routine.doneAt(t.occurrence) != null) continue;
       if (routine.skippedAt(t.occurrence) != null) continue;
       if (t.start.isAfter(now)) continue;
+      if (quietDays.settlesAt(t.start, wallClock) case final settles?) {
+        // Left undone on a quiet day, it is skipped, not Missed.
+        if (!t.endsAt.isAfter(now) || !settles.isAfter(now)) continue;
+      }
       if (t.endsAt.isAfter(now)) {
         due = t;
       } else {
@@ -497,13 +804,39 @@ class Alarms {
       renag: store.renagInterval,
       allDayFrom: store.allDayFrom,
       quiet: store.quietHoursOn ? store.quietHours : null,
+      quietDays: store.quietDays,
+    );
+  }
+
+  /// The Heads-ups at the store's now, on [wallClock] (obf-1046): of each
+  /// Routine the offsets the user's own Devices set ([Routines.headsUps]),
+  /// with this Device's snoozes, all-day time and Quiet Hours; over
+  /// [routines] when the caller has read [Routines.all] already.
+  List<PlannedHeadsUp> headsUps(
+    WallClock wallClock, {
+    List<Routine>? routines,
+  }) {
+    final read = Routines(store);
+    return headsUpPlan(
+      routines: [
+        for (final r in routines ?? read.all())
+          (r, read.note(r), read.headsUps(r.id)),
+      ],
+      snoozes: snoozes,
+      now: store.clock(),
+      wallClock: wallClock,
+      allDayFrom: store.allDayFrom,
+      quiet: store.quietHoursOn ? store.quietHours : null,
+      quietDays: store.quietDays,
     );
   }
 
   /// The Nudge at the store's now over the Unsorted Notes, with this
   /// Device's snooze, repeat interval and Quiet Hours; null when nothing
   /// is Unsorted. Of the Occurrences of [plan], Quiet Hours hold back
-  /// only the first ring of an all-day one.
+  /// only the first ring of an all-day one; in them the rest ring
+  /// without sound. On a quiet day it waits for the day's end
+  /// (obf-1044).
   PlannedNudge? nudge(WallClock wallClock) => nudgePlan(
     unsorted: Notes(store).unsorted(),
     snooze: nudgeSnooze,
@@ -511,18 +844,20 @@ class Alarms {
     wallClock: wallClock,
     repeat: store.nudgeRepeat,
     quiet: store.quietHoursOn ? store.quietHours : null,
+    quietUntil: store.quietUntil(wallClock),
   );
 
   /// The Changes Nudge at the store's now (#109): the people changes
   /// travel with by bundles who lack some ([ChangesNudges.waitingForChanges]),
   /// with the Nudge's repeat interval and Quiet Hours; null when nobody
-  /// waits.
+  /// waits. On a quiet day it waits for the day's end (obf-1044).
   PlannedChangesNudge? changesNudge(WallClock wallClock) => changesNudgePlan(
     waiting: store.waitingForChanges(),
     now: store.clock(),
     wallClock: wallClock,
     repeat: store.nudgeRepeat,
     quiet: store.quietHoursOn ? store.quietHours : null,
+    quietUntil: store.quietUntil(wallClock),
   );
 
   /// This Device's latest snooze of the Nudge; never synced (ADR 0008).
@@ -552,6 +887,7 @@ class Alarms {
       now: store.clock(),
       wallClock: wallClock,
       allDayFrom: store.allDayFrom,
+      quietDays: store.quietDays,
     );
   }
 
@@ -564,20 +900,29 @@ class Alarms {
         now: store.clock(),
         wallClock: wallClock,
         allDayFrom: store.allDayFrom,
+        quietDays: store.quietDays,
       );
 
   /// The user tapped "seen": the Missed Summary starts over from now.
   void markSeen() => store.missedSeen = store.clock();
 
   /// The Occurrences Done or skipped from yesterday to tomorrow on
-  /// [wallClock], by Routine id: their notifications, if still showing,
-  /// can go. Over [routines] when the caller has read [Routines.all]
-  /// already (#228).
+  /// [wallClock], by Routine id, and those starting on a quiet day
+  /// (obf-1044): their notifications, if still showing, can go. Over
+  /// [routines] when the caller has read [Routines.all] already (#228).
   List<(String, Occurrence)> recentlyDone(
     WallClock wallClock, {
     List<Routine>? routines,
   }) {
     final today = Day.today(store.clock(), wallClock);
+    final quietDays = store.quietDays;
+    final allDay = store.allDayFrom;
+    bool quieted(Occurrence occurrence) {
+      final start = startOf(occurrence, allDay);
+      final at = instantOf(start.day, start.time, wallClock);
+      return quietDays.holding(at, wallClock) != null;
+    }
+
     return [
       for (final routine in routines ?? Routines(store).all())
         for (final occurrence in routine.between(
@@ -585,7 +930,8 @@ class Alarms {
           today.addDays(1),
         ))
           if (routine.doneAt(occurrence) != null ||
-              routine.skippedAt(occurrence) != null)
+              routine.skippedAt(occurrence) != null ||
+              quieted(occurrence))
             (routine.id, occurrence),
     ];
   }

@@ -88,6 +88,12 @@ Each line names what the app does with the data and why that is not
   "servicing the transmitted request in real time".
 - **The local-network sync and Bonjour announcement**: device to device
   on the user's network, never through the developer.
+- **Grammar files** (obf-1037): a `.sublime-syntax` file the user adds
+  in Settings ▸ Code languages is read from the picker into the log as
+  a setting of the person, and syncs, like the Notes, only to the
+  user's own Devices; it is data that colours code, never run, and
+  never reaches the developer or another person. User Content: other
+  above covers it; the label stays **Data Not Collected**.
 - **The shared folder**: files the app writes, end-to-end encrypted with
   the Area's key, into a folder the user picks; the carrier (iCloud
   Drive, Möbius Sync) is the user's choice and cannot read them.

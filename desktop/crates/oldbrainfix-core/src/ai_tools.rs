@@ -180,7 +180,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it) with a Code text's language (codeLanguage: a grammar's scope as list_code_languages names it, or null), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -223,6 +223,13 @@ pub fn tools() -> Vec<Value> {
             &[],
         ),
         tool(
+            "list_code_languages",
+            "Lists the languages a Code text and a fenced code block of a formatted text can be coloured by (obf-1036): the built-in grammars and those the person added (obf-1037), one of the same scope in the built-in one's place; each grammar's name, its scope (what set_code_language and read_note's codeLanguage use) and the names a fence may give it.",
+            true,
+            json!({}),
+            &[],
+        ),
+        tool(
             "find_notes",
             "Finds Notes by words, for asking about them (#267): each word is searched as list_notes searches (text, Sections, Transcripts, Photo Texts, attached files' names and Attachment Texts, Tally entries' lines and list Lines, ignoring case), and the Notes holding most of the words come first, then the newest. Each Note found names its id, title (its first line), capture time, Area or Topic, the words it holds and a short excerpt of its text; read_note reads it in full. Search again with other words, synonyms and spellings when little is found. Neither the trash nor merged Notes count.",
             true,
@@ -259,7 +266,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows, on top of that (textSize: normal, larger at 1.15 or largest at 1.3 times), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer), whether the user switched on AI (experimental) on this computer (aiOn: the Ask panel and the phone's questions; this port works either way), and whether the Ask panel lets an OpenAI-compatible provider's model think before it answers (askThinks: off asks it not to). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows, on top of that (textSize: normal, larger at 1.15 or largest at 1.3 times), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), when today's quiet day ends, a setting of the person too, on which nothing notifies while the Agenda still shows everything (quietDayUntil: midnight, or when End was tapped, as an instant; null while today is not quiet), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), the grammars the person added to colour code in more languages, a setting of the person too (grammars: each one's name and scope; one of a built-in language's scope replaces the built-in one; they are added and removed in the apps only), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer), whether the user switched on AI (experimental) on this computer (aiOn: the Ask panel and the phone's questions; this port works either way), and whether the Ask panel lets an OpenAI-compatible provider's model think before it answers (askThinks: off asks it not to). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -325,6 +332,16 @@ pub fn tools() -> Vec<Value> {
                 "format": {"enum": ["plain", "markdown", "code"], "type": "string"},
             }),
             &["id", "format"],
+        ),
+        tool(
+            "set_code_language",
+            "Sets the language a Note's Code text is coloured by (obf-1036), as the text format badge picks it: one of the grammars list_code_languages names, by its scope such as source.rust, or an empty text for none. The text stays as written; only a Note whose text is code takes one.",
+            false,
+            json!({
+                "id": id("Note"),
+                "language": string("The grammar's scope, such as source.rust; empty for none"),
+            }),
+            &["id", "language"],
         ),
         tool(
             "remove_captured",
@@ -425,6 +442,13 @@ pub fn tools() -> Vec<Value> {
             false,
             json!({"after": {"type": ["integer", "null"]}, "id": id("Routine")}),
             &["id", "after"],
+        ),
+        tool(
+            "set_heads_ups",
+            "Sets the user's own Heads-ups of a Routine or Reminder, on their own Devices only: one notification each, so many minutes before an Occurrence starts, from 1 to 43200; an empty list clears them. An all-day Occurrence takes whole days only (multiples of 1440). Done, Skip or a snooze before a Heads-up cancels it.",
+            false,
+            json!({"id": id("Routine"), "minutes": {"items": {"type": "integer"}, "type": "array"}}),
+            &["id", "minutes"],
         ),
         tool(
             "trash_routine",
@@ -883,6 +907,7 @@ fn note_summary(note: &Note, kind: &NoteKind) -> Value {
         "sessions": kind.sessions,
         "text": note.text,
         "textFormat": note.text_format,
+        "codeLanguage": note.code_language,
         "trashed": note.is_trashed(),
         "unsorted": note.is_unsorted(),
     })
@@ -1343,6 +1368,11 @@ impl Store {
     /// pool, count and picking rule.
     fn routine_value(&self, routine: &Routine) -> Result<Value> {
         let mut out = routine_json(routine);
+        // The user's own Heads-ups (obf-1046), as they ring here.
+        let heads_ups = Routines::new(self).heads_ups(&routine.id)?;
+        if let Some(all) = out.as_object_mut() {
+            all.insert("headsUpMinutes".into(), json!(heads_ups));
+        }
         if let (Some(session), Some(all)) =
             (Sessions::new(self).by_id(&routine.id)?, out.as_object_mut())
         {
@@ -1644,6 +1674,21 @@ impl Store {
                 }
                 ToolOutput::json(&Value::Array(out))
             }
+            "list_code_languages" => {
+                let all: Vec<Value> = PersonSettings::new(self)
+                    .grammars()?
+                    .all
+                    .iter()
+                    .map(|g| {
+                        json!({
+                            "fenceNames": g.file_extensions,
+                            "name": g.name,
+                            "scope": g.scope,
+                        })
+                    })
+                    .collect();
+                ToolOutput::json(&Value::Array(all))
+            }
             "list_tags" => {
                 fn node(n: &TagNode) -> Value {
                     json!({
@@ -1802,6 +1847,16 @@ impl Store {
                     "renagMinutes": settings.renag_interval()?.num_minutes(),
                     "theme": settings.theme()?.name(),
                     "trashesDoneReminder": PersonSettings::new(self).trashes_done_reminder()?,
+                    // The person's own grammars, by name and scope only
+                    // (obf-1037): their files are added in the apps.
+                    "grammars": PersonSettings::new(self)
+                        .grammars()?
+                        .added
+                        .iter()
+                        .map(|g| json!({"name": g.name, "scope": g.scope}))
+                        .collect::<Vec<_>>(),
+                    // Read only, as every setting (ADR 0026, obf-1044).
+                    "quietDayUntil": PersonSettings::new(self).quiet_until(wall)?.map(dart_iso),
                 }))
             }
             other => ToolOutput::json(&self.ai_read_data(other, args, wall)?),
@@ -2142,6 +2197,31 @@ impl Store {
                 notes.set_format(&note.id, format)?;
                 note.id
             }
+            "set_code_language" => {
+                let language = text_arg(args, "language")?;
+                let note = notes
+                    .by_id(id()?)?
+                    .ok_or_else(|| Error::Invalid(format!("not a Note: {}", id().unwrap_or(""))))?;
+                // As the badge: a Code text only, and a grammar known here.
+                if note.text_format != text_format::CODE {
+                    return Err(Error::Invalid(format!(
+                        "the text of {} is not code: set_text_format makes it code first",
+                        note.id
+                    )));
+                }
+                if !language.is_empty()
+                    && PersonSettings::new(self)
+                        .grammars()?
+                        .by_scope(Some(language))
+                        .is_none()
+                {
+                    return Err(Error::Invalid(format!(
+                        "no code language {language}: list_code_languages names them"
+                    )));
+                }
+                notes.set_code_language(&note.id, Some(language))?;
+                note.id
+            }
             "remove_captured" => {
                 let detail = text_arg(args, "detail")?;
                 let detail = CapturedDetail::parse(detail)
@@ -2221,6 +2301,20 @@ impl Store {
             }
             "set_escalation" => {
                 routines.set_escalation(id()?, optional_number(args, "after")?)?;
+                id()?.to_string()
+            }
+            "set_heads_ups" => {
+                let minutes = args
+                    .get("minutes")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| Error::Invalid("minutes needs a list".into()))?
+                    .iter()
+                    .map(|m| {
+                        m.as_i64()
+                            .ok_or_else(|| Error::Invalid(format!("not a number of minutes: {m}")))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                routines.set_heads_ups(id()?, &minutes)?;
                 id()?.to_string()
             }
             "trash_routine" => {

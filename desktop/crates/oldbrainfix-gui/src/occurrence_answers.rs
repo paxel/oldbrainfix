@@ -9,6 +9,7 @@
 use chrono::Duration;
 use egui::{RichText, Ui};
 use oldbrainfix_core::alarms::open_occurrences;
+use oldbrainfix_core::person_settings::PersonSettings;
 use oldbrainfix_core::{
     Alarms, Day, DeviceSettings, Occurrence, Result, Routine, Routines, Store, WallClock,
 };
@@ -61,9 +62,16 @@ pub fn answers(
     }
     let now = store.now();
     let all_day_from = DeviceSettings::new(store).all_day_from()?;
-    let snooze = open_occurrences(std::slice::from_ref(routine), now, wall, all_day_from)
-        .iter()
-        .any(|o| !o.missed && o.occurrence == *occurrence);
+    let quiet_days = PersonSettings::new(store).quiet_days()?;
+    let snooze = open_occurrences(
+        std::slice::from_ref(routine),
+        now,
+        wall,
+        all_day_from,
+        &quiet_days,
+    )
+    .iter()
+    .any(|o| !o.missed && o.occurrence == *occurrence);
     let not_today = store.may_check_off(&routine.id)?;
     let tomorrow = not_today && occurrence.day >= Day::today(now, wall);
     Ok(Answers {

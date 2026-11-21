@@ -120,11 +120,11 @@ void main() {
       expect(alarms.labels?.nudgeChannel, 'Nudges');
     });
 
-    testWidgets('Save without a choice means 1 h', (tester) async {
+    testWidgets('Back without a choice means 1 h', (tester) async {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'call the plumber');
-      await tap(tester, find.text('Save'));
+      await backFromCapture(tester);
 
       expect(
         notes.all().single.nudgeAt,
@@ -178,8 +178,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      await backFromCapture(tester);
 
       expect(find.byType(CaptureScreen), findsNothing);
       final note = notes.all().single;
@@ -191,8 +190,7 @@ void main() {
     testWidgets('by Back with nothing typed captures nothing', (tester) async {
       await start(tester);
       await openTextCapture(tester);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      await backFromCapture(tester);
       expect(find.byType(CaptureScreen), findsNothing);
       expect(notes.all(), isEmpty);
     });

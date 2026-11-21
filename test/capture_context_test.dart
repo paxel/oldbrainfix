@@ -54,7 +54,7 @@ void main() {
   Future<void> capture(WidgetTester tester, String text) async {
     await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), text);
-    await tap(tester, find.text('Save'));
+    await saveCapture(tester);
   }
 
   Future<void> arrive(WidgetTester tester, Coordinates? at) async {
@@ -126,7 +126,7 @@ void main() {
       await openTextCapture(tester);
       expect(find.byType(AlertDialog), findsNothing, reason: 'not in Capture');
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       expect(notes.all().single.text, 'nees mor sauce');
       expect(find.text('Remember where you were?'), findsOneWidget);

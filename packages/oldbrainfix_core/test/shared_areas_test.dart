@@ -144,6 +144,20 @@ void main() {
   }
 
   group('sharing', () {
+    test('a Note of an Area the reader is no member of links to nothing '
+        'they read (obf-1035)', () {
+      final h = household(AreaRole.member);
+      final link = AppLink(AppLinkKind.note, h.note).url;
+      final secret = Notes(ann).capture(
+        'See [milk]($link)',
+        format: TextFormats.markdown,
+        place: Places(ann).areas().firstWhere((a) => a.name == 'Health').id,
+      );
+      exchange(ben, ann);
+      expect([for (final n in Backlinks(ann).to(h.note)) n.id], [secret.id]);
+      expect(Backlinks(ben).to(h.note), isEmpty);
+    });
+
     test('the first to share is its first Manager, with its own Devices', () {
       final house = Places(ann).addArea('Household');
       exchange(annDesk, ann);

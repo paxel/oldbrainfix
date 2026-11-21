@@ -195,6 +195,7 @@ class _HeldAlarms extends FakeAlarms {
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    List<ArmedHeadsUp> headsUps = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
     String? sound,
@@ -204,6 +205,7 @@ class _HeldAlarms extends FakeAlarms {
       alarms,
       labels,
       done: done,
+      headsUps: headsUps,
       nudge: nudge,
       changes: changes,
       sound: sound,

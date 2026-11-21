@@ -1,0 +1,107 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: Shell
+scope: source.shell
+file_extensions: [sh, bash, zsh, shell, ksh, console]
+first_line_match: '^#!\s*/\S*(?:/|\benv\s+(?:-\S+\s+)?)(?:sh|bash|zsh|ksh|dash)\b'
+
+variables:
+  pre: '(?<![\w.-])'
+  post: '(?![\w.-])'
+
+contexts:
+  main:
+    - match: '(?<![^\s;&|()])#.*'
+      scope: comment.line.number-sign.shell
+    - match: '\\.'
+      scope: constant.character.escape.shell
+    - match: '"'
+      scope: punctuation.definition.string.begin.shell
+      push: double_string
+    - match: '\$'''
+      scope: punctuation.definition.string.begin.shell
+      push: ansi_string
+    - match: ''''
+      scope: punctuation.definition.string.begin.shell
+      push: single_string
+    - match: '`'
+      push: backticks
+    - match: '\$\('
+      scope: punctuation.section.subshell.begin.shell
+      push: subshell
+    - include: expansions
+    - match: '<<-?\s*[''"]?EOF[''"]?'
+      scope: keyword.operator.heredoc.shell
+      push: heredoc_eof
+    - match: '<<-?\s*[''"]?END[''"]?'
+      scope: keyword.operator.heredoc.shell
+      push: heredoc_end
+    - match: '^\s*(?:function\s+)?([A-Za-z_][\w-]*)\s*(?=\(\s*\))'
+      captures:
+        1: entity.name.function.shell
+    - match: '{{pre}}(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|in|function|select|return|break|continue|exit|time|coproc){{post}}'
+      scope: keyword.control.shell
+    - match: '{{pre}}(?:echo|printf|cd|pwd|export|local|readonly|declare|typeset|source|alias|unalias|unset|set|shift|test|read|eval|exec|trap|wait|kill|true|false|let|getopts|umask|command|builtin|type|hash|jobs|bg|fg|disown|pushd|popd|dirs|shopt|mapfile)(?![\w.-])'
+      scope: support.function.builtin.shell
+    - match: '\b[A-Za-z_]\w*(?=\+?=)'
+      scope: variable.parameter.assignment.shell
+    - match: '{{pre}}\d+{{post}}'
+      scope: constant.numeric.integer.shell
+    - match: '&&|\|\||;;|>>|[|&;<>]'
+      scope: keyword.operator.shell
+
+  expansions:
+    - match: '\$\{[^}\n]*\}'
+      scope: variable.parameter.shell
+    - match: '\$(?:[A-Za-z_]\w*|[@*#?$!0-9-])'
+      scope: variable.parameter.shell
+
+  double_string:
+    - meta_scope: string.quoted.double.shell
+    - match: '"'
+      scope: punctuation.definition.string.end.shell
+      pop: true
+    - match: '\\[$`"\\]'
+      scope: constant.character.escape.shell
+    - match: '\$\('
+      scope: punctuation.section.subshell.begin.shell
+      push: subshell
+    - include: expansions
+
+  ansi_string:
+    - meta_scope: string.quoted.single.shell
+    - match: ''''
+      scope: punctuation.definition.string.end.shell
+      pop: true
+    - match: '\\(?:x[0-9a-fA-F]{1,2}|[0-7]{1,3}|.)'
+      scope: constant.character.escape.shell
+
+  single_string:
+    - meta_scope: string.quoted.single.shell
+    - match: ''''
+      scope: punctuation.definition.string.end.shell
+      pop: true
+
+  backticks:
+    - match: '`'
+      pop: true
+    - include: main
+
+  subshell:
+    - match: '\)'
+      scope: punctuation.section.subshell.end.shell
+      pop: true
+    - include: main
+
+  heredoc_eof:
+    - meta_content_scope: string.unquoted.heredoc.shell
+    - match: '^\s*EOF$'
+      scope: keyword.operator.heredoc.shell
+      pop: true
+
+  heredoc_end:
+    - meta_content_scope: string.unquoted.heredoc.shell
+    - match: '^\s*END$'
+      scope: keyword.operator.heredoc.shell
+      pop: true

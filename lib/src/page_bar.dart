@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'l10n.dart';
 import 'look.dart';
+import 'spotlight.dart';
 import 'sync_line.dart';
 
 /// Width from which a screen counts as wide (UI laws, "The bar"): below
@@ -20,22 +21,34 @@ const _iconRoom = 44.0;
 /// An action of a page's bar that goes into ⋮ when the bar is full (UI
 /// laws, "The bar"): on the bar its icon with [label] as its tooltip, in
 /// ⋮ its icon and [label], greyed in both while [onPressed] is null. Any
-/// other widget among a bar's actions stays on the bar.
+/// other widget among a bar's actions stays on the bar. With a
+/// [spotlight], its tip (obf-1043) points at it on the bar, else at ⋮.
 class BarAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
+  final String? spotlight;
 
   const BarAction({
     super.key,
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.spotlight,
   });
 
   @override
-  Widget build(BuildContext context) =>
-      IconButton(tooltip: label, onPressed: onPressed, icon: Icon(icon));
+  Widget build(BuildContext context) {
+    final button = IconButton(
+      tooltip: label,
+      onPressed: onPressed,
+      icon: Icon(icon),
+    );
+    return switch (spotlight) {
+      final id? => Spotlight(id: id, child: button),
+      null => button,
+    };
+  }
 }
 
 /// [actions] as a bar with room for [slots] buttons shows them (UI laws,
@@ -69,7 +82,17 @@ class _BarMore extends StatelessWidget {
   const _BarMore({required this.actions});
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<VoidCallback>(
+  Widget build(BuildContext context) {
+    Widget more = _menu(context);
+    for (final action in actions) {
+      if (action.spotlight case final id?) {
+        more = Spotlight(id: id, child: more);
+      }
+    }
+    return more;
+  }
+
+  Widget _menu(BuildContext context) => PopupMenuButton<VoidCallback>(
     key: const ValueKey('bar-more'),
     tooltip: context.t.more,
     icon: const Icon(Icons.more_vert),
@@ -103,13 +126,16 @@ class _BarMore extends StatelessWidget {
 /// [titleIcon], at most 36 wide, stands before the title. The [SyncLine]
 /// runs along its bottom while this Device syncs (#225). [onBack] is the
 /// way back of a page that is no route of its own, the Areas list beside
-/// the Agenda (#258).
+/// the Agenda (#258). [background], where given, fills the bar instead of
+/// the theme's colour: the pages with a search bar set their header off
+/// from the page with it (#351, obf-1041).
 AppBar pageBar(
   BuildContext context, {
   required String title,
   Widget? titleIcon,
   List<Widget> actions = const [],
   VoidCallback? onBack,
+  Color? background,
 }) {
   // Only whether it can go back, not the whole route: a page coming on
   // top does not build this page again (#210).
@@ -130,6 +156,7 @@ AppBar pageBar(
               ],
             ),
       actions: actions,
+      backgroundColor: background,
       flexibleSpace: const SyncLine(),
     );
   }
@@ -174,6 +201,7 @@ AppBar pageBar(
   return AppBar(
     leading: leading,
     actions: barActions(actions, (room / slot).floor()),
+    backgroundColor: background,
     flexibleSpace: const SyncLine(),
     bottom: PreferredSize(
       preferredSize: Size.fromHeight(height),

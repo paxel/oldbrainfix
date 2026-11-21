@@ -1,0 +1,103 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: JavaScript / TypeScript
+scope: source.js
+file_extensions: [js, javascript, mjs, cjs, jsx, ts, typescript, tsx, mts, cts]
+first_line_match: '^#!\s*/\S*(?:/|\benv\s+(?:-\S+\s+)?)(?:node|nodejs|deno|bun)\b'
+
+variables:
+  pre: '(?<![\w$])'
+  post: '(?![\w$])'
+  ident: '[A-Za-z_$][\w$]*'
+
+contexts:
+  main:
+    - match: '^#!.*'
+      scope: comment.line.shebang.js
+    - match: '//.*'
+      scope: comment.line.double-slash.js
+    - match: '/\*'
+      scope: punctuation.definition.comment.begin.js
+      push: block_comment
+    - match: '"'
+      push: double_string
+    - match: ''''
+      push: single_string
+    - match: '`'
+      push: template
+    - match: '@{{ident}}'
+      scope: variable.function.decorator.js
+    - match: '{{pre}}(function)\s*\*?\s*({{ident}})'
+      captures:
+        1: keyword.declaration.function.js
+        2: entity.name.function.js
+    - match: '{{pre}}(class|interface|enum|type|namespace)\s+({{ident}})(?=[\s<{=]|$)'
+      captures:
+        1: keyword.declaration.js
+        2: entity.name.type.js
+    - match: '{{pre}}(?:if|else|for|while|do|switch|case|default|break|continue|return|throw|try|catch|finally|new|delete|typeof|instanceof|in|of|void|yield|await|async|import|export|from|as|with|debugger|extends|implements|satisfies|keyof|infer|is|asserts)(?![\w$])'
+      scope: keyword.control.js
+    - match: '{{pre}}(?:var|let|const|function|class|interface|enum|namespace|declare)(?![\w$])'
+      scope: keyword.declaration.js
+    - match: '{{pre}}(?:static|public|private|protected|readonly|abstract|override|accessor)(?![\w$])'
+      scope: storage.modifier.js
+    - match: '{{pre}}(?:true|false|null|undefined|NaN|Infinity)(?![\w$])'
+      scope: constant.language.js
+    - match: '{{pre}}(?:this|super|arguments)(?![\w$])'
+      scope: variable.language.js
+    - match: '{{pre}}(?:string|number|boolean|bigint|symbol|any|unknown|never|object|Array|Object|String|Number|Boolean|Promise|Map|Set|WeakMap|WeakSet|Date|RegExp|Error|Symbol|BigInt|Record|Partial|Readonly|Pick|Omit)(?![\w$])'
+      scope: support.type.js
+    - match: '{{pre}}(?:console|window|document|globalThis|process|JSON|Math|Reflect)(?![\w$])'
+      scope: support.class.js
+    - match: '{{pre}}(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\.\d[\d_]*(?:[eE][+-]?\d+)?)n?'
+      scope: constant.numeric.js
+    - match: '{{pre}}{{ident}}(?=\s*\()'
+      scope: variable.function.js
+    - match: '=>|\.\.\.|\?\?=?|\?\.|&&=?|\|\|=?|[-+*/%<>=!&|^~]=?'
+      scope: keyword.operator.js
+
+  block_comment:
+    - meta_scope: comment.block.js
+    - match: '\*/'
+      scope: punctuation.definition.comment.end.js
+      pop: true
+
+  escapes:
+    - match: '\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|u\{[0-9a-fA-F]{1,6}\}|.)'
+      scope: constant.character.escape.js
+
+  double_string:
+    - meta_scope: string.quoted.double.js
+    - match: '"|$'
+      pop: true
+    - include: escapes
+
+  single_string:
+    - meta_scope: string.quoted.single.js
+    - match: '''|$'
+      pop: true
+    - include: escapes
+
+  template:
+    - meta_scope: string.quoted.other.template.js
+    - match: '`'
+      pop: true
+    - include: escapes
+    - match: '\$\{'
+      push: template_expr
+
+  template_expr:
+    - meta_scope: meta.interpolation.js variable.parameter.interpolation.js
+    - match: '\}'
+      pop: true
+    - match: '\{'
+      push: braces
+    - include: main
+
+  braces:
+    - match: '\}'
+      pop: true
+    - match: '\{'
+      push: braces
+    - include: main

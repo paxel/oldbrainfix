@@ -880,35 +880,31 @@ void main() {
       );
     });
 
-    for (final formatBar in [false, true]) {
-      testWidgets('puts the cursor there in Capture'
-          '${formatBar ? ', with the format bar' : ''}', (tester) async {
-        store.setQuickNoteShows(QuickNoteControl.formatBar, formatBar);
-        await tester.pumpWidget(OldBrainFixApp(store: store));
-        await tester.pumpAndSettle();
-        await openTextCapture(tester);
-        const text = 'hello wonderful world';
-        await tester.enterText(find.byType(TextField).first, text);
-        tester.view.viewInsets = const FakeViewPadding(bottom: 900);
-        addTearDown(tester.view.resetViewInsets);
-        await tester.pumpAndSettle();
-        final controller = fieldOf(tester, text);
+    testWidgets('puts the cursor there in Capture', (tester) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await openTextCapture(tester);
+      const text = 'hello wonderful world';
+      await tester.enterText(find.byType(TextField).first, text);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      final controller = fieldOf(tester, text);
 
-        await tester.tapAt(caretIn(tester, text, 8));
-        await tester.pump(const Duration(milliseconds: 500));
-        expect(controller.selection, const TextSelection.collapsed(offset: 8));
-        await tester.tapAt(caretIn(tester, text, 13));
-        await tester.pump(const Duration(milliseconds: 500));
-        expect(controller.selection, const TextSelection.collapsed(offset: 13));
+      await tester.tapAt(caretIn(tester, text, 8));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, const TextSelection.collapsed(offset: 8));
+      await tester.tapAt(caretIn(tester, text, 13));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.selection, const TextSelection.collapsed(offset: 13));
 
-        await tester.longPressAt(caretIn(tester, text, 9));
-        await tester.pumpAndSettle();
-        expect(
-          controller.selection,
-          const TextSelection(baseOffset: 6, extentOffset: 15),
-        );
-      });
-    }
+      await tester.longPressAt(caretIn(tester, text, 9));
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 6, extentOffset: 15),
+      );
+    });
   });
 
   test('grapheme boundaries', () {

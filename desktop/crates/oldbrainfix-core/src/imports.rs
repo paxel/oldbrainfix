@@ -14,6 +14,7 @@ use crate::checklists::{
 };
 use crate::entry::dart_iso;
 use crate::error::{Error, Result};
+use crate::import_formats::{self, ImportFormat};
 use crate::notes::keys;
 use crate::places::Places;
 use crate::search::lower_case;
@@ -114,12 +115,15 @@ impl<'a> Imports<'a> {
         Imports { store }
     }
 
-    /// Makes one Note of each Markdown (`.md`, `.markdown`) and text
-    /// (`.txt`) file of `files` in a new Area named `area_name`, as
-    /// [`Imports::notes`] writes them; any other file is skipped and
-    /// counted. A Markdown file's Note is formatted, its Markdown as
-    /// written; a text file's is plain. A Note is dated by its file's
-    /// modification time, and by now when that is unknown or later.
+    /// Makes one Note of each Markdown (`.md`, `.markdown`), text
+    /// (`.txt`), AsciiDoc (`.adoc`, `.asciidoc`, `.asc`), Org (`.org`),
+    /// reStructuredText (`.rst`) and HTML (`.html`, `.htm`) file of
+    /// `files` in a new Area named `area_name`, as [`Imports::notes`]
+    /// writes them; any other file is skipped and counted. A Markdown
+    /// file's Note is formatted, its Markdown as written; a text file's
+    /// is plain; the others' are formatted, read into the Markdown subset
+    /// ([`import_formats`]). A Note is dated by its file's modification
+    /// time, and by now when that is unknown or later.
     pub fn folder(&self, area_name: &str, files: &[ImportFile]) -> Result<ImportSummary> {
         let name = area(area_name)?;
         let now = self.store.now();
@@ -127,7 +131,11 @@ impl<'a> Imports<'a> {
         let (mut not_text, mut too_large) = (0, 0);
         for file in files {
             let base = base(&file.name);
-            let Some((stem, format)) = format_of(base) else {
+            let document = document_of(base);
+            let Some((stem, format)) = document
+                .map(|(stem, _)| (stem, MARKDOWN))
+                .or_else(|| format_of(base))
+            else {
                 not_text += 1;
                 continue;
             };
@@ -139,7 +147,15 @@ impl<'a> Imports<'a> {
                 not_text += 1;
                 continue;
             };
-            let text = titled(stem, &read, format);
+            let text = match document {
+                // A page's own title stands under the file's name, unless
+                // the text begins with it, as the name does.
+                Some((_, kind)) => {
+                    let page = import_formats::read(kind, &read);
+                    titled(stem, &titled(&page.title, &page.text, format), format)
+                }
+                None => titled(stem, &read, format),
+            };
             if text.is_empty() {
                 not_text += 1;
                 continue;
@@ -595,6 +611,17 @@ pub(crate) fn format_of(base: &str) -> Option<(&str, &'static str)> {
         "txt" => Some((stem, PLAIN)),
         _ => None,
     }
+}
+
+/// The name without its extension of the file `base`, and the format of
+/// a document of another tool it is, by its extension in any case of
+/// ASCII letters; `None` for a hidden file and any other kind.
+fn document_of(base: &str) -> Option<(&str, ImportFormat)> {
+    if base.starts_with('.') {
+        return None;
+    }
+    let (stem, extension) = base.rsplit_once('.')?;
+    ImportFormat::of_extension(&extension.to_ascii_lowercase()).map(|kind| (stem, kind))
 }
 
 /// The text of `bytes`: UTF-8 without the byte order mark before it,

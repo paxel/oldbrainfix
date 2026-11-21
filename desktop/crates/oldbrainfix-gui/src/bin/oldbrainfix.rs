@@ -435,6 +435,12 @@ impl Shell {
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
         app.offer_restore();
+        // The tips explaining each screen (obf-1043), counted as shown
+        // for what an earlier version had before the first start's view
+        // or the help Notes run.
+        if let Err(e) = app.set_spotlights(true) {
+            eprintln!("tips: {e}");
+        }
         // The help Notes this version owes (#180); after the first start
         // once it is answered.
         if let Err(e) = app.set_help(env!("CARGO_PKG_VERSION")) {
@@ -960,7 +966,6 @@ fn run() -> Result<i32, String> {
         let (store, saved) = (store.clone(), saved.clone());
         Rc::new(move || {
             let mut popup = CapturePopup::new(store.clone(), locale);
-            popup.set_recorder(Box::new(MicRecorder::default()));
             popup.set_clipboard(Box::new(SystemClipboard::default()));
             let saved = saved.clone();
             popup.on_saved(Box::new(move || saved()));

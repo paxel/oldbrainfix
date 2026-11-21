@@ -5,8 +5,8 @@
 //! the one with the same key, and is closed once its Occurrence is Done
 //! or skipped. A Windows toast offers the same buttons but is neither
 //! replaced nor closed: notify-rust shows each one anew and closes none. On macOS a click on it is heard, but
-//! it offers no buttons: notify-rust puts more than one under a menu
-//! titled "Options" in English only.
+//! it offers no buttons: more than one would go under a menu titled
+//! "Options" in English only.
 
 use std::sync::{Arc, Mutex};
 
@@ -115,7 +115,7 @@ impl Notifier for DesktopNotifier {
     }
 }
 
-#[cfg(not(all(unix, not(target_os = "macos"))))]
+#[cfg(windows)]
 impl Notifier for DesktopNotifier {
     fn show(&mut self, notice: &Notice) {
         use notify_rust::NotificationResponse;
@@ -123,18 +123,16 @@ impl Notifier for DesktopNotifier {
         n.summary(&notice.title)
             .body(&notice.body)
             .appname(oldbrainfix_core::APP_NAME);
-        if cfg!(target_os = "windows") {
-            for (id, label) in &notice.actions {
-                n.action(id, label);
-            }
+        for (id, label) in &notice.actions {
+            n.action(id, label);
         }
-        // Without a sound name a toast and a macOS notification stay
-        // silent, as a `silent` notice is to.
+        // Without a sound name a toast stays silent, as a `silent` notice
+        // is to.
         if notice.urgent {
             n.sound_name("Default");
         }
-        // A toast is shown here; a macOS notification only once its
-        // handle waits, on this thread, for a click or a button.
+        // The toast is shown here; its handle waits for a click or a
+        // button.
         let handle = match n.show() {
             Ok(handle) => handle,
             Err(e) => {
@@ -166,6 +164,68 @@ impl Notifier for DesktopNotifier {
     }
 
     fn close(&mut self, _key: &str) {}
+}
+
+/// On macOS through mac-notification-sys itself, not notify-rust: a
+/// notification without buttons there was handed over without waiting,
+/// so its click was never heard (obf-1039). Waiting for the click blocks
+/// this notification's own thread until it is clicked or gone; the
+/// answer comes from the main thread's run loop, which the window runs.
+#[cfg(target_os = "macos")]
+impl Notifier for DesktopNotifier {
+    fn show(&mut self, notice: &Notice) {
+        let title = notice.title.clone();
+        let body = notice.body.clone();
+        let urgent = notice.urgent;
+        let taps = self.taps.clone();
+        let key = notice.key.clone();
+        std::thread::spawn(move || {
+            // Unset, the library posts as Finder, and a click brings up
+            // Finder instead of this app. The first call sets it; later
+            // ones only answer that it is set already.
+            drop(mac_notification_sys::set_application(
+                "io.github.paxel.oldbrainfix",
+            ));
+            let mut n = mac_notification_sys::Notification::new();
+            n.title(&title)
+                .message(&body)
+                .asynchronous(false)
+                .wait_for_click(true);
+            // Without a sound name it stays silent, as a `silent` notice
+            // is to.
+            if urgent {
+                n.sound("Default");
+            }
+            match n.send() {
+                Ok(response) => {
+                    let clicked =
+                        matches!(response, mac_notification_sys::NotificationResponse::Click);
+                    if let Some(tap) = clicked_tap(key, clicked, chrono::Utc::now()) {
+                        drop(taps.send(crate::alerts::Event::Tap(tap)));
+                    }
+                }
+                Err(e) => eprintln!("oldbrainfix: notification: {e}"),
+            }
+        });
+    }
+
+    fn close(&mut self, _key: &str) {}
+}
+
+/// What a macOS notification without buttons answered, as a tap: a
+/// click on it is Open, as a click on the notification itself is on the
+/// other systems; one gone unclicked is none.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn clicked_tap(
+    key: String,
+    clicked: bool,
+    at: chrono::DateTime<chrono::Utc>,
+) -> Option<crate::alerts::Tap> {
+    clicked.then(|| crate::alerts::Tap {
+        key,
+        action: crate::alerts::OPEN.to_string(),
+        at,
+    })
 }
 
 /// What a [`RecordingNotifier`] was asked to do.
@@ -204,3 +264,6 @@ impl Notifier for RecordingNotifier {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

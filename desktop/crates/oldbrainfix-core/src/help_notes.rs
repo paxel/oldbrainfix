@@ -1,22 +1,23 @@
 //! The app's own Notes that explain it (#180, ADR 0042), under the ids
-//! and in the order the Dart core's `help_notes.dart` writes them:
-//! "Quick start", "What the icons mean" and one "What's new in X.Y.Z" per
-//! release, filed into their own Area "Old Brain Fix". Each has an id
-//! fixed by the person and the version, so a second Device of the same
-//! person finds it made and makes none, two Devices that make it apart
-//! write the same entities, and a Note the person deleted stays deleted.
+//! and in the order the Dart core's `help_notes.dart` writes them: one
+//! "What's new in X.Y.Z" per release, filed into their own Area "Old
+//! Brain Fix". Each has an id fixed by the person and the version, so a
+//! second Device of the same person finds it made and makes none, two
+//! Devices that make it apart write the same entities, and a Note the
+//! person deleted stays deleted. "Quick start" and "What the icons mean"
+//! are made no more (obf-1043, ADR 0055), as Spotlights explain the
+//! screens; the ones made up to 0.6.1 stay as the person has them, under
+//! the ids below.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 
 use crate::Result;
-use crate::checklists::{self, NewLine, order, write_line_as};
+use crate::checklists;
 use crate::entry::dart_iso;
-use crate::note_kinds;
 use crate::notes::keys as note_keys;
 use crate::places::{Places, keys as place_keys};
 use crate::profile::OwnProfile;
-use crate::shopping_lists::ListOnAgenda;
 use crate::store::Store;
 use crate::text_format::{self, StoredText};
 
@@ -41,17 +42,6 @@ pub type WhatsNew = BTreeMap<String, BTreeMap<String, String>>;
 pub struct HelpTexts<'a> {
     /// The Area's name, "Old Brain Fix".
     pub area_name: String,
-    /// "Quick start" and its Lines, the steps to try, and its Description
-    /// (#260), folded under the name: a link to each step's place (#261)
-    /// and the desktop's way for each step, Markdown.
-    pub quick_start_title: String,
-    pub quick_start_lines: Vec<String>,
-    pub quick_start_description: String,
-    /// "What the icons mean" in full, its title the first line, Markdown
-    /// with a link to the guide (#261), and the pictures of the icons, one
-    /// per group.
-    pub icons_text: String,
-    pub icon_pictures: Vec<&'a [u8]>,
     /// The title of a What's new Note for a version.
     pub whats_new_title: Box<dyn Fn(&str) -> String + 'a>,
 }
@@ -136,13 +126,12 @@ impl<'a> HelpNotes<'a> {
     /// `language` with `texts`; `fresh` when this start began with the
     /// first start (a new person, a Device added or a Backup restored).
     ///
-    /// Quick start and What the icons mean are made once per person.
     /// Each What's new of a version after the one this Device last ran
     /// (or after [`SINCE`], for a Device that recorded none, unless
-    /// `fresh`) up to `version` is made once per person, oldest first.
-    /// Nothing is made before the own Profile exists; then the version is
-    /// recorded and the same start again makes nothing. Returns the ids
-    /// of the Notes made.
+    /// `fresh`) up to `version` is made once per person, oldest first; a
+    /// fresh start makes none. Nothing is made before the own Profile
+    /// exists; then the version is recorded and the same start again
+    /// makes nothing. Returns the ids of the Notes made.
     pub fn make_due(
         &self,
         version: &str,
@@ -181,21 +170,6 @@ impl<'a> HelpNotes<'a> {
         s.batch(|| {
             let mut made = Vec::new();
             let mut area: Option<String> = None;
-            if !self.made(&persons, quick_start_id)? {
-                let into = self.area_once(&mut area, &person, &persons, &texts.area_name)?;
-                self.quick_start(&person, &into, texts)?;
-                made.push(quick_start_id(&person));
-            }
-            if !self.made(&persons, icons_id)? {
-                let into = self.area_once(&mut area, &person, &persons, &texts.area_name)?;
-                self.note(
-                    &icons_id(&person),
-                    (&into, text_format::MARKDOWN),
-                    &texts.icons_text,
-                    &texts.icon_pictures,
-                )?;
-                made.push(icons_id(&person));
-            }
             for v in due {
                 if self.made(&persons, |p| whats_new_id(p, v))? {
                     continue;
@@ -208,12 +182,7 @@ impl<'a> HelpNotes<'a> {
                 };
                 let into = self.area_once(&mut area, &person, &persons, &texts.area_name)?;
                 let text = format!("{}\n\n{text}", (texts.whats_new_title)(v));
-                self.note(
-                    &whats_new_id(&person, v),
-                    (&into, text_format::PLAIN),
-                    &text,
-                    &[],
-                )?;
+                self.note(&whats_new_id(&person, v), &into, &text, &[])?;
                 made.push(whats_new_id(&person, v));
             }
             s.set_local_setting(VERSION_SETTING, version)?;
@@ -275,17 +244,9 @@ impl<'a> HelpNotes<'a> {
         Ok(id)
     }
 
-    /// Writes the Note `id` with `text` in `format` and `photos`, filed
-    /// into `area`, with no Nudge. Quick start and What the icons mean
-    /// are formatted, so their app links open (#261); a What's new is
-    /// plain.
-    fn note(
-        &self,
-        id: &str,
-        (area, format): (&str, &str),
-        text: &str,
-        photos: &[&[u8]],
-    ) -> Result<()> {
+    /// Writes the Note `id` with `text` and `photos`, filed into `area`,
+    /// with no Nudge, plain.
+    fn note(&self, id: &str, area: &str, text: &str, photos: &[&[u8]]) -> Result<()> {
         let s = self.store;
         let now = s.now();
         let at = Some(now);
@@ -295,47 +256,12 @@ impl<'a> HelpNotes<'a> {
             .collect::<Result<Vec<_>>>()?;
         s.append(id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), at)?;
         s.append(id, note_keys::CAPTURED, Some(&dart_iso(now)), at)?;
-        let text = StoredText::of(format, text, text_format::VERSION).encode();
+        let text = StoredText::of(text_format::PLAIN, text, text_format::VERSION).encode();
         s.append(id, note_keys::TEXT, Some(&text), at)?;
         s.append(id, note_keys::PLACE, Some(area), at)?;
         for hash in &hashes {
             s.append(id, &note_keys::photo(hash), Some(note_keys::ADDED), at)?;
         }
-        Ok(())
-    }
-
-    /// Writes the Quick start: a Checklist named `quick_start_title` with
-    /// its Description, whose Lines are the steps to try, under ids fixed
-    /// by the person and the Line's place, shown on the Agenda as one row
-    /// with its count.
-    fn quick_start(&self, person: &str, area: &str, texts: &HelpTexts) -> Result<()> {
-        let s = self.store;
-        let id = quick_start_id(person);
-        let making = quick_start_making(person);
-        let now = s.now();
-        let text = note_kinds::join(&texts.quick_start_title, &texts.quick_start_description);
-        self.note(&id, (area, text_format::MARKDOWN), &text, &[])?;
-        let kind = checklists::keys::kind_of(&making);
-        s.append(&id, checklists::keys::KIND, Some(&kind), Some(now))?;
-        s.append(&id, note_keys::SPAWNED, Some(&dart_iso(now)), Some(now))?;
-        let mut key = String::new();
-        for (i, line) in texts.quick_start_lines.iter().enumerate() {
-            key = order::after(&key);
-            let new = NewLine {
-                text: line,
-                order: &key,
-                indent: false,
-                checked: false,
-                received: None,
-                at: Some(now),
-            };
-            write_line_as(s, quick_start_line_id(person, i), &id, &making, &new)?;
-        }
-        // One row on the Agenda with its count (Q549), the person's own
-        // choice as "Show on the Agenda" writes it.
-        let agenda = format!("{}{id}", checklists::keys::AGENDA_PREFIX);
-        let count = ListOnAgenda::Count.code();
-        s.append(&agenda, checklists::keys::AGENDA, Some(count), Some(now))?;
         Ok(())
     }
 }

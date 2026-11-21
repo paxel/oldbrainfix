@@ -57,6 +57,10 @@ void main() {
     testWidgets('is not offered where there is none', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
+      await tap(tester, find.byIcon(Icons.add));
+      expect(fanEntry('photo'), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
       await openTextCapture(tester);
       expect(find.byType(CaptureScreen), findsOneWidget);
       expect(camera, findsNothing);
@@ -64,14 +68,15 @@ void main() {
 
     testWidgets('takes a photo Note with the Nudge picked', (tester) async {
       await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, camera);
+      await openCaptureBy(tester, 'photo');
 
       expect(photos.taken, 1);
       // The photo shows on the capture screen; words are optional.
       expect(find.byType(NotePhoto), findsOneWidget);
       expect(find.text('A few words about it (optional)'), findsOneWidget);
       expect(find.byType(NudgeButtons), findsOneWidget);
+      // The quick note offers no second photo: the editor does (#352).
+      expect(camera, findsNothing);
 
       await tap(tester, find.byKey(const ValueKey('nudge10')));
       final note = notes.all().single;
@@ -91,24 +96,20 @@ void main() {
 
     testWidgets('a few words go with the photo into one Note', (tester) async {
       await start(tester);
-      await openTextCapture(tester);
+      await openCaptureBy(tester, 'photo');
       await tester.enterText(find.byType(TextField), 'this shelf');
-      await tap(tester, camera);
-      photos.nextPhoto = otherPng;
-      await tap(tester, camera);
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       final note = notes.all().single;
       expect(note.text, 'this shelf');
-      expect(note.photos, hasLength(2));
+      expect(note.photos, hasLength(1));
     });
 
     testWidgets('backing out of the camera captures nothing', (tester) async {
       photos.nextPhoto = null;
       await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, camera);
-      await tap(tester, find.text('Save'));
+      await openCaptureBy(tester, 'photo');
+      await backFromCapture(tester);
 
       expect(notes.all(), isEmpty);
     });
@@ -119,11 +120,12 @@ void main() {
       final shot = Completer<Uint8List?>();
       photos.camera = shot;
       await start(tester);
-      await openTextCapture(tester);
-      await tester.enterText(find.byType(TextField), 'parking spot');
-      await tester.tap(camera);
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+      await tester.tap(fanEntry('photo'));
       await tester.pump();
-      // The camera app covers ours: the words are saved already.
+      await tester.pump();
+      // The camera app covers ours: nothing typed, nothing to keep yet.
       for (final state in [
         AppLifecycleState.inactive,
         AppLifecycleState.hidden,
@@ -134,14 +136,101 @@ void main() {
       ]) {
         tester.binding.handleAppLifecycleStateChanged(state);
       }
-      expect(notes.all().single.photos, isEmpty);
+      expect(notes.all(), isEmpty);
       shot.complete(onePixelPng);
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Save'));
+      await tester.enterText(find.byType(TextField), 'parking spot');
+      await saveCapture(tester);
 
       final note = notes.all().single;
       expect(note.text, 'parking spot');
       expect(note.photos, hasLength(1));
+    });
+
+    testWidgets('leaving while the pictures picked are read still keeps '
+        'them', (tester) async {
+      photos.picker = Completer();
+      await start(tester);
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+      await tester.tap(fanEntry('gallery'));
+      // The page is in; the pictures are still being read.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('nudge10')));
+      await tester.pump();
+      photos.picker?.complete([onePixelPng, otherPng]);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CaptureScreen), findsNothing);
+      final note = notes.all().single;
+      expect(note.photos, hasLength(2));
+      // The Nudge picked holds for the pictures: they were written first.
+      expect(note.nudge, now.add(const Duration(minutes: 10)));
+    });
+
+    testWidgets('the editor\'s Photo takes a photo into the open Note (#352)', (
+      tester,
+    ) async {
+      final note = notes.capture('this shelf');
+      await start(tester);
+      await edit(tester, note);
+      await tap(tester, find.byKey(const ValueKey('editor-photo')));
+
+      expect(photos.taken, 1);
+      expect(notes.byId(note.id)!.photos, [store.putPhoto(onePixelPng)]);
+      expect(notes.byId(note.id)!.text, 'this shelf');
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      await tester.ensureVisible(find.byType(NotePhoto));
+      expect(find.byType(NotePhoto), findsOneWidget);
+    });
+
+    testWidgets('the editor\'s Gallery puts the pictures picked into the '
+        'open Note, and closing the picker changes nothing (#352)', (
+      tester,
+    ) async {
+      final note = notes.capture('receipts');
+      await start(tester);
+      await edit(tester, note);
+      await tap(tester, find.byKey(const ValueKey('editor-gallery')));
+      expect(photos.picks, 1);
+      expect(notes.byId(note.id)!.photos, isEmpty);
+
+      photos.nextPicked = [onePixelPng, otherPng];
+      await tap(tester, find.byKey(const ValueKey('editor-gallery')));
+      expect(photos.picks, 2);
+      expect(photos.taken, 0);
+      expect(notes.byId(note.id)!.photos, hasLength(2));
+      expect(notes.all(), hasLength(1));
+    });
+
+    testWidgets('the editor\'s Paste puts the text at the cursor and the '
+        'picture into the Note, and says so when there is nothing (#352)', (
+      tester,
+    ) async {
+      final note = notes.capture('Receipts of the');
+      await start(tester);
+      await edit(tester, note);
+      await tap(tester, find.byKey(const ValueKey('editor-paste')));
+      expect(photos.pastes, 1);
+      expect(find.byKey(const ValueKey('paste-empty')), findsOneWidget);
+      expect(notes.byId(note.id)!.text, 'Receipts of the');
+
+      photos.clipboard = SharedItem(text: 'old flat', photos: [onePixelPng]);
+      final field = tester.widget<TextField>(
+        find.descendant(
+          of: find.byKey(const ValueKey('note-text')),
+          matching: find.byType(TextField),
+        ),
+      );
+      field.controller!.selection = const TextSelection.collapsed(offset: 15);
+      await tap(tester, find.byKey(const ValueKey('editor-paste')));
+      expect(photos.pastes, 2);
+      expect(find.byKey(const ValueKey('paste-empty')), findsNothing);
+      final pasted = notes.byId(note.id)!;
+      expect(pasted.text, 'Receipts of theold flat');
+      expect(pasted.photos, hasLength(1));
     });
   });
 
@@ -198,8 +287,8 @@ void main() {
       photos.waiting.add(const SharedItem(text: 'first'));
       photos.share(SharedItem(photos: [onePixelPng, otherPng]));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Save'));
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
+      await saveCapture(tester);
 
       expect(find.byType(CaptureScreen), findsNothing);
       expect(notes.all().map((n) => n.photos.length), unorderedEquals([0, 2]));

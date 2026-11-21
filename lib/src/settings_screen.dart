@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -15,6 +16,7 @@ import 'context_platform.dart';
 import 'failure_dialog.dart';
 import 'features_choice.dart';
 import 'feedback_screen.dart';
+import 'file_platform.dart';
 import 'folder_import.dart';
 import 'folder_platform.dart';
 import 'keep_import.dart';
@@ -31,6 +33,7 @@ import 'settings_search.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
 import 'speech_platform.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 
 export 'settings_search.dart' show SettingsHeading, SettingsSection;
@@ -48,7 +51,9 @@ enum _Importing { folder, keep }
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; in Advanced, Ask (#333); and Send feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
+/// Google Keep export; in Advanced, Ask (#333); Show tips again
+/// (obf-1043); the person's own Code languages (obf-1037); and Send
+/// feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -109,6 +114,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// Show tips again (obf-1043): every screen of this Device shows its
+  /// Spotlights again on its next visit, and the top says so.
+  void _showTips() {
+    resetSpotlights(widget.store);
+    AnnouncementsScope.of(context)?.announce(context.t.settingsShowTipsDone);
   }
 
   @override
@@ -571,11 +583,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // At the top, above the page it filters (#282).
-          BrowserSearchField(
-            key: const ValueKey('settingsSearch'),
-            controller: _search,
-            hint: t.settingsSearchHint,
-            onChanged: _searched,
+          Spotlight(
+            id: 'settings-search',
+            child: BrowserSearchField(
+              key: const ValueKey('settingsSearch'),
+              controller: _search,
+              hint: t.settingsSearchHint,
+              onChanged: _searched,
+            ),
           ),
           Expanded(
             // A short page, built whole.
@@ -951,7 +966,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _QuickNoteSettings(
                       store: widget.store,
-                      advanced: _advanced,
                       headingKey: _heading('quick-note'),
                     ),
                     if (hasCalendarPage(context))
@@ -1095,6 +1109,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
+                    // The last of this phone's own (obf-1043): every
+                    // screen explains itself again.
+                    SettingsGroup(
+                      children: [
+                        const SizedBox(height: 16),
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [t.settingsShowTips],
+                              child: Spotlight(
+                                id: 'settings-show-tips',
+                                child: ListTile(
+                                  key: const ValueKey('showTips'),
+                                  leading: const Icon(
+                                    Icons.tips_and_updates_outlined,
+                                  ),
+                                  title: Text(t.settingsShowTips),
+                                  onTap: _showTips,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                     // The person's own, on all of their own Devices
                     // (#197): after the settings of this phone, before
                     // Send feedback.
@@ -1110,13 +1149,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             t.featuresAdvanced,
                             t.featuresAdvancedDetail,
                           ],
-                          child: FeaturesChoice(
-                            advanced: _advanced,
-                            onChanged: _setAdvanced,
+                          child: Spotlight(
+                            id: 'settings-features',
+                            child: FeaturesChoice(
+                              advanced: _advanced,
+                              onChanged: _setAdvanced,
+                            ),
                           ),
                         ),
                       ],
                     ),
+                    // The person's own too (obf-1037), Simple and
+                    // Advanced alike.
+                    _GrammarSettings(store: widget.store),
                     SettingsGroup(
                       children: [
                         const SizedBox(height: 16),
@@ -1341,40 +1386,24 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
   }
 }
 
-/// What this Device's quick note shows besides its text field, its
-/// Photo, Voice, Gallery and Paste and "To full editor" (#142): each of
-/// the card's actions and the format bar once switched on, and the Nudge
-/// buttons until switched off.
+/// The quick note's settings (#352): the text, the three Nudge buttons
+/// and More, nothing else, the rest in the full editor; only the Nudge
+/// buttons can be switched off for a single Save. The quick note's
+/// switches of before (#142) stay stored and no longer show.
 class _QuickNoteSettings extends StatefulWidget {
   final Store store;
-
-  /// Whether the format bar's switch shows: only in Advanced (#197).
-  final bool advanced;
 
   /// The heading's key, for an app link (#261).
   final Key? headingKey;
 
-  const _QuickNoteSettings({
-    required this.store,
-    required this.advanced,
-    this.headingKey,
-  });
+  const _QuickNoteSettings({required this.store, this.headingKey});
 
   @override
   State<_QuickNoteSettings> createState() => _QuickNoteSettingsState();
 }
 
 class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
-  late final _shows = {
-    for (final control in QuickNoteControl.values)
-      control: widget.store.quickNoteShows(control),
-  };
   late bool _nudgeButtons = widget.store.quickNoteNudgeButtonsOn;
-
-  void _set(QuickNoteControl control, bool on) {
-    widget.store.setQuickNoteShows(control, on);
-    setState(() => _shows[control] = on);
-  }
 
   void _setNudgeButtons(bool on) {
     widget.store.quickNoteNudgeButtonsOn = on;
@@ -1384,17 +1413,6 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    Widget shows(QuickNoteControl control, IconData icon, String title) =>
-        SettingsRow(
-          words: [title],
-          child: SwitchBelow(
-            switchKey: ValueKey('quickNote-${control.name}'),
-            leading: Icon(icon),
-            title: Text(title),
-            value: _shows[control] ?? false,
-            onChanged: (on) => _set(control, on),
-          ),
-        );
     return SettingsGroup(
       heading: t.settingsQuickNote,
       headingKey: widget.headingKey,
@@ -1408,35 +1426,6 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
                 child: Text(t.settingsQuickNoteDetail),
               ),
             ),
-            shows(
-              QuickNoteControl.fileInto,
-              Icons.drive_file_move_outline,
-              t.fileInto,
-            ),
-            // The alarm clock offers a Routine or Reminder without it (#223);
-            // Frogs, Sessions and Tallies are made only in Advanced (#197).
-            if (widget.advanced)
-              shows(
-                QuickNoteControl.schedule,
-                Icons.alarm_add_outlined,
-                t.quickNoteSchedule,
-              ),
-            shows(
-              QuickNoteControl.shopping,
-              Icons.add_shopping_cart,
-              t.addToShoppingList,
-            ),
-            shows(
-              QuickNoteControl.importance,
-              Icons.priority_high,
-              t.importance,
-            ),
-            if (widget.advanced)
-              shows(
-                QuickNoteControl.formatBar,
-                Icons.format_bold,
-                t.quickNoteFormatBar,
-              ),
             SettingsRow(
               words: [t.quickNoteNudgeButtons, t.quickNoteNudgeButtonsDetail],
               child: SwitchBelow(
@@ -1452,5 +1441,163 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
         ),
       ],
     );
+  }
+}
+
+/// Code languages (obf-1037): the person's own grammars, a setting of the
+/// person synced to all of their own Devices, each with Remove, and "Add
+/// grammar…", which picks a file of any kind with the system's picker,
+/// as a Sublime syntax definition has no media type. A file the cores
+/// refuse is said in red under the button, with what is wrong, and
+/// nothing is added.
+class _GrammarSettings extends StatefulWidget {
+  final Store store;
+
+  const _GrammarSettings({required this.store});
+
+  @override
+  State<_GrammarSettings> createState() => _GrammarSettingsState();
+}
+
+class _GrammarSettingsState extends State<_GrammarSettings> {
+  late List<Grammar> _added = widget.store.grammars.added;
+
+  /// The file the last pick refused and why; null once one was added.
+  ({String file, String reason})? _refused;
+
+  var _picking = false;
+
+  Future<void> _add() async {
+    if (_picking) return;
+    final files = FileScope.of(context);
+    setState(() => _picking = true);
+    var picked = const <DeviceFile>[];
+    try {
+      picked = await files.pickFiles();
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
+    ({String file, String reason})? refused;
+    var added = false;
+    try {
+      for (final file in picked) {
+        try {
+          widget.store.addGrammar(_grammarBytes(file.path));
+          added = true;
+        } on GrammarRefused catch (e) {
+          refused ??= (file: _fileName(file), reason: e.reason);
+        } on FileSystemException catch (e) {
+          refused ??= (file: _fileName(file), reason: e.message);
+        }
+      }
+    } finally {
+      dropDeviceFiles(picked);
+    }
+    if (!mounted) return;
+    setState(() {
+      _added = widget.store.grammars.added;
+      if (refused != null) {
+        _refused = refused;
+      } else if (added) {
+        _refused = null;
+      }
+    });
+  }
+
+  void _remove(String scope) {
+    widget.store.removeGrammar(scope);
+    setState(() => _added = widget.store.grammars.added);
+  }
+
+  /// An added grammar: its name, the built-in one it replaces or else its
+  /// scope, and Remove, which removes it at once.
+  SettingsRow _grammarRow(AppLocalizations t, Grammar grammar) {
+    final detail = switch (Grammars.builtIn.byScope(grammar.scope)) {
+      final builtIn? => t.grammarInPlaceOf(builtIn.name),
+      null => grammar.scope,
+    };
+    return SettingsRow(
+      words: [t.grammarsTitle, grammar.name, detail],
+      child: ListTile(
+        key: ValueKey('grammar-${grammar.scope}'),
+        leading: const Icon(Icons.code),
+        title: Text(grammar.name),
+        subtitle: Text(detail),
+        trailing: TextButton(
+          key: ValueKey('grammar-remove-${grammar.scope}'),
+          onPressed: () => _remove(grammar.scope),
+          child: Text(t.grammarRemove),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final refused = _refused;
+    return SettingsGroup(
+      heading: t.grammarsTitle,
+      children: [
+        SettingsSection(
+          children: [
+            SettingsRow(
+              words: [t.grammarsTitle, t.grammarsHint],
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(t.grammarsHint),
+              ),
+            ),
+            for (final grammar in _added) _grammarRow(t, grammar),
+            if (FileScope.of(context).pickable)
+              SettingsRow(
+                words: [t.grammarsTitle, t.grammarAdd],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Spotlight(
+                      id: 'settings-grammar',
+                      child: ListTile(
+                        key: const ValueKey('grammarAdd'),
+                        leading: const Icon(Icons.add),
+                        title: Text(t.grammarAdd),
+                        enabled: !_picking,
+                        onTap: _add,
+                      ),
+                    ),
+                    if (refused != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: Text(
+                          t.grammarRefused(refused.file, refused.reason),
+                          key: const ValueKey('grammarRefused'),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// A picked file's name as the picker gave it, else its copy's.
+String _fileName(DeviceFile file) => file.name.isNotEmpty
+    ? file.name
+    : file.path.substring(file.path.lastIndexOf(Platform.pathSeparator) + 1);
+
+/// The first [maxGrammarBytes] and one more of the file at [path]: enough
+/// for the core to refuse a larger one, without reading a large one whole.
+List<int> _grammarBytes(String path) {
+  final file = File(path).openSync();
+  try {
+    return file.readSync(maxGrammarBytes + 1);
+  } finally {
+    file.closeSync();
   }
 }

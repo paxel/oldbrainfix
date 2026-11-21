@@ -1,0 +1,48 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: JSON
+scope: source.json
+file_extensions: [json, jsonc, json5, geojson]
+
+contexts:
+  main:
+    - match: '//.*'
+      scope: comment.line.double-slash.json
+    - match: '/\*'
+      push: block_comment
+    - match: '"(?:[^"\\\n]|\\.)*"(?=\s*:)'
+      scope: support.type.property-name.json
+    - match: '''(?:[^''\\\n]|\\.)*''(?=\s*:)'
+      scope: support.type.property-name.json
+    - match: '\b[A-Za-z_$][\w$]*(?=\s*:)'
+      scope: support.type.property-name.json
+    - match: '"'
+      push: double_string
+    - match: ''''
+      push: single_string
+    - match: '\b(?:true|false|null)\b'
+      scope: constant.language.json
+    - match: '[-+]?\b(?:0[xX][0-9a-fA-F]+|\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|Infinity|NaN)\b|[-+]?\.\d+(?:[eE][+-]?\d+)?'
+      scope: constant.numeric.json
+
+  block_comment:
+    - meta_scope: comment.block.json
+    - match: '\*/'
+      pop: true
+
+  escapes:
+    - match: '\\(?:u[0-9a-fA-F]{4}|.)'
+      scope: constant.character.escape.json
+
+  double_string:
+    - meta_scope: string.quoted.double.json
+    - match: '"|$'
+      pop: true
+    - include: escapes
+
+  single_string:
+    - meta_scope: string.quoted.single.json
+    - match: '''|$'
+      pop: true
+    - include: escapes

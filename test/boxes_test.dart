@@ -234,7 +234,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), '☐ Pay rent');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(find.text('Just captured'), findsOneWidget);
 
       final note = notes.all().single;

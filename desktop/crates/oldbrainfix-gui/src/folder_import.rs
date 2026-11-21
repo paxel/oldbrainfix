@@ -13,6 +13,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 
 use chrono::{DateTime, Utc};
 use oldbrainfix_core::Store;
+use oldbrainfix_core::import_formats::ImportFormat;
 use oldbrainfix_core::imports::{ImportFile, ImportSummary, Imports, MAX_FILE_BYTES};
 
 use crate::keep_import::{self, KeepSource};
@@ -168,8 +169,10 @@ fn read_into(dir: &Path, prefix: &str, files: &mut Vec<ImportFile>) -> std::io::
 }
 
 /// Whether the file `name` may become a Note, as the core takes it: a
-/// Markdown (`.md`, `.markdown`) or text (`.txt`) file, in any case of
-/// ASCII letters, not a hidden one. Others are not worth reading.
+/// Markdown (`.md`, `.markdown`), text (`.txt`), AsciiDoc (`.adoc`,
+/// `.asciidoc`, `.asc`), Org (`.org`), reStructuredText (`.rst`) or HTML
+/// (`.html`, `.htm`) file, in any case of ASCII letters, not a hidden one.
+/// Others are not worth reading.
 pub fn may_become_note(name: &str) -> bool {
     if name.starts_with('.') {
         return false;
@@ -178,6 +181,7 @@ pub fn may_become_note(name: &str) -> bool {
         ["md", "markdown", "txt"]
             .iter()
             .any(|known| ending.eq_ignore_ascii_case(known))
+            || ImportFormat::of_extension(&ending.to_ascii_lowercase()).is_some()
     })
 }
 

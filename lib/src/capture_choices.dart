@@ -39,11 +39,15 @@ class ScheduleChoice {
   /// The Session's part; null for a plain Routine or Reminder.
   final SessionChoice? session;
 
+  /// This person's own Heads-ups (obf-1046), minutes before the start.
+  final List<int> headsUps;
+
   const ScheduleChoice(
     this.schedule, {
     this.renag,
     this.escalation,
     this.session,
+    this.headsUps = const [],
   });
 
   /// Spawns it from the Note [noteId] in [store]; the Routine's id.
@@ -58,6 +62,7 @@ class ScheduleChoice {
         : spawnSession(store, noteId, schedule, session);
     routines.setRenag(id, renag);
     routines.setEscalation(id, escalation);
+    if (headsUps.isNotEmpty) routines.setHeadsUps(id, headsUps);
     return id;
   }
 }

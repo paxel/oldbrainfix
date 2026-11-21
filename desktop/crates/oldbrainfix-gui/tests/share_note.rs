@@ -363,10 +363,17 @@ fn a_copied_checklist_pasted_into_a_new_note_gives_the_same_boxes() -> TestResul
     app.select(Selection::All);
     let mut harness = window(app);
     copy_from_the_card(&mut harness)?;
-    // File ▸ New Note, its Paste and Save.
+    // File ▸ New Note, Ctrl+V in its empty field and Save.
     harness.state_mut().new_note();
     harness.run();
-    click(&mut harness, "Paste")?;
+    harness.event(egui::Event::Key {
+        key: egui::Key::V,
+        physical_key: None,
+        pressed: false,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    harness.run();
     harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Enter);
     harness.run();
     let pasted = notes

@@ -2,7 +2,32 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.6.1]
+## [0.7.0]
+
+### Neu
+
+- Eine Routine oder Erinnerung kann vorwarnen, bevor sie fällig ist, etwa „Zahnarzt in 20 Min.“, in der Ruhezeit ohne Ton und für jede Person eigen. ([obf-1046](https://github.com/paxel/oldbrainfix/issues/356))
+- „Heute ruhig“ im Menü der Agenda hält den Tag auf deinen Geräten ruhig: Alles bleibt sichtbar, nichts klingelt, und Unerledigtes gilt als ausgelassen. ([obf-1044](https://github.com/paxel/oldbrainfix/issues/354))
+- Eine Notiz zeigt an ihrem Ende „Verlinkt von“ mit den Notizen, deren App-Links zu ihr führen. ([obf-1035](https://github.com/paxel/oldbrainfix/issues/345))
+- Der Import nimmt auch AsciiDoc-, Org-, reStructuredText- und HTML-Dateien, jede als formatierte Notiz, ohne etwas darin auszuführen. ([obf-1038](https://github.com/paxel/oldbrainfix/issues/348))
+- Code wird nach seiner Sprache eingefärbt: ein Code-Text nach der neben „Code“ gewählten, ein Codeblock nach der in seiner ersten Zeile genannten. ([obf-1036](https://github.com/paxel/oldbrainfix/issues/346))
+- „Grammatik hinzufügen …“ in den Einstellungen färbt Code in weiteren Sprachen aus einer Sublime-Syntaxdatei, auf all deinen Geräten und nur für dich. ([obf-1037](https://github.com/paxel/oldbrainfix/issues/347))
+- Tipps erklären jede Seite beim ersten Besuch und danach Neues einmal; wer neu ist, bekommt sie statt der Hilfe-Notizen zum Schnellstart. ([obf-1043](https://github.com/paxel/oldbrainfix/issues/353))
+
+### Geändert
+
+- Auf dem Handy liegt das Suchfeld der Bereichsliste, eines Bereichs und eines Themas auf einem von der Seite abgesetzten Streifen. ([obf-1041](https://github.com/paxel/oldbrainfix/issues/351))
+- Ein „Erinnere mich …“ richtet eine Routine oder Erinnerung ein, wo bisher „Routine …“ und „Erinnerung …“ getrennt standen. ([obf-1034](https://github.com/paxel/oldbrainfix/issues/344))
+- Die Schnellnotiz zeigt nur noch den Text, drei Stupser-Knöpfe und „Mehr“, alles andere steht im Notiz-Editor und im Notiz-Dialog. ([obf-1042](https://github.com/paxel/oldbrainfix/issues/352))
+- In der Ruhezeit erscheint eine Routine oder Erinnerung ohne Ton und Vibration, außer ihre Eskalation ist an. ([obf-1045](https://github.com/paxel/oldbrainfix/issues/355))
+
+### Behoben
+
+- Auf dem Mac öffnet ein Klick auf eine Benachrichtigung das Fenster bei dem, worum es geht. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
+- Auf Android zeigt ein Tippen auf die Nachhol-Benachrichtigung die Agenda, egal welche Seite offen war. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
+- Eine Sprachaufnahme endet nicht mehr, wenn sich das Handy sperrt, und der Bildschirm bleibt während der Aufnahme an. ([obf-1040](https://github.com/paxel/oldbrainfix/issues/350))
+
+## [0.6.1] - 2026-11-19
 
 ### Neu
 

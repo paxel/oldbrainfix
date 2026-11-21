@@ -8,11 +8,21 @@ An Import takes a list of files, each a name, a modification time (none when the
 
 ## Files
 
-A file is taken by its extension, in any case of ASCII letters: `.md` and `.markdown` make a formatted Note (ADR 0033), `.txt` a plain one. Any other file is skipped, and so is a hidden one, whose name starts with a `.` (such as the `._` files macOS leaves beside others). Only the part of a name after its last `/` or `\` counts, so an app may hand over files of subfolders by their paths.
+A file is taken by its extension, in any case of ASCII letters: `.md` and `.markdown` make a formatted Note (ADR 0033), `.txt` a plain one, and the documents of other tools below a formatted one: `.adoc`, `.asciidoc` and `.asc` (AsciiDoc), `.org` (Org), `.rst` (reStructuredText), `.html` and `.htm` (HTML). Any other file is skipped, and so is a hidden one, whose name starts with a `.` (such as the `._` files macOS leaves beside others). Only the part of a name after its last `/` or `\` counts, so an app may hand over files of subfolders by their paths.
 
 The bytes are UTF-8, a byte order mark before them dropped. Bytes that are no UTF-8 are read as Windows-1252, the encoding older text files on Windows are in, which reads every byte, so a letter such as "ü" stays a letter instead of becoming a replacement character; the five bytes Windows-1252 leaves open read as Latin-1 does. A file holding a zero byte is no text file (one in UTF-16 holds them) and is skipped. Line breaks `\r\n` and `\r` become `\n`.
 
 The text is kept as written: Markdown the subset does not know, such as a task list `- [ ]`, front matter between `---` lines, a code block or an image, shows as the characters it is (ADR 0033), and a ☐, ✅ or ❌ becomes a Box as at Capture (ADR 0035). Blank lines at its start and blanks at its end go.
+
+## Documents of other tools (#348)
+
+An AsciiDoc, Org, reStructuredText or HTML file is decoded as any text file above, then read into the Markdown subset (ADR 0033) by a reader written by hand in each core (`import_formats.dart`, `import_formats.rs`), with no library: the same text makes the same Markdown, byte for byte. The rest is as for a Markdown file: its name as its first line unless the text begins with it, its date, the sizes, the Area.
+
+- **What becomes Markdown.** What the subset has: the first two levels of headings as `#` and `##` (AsciiDoc's `=` and `==`, Org's `*` and `**`, the first two styles of reStructuredText's titles met, `<h1>` and `<h2>`; Org's `#+TITLE:` a `#` too); bold, italic, strike-through, inline code and links; bulleted and numbered lists, any level below the first one level in; quotes; code blocks with their language; tables, their first row the header row. A link is one only to an address `Markdown.mayOpen` allows; any other keeps its label as text. Every line stays a line, as the subset shows every line break (ADR 0033), so a wrapped paragraph stays wrapped.
+- **What stays as written.** What the subset lacks stays as the characters it is, escaped so that it reads as itself: deeper headings, AsciiDoc's attributes, block titles, admonitions and block macros, Org's keywords, drawers, comments and underline, reStructuredText's directives, comments, fields and roles, and any line a reader does not know. HTML's marks are no text: of it the text stays, a run of blanks one space, its `<h3>` and deeper headings a line of text and an image its `alt` text.
+- **Nothing runs.** No reader opens a file or an address: an include (`include::`, `.. include::`, `#+INCLUDE:`) stays the line it is, and an image is never fetched. In HTML a `<script>`, a `<style>` and a `<template>` go with their content, to the end of the file when they are not closed, and so do comments, the doctype and every attribute but a link's `href`, an image's `alt`, a list's `start` and a code block's `class`.
+- **HTML's title.** A page's `<title>` is no part of its text; it stands as the first line under the file's name, unless the text begins with it, as the name does.
+- **Twins.** Both readers go by code points, decide only by ASCII characters, count a title's underline in code points, read only the named character references of HTML 4's Latin-1 set and a few more, the same table in both, and leave any other `&` as written. Each reads a file in a time that grows with its length alone, as a hostile file may hold a megabyte of marks on one line; they escape by the rules of `Markdown.escape` but on their own, since it parses the whole line.
 
 ## The title
 
@@ -66,7 +76,10 @@ An Import has no AI port tool (ADR 0026): it is a person's own act with the syst
 - Converting what the subset does not know, such as task lists into Boxes or front matter into a Capture Context (rejected for now: the Markdown stays as written, and nothing of it is lost).
 - Importing the notes in Keep's trash, or leaving the archived ones out (rejected: a note thrown away would come back, and an archived one, kept on purpose, would be lost).
 - Keep's labels as Topics or Areas (rejected: labels are tags; a note has many labels and a Note one place).
-- Keep's formatted text from `textContentHtml` as a formatted Note (rejected for now: the words are all in `textContent`, and an HTML reader in both cores would have to agree on every tag).
+- Keep's formatted text from `textContentHtml` as a formatted Note (rejected for now: the words are all in `textContent`, and an HTML reader in both cores would have to agree on every tag; #348 brought one for HTML files, and Keep still uses `textContent`).
+- A library for each of the four formats of #348, such as Asciidoctor, Pandoc or an HTML parser (rejected: none is in both ecosystems, each would read the same file differently in the two cores, and some run includes or fetch images).
+- Converting what the subset lacks into something near it, such as a third heading level into a second or an admonition into a quote (rejected: it would change what the document says; as written, nothing of it is lost).
+- Joining the wrapped lines of a paragraph (rejected: every other text keeps its line breaks, and the subset shows each one).
 - Keep's voice recordings as recordings of the Note (rejected for now: the ticket asks for photos; they are counted, so the person knows).
 - Leaving imported Checklists on the Agenda, as every other Checklist starts (rejected: an Import of dozens of Keep lists with open Lines would put every one of them on today's Agenda at once, much as Nudging every imported Note would).
 - Reading every `.json` of a Takeout (rejected: the sidecars of other Google products would be counted as skipped by the hundred).
@@ -76,4 +89,5 @@ An Import has no AI port tool (ADR 0026): it is a person's own act with the syst
 - Importing the same folder twice makes two Areas with the same Notes; the second one's name has " (2)" after it.
 - A file's name stands over its text as the first line when the text does not begin with it.
 - The `keep` fixture holds a small Takeout: a note with a title, labels, a photo, one found by its other name, one missing and a voice recording; a list with a checked Line; an archived note; a note in the trash, one that is no JSON, the `.html` twin, `Labels.txt` and a note of another product; both cores write its log and its photos byte for byte.
+- The `import-formats` fixture holds a folder of an AsciiDoc, an Org, a reStructuredText and an HTML document, each with parts the subset has and lacks, an include, a script and an image among them, extensions in capitals and of every kind, a Markdown file and a file of another kind; both cores read each document to the same Markdown and write its log byte for byte.
 - The `import` fixture holds a folder of every kind of file above, the Area beside one of the same name, a folder of nothing usable and a second Import; both cores write its log byte for byte.

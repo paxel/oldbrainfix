@@ -4,8 +4,7 @@
 //! writing nothing; Alt+Up and Alt+Down and Move up and Move down, in the
 //! Area menu and the right-click, move the Area shown one place, also a
 //! Shared one a Member is in; a card dropped on an Area's row still files
-//! it; and File into…, in the window and the capture popup, and Link
-//! to… list the Areas in that order.
+//! it; and File into… and Link to… list the Areas in that order.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -25,12 +24,10 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
-    AreaRole, DeviceSettings, Invite, Notes, OwnProfile, PairedDevice, PersonSettings, Places,
-    QuickNoteControl, SigningKey, Store,
+    AreaRole, Invite, Notes, OwnProfile, PairedDevice, PersonSettings, Places, SigningKey, Store,
 };
 use oldbrainfix_gui::app_links::{self, Group};
 use oldbrainfix_gui::l10n::L10n;
-use oldbrainfix_gui::popup::CapturePopup;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -461,41 +458,5 @@ fn link_to_lists_the_areas_in_the_persons_order() -> TestResult {
         places,
         ["Work", "Garden", "Household", "Household ▸ Kitchen"]
     );
-    Ok(())
-}
-
-#[test]
-fn the_capture_popups_file_into_lists_the_areas_in_the_persons_order() -> TestResult {
-    let store = store()?;
-    DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
-    let work = Places::new(&store)
-        .areas()?
-        .into_iter()
-        .find(|a| a.name == "Work")
-        .ok_or("Work")?;
-    PersonSettings::new(&store).set_area_order(&[work.id])?;
-    let popup = CapturePopup::new(Arc::new(store), "en");
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(560.0, 900.0))
-        .build_ui_state(
-            |ui, popup: &mut CapturePopup| {
-                App::install(ui.ctx());
-                popup.show(ui);
-            },
-            popup,
-        );
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Buy bread");
-    harness.run();
-    harness
-        .query_all_by_role_and_label(Role::Button, "File into…")
-        .next_back()
-        .ok_or("no File into…")?
-        .click_accesskit();
-    harness.run();
-    assert!(harness.state().page_open());
-    let top = |name: &str| harness.get_by_label(name).rect().top();
-    assert!(top("Work") < top("Garden"));
-    assert!(top("Garden") < top("Household"));
     Ok(())
 }

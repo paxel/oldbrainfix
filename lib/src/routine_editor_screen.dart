@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'calendar_platform.dart';
 import 'capture_choices.dart';
+import 'heads_up_text.dart';
 import 'iphone_words.dart';
 import 'l10n.dart';
 import 'leave_saves.dart';
@@ -17,6 +18,7 @@ import 'routine_history_screen.dart';
 import 'schedule_sentence_field.dart';
 import 'schedule_text.dart';
 import 'session_editor.dart';
+import 'spotlight.dart';
 import 'system_bars.dart';
 
 /// The Device's wall clock: what its own clock shows for an instant.
@@ -42,7 +44,7 @@ Future<bool> spawnFromNote(
       notes: notes,
       places: places,
       noteId: note.id,
-      reminder: spawn == Spawn.reminder,
+      reminder: spawn == Spawn.remind,
       // Only a plain Note becomes a Session (ADR 0039): a Session Note's
       // new Routine runs it as it is, and one of another kind runs plain.
       session:
@@ -69,7 +71,7 @@ Future<ScheduleChoice?> chooseSchedule(
       notes: notes,
       places: places,
       capture: draft,
-      reminder: spawn == Spawn.reminder,
+      reminder: spawn == Spawn.remind,
       session: spawn == Spawn.session,
     ),
   ),
@@ -114,7 +116,12 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// when ignored: its own interval or this Device's default from
 /// Settings. A folded Escalation section below it turns on the
 /// full-screen alarm after a number of ignored Re-nags (3 when first
-/// turned on). Save writes the Routine, and so does leaving by Back with
+/// turned on). Above them the Heads-ups (obf-1046) list this person's own
+/// warnings ahead of each Occurrence, each removable, and add one from a
+/// menu at the finger; an all-day schedule offers and keeps whole days
+/// only. A Member who may not change the Routine sees the rest without
+/// editing it and sets only the Heads-ups, which Save then writes alone.
+/// Save writes the Routine, and so does leaving by Back with
 /// a change that can be saved (#275); one that can't, no text, no
 /// weekday or a changed schedule that never happens, asks once whether
 /// to discard it. A saved Routine's history
@@ -225,6 +232,11 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// After how many ignored Re-nags it escalates; null when it does not.
   int? _escalation;
 
+  /// This person's own Heads-ups (obf-1046), minutes before the start, as
+  /// set here; an all-day schedule keeps only the whole days of them
+  /// ([_keptHeadsUps]), the others stay should times come back.
+  List<int> _headsUps = const [];
+
   /// A Routine in a Shared Area that only a Manager may change: shown,
   /// not edited (ADR 0013).
   late final bool _locked =
@@ -258,6 +270,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       _note = _routines.note(routine);
       _renag = routine.renag;
       _escalation = routine.escalation;
+      _headsUps = _routines.headsUps(routine.id);
       _load(routine.schedule);
     } else {
       final noteId = widget.noteId;
@@ -273,6 +286,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       if (widget.initial case final initial?) {
         _renag = initial.renag;
         _escalation = initial.escalation;
+        _headsUps = initial.headsUps;
         _load(initial.schedule);
       } else if (widget.reminder) {
         // The next full hour, today or just after midnight.
@@ -525,17 +539,28 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     _escalation ?? '',
     _text.text.trim(),
     _draft?.signature ?? '',
+    _keptHeadsUps.join(','),
   ].join('\n');
 
-  bool _changed() => !_locked && _editKey() != _asOpened;
+  /// Locked, only the Heads-ups can change.
+  bool _changed() => _editKey() != _asOpened;
+
+  /// The Heads-ups Save writes, ascending: whole days only for an all-day
+  /// schedule, which takes no others.
+  List<int> get _keptHeadsUps => [
+    for (final minutes in [..._headsUps]..sort())
+      if (_times.isNotEmpty || wholeDays(minutes)) minutes,
+  ];
 
   /// Whether leaving may save (#275): what Save takes, a new Session's
   /// pool chosen, and a schedule that still happens, unless it is the
-  /// one the page opened with, such as a past Reminder's.
+  /// one the page opened with, such as a past Reminder's. Locked, it
+  /// saves the Heads-ups alone, which always may.
   bool _leaveValid() =>
-      _canSave &&
-      (_draft?.valid ?? true) &&
-      (_next.isNotEmpty || _scheduleKey() == _scheduleAsOpened);
+      _locked ||
+      (_canSave &&
+          (_draft?.valid ?? true) &&
+          (_next.isNotEmpty || _scheduleKey() == _scheduleAsOpened));
 
   /// Keep editing: a new Session's pool shows its error.
   void _keepEditing() {
@@ -552,6 +577,14 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   }
 
   void _save() {
+    // A Member who may not change it keeps their own Heads-ups alone.
+    if (_locked) {
+      if (_routine case final routine?) {
+        _routines.setHeadsUps(routine.id, _keptHeadsUps);
+      }
+      Navigator.of(context).pop(true);
+      return;
+    }
     final schedule = _schedule;
     if (schedule == null) return;
     final draft = _draft;
@@ -566,6 +599,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           renag: _renag,
           escalation: _escalation,
           session: draft?.choice,
+          headsUps: _keptHeadsUps,
         ),
       );
       return;
@@ -589,6 +623,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     }
     _routines.setRenag(id, _renag);
     _routines.setEscalation(id, _escalation);
+    _routines.setHeadsUps(id, _keptHeadsUps);
     Navigator.of(context).pop(true);
   }
 
@@ -689,17 +724,17 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                 onPressed: _delete,
                 icon: const Icon(Icons.delete_outline),
               ),
-            if (!_locked)
-              TextButton(
-                onPressed: _canSave ? _save : null,
+            // Locked, it saves the Heads-ups alone.
+            Spotlight(
+              id: 'routine-save',
+              child: TextButton(
+                onPressed: _locked || _canSave ? _save : null,
                 child: Text(t.save),
               ),
+            ),
           ],
         ),
-        body: AbsorbPointer(
-          absorbing: _locked,
-          child: _body(context, t, locale, routine, note, once: once),
-        ),
+        body: _body(context, t, locale, routine, note, once: once),
       ),
     );
   }
@@ -712,93 +747,91 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     Note? note, {
     required bool once,
   }) {
-    return ListView(
-      padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
-      children: [
-        if (_locked)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(t.onlyManagers),
-          ),
-        if (widget.capture case final capture?)
-          EditorPanel(
-            heading: t.fromNote,
-            child: Row(
-              children: [
-                const Icon(Icons.sticky_note_2_outlined),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    capture.text.trim().isEmpty
-                        ? t.noteBeingCaptured
-                        : capture.text.trim(),
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else if (widget.noteId == null && routine == null)
-          Embossed(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _text,
-                autofocus: true,
-                maxLines: null,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: t.routineWhatHint,
-                  filled: false,
-                  border: InputBorder.none,
+    // Locked, all but the Heads-ups shows without taking a touch; the
+    // page still scrolls.
+    Widget shown(Widget child) => _locked ? AbsorbPointer(child: child) : child;
+    final schedule = <Widget>[
+      if (widget.capture case final capture?)
+        EditorPanel(
+          heading: t.fromNote,
+          child: Row(
+            children: [
+              const Icon(Icons.sticky_note_2_outlined),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  capture.text.trim().isEmpty
+                      ? t.noteBeingCaptured
+                      : capture.text.trim(),
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
+            ],
+          ),
+        )
+      else if (widget.noteId == null && routine == null)
+        Embossed(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _text,
+              autofocus: true,
+              maxLines: null,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: t.routineWhatHint,
+                filled: false,
+                border: InputBorder.none,
+              ),
             ),
-          )
-        else
-          EditorPanel(
-            heading: t.fromNote,
-            child: note == null
-                ? Text(t.noteDeleted)
-                : note.isTrashed
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        noteText(t, note),
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      Text(t.noteInTrash),
-                    ],
-                  )
-                : Material(
-                    // The ink shows on the panel, not under it.
-                    type: MaterialType.transparency,
-                    child: InkWell(
-                      onTap: _openNote,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.sticky_note_2_outlined),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              noteText(t, note),
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
+          ),
+        )
+      else
+        EditorPanel(
+          heading: t.fromNote,
+          child: note == null
+              ? Text(t.noteDeleted)
+              : note.isTrashed
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      noteText(t, note),
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    Text(t.noteInTrash),
+                  ],
+                )
+              : Material(
+                  // The ink shows on the panel, not under it.
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: _openNote,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.sticky_note_2_outlined),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            noteText(t, note),
+                            style: Theme.of(context).textTheme.bodyLarge,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-          ),
-        const SizedBox(height: 16),
-        if (_draft case final draft?)
-          SessionFields(draft: draft, onChanged: () => setState(() {})),
-        EditorPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ScheduleSentenceField(
+                ),
+        ),
+      const SizedBox(height: 16),
+      if (_draft case final draft?)
+        SessionFields(draft: draft, onChanged: () => setState(() {})),
+      EditorPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Spotlight(
+              id: 'routine-sentence',
+              child: ScheduleSentenceField(
                 schedule: _advanced
                     ? null
                     : SimpleSchedule(_simpleRepeat(), _start, _times),
@@ -810,94 +843,149 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                 now: _sentenceNow,
                 onRead: _takeSentence,
               ),
-              if (_quick.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  key: const ValueKey('quickReminders'),
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    for (final quick in _quick)
-                      ActionChip(
-                        key: ValueKey('quick-${quick.chip.name}'),
-                        label: Text(_quickLabel(t, locale, quick)),
-                        onPressed: () => _pickQuick(quick.chip),
-                      ),
+            ),
+            if (_quick.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                key: const ValueKey('quickReminders'),
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final quick in _quick)
+                    ActionChip(
+                      key: ValueKey('quick-${quick.chip.name}'),
+                      label: Text(_quickLabel(t, locale, quick)),
+                      onPressed: () => _pickQuick(quick.chip),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            ChoiceChips<bool>(
+              value: _advanced,
+              options: [
+                RadioOption(value: false, title: Text(t.scheduleSimple)),
+                RadioOption(value: true, title: Text(t.scheduleAdvanced)),
+              ],
+              onChanged: _switchMode,
+            ),
+            const SizedBox(height: 16),
+            if (_advanced) _advancedEditor(t) else ..._simpleEditor(t),
+            const SizedBox(height: 8),
+            ControlBelow(
+              padding: EdgeInsets.zero,
+              title: Text(once ? t.onDay : t.startsOn),
+              control: TextButton.icon(
+                onPressed: _pickStart,
+                icon: const Icon(Icons.event),
+                label: Text(dayText(locale, _start)),
+              ),
+            ),
+            if (!_advanced && _kind != RepeatKind.once) ..._endEditor(t),
+          ],
+        ),
+      ),
+      EditorPanel(
+        heading: t.timesHeading,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (_times.isEmpty) Chip(label: Text(t.allDay)),
+            for (final time in _times)
+              InputChip(
+                label: Text(clockText(locale, time)),
+                deleteButtonTooltipMessage: t.removeTime(
+                  clockText(locale, time),
+                ),
+                onDeleted: () => _change(
+                  () => _times = [
+                    for (final kept in _times)
+                      if (kept != time) kept,
                   ],
                 ),
-              ],
-              const SizedBox(height: 16),
-              ChoiceChips<bool>(
-                value: _advanced,
-                options: [
-                  RadioOption(value: false, title: Text(t.scheduleSimple)),
-                  RadioOption(value: true, title: Text(t.scheduleAdvanced)),
-                ],
-                onChanged: _switchMode,
               ),
-              const SizedBox(height: 16),
-              if (_advanced) _advancedEditor(t) else ..._simpleEditor(t),
-              const SizedBox(height: 8),
-              ControlBelow(
-                padding: EdgeInsets.zero,
-                title: Text(once ? t.onDay : t.startsOn),
-                control: TextButton.icon(
-                  onPressed: _pickStart,
-                  icon: const Icon(Icons.event),
-                  label: Text(dayText(locale, _start)),
-                ),
-              ),
-              if (!_advanced && _kind != RepeatKind.once) ..._endEditor(t),
-            ],
-          ),
-        ),
-        EditorPanel(
-          heading: t.timesHeading,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (_times.isEmpty) Chip(label: Text(t.allDay)),
-              for (final time in _times)
-                InputChip(
-                  label: Text(clockText(locale, time)),
-                  deleteButtonTooltipMessage: t.removeTime(
-                    clockText(locale, time),
-                  ),
-                  onDeleted: () => _change(
-                    () => _times = [
-                      for (final kept in _times)
-                        if (kept != time) kept,
-                    ],
-                  ),
-                ),
-              if (!once || _times.isEmpty)
-                ActionChip(
+            if (!once || _times.isEmpty)
+              Spotlight(
+                id: 'routine-times',
+                child: ActionChip(
                   avatar: const Icon(Icons.add),
                   label: Text(t.addTime),
                   onPressed: _addTime,
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
-        EditorPanel(
-          heading: t.nextOccurrences,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_schedule != null && _next.isEmpty) Text(t.neverDue),
-              for (final o in _next)
-                Text(
-                  '${dayText(locale, o.day)}  '
-                  '${occurrenceTime(t, locale, o)}',
-                ),
-            ],
-          ),
+      ),
+      EditorPanel(
+        heading: t.nextOccurrences,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_schedule != null && _next.isEmpty) Text(t.neverDue),
+            for (final o in _next)
+              Text(
+                '${dayText(locale, o.day)}  '
+                '${occurrenceTime(t, locale, o)}',
+              ),
+          ],
         ),
-        _renagPanel(t),
-        _escalationPanel(t),
+      ),
+    ];
+    return ListView(
+      padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+      children: [
+        if (_locked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(t.onlyManagers),
+          ),
+        for (final part in schedule) shown(part),
+        Spotlight(id: 'routine-heads-ups', child: _headsUpsPanel(t)),
+        shown(_renagPanel(t)),
+        shown(_escalationPanel(t)),
       ],
+    );
+  }
+
+  /// The Heads-ups (obf-1046): each one set, the earliest warning first,
+  /// with its ✕, and Add heads-up with those not set yet; an all-day
+  /// schedule shows and offers whole days only.
+  Widget _headsUpsPanel(AppLocalizations t) {
+    final kept = _keptHeadsUps;
+    final offered = [
+      for (final minutes in _times.isEmpty ? allDayHeadsUps : timedHeadsUps)
+        if (!kept.contains(minutes)) minutes,
+    ];
+    return EditorPanel(
+      key: const ValueKey('headsUps'),
+      heading: t.headsUpsHeading,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          for (final minutes in kept.reversed)
+            InputChip(
+              key: ValueKey('headsUp-$minutes'),
+              label: Text(headsUpBefore(t, minutes)),
+              deleteButtonTooltipMessage: t.removeHeadsUp,
+              onDeleted: () => setState(
+                () => _headsUps = [
+                  for (final m in _headsUps)
+                    if (m != minutes) m,
+                ],
+              ),
+            ),
+          if (offered.isNotEmpty)
+            _AddHeadsUp(
+              offered: offered,
+              onPicked: (minutes) =>
+                  setState(() => _headsUps = [..._headsUps, minutes]),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1196,6 +1284,62 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       helperMaxLines: 2,
       errorText: _ruleError == null ? null : t.rruleInvalid(_ruleError ?? ''),
       errorMaxLines: 3,
+    ),
+  );
+}
+
+/// Add heads-up: a menu at the finger with the Heads-ups [offered], in
+/// their order (UI laws, "menus open at the finger").
+class _AddHeadsUp extends StatefulWidget {
+  final List<int> offered;
+  final ValueChanged<int> onPicked;
+
+  const _AddHeadsUp({required this.offered, required this.onPicked});
+
+  @override
+  State<_AddHeadsUp> createState() => _AddHeadsUpState();
+}
+
+class _AddHeadsUpState extends State<_AddHeadsUp> {
+  /// Where the finger last went down on the chip.
+  Offset? _finger;
+
+  Future<void> _open() async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final box = context.findRenderObject() as RenderBox?;
+    if (overlay == null || box == null) return;
+    // Opened without a finger, as by a screen reader: at the chip.
+    final at = _finger ?? box.localToGlobal(box.size.center(Offset.zero));
+    _finger = null;
+    final t = context.t;
+    final picked = await showMenu<int>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        for (final minutes in widget.offered)
+          PopupMenuItem(
+            key: ValueKey('addHeadsUp-$minutes'),
+            value: minutes,
+            child: Text(headsUpBefore(t, minutes)),
+          ),
+      ],
+    );
+    if (!mounted || picked == null) return;
+    widget.onPicked(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (event) => _finger = event.position,
+    child: ActionChip(
+      key: const ValueKey('addHeadsUp'),
+      avatar: const Icon(Icons.add),
+      label: Text(context.t.addHeadsUp),
+      onPressed: _open,
     ),
   );
 }

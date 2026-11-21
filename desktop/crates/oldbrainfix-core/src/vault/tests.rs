@@ -457,6 +457,49 @@ fn a_rebuild_brings_back_every_note_as_it_was_under_new_ids() -> TestResult {
 }
 
 #[test]
+fn a_code_texts_language_is_a_property_and_comes_back() -> TestResult {
+    let time = clock(at(1, 8));
+    let old = device(&time, 1)?;
+    let notes = Notes::new(&old);
+    let script = notes.capture("fn main() {}\n", None, None)?;
+    notes.set_format(&script.id, text_format::CODE)?;
+    notes.set_code_language(&script.id, Some("source.rust"))?;
+    let dir = tempfile::tempdir()?;
+    let exported = export_of(&old, dir.path())?;
+    let file = walk(&exported.folder)
+        .into_iter()
+        .find(|p| p.extension().is_some_and(|e| e == "md"))
+        .ok_or("the Note's file")?;
+    let written = std::fs::read_to_string(file)?;
+    assert!(
+        written.contains("\nlanguage: \"source.rust\"\n"),
+        "{written}"
+    );
+    let new = rebuilt(&exported.folder, 2)?;
+    let back = Notes::new(&new).all()?;
+    let [note] = back.as_slice() else {
+        return Err("one Note".into());
+    };
+    assert_eq!(note.text_format, text_format::CODE);
+    assert_eq!(note.code_language.as_deref(), Some("source.rust"));
+    Ok(())
+}
+
+/// Every file under `dir`.
+fn walk(dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            out.extend(walk(&p));
+        } else {
+            out.push(p);
+        }
+    }
+    out
+}
+
+#[test]
 fn what_is_hidden_from_the_ai_stays_hidden_after_a_rebuild() -> TestResult {
     let time = clock(at(1, 8));
     let old = full(&time)?;
