@@ -917,7 +917,8 @@ fn settings_switch_simple_or_advanced_for_the_person() -> TestResult {
     harness.run();
     // Never chosen: Advanced, so nothing is hidden (#197).
     assert!(radio(&harness, "Advanced").accesskit_node().toggled() == Some(Toggled::True));
-    assert!(shows(&harness, "Format bar"));
+    // The quick note is the same in both (#352): no switch of its own.
+    assert!(!shows(&harness, "Format bar"));
     radio(&harness, "Simple").click_accesskit();
     harness.run();
     assert!(!PersonSettings::new(harness.state().store()).advanced()?);

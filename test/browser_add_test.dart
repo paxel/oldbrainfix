@@ -11,6 +11,8 @@ import 'package:oldbrainfix/src/session_form_screen.dart';
 import 'package:oldbrainfix/src/tally_form_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'open_capture.dart';
+
 Map<String, Object?> wire(Map<String, Object?> json) =>
     jsonDecode(jsonEncode(json)) as Map<String, Object?>;
 
@@ -193,9 +195,9 @@ void main() {
         await openPage(tester, page);
         await pick(tester, NewKind.note);
         await tester.enterText(find.byType(TextField), 'nees mor sauce');
-        // Leaving saves, with a Nudge where it stays Unsorted.
-        await tester.pageBack();
-        await tester.pumpAndSettle();
+        // Leaving by Back saves, with a Nudge where it stays Unsorted;
+        // the quick note has no back arrow on Android (#352).
+        await backFromCapture(tester);
         expect(only().text, 'nees mor sauce');
         expect(only().place, placeOf(page));
       });
