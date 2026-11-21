@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
@@ -315,13 +315,12 @@ void main() {
       expect(notes.all().single.recordings, hasLength(1));
     });
 
-    testWidgets('the recording goes on in the background and with the '
-        'phone locked, and shows as running back in the app (#350)', (
+    testWidgets('on Android, leaving the app or locking the phone ends the '
+        'recording and keeps it, back on the text field (#368)', (
       tester,
     ) async {
       await start(tester);
       await openVoice(tester);
-      await tester.pump(const Duration(seconds: 2));
       for (final state in [
         AppLifecycleState.inactive,
         AppLifecycleState.hidden,
@@ -329,44 +328,9 @@ void main() {
       ]) {
         tester.binding.handleAppLifecycleStateChanged(state);
       }
-      await tester.pump(const Duration(seconds: 3));
-
-      expect(voice.stops, 0);
-      expect(voice.recording, isTrue);
-
-      for (final state in [
-        AppLifecycleState.hidden,
-        AppLifecycleState.inactive,
-        AppLifecycleState.resumed,
-      ]) {
-        tester.binding.handleAppLifecycleStateChanged(state);
-      }
-      await tester.pump();
-      // Still recording, the time counted on.
-      expect(stop, findsOneWidget);
-      expect(find.text('Recording…'), findsOneWidget);
-      expect(elapsed(tester), '0:05');
-      await tap(tester, stop);
-
-      expect(voice.stops, 1);
-      final note = notes.all().single;
-      expect(note.recordings, [store.putAudio(first)]);
-    });
-
-    testWidgets("Stop on the notification ends the recording and keeps it, "
-        "as the screen's Stop does (#350)", (tester) async {
-      await start(tester);
-      await openVoice(tester);
-      for (final state in [
-        AppLifecycleState.inactive,
-        AppLifecycleState.hidden,
-        AppLifecycleState.paused,
-      ]) {
-        tester.binding.handleAppLifecycleStateChanged(state);
-      }
-      voice.askStop();
       await tester.pumpAndSettle();
 
+      // Stopped once, written at once.
       expect(voice.stops, 1);
       expect(voice.recording, isFalse);
       final captured = notes.all().single;
@@ -393,16 +357,74 @@ void main() {
       expect(voice.stops, 1);
     });
 
-    testWidgets("the notification is in the app's words", (tester) async {
+    testWidgets('on Android, leaving the app ends the editor\'s recording, '
+        'keeps it in the Note and closes its page (#368)', (tester) async {
+      final note = notes.capture('call the plumber');
       await start(tester);
-      await openVoice(tester);
+      await edit(tester, note);
+      await tap(tester, editorVoice);
+      expect(voice.recording, isTrue);
 
-      expect(voice.notice?.toMap(), {
-        'channel': 'Recording',
-        'title': 'Recording a voice note',
-        'stop': 'Stop',
-      });
-      await tap(tester, stop);
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+
+      expect(voice.stops, 1);
+      expect(voice.recording, isFalse);
+      expect(stop, findsNothing);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(notes.byId(note.id)!.recordings, [store.putAudio(first)]);
+    });
+
+    testWidgets('on the iPhone the recording goes on in the background and '
+        'with the phone locked, and shows as running back in the app (#350)', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await start(tester);
+        await openVoice(tester);
+        await tester.pump(const Duration(seconds: 2));
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pump(const Duration(seconds: 3));
+
+        expect(voice.stops, 0);
+        expect(voice.recording, isTrue);
+
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pump();
+        // Still recording, the time counted on.
+        expect(stop, findsOneWidget);
+        expect(find.text('Recording…'), findsOneWidget);
+        expect(elapsed(tester), '0:05');
+        await tap(tester, stop);
+
+        expect(voice.stops, 1);
+        final note = notes.all().single;
+        expect(note.recordings, [store.putAudio(first)]);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
 
     testWidgets('a second recording in the editor goes into the same Note', (

@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.7.1]
 
+### Geändert
+
+- Auf Android beendet das Sperren des Handys oder das Verlassen der App eine Sprachaufnahme und behält sie; der Bildschirm bleibt während der Aufnahme an. ([obf-1057](https://github.com/paxel/oldbrainfix/issues/368))
+
 ## [0.7.0] - 2026-11-21
 
 ### Neu

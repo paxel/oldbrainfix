@@ -22,9 +22,8 @@ abstract interface class VoicePlatform {
   Future<bool> request();
 
   /// Starts recording; whether it did. The screen stays on while it
-  /// runs, and locked anyway the recording goes on (#350): on Android
-  /// under a notification of [notice]'s words with a Stop.
-  Future<bool> start(RecordingNotice notice);
+  /// runs (#350).
+  Future<bool> start();
 
   /// Ends the recording; its bytes, or null when nothing usable was
   /// recorded.
@@ -43,30 +42,6 @@ abstract interface class VoicePlatform {
 
   /// A recording played to its end.
   Stream<void> get playbackEnded;
-
-  /// The recording was asked to end outside the app, by Stop on its
-  /// notification (#350); the app ends and keeps it.
-  Stream<void> get stopAsked;
-}
-
-/// The words of the notification a recording runs under on Android
-/// (#350), in the app's language: its channel, its title and its Stop.
-class RecordingNotice {
-  final String channel;
-  final String title;
-  final String stop;
-
-  const RecordingNotice({
-    required this.channel,
-    required this.title,
-    required this.stop,
-  });
-
-  Map<String, String> toMap() => {
-    'channel': channel,
-    'title': title,
-    'stop': stop,
-  };
 }
 
 /// No microphone: the default where none is handed in.
@@ -83,7 +58,7 @@ class NoVoice implements VoicePlatform {
   Future<bool> request() async => false;
 
   @override
-  Future<bool> start(RecordingNotice notice) async => false;
+  Future<bool> start() async => false;
 
   @override
   Future<Uint8List?> stop() async => null;
@@ -99,9 +74,6 @@ class NoVoice implements VoicePlatform {
 
   @override
   Stream<void> get playbackEnded => const Stream.empty();
-
-  @override
-  Stream<void> get stopAsked => const Stream.empty();
 }
 
 /// Android's own MediaRecorder and MediaPlayer behind the app's method
@@ -109,12 +81,10 @@ class NoVoice implements VoicePlatform {
 class AndroidVoice implements VoicePlatform {
   static const _channel = MethodChannel('io.github.paxel.oldbrainfix/voice');
   final _ended = StreamController<void>.broadcast();
-  final _stopAsked = StreamController<void>.broadcast();
 
   AndroidVoice() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'played') _ended.add(null);
-      if (call.method == 'stopAsked') _stopAsked.add(null);
     });
   }
 
@@ -128,7 +98,7 @@ class AndroidVoice implements VoicePlatform {
   Future<bool> request() => _ask('request');
 
   @override
-  Future<bool> start(RecordingNotice notice) => _ask('start', notice.toMap());
+  Future<bool> start() => _ask('start');
 
   @override
   Future<Uint8List?> stop() async {
@@ -152,9 +122,6 @@ class AndroidVoice implements VoicePlatform {
 
   @override
   Stream<void> get playbackEnded => _ended.stream;
-
-  @override
-  Stream<void> get stopAsked => _stopAsked.stream;
 
   static Future<bool> _ask(String method, [Object? arguments]) async {
     try {

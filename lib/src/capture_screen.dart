@@ -224,10 +224,11 @@ void announceUntranscribable(
 /// the recording; the Nudge buttons and Back end it and save; there is no
 /// hold-to-talk and no stop on silence (UI laws, "Capture"). The first
 /// time, while the microphone is not allowed yet, it explains why and
-/// asks. The screen stays on while recording, and the recording goes on
-/// with the app in the background and the phone locked (#350), until
-/// Stop here, Back, a Nudge button or Stop on its notification ends and
-/// keeps it ([VoiceRecorder]). Text typed before goes into the same Note.
+/// asks. The screen stays on while recording (#350). On the iPhone the
+/// recording goes on with the app in the background and the phone locked,
+/// until Stop here, Back or a Nudge button ends and keeps it; on Android
+/// leaving the app or locking the phone ends and keeps it too (#368)
+/// ([VoiceRecorder]). Text typed before goes into the same Note.
 class CaptureScreen extends StatefulWidget {
   final Notes notes;
   final LocationSource location;
@@ -377,7 +378,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
           _write(null);
           // What was written shows as such.
           if (mounted) setState(() {});
-          // A recording goes on in the background (#350).
+          // A recording ends there on Android, on the iPhone it goes on
+          // (#350, #368): [VoiceRecorder] sees to it.
         }
       },
     );
@@ -420,8 +422,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
   void dispose() {
     _lock?.removeListener(_lockChanged);
     _lifecycle.dispose();
-    // Closed from elsewhere while recording, as by a notification's tap:
-    // the recording ends, so the screen times out again, and is kept.
+    // Closed from elsewhere while recording: the recording ends, so the
+    // screen times out again, and is kept.
     _recorder.dispose();
     _text.removeListener(_textChanged);
     _text.dispose();
