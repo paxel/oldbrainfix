@@ -1,0 +1,242 @@
+{
+  "now": "2026-01-09T13:01:00.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Take the pills",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:01.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "Stretch",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:12.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "text": "Walk",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:23.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "text": "Dentist",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:34.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000009",
+      "text": "Call Grandma back",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:46.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000009",
+    "note:00000000000000000000000000000007",
+    "note:00000000000000000000000000000005",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000009"
+  ],
+  "trashed": [],
+  "inside": {},
+  "sections": {
+    "note:00000000000000000000000000000009": [],
+    "note:00000000000000000000000000000007": [],
+    "note:00000000000000000000000000000005": [],
+    "note:00000000000000000000000000000003": [],
+    "note:00000000000000000000000000000001": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000009": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Call Grandma back"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Dentist"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Walk"
+    },
+    "note:00000000000000000000000000000003": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Stretch"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Take the pills"
+    }
+  },
+  "search": {
+    "": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [
+      "note:00000000000000000000000000000007"
+    ],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000001"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {},
+  "conflicts": []
+}

@@ -1,0 +1,127 @@
+{
+  "areas": [
+    "Locked",
+    "Open"
+  ],
+  "closed": {
+    "areas": [
+      "Locked"
+    ],
+    "linking": [
+      [
+        11,
+        3,
+        2,
+        1
+      ],
+      [],
+      [],
+      [
+        9,
+        2
+      ],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ]
+  },
+  "linking": [
+    [
+      11,
+      7,
+      3,
+      2,
+      1
+    ],
+    [],
+    [],
+    [
+      9,
+      7,
+      2
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    []
+  ],
+  "notes": [
+    {
+      "text": "Ann",
+      "amends": [
+        {
+          "text": "Myself: [Ann]({0})",
+          "format": "markdown"
+        }
+      ]
+    },
+    {
+      "text": "Call [Ann]({0})",
+      "format": "markdown"
+    },
+    {
+      "text": "Groceries",
+      "amends": [
+        {
+          "text": "**[Ann]({0})** and [Bea]({3})",
+          "format": "markdown"
+        }
+      ]
+    },
+    {
+      "text": "| Who |\n| --- |\n| [Ann]({^0}) |",
+      "format": "markdown"
+    },
+    {
+      "text": "Plain [Ann]({0})"
+    },
+    {
+      "text": "[Ann]({0})",
+      "format": "code"
+    },
+    {
+      "text": "`[Ann]({0})` and [Ann](https://example.org)",
+      "format": "markdown"
+    },
+    {
+      "text": "Locked [Ann]({%0})",
+      "format": "markdown",
+      "area": 0
+    },
+    {
+      "text": "Gone [Ann]({0})",
+      "format": "markdown",
+      "trashed": true
+    },
+    {
+      "text": "Household",
+      "area": 1
+    },
+    {
+      "text": "Merged [Bea]({3})",
+      "format": "markdown",
+      "into": 9
+    },
+    {
+      "text": "Twice [Ann]({0}) and *[Ann]({0})*",
+      "format": "markdown",
+      "area": 1
+    },
+    {
+      "text": "Into locked [Bea]({3})",
+      "format": "markdown",
+      "into": 7
+    }
+  ]
+}

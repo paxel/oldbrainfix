@@ -4,6 +4,7 @@ import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/missed_summary_card.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
@@ -120,6 +121,20 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await start(tester);
       expect(card, findsNothing);
+    });
+
+    testWidgets('the Catch-up Notification shows it from any page '
+        '(obf-1039)', (tester) async {
+      madeAt(DateTime(2026, 10, 22, 6), 'pills', daily([at(8)]));
+      await start(tester);
+      await openDeviceSettings(tester);
+      expect(find.byType(SettingsScreen), findsOneWidget);
+
+      // Tapped while the app runs on another page.
+      alarms.tapCatchUp();
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsNothing);
+      expect(card, findsOneWidget);
     });
 
     testWidgets('checking one off marks it Done late', (tester) async {

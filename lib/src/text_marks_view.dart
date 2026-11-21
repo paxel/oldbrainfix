@@ -12,6 +12,7 @@ import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'person_screen.dart';
 import 'profile.dart';
 import 'table_screen.dart';
 import 'tick_saves.dart';
@@ -419,6 +420,79 @@ TextStyle codeStyle(ColorScheme scheme, TextStyle base) => base.copyWith(
   backgroundColor: codeTint(scheme),
 );
 
+/// The colour code's part of the kind [colour] is drawn in (obf-1036),
+/// in the light or the dark look ([brightness]); only the glyphs take
+/// it, the font, the size and the tint stay.
+Color codeColour(CodeColour colour, Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  return Color(switch (colour) {
+    CodeColour.comment => dark ? 0xFF8B949E : 0xFF6A737D,
+    CodeColour.string => dark ? 0xFFA5D6FF : 0xFF0A3069,
+    CodeColour.number ||
+    CodeColour.constant ||
+    CodeColour.attribute => dark ? 0xFF79C0FF : 0xFF0550AE,
+    CodeColour.keyword || CodeColour.operator => dark ? 0xFFFF7B72 : 0xFFCF222E,
+    CodeColour.type || CodeColour.variable => dark ? 0xFFFFA657 : 0xFF953800,
+    CodeColour.function => dark ? 0xFFD2A8FF : 0xFF8250DF,
+    CodeColour.tag => dark ? 0xFF7EE787 : 0xFF116329,
+  });
+}
+
+/// The grammars code is coloured with below [context] (obf-1037): the
+/// person's own with the built-in ones, as the store has them now; the
+/// built-in ones alone outside the app.
+Grammars codeGrammars(BuildContext context) =>
+    PersonScope.of(context)?.store.grammars ?? Grammars.builtIn;
+
+/// The coloured parts of [text] in [grammar]'s language, read once for
+/// each grammar and text of the last few: a rebuild, or a card shown
+/// again, does not read it anew. The grammar itself is the key, not its
+/// scope, so one of the person's own in a built-in one's place, or that
+/// one back after Remove, colours anew (obf-1037).
+List<CodeSpan> codeSpans(Grammar grammar, String text) {
+  final key = (grammar, text);
+  final known = _codeSpans.remove(key);
+  if (known != null) return _codeSpans[key] = known;
+  final spans = grammar.colour(text);
+  _codeSpans[key] = spans;
+  if (_codeSpans.length > 64) _codeSpans.remove(_codeSpans.keys.first);
+  return spans;
+}
+
+// Oldest first: a hit goes to the end again.
+final _codeSpans = <(Grammar, String), List<CodeSpan>>{};
+
+/// [text] from [from] to [to] as spans in [style], each coloured part of
+/// [spans] (in [text]) in its colour; null when none of them lies there,
+/// so it is drawn as without a language.
+List<InlineSpan>? colouredCode(
+  BuildContext context,
+  String text,
+  List<CodeSpan> spans,
+  int from,
+  int to,
+) {
+  final brightness = Theme.of(context).brightness;
+  final children = <InlineSpan>[];
+  var at = from;
+  for (final span in spans) {
+    final start = math.max(span.start, from);
+    final end = math.min(span.end, to);
+    if (start >= end) continue;
+    if (start > at) children.add(TextSpan(text: text.substring(at, start)));
+    children.add(
+      TextSpan(
+        text: text.substring(start, end),
+        style: TextStyle(color: codeColour(span.colour, brightness)),
+      ),
+    );
+    at = end;
+  }
+  if (children.isEmpty) return null;
+  if (to > at) children.add(TextSpan(text: text.substring(at, to)));
+  return children;
+}
+
 /// The room before a line of the kind [next] after one of [prev], in
 /// parts of the font's size: more before a heading, less after one,
 /// little between two items or two quote lines, half the size between
@@ -491,6 +565,17 @@ class TagTextController extends TextEditingController {
   set code(bool value) {
     if (value == _codeText) return;
     _codeText = value;
+    notifyListeners();
+  }
+
+  String? _language;
+
+  /// The language a Code text is coloured by (obf-1036), a grammar's
+  /// scope; without one, or one not known here, it is in one colour.
+  String? get codeLanguage => _language;
+  set codeLanguage(String? scope) {
+    if (scope == _language) return;
+    _language = scope;
     notifyListeners();
   }
 
@@ -575,16 +660,26 @@ class TagTextController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
-    if (_codeText) {
-      return super.buildTextSpan(
-        context: context,
-        style: (style ?? const TextStyle()).copyWith(fontFamily: 'monospace'),
-        withComposing: withComposing,
-      );
-    }
     final composing = withComposing && value.isComposingRangeValid
         ? value.composing
         : TextRange.empty;
+    if (_codeText) {
+      final mono = (style ?? const TextStyle()).copyWith(
+        fontFamily: 'monospace',
+      );
+      final grammar = codeGrammars(context).byScope(_language);
+      final spans = grammar == null
+          ? const <CodeSpan>[]
+          : codeSpans(grammar, text);
+      if (spans.isEmpty) {
+        return super.buildTextSpan(
+          context: context,
+          style: mono,
+          withComposing: withComposing,
+        );
+      }
+      return _colouredCode(context, mono, spans, composing);
+    }
     final runs = tagRuns(text);
     if (_markdown || runs.isNotEmpty) {
       return _formatted(context, style, composing, runs);
@@ -628,6 +723,82 @@ class TagTextController extends TextEditingController {
     );
   }
 
+  /// A Code text in [style], each part of [spans] in its colour, what is
+  /// being composed underlined.
+  TextSpan _colouredCode(
+    BuildContext context,
+    TextStyle style,
+    List<CodeSpan> spans,
+    TextRange composing,
+  ) {
+    final text = this.text;
+    final brightness = Theme.of(context).brightness;
+    final cuts = <int>{
+      0,
+      text.length,
+      for (final span in spans) ...[span.start, span.end],
+      if (composing.isValid) ...[composing.start, composing.end],
+    }.where((at) => at >= 0 && at <= text.length).toList()..sort();
+    var next = 0;
+    final children = <InlineSpan>[];
+    for (var i = 0; i + 1 < cuts.length; i++) {
+      final (from, to) = (cuts[i], cuts[i + 1]);
+      if (from >= to) continue;
+      while (next < spans.length && spans[next].end <= from) {
+        next++;
+      }
+      final colour = next < spans.length && spans[next].start <= from
+          ? codeColour(spans[next].colour, brightness)
+          : null;
+      final composed =
+          composing.isValid && composing.start <= from && to <= composing.end;
+      children.add(
+        TextSpan(
+          text: text.substring(from, to),
+          style: colour == null && !composed
+              ? null
+              : TextStyle(
+                  color: colour,
+                  decoration: composed ? TextDecoration.underline : null,
+                ),
+        ),
+      );
+    }
+    return TextSpan(style: style, children: children);
+  }
+
+  /// The colour of each code block's line of [text] whose fence names a
+  /// language of [grammars] (obf-1036), by character; null where none.
+  static List<CodeColour?> _blockColours(
+    String text,
+    List<MarkdownBlock> blocks,
+    Grammars grammars,
+  ) {
+    final colours = List<CodeColour?>.filled(text.length, null);
+    MarkdownCodeBlock? done;
+    for (final block in blocks) {
+      final code = block.code;
+      if (code == null || identical(code, done)) continue;
+      done = code;
+      final grammar = grammars.forFence(code.language);
+      if (grammar == null) continue;
+      final lines = [
+        for (var l = code.firstLine; l <= code.lastLine; l++)
+          if (!code.isFence(l)) blocks[l],
+      ];
+      if (lines.isEmpty) continue;
+      // Its lines as one piece, so what runs on over lines reads so.
+      final from = lines.first.start;
+      final to = lines.last.end;
+      for (final span in codeSpans(grammar, text.substring(from, to))) {
+        for (var i = from + span.start; i < from + span.end && i < to; i++) {
+          colours[i] = span.colour;
+        }
+      }
+    }
+    return colours;
+  }
+
   // What a character of a formatted text is, as bits.
   static const _mark = 1;
   static const _bold = 2;
@@ -644,6 +815,10 @@ class TagTextController extends TextEditingController {
   static const _id = 4096;
   static const _grid = 8192;
   static const _codeLine = 16384;
+
+  /// Above the other bits: a code block's character's [CodeColour], one
+  /// more than its index, or 0.
+  static const _colourShift = 15;
 
   /// The text formatted, character for character: each one gets the bits
   /// of what it is, and neighbours with the same bits share a span. A
@@ -694,7 +869,8 @@ class TagTextController extends TextEditingController {
       final index? when _markdown => _tablesIn(text).elementAtOrNull(index),
       _ => null,
     };
-    for (final block in _markdown ? Markdown.parse(text) : <MarkdownBlock>[]) {
+    final blocks = _markdown ? Markdown.parse(text) : <MarkdownBlock>[];
+    for (final block in blocks) {
       set(block.start, block.end, switch (block.kind) {
         MarkdownBlockKind.heading1 => _heading1,
         MarkdownBlockKind.heading2 => _heading2,
@@ -764,6 +940,14 @@ class TagTextController extends TextEditingController {
           break;
       }
       block.spans.forEach(walk);
+    }
+    // A code block's words in the colours of its fence's language.
+    final colours = _blockColours(text, blocks, codeGrammars(context));
+    for (var i = 0; i < text.length; i++) {
+      final colour = colours[i];
+      if (colour != null && bits[i] & (_codeLine | _mark) == _codeLine) {
+        bits[i] |= (colour.index + 1) << _colourShift;
+      }
     }
     final tags = _markdown ? Markdown.tags(text) : Markdown.plainTags(text);
     for (final tag in tags) {
@@ -881,6 +1065,7 @@ class TagTextController extends TextEditingController {
         : has(_heading2)
         ? size * heading2Scale
         : null;
+    final coloured = bits >> _colourShift;
     final style = TextStyle(
       fontSize: has(_code) ? (heading ?? size) * codeScale : heading,
       // A code block's lines lie together on their tint.
@@ -899,6 +1084,11 @@ class TagTextController extends TextEditingController {
       backgroundColor: has(_code) ? codeTint(scheme) : null,
       color: has(_link) || has(_tag) || has(_sign)
           ? scheme.primary
+          : coloured > 0
+          ? codeColour(
+              CodeColour.values[coloured - 1],
+              Theme.of(context).brightness,
+            )
           : has(_quote)
           ? scheme.onSurfaceVariant
           : null,
@@ -995,12 +1185,15 @@ int storedOffset(List<ShownBox> boxes, int shown) {
 /// glyph it was written with.
 ///
 /// A Code text ([TextFormats.code], #213) is drawn as written in
-/// monospace, unwrapped.
+/// monospace, unwrapped, coloured by its [language] (a grammar's scope,
+/// obf-1036) when it is one known here.
 ///
 /// A text in [TextFormats.markdown] is drawn formatted (ADR 0033), each
 /// of its lines that [start] to [end] touches: headings larger, items
 /// after a bullet or their number, quotes beside a bar, bold, italic,
-/// struck through, code in a fixed width on a light tint and links. A
+/// struck through, code in a fixed width on a light tint and links; a
+/// code block whose fence names a language known here is coloured by
+/// it (obf-1036). A
 /// link to a web or e-mail address opens with a tap ([LinkOpenScope]);
 /// any other stays text. Boxes, tags and web addresses work in it as in
 /// a plain text, except a tag in a link's label, which is part of the
@@ -1024,6 +1217,7 @@ class MarkedText extends StatefulWidget {
   final String? source;
   final BoxTicking? ticking;
   final TableEditing? tableEdit;
+  final String? language;
 
   const MarkedText(
     this.text, {
@@ -1038,6 +1232,7 @@ class MarkedText extends StatefulWidget {
     this.source,
     this.ticking,
     this.tableEdit,
+    this.language,
   }) : assert(
          boxes == null || source != null || tableEdit == null,
          'a table is changed in the text as stored, its ids in it',
@@ -1171,13 +1366,26 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final style = DefaultTextStyle.of(context).style
         .merge(widget.style)
         .copyWith(fontFamily: 'monospace');
-    final lines = Text(
-      text.substring(from, to),
-      style: style,
-      softWrap: false,
-      maxLines: widget.maxLines,
-      overflow: widget.overflow ?? TextOverflow.clip,
-    );
+    // The whole text is read, so what began before [from] reads so.
+    final grammar = codeGrammars(context).byScope(widget.language);
+    final coloured = grammar == null
+        ? null
+        : colouredCode(context, text, codeSpans(grammar, text), from, to);
+    final lines = coloured == null
+        ? Text(
+            text.substring(from, to),
+            style: style,
+            softWrap: false,
+            maxLines: widget.maxLines,
+            overflow: widget.overflow ?? TextOverflow.clip,
+          )
+        : Text.rich(
+            TextSpan(children: coloured),
+            style: style,
+            softWrap: false,
+            maxLines: widget.maxLines,
+            overflow: widget.overflow ?? TextOverflow.clip,
+          );
     if (widget.maxLines != null) return lines;
     return Container(
       key: const ValueKey('code-text'),
@@ -1231,7 +1439,10 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         if (compact) {
           if (!code.isFence(block.line)) {
             room(MarkdownBlockKind.code);
-            lines.add(_line(context, block, base, boxes, tags));
+            lines.add(
+              _colouredCodeLine(context, code, block, base) ??
+                  _line(context, block, base, boxes, tags),
+            );
           }
         } else if (!identical(code, drawn)) {
           drawn = code;
@@ -1349,15 +1560,28 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     int to,
   ) {
     final found = _foundIn;
-    final text = found.shown;
-    final content = [
-      for (var l = code.firstLine; l <= code.lastLine; l++)
-        if (found.blocks[l] case final b
-            when !code.isFence(l) && b.end >= from && b.start <= to)
-          text.substring(b.start, b.end),
-    ].join('\n');
+    final (all, starts) = _codeContent(code);
+    // The lines in [from] to [to], one after the other.
+    int? first;
+    var last = 0;
+    for (final MapEntry(key: l, value: at) in starts.entries) {
+      final b = found.blocks[l];
+      if (b.end < from || b.start > to) continue;
+      first ??= at;
+      last = at + b.end - b.start;
+    }
+    final start = first ?? 0;
+    final end = first == null ? 0 : last;
+    final grammar = codeGrammars(context).forFence(code.language);
+    final coloured = grammar == null
+        ? null
+        : colouredCode(context, all, codeSpans(grammar, all), start, end);
     final scheme = Theme.of(context).colorScheme;
     final grow = _grown(context, base.fontSize ?? 14);
+    final style = codeStyle(
+      scheme,
+      base,
+    ).copyWith(backgroundColor: Colors.transparent);
     return Container(
       key: ValueKey('code-${code.firstLine}'),
       width: double.infinity,
@@ -1367,13 +1591,57 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         borderRadius: BorderRadius.circular(4),
       ),
       // The block's tint is its ground: its words have none of their own.
-      child: Text(
-        content,
-        style: codeStyle(
-          scheme,
-          base,
-        ).copyWith(backgroundColor: Colors.transparent),
-      ),
+      child: coloured == null
+          ? Text(all.substring(start, end), style: style)
+          : Text.rich(TextSpan(children: coloured), style: style),
+    );
+  }
+
+  /// The lines of [code] but its fences as one piece, as its language
+  /// reads them, and where each of them starts in it, by its line.
+  (String, Map<int, int>) _codeContent(MarkdownCodeBlock code) {
+    final found = _foundIn;
+    final text = found.shown;
+    final starts = <int, int>{};
+    final all = StringBuffer();
+    for (var l = code.firstLine; l <= code.lastLine; l++) {
+      if (code.isFence(l)) continue;
+      if (starts.isNotEmpty) all.write('\n');
+      starts[l] = all.length;
+      final b = found.blocks[l];
+      all.write(text.substring(b.start, b.end));
+    }
+    return (all.toString(), starts);
+  }
+
+  /// A line of [code], [block], on a compact card in the colours of its
+  /// fence's language; null when it names none known here, or nothing
+  /// of the line is coloured.
+  Widget? _colouredCodeLine(
+    BuildContext context,
+    MarkdownCodeBlock code,
+    MarkdownBlock block,
+    TextStyle base,
+  ) {
+    final grammar = codeGrammars(context).forFence(code.language);
+    if (grammar == null) return null;
+    final (all, starts) = _codeContent(code);
+    final at = starts[block.line];
+    if (at == null) return null;
+    final coloured = colouredCode(
+      context,
+      all,
+      codeSpans(grammar, all),
+      at,
+      at + block.end - block.start,
+    );
+    if (coloured == null) return null;
+    return Text.rich(
+      TextSpan(children: coloured),
+      style: codeStyle(Theme.of(context).colorScheme, base),
+      strutStyle: formattedStrut(base),
+      maxLines: widget.maxLines,
+      overflow: widget.overflow,
     );
   }
 

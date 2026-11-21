@@ -147,7 +147,7 @@ void main() {
   });
 
   group('where a Session starts', () {
-    testWidgets('the Note editor\'s "+" offers Routine, Reminder, Frog and '
+    testWidgets('the Note editor\'s "+" offers Remind me…, Frog and '
         'Session; Session opens the editor the card\'s menu opens', (
       tester,
     ) async {
@@ -156,7 +156,7 @@ void main() {
       await start(tester);
       await edit(tester, id);
       await tap(tester, key('badge-add'));
-      for (final item in ['Routine', 'Reminder', 'Frog', 'Session']) {
+      for (final item in ['Remind me…', 'Frog', 'Session']) {
         expect(find.widgetWithText(PopupMenuItem<Spawn>, item), findsOneWidget);
       }
 
@@ -300,11 +300,11 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'Sport');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
       expect(find.byType(BottomSheet), findsNothing);
-      for (final item in ['Routine', 'Reminder', 'Frog']) {
+      for (final item in ['Remind me…', 'Frog']) {
         expect(find.text(item), findsOneWidget);
       }
       await tap(tester, find.text('Session'));
@@ -661,11 +661,13 @@ void main() {
       await start(tester);
       await edit(tester, made.noteId);
       await tap(tester, key('badge-add'));
-      expect(key('spawn-routine'), findsOneWidget);
+      expect(key('spawn-remind'), findsOneWidget);
       expect(key('spawn-session'), findsNothing);
-      await tap(tester, key('spawn-routine'));
+      await tap(tester, key('spawn-remind'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(key('session-pool'), findsNothing);
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
       await tap(tester, find.text('Save'));
 
       expect(sessions.ofNote(made.noteId), hasLength(2));

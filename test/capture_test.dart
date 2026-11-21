@@ -13,8 +13,7 @@ void main() {
 
     await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), 'nees mor sauce');
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
+    await saveCapture(tester);
 
     expect(find.text('nees mor sauce'), findsOneWidget);
     expect(Notes(store).all().single.text, 'nees mor sauce');
@@ -26,8 +25,7 @@ void main() {
     await tester.pumpWidget(OldBrainFixApp(store: store));
 
     await openTextCapture(tester);
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
+    await saveCapture(tester);
 
     expect(Notes(store).all(), isEmpty);
   });

@@ -361,18 +361,16 @@ void main() {
       expect(find.byType(MergeIntoScreen), findsOneWidget);
     });
 
-    testWidgets('offers Routine…, Reminder…, Frog and Session… between '
-        'File into… and Merge into…, and Routine… opens its editor (#281)', (
-      tester,
-    ) async {
+    testWidgets('offers Remind me…, Frog and Session… between '
+        'File into… and Merge into…, and Remind me… opens the editor as a '
+        'Reminder (#281, #344)', (tester) async {
       notes.capture('Call the plumber');
       await openCompact(tester);
 
       await tap(tester, key('note-menu'));
       final order = [
         key('note-file'),
-        key('note-spawn-routine'),
-        key('note-spawn-reminder'),
+        key('note-spawn-remind'),
         key('note-spawn-frog'),
         key('note-spawn-session'),
         key('note-merge'),
@@ -384,11 +382,13 @@ void main() {
           reason: 'step $i',
         );
       }
-      expect(find.text('Routine…'), findsOneWidget);
-      expect(find.text('Reminder…'), findsOneWidget);
+      expect(find.text('Remind me…'), findsOneWidget);
+      expect(find.text('Routine…'), findsNothing);
+      expect(find.text('Reminder…'), findsNothing);
       expect(find.text('Session…'), findsOneWidget);
-      await tap(tester, key('note-spawn-routine'));
+      await tap(tester, key('note-spawn-remind'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(find.text('New Reminder'), findsOneWidget);
     });
 
     testWidgets('offers no Session… on a Checklist (#281)', (tester) async {
@@ -397,14 +397,13 @@ void main() {
       await openCompact(tester);
 
       await tap(tester, key('note-menu'));
-      expect(key('note-spawn-routine'), findsOneWidget);
-      expect(key('note-spawn-reminder'), findsOneWidget);
+      expect(key('note-spawn-remind'), findsOneWidget);
       expect(key('note-spawn-frog'), findsOneWidget);
       // Only a plain Note becomes a Session (ADR 0039).
       expect(key('note-spawn-session'), findsNothing);
     });
 
-    testWidgets('offers only Routine… and Reminder… in Simple (#281)', (
+    testWidgets('offers only Remind me… in Simple (#281, #344)', (
       tester,
     ) async {
       notes.capture('Call the plumber');
@@ -412,8 +411,7 @@ void main() {
       await openCompact(tester);
 
       await tap(tester, key('note-menu'));
-      expect(key('note-spawn-routine'), findsOneWidget);
-      expect(key('note-spawn-reminder'), findsOneWidget);
+      expect(key('note-spawn-remind'), findsOneWidget);
       expect(key('note-spawn-frog'), findsNothing);
       expect(key('note-spawn-session'), findsNothing);
     });
@@ -744,7 +742,7 @@ void main() {
         tester,
         find.byTooltip('Routine, Reminder, Frog or Session').first,
       );
-      expect(find.text('Routine'), findsOneWidget);
+      expect(find.text('Remind me…'), findsOneWidget);
       expect(find.text('Session'), findsNothing);
     });
   });

@@ -223,9 +223,9 @@ fn the_text_format_badge_sets_code_and_back_never_formatted_to_plain() -> TestRe
     for kind in ["Checklist", "Tally", "Session"] {
         assert!(!radio(&harness, kind), "{kind}");
     }
-    // Nor a Session from "+", which still offers a Routine.
+    // Nor a Session from "+", which still offers Remind me… (#344).
     click(&mut harness, "Routine, Reminder, Frog or Session")?;
-    assert!(shows(&harness, "Routine"));
+    assert!(shows(&harness, "Remind me…"));
     assert!(!shows(&harness, "Session"));
     harness.key_press(egui::Key::Escape);
     harness.run();

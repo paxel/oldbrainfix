@@ -1,0 +1,397 @@
+{
+  "now": "2026-01-02T10:00:35.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [
+    {
+      "id": "area:00000000000000000000000000000001",
+      "name": "From Documents",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    }
+  ],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "# key\n-----BEGIN NOTE-----\nplain",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2024-03-01T00:00:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "# Old notes\nA line with a #hashtag and **bold**.",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2024-12-24T16:30:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "# Trip\n# Trip & tour\n# Trip *north*\n\nPack **boots** and [the map](https://example.org/?a=1&b=2), not this.\nCosts € 12 © 😀 &bogus;\n\n- Socks\n  - Wool\n- Hat\n\n3. Three\n4. Four\n\n> Quoted \\*stars\\*\n\n```sh\nls -l\n  cd ~\n```\n\n| Day | A\\|B |\n| --- | --- |\n| 1 | `x\\|y` |\n\nSmall heading\n\nA fjord\none\ntwo ~~gone~~",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2024-12-24T16:30:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "text": "# Recipes\n\n## Soup 🍲\n\nCut **onions** and *carrots*, use `salt`. See [the site](https://example.org/soup) or Notes.\n\n- one\n- two\n\n  - deep\n\n1. auto\n2. auto again\n\nExample:\n```\nprint(\"x\")\n```\n\n```python\ndef f():\n    return 1\n```\n\n.. include:: secret.rst\n.. note:: Keep warm.\n\nKüche\n-----\n\nThird level\n\\~\\~\\~\\~\\~\\~\\~\\~\\~\\~\\~\n\n| Name | Qty |\n| --- | --- |\n| Egg | 2 |\n\n:Author: Ada\nEscaped \\*star\\* and :role:\\`text\\`.",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-01-20T18:00:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "# Plain\n*kept* as written",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-02-02T00:00:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "text": "# Garden notes\n:author: Ada\n\n## Planting\nPlant **tomatoes** and *basil* in `bed 2`, see [the plan](https://example.org/garden_plan).\nWater **every**morning\nand ~~never~~ at noon, Grüße 😀.\n\n- Seeds\n  - Carrots\n1. First\n2. Second\n\n```python\nprint(\"**not bold**\")\n```\n\n> A quote with **bold**.\n\ninclude::secret.adoc\\[]\nimage::https://example.org/photo.png\\[A photo]\n\nNOTE: Keep the hose coiled.\n\n| Plant | Month |\n| --- | --- |\n| Tomato | May |\n| Basil | June |\n\n=== Deeper\n// a comment",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-04-02T07:15:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000008",
+      "text": "# week\n# Week plan\n#+AUTHOR: Ada\n# TODO Shopping :errands:\n- milk and **butter**\n- \\[ ] *fresh* bread\n  - rye\n1. first\n2. second\n## Notes\nCall `Bob` about the ~~old~~ `car`, see [the page](https://example.org/a_b) or other.\n\\*\\*\\* Deeper heading\n:PROPERTIES:\n:ID: 1234\n:END:\n```shell\necho \"hi\"\n* not a heading\n```\n> Be kind.\n\n#+INCLUDE: \"secret.org\"\n\n| Name | Age |\n| --- | --- |\n| Ann | 3 |\n\n\\# a comment\n\\_underlined\\_ line\nhttps://example.org/x_y is bare.",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-04-02T07:15:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000009",
+      "text": "# Packing\nSocks",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:01.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000009",
+    "note:00000000000000000000000000000007",
+    "note:00000000000000000000000000000008",
+    "note:00000000000000000000000000000006",
+    "note:00000000000000000000000000000005",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000004",
+    "note:00000000000000000000000000000002"
+  ],
+  "unsorted": [],
+  "trashed": [],
+  "inside": {
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000002"
+    ]
+  },
+  "sections": {
+    "note:00000000000000000000000000000009": [],
+    "note:00000000000000000000000000000007": [],
+    "note:00000000000000000000000000000008": [],
+    "note:00000000000000000000000000000006": [],
+    "note:00000000000000000000000000000005": [],
+    "note:00000000000000000000000000000003": [],
+    "note:00000000000000000000000000000004": [],
+    "note:00000000000000000000000000000002": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000009": {
+      "html": "<h1>Packing</h1>\n<p>Socks</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Packing\nSocks"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": "<h1>Garden notes</h1>\n<p>:author: Ada</p>\n<h2>Planting</h2>\n<p>Plant <strong>tomatoes</strong> and <em>basil</em> in <code>bed 2</code>, see <a href=\"https://example.org/garden_plan\">the plan</a>.<br>Water <strong>every</strong>morning<br>and <del>never</del> at noon, Grüße 😀.</p>\n<ul><li>Seeds<ul><li>Carrots</li></ul></li></ul>\n<ol><li>First</li><li>Second</li></ol>\n<pre><code class=\"language-python\">print(&quot;**not bold**&quot;)\n</code></pre>\n<blockquote>A quote with <strong>bold</strong>.</blockquote>\n<p>include::secret.adoc[]<br>image::https://example.org/photo.png[A photo]</p>\n<p>NOTE: Keep the hose coiled.</p>\n<table><thead><tr><th>Plant</th><th>Month</th></tr></thead><tbody><tr><td>Tomato</td><td>May</td></tr><tr><td>Basil</td><td>June</td></tr></tbody></table>\n<p>=== Deeper<br>// a comment</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Garden notes\n:author: Ada\n\n## Planting\nPlant **tomatoes** and *basil* in `bed 2`, see [the plan](https://example.org/garden_plan).\nWater **every**morning\nand ~~never~~ at noon, Grüße 😀.\n\n- Seeds\n  - Carrots\n1. First\n2. Second\n\n```python\nprint(\"**not bold**\")\n```\n\n> A quote with **bold**.\n\ninclude::secret.adoc\\[]\nimage::https://example.org/photo.png\\[A photo]\n\nNOTE: Keep the hose coiled.\n\n| Plant | Month |\n| --- | --- |\n| Tomato | May |\n| Basil | June |\n\n=== Deeper\n// a comment"
+    },
+    "note:00000000000000000000000000000008": {
+      "html": "<h1>week</h1>\n<h1>Week plan</h1>\n<p>#+AUTHOR: Ada</p>\n<h1>TODO Shopping :errands:</h1>\n<ul><li>milk and <strong>butter</strong></li><li>[ ] <em>fresh</em> bread<ul><li>rye</li></ul></li></ul>\n<ol><li>first</li><li>second</li></ol>\n<h2>Notes</h2>\n<p>Call <code>Bob</code> about the <del>old</del> <code>car</code>, see <a href=\"https://example.org/a_b\">the page</a> or other.<br>*** Deeper heading<br>:PROPERTIES:<br>:ID: 1234<br>:END:</p>\n<pre><code class=\"language-shell\">echo &quot;hi&quot;\n* not a heading\n</code></pre>\n<blockquote>Be kind.</blockquote>\n<p>#+INCLUDE: &quot;secret.org&quot;</p>\n<table><thead><tr><th>Name</th><th>Age</th></tr></thead><tbody><tr><td>Ann</td><td>3</td></tr></tbody></table>\n<p># a comment<br>_underlined_ line<br>https://example.org/x_y is bare.</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# week\n# Week plan\n#+AUTHOR: Ada\n# TODO Shopping :errands:\n- milk and **butter**\n- \\[ ] *fresh* bread\n  - rye\n1. first\n2. second\n## Notes\nCall `Bob` about the ~~old~~ `car`, see [the page](https://example.org/a_b) or other.\n\\*\\*\\* Deeper heading\n:PROPERTIES:\n:ID: 1234\n:END:\n```shell\necho \"hi\"\n* not a heading\n```\n> Be kind.\n\n#+INCLUDE: \"secret.org\"\n\n| Name | Age |\n| --- | --- |\n| Ann | 3 |\n\n\\# a comment\n\\_underlined\\_ line\nhttps://example.org/x_y is bare."
+    },
+    "note:00000000000000000000000000000006": {
+      "html": "<h1>Plain</h1>\n<p><em>kept</em> as written</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Plain\n*kept* as written"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": "<h1>Recipes</h1>\n<h2>Soup 🍲</h2>\n<p>Cut <strong>onions</strong> and <em>carrots</em>, use <code>salt</code>. See <a href=\"https://example.org/soup\">the site</a> or Notes.</p>\n<ul><li>one</li><li>two</li></ul>\n<ul><li>deep</li></ul>\n<ol><li>auto</li><li>auto again</li></ol>\n<p>Example:</p>\n<pre><code>print(&quot;x&quot;)\n</code></pre>\n<pre><code class=\"language-python\">def f():\n    return 1\n</code></pre>\n<p>.. include:: secret.rst<br>.. note:: Keep warm.</p>\n<p>Küche<br>-----</p>\n<p>Third level<br>~~~~~~~~~~~</p>\n<table><thead><tr><th>Name</th><th>Qty</th></tr></thead><tbody><tr><td>Egg</td><td>2</td></tr></tbody></table>\n<p>:Author: Ada<br>Escaped *star* and :role:`text`.</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Recipes\n\n## Soup 🍲\n\nCut **onions** and *carrots*, use `salt`. See [the site](https://example.org/soup) or Notes.\n\n- one\n- two\n\n  - deep\n\n1. auto\n2. auto again\n\nExample:\n```\nprint(\"x\")\n```\n\n```python\ndef f():\n    return 1\n```\n\n.. include:: secret.rst\n.. note:: Keep warm.\n\nKüche\n-----\n\nThird level\n\\~\\~\\~\\~\\~\\~\\~\\~\\~\\~\\~\n\n| Name | Qty |\n| --- | --- |\n| Egg | 2 |\n\n:Author: Ada\nEscaped \\*star\\* and :role:\\`text\\`."
+    },
+    "note:00000000000000000000000000000003": {
+      "html": "<h1>Old notes</h1>\n<p>A line with a #hashtag and <strong>bold</strong>.</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Old notes\nA line with a #hashtag and **bold**."
+    },
+    "note:00000000000000000000000000000004": {
+      "html": "<h1>Trip</h1>\n<h1>Trip &amp; tour</h1>\n<h1>Trip <em>north</em></h1>\n<p>Pack <strong>boots</strong> and <a href=\"https://example.org/?a=1&amp;b=2\">the map</a>, not this.<br>Costs € 12 © 😀 &amp;bogus;</p>\n<ul><li>Socks<ul><li>Wool</li></ul></li><li>Hat</li></ul>\n<ol start=\"3\"><li>Three</li><li>Four</li></ol>\n<blockquote>Quoted *stars*</blockquote>\n<pre><code class=\"language-sh\">ls -l\n  cd ~\n</code></pre>\n<table><thead><tr><th>Day</th><th>A|B</th></tr></thead><tbody><tr><td>1</td><td><code>x|y</code></td></tr></tbody></table>\n<p>Small heading</p>\n<p>A fjord<br>one<br>two <del>gone</del></p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Trip\n# Trip & tour\n# Trip *north*\n\nPack **boots** and [the map](https://example.org/?a=1&b=2), not this.\nCosts € 12 © 😀 &bogus;\n\n- Socks\n  - Wool\n- Hat\n\n3. Three\n4. Four\n\n> Quoted \\*stars\\*\n\n```sh\nls -l\n  cd ~\n```\n\n| Day | A\\|B |\n| --- | --- |\n| 1 | `x\\|y` |\n\nSmall heading\n\nA fjord\none\ntwo ~~gone~~"
+    },
+    "note:00000000000000000000000000000002": {
+      "html": "<h1>key</h1>\n<p>-----BEGIN NOTE-----<br>plain</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# key\n-----BEGIN NOTE-----\nplain"
+    }
+  },
+  "search": {
+    "": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000002"
+    ],
+    "sauce": [],
+    "MILK": [
+      "note:00000000000000000000000000000008"
+    ],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000002"
+    ],
+    "heading": [
+      "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000004"
+    ],
+    "format": [],
+    "**": [
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000008"
+    ],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000002"
+    ]
+  },
+  "conflicts": []
+}

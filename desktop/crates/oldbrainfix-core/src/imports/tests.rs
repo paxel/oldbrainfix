@@ -741,3 +741,66 @@ fn only_formats_known_here_are_taken() {
             .is_err()
     );
 }
+
+#[test]
+fn documents_of_other_tools_become_formatted_notes_beside_markdown_and_text() -> Result<()> {
+    let store = store();
+    let summary = Imports::new(&store).folder(
+        "From Notes",
+        &[
+            file("Garden.adoc", "= Garden\n*Water* daily.", Some(may())),
+            file("week.ORG", "* Monday\n- call", Some(may())),
+            file("Soup.rst", "Cut **onions**.", Some(may())),
+            file(
+                "page.htm",
+                "<title>Trip</title><h1>Trip</h1><p>Pack</p>",
+                Some(may()),
+            ),
+            file("Plain.txt", "some text", Some(may())),
+            file("Marked.md", "# Marked", Some(may())),
+            file("slides.pdf", "%PDF", Some(may())),
+            file(".hidden.org", "* hidden", Some(may())),
+        ],
+    )?;
+    assert_eq!((summary.notes, summary.not_text), (6, 2));
+    let notes = inside(&store, &summary)?;
+    let mut texts: Vec<_> = notes
+        .iter()
+        .map(|n| (n.text.as_str(), n.text_format.as_str()))
+        .collect();
+    texts.sort();
+    let mut expected = vec![
+        ("# Garden\n**Water** daily.", MARKDOWN),
+        ("# week\n# Monday\n- call", MARKDOWN),
+        ("# Soup\nCut **onions**.", MARKDOWN),
+        ("# page\n# Trip\n\nPack", MARKDOWN),
+        ("Plain\nsome text", PLAIN),
+        ("# Marked", MARKDOWN),
+    ];
+    expected.sort();
+    assert_eq!(texts, expected);
+    assert!(notes.iter().all(|n| n.captured == may()));
+    Ok(())
+}
+
+#[test]
+fn an_import_reads_no_file_an_include_names() -> Result<()> {
+    let store = store();
+    let summary = Imports::new(&store).folder(
+        "From Notes",
+        &[
+            file("Main.adoc", "include::Secret.txt[]", Some(may())),
+            file("Main.rst", ".. include:: Secret.txt", Some(may())),
+            file("Main.org", "#+INCLUDE: \"Secret.txt\"", Some(may())),
+            file("Secret.txt", "the secret", Some(may())),
+        ],
+    )?;
+    let notes = inside(&store, &summary)?;
+    let secret: Vec<_> = notes
+        .iter()
+        .map(|n| n.text.as_str())
+        .filter(|t| t.contains("the secret"))
+        .collect();
+    assert_eq!(secret, ["Secret\nthe secret"]);
+    Ok(())
+}

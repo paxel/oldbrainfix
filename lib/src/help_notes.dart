@@ -218,8 +218,10 @@ Map<String, Map<String, String>> parseWhatsNew(String json) => {
 };
 
 /// Makes the help Notes due on this Device (#180) in [t]'s language,
-/// running [version]; [fresh] right after the first start. Called once
-/// the own Profile exists.
+/// running [version]: the What's new of each version passed, none when
+/// [fresh], right after the first start. Called once the own Profile
+/// exists. Quick start and What the icons mean are made no more
+/// (obf-1043, ADR 0055); their words and pictures above go into no Note.
 Future<List<String>> makeHelpNotes(
   Store store,
   HelpSource source,
@@ -231,10 +233,6 @@ Future<List<String>> makeHelpNotes(
   if (store.localSetting(HelpNotes.versionSetting) == version) return const [];
   final language = t.localeName;
   final whatsNew = await source.whatsNew();
-  final pictures = [
-    for (final group in helpIconGroups)
-      await source.picture(group.asset(language)),
-  ];
   return HelpNotes(store).makeDue(
     version: version,
     fresh: fresh,
@@ -242,11 +240,6 @@ Future<List<String>> makeHelpNotes(
     whatsNew: whatsNew,
     texts: HelpTexts(
       areaName: t.helpAreaName,
-      quickStartTitle: t.helpQuickStartTitle,
-      quickStartLines: quickStartLines(t),
-      quickStartDescription: quickStartDescription(t),
-      iconsText: helpIconsText(t),
-      iconPictures: pictures,
       whatsNewTitle: (v) => t.helpWhatsNewTitle(v),
     ),
   );

@@ -181,7 +181,7 @@ void main() {
       expect(voice.starts, 1);
       expect(fanEntry('text'), findsNothing);
       await tap(tester, find.byKey(const ValueKey('stopRecording')));
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expectFanOpen(false);
       expect(find.byType(AgendaScreen), findsOneWidget);
     });
@@ -200,7 +200,7 @@ void main() {
       expect(photos.picks, 0);
 
       await tester.enterText(find.byType(TextField), 'call the vet');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.text, 'call the vet');
     });
 
@@ -245,7 +245,7 @@ void main() {
       expect(notes.all().single.photos, hasLength(2));
 
       await tester.enterText(find.byType(TextField), 'the old flat');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.text, 'the old flat');
     });
 
@@ -259,7 +259,7 @@ void main() {
       expect(photos.picks, 1);
       expect(find.byType(CaptureScreen), findsOneWidget);
       expect(notes.all(), isEmpty);
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all(), isEmpty);
     });
 
@@ -280,7 +280,7 @@ void main() {
       // Like typed text, it is written on leaving.
       expect(notes.all(), isEmpty);
 
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.text, 'call the vet');
       expect(notes.all().single.photos, isEmpty);
     });
@@ -308,7 +308,7 @@ void main() {
       await start(tester);
       await tap(tester, plus);
       await tap(tester, fanEntry('paste'));
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
 
       expect(notes.all().single.textFormat, TextFormats.markdown);
     });
@@ -328,7 +328,7 @@ void main() {
       await tester.enterText(find.byType(TextField), 'call');
       await tester.pump();
       expect(find.text(en.pasteEmpty), findsNothing);
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.text, 'call');
     });
   });
@@ -354,7 +354,7 @@ void main() {
       expect(photos.pastes, 0);
 
       await tester.enterText(find.byType(TextField), 'call the vet');
-      await tap(tester, find.text('Save'));
+      await saveCapture(tester);
       expect(notes.all().single.text, 'call the vet');
       expect(find.byType(AgendaScreen), findsOneWidget);
       // A tap still fans out.

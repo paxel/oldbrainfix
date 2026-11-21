@@ -198,21 +198,24 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
     });
 
-    testWidgets('"+" offers Routine, Reminder, Frog and Session at the '
+    testWidgets('"+" offers Remind me…, Frog and Session at the '
         'finger; a Routine shows as a badge with its schedule, which opens '
-        'its editor', (tester) async {
+        'its editor (#344)', (tester) async {
       final id = notes.capture('dentist').id;
       await edit(tester, id);
       await tap(tester, key('badge-add'));
       expect(find.byType(BottomSheet), findsNothing);
-      for (final spawn in ['routine', 'reminder', 'frog', 'session']) {
+      for (final spawn in ['remind', 'frog', 'session']) {
         expect(key('spawn-$spawn'), findsOneWidget, reason: spawn);
       }
-      for (final words in ['Routine', 'Reminder', 'Frog', 'Session']) {
+      for (final words in ['Remind me…', 'Frog', 'Session']) {
         expect(find.text(words), findsOneWidget, reason: words);
       }
-      await tap(tester, key('spawn-routine'));
+      await tap(tester, key('spawn-remind'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      // It starts as a Reminder; Every … makes it a Routine.
+      await tester.ensureVisible(find.text('Every …'));
+      await tap(tester, find.text('Every …'));
       await tap(tester, find.text('Save'));
 
       final routine = Routines(store).ofNote(id).single;
@@ -402,7 +405,7 @@ void main() {
     ];
 
     testWidgets('in Simple a plain Note offers no Tally nor Session, and '
-        '"+" only Routine and Reminder', (tester) async {
+        '"+" only Remind me…', (tester) async {
       final id = notes.capture('Trip\nPassport').id;
       store.advanced = false;
       await edit(tester, id);
@@ -411,8 +414,7 @@ void main() {
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();
       await tap(tester, key('badge-add'));
-      expect(key('spawn-routine'), findsOneWidget);
-      expect(key('spawn-reminder'), findsOneWidget);
+      expect(key('spawn-remind'), findsOneWidget);
       expect(key('spawn-frog'), findsNothing);
       expect(key('spawn-session'), findsNothing);
     });
@@ -602,7 +604,7 @@ void main() {
     expect(find.bySemanticsLabel('Art: Checkliste'), findsOneWidget);
     semantics.dispose();
     await tap(tester, key('badge-add'));
-    for (final words in ['Routine', 'Erinnerung', 'Frosch', 'Einheit']) {
+    for (final words in ['Erinnere mich …', 'Frosch', 'Einheit']) {
       expect(find.text(words), findsOneWidget, reason: words);
     }
     expect(tester.takeException(), isNull);

@@ -914,17 +914,11 @@ abstract class AppLocalizations {
   /// **'Reminder'**
   String get reminder;
 
-  /// Entry in a compact Note card's ⋮ menu that opens the editor of a new Routine for the Note.
+  /// The one entry, in a Note card's menus, the Note editor's "+", the quick note's alarm clock and the desktop's Note menu, that opens the editor of a new Routine or Reminder for the Note, starting as a Reminder (once).
   ///
   /// In en, this message translates to:
-  /// **'Routine…'**
-  String get spawnRoutine;
-
-  /// Entry in a compact Note card's ⋮ menu that opens the editor of a new Reminder for the Note.
-  ///
-  /// In en, this message translates to:
-  /// **'Reminder…'**
-  String get spawnReminder;
+  /// **'Remind me…'**
+  String get remindMe;
 
   /// Entry in a compact Note card's ⋮ menu, in Advanced, that opens the editor of a new Session run from the Note.
   ///
@@ -1610,6 +1604,114 @@ abstract class AppLocalizations {
   /// **'Escalated alarms'**
   String get escalatedChannel;
 
+  /// No description provided for @quietChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Routines and Reminders in the Quiet Hours'**
+  String get quietChannel;
+
+  /// The Agenda's menu entry that makes today a quiet day: everything shows, nothing notifies (obf-1044).
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet today'**
+  String get quietToday;
+
+  /// The line at the top of the Agenda while today is a quiet day (obf-1044).
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet day until midnight'**
+  String get quietDayLine;
+
+  /// The button on the quiet day's line that ends it now (obf-1044).
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get quietDayEnd;
+
+  /// The Android notification channel of the Heads-ups (obf-1046).
+  ///
+  /// In en, this message translates to:
+  /// **'Heads-ups'**
+  String get headsUpChannel;
+
+  /// No description provided for @headsUpsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Heads-ups'**
+  String get headsUpsHeading;
+
+  /// No description provided for @addHeadsUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Add heads-up'**
+  String get addHeadsUp;
+
+  /// No description provided for @removeHeadsUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove heads-up'**
+  String get removeHeadsUp;
+
+  /// No description provided for @headsUpMinutesBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min before'**
+  String headsUpMinutesBefore(int minutes);
+
+  /// No description provided for @headsUpHoursBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h before'**
+  String headsUpHoursBefore(int hours);
+
+  /// No description provided for @headsUpHoursMinutesBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h {minutes} min before'**
+  String headsUpHoursMinutesBefore(int hours, int minutes);
+
+  /// No description provided for @headsUpDaysBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{1 day before} other{{days} days before}}'**
+  String headsUpDaysBefore(int days);
+
+  /// No description provided for @headsUpWeeksBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{1 week before} other{{weeks} weeks before}}'**
+  String headsUpWeeksBefore(int weeks);
+
+  /// No description provided for @headsUpInMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'in {minutes} min'**
+  String headsUpInMinutes(int minutes);
+
+  /// No description provided for @headsUpInHours.
+  ///
+  /// In en, this message translates to:
+  /// **'in {hours} h'**
+  String headsUpInHours(int hours);
+
+  /// No description provided for @headsUpInHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'in {hours} h {minutes} min'**
+  String headsUpInHoursMinutes(int hours, int minutes);
+
+  /// No description provided for @headsUpInDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{in 1 day} other{in {days} days}}'**
+  String headsUpInDays(int days);
+
+  /// No description provided for @headsUpInWeeks.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{in 1 week} other{in {weeks} weeks}}'**
+  String headsUpInWeeks(int weeks);
+
   /// No description provided for @escalationHeading.
   ///
   /// In en, this message translates to:
@@ -1721,7 +1823,7 @@ abstract class AppLocalizations {
   /// No description provided for @nudgeSettingsExplain.
   ///
   /// In en, this message translates to:
-  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.'**
+  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders show on time but without sound, unless Escalation is on for them; only an all-day one waits until they end.'**
   String get nudgeSettingsExplain;
 
   /// No description provided for @nudgeRepeat.
@@ -1910,11 +2012,23 @@ abstract class AppLocalizations {
   /// **'Recording…'**
   String get recording;
 
-  /// The big button that ends a voice recording on the capture screen; the screen stays.
+  /// The big button that ends a voice recording on the capture screen; the screen stays. Also the button on the Android notification a recording runs under (#350).
   ///
   /// In en, this message translates to:
   /// **'Stop'**
   String get stopRecording;
+
+  /// The title of the Android notification a voice recording runs under while the phone is locked (#350); a tap opens the app, its Stop ends the recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording a voice note'**
+  String get recordingNotice;
+
+  /// The name of the Android notification channel of a voice recording running (#350), shown in Android's notification settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get recordingChannel;
 
   /// No description provided for @voiceRecording.
   ///
@@ -2669,7 +2783,7 @@ abstract class AppLocalizations {
   /// No description provided for @allDayFromDetail.
   ///
   /// In en, this message translates to:
-  /// **'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.'**
+  /// **'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win: it waits until they end, and in them it Re-nags without sound unless Escalation is on.'**
   String get allDayFromDetail;
 
   /// No description provided for @alarmSound.
@@ -7958,6 +8072,12 @@ abstract class AppLocalizations {
   /// **'Not available here'**
   String get linkNotAvailable;
 
+  /// Heading of the part at a Note's end listing the Notes whose text or Sections hold an app link to it, one row per Note by its first line (obf-1035).
+  ///
+  /// In en, this message translates to:
+  /// **'Linked from'**
+  String get linkedFrom;
+
   /// Title of the one question before a file link opens (#261).
   ///
   /// In en, this message translates to:
@@ -8219,7 +8339,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
+  /// **'The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -8369,7 +8489,7 @@ abstract class AppLocalizations {
   /// Subtitle of 'importFolder'.
   ///
   /// In en, this message translates to:
-  /// **'Each Markdown or text file in it becomes a Note in a new Area, dated when the file was last changed.'**
+  /// **'Each Markdown, text, AsciiDoc, Org, reStructuredText or HTML file in it becomes a Note in a new Area, dated when the file was last changed.'**
   String get importFolderDetail;
 
   /// Subtitle of 'importFolder' while the picked folder's files are read and imported.
@@ -8411,7 +8531,7 @@ abstract class AppLocalizations {
   /// Announced when an Import found nothing to make Notes of; the tap opens the dialog with the cause and the fix. Shared with the desktop.
   ///
   /// In en, this message translates to:
-  /// **'No Markdown or text file found.'**
+  /// **'No file found to import.'**
   String get importNothing;
 
   /// Title of the dialog behind 'importNothing'. Shared with the desktop.
@@ -8423,7 +8543,7 @@ abstract class AppLocalizations {
   /// The cause in the dialog behind 'importNothing'. Shared with the desktop.
   ///
   /// In en, this message translates to:
-  /// **'The folder and its folders hold no Markdown file (.md, .markdown) or text file (.txt) that could be taken; other files and files that are too large are skipped.'**
+  /// **'The folder and its folders hold no Markdown file (.md, .markdown), text file (.txt), AsciiDoc file (.adoc, .asciidoc, .asc), Org file (.org), reStructuredText file (.rst) or HTML file (.html, .htm) that could be taken; other files and files that are too large are skipped.'**
   String get importNothingCause;
 
   /// The fix in the dialog behind 'importNothing'. Shared with the desktop.
@@ -8435,7 +8555,7 @@ abstract class AppLocalizations {
   /// The details in the dialog behind 'importNothing': the folder and the files skipped. Shared with the desktop.
   ///
   /// In en, this message translates to:
-  /// **'Folder: {folder}\nNot Markdown or text: {notText}\nToo large: {tooLarge}'**
+  /// **'Folder: {folder}\nOther files: {notText}\nToo large: {tooLarge}'**
   String importSkippedDetails(String folder, int notText, int tooLarge);
 
   /// Announced when the picked folder or one of its files could not be read; the tap opens the dialog with the cause and the fix. Shared with the desktop.
@@ -8714,6 +8834,18 @@ abstract class AppLocalizations {
   /// **'Keep as code'**
   String get keepAsCode;
 
+  /// The heading of the language choice in the text format badge's dialog while Code is picked (obf-1036): the language a Code text is coloured by.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get codeLanguage;
+
+  /// The choice of no language for a Code text (obf-1036): it shows in one colour.
+  ///
+  /// In en, this message translates to:
+  /// **'No language'**
+  String get codeLanguageNone;
+
   /// Line under the title of a Note's History page (#193).
   ///
   /// In en, this message translates to:
@@ -8921,13 +9053,13 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStart3.
   ///
   /// In en, this message translates to:
-  /// **'Tap + and Text, type a task, tap the alarm clock, then Reminder; set its time and tap Save twice.'**
+  /// **'Type a task in +, tap More, then + and Remind me…; set its time and tap Save.'**
   String get helpQuickStart3;
 
   /// No description provided for @helpQuickStart4.
   ///
   /// In en, this message translates to:
-  /// **'Tap + and Text, type a habit, tap the alarm clock, then Routine; choose when it repeats and tap Save twice.'**
+  /// **'Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.'**
   String get helpQuickStart4;
 
   /// No description provided for @helpQuickStart5.
@@ -8975,13 +9107,13 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStartDesktop3.
   ///
   /// In en, this message translates to:
-  /// **'Reminder: in the quick note, click the alarm clock, then Reminder; set its time, click Save, then Ctrl+Enter.'**
+  /// **'Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.'**
   String get helpQuickStartDesktop3;
 
   /// No description provided for @helpQuickStartDesktop4.
   ///
   /// In en, this message translates to:
-  /// **'Routine: the same, with Routine.'**
+  /// **'Routine: the same, then Every … and when it repeats.'**
   String get helpQuickStartDesktop4;
 
   /// No description provided for @helpQuickStartDesktop5.
@@ -10626,6 +10758,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open in another app'**
   String get openInOtherApp;
+
+  /// The heading of the Settings section of the person's own grammars (obf-1037): files that colour code in more languages.
+  ///
+  /// In en, this message translates to:
+  /// **'Code languages'**
+  String get grammarsTitle;
+
+  /// The line under the heading of the Settings section of the person's own grammars (obf-1037).
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Sublime syntax file (.sublime-syntax) to colour code in another language. It colours code on all your Devices, only for you.'**
+  String get grammarsHint;
+
+  /// The button in Settings ▸ Code languages (obf-1037) that picks a grammar file with the system's picker and adds it.
+  ///
+  /// In en, this message translates to:
+  /// **'Add grammar…'**
+  String get grammarAdd;
+
+  /// The line under an added grammar in Settings ▸ Code languages (obf-1037) whose scope is that of a built-in one, which it replaces until it is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces the built-in grammar for {name}'**
+  String grammarInPlaceOf(String name);
+
+  /// The button beside an added grammar in Settings ▸ Code languages (obf-1037): the grammar is gone from all of the person's Devices, a built-in one of its language colours again.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get grammarRemove;
+
+  /// The red line under Add grammar… in Settings ▸ Code languages (obf-1037) when the picked file is refused; nothing was added. The reason is the core's own, in English.
+  ///
+  /// In en, this message translates to:
+  /// **'{file} was not added: {reason}'**
+  String grammarRefused(String file, String reason);
+
+  /// The button on a Spotlight's card (obf-1043) that shows the screen's next tip. CONTEXT.md, Spotlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get spotNext;
+
+  /// The button on a Spotlight's card (obf-1043) that ends the screen's tour; its other tips count as seen.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get spotSkip;
+
+  /// The button on the last Spotlight of a screen's tour (obf-1043), in place of Next.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get spotDone;
+
+  /// The Settings row (obf-1043) that brings back every Spotlight on this Device: each screen explains itself again on its next visit.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tips again'**
+  String get settingsShowTips;
+
+  /// Said once Show tips again (obf-1043) was used, on this Device only.
+  ///
+  /// In en, this message translates to:
+  /// **'Each screen shows its tips again.'**
+  String get settingsShowTipsDone;
+
+  /// A Spotlight (obf-1043) on the Agenda's +: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'+ captures a Note; hold it to start typing at once.'**
+  String get spotAgendaPlus;
+
+  /// A Spotlight (obf-1043) on the Agenda's Today heading: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Today lists what is due; tick each one off once it is done.'**
+  String get spotAgendaToday;
+
+  /// A Spotlight (obf-1043) on the Agenda's Unsorted count: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes not filed yet wait here as Unsorted, to be sorted later.'**
+  String get spotAgendaUnsorted;
+
+  /// A Spotlight (obf-1043) on the Agenda's folder: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder opens your Areas and Topics, where filed Notes are.'**
+  String get spotAgendaBrowse;
+
+  /// A Spotlight (obf-1043) on Quiet today in the Agenda's bar or its ⋮ menu (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet today: nothing rings until midnight, and everything still shows.'**
+  String get spotAgendaQuiet;
+
+  /// A Spotlight (obf-1043) on the Agenda's Profile picture: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Your picture opens your Profile, with Settings, Sync and Backups.'**
+  String get spotAgendaProfile;
+
+  /// A Spotlight (obf-1043) on the quick note's three Nudge buttons: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Each button saves the Note, and a Nudge reminds you to sort it then.'**
+  String get spotCaptureNudge;
+
+  /// A Spotlight (obf-1043) on the quick note's More (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'More saves the Note and opens it in the full editor.'**
+  String get spotCaptureMore;
+
+  /// A Spotlight (obf-1043) on the Note editor's kind badge: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'The kind makes this Note a Checklist, a Shopping List and more.'**
+  String get spotEditorKind;
+
+  /// A Spotlight (obf-1043) on the Note editor's Area and Topic badge: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Here you file the Note into an Area or a Topic.'**
+  String get spotEditorPlace;
+
+  /// A Spotlight (obf-1043) on the Note editor's + badge, which holds Remind me… (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'In +, Remind me… sets up a Reminder or a Routine for this Note.'**
+  String get spotEditorRemind;
+
+  /// A Spotlight (obf-1043) on the text format badge of a Code text, where its language is picked (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Here you also pick the language that colours this Code text.'**
+  String get spotEditorCodeLanguage;
+
+  /// A Spotlight (obf-1043) on Linked from at a Note's end (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked from lists the Notes whose links lead to this one.'**
+  String get spotEditorLinkedFrom;
+
+  /// A Spotlight (obf-1043) on the search field of an Area or a Topic: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Search finds the Notes filed here.'**
+  String get spotAreaSearch;
+
+  /// A Spotlight (obf-1043) on the + of an Area or a Topic: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'+ makes a new Note or list, filed right here.'**
+  String get spotAreaAdd;
+
+  /// A Spotlight (obf-1043) on the compact view button of a list of Notes: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'This switches the cards between the compact and the detailed view.'**
+  String get spotCardsView;
+
+  /// A Spotlight (obf-1043) on the first card on the Unsorted list: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort each Note: file it into an Area, merge it or set a Reminder.'**
+  String get spotUnsortedCard;
+
+  /// A Spotlight (obf-1043) on the Routine editor's schedule sentence: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Type when it is due, such as “every Monday at 08:00”.'**
+  String get spotRoutineSentence;
+
+  /// A Spotlight (obf-1043) on the Routine editor's Add time: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a time of day; without one it is due all day.'**
+  String get spotRoutineTimes;
+
+  /// A Spotlight (obf-1043) on the Routine editor's Add heads-up (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'A heads-up tells you ahead of time, such as 20 min before.'**
+  String get spotRoutineHeadsUps;
+
+  /// A Spotlight (obf-1043) on the Routine editor's Save: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Save keeps the schedule; going back saves it too.'**
+  String get spotRoutineSave;
+
+  /// A Spotlight (obf-1043) on the search field of the Settings: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Search finds any setting by a word in it.'**
+  String get spotSettingsSearch;
+
+  /// A Spotlight (obf-1043) on Show tips again in the Settings (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tips again brings back every tip on this Device.'**
+  String get spotSettingsShowTips;
+
+  /// A Spotlight (obf-1043) on Simple and Advanced in the Settings: one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Simple or Advanced: Advanced also makes Tallies, Sessions, Frogs and Topics.'**
+  String get spotSettingsFeatures;
+
+  /// A Spotlight (obf-1043) on Add grammar… in the Settings (new in 0.7.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Add grammar… colours code in one more language, on all your Devices.'**
+  String get spotSettingsGrammar;
 }
 
 class _AppLocalizationsDelegate

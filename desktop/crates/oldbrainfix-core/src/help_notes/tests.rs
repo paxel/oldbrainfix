@@ -1,7 +1,7 @@
 use super::*;
 use crate::lan::{answer_sync, apply_answer, sync_request};
 use crate::signing::SigningKey;
-use crate::{Checklists, ListOnAgenda, Notes, NotesGo, PairedDevice};
+use crate::{Checklists, Notes, NotesGo, PairedDevice};
 use chrono::Duration;
 
 type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
@@ -61,19 +61,9 @@ fn exchange(joiner: &Store, host: &Store) -> TestResult {
     Ok(())
 }
 
-const PICTURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 1];
-
 fn english() -> HelpTexts<'static> {
     HelpTexts {
         area_name: "Old Brain Fix".into(),
-        quick_start_title: "Quick start".into(),
-        quick_start_lines: vec![
-            "Capture a thought with +".into(),
-            "File it into an Area".into(),
-        ],
-        quick_start_description: "On the desktop:\nCapture: Ctrl+N\nFile: drag it".into(),
-        icons_text: "What the icons mean\n\nKind: what the Note is".into(),
-        icon_pictures: vec![PICTURE],
         whats_new_title: Box::new(|v| format!("What's new in {v}")),
     }
 }
@@ -99,81 +89,68 @@ fn person(store: &Store) -> Made<String> {
 }
 
 #[test]
-fn a_fresh_install_files_quick_start_and_the_icons_and_no_whats_new() -> TestResult {
+fn a_fresh_install_makes_nothing_and_records_the_version() -> TestResult {
     let ann = device(1, "Ann")?;
     let p = person(&ann)?;
-    assert_eq!(
-        make(&ann, "0.4.0", true)?,
-        [quick_start_id(&p), icons_id(&p)]
-    );
-    let area = Places::new(&ann)
-        .area_by_id(&area_id(&p))?
-        .ok_or("the Area")?;
-    assert_eq!(area.name, "Old Brain Fix");
-    assert_eq!(area.colour.as_deref(), Some(AREA_COLOUR));
-    assert_eq!(area.icon.as_deref(), Some(AREA_ICON));
-    let notes = Notes::new(&ann);
-    assert!(notes.unsorted()?.is_empty());
-    // Named "Quick start", the desktop's way folded under it (#260).
-    let text = notes.by_id(&quick_start_id(&p))?.ok_or("the Note")?.text;
-    assert_eq!(
-        text,
-        "Quick start\nOn the desktop:\nCapture: Ctrl+N\nFile: drag it"
-    );
-    // Formatted, so the links of its steps open (#261); so is What
-    // the icons mean.
-    for id in [quick_start_id(&p), icons_id(&p)] {
-        let note = notes.by_id(&id)?.ok_or("the Note")?;
-        assert_eq!(note.text_format, text_format::MARKDOWN, "{id}");
-    }
-    assert_eq!(crate::note_kinds::name(&text), "Quick start");
-    assert_eq!(
-        crate::note_kinds::description(&text),
-        english().quick_start_description
-    );
-    let list = Checklists::new(&ann)
-        .by_note(&quick_start_id(&p))?
-        .ok_or("a list")?;
-    let lines: Vec<_> = list
-        .lines
-        .iter()
-        .map(|l| (l.id.clone(), l.text.clone()))
-        .collect();
-    assert_eq!(
-        lines,
-        [
-            (
-                quick_start_line_id(&p, 0),
-                "Capture a thought with +".to_string()
-            ),
-            (
-                quick_start_line_id(&p, 1),
-                "File it into an Area".to_string()
-            ),
-        ]
-    );
-    // On the Agenda as one row with its count, not a row per Line.
-    let checklists = Checklists::new(&ann);
-    assert_eq!(
-        checklists.on_agenda(&quick_start_id(&p))?,
-        ListOnAgenda::Count
-    );
-    let rows = checklists.agenda_rows()?;
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].shows, ListOnAgenda::Count);
-    let icons = notes.by_id(&icons_id(&p))?.ok_or("the icons")?;
-    assert_eq!(icons.photos.len(), 1);
-    assert_eq!(icons.nudge, None);
     let written = ann.all_entries()?.len();
     assert!(make(&ann, "0.4.0", true)?.is_empty());
     assert_eq!(ann.all_entries()?.len(), written);
+    assert_eq!(
+        ann.local_setting(VERSION_SETTING)?.as_deref(),
+        Some("0.4.0")
+    );
+    // No Area without a Note to go into it.
+    assert!(Places::new(&ann).area_by_id(&area_id(&p))?.is_none());
+    assert!(make(&ann, "0.4.0", true)?.is_empty());
+    assert_eq!(ann.all_entries()?.len(), written);
+    Ok(())
+}
+
+/// Spotlights explain the screens instead (obf-1043, ADR 0055): neither
+/// a fresh start, an update nor a Device that recorded no version makes
+/// a Quick start or What the icons mean.
+#[test]
+fn no_start_makes_a_quick_start_or_what_the_icons_mean() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let p = person(&ann)?;
+    let mut made = make(&ann, "0.4.0", true)?;
+    made.extend(make(&ann, "0.4.1", false)?);
+    ann.remove_local_setting(VERSION_SETTING)?;
+    made.extend(make(&ann, "0.5.0", false)?);
+    assert_eq!(
+        made,
+        [
+            whats_new_id(&p, "0.4.1"),
+            whats_new_id(&p, "0.4.0"),
+            whats_new_id(&p, "0.5.0"),
+        ]
+    );
+    for id in [quick_start_id(&p), icons_id(&p)] {
+        assert!(ann.logged_history(&id)?.is_empty(), "{id}");
+    }
+    assert!(Checklists::new(&ann).agenda_rows()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_quick_start_made_before_stays_as_it_is() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let p = person(&ann)?;
+    // As 0.6.1 made it, in short.
+    let id = quick_start_id(&p);
+    ann.append(&id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), None)?;
+    ann.append(&id, note_keys::TEXT, Some("Quick start"), None)?;
+    ann.append(&id, note_keys::PLACE, Some(&area_id(&p)), None)?;
+    let before = ann.logged_history(&id)?.len();
+    assert_eq!(make(&ann, "0.4.0", false)?, [whats_new_id(&p, "0.4.0")]);
+    assert_eq!(ann.logged_history(&id)?.len(), before);
     Ok(())
 }
 
 #[test]
 fn nothing_is_made_before_the_own_profile_exists() -> TestResult {
     let store = bare(1)?;
-    assert!(make(&store, "0.4.0", true)?.is_empty());
+    assert!(make(&store, "0.4.0", false)?.is_empty());
     assert!(store.all_entries()?.is_empty());
     assert_eq!(store.local_setting(VERSION_SETTING)?, None);
     Ok(())
@@ -185,17 +162,21 @@ fn an_update_makes_each_whats_new_passed_oldest_first() -> TestResult {
     let p = person(&ann)?;
     assert_eq!(
         make(&ann, "0.4.1", false)?,
-        [
-            quick_start_id(&p),
-            icons_id(&p),
-            whats_new_id(&p, "0.4.0"),
-            whats_new_id(&p, "0.4.1"),
-        ]
+        [whats_new_id(&p, "0.4.0"), whats_new_id(&p, "0.4.1")]
     );
     let note = Notes::new(&ann)
         .by_id(&whats_new_id(&p, "0.4.0"))?
         .ok_or("a Note")?;
     assert_eq!(note.text, "What's new in 0.4.0\n\nAdded\n• Help Notes.");
+    assert_eq!(note.text_format, text_format::PLAIN);
+    assert_eq!(note.nudge, None);
+    let area = Places::new(&ann)
+        .area_by_id(&area_id(&p))?
+        .ok_or("the Area")?;
+    assert_eq!(area.name, "Old Brain Fix");
+    assert_eq!(area.colour.as_deref(), Some(AREA_COLOUR));
+    assert_eq!(area.icon.as_deref(), Some(AREA_ICON));
+    assert!(Notes::new(&ann).unsorted()?.is_empty());
     assert_eq!(make(&ann, "0.5.0", false)?, [whats_new_id(&p, "0.5.0")]);
     Ok(())
 }
@@ -205,12 +186,15 @@ fn a_second_device_makes_nothing_and_a_deleted_note_never_returns() -> TestResul
     let ann = device(1, "Ann")?;
     let p = person(&ann)?;
     make(&ann, "0.4.1", false)?;
-    Notes::new(&ann).trash(&quick_start_id(&p))?;
-    ann.append(&icons_id(&p), note_keys::TYPE, None, None)?;
+    Notes::new(&ann).trash(&whats_new_id(&p, "0.4.0"))?;
+    // Purged, as 30 days in the trash do.
+    ann.append(&whats_new_id(&p, "0.4.1"), note_keys::TYPE, None, None)?;
     let desk = own_device(2, &ann)?;
     assert_eq!(person(&desk)?, p);
     assert!(make(&desk, "0.4.1", true)?.is_empty());
     assert_eq!(make(&desk, "0.5.0", false)?, [whats_new_id(&p, "0.5.0")]);
+    desk.remove_local_setting(VERSION_SETTING)?;
+    assert!(make(&desk, "0.5.0", false)?.is_empty());
     Ok(())
 }
 
@@ -220,7 +204,7 @@ fn a_note_another_person_wrote_under_the_id_counts_for_nothing() -> TestResult {
     let ben = device(3, "Ben")?;
     let p = person(&ann)?;
     ben.append(
-        &quick_start_id(&p),
+        &whats_new_id(&p, "0.4.0"),
         note_keys::TYPE,
         Some(note_keys::TYPE_NOTE),
         None,
@@ -232,7 +216,7 @@ fn a_note_another_person_wrote_under_the_id_counts_for_nothing() -> TestResult {
         .collect();
     let mut report = crate::ImportReport::default();
     ann.apply_entries(&wire, &[ben.own_key_record()?], None, &mut report)?;
-    assert!(make(&ann, "0.4.0", true)?.contains(&quick_start_id(&p)));
+    assert!(make(&ann, "0.4.0", false)?.contains(&whats_new_id(&p, "0.4.0")));
     Ok(())
 }
 
@@ -240,7 +224,7 @@ fn a_note_another_person_wrote_under_the_id_counts_for_nothing() -> TestResult {
 fn a_deleted_area_is_made_again_with_its_look() -> TestResult {
     let ann = device(1, "Ann")?;
     let p = person(&ann)?;
-    make(&ann, "0.4.0", true)?;
+    make(&ann, "0.4.0", false)?;
     let places = Places::new(&ann);
     places.set_colour(&area_id(&p), Some("FF0000"))?;
     places.delete_area(&area_id(&p), NotesGo::Trash)?;

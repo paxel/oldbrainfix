@@ -1,6 +1,7 @@
 import AVFoundation
 import Flutter
 import Foundation
+import UIKit
 
 /// The voice channel on the iPhone (#239), answering the calls of
 /// MainActivity.kt's with the same arguments and answers: the
@@ -130,6 +131,9 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
         recorder.prepareToRecord(), recorder.record()
       else { continue }
       self.recorder = recorder
+      // The screen stays on while it runs (#350); locked anyway, the
+      // active session and the audio background mode keep it going.
+      UIApplication.shared.isIdleTimerDisabled = true
       return true
     }
     // The microphone is busy elsewhere.
@@ -146,6 +150,7 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
     guard let recorder else { return nil }
     self.recorder = nil
     recorder.stop()
+    UIApplication.shared.isIdleTimerDisabled = false
     deactivate()
     let file = recordingFile
     if let size = SpeechFiles.stamp(file)?.size, size > 0 { return file }

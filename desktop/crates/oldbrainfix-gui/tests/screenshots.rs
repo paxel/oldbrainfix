@@ -41,9 +41,9 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::backup;
 use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{
-    AreaRole, BoxState, Boxes, Checklists, ClockTime, Day, DeviceSettings, Frogs, ImportReport,
-    Importance, NewFile, Notes, OwnProfile, PairedDevice, PersonSettings, Places, QuickNoteControl,
-    Routines, Schedule, ShoppingLists, SigningKey, Store, Tallies, parse_time, text_format,
+    AreaRole, BoxState, Boxes, Checklists, ClockTime, Day, Frogs, ImportReport, Importance,
+    NewFile, Notes, OwnProfile, PairedDevice, PersonSettings, Places, Routines, Schedule,
+    ShoppingLists, SigningKey, Store, Tallies, parse_time, text_format,
 };
 use oldbrainfix_gui::feedback_view::FeedbackFacts;
 use oldbrainfix_gui::l10n::L10n;
@@ -603,6 +603,8 @@ fn shoot(harness: &mut Harness<'static, App>, name: &str) -> TestResult {
 #[ignore = "needs a GPU or a software Vulkan; run by the release workflow"]
 fn render_the_screenshots() -> TestResult {
     let (store, ids) = demo(&EN)?;
+    // The guide's frames show no tip (obf-1043).
+    oldbrainfix_gui::spotlight::mark_all_seen(&store)?;
     let mut app = App::new(store, "en");
     app.set_wall_clock(Arc::new(utc));
     let mut harness = Harness::builder()
@@ -776,6 +778,8 @@ fn window_with_clock(
 ) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
     let (store, ids, now) = demo_with_clock(x)?;
     prepare(&store, &ids, &now)?;
+    // The guide's frames show no tip (obf-1043).
+    oldbrainfix_gui::spotlight::mark_all_seen(&store)?;
     let mut app = App::new(store, locale);
     app.set_wall_clock(Arc::new(utc));
     let mut harness = Harness::builder()
@@ -861,6 +865,8 @@ fn first_start(
     let store = Store::in_memory(Box::new(move || now), || {
         Ok(SigningKey::from_seed([46; 32]))
     })?;
+    // The guide's frames show no tip (obf-1043).
+    oldbrainfix_gui::spotlight::mark_all_seen(&store)?;
     let mut app = App::new(store, locale);
     app.set_wall_clock(Arc::new(utc));
     app.set_profile_defaults(Box::new(|store| {
@@ -963,8 +969,8 @@ fn all_guide_frames() -> TestResult {
                 &box_frame("getting-started", "import-keep"),
             )?);
             // A thought typed into the quick note, opened over the Agenda
-            // as File ▸ New Note opens it (#146): the action row and the
-            // Nudge times show.
+            // as File ▸ New Note opens it (#146): More and the Nudge times
+            // show under the text, nothing else (#352).
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().new_note();
             harness.run();
@@ -978,44 +984,12 @@ fn all_guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame("capture-and-sort", "capture"),
             )?);
-            // Capture and sort: File into… over the quick note with what
-            // Settings ▸ Quick note switched on, the capture popup of the
-            // hotkey, the Unsorted Notes, the Note dialog and its History.
-            let mut harness = window_with(texts, language, theme, |store, _| {
-                let device = DeviceSettings::new(store);
-                for control in [
-                    QuickNoteControl::FileInto,
-                    QuickNoteControl::Schedule,
-                    QuickNoteControl::Importance,
-                ] {
-                    device.set_quick_note_shows(control, true)?;
-                }
-                // Filed into Repairs, then Work, before: on top (#272).
-                let places = Places::new(store);
-                for area in places.areas()? {
-                    if area.name == texts.household {
-                        for topic in places.topics(&area.id)? {
-                            device.filed_into(&topic.id)?;
-                        }
-                    }
-                }
-                for area in places.areas()? {
-                    if area.name == texts.work {
-                        device.filed_into(&area.id)?;
-                    }
-                }
-                Ok(())
-            })?;
-            harness.state_mut().new_note();
-            harness.run();
+            // Capture and sort: the quick note's More, which saves it and
+            // opens the Note dialog on it, where it is sorted (#352); the
+            // capture popup of the hotkey, the Unsorted Notes, the Note
+            // dialog and its History.
             harness
-                .get_by(|n| n.placeholder() == Some(texts.hint))
-                .click();
-            harness.run();
-            harness.get_by(|n| n.is_focused()).type_text(texts.capture);
-            harness.run();
-            harness
-                .get_by_role_and_label(Role::Button, L10n::new(language).file_into())
+                .get_by_role_and_label(Role::Button, L10n::new(language).more())
                 .click();
             harness.run();
             problems.extend(match_frame(
@@ -2200,7 +2174,7 @@ type AppWindow = Box<Harness<'static, App>>;
 /// Repairs shown below its path, the capture popup, a text kept from the
 /// command line in Unsorted, a dropped photo waiting in the quick note,
 /// the Agenda, the speech model, the Sync menu, an AI Task's review, the
-/// View menu, the File menu and the quick note's ways to a photo.
+/// View menu, the File menu and the Note dialog's ways to a photo.
 fn desktop_frames(
     texts: &Texts,
     language: &str,
@@ -2289,10 +2263,12 @@ fn desktop_frames(
         scene(&mut harness, texts)?;
         problems.extend(match_frame(&mut harness, &box_frame(name))?);
     }
-    // The quick note's Paste and From file…, the desktop's ways to a
-    // photo without a camera.
+    // The Note dialog's Paste and Attach a file…, the desktop's ways to a
+    // photo without a camera (#352); Paste and Record voice show where a
+    // clipboard and a microphone are.
     let mut harness = Box::new(window(texts, language, theme)?);
-    harness.state_mut().new_note();
+    let captured = Notes::new(harness.state().store()).capture(texts.capture, None, None)?;
+    harness.state_mut().select_note(&captured.id);
     harness.run();
     problems.extend(match_frame(&mut harness, &box_frame("missing"))?);
     drop(harness);

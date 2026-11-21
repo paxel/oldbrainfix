@@ -1,6 +1,24 @@
 use super::*;
 
 #[test]
+fn documents_of_other_tools_are_read_too() {
+    for name in [
+        "Garden.adoc",
+        "notes.asciidoc",
+        "key.ASC",
+        "week.org",
+        "Recipes.rst",
+        "Trip.HTML",
+        "page.htm",
+    ] {
+        assert!(may_become_note(name), "{name}");
+    }
+    assert!(!may_become_note(".hidden.org"));
+    assert!(!may_become_note("page.xhtml"));
+    assert!(!may_become_note("slides.pdf"));
+}
+
+#[test]
 fn only_markdown_and_text_files_not_hidden_are_read() {
     assert!(may_become_note("Dentist.txt"));
     assert!(may_become_note("Shopping.MD"));

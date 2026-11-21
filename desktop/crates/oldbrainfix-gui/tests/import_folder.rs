@@ -132,7 +132,7 @@ fn a_folder_becomes_dated_notes_in_a_new_area_and_the_click_opens_it() -> TestRe
     import_dialog(&mut harness);
     assert!(shows(
         &harness,
-        "Each Markdown or text file in it becomes a Note"
+        "Each Markdown, text, AsciiDoc, Org, reStructuredText or HTML file in it becomes a Note"
     ));
     // Closed, it opens again for the Import.
     harness.get_by_label("Close").click_accesskit();
@@ -181,7 +181,7 @@ fn a_folder_becomes_dated_notes_in_a_new_area_and_the_click_opens_it() -> TestRe
         "3 Notes went into the new Area From Notes."
     ));
     assert!(shows(&harness, "3 files were skipped:"));
-    assert!(shows(&harness, "Not Markdown or text: 2"));
+    assert!(shows(&harness, "Other files: 2"));
     assert!(shows(&harness, "Too large: 1"));
     harness.get_by_label("Open the Area").click_accesskit();
     harness.step();
@@ -230,22 +230,19 @@ fn a_folder_without_markdown_or_text_changes_nothing() -> TestResult {
     std::fs::write(dir.join("photo.png"), [0x89, b'P', b'N', b'G'])?;
     let mut harness = window(store()?, Some(dir))?;
     import(&mut harness)?;
-    assert_eq!(
-        harness.state().notice(),
-        Some("No Markdown or text file found.")
-    );
+    assert_eq!(harness.state().notice(), Some("No file found to import."));
     let desk = harness.state().store();
     assert!(Places::new(desk).areas()?.is_empty());
     assert!(Notes::new(desk).all()?.is_empty());
     harness
-        .get_by_label("No Markdown or text file found.")
+        .get_by_label("No file found to import.")
         .click_accesskit();
     harness.step();
     harness.step();
     assert!(shows(&harness, "Nothing imported"));
     assert!(shows(&harness, "Pick the folder the notes lie in."));
     assert!(shows(&harness, "Folder: Photos"));
-    assert!(shows(&harness, "Not Markdown or text: 1"));
+    assert!(shows(&harness, "Other files: 1"));
     Ok(())
 }
 

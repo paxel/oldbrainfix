@@ -1,0 +1,104 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: Rust
+scope: source.rust
+file_extensions: [rs, rust]
+
+variables:
+  ident: '[A-Za-z_]\w*'
+  esc: '\\(?:x[0-9a-fA-F]{2}|u\{[0-9a-fA-F_]{1,8}\}|.)'
+
+contexts:
+  main:
+    - match: '//.*'
+      scope: comment.line.double-slash.rust
+    - match: '/\*'
+      push: block_comment
+    - match: '\b[bc]?r"'
+      push: raw_string_0
+    - match: '\b[bc]?r#"'
+      push: raw_string_1
+    - match: '\b[bc]?r##"'
+      push: raw_string_2
+    - match: '\b[bc]"|"'
+      push: string
+    - match: '(?:\bb)?''(?:{{esc}}|[^\\''\n])'''
+      scope: string.quoted.single.char.rust
+    - match: '''{{ident}}(?!'')'
+      scope: storage.modifier.lifetime.rust
+    - match: '#!?\['
+      push: attribute
+    - match: '\b(fn)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.function.rust
+        2: entity.name.function.rust
+    - match: '\b(struct|enum|trait|type|union)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.rust
+        2: entity.name.type.rust
+    - match: '\b{{ident}}!(?!=)'
+      scope: support.function.macro.rust
+    - match: '\b(?:if|else|for|while|loop|match|return|break|continue|in|as|where|await|yield|use|mod|impl|let|fn|struct|enum|trait|type|union|macro_rules)\b'
+      scope: keyword.control.rust
+    - match: '\b(?:pub|mut|ref|const|static|unsafe|async|move|extern|dyn|crate)\b'
+      scope: storage.modifier.rust
+    - match: '\b(?:self|Self|super)\b'
+      scope: variable.language.rust
+    - match: '\b(?:true|false)\b'
+      scope: constant.language.rust
+    - match: '\b(?:[iu](?:8|16|32|64|128|size)|f32|f64|bool|char|str)\b'
+      scope: storage.type.rust
+    - match: '\b[A-Z][a-z]\w*'
+      scope: entity.name.type.rust
+    - match: '\b(?:0x[0-9a-fA-F_]+|0o[0-7_]+|0b[01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?[\d_]+)?)(?:[iu](?:8|16|32|64|128|size)|f32|f64)?\b'
+      scope: constant.numeric.rust
+    - match: '\b{{ident}}(?=\s*(?:::\s*<[^>\n]{0,80}>\s*)?\()'
+      scope: variable.function.rust
+    - match: '->|=>|::|\.\.=?|&&|\|\||[-+*/%<>=!&|^]=?|\?'
+      scope: keyword.operator.rust
+
+  block_comment:
+    - meta_scope: comment.block.rust
+    - match: '\*/'
+      pop: true
+    - match: '/\*'
+      push: block_comment
+
+  string:
+    - meta_scope: string.quoted.double.rust
+    - match: '"'
+      pop: true
+    - match: '{{esc}}'
+      scope: constant.character.escape.rust
+
+  raw_string_0:
+    - meta_scope: string.quoted.double.raw.rust
+    - match: '"'
+      pop: true
+
+  raw_string_1:
+    - meta_scope: string.quoted.double.raw.rust
+    - match: '"#'
+      pop: true
+
+  raw_string_2:
+    - meta_scope: string.quoted.double.raw.rust
+    - match: '"##'
+      pop: true
+
+  attribute:
+    - meta_scope: meta.annotation.rust
+    - match: '\]'
+      pop: true
+    - match: '\['
+      push: attribute
+    - match: '"'
+      push: string
+    - match: '(?<=\[)\s*({{ident}}(?:::{{ident}})*)'
+      captures:
+        1: variable.function.annotation.rust
+    - match: '\b(?:true|false)\b'
+      scope: constant.language.rust
+    - match: '\b\d[\w.]*'
+      scope: constant.numeric.rust

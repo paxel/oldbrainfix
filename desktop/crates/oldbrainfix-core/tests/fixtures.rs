@@ -31,7 +31,7 @@ use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::nudges::QuietHours;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::question_marks::{self, SHAPES};
-use oldbrainfix_core::routines::routines_by_name;
+use oldbrainfix_core::routines::{heads_up_keys, routines_by_name};
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
@@ -50,7 +50,8 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 32] = [
+const SCENARIOS: [&str; 35] = [
+    "added-grammars",
     "area-order",
     "area-order-shown",
     "attachments",
@@ -67,6 +68,7 @@ const SCENARIOS: [&str; 32] = [
     "hidden-from-ai",
     "history",
     "import",
+    "import-formats",
     "keep",
     "list-switch",
     "markdown",
@@ -75,6 +77,7 @@ const SCENARIOS: [&str; 32] = [
     "not-today",
     "notes",
     "places",
+    "quiet-day",
     "routines",
     "sections",
     "session-legacy",
@@ -1214,9 +1217,14 @@ fn note_histories_come_to_what_the_dart_core_says() -> TestResult {
         assert_eq!(json!({ "notes": out }), read_json(&path)?, "{scenario}");
         checked += 1;
     }
-    assert_eq!(checked, SCENARIOS.len());
+    // A scenario without a Note has no History to compare.
+    assert_eq!(checked, SCENARIOS.len() - WITHOUT_NOTES.len());
     Ok(())
 }
+
+/// The scenarios whose log holds no Note, so the generator writes no
+/// `note_history.json` for them.
+const WITHOUT_NOTES: [&str; 1] = ["added-grammars"];
 
 #[test]
 fn boxes_show_and_tick_as_the_dart_core_does() -> TestResult {
@@ -1817,6 +1825,79 @@ fn simple_or_advanced_reads_as_the_dart_core_reads_it() -> TestResult {
     Ok(())
 }
 
+/// The generator's `added-grammars` scenario (obf-1037).
+fn write_added_grammars(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    use oldbrainfix_core::person_settings::keys;
+    let settings = PersonSettings::new(store);
+    let grammar = |name: &str, scope: &str| {
+        format!(
+            "name: {name}\nscope: {scope}\nfile_extensions: [cbl, rs]\n\
+             contexts:\n  main:\n    - match: '\\bMOVE\\b'\n      scope: keyword\n"
+        )
+    };
+    let add = |source: &str| -> Built {
+        settings.add_grammar(source.as_bytes())?.map_err(|e| e.0)?;
+        Ok(())
+    };
+    add(&grammar("COBOL", "source.cobol"))?;
+    add(&grammar("COBOL", "source.cobol"))?;
+    let refused = settings
+        .add_grammar(b"name: X\nscope: source.x\ncontexts:\n  main:\n    - match: a++\n")?;
+    assert!(refused.is_err());
+    add(&grammar("My Rust", "source.rust"))?;
+    add(&grammar("COBOL 85", "source.cobol"))?;
+    add(&grammar("Ä", "source.ä"))?;
+    add(&grammar("ZZ", "source.😀"))?;
+    store.append(
+        keys::ENTITY,
+        &keys::grammar("source.broken"),
+        Some("name: [x\n"),
+        None,
+    )?;
+    store.append(
+        keys::ENTITY,
+        &keys::grammar("source.go"),
+        Some(&grammar("Not Go", "source.notgo")),
+        None,
+    )?;
+    settings.remove_grammar("source.cobol")?;
+    settings.remove_grammar("source.cobol")?;
+    settings.remove_grammar("source.rust")?;
+    Ok(())
+}
+
+#[test]
+fn the_persons_own_grammars_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let expected = read_json(
+        &fixtures()
+            .join("added-grammars")
+            .join("added_grammars.json"),
+    )?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    assert!(!reads.is_empty());
+    let entries = log("added-grammars")?;
+    for read in reads {
+        let length = read["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        let grammars = PersonSettings::new(&store).grammars()?;
+        let all: Vec<&str> = grammars.all.iter().map(|g| g.scope.as_str()).collect();
+        let added: Vec<&str> = grammars.added.iter().map(|g| g.name.as_str()).collect();
+        let fences: Vec<Option<&str>> = ["cbl", "rs", "rust", "zz"]
+            .iter()
+            .map(|name| grammars.for_fence(name).map(|g| g.scope.as_str()))
+            .collect();
+        assert_eq!(json!(all), read["all"], "after {length} entries");
+        assert_eq!(json!(added), read["added"], "after {length} entries");
+        assert_eq!(json!(fences), read["fences"], "after {length} entries");
+    }
+    Ok(())
+}
+
 /// The generator's `area-order` scenario (#280).
 fn write_area_order(store: &Store) -> Built {
     use oldbrainfix_core::PersonSettings;
@@ -2047,42 +2128,15 @@ fn the_areas_read_by_the_name_shown_as_the_dart_core_reads_them() -> TestResult 
 
 /// The texts of the generator's `help` scenario, English or German.
 fn help_texts(german: bool) -> oldbrainfix_core::HelpTexts<'static> {
-    const EN: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
-    const DE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2];
-    if german {
-        oldbrainfix_core::HelpTexts {
-            area_name: "Old Brain Fix".into(),
-            quick_start_title: "Schnellstart".into(),
-            quick_start_lines: vec![
-                "Einen Gedanken mit + erfassen".into(),
-                "Ihn in einen Bereich einsortieren".into(),
-            ],
-            quick_start_description:
-                "Hingehen:\n1. [Agenda](oldbrainfix://agenda)\n\nAuf dem Desktop:\nErfassen: Strg+N"
-                    .into(),
-            icons_text:
-                "Was die Symbole bedeuten\n\nArt: was die Notiz ist\n\n[Anleitung](oldbrainfix://guide)"
-                    .into(),
-            icon_pictures: vec![DE],
-            whats_new_title: Box::new(|v| format!("Neu in {v}")),
-        }
-    } else {
-        oldbrainfix_core::HelpTexts {
-            area_name: "Old Brain Fix".into(),
-            quick_start_title: "Quick start".into(),
-            quick_start_lines: vec![
-                "Capture a thought with +".into(),
-                "File it into an Area".into(),
-            ],
-            quick_start_description:
-                "Go there:\n1. [Agenda](oldbrainfix://agenda)\n\nOn the desktop:\nCapture: Ctrl+N"
-                    .into(),
-            icons_text:
-                "What the icons mean\n\nKind: what the Note is\n\n[User guide](oldbrainfix://guide)"
-                    .into(),
-            icon_pictures: vec![EN],
-            whats_new_title: Box::new(|v| format!("What's new in {v}")),
-        }
+    oldbrainfix_core::HelpTexts {
+        area_name: "Old Brain Fix".into(),
+        whats_new_title: Box::new(move |v| {
+            if german {
+                format!("Neu in {v}")
+            } else {
+                format!("What's new in {v}")
+            }
+        }),
     }
 }
 
@@ -2113,8 +2167,8 @@ fn write_help_steps(store: &Store) -> Result<Vec<Vec<String>>, Box<dyn std::erro
     make("0.4.0", true, false)?;
     make("0.4.0", true, false)?;
     let person = OwnProfile::new(store).get()?.ok_or("a Profile")?.id;
-    Notes::new(store).trash(&help_notes::quick_start_id(&person))?;
     make("0.4.1", false, true)?;
+    Notes::new(store).trash(&help_notes::whats_new_id(&person, "0.4.1"))?;
     store.remove_local_setting(help_notes::VERSION_SETTING)?;
     make("0.4.1", false, false)?;
     Places::new(store).delete_area(&help_notes::area_id(&person), NotesGo::Trash)?;
@@ -2261,6 +2315,78 @@ fn write_import(store: &Store) -> Built {
     Ok(())
 }
 
+/// A document handed to an Import, with what the Dart core read it as.
+type Document = (ImportFile, Option<Value>);
+
+/// The documents the generator's `import-formats` scenario imports, in
+/// the order it handed them over, read back from what it wrote: each its
+/// name, when it was last changed and its bytes from `inputs/`, with what
+/// the Dart core read it as.
+fn documents() -> Result<Vec<Document>, Box<dyn std::error::Error>> {
+    let dir = fixtures().join("import-formats");
+    let listed = read_json(&dir.join("documents.json"))?;
+    let mut out = Vec::new();
+    for document in listed["documents"]
+        .as_array()
+        .ok_or("documents.json lists documents")?
+    {
+        let name = document["name"].as_str().ok_or("a name")?;
+        let modified = match document["modified"].as_str() {
+            Some(at) => Some(parse_time(at)?),
+            None => None,
+        };
+        let file = ImportFile {
+            name: name.into(),
+            modified,
+            bytes: std::fs::read(dir.join("inputs").join(name))?,
+        };
+        out.push((file, document.get("read").cloned()));
+    }
+    Ok(out)
+}
+
+/// The Import of the generator's `import-formats` scenario.
+fn import_formats_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
+    let files: Vec<ImportFile> = documents()?.into_iter().map(|(file, _)| file).collect();
+    Ok(vec![Imports::new(store).folder("From Documents", &files)?])
+}
+
+/// The generator's `import-formats` scenario.
+fn write_import_formats(store: &Store) -> Built {
+    import_formats_into(store)?;
+    Ok(())
+}
+
+#[test]
+fn documents_of_other_tools_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::import_formats::{self, ImportFormat};
+    let mut checked = 0;
+    for (file, read) in documents()? {
+        let extension = file
+            .name
+            .rsplit_once('.')
+            .map(|(_, e)| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        let format = ImportFormat::of_extension(&extension);
+        let Some(format) = format else {
+            assert_eq!(read, None, "{}", file.name);
+            continue;
+        };
+        let text = String::from_utf8(file.bytes)?;
+        let ours = import_formats::read(format, &text);
+        let theirs = read.ok_or("the Dart core read it")?;
+        assert_eq!(
+            json!({ "text": ours.text, "title": ours.title }),
+            theirs,
+            "{}",
+            file.name
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 7);
+    Ok(())
+}
+
 /// The generator's `_keepTakeout`: the Takeout the `keep` scenario
 /// imports, as an app hands its entries over.
 fn keep_takeout() -> Vec<ImportFile> {
@@ -2380,7 +2506,11 @@ fn summary_json(s: &ImportSummary) -> Value {
 #[test]
 fn imports_come_to_what_the_dart_core_says() -> TestResult {
     type Into = fn(&Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>>;
-    let scenarios: [(&str, Into); 2] = [("import", import_into), ("keep", keep_into)];
+    let scenarios: [(&str, Into); 3] = [
+        ("import", import_into),
+        ("import-formats", import_formats_into),
+        ("keep", keep_into),
+    ];
     for (scenario, into) in scenarios {
         let store = writer_store()?;
         let summaries: Vec<Value> = into(&store)?.iter().map(summary_json).collect();
@@ -2655,7 +2785,8 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 32] = [
+    let writers: [(&str, Writer); 35] = [
+        ("added-grammars", write_added_grammars),
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
         ("attachments", write_attachments),
@@ -2672,6 +2803,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("hidden-from-ai", write_hidden_from_ai),
         ("history", write_history),
         ("import", write_import),
+        ("import-formats", write_import_formats),
         ("keep", write_keep),
         ("list-switch", write_list_switch),
         ("markdown", write_markdown),
@@ -2680,6 +2812,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("not-today", write_not_today),
         ("notes", write_notes),
         ("places", write_places),
+        ("quiet-day", write_quiet_day),
         ("routines", write_routines),
         ("sections", write_sections),
         ("session-legacy", write_session_legacy),
@@ -2752,7 +2885,7 @@ fn write_routines(store: &Store) -> Built {
     let weekend = routines.spawn(&plants.id, &weekends)?;
     routines.reschedule(&weekend.id, &weekends)?;
     let dentist = notes.capture("Dentist", None, None)?;
-    routines.spawn(
+    let skipped_hour = routines.spawn(
         &dentist.id,
         &schedule(day(2026, 3, 29), &[at(2, 30)?], None)?,
     )?;
@@ -2820,6 +2953,25 @@ fn write_routines(store: &Store) -> Built {
     routines.trash_note(&car.id)?;
     notes.capture("Unsorted thought", None, Some(Duration::minutes(10)))?;
     notes.capture("Another thought", None, None)?;
+    // Heads-ups (obf-1046), as the generator sets them.
+    routines.set_heads_ups(&medication.id, &[1440, 20])?;
+    routines.set_heads_ups(&weekend.id, &[30, 1440, 2880])?;
+    routines.set_heads_ups(&skipped_hour.id, &[20, 60])?;
+    // In spring, away from the autumn days the GUI's tests ring this log on.
+    let train = routines.create(
+        "Night train",
+        &schedule(day(2026, 3, 29), &[at(23, 0)?], None)?,
+    )?;
+    routines.set_heads_ups(&train.id, &[1440])?;
+    let haircut = routines.create("Haircut", &schedule(day(2026, 4, 2), &[at(9, 0)?], None)?)?;
+    routines.set_heads_ups(&haircut.id, &[2880, 1440])?;
+    routines.mark_done(&haircut.id, &o(day(2026, 4, 2), Some(at(9, 0)?)), None)?;
+    store.append(
+        &heads_up_keys::of(&night.id),
+        heads_up_keys::HEADS_UPS,
+        Some("0020,abc,15,+5, 5,43201,1440,15,-3,"),
+        None,
+    )?;
     Ok(())
 }
 
@@ -2878,6 +3030,7 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
     let plan = alarms.plan(&berlin)?;
     let missed = alarms.missed(&berlin)?;
     let nudge = alarms.nudge(&berlin)?;
+    let heads_ups = alarms.heads_ups(&berlin)?;
     let later = now + Duration::hours(3);
     let mut open_of = serde_json::Map::new();
     for note in Notes::new(store).all()? {
@@ -2917,6 +3070,24 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
             "text": a.text,
             "wordless": a.wordless.name(),
             "firesAfterNow": iso(a.fires_after(now)),
+            // Quiet Hours silence it unless it escalates (obf-1045).
+            "quiet": a.quiet.map(|q| q.to_string()),
+            "silentAfterNow": a.fires_after(now).map(|f| a.silent_at(f, &berlin)),
+        })).collect::<Vec<_>>(),
+        // Heads-ups before the Occurrences (obf-1046).
+        "headsUpCount": heads_ups.len(),
+        "headsUps": heads_ups.iter().take(40).map(|h| json!({
+            "id": h.id(),
+            "routine": h.routine_id,
+            "occurrence": h.occurrence.key(),
+            "minutes": h.minutes,
+            "at": dart_iso(h.at),
+            "wall": wall(&h.wall),
+            "start": wall(&h.start),
+            "text": h.text,
+            "wordless": h.wordless.name(),
+            "quiet": h.quiet.map(|q| q.to_string()),
+            "silent": h.silent_at(&berlin),
         })).collect::<Vec<_>>(),
         "missed": {
             "count": missed.count(),
@@ -2962,6 +3133,11 @@ fn routines_and_their_alarms_come_to_what_the_dart_core_says() -> TestResult {
     assert_eq!(json!(all), expected["all"]);
     let trashed: Vec<String> = routines.trashed()?.into_iter().map(|r| r.id).collect();
     assert_eq!(json!(trashed), expected["trashed"]);
+    let mut heads_ups_of = serde_json::Map::new();
+    for id in &ids {
+        heads_ups_of.insert(id.clone(), json!(routines.heads_ups(id)?));
+    }
+    assert_eq!(Value::Object(heads_ups_of), expected["headsUpsOf"]);
     let mut of_note = serde_json::Map::new();
     for note in Notes::new(&store).all()? {
         let ids: Vec<String> = routines
@@ -2982,6 +3158,8 @@ fn routines_and_their_alarms_come_to_what_the_dart_core_says() -> TestResult {
             "agenda",
             "alarmCount",
             "alarms",
+            "headsUpCount",
+            "headsUps",
             "missed",
             "nudge",
             "recentlyDone",
@@ -3898,6 +4076,192 @@ fn skips_and_moved_occurrences_come_to_what_the_dart_core_says() -> TestResult {
             "openOf",
             "recentlyDone",
             "todayByNote",
+            "histories",
+        ] {
+            assert_eq!(ours[key], check[key], "{now} {key}");
+        }
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------ Quiet day
+
+/// The generator's `quiet-day` scenario (obf-1044).
+fn write_quiet_day(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    use oldbrainfix_core::person_settings::keys;
+    let routines = Routines::new(store);
+    routines.create(
+        "Take the pills",
+        &schedule(
+            Day::new(2026, 1, 1),
+            &[at(8, 0)?, at(20, 0)?],
+            Some("FREQ=DAILY"),
+        )?,
+    )?;
+    routines.create(
+        "Stretch",
+        &schedule(
+            Day::new(2026, 1, 5),
+            &[at(9, 0)?],
+            Some("FREQ=WEEKLY;BYDAY=MO"),
+        )?,
+    )?;
+    routines.create(
+        "Walk",
+        &schedule(Day::new(2026, 1, 1), &[], Some("FREQ=DAILY"))?,
+    )?;
+    let dentist = routines
+        .create(
+            "Dentist",
+            &schedule(Day::new(2026, 1, 7), &[at(10, 0)?], None)?,
+        )?
+        .id;
+    routines.set_heads_ups(&dentist, &[60, 1440])?;
+    Notes::new(store).capture("Call Grandma back", None, None)?;
+    let settings = PersonSettings::new(store);
+    // Tuesday the 6th, 13:00: quiet until midnight.
+    jump(Duration::days(5) + Duration::hours(2));
+    settings.quiet_today(&berlin)?;
+    settings.quiet_today(&berlin)?;
+    // Thursday the 8th, 08:00: quiet, and ended at 14:00.
+    jump(Duration::hours(43));
+    settings.quiet_today(&berlin)?;
+    jump(Duration::hours(6));
+    settings.end_quiet_day(&berlin)?;
+    settings.end_quiet_day(&berlin)?;
+    // As no app writes them.
+    let raw = |field: &str, value: &str| store.append(keys::ENTITY, field, Some(value), None);
+    raw(&format!("{}2026-1-9", keys::QUIET_DAY_PREFIX), keys::ON)?;
+    raw(&keys::quiet_day(Day::new(2026, 1, 10)), "Rude")?;
+    raw(
+        &keys::quiet_day(Day::new(2026, 1, 11)),
+        "2026-01-11T12:00:00.000Z later",
+    )?;
+    Ok(())
+}
+
+fn quiet_day_adherence(a: &Adherence) -> Value {
+    json!({"done": a.done, "missed": a.missed, "skipped": a.skipped, "share": a.share()})
+}
+
+fn quiet_day_rows(rows: &[AgendaRow]) -> Value {
+    json!(
+        rows.iter()
+            .map(|r| json!([
+                r.routine.id,
+                r.occurrence.key(),
+                iso(r.done()),
+                iso(r.skipped())
+            ]))
+            .collect::<Vec<_>>()
+    )
+}
+
+/// What this core makes of the `quiet-day` log at one held moment, in
+/// the shape of a check in the generator's `quiet_day.json`.
+fn quiet_day_check(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::PersonSettings;
+    let now = store.now();
+    let routines = Routines::new(store);
+    let alarms = Alarms::new(store);
+    let agenda = routines.agenda(&berlin)?;
+    let missed = alarms.missed(&berlin)?;
+    let mut open_of = serde_json::Map::new();
+    for note in Notes::new(store).all()? {
+        let open: Vec<Value> = alarms
+            .open_of(&note.id, &berlin)?
+            .iter()
+            .map(|o| json!([o.routine.id, o.occurrence.key(), o.missed]))
+            .collect();
+        open_of.insert(note.id, json!(open));
+    }
+    let mut histories = Vec::new();
+    for r in routines.all()? {
+        let h = routines.history(&r, &berlin, oldbrainfix_core::history::MONDAY)?;
+        histories.push(json!({
+            "routine": r.id,
+            "thisWeek": quiet_day_adherence(&h.this_week),
+            "thisMonth": quiet_day_adherence(&h.this_month),
+            "entries": h.entries.iter().map(|e| json!([
+                e.occurrence.key(),
+                e.status.name(),
+                dart_iso(e.missed_at),
+                iso(e.done_at),
+                iso(e.skipped_at),
+            ])).collect::<Vec<_>>(),
+        }));
+    }
+    let nudge = alarms.nudge(&berlin)?.map(|n| {
+        json!({
+            "at": dart_iso(n.at),
+            "since": iso(n.since),
+            "own": n.anchors.iter().map(|a| dart_iso(a.due)).collect::<Vec<_>>(),
+        })
+    });
+    Ok(json!({
+        "now": dart_iso(now),
+        "quietUntil": iso(PersonSettings::new(store).quiet_until(&berlin)?),
+        "agenda": {
+            "today": quiet_day_rows(&agenda.today_rows),
+            "tomorrow": quiet_day_rows(&agenda.tomorrow_rows),
+        },
+        "alarms": alarms.plan(&berlin)?.iter().map(|a| json!([
+            a.id(),
+            dart_iso(a.at),
+            a.wall.as_ref().map(wall),
+            dart_iso(a.ends_at),
+            iso(a.fires_after(now)),
+            iso(a.escalates_at()),
+        ])).collect::<Vec<_>>(),
+        "headsUps": alarms.heads_ups(&berlin)?.iter()
+            .map(|h| json!([h.id(), dart_iso(h.at)]))
+            .collect::<Vec<_>>(),
+        "nudge": nudge,
+        "missed": {
+            "count": missed.count(),
+            "nextChange": iso(missed.next_change),
+            "routines": missed.routines.iter().map(|m| {
+                let mut row = vec![json!(m.routine.id)];
+                row.extend(m.missed.iter().map(|o| json!([o.occurrence.key(), dart_iso(o.missed_at)])));
+                Value::Array(row)
+            }).collect::<Vec<_>>(),
+        },
+        "openOf": open_of,
+        "recentlyDone": alarms.recently_done(&berlin)?.iter()
+            .map(|(id, o)| json!([id, o.key()]))
+            .collect::<Vec<_>>(),
+        "histories": histories,
+    }))
+}
+
+#[test]
+fn quiet_days_come_to_what_the_dart_core_says() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let expected = read_json(&fixtures().join("quiet-day").join("quiet_day.json"))?;
+    let read_at = read_json(&fixtures().join("quiet-day").join("expected.json"))?;
+    let store = load("quiet-day", read_at["now"].as_str().ok_or("now")?)?;
+    let days: serde_json::Map<String, Value> = PersonSettings::new(&store)
+        .quiet_days()?
+        .ends
+        .iter()
+        .map(|(day, end)| (day.to_string(), iso(*end)))
+        .collect();
+    assert_eq!(Value::Object(days), expected["quietDays"]);
+    let checks = expected["checks"].as_array().ok_or("checks")?;
+    assert_eq!(checks.len(), 5);
+    for check in checks {
+        let now = check["now"].as_str().ok_or("now")?;
+        let ours = quiet_day_check(&load("quiet-day", now)?)?;
+        for key in [
+            "quietUntil",
+            "agenda",
+            "alarms",
+            "headsUps",
+            "nudge",
+            "missed",
+            "openOf",
+            "recentlyDone",
             "histories",
         ] {
             assert_eq!(ours[key], check[key], "{now} {key}");
@@ -8163,6 +8527,111 @@ fn the_tag_tree_is_read_as_the_dart_core_reads_it() -> TestResult {
     Ok(())
 }
 
+/// The generator's `written`: `{n}` the app link to the `n`th Note,
+/// `{^n}` with its scheme in capitals, `{%n}` with its id's `:` encoded.
+fn backlink_text(text: &str, ids: &[String]) -> Result<String, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::app_link::{AppLink, SCHEME};
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(open) = rest.find('{') {
+        out.push_str(&rest[..open]);
+        let close = rest[open..].find('}').ok_or("unclosed")? + open;
+        let inner = &rest[open + 1..close];
+        let (mark, n) = match inner.chars().next() {
+            Some(c @ ('^' | '%')) => (Some(c), &inner[1..]),
+            _ => (None, inner),
+        };
+        let id = ids.get(n.parse::<usize>()?).ok_or("no such Note")?;
+        let url = AppLink::Note(id.clone()).url();
+        out.push_str(&match mark {
+            Some('^') => url.replacen(SCHEME, "OLDBRAINFIX://", 1),
+            Some(_) => format!("{SCHEME}note/{}", id.replace(':', "%3A")),
+            None => url,
+        });
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
+#[test]
+fn backlinks_are_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::Backlinks;
+    let fixture = read_json(&fixtures().join("backlinks.json"))?;
+    let captured = fixture["notes"].as_array().ok_or("notes")?;
+    let at = std::sync::Arc::new(std::sync::Mutex::new(parse_time(
+        "2026-11-12T08:00:00.000Z",
+    )?));
+    let clock = at.clone();
+    let store = Store::in_memory(
+        Box::new(move || clock.lock().map(|t| *t).unwrap_or_default()),
+        || Ok(SigningKey::from_seed([9; 32])),
+    )?;
+    let tick = || {
+        if let Ok(mut t) = at.lock() {
+            *t += chrono::Duration::minutes(1);
+        }
+    };
+    let notes = Notes::new(&store);
+    let places = Places::new(&store);
+    let mut area_ids = Vec::new();
+    for name in fixture["areas"].as_array().ok_or("areas")? {
+        area_ids.push(places.add_area(name.as_str().ok_or("area")?)?.id);
+    }
+    let mut ids: Vec<String> = Vec::new();
+    for note in captured {
+        tick();
+        let text = backlink_text(note["text"].as_str().ok_or("text")?, &ids)?;
+        let format = note["format"].as_str().unwrap_or("plain");
+        let place = match note["area"].as_u64() {
+            Some(i) => Some(area_ids.get(usize::try_from(i)?).ok_or("area")?.as_str()),
+            None => None,
+        };
+        ids.push(notes.capture_as(&text, format, place, None)?.id);
+    }
+    for (i, note) in captured.iter().enumerate() {
+        for amend in note["amends"].as_array().into_iter().flatten() {
+            tick();
+            let text = backlink_text(amend["text"].as_str().ok_or("amend")?, &ids)?;
+            let format = amend["format"].as_str().unwrap_or("plain");
+            notes.amend_as(&ids[i], &text, format)?;
+        }
+    }
+    for (i, note) in captured.iter().enumerate() {
+        if let Some(into) = note["into"].as_u64() {
+            notes.merge(&ids[i], &ids[usize::try_from(into)?])?;
+        }
+        if note["trashed"].as_bool() == Some(true) {
+            notes.trash(&ids[i])?;
+        }
+    }
+    let mut closed = std::collections::HashSet::new();
+    let areas = fixture["areas"].as_array().ok_or("areas")?;
+    for shut in fixture["closed"]["areas"].as_array().ok_or("closed")? {
+        let i = areas.iter().position(|a| a == shut).ok_or("closed area")?;
+        closed.insert(area_ids.get(i).ok_or("area")?.clone());
+    }
+    assert!(!closed.is_empty());
+    let backlinks = Backlinks::new(&store);
+    for (shut, wanted) in [
+        (std::collections::HashSet::new(), &fixture["linking"]),
+        (closed, &fixture["closed"]["linking"]),
+    ] {
+        let mut ours = Vec::new();
+        for id in &ids {
+            let linking: Vec<usize> = backlinks
+                .to(id, &shut)?
+                .iter()
+                .filter_map(|n| ids.iter().position(|i| *i == n.id))
+                .collect();
+            ours.push(json!(linking));
+        }
+        assert_eq!(&json!(ours), wanted);
+    }
+    assert_ne!(fixture["linking"], fixture["closed"]["linking"]);
+    Ok(())
+}
+
 // --------------------------------------------------- Schedule sentences
 
 /// `repeat` as the generator writes it.
@@ -9348,5 +9817,85 @@ fn a_sent_shopping_list_goes_as_the_dart_core_sends_and_takes_it() -> TestResult
         lines_of(&dir.join("plained.jsonl"))?
     );
     assert_eq!(read_shopping_of(&ben, &got)?, expected["third"]);
+    Ok(())
+}
+
+#[test]
+fn code_is_coloured_as_the_dart_core_colours_it() -> TestResult {
+    use oldbrainfix_core::highlight::{CodeRegex, CodeSpan, Grammar, Grammars};
+    let fixture = read_json(&fixtures().join("highlight.json"))?;
+    let grammars = Grammars::built_in();
+    // The built-in grammars, all read, in the same order.
+    let listed: Vec<Value> = grammars
+        .all
+        .iter()
+        .map(|g| json!({"name": g.name, "scope": g.scope, "fenceNames": g.file_extensions}))
+        .collect();
+    assert_eq!(Value::Array(listed), fixture["grammars"]);
+    assert_eq!(grammars.all.len(), 15);
+    // Spans in code points, as the fixture counts them.
+    let points = |text: &str, spans: Vec<CodeSpan>| -> Value {
+        let point = |byte: usize| text[..byte].chars().count();
+        Value::Array(
+            spans
+                .iter()
+                .map(|s| json!([point(s.start), point(s.end), s.colour.name()]))
+                .collect(),
+        )
+    };
+    for sample in fixture["samples"].as_array().ok_or("samples")? {
+        let scope = sample["scope"].as_str().ok_or("scope")?;
+        let text = sample["text"].as_str().ok_or("text")?;
+        let g = grammars.by_scope(Some(scope)).ok_or("the grammar")?;
+        assert!(
+            !sample["spans"].as_array().ok_or("spans")?.is_empty(),
+            "{scope}"
+        );
+        assert_eq!(points(text, g.colour(text)), sample["spans"], "{scope}");
+    }
+    for corner in fixture["corners"].as_array().ok_or("corners")? {
+        let g = Grammar::parse(corner["grammar"].as_str().ok_or("grammar")?)
+            .map_err(|e| format!("{e:?}"))?;
+        let text = corner["text"].as_str().ok_or("text")?;
+        assert_eq!(
+            points(text, g.colour(text)),
+            corner["spans"],
+            "{}",
+            corner["about"]
+        );
+    }
+    for fence in fixture["fences"].as_array().ok_or("fences")? {
+        let name = fence["name"].as_str().ok_or("name")?;
+        assert_eq!(
+            json!(grammars.for_fence(name).map(|g| &g.scope)),
+            fence["scope"],
+            "{name}"
+        );
+    }
+    for guess in fixture["guesses"].as_array().ok_or("guesses")? {
+        let text = guess["text"].as_str().ok_or("text")?;
+        assert_eq!(
+            json!(grammars.guess(text).map(|g| &g.scope)),
+            guess["scope"],
+            "{text}"
+        );
+    }
+    for refused in fixture["refused"].as_array().ok_or("refused")? {
+        let source = refused["grammar"].as_str().ok_or("grammar")?;
+        assert_eq!(
+            json!(Grammar::parse(source).is_err()),
+            refused["refused"],
+            "{}",
+            refused["about"]
+        );
+    }
+    for regex in fixture["regexes"].as_array().ok_or("regexes")? {
+        let source = regex["regex"].as_str().ok_or("regex")?;
+        assert_eq!(
+            json!(CodeRegex::parse(source).is_err()),
+            regex["refused"],
+            "{source}"
+        );
+    }
     Ok(())
 }

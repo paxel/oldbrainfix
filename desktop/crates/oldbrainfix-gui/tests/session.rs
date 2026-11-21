@@ -998,7 +998,7 @@ fn plus_on_a_session_note_offers_no_session_and_its_routine_runs_it() -> TestRes
     let t = L10n::new("en");
     let mut harness = window(&device.store, Some(&device.sport));
     add_menu(&mut harness, &t);
-    for offered in [t.routine(), t.reminder(), t.frog()] {
+    for offered in [t.remind_me(), t.frog()] {
         assert!(
             harness
                 .query_all_by_role_and_label(Role::Button, offered)
@@ -1013,13 +1013,18 @@ fn plus_on_a_session_note_offers_no_session_and_its_routine_runs_it() -> TestRes
             .next()
             .is_none()
     );
-    click_button(&mut harness, t.routine());
+    click_button(&mut harness, t.remind_me());
     assert!(
         harness
             .state()
             .routine_editor()
             .is_some_and(|e| e.session().is_none())
     );
+    // Remind me… starts as a Reminder; Every … makes it a Routine (#344).
+    harness
+        .get_by_role_and_label(Role::RadioButton, t.repeat_every())
+        .click();
+    harness.run();
     click_button(&mut harness, t.save());
     let runs = Sessions::new(&device.store).of_note(&device.sport)?;
     assert_eq!(runs.len(), 2);
@@ -1119,7 +1124,7 @@ fn with_no_tally_a_session_is_offered_shows_the_hint_and_save_makes_nothing() ->
     let t = L10n::new("en");
     let mut harness = window(&store, Some(&legs));
     add_menu(&mut harness, &t);
-    for offered in [t.routine(), t.reminder(), t.frog(), t.session()] {
+    for offered in [t.remind_me(), t.frog(), t.session()] {
         assert!(
             harness
                 .query_all_by_role_and_label(Role::Button, offered)

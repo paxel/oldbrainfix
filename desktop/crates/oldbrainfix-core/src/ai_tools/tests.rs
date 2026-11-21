@@ -285,6 +285,110 @@ fn the_text_format_is_read_and_set_as_a_pending_change() -> TestResult {
 }
 
 #[test]
+fn the_persons_own_grammars_are_listed_read_and_taken_by_set_code_language() -> TestResult {
+    let store = store();
+    let cobol = "name: COBOL\nscope: source.cobol\nfile_extensions: [cbl]\n\
+                 contexts:\n  main:\n    - match: '\\bMOVE\\b'\n      scope: keyword\n";
+    PersonSettings::new(&store)
+        .add_grammar(cobol.as_bytes())?
+        .map_err(|e| e.0)?;
+    let script = Notes::new(&store).capture("MOVE A TO B", None, None)?;
+    let task = store.open_ai_task()?;
+    let listed = json_of(&call(&store, &task, "list_code_languages", &json!({}))?)?;
+    let scopes: Vec<&Value> = listed
+        .as_array()
+        .ok_or("a list")?
+        .iter()
+        .map(|g| &g["scope"])
+        .collect();
+    assert!(scopes.contains(&&json!("source.cobol")));
+    assert!(scopes.contains(&&json!("source.rust")));
+    // read_settings names them, nothing of their files.
+    let settings = json_of(&call(&store, &task, "read_settings", &json!({}))?)?;
+    assert_eq!(
+        settings.pointer("/grammars"),
+        Some(&json!([{"name": "COBOL", "scope": "source.cobol"}]))
+    );
+    call(
+        &store,
+        &task,
+        "set_text_format",
+        &json!({"id": script.id, "format": "code"}),
+    )?;
+    let set = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.cobol"}),
+    )?;
+    assert!(!set.is_error, "{set:?}");
+    Ok(())
+}
+
+#[test]
+fn a_code_texts_language_is_listed_read_and_set_as_a_pending_change() -> TestResult {
+    let store = store();
+    let notes = Notes::new(&store);
+    let script = notes.capture("fn main() {}", None, None)?;
+    let task = store.open_ai_task()?;
+    let listed = call(&store, &task, "list_code_languages", &json!({}))?;
+    assert!(!listed.is_error, "{listed:?}");
+    assert!(format!("{listed:?}").contains(r#"\"scope\":\"source.rust\""#));
+    let language_of = |id: &str| -> std::result::Result<Value, Box<dyn std::error::Error>> {
+        let read = call(&store, &task, "read_note", &json!({"id": id}))?;
+        let [ToolContent::Text(text)] = &read.content[..] else {
+            return Err("a text".into());
+        };
+        let read: Value = serde_json::from_str(text)?;
+        Ok(read["codeLanguage"].clone())
+    };
+    assert_eq!(language_of(&script.id)?, Value::Null);
+    // Not while the text is plain.
+    let refused = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.rust"}),
+    )?;
+    assert!(refused.is_error);
+    call(
+        &store,
+        &task,
+        "set_text_format",
+        &json!({"id": script.id, "format": "code"}),
+    )?;
+    let set = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.rust"}),
+    )?;
+    assert!(!set.is_error, "{set:?}");
+    assert_eq!(language_of(&script.id)?, json!("source.rust"));
+    // No grammar of that scope.
+    let refused = call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": "source.cobol"}),
+    )?;
+    assert!(refused.is_error);
+    // Empty for none.
+    call(
+        &store,
+        &task,
+        "set_code_language",
+        &json!({"id": script.id, "language": ""}),
+    )?;
+    assert_eq!(language_of(&script.id)?, Value::Null);
+    let review = store.ai_review(&task)?;
+    assert!(review.groups.iter().any(|(kind, items)| {
+        *kind == crate::ai_task::AiChangeKind::NoteText && items[0].entity == script.id
+    }));
+    Ok(())
+}
+
+#[test]
 fn a_sections_text_is_edited_as_a_pending_change() -> TestResult {
     let store = store();
     let notes = Notes::new(&store);
@@ -383,6 +487,20 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     assert_eq!(read.pointer("/textSize"), Some(&json!("larger")));
     assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
     assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
+    // Today's quiet day (obf-1044), read only.
+    assert_eq!(read.pointer("/quietDayUntil"), Some(&Value::Null));
+    let utc = |t: DateTime<Utc>| t.naive_utc();
+    PersonSettings::new(&store).quiet_today(&utc)?;
+    let midnight = Day::today(store.now(), &utc).add_days(1);
+    let settings = call(&store, &task, "read_settings", &json!({}))?;
+    assert_eq!(
+        json_of(&settings)?.pointer("/quietDayUntil"),
+        Some(&json!(dart_iso(crate::alarms::instant_of(
+            midnight,
+            crate::schedule::ClockTime { hour: 0, minute: 0 },
+            &utc,
+        ))))
+    );
     PersonSettings::new(&store).set_advanced(false)?;
     store.set_ai_on(true)?;
     store.set_ask_thinks(true)?;
@@ -863,6 +981,55 @@ fn a_checklists_agenda_choice_is_set_once_accepted() -> TestResult {
 }
 
 #[test]
+fn a_routines_heads_ups_are_set_once_accepted() -> TestResult {
+    use crate::routines::heads_up_keys;
+    let store = store();
+    let note = Notes::new(&store).capture("Dentist", None, None)?.id;
+    let schedule = Schedule::new(Day::new(2026, 3, 1), &[], None).ok_or("a schedule")?;
+    let routine = Routines::new(&store).spawn(&note, &schedule)?.id;
+    let task = store.open_ai_task()?;
+    let set = |id: &str, minutes: Value| {
+        call(
+            &store,
+            &task,
+            "set_heads_ups",
+            &json!({"id": id, "minutes": minutes}),
+        )
+    };
+    assert!(
+        set("routine:none", json!([20]))?.is_error,
+        "no such Routine"
+    );
+    assert!(set(&routine, json!("20"))?.is_error, "no list");
+    assert!(set(&routine, json!([20, "x"]))?.is_error, "no number");
+    let logged = store.all_entries()?.len();
+    assert!(!set(&routine, json!([1440, 20, 20, 0, 99999]))?.is_error);
+    assert_eq!(store.all_entries()?.len(), logged, "the log waits");
+    let entity = heads_up_keys::of(&routine);
+    assert_eq!(
+        store.current(&entity, heads_up_keys::HEADS_UPS)?.as_deref(),
+        Some("20,1440")
+    );
+    let review = store.ai_review(&task)?;
+    let items: Vec<&crate::ai_task::AiReviewItem> =
+        review.groups.iter().flat_map(|(_, i)| i).collect();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].kind, crate::ai_task::AiChangeKind::Routine);
+    assert_eq!(items[0].note.as_deref(), Some(note.as_str()));
+    // Read from the user's own entries in the log alone, they ring once
+    // accepted.
+    let listed = json_of(&call(&store, &task, "list_routines", &json!({}))?)?;
+    assert_eq!(listed[0]["headsUpMinutes"], json!([]));
+    assert!(Routines::new(&store).heads_ups(&routine)?.is_empty());
+    store.accept_pending(&task)?;
+    assert_eq!(Routines::new(&store).heads_ups(&routine)?, [20, 1440]);
+    let task = store.open_ai_task()?;
+    let out = json_of(&call(&store, &task, "list_routines", &json!({}))?)?;
+    assert_eq!(out[0]["headsUpMinutes"], json!([20, 1440]));
+    Ok(())
+}
+
+#[test]
 fn a_shopping_lists_agenda_choice_is_set_once_accepted() -> TestResult {
     let store = store();
     let shop = shopping_list(&store, "Shop\nMilk")?;
@@ -929,6 +1096,7 @@ fn no_tool_writes_the_users_own_data() {
         "merge_notes",
         "set_importance",
         "set_text_format",
+        "set_code_language",
         "remove_captured",
         "trash_note",
         "restore_note",
@@ -942,6 +1110,7 @@ fn no_tool_writes_the_users_own_data() {
         "reschedule_routine",
         "set_renag",
         "set_escalation",
+        "set_heads_ups",
         "trash_routine",
         "restore_routine",
         "make_tally",

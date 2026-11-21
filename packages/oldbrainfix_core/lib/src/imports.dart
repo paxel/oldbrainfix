@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'checklists.dart';
+import 'import_formats.dart';
 import 'notes.dart';
 import 'places.dart';
 import 'shopping_lists.dart';
@@ -124,12 +125,15 @@ class Imports {
 
   Imports(this.store);
 
-  /// Makes one Note of each Markdown (`.md`, `.markdown`) and text
-  /// (`.txt`) file of [files] in a new Area named [areaName], as [notes]
-  /// writes them; any other file is skipped and counted. A Markdown
-  /// file's Note is formatted, its Markdown as written; a text file's is
-  /// plain. A Note is dated by its file's modification time, and by now
-  /// when that is unknown or later.
+  /// Makes one Note of each Markdown (`.md`, `.markdown`), text
+  /// (`.txt`), AsciiDoc (`.adoc`, `.asciidoc`, `.asc`), Org (`.org`),
+  /// reStructuredText (`.rst`) and HTML (`.html`, `.htm`) file of [files]
+  /// in a new Area named [areaName], as [notes] writes them; any other
+  /// file is skipped and counted. A Markdown file's Note is formatted,
+  /// its Markdown as written; a text file's is plain; the others' are
+  /// formatted, read into the Markdown subset ([ImportFormats]). A Note
+  /// is dated by its file's modification time, and by now when that is
+  /// unknown or later.
   ImportSummary folder(String areaName, List<ImportFile> files) {
     final name = _areaName(areaName);
     final now = store.clock().toUtc();
@@ -138,7 +142,8 @@ class Imports {
     var tooLarge = 0;
     for (final file in files) {
       final base = _base(file.name);
-      final format = _format(base);
+      final document = _document(base);
+      final format = document == null ? _format(base) : TextFormats.markdown;
       if (format == null) {
         notText++;
         continue;
@@ -152,11 +157,16 @@ class Imports {
         notText++;
         continue;
       }
-      final text = _titled(
-        base.substring(0, base.lastIndexOf('.')),
-        read,
-        format,
-      );
+      final stem = base.substring(0, base.lastIndexOf('.'));
+      final String text;
+      if (document != null) {
+        // A page's own title stands under the file's name, unless the
+        // text begins with it, as the name does.
+        final page = ImportFormats.read(document, read);
+        text = _titled(stem, _titled(page.title, page.text, format), format);
+      } else {
+        text = _titled(stem, read, format);
+      }
       if (text.isEmpty) {
         notText++;
         continue;
@@ -575,6 +585,16 @@ class Imports {
       'txt' => TextFormats.plain,
       _ => null,
     };
+  }
+
+  /// The format of a document of another tool the file [base] is, by its
+  /// extension in any case of ASCII letters; null for a hidden file and
+  /// any other kind.
+  static ImportFormat? _document(String base) {
+    if (base.startsWith('.')) return null;
+    final dot = base.lastIndexOf('.');
+    if (dot < 0) return null;
+    return ImportFormats.ofExtension(_asciiLower(base.substring(dot + 1)));
   }
 
   static String _asciiLower(String text) => String.fromCharCodes([

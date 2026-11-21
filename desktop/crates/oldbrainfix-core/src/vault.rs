@@ -921,6 +921,9 @@ fn properties(
         ("captured", json!(dart_iso(note.captured))),
         ("format", json!(note.text_format)),
     ];
+    if let Some(language) = &note.code_language {
+        props.push(("language", json!(language)));
+    }
     if note.text_version != VERSION {
         props.push(("textVersion", json!(note.text_version)));
     }
@@ -2092,6 +2095,9 @@ fn write_ours(
     store.append(note, note_keys::TEXT, Some(&text), date)?;
     if let Some(place) = place {
         store.append(note, note_keys::PLACE, Some(place), date)?;
+    }
+    if let Some(language) = text_of("language").filter(|l| !l.is_empty()) {
+        store.append(note, note_keys::LANGUAGE, Some(language), date)?;
     }
     if let Some(importance) = text_of("importance") {
         let importance = notes::Importance::from_name(Some(importance));

@@ -219,6 +219,36 @@
           "mayUse": false
         }
       ]
+    },
+    {
+      "id": "note:00000000000000000000000000000019",
+      "history": [
+        {
+          "at": "2026-01-01T10:02:45.000Z",
+          "entity": "note:00000000000000000000000000000019",
+          "kind": "captured",
+          "before": null,
+          "after": "Night train",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000001b",
+      "history": [
+        {
+          "at": "2026-01-01T10:02:57.000Z",
+          "entity": "note:0000000000000000000000000000001b",
+          "kind": "captured",
+          "before": null,
+          "after": "Haircut",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
     }
   ]
 }

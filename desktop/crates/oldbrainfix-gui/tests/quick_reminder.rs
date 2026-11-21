@@ -3,10 +3,10 @@
 //! Tonight, Tomorrow and In a week, each with its time, Tomorrow and In a
 //! week when this Device's Quiet Hours end (09:00 while they are off),
 //! Tonight only until 19:00. One click sets the schedule and Save writes
-//! it; a chip is read again at the click. A new Reminder from a Note, a
-//! new Routine set to Once and the quick note's alarm clock, in the
-//! window and the popup, offer them; a saved Reminder, a Session, an
-//! Advanced schedule and a repeat do not.
+//! it; a chip is read again at the click. A new Reminder from a Note,
+//! also one the quick note's More opened (#352), and a new Routine set to
+//! Once offer them; a saved Reminder, a Session, an Advanced schedule and
+//! a repeat do not.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -27,7 +27,6 @@ use oldbrainfix_core::{
     ClockTime, Day, DeviceSettings, Note, Notes, OwnProfile, QuietHours, Routine, Routines,
     Schedule, SigningKey, Store, parse_time,
 };
-use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -40,7 +39,7 @@ fn utc(at: DateTime<Utc>) -> NaiveDateTime {
 /// Monday, 26 October 2026, 14:20.
 const NOW: &str = "2026-10-26T14:20:00.000Z";
 
-/// The alarm clock of a Note and of the quick note.
+/// The alarm clock of a Note.
 const CLOCK: &str = "Routine, Reminder, Frog or Session";
 
 /// The starts of the chips' labels, in their order.
@@ -134,7 +133,7 @@ fn reminder(
     harness.run();
     harness.get_by_label(CLOCK).click();
     harness.run();
-    click(&mut harness, "Reminder")?;
+    click(&mut harness, "Remind me…")?;
     assert!(harness.state().routine_editor().is_some());
     Ok((harness, note))
 }
@@ -306,7 +305,9 @@ fn a_saved_reminder_and_a_new_session_offer_none() -> TestResult {
 }
 
 #[test]
-fn the_quick_notes_alarm_clock_takes_a_chip_with_the_note() -> TestResult {
+fn the_quick_notes_more_leads_to_the_alarm_clock_and_its_chips() -> TestResult {
+    // The quick note has no alarm clock (#352): More saves it and opens
+    // the Note dialog, whose alarm clock offers the chips.
     let (store, _) = store(NOW)?;
     let mut harness = window(&store, Selection::Agenda);
     harness.state_mut().new_note();
@@ -317,22 +318,16 @@ fn the_quick_notes_alarm_clock_takes_a_chip_with_the_note() -> TestResult {
     harness.run();
     harness.get_by(|n| n.is_focused()).type_text("Buy stamps");
     harness.run();
+    assert!(harness.query_all_by_label(CLOCK).next().is_none());
+    click(&mut harness, "More")?;
+    assert!(!harness.state().quick_note_open());
     harness.get_by_role_and_label(Role::Button, CLOCK).click();
     harness.run();
-    click(&mut harness, "Reminder")?;
+    click(&mut harness, "Remind me…")?;
+    assert_eq!(chips(&harness).len(), 4);
     click(&mut harness, "Tonight 19:00")?;
     click(&mut harness, "Save")?;
     assert!(harness.state().routine_editor().is_none());
-    assert!(Routines::new(&store).all()?.is_empty());
-    // Back in the quick note's field, Ctrl+Enter saves both.
-    harness
-        .get_by(|n| {
-            n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Buy stamps")
-        })
-        .click();
-    harness.run();
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Enter);
-    harness.run();
     let note = Notes::new(&store)
         .all()?
         .into_iter()
@@ -341,54 +336,5 @@ fn the_quick_notes_alarm_clock_takes_a_chip_with_the_note() -> TestResult {
     let saved = reminders_of(&store, &note.id)?;
     assert_eq!(saved.len(), 1);
     assert_eq!(saved[0].schedule, once(Day::new(2026, 10, 26), 19, 0)?);
-    Ok(())
-}
-
-struct Popup {
-    popup: CapturePopup,
-    outcome: Outcome,
-}
-
-#[test]
-fn the_popups_alarm_clock_takes_a_chip_with_the_note() -> TestResult {
-    let (store, _) = store(NOW)?;
-    let mut popup = CapturePopup::new(store.clone(), "en");
-    popup.set_wall_clock(Arc::new(utc));
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(560.0, 1400.0))
-        .build_ui_state(
-            |ui, state: &mut Popup| {
-                App::install(ui.ctx());
-                if state.outcome == Outcome::Open {
-                    state.outcome = state.popup.show(ui);
-                }
-            },
-            Popup {
-                popup,
-                outcome: Outcome::Open,
-            },
-        );
-    harness.run();
-    harness
-        .get_by(|n| n.is_focused())
-        .type_text("Call the dentist");
-    harness.run();
-    harness.get_by_role_and_label(Role::Button, CLOCK).click();
-    harness.run();
-    click(&mut harness, "Reminder")?;
-    assert_eq!(chips(&harness).len(), 4);
-    click(&mut harness, "Tomorrow 08:00")?;
-    click(&mut harness, "Save")?;
-    assert!(!harness.state().popup.page_open());
-    click(&mut harness, "Save")?;
-    assert_eq!(harness.state().outcome, Outcome::Closed);
-    let note = Notes::new(&store)
-        .all()?
-        .into_iter()
-        .find(|n| n.text == "Call the dentist")
-        .ok_or("the Note")?;
-    let saved = reminders_of(&store, &note.id)?;
-    assert_eq!(saved.len(), 1);
-    assert_eq!(saved[0].schedule, once(Day::new(2026, 10, 27), 8, 0)?);
     Ok(())
 }

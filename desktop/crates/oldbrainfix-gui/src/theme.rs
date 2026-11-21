@@ -9,6 +9,7 @@ use egui::{
     Button, Color32, Context, Key, Modifiers, Rect, Response, Shape, Stroke, Theme,
     ThemePreference, Ui, Visuals,
 };
+use oldbrainfix_core::highlight::CodeColour;
 use oldbrainfix_core::{TextSize, ThemeChoice};
 
 /// The colours of one brightness.
@@ -278,6 +279,22 @@ pub const CODE_TINT: f32 = 0.08;
 pub fn code_tint(text: Color32) -> Color32 {
     let alpha = (CODE_TINT * 255.0).round() as u8;
     Color32::from_rgba_unmultiplied(text.r(), text.g(), text.b(), alpha)
+}
+
+/// The colour a part of code of the kind `part` is drawn in (obf-1036),
+/// in the dark look while `dark`, readable on [`code_tint`]: GitHub's
+/// palette, as the phone's.
+pub fn code_colour(dark: bool, part: CodeColour) -> Color32 {
+    let (light, dark_one) = match part {
+        CodeColour::Comment => (0x6A737D, 0x8B949E),
+        CodeColour::String => (0x0A3069, 0xA5D6FF),
+        CodeColour::Number | CodeColour::Constant | CodeColour::Attribute => (0x0550AE, 0x79C0FF),
+        CodeColour::Keyword | CodeColour::Operator => (0xCF222E, 0xFF7B72),
+        CodeColour::Type | CodeColour::Variable => (0x953800, 0xFFA657),
+        CodeColour::Function => (0x8250DF, 0xD2A8FF),
+        CodeColour::Tag => (0x116329, 0x7EE787),
+    };
+    argb(0xFF00_0000 | if dark { dark_one } else { light })
 }
 
 /// The visuals of one brightness: egui's own, on the phone's colours.

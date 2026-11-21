@@ -30,12 +30,13 @@
 </box-tab>
 <box-more>
 <ul>
-  <li><strong>From a Note</strong>: the alarm clock on the Note's card, "Routine, Reminder, Frog or Session", offers <strong>Routine</strong> and <strong>Reminder</strong>; it sits in the row under a detailed card. The "+" at the end of the Note editor's badges offers the same, and so does the alarm clock of the quick note before the Note is saved, which saves the Routine or Reminder together with the Note and, left with nothing typed, neither (see <a href="capture-and-sort.html#sort-while-capturing">Sort while capturing</a>). In Simple they offer only Routine and Reminder; Frog and Session are there in Advanced. The editor shows the Note on top under "From the Note"; a tap on it opens the Note. For a Note still being captured it shows the text typed so far, or "The Note being captured", and a tap does nothing. A Note can have several Routines and Reminders; on a Session each of them runs the Session, which its Note sets up (see <a href="lists-tallies-sessions-frogs.html">Lists, Tallies, Sessions and Frogs</a>).</li>
+  <li><strong>From a Note</strong>: the alarm clock on the Note's card, "Routine, Reminder, Frog or Session", offers <strong>Remind me…</strong> for both; it sits in the row under a detailed card. The "+" at the end of the Note editor's badges offers the same, also for a thought just typed into the quick note, after <strong>More</strong> (see <a href="capture-and-sort.html#sort-while-capturing">Sort while capturing</a>). In Simple they offer only Remind me…; Frog and Session are there in Advanced. The editor shows the Note on top under "From the Note"; a tap on it opens the Note. For a Note still being captured it shows the text typed so far, or "The Note being captured", and a tap does nothing. A Note can have several Routines and Reminders; on a Session each of them runs the Session, which its Note sets up (see <a href="lists-tallies-sessions-frogs.html">Lists, Tallies, Sessions and Frogs</a>).</li>
   <li><strong>Without a Note</strong>: "New Routine or Reminder" in the Agenda's bar opens the editor with the field "What is to be done?". The text typed there becomes the Routine's Note.</li>
 </ul>
 <p>
-  A new Routine or Session starts every day, all day, a new Reminder once at the next full hour; the
-  Agenda's "New Routine or Reminder" starts a Routine. A new Reminder, or a new Routine
+  Remind me… starts a Reminder, once at the next full hour; picking a repeat in its editor makes it a
+  Routine and keeps the day and times set, and Once makes it a Reminder again. A new Session starts
+  every day, all day, and the Agenda's "New Routine or Reminder" starts a Routine. A new Reminder, or a new Routine
   set to Once, has four buttons under the line <strong>When</strong>, each with its time:
   <strong>In 1 h</strong>, <strong>Tonight</strong> at 19:00, shown until 19:00,
   <strong>Tomorrow</strong> and <strong>In a week</strong>, both when this Device's Quiet Hours end,
@@ -62,10 +63,9 @@
 </p>
 <p>
   On the desktop the editor opens as a dialog over the window. A Note is given a Routine or Reminder
-  in the Note dialog, with the "+" at the end of its badges, or with <strong>Note ▸ Routine…</strong>
-  and <strong>Note ▸ Reminder…</strong>, which follow with Frog and Session in Advanced, as a card's
-  ⋮ and right-click offer them; the cards have no alarm clock. The alarm clock of the quick note, in the window and the popup, offers
-  Routine and Reminder too. The dialog has the History button beside its heading and
+  in the Note dialog, with the "+" at the end of its badges, or with <strong>Note ▸ Remind me…</strong>,
+  which Frog and Session follow in Advanced, as a card's
+  ⋮ and right-click offer them; the cards have no alarm clock. The quick note's <strong>More</strong> opens the Note dialog with them. The dialog has the History button beside its heading and
   <strong>Cancel</strong>, <strong>Delete</strong> and <strong>Save</strong> at the bottom; it has no
   calendar button. Esc or a click beside it saves as leaving does; <strong>Cancel</strong> drops
   the change. Where only a Manager may change a
@@ -185,6 +185,16 @@
   alarm". Its Stop counts as Done, and its one Snooze waits 10 min, as the alarm has room
   for one only. Without the Alarms access it comes as a time-sensitive notification.
 </p>
+<p>
+  Under <strong>Heads-ups</strong> in the editor a Routine or Reminder warns ahead of its
+  Occurrence, such as "Dentist in 20 min" at 09:40 for 10:00. <strong>Add heads-up</strong> offers
+  5, 10, 15 and 30 min, 1 and 2 h, 1 and 2 days and 1 week before, an all-day one whole days only;
+  the ✕ beside one removes it. A heads-up is one notification with no Re-nag and nothing to check
+  off, without sound in the Quiet Hours; the Occurrence still rings at its time. An all-day one
+  warns on its day at the time it would ring. Done, Skip or Snooze before it cancels the heads-up.
+  Heads-ups are your own and stay on your own Devices: in a Shared Area each person sets their own,
+  also a Member who may not change the Routine.
+</p>
 </box-more>
 </guide-box>
 
@@ -233,8 +243,9 @@
   then on it rings and Re-nags until it counts as Missed: at the start of the day of its next
   Occurrence, or at midnight when there is none. The Quiet Hours hold back only Nudges and that
   first ring: when they hold the time, an all-day Occurrence rings once they end, and not at all
-  when they last until it counts as Missed. Routines and Reminders with a time ring on time. A
-  calendar file from <strong>Export</strong> or <strong>Share</strong> gives an all-day event its
+  when they last until it counts as Missed. In the Quiet Hours every Routine and Reminder shows
+  without sound or vibration, its Re-nags too; only a Routine with Escalation on rings with sound
+  from its first ring. Routines and Reminders with a time come on time. A calendar file from <strong>Export</strong> or <strong>Share</strong> gives an all-day event its
   alarm at the time of the Device that saved it.
 </p>
 <p>
@@ -480,6 +491,17 @@
   at once without opening the app; the app takes the tick in the next time it opens or comes back.
   The appointments show while the app has full access to the calendars. The swipe from the Agenda to
   the Areas starts away from the left edge, where iOS's own swipe goes back.
+</p>
+<p>
+  On a day you want to see what is due but not be pushed to it, such as a sick day,
+  <strong>Quiet today</strong> makes it a quiet day on all your own Devices: on the phone it is the
+  bell in the Agenda's top bar, or in its ⋮ when the bar is full; on the desktop it is in the ⋮ of
+  the Agenda's bar.
+  The Agenda then starts with "Quiet day until midnight" and still shows everything, each to check
+  off on its own, but nothing notifies that day: no ring, Re-nag, heads-up, Escalation or Nudge.
+  What is left undone at midnight counts as skipped, never as Missed. <strong>End</strong> on that
+  line ends it at once: what is still to come rings again, what already passed does not. Each
+  Device ends it at its own midnight.
 </p>
 </box-more>
 </guide-box>

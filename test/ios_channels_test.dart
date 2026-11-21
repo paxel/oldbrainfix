@@ -381,7 +381,7 @@ void main() {
 
     await openTextCapture(tester);
     await settle(tester);
-    await tester.pageBack();
+    await backFromCapture(tester);
     await settle(tester);
     expect(find.byType(AgendaScreen), findsOneWidget);
 

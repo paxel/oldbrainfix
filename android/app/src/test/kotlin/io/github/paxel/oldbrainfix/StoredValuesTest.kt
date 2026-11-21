@@ -122,6 +122,25 @@ class StoredValuesTest {
     }
 
     @Test
+    fun anAlarmReadsTheQuietHoursItKeepsQuietIn() {
+        val plan = JSONArray()
+            .put(alarmJson("a"))
+            .put(alarmJson("b").put("quiet", JSONArray(listOf(22, 0, 8, 0))))
+        assertEquals(listOf(null, listOf(22, 0, 8, 0)), Scheduler.planOf(plan.toString()).map { it.quiet })
+    }
+
+    @Test
+    fun aHeadsUpReadsAsAnAlarmThatRingsOnce() {
+        val plan = JSONArray()
+            .put(alarmJson("h").put("minutes", 20).put("quiet", JSONArray(listOf(22, 0, 8, 0))))
+        val headsUp = Scheduler.planOf(plan.toString()).single()
+        assertEquals(listOf(2026, 10, 24, 8, 0), headsUp.local)
+        assertEquals(0L, headsUp.renagMs)
+        assertEquals(null, headsUp.end)
+        assertEquals(listOf(22, 0, 8, 0), headsUp.quiet)
+    }
+
+    @Test
     fun theLabelsFallBackToTheirNames() {
         val labels = JSONObject().put("done", "Erledigt").put("snooze", 5)
         assertEquals("Erledigt", Scheduler.labelOf(labels.toString(), "done"))

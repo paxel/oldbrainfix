@@ -382,9 +382,10 @@ void main() {
       final store = Store.inMemory();
       addTearDown(store.close);
       final notes = Notes(store);
+      // A language not known here, so in one colour (obf-1036).
       final id = notes
           .capture(
-            '#a\n```bash\n**x** #tag ☐\n# no\n```\nafter',
+            '#a\n```txt\n**x** #tag ☐\n# no\n```\nafter',
             format: TextFormats.markdown,
           )
           .id;
@@ -402,7 +403,7 @@ void main() {
       final shown = shownUnder(tester, text);
       expect(shown, endsWith('#a|$content|after'));
       expect(shown, isNot(contains('`')));
-      expect(shown, isNot(contains('bash')));
+      expect(shown, isNot(contains('txt')));
       final tags = find.byWidgetPredicate(
         (w) => w.key is ValueKey<String> && '${w.key}'.contains("'tag-"),
       );
@@ -509,8 +510,7 @@ void main() {
       await tester.pumpAndSettle();
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), text);
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
+      await saveCapture(tester);
     }
 
     testWidgets('a text that uses a format is kept formatted, and its card '

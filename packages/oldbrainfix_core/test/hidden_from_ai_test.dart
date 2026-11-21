@@ -89,6 +89,7 @@ void main() {
       expect(ann.hiddenFromAiBy(merged), [alone]);
       expect(ann.hiddenFromAiBy(line), [list]);
       expect(ann.hiddenFromAiBy('${ChecklistKeys.agendaPrefix}$list'), [list]);
+      expect(ann.hiddenFromAiBy(HeadsUpKeys.of(routine)), [alone]);
       expect(ann.isHiddenFromAi(open), isFalse);
       notes.file(inArea, places.addArea('Work').id);
       expect(ann.isHiddenFromAi(inArea), isFalse);

@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:02:41.000Z",
+  "now": "2026-01-02T10:03:11.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -362,9 +362,71 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000019",
+      "text": "Night train",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:45.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000001b",
+      "text": "Haircut",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:57.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
     }
   ],
   "all": [
+    "note:0000000000000000000000000000001b",
+    "note:00000000000000000000000000000019",
     "note:00000000000000000000000000000018",
     "note:00000000000000000000000000000017",
     "note:00000000000000000000000000000011",
@@ -386,6 +448,8 @@
   ],
   "inside": {},
   "sections": {
+    "note:0000000000000000000000000000001b": [],
+    "note:00000000000000000000000000000019": [],
     "note:00000000000000000000000000000018": [],
     "note:00000000000000000000000000000017": [],
     "note:00000000000000000000000000000011": [],
@@ -403,6 +467,18 @@
   "unreadPhotos": [],
   "removable": {},
   "shares": {
+    "note:0000000000000000000000000000001b": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Haircut"
+    },
+    "note:00000000000000000000000000000019": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Night train"
+    },
     "note:00000000000000000000000000000018": {
       "html": null,
       "photos": [],
@@ -478,6 +554,8 @@
   },
   "search": {
     "": [
+      "note:0000000000000000000000000000001b",
+      "note:00000000000000000000000000000019",
       "note:00000000000000000000000000000018",
       "note:00000000000000000000000000000017",
       "note:00000000000000000000000000000011",

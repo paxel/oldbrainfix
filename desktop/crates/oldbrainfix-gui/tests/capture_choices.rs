@@ -1,607 +1,124 @@
-//! Finishing a Note while capturing it (#113), in the capture popup and
-//! the window's capture field, driven headless by egui_kittest over a
-//! store with its clock held still: the Note card's buttons show, a
-//! choice shows at the top and is not written, leaving or saving writes
-//! the Note and all of it together, a sorted Note gets one Save and no
-//! Nudge, an empty Note writes nothing and drops its choices, and a write
-//! failing on the way leaves nothing written and everything on screen.
+//! Writing a Note as it is captured (#113): [`capture_choices::capture`],
+//! which the quick note, the popup and the window's dialog save through,
+//! over a store with its clock held still. A Note filed where it goes
+//! gets no Nudge, an Unsorted one its Nudge, an empty one writes nothing,
+//! and a Kind it is made applies to the typed lines only (#310). The quick
+//! note itself sets nothing up any more (#352): what it showed for that
+//! is the Note dialog's, tested there.
 
 use std::sync::Arc;
 
-use egui::Key;
-use egui::accesskit::{Role, Toggled};
-use egui_kittest::Harness;
-use egui_kittest::kittest::{NodeT, Queryable};
+use chrono::Duration;
 use oldbrainfix_core::{
-    Checklists, DeviceSettings, Frogs, Importance, Note, Notes, OwnProfile, Places,
-    QuickNoteControl, Routines, Sessions, ShoppingLists, SigningKey, Store, Tallies, parse_time,
+    Checklists, Note, Notes, OwnProfile, Places, ShoppingLists, SigningKey, Store, parse_time,
 };
-use oldbrainfix_gui::App;
 use oldbrainfix_gui::capture_choices::{self, CaptureChoices, CaptureKind, Captured};
-use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// A store with the Area "Household" and the Tally "Push-ups", every
-/// Quick note switch on (#142); the store, the Area's id and the Tally's
-/// Note.
-fn store() -> Result<(Arc<Store>, String, String), Box<dyn std::error::Error>> {
+/// A store with the Area "Household"; the store and the Area's id.
+fn store() -> Result<(Arc<Store>, String), Box<dyn std::error::Error>> {
     let now = parse_time("2026-10-26T09:00:00.000Z")?;
     let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([3; 32])))?;
     OwnProfile::new(&store).apply_defaults("Desk", None)?;
-    for control in QuickNoteControl::ALL {
-        DeviceSettings::new(&store).set_quick_note_shows(control, true)?;
-    }
     let household = Places::new(&store).add_area("Household")?.id;
-    let tally = Notes::new(&store).capture("Push-ups", None, None)?.id;
-    Tallies::new(&store).add_field(&tally, "Push-ups", "times", Some(20.0), None)?;
-    Ok((Arc::new(store), household, tally))
-}
-
-/// The Note with `text`, if one was written.
-fn note(store: &Store, text: &str) -> Result<Option<Note>, Box<dyn std::error::Error>> {
-    Ok(Notes::new(store)
-        .all()?
-        .into_iter()
-        .find(|n| n.text == text))
+    Ok((Arc::new(store), household))
 }
 
 fn nudge(store: &Store, id: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
     Ok(store.current(id, "nudge")?)
 }
 
-fn shows<S>(harness: &Harness<'_, S>, label: &str) -> bool {
-    harness.query_all_by_label(label).next().is_some()
+fn wall(at: chrono::DateTime<chrono::Utc>) -> chrono::NaiveDateTime {
+    at.naive_utc()
 }
 
-fn click<S>(harness: &mut Harness<'_, S>, label: &str) {
-    harness
-        .get_by_role_and_label(Role::Button, label)
-        .click_accesskit();
-    harness.run();
+/// Captures `text` into `place` with `choices`, nothing held.
+fn captured(
+    store: &Store,
+    text: &str,
+    place: Option<&str>,
+    choices: &CaptureChoices,
+) -> Result<Captured, Box<dyn std::error::Error>> {
+    Ok(capture_choices::capture(
+        store,
+        text,
+        place,
+        Duration::minutes(10),
+        (&[], &[], &[]),
+        (choices, &wall),
+    )?)
 }
 
-/// The quick note's alarm clock, whose menu offers a Routine or Reminder
-/// and, switched on, a Frog and Session (#223).
-const CLOCK: &str = "Routine, Reminder, Frog or Session";
-
-/// Sets up `kind` from the alarm clock's menu.
-fn spawn<S>(harness: &mut Harness<'_, S>, kind: &str) {
-    harness.get_by_role_and_label(Role::Button, CLOCK).click();
-    harness.run();
-    click(harness, kind);
-}
-
-struct Popup {
-    popup: CapturePopup,
-    closed: bool,
-}
-
-/// A popup over `store`, as tall as a page needs.
-fn popup(store: &Arc<Store>) -> Harness<'static, Popup> {
-    let popup = CapturePopup::new(store.clone(), "en");
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(560.0, 900.0))
-        .build_ui_state(
-            |ui, state: &mut Popup| {
-                App::install(ui.ctx());
-                if state.popup.show(ui) == Outcome::Closed {
-                    state.closed = true;
-                }
-            },
-            Popup {
-                popup,
-                closed: false,
-            },
-        );
-    harness.run();
-    harness
-}
-
-fn type_in_popup(harness: &mut Harness<'_, Popup>, text: &str) {
-    harness.get_by(|n| n.is_focused()).type_text(text);
-    harness.run();
-}
-
-/// Sets up a Session picking "Push-ups" every day in the Routine editor
-/// on the page shown, and saves it there.
-fn choose_session<S>(harness: &mut Harness<'_, S>) {
-    assert!(shows(harness, "New Session"));
-    harness
-        .get_by_role_and_label(Role::CheckBox, "Push-ups")
-        .click_accesskit();
-    harness.run();
-    click(harness, "Save");
+fn kept(captured: Captured) -> Result<Note, Box<dyn std::error::Error>> {
+    match captured {
+        Captured::Note(note) => Ok(note),
+        _ => Err("a Note".into()),
+    }
 }
 
 #[test]
-fn the_popup_files_the_note_and_saves_it_without_a_nudge() -> TestResult {
-    let (store, household, _) = store()?;
-    let mut harness = popup(&store);
-    for label in ["File into…", CLOCK, "More"] {
-        assert!(shows(&harness, label), "{label}");
-    }
-    assert!(shows(&harness, "10 min"));
-    type_in_popup(&mut harness, "Descale the kettle");
-    click(&mut harness, "File into…");
-    click(&mut harness, "Household");
-    // Shown at the top, not written.
-    assert!(shows(&harness, "Into: Household"));
+fn an_unsorted_capture_keeps_its_nudge_and_a_filed_one_none() -> TestResult {
+    let (store, household) = store()?;
+    let choices = CaptureChoices::default();
+    let stamps = kept(captured(&store, "Buy stamps", None, &choices)?)?;
+    assert_eq!(stamps.place, None);
+    assert!(nudge(&store, &stamps.id)?.is_some());
+    let tap = kept(captured(&store, "Fix the tap", Some(&household), &choices)?)?;
+    assert_eq!(tap.place.as_deref(), Some(household.as_str()));
+    assert_eq!(nudge(&store, &tap.id)?, None);
+    Ok(())
+}
+
+#[test]
+fn an_empty_capture_writes_nothing() -> TestResult {
+    let (store, _) = store()?;
+    let entries = store.all_entries()?.len();
+    let choices = CaptureChoices::default();
     assert_eq!(
-        harness.state().popup.choices().place,
-        Some(household.clone())
+        captured(&store, "  \n ", None, &choices)?,
+        Captured::Nothing
     );
-    assert_eq!(note(&store, "Descale the kettle")?, None);
-    // A sorted Note needs no Nudge: one Save.
-    assert!(!shows(&harness, "10 min"));
-    assert!(shows(&harness, "Save"));
-    assert!(shows(
-        &harness,
-        "Enter saves it. Shift+Enter starts a new line. Esc keeps what is typed the same way; \
-         empty, it just closes."
-    ));
-    // Leaving saves all of it.
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(harness.state().closed);
-    let kettle = note(&store, "Descale the kettle")?.ok_or("the Note")?;
-    assert_eq!(kettle.place, Some(household));
-    assert_eq!(nudge(&store, &kettle.id)?, None);
-    Ok(())
-}
-
-#[test]
-fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = popup(&store);
-    type_in_popup(&mut harness, "Call the dentist");
-    spawn(&mut harness, "Reminder");
-    assert!(harness.state().popup.page_open());
-    assert!(shows(&harness, "New Reminder"));
-    // The Note it is for, by the text typed so far.
-    assert!(shows(&harness, "Call the dentist"));
-    click(&mut harness, "Save");
-    assert!(!harness.state().popup.page_open());
-    assert_eq!(harness.state().popup.text(), "Call the dentist");
-    assert_eq!(harness.state().popup.choices().schedules.len(), 1);
-    assert!(
-        harness
-            .query_all_by_label_contains("Reminder: ")
-            .next()
-            .is_some()
-    );
-    assert!(Routines::new(&store).all()?.is_empty());
-    assert_eq!(note(&store, "Call the dentist")?, None);
-    // Dropped and set up again, then Esc on the page takes nothing.
-    let chip = harness
-        .query_all_by_label_contains("Remove Reminder: ")
-        .next()
-        .ok_or("the chip's Remove")?;
-    chip.click_accesskit();
-    harness.run();
-    assert!(harness.state().popup.choices().schedules.is_empty());
-    assert!(shows(&harness, "10 min"));
-    spawn(&mut harness, "Reminder");
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(!harness.state().popup.page_open());
-    assert!(!harness.state().closed);
-    assert!(harness.state().popup.choices().schedules.is_empty());
-    // Alt+Left goes back from the page the same way, once the cursor
-    // left the When line it starts in (#277), where Alt+Left rests.
-    spawn(&mut harness, "Reminder");
-    harness.key_press(Key::Tab);
-    harness.run();
-    harness.key_press_modifiers(egui::Modifiers::ALT, Key::ArrowLeft);
-    harness.run();
-    assert!(!harness.state().popup.page_open());
-    assert!(harness.state().popup.choices().schedules.is_empty());
-    spawn(&mut harness, "Reminder");
-    click(&mut harness, "Save");
-    click(&mut harness, "Save");
-    assert!(harness.state().closed);
-    let dentist = note(&store, "Call the dentist")?.ok_or("the Note")?;
-    let routines = Routines::new(&store).of_note(&dentist.id)?;
-    assert_eq!(routines.len(), 1);
-    assert!(routines[0].is_reminder());
-    assert_eq!(nudge(&store, &dentist.id)?, None);
-    Ok(())
-}
-
-#[test]
-fn an_empty_note_writes_nothing_and_drops_its_choices() -> TestResult {
-    let (store, _, _) = store()?;
-    let entries = store.all_entries()?.len();
-    let mut harness = popup(&store);
-    spawn(&mut harness, "Frog");
-    assert!(shows(&harness, "Frog"));
-    assert!(harness.state().popup.choices().frog);
-    // Nothing typed: the Save rests.
-    assert!(
-        harness
-            .get_by_role_and_label(Role::Button, "Save")
-            .accesskit_node()
-            .is_disabled()
-    );
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(harness.state().closed);
     assert_eq!(store.all_entries()?.len(), entries);
-    assert_eq!(harness.state().popup.choices(), &CaptureChoices::default());
     Ok(())
 }
 
 #[test]
-fn a_write_failing_in_the_popup_leaves_nothing_written() -> TestResult {
-    let (store, _, tally) = store()?;
-    let mut harness = popup(&store);
-    type_in_popup(&mut harness, "Workout");
-    spawn(&mut harness, "Session");
-    choose_session(&mut harness);
-    assert!(
-        harness
-            .query_all_by_label_contains("Session: ")
-            .next()
-            .is_some()
-    );
-    // The Tally goes meanwhile: the Session cannot pick it any more.
-    Notes::new(&store).trash(&tally)?;
-    let entries = store.all_entries()?.len();
-    click(&mut harness, "Save");
-    assert!(!harness.state().closed);
-    assert!(harness.state().popup.error().is_some());
-    assert_eq!(store.all_entries()?.len(), entries);
-    assert_eq!(note(&store, "Workout")?, None);
-    assert!(Sessions::new(&store).all()?.is_empty());
-    // Everything stays, to change and save again.
-    assert_eq!(harness.state().popup.text(), "Workout");
-    assert_eq!(harness.state().popup.choices().schedules.len(), 1);
-    let chip = harness
-        .query_all_by_label_contains("Remove Session: ")
-        .next()
-        .ok_or("the chip's Remove")?;
-    chip.click_accesskit();
-    harness.run();
-    click(&mut harness, "1 h");
-    assert!(harness.state().closed);
-    let workout = note(&store, "Workout")?.ok_or("the Note")?;
-    assert!(nudge(&store, &workout.id)?.is_some());
-    Ok(())
-}
-
-/// The window over `store` in English, on the Agenda.
-fn window(store: &Arc<Store>) -> Harness<'static, App> {
-    let mut app = App::new(store.clone(), "en");
-    app.set_region(Some("DE"));
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 1400.0))
-        .build_ui_state(
-            |ui, app: &mut App| {
-                App::install(ui.ctx());
-                app.show(ui);
-            },
-            app,
-        );
-    harness.run();
-    harness
-}
-
-fn type_in_window(harness: &mut Harness<'_, App>, text: &str) {
-    // The quick note's dialog first (#146).
-    if !harness.state().quick_note_open() {
-        harness.state_mut().new_note();
-        harness.run();
-    }
-    harness
-        .get_by(|n| n.placeholder() == Some("What's on your mind?"))
-        .click();
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text(text);
-    harness.run();
-}
-
-#[test]
-fn the_windows_capture_holds_its_choices_until_saved() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = window(&store);
-    // The buttons show once something is typed.
-    assert!(!shows(&harness, "Frog"));
-    type_in_window(&mut harness, "Water the plants");
-    for label in ["File into…", CLOCK, "More"] {
-        assert!(shows(&harness, label), "{label}");
-    }
-    assert!(shows(&harness, "10 min"));
-    spawn(&mut harness, "Frog");
-    click(&mut harness, "More");
-    harness.get_by_label("Important").click_accesskit();
-    harness.run();
-    assert!(shows(&harness, "Remove Frog"));
-    assert!(shows(&harness, "Remove Important"));
-    assert_eq!(note(&store, "Water the plants")?, None);
-    assert!(!shows(&harness, "10 min"));
-    assert!(shows(&harness, "Ctrl+Enter saves it."));
-    click(&mut harness, "Save");
-    let plants = note(&store, "Water the plants")?.ok_or("the Note")?;
-    assert_eq!(plants.importance, Importance::Important);
-    assert_eq!(Frogs::new(&store).of_note(&plants.id)?.len(), 1);
-    assert_eq!(nudge(&store, &plants.id)?, None);
-    // Saved, the quick note's dialog goes; no Note dialog opens (#146).
-    assert!(!harness.state().quick_note_open());
-    assert_eq!(harness.state().selected_note(), None);
-    assert!(!shows(&harness, "Remove Frog"));
-    Ok(())
-}
-
-#[test]
-fn a_tally_set_up_in_the_window_is_made_with_the_note() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = window(&store);
-    type_in_window(&mut harness, "Glasses of water");
-    click(&mut harness, "More");
-    click(&mut harness, "Make it a Tally");
-    harness
-        .get_by_role_and_label(Role::TextInput, "Name")
-        .click();
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Glasses");
-    harness.run();
-    click(&mut harness, "Save");
-    assert!(shows(&harness, "Tally: Glasses"));
-    assert_eq!(note(&store, "Glasses of water")?, None);
-    click(&mut harness, "Save");
-    let water = note(&store, "Glasses of water")?.ok_or("the Note")?;
-    let tally = Tallies::new(&store)
-        .by_note(&water.id)?
-        .ok_or("its Tally")?;
-    assert_eq!(tally.fields.len(), 1);
-    assert_eq!(tally.fields[0].name, "Glasses");
-    assert_eq!(nudge(&store, &water.id)?, None);
-    Ok(())
-}
-
-#[test]
-fn a_write_failing_in_the_window_leaves_nothing_written() -> TestResult {
-    let (store, _, tally) = store()?;
-    let mut harness = window(&store);
-    type_in_window(&mut harness, "Workout");
-    spawn(&mut harness, "Session");
-    choose_session(&mut harness);
-    assert!(
-        harness
-            .query_all_by_label_contains("Session: ")
-            .next()
-            .is_some()
-    );
-    assert!(Sessions::new(&store).all()?.is_empty());
-    Notes::new(&store).trash(&tally)?;
-    let entries = store.all_entries()?.len();
-    click(&mut harness, "Save");
-    assert!(harness.state().error().is_some());
-    assert_eq!(store.all_entries()?.len(), entries);
-    assert_eq!(note(&store, "Workout")?, None);
-    // The text and the Session stay on the capture.
-    assert!(
-        harness
-            .query_by(
-                |n| n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Workout")
-            )
-            .is_some()
-    );
-    assert!(
-        harness
-            .query_all_by_label_contains("Session: ")
-            .next()
-            .is_some()
-    );
-    Ok(())
-}
-
-#[test]
-fn file_into_without_areas_offers_a_new_area() -> TestResult {
-    let now = parse_time("2026-10-26T09:00:00.000Z")?;
-    let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([4; 32])))?;
-    OwnProfile::new(&store).apply_defaults("Desk", None)?;
-    DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
-    let store = Arc::new(store);
-    let mut harness = window(&store);
-    type_in_window(&mut harness, "Water the plants");
-    click(&mut harness, "File into…");
-    // Made there and filed into at once (#272).
-    assert!(shows(&harness, "New Area…"));
-    assert!(harness.query_all_by_label_contains("Tap").next().is_none());
-    Ok(())
-}
-
-#[test]
-fn a_place_picked_by_keyboard_or_screen_reader_closes_file_into() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = window(&store);
-    type_in_window(&mut harness, "Water the plants");
-    // "Household" in the left pane, and in File into… while it is open.
-    let households = |harness: &Harness<'_, App>| {
-        harness
-            .query_all_by_role_and_label(Role::Button, "Household")
-            .count()
+fn a_list_kind_makes_each_typed_line_a_line() -> TestResult {
+    let (store, _) = store()?;
+    let checklist = CaptureChoices {
+        kind: CaptureKind::Checklist,
+        ..CaptureChoices::default()
     };
-    let shut = households(&harness);
-    click(&mut harness, "File into…");
-    assert_eq!(households(&harness), shut + 1);
-    // No pointer click: the pick alone closes it.
-    let pick = harness
-        .query_all_by_role_and_label(Role::Button, "Household")
-        .last()
-        .ok_or("File into…'s Household")?;
-    pick.click_accesskit();
-    harness.run();
-    assert!(shows(&harness, "Into: Household"));
-    assert_eq!(households(&harness), shut);
-    // It opens again with the next click on it, Household now also
-    // filed into recently, and the same pick, which changes nothing on
-    // the card, closes it too.
-    click(&mut harness, "File into…");
-    assert_eq!(households(&harness), shut + 2);
-    let pick = harness
-        .query_all_by_role_and_label(Role::Button, "Household")
-        .last()
-        .ok_or("File into…'s Household")?;
-    pick.click_accesskit();
-    harness.run();
-    assert_eq!(households(&harness), shut);
-    Ok(())
-}
-
-/// The lines of the Checklist of `id`, in order.
-fn checklist_lines(store: &Store, id: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let list = Checklists::new(store).by_note(id)?.ok_or("a Checklist")?;
-    Ok(list.lines.into_iter().map(|l| l.text).collect())
-}
-
-/// The open lines of the Shopping List of `id`, in order.
-fn shopping_lines(store: &Store, id: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let wall = |at: chrono::DateTime<chrono::Utc>| at.naive_utc();
-    let list = ShoppingLists::new(store)
-        .by_note(id, &wall)?
-        .ok_or("a Shopping List")?;
-    Ok(list.open().into_iter().map(|l| l.text.clone()).collect())
-}
-
-/// Whether the Kind choice's option `label` is the one picked (#310).
-fn kind_picked<S>(harness: &Harness<'_, S>, label: &str) -> bool {
-    harness
-        .get_by_role_and_label(Role::RadioButton, label)
-        .accesskit_node()
-        .toggled()
-        == Some(Toggled::True)
-}
-
-fn pick_kind<S>(harness: &mut Harness<'_, S>, label: &str) {
-    harness
-        .get_by_role_and_label(Role::RadioButton, label)
-        .click_accesskit();
-    harness.run();
-}
-
-#[test]
-fn the_popup_makes_a_checklist_of_each_line_chosen_above_the_field() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = popup(&store);
-    // Text, Checklist and Shopping List, Text at first, above the field.
-    for label in ["Text", "Checklist", "Shopping List"] {
-        assert!(
-            harness
-                .query_by_role_and_label(Role::RadioButton, label)
-                .is_some(),
-            "{label}"
-        );
-    }
-    assert!(kind_picked(&harness, "Text"));
-    let checklist = harness
-        .get_by_role_and_label(Role::RadioButton, "Checklist")
-        .rect();
-    let field = harness
-        .get_by(|n| n.placeholder() == Some("What's on your mind?"))
-        .rect();
-    assert!(checklist.bottom() <= field.top(), "{checklist:?} {field:?}");
-    // Picked with the pointer first, the typing still goes into the field.
-    harness
-        .get_by_role_and_label(Role::RadioButton, "Checklist")
-        .click();
-    harness.run();
-    assert!(kind_picked(&harness, "Checklist"));
-    type_in_popup(&mut harness, "Passport\nTickets\nCharger");
-    assert_eq!(harness.state().popup.text(), "Passport\nTickets\nCharger");
-    // A list leaves Unsorted, and needs the Note itself.
-    assert!(!shows(&harness, "10 min"));
-    assert!(!shows(&harness, "Add to Note…"));
-    harness.key_press(Key::Enter);
-    harness.run();
-    assert!(harness.state().closed);
-    let notes = Notes::new(&store).all()?;
-    let made = notes
-        .iter()
-        .find(|n| Checklists::new(&store).is_checklist(&n.id).unwrap_or(false))
-        .ok_or("the Checklist")?;
-    assert_eq!(made.text, "");
-    assert_eq!(
-        checklist_lines(&store, &made.id)?,
-        ["Passport", "Tickets", "Charger"]
-    );
+    let made = kept(captured(
+        &store,
+        "Passport\nTickets\nCharger",
+        None,
+        &checklist,
+    )?)?;
+    let list = Checklists::new(&store)
+        .by_note(&made.id)?
+        .ok_or("a Checklist")?;
+    let lines: Vec<String> = list.lines.into_iter().map(|l| l.text).collect();
+    assert_eq!(lines, ["Passport", "Tickets", "Charger"]);
+    // A list leaves Unsorted.
     assert_eq!(nudge(&store, &made.id)?, None);
-    // Saved, the popup starts at Text again.
-    assert_eq!(harness.state().popup.choices().kind, CaptureKind::Text);
-    Ok(())
-}
-
-#[test]
-fn the_windows_shopping_list_takes_a_heading_as_its_name() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = window(&store);
-    // The quick note opens with the cursor in its field; a pick with the
-    // pointer leaves the typing going there.
-    harness.state_mut().new_note();
-    harness.run();
-    harness
-        .get_by_role_and_label(Role::RadioButton, "Shopping List")
-        .click();
-    harness.run();
-    harness
-        .get_by(|n| n.is_focused())
-        .type_text("# Weekend\nMilk\nEggs");
-    harness.run();
-    click(&mut harness, "Save");
-    let weekend = note(&store, "Weekend")?.ok_or("the list")?;
+    let shopping = CaptureChoices {
+        kind: CaptureKind::ShoppingList,
+        ..CaptureChoices::default()
+    };
+    let weekend = kept(captured(&store, "# Weekend\nMilk\nEggs", None, &shopping)?)?;
     assert!(ShoppingLists::new(&store).is_shopping_list(&weekend.id)?);
-    assert_eq!(shopping_lines(&store, &weekend.id)?, ["Milk", "Eggs"]);
-    Ok(())
-}
-
-#[test]
-fn a_list_kind_offers_no_add_to_note_tally_or_session() -> TestResult {
-    let (store, _, _) = store()?;
-    let mut harness = popup(&store);
-    type_in_popup(&mut harness, "Push-ups");
-    assert!(shows(&harness, "Add to Note…"));
-    pick_kind(&mut harness, "Checklist");
-    assert!(!shows(&harness, "Add to Note…"));
-    // Esc would leave the popup: a second click closes each menu.
-    click(&mut harness, "More");
-    assert!(!shows(&harness, "Make it a Tally"));
-    click(&mut harness, "More");
-    harness.get_by_role_and_label(Role::Button, CLOCK).click();
-    harness.run();
-    assert!(shows(&harness, "Routine"));
-    assert!(!shows(&harness, "Session"));
-    harness.get_by_role_and_label(Role::Button, CLOCK).click();
-    harness.run();
-    // Text again: all of it is back, and a Tally set up hides the choice.
-    pick_kind(&mut harness, "Text");
-    assert!(shows(&harness, "Add to Note…"));
-    click(&mut harness, "More");
-    click(&mut harness, "Make it a Tally");
-    harness
-        .get_by_role_and_label(Role::TextInput, "Name")
-        .click();
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Push-ups");
-    harness.run();
-    click(&mut harness, "Save");
-    assert!(shows(&harness, "Tally: Push-ups"));
-    assert!(
-        harness
-            .query_by_role_and_label(Role::RadioButton, "Checklist")
-            .is_none()
-    );
     Ok(())
 }
 
 #[test]
 fn with_nothing_typed_the_kind_is_no_list() -> TestResult {
-    let (store, _, _) = store()?;
+    let (store, _) = store()?;
     let choices = CaptureChoices {
         kind: CaptureKind::Checklist,
         ..CaptureChoices::default()
     };
-    let wall = |at: chrono::DateTime<chrono::Utc>| at.naive_utc();
     let photo = vec![1, 2, 3];
     let captured = capture_choices::capture(
         &store,
@@ -611,9 +128,7 @@ fn with_nothing_typed_the_kind_is_no_list() -> TestResult {
         (std::slice::from_ref(&photo), &[], &[]),
         (&choices, &wall),
     )?;
-    let Captured::Note(kept) = captured else {
-        return Err("a Note".into());
-    };
+    let kept = kept(captured)?;
     assert!(!Checklists::new(&store).is_checklist(&kept.id)?);
     // Unsorted, it keeps its Nudge.
     assert!(nudge(&store, &kept.id)?.is_some());

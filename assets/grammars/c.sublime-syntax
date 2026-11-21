@@ -1,0 +1,70 @@
+%YAML 1.2
+---
+# Old Brain Fix (obf-1036): written for this app, MIT OR Apache-2.0 as the app.
+name: C / C++
+scope: source.c++
+file_extensions: [c, h, cpp, c++, cc, cxx, hpp, hh, hxx, cplusplus]
+
+variables:
+  ident: '[A-Za-z_]\w*'
+  esc: '\\(?:x[0-9a-fA-F]+|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[0-7]{1,3}|.)'
+
+contexts:
+  main:
+    - match: '//.*'
+      scope: comment.line.double-slash.c
+    - match: '/\*'
+      push: block_comment
+    - match: '^\s*(#\s*(?:include|include_next|import))\s*(<[^>\n]*>)'
+      captures:
+        1: keyword.control.import.c
+        2: string.quoted.other.include.c
+    - match: '^\s*#\s*[A-Za-z_]+'
+      scope: keyword.control.preprocessor.c
+    - match: '\b(?:u8|[uUL])?R"\('
+      push: raw_string
+    - match: '\b(?:u8|[uUL])"|"'
+      push: string
+    - match: '(?:\b(?:u8|[uUL]))?''(?:{{esc}}|[^\\''\n]){1,4}'''
+      scope: string.quoted.single.char.c
+    - match: '\b(class|struct|union|enum|namespace)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.c
+        2: entity.name.type.c
+    - match: '\b(?:if|else|for|while|do|switch|case|default|break|continue|return|goto|sizeof|alignof|typedef|new|delete|throw|try|catch|using|template|typename|operator|co_await|co_yield|co_return|static_assert|decltype|requires|concept|and|or|not)\b'
+      scope: keyword.control.c
+    - match: '\b(?:struct|union|enum|class|namespace)\b'
+      scope: keyword.declaration.c
+    - match: '\b(?:const|static|extern|volatile|register|inline|restrict|signed|unsigned|public|private|protected|virtual|override|final|explicit|friend|mutable|constexpr|consteval|constinit|noexcept|thread_local)\b'
+      scope: storage.modifier.c
+    - match: '\b(?:true|false|NULL|nullptr)\b'
+      scope: constant.language.c
+    - match: '\bthis\b'
+      scope: variable.language.c
+    - match: '\b(?:void|char|short|int|long|float|double|bool|auto|wchar_t|char8_t|char16_t|char32_t|size_t|ssize_t|ptrdiff_t|u?int(?:8|16|32|64|ptr|max)_t)\b'
+      scope: storage.type.c
+    - match: '\bstd(?=::)'
+      scope: support.class.c
+    - match: '\b(?:0[xX][0-9a-fA-F'']+|0[bB][01'']+|\d[\d'']*(?:\.\d[\d'']*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)[uUlLfF]{0,3}'
+      scope: constant.numeric.c
+    - match: '\b{{ident}}(?=\s*\()'
+      scope: variable.function.c
+    - match: '->|::|&&|\|\||\+\+|--|<<=?|>>=?|[-+*/%<>=!&|^~?]=?'
+      scope: keyword.operator.c
+
+  block_comment:
+    - meta_scope: comment.block.c
+    - match: '\*/'
+      pop: true
+
+  string:
+    - meta_scope: string.quoted.double.c
+    - match: '"|$'
+      pop: true
+    - match: '{{esc}}'
+      scope: constant.character.escape.c
+
+  raw_string:
+    - meta_scope: string.quoted.double.raw.c
+    - match: '\)"'
+      pop: true

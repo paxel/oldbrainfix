@@ -9,7 +9,6 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
-import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
@@ -194,15 +193,20 @@ void main() {
     expect(iconOf(tester, agenda), closeTo(24 * 1.3, 0.001));
   });
 
-  testWidgets("a phone in German has room for all of the Agenda's bar, "
-      'New Session included (#246)', (tester) async {
+  testWidgets("a phone in German fits the Agenda's bar, New Session and "
+      'Quiet today in ⋮ (#246, obf-1044)', (tester) async {
     germanPhone(tester);
     await start(tester, context: FakeContext());
     expectBarClear(tester);
-    for (final key in ['calendarPage', 'newRoutine', 'newSession']) {
+    for (final key in ['calendarPage', 'newRoutine']) {
       expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
     }
-    expect(find.byKey(const ValueKey('bar-more')), findsNothing);
+    expect(find.byKey(const ValueKey('newSession')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('bar-more')));
+    await tester.pumpAndSettle();
+    expect(find.text('Neue Einheit'), findsOneWidget);
+    expect(find.text('Heute ruhig'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -279,13 +283,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the capture screen with all of it on, the keyboard up', (
-      tester,
-    ) async {
-      for (final control in QuickNoteControl.values) {
-        store.setQuickNoteShows(control, true);
-      }
-      ShoppingLists(store).make(notes.capture('Einkauf').id);
+    testWidgets('the capture screen, the keyboard up', (tester) async {
       germanPhone(tester);
       const keyboard = 300.0;
       await start(tester);
@@ -294,7 +292,7 @@ void main() {
       tester.view.viewInsets = const FakeViewPadding(bottom: keyboard * 3);
       await tester.pumpAndSettle();
       expect(find.byType(CaptureScreen), findsOneWidget);
-      expect(find.byType(TwoRowTextField), findsOneWidget);
+      expect(find.byKey(const ValueKey('captureToEditor')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

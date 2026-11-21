@@ -19,6 +19,7 @@ fn alarm(at: &str, renag: i64, ends: &str) -> Result<PlannedAlarm> {
         escalation: Some(2),
         ends: moment,
         ends_at: parse_time(ends)?,
+        quiet: None,
         text: None,
         wordless: Wordless::Photo,
         wordless_name: String::new(),
@@ -205,6 +206,39 @@ fn quiet_hours_win_over_the_all_day_time() -> Result<()> {
 }
 
 #[test]
+fn an_alarm_rings_silent_in_the_quiet_hours_unless_it_escalates() -> Result<()> {
+    let store = crate::store::tests::store();
+    let quiet = QuietHours {
+        start: ClockTime {
+            hour: 17,
+            minute: 0,
+        },
+        end: ClockTime {
+            hour: 18,
+            minute: 0,
+        },
+    };
+    DeviceSettings::new(&store).set_quiet_hours(quiet)?;
+    let plan = all_day_today(&store)?;
+    assert_eq!(plan[0].quiet, Some(quiet));
+    let t = |s: &str| parse_time(s);
+    assert!(!plan[0].silent_at(t("2026-01-01T15:00:00.000Z")?, &utc_wall));
+    assert!(plan[0].silent_at(t("2026-01-01T17:00:00.000Z")?, &utc_wall));
+    assert!(!plan[0].silent_at(t("2026-01-01T18:00:00.000Z")?, &utc_wall));
+    // Escalation is the only way through.
+    let routines = Routines::new(&store);
+    routines.set_escalation(&plan[0].routine_id, Some(3))?;
+    let escalating = Alarms::new(&store).plan(&utc_wall)?;
+    assert_eq!(escalating[0].quiet, None);
+    assert!(!escalating[0].silent_at(t("2026-01-01T17:00:00.000Z")?, &utc_wall));
+    // Off, nothing is silent.
+    routines.set_escalation(&plan[0].routine_id, None)?;
+    DeviceSettings::new(&store).set_quiet_hours_on(false)?;
+    assert_eq!(Alarms::new(&store).plan(&utc_wall)?[0].quiet, None);
+    Ok(())
+}
+
+#[test]
 fn snoozes_are_kept_on_this_device() -> Result<()> {
     let store = crate::store::tests::store();
     let alarms = Alarms::new(&store);
@@ -220,5 +254,357 @@ fn snoozes_are_kept_on_this_device() -> Result<()> {
         alarms.nudge_snooze()?,
         Some(NudgeSnooze { at: until, until })
     );
+    Ok(())
+}
+
+// ------------------------------------------------------------ Heads-ups
+
+/// Central European time, as the fixtures keep it.
+fn europe(utc: DateTime<Utc>) -> NaiveDateTime {
+    utc.with_timezone(&chrono_tz::Europe::Berlin).naive_local()
+}
+
+fn time(hour: u32, minute: u32) -> ClockTime {
+    ClockTime { hour, minute }
+}
+
+/// A store whose clock stands at `now`.
+fn store_at(now: &str) -> Result<Store> {
+    let now = parse_time(now)?;
+    Store::in_memory(Box::new(move || now), || {
+        Ok(crate::signing::SigningKey::from_seed([1; 32]))
+    })
+}
+
+/// A Reminder of a new Note `text` on `day`, at `at` or all day.
+fn reminder(store: &Store, text: &str, day: Day, at: Option<ClockTime>) -> Result<String> {
+    let note = Notes::new(store).capture(text, None, None)?;
+    let schedule = crate::schedule::Schedule::new(day, &at.into_iter().collect::<Vec<_>>(), None)
+        .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+    Ok(Routines::new(store).spawn(&note.id, &schedule)?.id)
+}
+
+/// A Routine of a new Note `text` every day from 1 October 2026 at
+/// `times`.
+fn daily(store: &Store, text: &str, times: &[ClockTime]) -> Result<String> {
+    let note = Notes::new(store).capture(text, None, None)?;
+    let rule = crate::schedule::Recurrence::parse("FREQ=DAILY")
+        .map_err(|e| Error::Invalid(e.to_string()))?;
+    let schedule = crate::schedule::Schedule::new(Day::new(2026, 10, 1), times, Some(rule))
+        .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+    Ok(Routines::new(store).spawn(&note.id, &schedule)?.id)
+}
+
+/// The Heads-ups of `store` on the European clock, as "minutes
+/// occurrence at wall".
+fn heads_ups(store: &Store) -> Result<Vec<String>> {
+    Ok(Alarms::new(store)
+        .heads_ups(&europe)?
+        .iter()
+        .map(|h| {
+            format!(
+                "{} {} {} {}",
+                h.minutes,
+                h.occurrence.key(),
+                dart_iso(h.at),
+                h.wall
+            )
+        })
+        .collect())
+}
+
+#[test]
+fn heads_ups_are_kept_leniently_and_written_canonically() -> Result<()> {
+    use crate::routines::heads_up_keys;
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let routines = Routines::new(&store);
+    let id = reminder(&store, "dentist", Day::new(2026, 10, 26), Some(time(10, 0)))?;
+    let entity = heads_up_keys::of(&id);
+    assert!(routines.heads_ups(&id)?.is_empty());
+    // As another version or a modified app might write them.
+    store.append(
+        &entity,
+        heads_up_keys::HEADS_UPS,
+        Some("1440,020,+5, 5,abc,0,43201,20,1440,,43200,-3,0x10"),
+        None,
+    )?;
+    assert_eq!(routines.heads_ups(&id)?, [20, 1440, 43200]);
+    assert!(heads_up_keys::read(None).is_empty());
+    assert!(heads_up_keys::read(Some("")).is_empty());
+    let written = |store: &Store| -> Result<Vec<Option<String>>> {
+        Ok(store
+            .all_entries()?
+            .into_iter()
+            .filter(|e| e.entity == entity)
+            .map(|e| e.value)
+            .collect())
+    };
+    routines.set_heads_ups(&id, &[1440, 20, 20, 0, -5, 50000])?;
+    assert_eq!(routines.heads_ups(&id)?, [20, 1440]);
+    let count = written(&store)?.len();
+    assert_eq!(written(&store)?.last(), Some(&Some("20,1440".to_string())));
+    routines.set_heads_ups(&id, &[20, 1440])?;
+    assert_eq!(written(&store)?.len(), count, "the same again");
+    routines.set_heads_ups(&id, &[])?;
+    assert_eq!(written(&store)?.last(), Some(&None));
+    assert!(routines.heads_ups(&id)?.is_empty());
+    assert!(routines.set_heads_ups("routine:none", &[20]).is_err());
+    // A Routine in the trash keeps them and plans none.
+    routines.set_heads_ups(&id, &[20])?;
+    routines.trash(&id)?;
+    assert_eq!(routines.heads_ups(&id)?, [20]);
+    assert!(heads_ups(&store)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_heads_up_comes_a_day_back_on_the_calendar_across_the_switch() -> Result<()> {
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let id = reminder(&store, "dentist", Day::new(2026, 10, 25), Some(time(10, 0)))?;
+    Routines::new(&store).set_heads_ups(&id, &[20, 1440])?;
+    // 10:00 on Sunday is 09:00 UTC in winter time; 10:00 the day before
+    // is 08:00 UTC in summer time, 25 hours earlier.
+    assert_eq!(
+        heads_ups(&store)?,
+        [
+            "1440 2026-10-25T10:00 2026-10-24T08:00:00.000Z 2026-10-24T10:00",
+            "20 2026-10-25T10:00 2026-10-25T08:40:00.000Z 2026-10-25T09:40",
+        ]
+    );
+    let plan = Alarms::new(&store).heads_ups(&europe)?;
+    assert_eq!(plan[0].id(), format!("headsUp:1440:{id}@2026-10-25T10:00"));
+    assert_eq!(plan[0].start.time, time(10, 0));
+    assert_eq!(plan[0].text.as_deref(), Some("dentist"));
+    assert_eq!(
+        Alarms::new(&store).plan(&europe)?.len(),
+        1,
+        "it still rings"
+    );
+    // Only those still ahead.
+    let routines = Routines::new(&store);
+    let read = vec![(
+        routines
+            .by_id(&id)?
+            .ok_or_else(|| Error::Invalid("a Routine".into()))?,
+        None,
+        routines.heads_ups(&id)?,
+    )];
+    let at = |now: &str| -> Result<Vec<i64>> {
+        let plan = heads_up_plan(
+            &read,
+            &BTreeMap::new(),
+            parse_time(now)?,
+            &europe,
+            crate::settings::DEFAULT_ALL_DAY_FROM,
+            None,
+            &QuietDays::default(),
+        );
+        Ok(plan.iter().map(|h| h.minutes).collect())
+    };
+    assert_eq!(
+        at("2026-10-24T08:00:00.000Z")?,
+        [20],
+        "the one due has rung"
+    );
+    assert!(at("2026-10-25T08:50:00.000Z")?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn no_heads_up_at_or_after_its_occurrence_starts() -> Result<()> {
+    let store = store_at("2026-03-28T12:00:00.000Z")?;
+    // On 29 March the clock jumps from 02:00 to 03:00: 02:10 is skipped
+    // and fires at 03:00, as the Occurrence itself does.
+    let id = reminder(
+        &store,
+        "night train",
+        Day::new(2026, 3, 29),
+        Some(time(2, 30)),
+    )?;
+    Routines::new(&store).set_heads_ups(&id, &[20, 60])?;
+    assert_eq!(
+        heads_ups(&store)?,
+        ["60 2026-03-29T02:30 2026-03-29T00:30:00.000Z 2026-03-29T01:30"]
+    );
+    Ok(())
+}
+
+#[test]
+fn an_all_day_heads_up_takes_whole_days_when_its_ring_would_ring() -> Result<()> {
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let id = reminder(&store, "bins out", Day::new(2026, 10, 27), None)?;
+    Routines::new(&store).set_heads_ups(&id, &[30, 1440, 2880])?;
+    assert_eq!(
+        heads_ups(&store)?,
+        [
+            "2880 2026-10-27 2026-10-25T14:00:00.000Z 2026-10-25T15:00",
+            "1440 2026-10-27 2026-10-26T14:00:00.000Z 2026-10-26T15:00",
+        ]
+    );
+    // From 07:00, in the Quiet Hours: once they end, at 08:00.
+    let settings = DeviceSettings::new(&store);
+    settings.set_all_day_from(time(7, 0))?;
+    assert_eq!(
+        heads_ups(&store)?,
+        [
+            "2880 2026-10-27 2026-10-25T07:00:00.000Z 2026-10-25T08:00",
+            "1440 2026-10-27 2026-10-26T07:00:00.000Z 2026-10-26T08:00",
+        ]
+    );
+    settings.set_quiet_hours_on(false)?;
+    assert_eq!(
+        heads_ups(&store)?,
+        [
+            "2880 2026-10-27 2026-10-25T06:00:00.000Z 2026-10-25T07:00",
+            "1440 2026-10-27 2026-10-26T06:00:00.000Z 2026-10-26T07:00",
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_heads_up_shows_silent_in_the_quiet_hours_whether_it_escalates_or_not() -> Result<()> {
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let id = reminder(&store, "pills", Day::new(2026, 10, 25), Some(time(8, 10)))?;
+    let routines = Routines::new(&store);
+    routines.set_heads_ups(&id, &[5, 20])?;
+    let plan = Alarms::new(&store).heads_ups(&europe)?;
+    let [early, late] = &plan[..] else {
+        return Err(Error::Invalid("two Heads-ups".into()));
+    };
+    // 07:50 lies in 22:00-08:00; 08:05 does not.
+    assert_eq!(early.minutes, 20);
+    assert_eq!(early.quiet, Some(crate::settings::DEFAULT_QUIET_HOURS));
+    assert!(early.silent_at(&europe));
+    assert!(early.to_string().contains("silent in 22:00-08:00"));
+    assert!(!late.silent_at(&europe));
+    routines.set_escalation(&id, Some(3))?;
+    assert!(Alarms::new(&store).heads_ups(&europe)?[0].silent_at(&europe));
+    DeviceSettings::new(&store).set_quiet_hours_on(false)?;
+    let off = Alarms::new(&store).heads_ups(&europe)?;
+    assert_eq!(off[0].quiet, None);
+    assert!(!off[0].silent_at(&europe));
+    Ok(())
+}
+
+#[test]
+fn done_skip_or_a_snooze_of_the_occurrence_cancels_its_heads_ups() -> Result<()> {
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let id = daily(&store, "feed the cat", &[time(18, 0)])?;
+    let routines = Routines::new(&store);
+    routines.set_heads_ups(&id, &[20])?;
+    let on = |day: i64| Occurrence::new(Day::new(2026, 10, day), Some(time(18, 0)));
+    let days = || -> Result<Vec<String>> {
+        Ok(Alarms::new(&store)
+            .heads_ups(&europe)?
+            .iter()
+            .take(2)
+            .map(|h| h.occurrence.key())
+            .collect())
+    };
+    assert_eq!(days()?, ["2026-10-24T18:00", "2026-10-25T18:00"]);
+    routines.mark_done(&id, &on(24), None)?;
+    routines.skip(&id, &on(25), None)?;
+    Alarms::new(&store).apply_snooze(
+        &id,
+        &on(26).key(),
+        parse_time("2026-10-26T18:00:00.000Z")?,
+    )?;
+    assert_eq!(days()?, ["2026-10-27T18:00", "2026-10-28T18:00"]);
+    Ok(())
+}
+
+#[test]
+fn a_routine_has_at_most_so_many_heads_ups() -> Result<()> {
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let times: Vec<ClockTime> = (0..6).map(|i| time(1 + 4 * i, 0)).collect();
+    let id = daily(&store, "water", &times)?;
+    Routines::new(&store).set_heads_ups(&id, &[10])?;
+    assert_eq!(
+        Alarms::new(&store).heads_ups(&europe)?.len(),
+        ALARMS_PER_ROUTINE
+    );
+    Ok(())
+}
+
+/// A quiet day (obf-1044): what starts on it rings nothing and is never
+/// Missed; what began before it Re-nags again from its end.
+#[test]
+fn a_quiet_day_rings_nothing_of_its_own_and_misses_nothing()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let utc = |t: DateTime<Utc>| t.naive_utc();
+    let at = |h: u32| ClockTime { hour: h, minute: 0 };
+    let store = crate::store::tests::store();
+    let routines = Routines::new(&store);
+    let made = |text: &str, times: &[ClockTime], rule: &str, start: Day| {
+        let schedule = crate::schedule::Schedule::new(
+            start,
+            times,
+            Some(crate::schedule::Recurrence::parse(rule)?),
+        )
+        .ok_or("a schedule")?;
+        Ok::<_, Box<dyn std::error::Error>>(routines.create(text, &schedule)?)
+    };
+    let day = Day::new(2026, 1, 6);
+    let pills = made(
+        "pills",
+        &[at(8), at(14)],
+        "FREQ=DAILY",
+        Day::new(2026, 1, 1),
+    )?;
+    let stretch = made(
+        "stretch",
+        &[at(9)],
+        "FREQ=WEEKLY;BYDAY=MO",
+        Day::new(2026, 1, 5),
+    )?;
+    let mut quiet = QuietDays::default();
+    quiet.ends.insert(day, None);
+    let midnight = instant_of(day.add_days(1), at(0), &utc);
+    let plan = alarm_plan(
+        &[(pills.clone(), None), (stretch.clone(), None)],
+        &BTreeMap::new(),
+        instant_of(day, at(9), &utc),
+        &utc,
+        Duration::minutes(10),
+        crate::settings::DEFAULT_ALL_DAY_FROM,
+        None,
+        &quiet,
+    );
+    assert!(plan.iter().all(|a| a.occurrence.day != day));
+    let weekly = plan
+        .iter()
+        .find(|a| a.routine_id == stretch.id)
+        .ok_or("the weekly one")?;
+    assert_eq!(weekly.at, midnight);
+    // At 15:00 the 08:00 one would be Missed.
+    let missed = missed_summary(
+        &[(pills.clone(), None)],
+        None,
+        instant_of(day, at(15), &utc),
+        &utc,
+        crate::settings::DEFAULT_ALL_DAY_FROM,
+        &quiet,
+    );
+    assert!(
+        missed
+            .routines
+            .iter()
+            .all(|m| m.missed.iter().all(|o| o.occurrence.day != day))
+    );
+    // End at 10:00 brings back the 14:00 one, not the 08:00.
+    quiet.ends.insert(day, Some(instant_of(day, at(10), &utc)));
+    let plan = alarm_plan(
+        &[(pills, None)],
+        &BTreeMap::new(),
+        instant_of(day, at(11), &utc),
+        &utc,
+        Duration::minutes(10),
+        crate::settings::DEFAULT_ALL_DAY_FROM,
+        None,
+        &quiet,
+    );
+    let first = plan.first().ok_or("an alarm")?;
+    assert_eq!(first.occurrence, Occurrence::new(day, Some(at(14))));
     Ok(())
 }

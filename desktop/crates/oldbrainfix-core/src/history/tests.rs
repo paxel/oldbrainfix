@@ -284,6 +284,7 @@ fn missed_agrees_with_the_missed_summary() -> Made<()> {
         w.store.now(),
         &europe,
         crate::settings::DEFAULT_ALL_DAY_FROM,
+        &crate::alarms::QuietDays::default(),
     );
     let history = w.history_of(&pills, MONDAY)?;
     let missed: Vec<&HistoryEntry> = history

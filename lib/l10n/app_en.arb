@@ -229,10 +229,8 @@
   "routineOrReminder": "Routine, Reminder, Frog or Session",
   "routine": "Routine",
   "reminder": "Reminder",
-  "spawnRoutine": "Routine…",
-  "@spawnRoutine": {"description": "Entry in a compact Note card's ⋮ menu that opens the editor of a new Routine for the Note."},
-  "spawnReminder": "Reminder…",
-  "@spawnReminder": {"description": "Entry in a compact Note card's ⋮ menu that opens the editor of a new Reminder for the Note."},
+  "remindMe": "Remind me…",
+  "@remindMe": {"description": "The one entry, in a Note card's menus, the Note editor's \"+\", the quick note's alarm clock and the desktop's Note menu, that opens the editor of a new Routine or Reminder for the Note, starting as a Reminder (once)."},
   "spawnSession": "Session…",
   "@spawnSession": {"description": "Entry in a compact Note card's ⋮ menu, in Advanced, that opens the editor of a new Session run from the Note."},
   "newRoutine": "New Routine",
@@ -595,6 +593,104 @@
   },
   "ringChannel": "Full-screen alarms",
   "escalatedChannel": "Escalated alarms",
+  "quietChannel": "Routines and Reminders in the Quiet Hours",
+  "quietToday": "Quiet today",
+  "@quietToday": {"description": "The Agenda's menu entry that makes today a quiet day: everything shows, nothing notifies (obf-1044)."},
+  "quietDayLine": "Quiet day until midnight",
+  "@quietDayLine": {"description": "The line at the top of the Agenda while today is a quiet day (obf-1044)."},
+  "quietDayEnd": "End",
+  "@quietDayEnd": {"description": "The button on the quiet day's line that ends it now (obf-1044)."},
+  "headsUpChannel": "Heads-ups",
+  "@headsUpChannel": {"description": "The Android notification channel of the Heads-ups (obf-1046)."},
+  "headsUpsHeading": "Heads-ups",
+  "addHeadsUp": "Add heads-up",
+  "removeHeadsUp": "Remove heads-up",
+  "headsUpMinutesBefore": "{minutes} min before",
+  "@headsUpMinutesBefore": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpHoursBefore": "{hours} h before",
+  "@headsUpHoursBefore": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpHoursMinutesBefore": "{hours} h {minutes} min before",
+  "@headsUpHoursMinutesBefore": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpDaysBefore": "{days, plural, =1{1 day before} other{{days} days before}}",
+  "@headsUpDaysBefore": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpWeeksBefore": "{weeks, plural, =1{1 week before} other{{weeks} weeks before}}",
+  "@headsUpWeeksBefore": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInMinutes": "in {minutes} min",
+  "@headsUpInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInHours": "in {hours} h",
+  "@headsUpInHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInHoursMinutes": "in {hours} h {minutes} min",
+  "@headsUpInHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInDays": "{days, plural, =1{in 1 day} other{in {days} days}}",
+  "@headsUpInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "headsUpInWeeks": "{weeks, plural, =1{in 1 week} other{in {weeks} weeks}}",
+  "@headsUpInWeeks": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
   "escalationHeading": "Escalation",
   "escalationOff": "Off: it only Re-nags",
   "escalationSummary": "{count, plural, =1{Full-screen alarm after 1 ignored Re-nag} other{Full-screen alarm after {count} ignored Re-nags}}",
@@ -651,7 +747,7 @@
     }
   },
   "nudgeBody": "Tap to sort them.",
-  "nudgeSettingsExplain": "While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.",
+  "nudgeSettingsExplain": "While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders show on time but without sound, unless Escalation is on for them; only an all-day one waits until they end.",
   "nudgeRepeat": "Nudge again after",
   "quietHours": "Quiet Hours",
   "quietFrom": "From",
@@ -728,7 +824,11 @@
   "recordVoice": "Record voice",
   "recording": "Recording…",
   "stopRecording": "Stop",
-  "@stopRecording": {"description": "The big button that ends a voice recording on the capture screen; the screen stays."},
+  "@stopRecording": {"description": "The big button that ends a voice recording on the capture screen; the screen stays. Also the button on the Android notification a recording runs under (#350)."},
+  "recordingNotice": "Recording a voice note",
+  "@recordingNotice": {"description": "The title of the Android notification a voice recording runs under while the phone is locked (#350); a tap opens the app, its Stop ends the recording."},
+  "recordingChannel": "Recording",
+  "@recordingChannel": {"description": "The name of the Android notification channel of a voice recording running (#350), shown in Android's notification settings."},
   "voiceRecording": "Voice recording",
   "playRecording": "Play the voice recording",
   "stopPlaying": "Stop",
@@ -1047,7 +1147,7 @@
   "settingsAlarmSetupDetail": "The permissions alarms need to ring on time.",
   "settingsRenagDetail": "How often an ignored alarm rings again, unless its Routine has its own interval.",
   "allDayFrom": "All-day items remind from",
-  "allDayFromDetail": "Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.",
+  "allDayFromDetail": "Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win: it waits until they end, and in them it Re-nags without sound unless Escalation is on.",
   "alarmSound": "Alarm sound",
   "alarmSoundOwn": "Old Brain Fix's own chime. Tap to choose another sound of the phone.",
   "alarmSoundChosen": "A sound of the phone. Tap to choose another, or Old Brain Fix's own chime.",
@@ -2645,6 +2745,8 @@
   "@linkToGuide": {"description": "The user guide's start page on the website, as a page of the Link to… picker (#261)."},
   "linkNotAvailable": "Not available here",
   "@linkNotAvailable": {"description": "Said when an app link's target cannot be seen on this Device (#261): a Note or Area deleted, in the trash, in a closed locked Area or never synced here, or a file not in the shared folder."},
+  "linkedFrom": "Linked from",
+  "@linkedFrom": {"description": "Heading of the part at a Note's end listing the Notes whose text or Sections hold an app link to it, one row per Note by its first line (obf-1035)."},
   "fileLinkTitle": "Open this file?",
   "@fileLinkTitle": {"description": "Title of the one question before a file link opens (#261)."},
   "fileLinkQuestion": "Open \"{file}\" from the shared folder with {app}?",
@@ -2731,7 +2833,7 @@
   "@toFullEditor": {"description": "Button on the quick note (the text capture screen): saves the Note at once as Unsorted, nudged in 1 h, and opens it in the full Note editor."},
   "settingsQuickNote": "Quick note",
   "@settingsQuickNote": {"description": "Section title in Settings for what the quick note (the text capture screen) shows."},
-  "settingsQuickNoteDetail": "The quick note shows the text, Photo, Voice, Gallery, Paste, File, \"To full editor\", \"Add to Note…\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.",
+  "settingsQuickNoteDetail": "The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.",
   "@settingsQuickNoteDetail": {"description": "Explanation under the Settings section 'Quick note'."},
   "quickNoteFormatBar": "Format bar",
   "@quickNoteFormatBar": {"description": "Switch in Settings ▸ Quick note: the format bar above the keyboard."},
@@ -2781,7 +2883,7 @@
   "@settingsImport": {"description": "Section title in Settings for the Import of a folder (CONTEXT.md: Import)."},
   "importFolder": "Import a folder",
   "@importFolder": {"description": "Settings row that opens the system's folder picker for an Import."},
-  "importFolderDetail": "Each Markdown or text file in it becomes a Note in a new Area, dated when the file was last changed.",
+  "importFolderDetail": "Each Markdown, text, AsciiDoc, Org, reStructuredText or HTML file in it becomes a Note in a new Area, dated when the file was last changed.",
   "@importFolderDetail": {"description": "Subtitle of 'importFolder'."},
   "importReading": "Reading the folder…",
   "@importReading": {"description": "Subtitle of 'importFolder' while the picked folder's files are read and imported."},
@@ -2795,15 +2897,15 @@
   "@importFinishedSkipped": {"description": "In the dialog behind 'importFinished' when files were skipped, above 'importSkippedDetails'. Shared with the desktop.", "placeholders": {"count": {"type": "int"}}},
   "importOpenArea": "Open the Area",
   "@importOpenArea": {"description": "Button in the dialog behind 'importFinished' that opens the new Area. Shared with the desktop."},
-  "importNothing": "No Markdown or text file found.",
+  "importNothing": "No file found to import.",
   "@importNothing": {"description": "Announced when an Import found nothing to make Notes of; the tap opens the dialog with the cause and the fix. Shared with the desktop."},
   "importNothingTitle": "Nothing imported",
   "@importNothingTitle": {"description": "Title of the dialog behind 'importNothing'. Shared with the desktop."},
-  "importNothingCause": "The folder and its folders hold no Markdown file (.md, .markdown) or text file (.txt) that could be taken; other files and files that are too large are skipped.",
+  "importNothingCause": "The folder and its folders hold no Markdown file (.md, .markdown), text file (.txt), AsciiDoc file (.adoc, .asciidoc, .asc), Org file (.org), reStructuredText file (.rst) or HTML file (.html, .htm) that could be taken; other files and files that are too large are skipped.",
   "@importNothingCause": {"description": "The cause in the dialog behind 'importNothing'. Shared with the desktop."},
   "importNothingFix": "Pick the folder the notes lie in. Nothing was changed.",
   "@importNothingFix": {"description": "The fix in the dialog behind 'importNothing'. Shared with the desktop."},
-  "importSkippedDetails": "Folder: {folder}\nNot Markdown or text: {notText}\nToo large: {tooLarge}",
+  "importSkippedDetails": "Folder: {folder}\nOther files: {notText}\nToo large: {tooLarge}",
   "@importSkippedDetails": {"description": "The details in the dialog behind 'importNothing': the folder and the files skipped. Shared with the desktop.", "placeholders": {"folder": {"type": "String"}, "notText": {"type": "int"}, "tooLarge": {"type": "int"}}},
   "importFailed": "The folder could not be imported.",
   "@importFailed": {"description": "Announced when the picked folder or one of its files could not be read; the tap opens the dialog with the cause and the fix. Shared with the desktop."},
@@ -2895,6 +2997,10 @@
   "@codePasted": {"description": "Under the Note's text in the Note editor after a paste that looks like a script or code (#213), before the button keepAsCode."},
   "keepAsCode": "Keep as code",
   "@keepAsCode": {"description": "The button under the Note's text in the Note editor after a paste that looks like code (#213): makes the whole text a Code text."},
+  "codeLanguage": "Language",
+  "@codeLanguage": {"description": "The heading of the language choice in the text format badge's dialog while Code is picked (obf-1036): the language a Code text is coloured by."},
+  "codeLanguageNone": "No language",
+  "@codeLanguageNone": {"description": "The choice of no language for a Code text (obf-1036): it shows in one colour."},
   "noteHistoryHint": "Every change of this Note, its Amends and its Lines, the newest first.",
   "@noteHistoryHint": {"description": "Line under the title of a Note's History page (#193)."},
   "noteHistoryCaptured": "Captured",
@@ -2962,8 +3068,8 @@
   "helpQuickStart1": "Tap the round + at the bottom right of the Agenda, then Text, type a thought and tap 1 h.",
   "@helpQuickStart1": {"description": "A Line of the Quick start Checklist (#180, #260): where and how on the phone, the exact place and gesture, up to about 20 words, nothing of Advanced (no Tallies, Sessions, Frogs or Topics)."},
   "helpQuickStart2": "On the Agenda, tap \"1 Unsorted\", then the folder with an arrow under the Note, and pick an Area.",
-  "helpQuickStart3": "Tap + and Text, type a task, tap the alarm clock, then Reminder; set its time and tap Save twice.",
-  "helpQuickStart4": "Tap + and Text, type a habit, tap the alarm clock, then Routine; choose when it repeats and tap Save twice.",
+  "helpQuickStart3": "Type a task in +, tap More, then + and Remind me…; set its time and tap Save.",
+  "helpQuickStart4": "Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.",
   "helpQuickStart5": "Tap the box in front of this Line to tick it: that is how a Checklist works.",
   "helpQuickStart6": "Tap the folder at the top of the Agenda, or swipe left, to search all Notes and open your Areas.",
   "helpQuickStart7": "Tap your Profile picture at the top right of the Agenda, then \"Back up this Device\" and \"Set up Backups\".",
@@ -2973,8 +3079,8 @@
   "helpQuickStartDesktop1": "Capture: File ▸ New Note or Ctrl+N, type, then Ctrl+Enter.",
   "@helpQuickStartDesktop1": {"description": "The desktop's way for the Quick start's Line of the same number (#260), a line of its Description: the step's short name, a colon, then the menus, keys and clicks; nothing of Advanced."},
   "helpQuickStartDesktop2": "File: in Unsorted in the sidebar, drag the card onto an Area, or right-click it, File into…, and pick the Area.",
-  "helpQuickStartDesktop3": "Reminder: in the quick note, click the alarm clock, then Reminder; set its time, click Save, then Ctrl+Enter.",
-  "helpQuickStartDesktop4": "Routine: the same, with Routine.",
+  "helpQuickStartDesktop3": "Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.",
+  "helpQuickStartDesktop4": "Routine: the same, then Every … and when it repeats.",
   "helpQuickStartDesktop5": "Tick: click the box in front of a Line.",
   "helpQuickStartDesktop6": "Search and browse: click an Area in the sidebar, or Edit ▸ Find (Ctrl+F).",
   "helpQuickStartDesktop7": "Backup: Sync ▸ Backups…, then \"Set up Backups\".",
@@ -3487,5 +3593,77 @@
   "pdfPageOf": "Page {page} of {pages}",
   "@pdfPageOf": {"description": "At the top of an attached PDF shown full screen (#286): the page shown and how many there are.", "placeholders": {"page": {"type": "int"}, "pages": {"type": "int"}}},
   "openInOtherApp": "Open in another app",
-  "@openInOtherApp": {"description": "The entry in the ⋮ of an attached PDF shown full screen (#286) that opens it with the system's app for PDFs."}
+  "@openInOtherApp": {"description": "The entry in the ⋮ of an attached PDF shown full screen (#286) that opens it with the system's app for PDFs."},
+  "grammarsTitle": "Code languages",
+  "@grammarsTitle": {"description": "The heading of the Settings section of the person's own grammars (obf-1037): files that colour code in more languages."},
+  "grammarsHint": "Add a Sublime syntax file (.sublime-syntax) to colour code in another language. It colours code on all your Devices, only for you.",
+  "@grammarsHint": {"description": "The line under the heading of the Settings section of the person's own grammars (obf-1037)."},
+  "grammarAdd": "Add grammar…",
+  "@grammarAdd": {"description": "The button in Settings ▸ Code languages (obf-1037) that picks a grammar file with the system's picker and adds it."},
+  "grammarInPlaceOf": "Replaces the built-in grammar for {name}",
+  "@grammarInPlaceOf": {"description": "The line under an added grammar in Settings ▸ Code languages (obf-1037) whose scope is that of a built-in one, which it replaces until it is removed.", "placeholders": {"name": {"type": "String"}}},
+  "grammarRemove": "Remove",
+  "@grammarRemove": {"description": "The button beside an added grammar in Settings ▸ Code languages (obf-1037): the grammar is gone from all of the person's Devices, a built-in one of its language colours again."},
+  "grammarRefused": "{file} was not added: {reason}",
+  "@grammarRefused": {"description": "The red line under Add grammar… in Settings ▸ Code languages (obf-1037) when the picked file is refused; nothing was added. The reason is the core's own, in English.", "placeholders": {"file": {"type": "String"}, "reason": {"type": "String"}}},
+  "spotNext": "Next",
+  "@spotNext": {"description": "The button on a Spotlight's card (obf-1043) that shows the screen's next tip. CONTEXT.md, Spotlight."},
+  "spotSkip": "Skip",
+  "@spotSkip": {"description": "The button on a Spotlight's card (obf-1043) that ends the screen's tour; its other tips count as seen."},
+  "spotDone": "Got it",
+  "@spotDone": {"description": "The button on the last Spotlight of a screen's tour (obf-1043), in place of Next."},
+  "settingsShowTips": "Show tips again",
+  "@settingsShowTips": {"description": "The Settings row (obf-1043) that brings back every Spotlight on this Device: each screen explains itself again on its next visit."},
+  "settingsShowTipsDone": "Each screen shows its tips again.",
+  "@settingsShowTipsDone": {"description": "Said once Show tips again (obf-1043) was used, on this Device only."},
+  "spotAgendaPlus": "+ captures a Note; hold it to start typing at once.",
+  "@spotAgendaPlus": {"description": "A Spotlight (obf-1043) on the Agenda's +: one sentence of what it does."},
+  "spotAgendaToday": "Today lists what is due; tick each one off once it is done.",
+  "@spotAgendaToday": {"description": "A Spotlight (obf-1043) on the Agenda's Today heading: one sentence of what it does."},
+  "spotAgendaUnsorted": "Notes not filed yet wait here as Unsorted, to be sorted later.",
+  "@spotAgendaUnsorted": {"description": "A Spotlight (obf-1043) on the Agenda's Unsorted count: one sentence of what it does."},
+  "spotAgendaBrowse": "The folder opens your Areas and Topics, where filed Notes are.",
+  "@spotAgendaBrowse": {"description": "A Spotlight (obf-1043) on the Agenda's folder: one sentence of what it does."},
+  "spotAgendaQuiet": "Quiet today: nothing rings until midnight, and everything still shows.",
+  "@spotAgendaQuiet": {"description": "A Spotlight (obf-1043) on Quiet today in the Agenda's bar or its ⋮ menu (new in 0.7.0): one sentence of what it does."},
+  "spotAgendaProfile": "Your picture opens your Profile, with Settings, Sync and Backups.",
+  "@spotAgendaProfile": {"description": "A Spotlight (obf-1043) on the Agenda's Profile picture: one sentence of what it does."},
+  "spotCaptureNudge": "Each button saves the Note, and a Nudge reminds you to sort it then.",
+  "@spotCaptureNudge": {"description": "A Spotlight (obf-1043) on the quick note's three Nudge buttons: one sentence of what it does."},
+  "spotCaptureMore": "More saves the Note and opens it in the full editor.",
+  "@spotCaptureMore": {"description": "A Spotlight (obf-1043) on the quick note's More (new in 0.7.0): one sentence of what it does."},
+  "spotEditorKind": "The kind makes this Note a Checklist, a Shopping List and more.",
+  "@spotEditorKind": {"description": "A Spotlight (obf-1043) on the Note editor's kind badge: one sentence of what it does."},
+  "spotEditorPlace": "Here you file the Note into an Area or a Topic.",
+  "@spotEditorPlace": {"description": "A Spotlight (obf-1043) on the Note editor's Area and Topic badge: one sentence of what it does."},
+  "spotEditorRemind": "In +, Remind me… sets up a Reminder or a Routine for this Note.",
+  "@spotEditorRemind": {"description": "A Spotlight (obf-1043) on the Note editor's + badge, which holds Remind me… (new in 0.7.0): one sentence of what it does."},
+  "spotEditorCodeLanguage": "Here you also pick the language that colours this Code text.",
+  "@spotEditorCodeLanguage": {"description": "A Spotlight (obf-1043) on the text format badge of a Code text, where its language is picked (new in 0.7.0): one sentence of what it does."},
+  "spotEditorLinkedFrom": "Linked from lists the Notes whose links lead to this one.",
+  "@spotEditorLinkedFrom": {"description": "A Spotlight (obf-1043) on Linked from at a Note's end (new in 0.7.0): one sentence of what it does."},
+  "spotAreaSearch": "Search finds the Notes filed here.",
+  "@spotAreaSearch": {"description": "A Spotlight (obf-1043) on the search field of an Area or a Topic: one sentence of what it does."},
+  "spotAreaAdd": "+ makes a new Note or list, filed right here.",
+  "@spotAreaAdd": {"description": "A Spotlight (obf-1043) on the + of an Area or a Topic: one sentence of what it does."},
+  "spotCardsView": "This switches the cards between the compact and the detailed view.",
+  "@spotCardsView": {"description": "A Spotlight (obf-1043) on the compact view button of a list of Notes: one sentence of what it does."},
+  "spotUnsortedCard": "Sort each Note: file it into an Area, merge it or set a Reminder.",
+  "@spotUnsortedCard": {"description": "A Spotlight (obf-1043) on the first card on the Unsorted list: one sentence of what it does."},
+  "spotRoutineSentence": "Type when it is due, such as “every Monday at 08:00”.",
+  "@spotRoutineSentence": {"description": "A Spotlight (obf-1043) on the Routine editor's schedule sentence: one sentence of what it does."},
+  "spotRoutineTimes": "Add a time of day; without one it is due all day.",
+  "@spotRoutineTimes": {"description": "A Spotlight (obf-1043) on the Routine editor's Add time: one sentence of what it does."},
+  "spotRoutineHeadsUps": "A heads-up tells you ahead of time, such as 20 min before.",
+  "@spotRoutineHeadsUps": {"description": "A Spotlight (obf-1043) on the Routine editor's Add heads-up (new in 0.7.0): one sentence of what it does."},
+  "spotRoutineSave": "Save keeps the schedule; going back saves it too.",
+  "@spotRoutineSave": {"description": "A Spotlight (obf-1043) on the Routine editor's Save: one sentence of what it does."},
+  "spotSettingsSearch": "Search finds any setting by a word in it.",
+  "@spotSettingsSearch": {"description": "A Spotlight (obf-1043) on the search field of the Settings: one sentence of what it does."},
+  "spotSettingsShowTips": "Show tips again brings back every tip on this Device.",
+  "@spotSettingsShowTips": {"description": "A Spotlight (obf-1043) on Show tips again in the Settings (new in 0.7.0): one sentence of what it does."},
+  "spotSettingsFeatures": "Simple or Advanced: Advanced also makes Tallies, Sessions, Frogs and Topics.",
+  "@spotSettingsFeatures": {"description": "A Spotlight (obf-1043) on Simple and Advanced in the Settings: one sentence of what it does."},
+  "spotSettingsGrammar": "Add grammar… colours code in one more language, on all your Devices.",
+  "@spotSettingsGrammar": {"description": "A Spotlight (obf-1043) on Add grammar… in the Settings (new in 0.7.0): one sentence of what it does."}
 }

@@ -6,7 +6,7 @@
 //! Dart core's.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -68,6 +68,67 @@ pub mod keys {
     /// The field marking `occurrence` skipped.
     pub fn skip(occurrence: &crate::schedule::Occurrence) -> String {
         format!("{SKIP_PREFIX}{}", occurrence.key())
+    }
+}
+
+/// Where a person's own Heads-ups of a Routine lie (obf-1046, ADR 0052):
+/// the entity `headsups:<routine id>`, outside every Area like an
+/// Override, so it is sealed under the personal key, goes only to the
+/// user's own Devices, and only what they wrote counts.
+pub mod heads_up_keys {
+    /// The id prefix, before the Routine's id.
+    pub const PREFIX: &str = "headsups:";
+    /// On that entity: the offsets before the Occurrence's start in whole
+    /// minutes, as decimal numbers joined by `,`, ascending, without
+    /// duplicates; absent or `None` for none.
+    pub const HEADS_UPS: &str = "headsUps";
+    /// The largest offset: 30 days, as far as the alarm plan looks ahead.
+    pub const MAX_MINUTES: i64 = 43200;
+
+    /// The entity holding the Heads-ups of the Routine `routine_id`.
+    pub fn of(routine_id: &str) -> String {
+        format!("{PREFIX}{routine_id}")
+    }
+
+    /// The offsets `value` holds, ascending and each once: a part that is
+    /// not a number from 1 to [`MAX_MINUTES`] in plain digits, without a
+    /// sign or a leading zero, is left out.
+    pub fn read(value: Option<&str>) -> Vec<i64> {
+        let Some(value) = value else {
+            return Vec::new();
+        };
+        let mut minutes: Vec<i64> = value
+            .split(',')
+            .filter(|part| {
+                !part.is_empty()
+                    && part.len() <= 5
+                    && !part.starts_with('0')
+                    && part.bytes().all(|b| b.is_ascii_digit())
+            })
+            .filter_map(|part| part.parse::<i64>().ok())
+            .filter(|n| *n <= MAX_MINUTES)
+            .collect();
+        minutes.sort_unstable();
+        minutes.dedup();
+        minutes
+    }
+
+    /// `minutes` as [`HEADS_UPS`] holds them: those from 1 to
+    /// [`MAX_MINUTES`], ascending and each once; `None` for none.
+    pub fn write(minutes: &[i64]) -> Option<String> {
+        let mut kept: Vec<i64> = minutes
+            .iter()
+            .copied()
+            .filter(|m| (1..=MAX_MINUTES).contains(m))
+            .collect();
+        kept.sort_unstable();
+        kept.dedup();
+        (!kept.is_empty()).then(|| {
+            kept.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        })
     }
 }
 
@@ -422,6 +483,53 @@ impl<'a> Routines<'a> {
         let value = after.map(|a| a.to_string());
         self.store
             .append(id, keys::ESCALATION, value.as_deref(), None)
+            .map(drop)
+    }
+
+    /// The Heads-ups of the Routine `routine_id` for this person
+    /// (obf-1046): the offsets before an Occurrence's start in whole
+    /// minutes, ascending, as one of the user's own Devices set them last.
+    /// What another person's Device wrote counts for nothing, so in a
+    /// Shared Area each person has their own.
+    pub fn heads_ups(&self, routine_id: &str) -> Result<Vec<i64>> {
+        self.heads_ups_by_own(routine_id, &mut HashMap::new())
+    }
+
+    /// [`Routines::heads_ups`], `own` remembering which Devices are the
+    /// user's own.
+    pub(crate) fn heads_ups_by_own(
+        &self,
+        routine_id: &str,
+        own: &mut HashMap<String, bool>,
+    ) -> Result<Vec<i64>> {
+        let entity = heads_up_keys::of(routine_id);
+        let value = self
+            .store
+            .own_current(&entity, heads_up_keys::HEADS_UPS, own)?;
+        Ok(heads_up_keys::read(value.as_deref()))
+    }
+
+    /// Sets the Heads-ups of the Routine `routine_id` for this person
+    /// alone (obf-1046), kept like an Override: on the user's own Devices
+    /// only, whatever their role in its Area. Offsets outside 1 to
+    /// [`heads_up_keys::MAX_MINUTES`] are left out; none clears them; the
+    /// same again writes nothing. [`Error::Invalid`] for an id that is no
+    /// Routine.
+    pub fn set_heads_ups(&self, routine_id: &str, minutes: &[i64]) -> Result<()> {
+        if self.by_id(routine_id)?.is_none() {
+            return Err(Error::Invalid(format!("not a Routine: {routine_id}")));
+        }
+        let value = heads_up_keys::write(minutes);
+        if value == heads_up_keys::write(&self.heads_ups(routine_id)?) {
+            return Ok(());
+        }
+        self.store
+            .append(
+                &heads_up_keys::of(routine_id),
+                heads_up_keys::HEADS_UPS,
+                value.as_deref(),
+                None,
+            )
             .map(drop)
     }
 

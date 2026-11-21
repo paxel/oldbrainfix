@@ -1,67 +1,41 @@
-//! What is set up for a Note while it is captured (#113), as the phone's
+//! What a Note is written with as it is captured (#113), as the phone's
 //! `capture_choices.dart` holds it: the Area or Topic it goes into, its
-//! Importance, the first field of the Tally it becomes, the Routines,
-//! Reminders and Sessions spawned from it and a Frog. None of it is
-//! written before the Note is: [`capture`] writes the Note and all of it
-//! in one batch, so a write that fails on the way leaves nothing, and an
-//! empty Note writes nothing at all.
+//! Kind, its Importance, the first field of the Tally it becomes, the
+//! Routines, Reminders and Sessions spawned from it, a Frog and the
+//! Shopping List its lines go into. None of it is written before the
+//! Note is: [`capture`] writes the Note and all of it in one batch, so a
+//! write that fails on the way leaves nothing, and an empty Note writes
+//! nothing at all.
 //!
-//! The capture popup and the window's quick note dialog share it, with
-//! "To full editor" and the Note card's buttons ([`action_row`]) and the
-//! choices shown at the top ([`chips`]), each with a button that drops it
-//! again. Of the buttons the alarm clock for a Routine or Reminder always
-//! shows (#223), the rest only once this Device switched it on in
-//! Settings ▸ Quick note ([`QuickNote`], #142). Sending and the trash
-//! need a saved Note and are not offered here.
+//! The quick note, the capture popup and the window's quick note dialog,
+//! shows only the text, the Nudge buttons and More (#352); the Note
+//! dialog does the rest once the Note is saved. Both save through
+//! [`save`], so the two cannot tell this apart. The Kind (#310) applies
+//! to the typed text only: with nothing typed the Note stays a Plain
+//! Note. With a Shopping List set (#124), each line typed becomes a Line
+//! of it instead and no Note is kept; a voice capture (#311) stays on
+//! the list as a Section, its recording to be listened to
+//! (`ShoppingLists::add_voice_capture`). No Line holds a photo or a file:
+//! a photo held drops the list ([`hold_photo`]).
 //!
-//! "Add to Note…" beside "To full editor" (#308) picks another Note and
-//! adds the capture to it at once as a Section ([`add_to_note`]): written
-//! where that Note lies, with no Nudge, and merged into it, so nothing
-//! waits in Unsorted. It is not offered once a Routine, Reminder,
-//! Session, Frog or Tally is set up, which need the Note itself.
-//!
-//! The Kind choice above the field (#310, Q715), Text, Checklist or
-//! Shopping List ([`kind_choice`]), makes the Note a Checklist or a
-//! Shopping List as it is written, each typed line a Line unless the
-//! first is a heading (#309); Text keeps it a Plain Note. It applies to
-//! the typed text only: with nothing typed the Note stays a Plain Note,
-//! a recording, photo or file stays on it as its own. A list made so
-//! leaves Unsorted, needing no Nudge; it needs the Note itself, so "Add
-//! to Note…", "Make it a Tally" and the Session are not offered
-//! meanwhile, and a Tally or Session set up hides the choice.
-//!
-//! "Add to a Shopping List" in "More" (#124) makes each line typed a Line
-//! of the list picked instead, and keeps no Note; the other choices wait
-//! unshown and unwritten meanwhile, and come back when its chip is
-//! dropped. A voice capture (#311) is offered it with a speech model or
-//! without: it stays on the list as a Section, its recording to be
-//! listened to, and the items said in its Transcript become Lines once
-//! the desktop or the phone transcribed it, the model downloaded later
-//! too (`ShoppingLists::add_voice_capture`). No Line holds a photo: a
-//! photo held drops the list picked, and no list is offered while one is
-//! ([`shopping_offer`], [`hold_photo`]).
-//! The popup and the window both save through [`save`], so the two
-//! cannot tell this apart.
+//! [`pour_into_shopping`] does the same for a Note already saved, as the
+//! Note dialog's Add to a Shopping List asks (#352).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::{Frame, Key, Margin, Modifiers, RichText, Stroke, Ui};
+use egui::{Key, Modifiers, RichText, Ui};
 use oldbrainfix_core::{
-    Area, Checklists, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes,
-    PersonSettings, QuickNoteControl, Routines, Schedule, SessionRule, Sessions, ShoppingLists,
-    Store, Tallies, TallyRule, Topic, WallClock, markdown, text_format,
+    Checklists, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes, Routines, Schedule,
+    SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, WallClock, markdown,
+    text_format,
 };
 
-use crate::app::{Wall, icon_button};
+use crate::app::Wall;
 use crate::attachment_view::HeldFile;
 use crate::enrich::Said;
-use crate::icons;
 use crate::l10n::L10n;
-use crate::names::{area_name, topic_name};
-use crate::schedule_text::schedule_text;
-use crate::setting_badges::menu_entry;
 
 /// A Session's pool, count, weekdays' own counts and rule as plain
 /// values, kept after its editor is gone.
@@ -118,6 +92,9 @@ pub struct ScheduleChoice {
     pub escalation: Option<i64>,
     /// The Session's part; `None` for a plain Routine or Reminder.
     pub session: Option<SessionChoice>,
+    /// The person's own Heads-ups, in minutes before an Occurrence
+    /// (obf-1046); none for none.
+    pub heads_ups: Vec<i64>,
 }
 
 impl ScheduleChoice {
@@ -130,6 +107,7 @@ impl ScheduleChoice {
         };
         routines.set_renag(&id, self.renag)?;
         routines.set_escalation(&id, self.escalation)?;
+        routines.set_heads_ups(&id, &self.heads_ups)?;
         Ok(id)
     }
 }
@@ -161,7 +139,7 @@ pub enum CaptureKind {
 pub struct CaptureChoices {
     /// The Kind it is made as it is written (#310).
     pub kind: CaptureKind,
-    /// The Area or Topic picked with "File into…".
+    /// The Area or Topic it goes into.
     pub place: Option<String>,
     pub importance: Importance,
     pub tally: Option<TallyFieldChoice>,
@@ -170,57 +148,6 @@ pub struct CaptureChoices {
     /// The Note of the Shopping List the lines go into instead of a
     /// Note; while one is, the rest waits unwritten.
     pub shopping: Option<String>,
-}
-
-/// Something on the capture's buttons or its choices to spawn.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Spawn {
-    Routine,
-    Reminder,
-    Frog,
-    Session,
-}
-
-/// One of the choices shown at the top.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Chip {
-    Place,
-    Importance,
-    Tally,
-    /// The Routine, Reminder or Session at this index.
-    Schedule(usize),
-    Frog,
-    Shopping,
-}
-
-/// What was asked of the capture's buttons or its choices.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Ask {
-    /// "File into…": opens its picker (#272).
-    PickPlace,
-    /// The Area or Topic picked there.
-    FileInto(String),
-    Spawn(Spawn),
-    Importance(Importance),
-    MakeTally,
-    /// The Kind it is made (#310).
-    Kind(CaptureKind),
-    /// The lines go into the Shopping List of this Note.
-    Shopping(String),
-    /// Drops the choice again.
-    Remove(Chip),
-}
-
-/// The page a button opens, which hands back its choice.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Opens {
-    Schedule {
-        reminder: bool,
-        session: bool,
-    },
-    Tally,
-    /// File into… (#272).
-    FileInto,
 }
 
 impl CaptureChoices {
@@ -239,15 +166,6 @@ impl CaptureChoices {
     /// Whether a Checklist or Shopping List is chosen as the Kind (#310).
     pub fn list_kind(&self) -> bool {
         self.kind != CaptureKind::Text
-    }
-
-    /// Whether the Kind choice shows (#310): not while a Shopping List is
-    /// picked, where the other choices wait unshown too, nor while a Tally
-    /// or Session is set up, which makes the Note that kind.
-    pub fn offers_kind(&self) -> bool {
-        self.shopping.is_none()
-            && self.tally.is_none()
-            && self.schedules.iter().all(|s| s.session.is_none())
     }
 
     /// Writes all of it into the Note `note_id`, which holds its place
@@ -296,63 +214,6 @@ impl CaptureChoices {
         }
         Ok(())
     }
-
-    /// Drops what may not go into `place`: in a Shared Area only a
-    /// Manager spawns (ADR 0013), and a Session there picks only Tallies
-    /// of that Area (ADR 0029).
-    pub fn keep_what_fits(
-        &mut self,
-        store: &Store,
-        place: Option<&str>,
-    ) -> oldbrainfix_core::Result<()> {
-        if !may_spawn(store, place)? {
-            self.schedules.clear();
-            self.frog = false;
-            return Ok(());
-        }
-        let fits = Sessions::new(store).choices(place.unwrap_or(""))?;
-        self.schedules.retain(|choice| {
-            choice
-                .session
-                .as_ref()
-                .is_none_or(|s| s.pool.iter().all(|id| fits.contains(id)))
-        });
-        Ok(())
-    }
-
-    /// Takes what was asked; the page to open for it, if any.
-    pub fn take(&mut self, asked: Ask, store: &Store) -> oldbrainfix_core::Result<Option<Opens>> {
-        match asked {
-            Ask::PickPlace => return Ok(Some(Opens::FileInto)),
-            Ask::FileInto(picked) => {
-                // Picked, it is filed into last, saved or not (#272).
-                DeviceSettings::new(store).filed_into(&picked)?;
-                self.keep_what_fits(store, Some(&picked))?;
-                self.place = Some(picked);
-            }
-            Ask::Spawn(Spawn::Frog) => self.frog = true,
-            Ask::Spawn(spawn) => {
-                return Ok(Some(Opens::Schedule {
-                    reminder: spawn == Spawn::Reminder,
-                    session: spawn == Spawn::Session,
-                }));
-            }
-            Ask::Importance(importance) => self.importance = importance,
-            Ask::MakeTally => return Ok(Some(Opens::Tally)),
-            Ask::Kind(kind) => self.kind = kind,
-            Ask::Shopping(list) => self.shopping = Some(list),
-            Ask::Remove(chip) => match chip {
-                Chip::Place => self.place = None,
-                Chip::Importance => self.importance = Importance::Normal,
-                Chip::Tally => self.tally = None,
-                Chip::Schedule(i) if i < self.schedules.len() => drop(self.schedules.remove(i)),
-                Chip::Schedule(_) => {}
-                Chip::Frog => self.frog = false,
-                Chip::Shopping => self.shopping = None,
-            },
-        }
-        Ok(None)
-    }
 }
 
 /// Whether this Device may spawn from a Note in `place`: anywhere but in
@@ -367,10 +228,6 @@ pub fn may_spawn(store: &Store, place: Option<&str>) -> oldbrainfix_core::Result
 
 /// A Shopping List a capture can go into: its Note's id and its title.
 pub type ListTitle = (String, String);
-
-/// What the capture's buttons offer: whether the Note may spawn where it
-/// goes, and the Shopping Lists it can go into.
-pub type Offer<'a> = (bool, &'a [ListTitle]);
 
 /// What a capture came to.
 #[derive(Debug, Clone, PartialEq)]
@@ -516,58 +373,12 @@ pub fn save(
     Ok((captured, said))
 }
 
-/// Adds `text` with the `photos`, `recordings` and `files` held to the
-/// Note `into` at once as a Section of it (#308), in one batch: a new
-/// Note written where `into` lies, so it is sealed for the same people,
-/// with no Nudge, and merged into it, so nothing waits in Unsorted. A
-/// recording gets its Transcript as a merged Note's does. The new Note's
-/// id; `None` when there is nothing to add, and nothing is written.
-pub fn add_to_note(
-    store: &Store,
-    text: &str,
-    into: &str,
-    (photos, recordings, files): (&[Vec<u8>], &[Vec<u8>], &[HeldFile]),
-) -> oldbrainfix_core::Result<Option<String>> {
-    let text = text.trim();
-    if text.is_empty() && photos.is_empty() && recordings.is_empty() && files.is_empty() {
-        return Ok(None);
-    }
-    let notes = Notes::new(store);
-    let place = notes.by_id(into)?.and_then(|n| n.place);
-    let attached: Vec<NewFile> = files.iter().map(HeldFile::new_file).collect();
-    store
-        .batch(|| {
-            let note = notes.capture_with_files(
-                text,
-                place.as_deref(),
-                None,
-                photos,
-                recordings,
-                &attached,
-            )?;
-            formatted(store, &note)?;
-            notes.merge(&note.id, into)?;
-            Ok(note.id)
-        })
-        .map(Some)
-}
-
 /// Holds `photo` with the `photos` of the Note being captured. No Line
 /// holds a photo, so the Shopping List picked in `choices` is dropped
 /// (UI laws, "Capture").
 pub fn hold_photo(photos: &mut Vec<Vec<u8>>, choices: &mut CaptureChoices, photo: Vec<u8>) {
     photos.push(photo);
     choices.shopping = None;
-}
-
-/// The Shopping Lists among `lists` a capture can go into: none while it
-/// holds a photo (`photo_held`); a recording goes with a speech model or
-/// without (#311).
-pub fn shopping_offer(lists: &[ListTitle], photo_held: bool) -> &[ListTitle] {
-    if photo_held {
-        return &[];
-    }
-    lists
 }
 
 /// Makes the text of the Note `note`, just captured, a formatted text
@@ -607,34 +418,11 @@ pub fn shopping_lists(store: &Store, t: &L10n) -> oldbrainfix_core::Result<Vec<L
     Ok(lists)
 }
 
-/// The title of the Shopping List `id` among `lists`; "Shopping List"
-/// for one no longer there.
-pub fn shopping_name(t: &L10n, lists: &[ListTitle], id: &str) -> String {
-    lists.iter().find(|(list, _)| list == id).map_or_else(
-        || t.shopping_heading().to_string(),
-        |(_, title)| title.clone(),
-    )
-}
-
-/// The Area or Topic `id` as the user reads it, "Area / Topic" for a
-/// Topic; `None` when `areas` has no such place.
-pub fn place_name(t: &L10n, areas: &[(Area, Vec<Topic>)], id: &str) -> Option<String> {
-    for (area, topics) in areas {
-        if area.id == id {
-            return Some(area_name(t, area));
-        }
-        if let Some(topic) = topics.iter().find(|topic| topic.id == id) {
-            return Some(format!("{} / {}", area_name(t, area), topic_name(t, topic)));
-        }
-    }
-    None
-}
-
 /// "Add to a Shopping List" in a menu: its heading over `lists`, by
 /// their Note's id with their title, as radio buttons, the one picked
 /// before on; with one list a single entry naming it, "Add to Weekly"
 /// (#276). The one picked.
-fn shopping_picker(
+pub fn shopping_picker(
     ui: &mut Ui,
     t: &L10n,
     current: Option<&str>,
@@ -671,54 +459,28 @@ fn shopping_picker(
     picked
 }
 
-/// What this Device's quick note, its dialog in the window and the popup, shows
-/// besides its text, its buttons for recordings, pictures and files and
-/// "To full editor" (#142, ADR 0008): each control once switched on in
-/// Settings ▸ Quick note, and the Nudge buttons until switched off.
+/// What this Device's quick note, its dialog in the window and the
+/// popup, shows besides its text and More (#142, #352, ADR 0008): the
+/// Nudge buttons until switched off in Settings ▸ Quick note.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QuickNote {
-    pub file_into: bool,
-    /// Frog and Session in the alarm clock's menu, which offers a
-    /// Routine or Reminder without it (#223), and "Make it a Tally".
-    pub schedule: bool,
-    pub shopping: bool,
-    pub importance: bool,
-    pub format_bar: bool,
     pub nudge_buttons: bool,
-    /// Whether the person chose Advanced (#197): only then are Frog,
-    /// Session, "Make it a Tally" and the format bar offered.
-    pub advanced: bool,
 }
 
 impl Default for QuickNote {
     /// As a Device that switched nothing.
     fn default() -> QuickNote {
         QuickNote {
-            file_into: false,
-            schedule: false,
-            shopping: false,
-            importance: false,
-            format_bar: false,
             nudge_buttons: true,
-            advanced: true,
         }
     }
 }
 
 impl QuickNote {
-    /// What this Device's settings switched on; the format bar only in
-    /// Advanced (#197).
+    /// What this Device's settings switched on.
     pub fn read(store: &Store) -> oldbrainfix_core::Result<QuickNote> {
         let settings = DeviceSettings::new(store);
-        let shows = |control| settings.quick_note_shows(control);
-        let advanced = PersonSettings::new(store).advanced()?;
         Ok(QuickNote {
-            advanced,
-            file_into: shows(QuickNoteControl::FileInto)?,
-            schedule: shows(QuickNoteControl::Schedule)?,
-            shopping: shows(QuickNoteControl::Shopping)?,
-            importance: shows(QuickNoteControl::Importance)?,
-            format_bar: advanced && shows(QuickNoteControl::FormatBar)?,
             nudge_buttons: settings.quick_note_nudge_buttons_on()?,
         })
     }
@@ -755,250 +517,44 @@ pub fn nudge_key(ui: &Ui, nudges: bool) -> Option<Duration> {
     })
 }
 
-/// What was asked of the capture's action row.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RowAsk {
-    /// A choice for the Note.
-    Choice(Ask),
-    /// "To full editor": save the Note and open it in the Note editor.
-    ToEditor,
-    /// "Add to Note…" (#308): pick the Note to add the capture to.
-    AddToNote,
-}
-
-/// The capture's action row: "To full editor", waiting until `ready`,
-/// "Add to Note…", waiting as well, unless something is set up that needs
-/// the Note itself (#308), "File into…", opening its picker, once `quick`
-/// switched it on, the alarm clock while `spawns`, else why not, its menu
-/// a Routine or Reminder (#223) and, switched on, a Frog and Session, and "More" with what
-/// `quick` switched on: the Importance, "Make it a Tally", which goes
-/// with the Frog and Session (Q481), and "Add to a Shopping List" over
-/// `lists`, offered while there is one. While a
-/// Shopping List is picked, only "More" with the lists shows, and no
-/// "To full editor", as the lines make no Note.
-pub fn action_row(
-    ui: &mut Ui,
-    t: &L10n,
-    choices: &CaptureChoices,
-    (spawns, lists): Offer<'_>,
-    (quick, ready): (&QuickNote, bool),
-) -> Option<RowAsk> {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    let mut asked = None;
-    // Lines need none of the rest: it waits while a list is picked.
-    let shopping = choices.shopping.as_deref();
-    if shopping.is_some() {
-        ui.horizontal_wrapped(|ui| {
-            ui.menu_button(RichText::new(t.more()).color(text), |ui| {
-                if let Some(list) = shopping_picker(ui, t, shopping, lists) {
-                    asked = Some(RowAsk::Choice(Ask::Shopping(list)));
-                }
-            });
-        });
-        return asked;
+/// Makes each line of the text of the saved Note `note_id` a Line of the
+/// Shopping List `list`, a name the list has bringing its Line back, and
+/// lets the Note go, all in one batch, as the phone's `pourIntoShopping`
+/// does (#124, #352): the Note dialog's Add to a Shopping List. A Note
+/// with a recording stays on the list as a Section instead, owing it the
+/// items said in its Transcripts (#311). The list goes to the top of the
+/// pick (#276). Whether it went; false when the list can no longer be
+/// added to, or the Note may no longer go (deleted, merged or with
+/// something spawned from it meanwhile): the Note stays then.
+pub fn pour_into_shopping(
+    store: &Store,
+    note_id: &str,
+    list: &str,
+    wall: &WallClock,
+) -> oldbrainfix_core::Result<bool> {
+    let notes = Notes::new(store);
+    let Some(note) = notes.by_id(note_id)? else {
+        return Ok(false);
+    };
+    if note.is_trashed() || note.is_merged() || note.spawned {
+        return Ok(false);
     }
-    let lists = if quick.shopping { lists } else { &[] };
-    ui.horizontal_wrapped(|ui| {
-        let editor = egui::Button::new(RichText::new(t.to_full_editor()).color(text));
-        if ui.add_enabled(ready, editor).clicked() {
-            asked = Some(RowAsk::ToEditor);
+    let lists = ShoppingLists::new(store);
+    let poured = if note.recordings.is_empty() {
+        store.batch(|| {
+            // Its boxes as they show, without their ids (ADR 0035).
+            lists.add_lines(list, &note.shown_text(), wall)?;
+            notes.discard(note_id)
+        })
+    } else {
+        lists.add_voice_capture(list, note_id, wall).map(drop)
+    };
+    match poured {
+        Ok(()) => {
+            DeviceSettings::new(store).set_last_shopping_list(Some(list))?;
+            Ok(true)
         }
-        // At once into another Note (#308); a Routine, Reminder, Session,
-        // Frog or Tally needs the Note itself, as a list Kind does (#310).
-        if choices.tally.is_none()
-            && choices.schedules.is_empty()
-            && !choices.frog
-            && !choices.list_kind()
-        {
-            let add = egui::Button::new(RichText::new(t.add_to_note()).color(text));
-            if ui.add_enabled(ready, add).clicked() {
-                asked = Some(RowAsk::AddToNote);
-            }
-        }
-        // Its picker opens over the capture, with a filter (#272).
-        if quick.file_into
-            && ui
-                .button(RichText::new(t.file_into()).color(text))
-                .clicked()
-        {
-            asked = Some(RowAsk::Choice(Ask::PickPlace));
-        }
-        // The alarm clock is always there for a Routine or Reminder
-        // (#223), its menu as the Note's "+"; the switch adds Frog and
-        // Session.
-        if spawns {
-            let clock = icon_button(ui, icons::ADD_ALARM, t.routine_or_reminder(), text);
-            egui::Popup::menu(&clock).show(|ui| {
-                let offered = [
-                    (Spawn::Routine, icons::REPEAT, t.routine()),
-                    (Spawn::Reminder, icons::REMINDER, t.reminder()),
-                    (Spawn::Frog, icons::FROG, t.frog()),
-                    (Spawn::Session, icons::SESSION, t.session()),
-                ];
-                for (spawn, icon, label) in offered {
-                    // A Note has one open Frog at a time; Frogs and
-                    // Sessions are made only in Advanced (#197), once
-                    // switched on.
-                    // A Note of a list Kind becomes no Session (#310).
-                    let extra = matches!(spawn, Spawn::Frog | Spawn::Session);
-                    if (spawn == Spawn::Frog && choices.frog)
-                        || (spawn == Spawn::Session && choices.list_kind())
-                        || (extra && !(quick.schedule && quick.advanced))
-                    {
-                        continue;
-                    }
-                    if menu_entry(ui, (icon, text), label).clicked() {
-                        asked = Some(RowAsk::Choice(Ask::Spawn(spawn)));
-                        // A pick closes the menu, also one by keyboard or
-                        // screen reader.
-                        ui.close();
-                    }
-                }
-            });
-        }
-        let tally =
-            quick.schedule && quick.advanced && choices.tally.is_none() && !choices.list_kind();
-        if !quick.importance && !tally && lists.is_empty() {
-            return;
-        }
-        ui.menu_button(RichText::new(t.more()).color(text), |ui| {
-            if quick.importance {
-                ui.label(RichText::new(t.importance()).strong().color(text));
-                let levels = [
-                    (Importance::Important, t.importance_important()),
-                    (Importance::Normal, t.importance_normal()),
-                    (Importance::Unimportant, t.importance_unimportant()),
-                ];
-                for (importance, label) in levels {
-                    let on = choices.importance == importance;
-                    if ui.radio(on, RichText::new(label).color(text)).clicked() && !on {
-                        asked = Some(RowAsk::Choice(Ask::Importance(importance)));
-                    }
-                }
-            }
-            if tally {
-                if quick.importance {
-                    ui.separator();
-                }
-                if ui
-                    .button(RichText::new(t.make_tally()).color(text))
-                    .clicked()
-                {
-                    asked = Some(RowAsk::Choice(Ask::MakeTally));
-                }
-            }
-            if !lists.is_empty() {
-                if quick.importance || tally {
-                    ui.separator();
-                }
-                if let Some(list) = shopping_picker(ui, t, None, lists) {
-                    asked = Some(RowAsk::Choice(Ask::Shopping(list)));
-                }
-            }
-        });
-    });
-    if !spawns {
-        ui.label(RichText::new(t.only_managers()).small().color(weak));
+        Err(Error::Invalid(_) | Error::HiddenFromAi(_)) => Ok(false),
+        Err(e) => Err(e),
     }
-    asked
-}
-
-/// The Kind choice above the field (#310): Text, Checklist and Shopping
-/// List as choice chips, the one chosen picked; nothing while
-/// [`CaptureChoices::offers_kind`] says no. What was asked of it.
-pub fn kind_choice(ui: &mut Ui, t: &L10n, choices: &CaptureChoices) -> Option<Ask> {
-    if !choices.offers_kind() {
-        return None;
-    }
-    let mut picked = choices.kind;
-    let options = [
-        (CaptureKind::Text, t.text().to_string()),
-        (CaptureKind::Checklist, t.checklist_heading().to_string()),
-        (CaptureKind::ShoppingList, t.shopping_heading().to_string()),
-    ];
-    let changed = crate::app::chip_row(ui, &mut picked, options);
-    (changed && picked != choices.kind).then_some(Ask::Kind(picked))
-}
-
-/// What was set up for the Note, at the top, not saved yet: where it
-/// goes (`place`, as the user reads it, and whether it can be dropped),
-/// its Importance, its Tally, Routines, Reminders and Sessions and its
-/// Frog, each with a button that drops it; nothing while there is none.
-/// While a Shopping List is picked, only it shows, by its title `lists`
-/// gives.
-pub fn chips(
-    ui: &mut Ui,
-    t: &L10n,
-    choices: &CaptureChoices,
-    (place, lists): (Option<(String, bool)>, &[ListTitle]),
-) -> Option<Ask> {
-    let mut shown: Vec<(Chip, String, bool)> = Vec::new();
-    // The other choices wait unshown while the lines go into a list.
-    if let Some(list) = &choices.shopping {
-        let title = shopping_name(t, lists, list);
-        shown.push((Chip::Shopping, t.capture_choice_shopping(&title), true));
-        return chip_row(ui, t, shown);
-    }
-    if let Some((name, removable)) = place {
-        shown.push((Chip::Place, t.capture_choice_place_desk(&name), removable));
-    }
-    match choices.importance {
-        Importance::Normal => {}
-        Importance::Important => {
-            shown.push((Chip::Importance, t.importance_important().into(), true));
-        }
-        Importance::Unimportant => {
-            shown.push((Chip::Importance, t.importance_unimportant().into(), true));
-        }
-    }
-    if let Some(tally) = &choices.tally {
-        shown.push((Chip::Tally, t.capture_choice_tally(&tally.name), true));
-    }
-    for (i, choice) in choices.schedules.iter().enumerate() {
-        let when = schedule_text(t, &choice.schedule);
-        let label = if choice.session.is_some() {
-            t.capture_choice_session(&when)
-        } else if choice.schedule.once() {
-            t.capture_choice_reminder(&when)
-        } else {
-            t.capture_choice_routine(&when)
-        };
-        shown.push((Chip::Schedule(i), label, true));
-    }
-    if choices.frog {
-        shown.push((Chip::Frog, t.frog().into(), true));
-    }
-    chip_row(ui, t, shown)
-}
-
-/// The chips `shown`, each with its label and whether a button drops it;
-/// what was asked of them.
-fn chip_row(ui: &mut Ui, t: &L10n, shown: Vec<(Chip, String, bool)>) -> Option<Ask> {
-    if shown.is_empty() {
-        return None;
-    }
-    let text = ui.visuals().text_color();
-    let stroke = Stroke::new(1.0, ui.visuals().weak_text_color());
-    let mut asked = None;
-    ui.horizontal_wrapped(|ui| {
-        for (chip, label, removable) in shown {
-            Frame::NONE
-                .stroke(stroke)
-                .corner_radius(8.0)
-                .inner_margin(Margin::symmetric(8, 2))
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(&label).color(text));
-                        if removable
-                            && icon_button(ui, icons::CLOSE, &t.remove_choice(&label), text)
-                                .clicked()
-                        {
-                            asked = Some(Ask::Remove(chip));
-                        }
-                    });
-                });
-        }
-    });
-    asked
 }

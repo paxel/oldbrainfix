@@ -1,11 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
-import 'package:oldbrainfix/src/routine_editor_screen.dart';
-import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
@@ -13,10 +12,9 @@ import 'fake_voice.dart';
 import 'open_capture.dart';
 import 'open_settings.dart';
 
-/// The quick note uncluttered (#142): the text, Photo, Voice, Gallery and
-/// Paste, the Nudge buttons, "To full editor" and the alarm clock for a
-/// Routine or Reminder (#223) by default, the rest switched on per Device
-/// in Settings ▸ Quick note.
+/// The quick note (#352): the text at the top, under it the three Nudge
+/// buttons and More, nothing else; Back saves as the 1 h button does, and
+/// More saves and opens the full editor in its place.
 void main() {
   late Store store;
   late Notes notes;
@@ -37,8 +35,8 @@ void main() {
     await tester.pumpWidget(
       OldBrainFixApp(
         store: store,
-        voice: FakeVoice(),
-        photos: FakePhotos(nextPhoto: onePixelPng),
+        voice: FakeVoice(nextRecording: Uint8List.fromList(const [1, 2, 3])),
+        photos: FakePhotos(nextPhoto: onePixelPng, nextPicked: [onePixelPng]),
       ),
     );
     await tester.pumpAndSettle();
@@ -53,129 +51,138 @@ void main() {
 
   Finder inCapture(Finder finder) =>
       find.descendant(of: find.byType(CaptureScreen), matching: finder);
-  final row = inCapture(find.byKey(const ValueKey('note-actions')));
-  final fileInto = inCapture(find.byTooltip('File into…'));
-  final spawnMenu = inCapture(find.byIcon(Icons.alarm_add_outlined));
-  final more = inCapture(find.byKey(const ValueKey('note-menu')));
-  final toEditor = find.byKey(const ValueKey('captureToEditor'));
+  final more = find.byKey(const ValueKey('captureToEditor'));
   final save = find.byKey(const ValueKey('captureSave'));
   final nudge10 = find.byKey(const ValueKey('nudge10'));
 
-  group('The quick note by default', () {
-    testWidgets('shows the text, Photo, Voice, Gallery, Paste, the Nudge '
-        'buttons, "To full editor" and the alarm clock, and nothing else that '
-        'sorts', (tester) async {
+  /// Every button of the quick note.
+  List<ButtonStyleButton> buttons(WidgetTester tester) => tester
+      .widgetList<ButtonStyleButton>(
+        inCapture(find.bySubtype<ButtonStyleButton>()),
+      )
+      .toList();
+
+  for (final simple in [false, true]) {
+    testWidgets('shows only the text, the three Nudge buttons and More, '
+        '${simple ? 'in Simple' : 'in Advanced'} alike', (tester) async {
+      store.advanced = !simple;
+      // What the quick note's switches showed before stays stored and
+      // shows no more.
+      for (final control in QuickNoteControl.values) {
+        store.setQuickNoteShows(control, true);
+      }
+      ShoppingLists(store).make(notes.capture('Groceries').id);
       places.addArea('Household');
       await start(tester);
       await openTextCapture(tester);
 
       expect(inCapture(find.byType(TextField)), findsOneWidget);
-      for (final key in [
-        'capturePhoto',
-        'captureVoice',
-        'captureGallery',
-        'capturePaste',
-        'nudge10',
-        'nudge30',
-        'nudge60',
-        'captureToEditor',
-      ]) {
-        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
-      }
-      expect(row, findsOneWidget);
-      expect(fileInto, findsNothing);
-      expect(spawnMenu, findsOneWidget);
-      expect(more, findsNothing);
-      expect(save, findsNothing);
+      expect(
+        buttons(tester).map((button) => button.key),
+        unorderedEquals(const [
+          ValueKey('nudge10'),
+          ValueKey('nudge30'),
+          ValueKey('nudge60'),
+          ValueKey('captureToEditor'),
+        ]),
+      );
+      expect(inCapture(find.byType(IconButton)), findsNothing);
       expect(inCapture(find.byType(InputChip)), findsNothing);
-      expect(find.byType(TwoRowTextField), findsNothing);
-    });
-
-    testWidgets('the alarm clock offers Routine and Reminder, as the Note '
-        'editor\'s "+" does, without Frog or Session (#223)', (tester) async {
-      await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, spawnMenu);
-      expect(find.text('Routine'), findsOneWidget);
-      expect(find.text('Reminder'), findsOneWidget);
-      expect(find.text('Frog'), findsNothing);
-      expect(find.text('Session'), findsNothing);
-    });
-
-    testWidgets('in Simple the alarm clock offers Routine and Reminder too '
-        '(#197, #223)', (tester) async {
-      store.advanced = false;
-      await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, spawnMenu);
-      expect(find.text('Routine'), findsOneWidget);
-      expect(find.text('Reminder'), findsOneWidget);
-      expect(find.text('Frog'), findsNothing);
-    });
-
-    testWidgets('a Reminder set up there opens its editor over the quick '
-        'note and is saved with the Note (#223)', (tester) async {
-      await start(tester);
-      await openTextCapture(tester);
-      await tester.enterText(find.byType(TextField), 'ring the plumber');
-      await tap(tester, spawnMenu);
-      await tap(tester, find.text('Reminder').last);
-      expect(find.byType(RoutineEditorScreen), findsOneWidget);
-      await tap(
-        tester,
-        find.descendant(
-          of: find.byType(RoutineEditorScreen),
-          matching: find.widgetWithText(TextButton, 'Save'),
-        ),
+      expect(inCapture(find.byType(ChoiceChip)), findsNothing);
+      expect(
+        inCapture(find.byKey(const ValueKey('note-actions'))),
+        findsNothing,
       );
-      expect(find.byType(CaptureScreen), findsOneWidget);
-      expect(find.textContaining('Reminder: '), findsOneWidget);
-      // Not written before the Note is.
-      expect(Routines(store).all(), isEmpty);
-      expect(notes.all(), isEmpty);
-
-      await tap(tester, save);
-      final note = notes.all().single;
-      expect(note.text, 'ring the plumber');
-      final routine = Routines(store).all().single;
-      expect(routine.noteId, note.id);
-      expect(routine.schedule.once, isTrue);
+      expect(find.text('More'), findsOneWidget);
+      // The text first, at the top; the buttons under it, More last.
+      final field = tester.getRect(inCapture(find.byType(TextField)));
+      expect(field.top, lessThan(tester.getRect(nudge10).top));
+      expect(
+        tester.getRect(nudge10).bottom,
+        lessThanOrEqualTo(tester.getRect(more).top),
+      );
     });
+  }
 
-    testWidgets('a quick note left with nothing typed leaves no Routine '
-        'behind (#223)', (tester) async {
+  testWidgets('on Android the bar holds no Save and no back arrow', (
+    tester,
+  ) async {
+    await start(tester);
+    await openTextCapture(tester);
+    expect(inCapture(find.byType(BackButton)), findsNothing);
+    expect(inCapture(find.widgetWithText(TextButton, 'Save')), findsNothing);
+  });
+
+  testWidgets('Back saves the Note Unsorted, nudged in 1 h', (tester) async {
+    await start(tester);
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'ring the plumber');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CaptureScreen), findsNothing);
+    final note = notes.all().single;
+    expect(note.text, 'ring the plumber');
+    expect(note.isUnsorted, isTrue);
+    expect(note.nudge, now.add(Notes.defaultNudge));
+  });
+
+  testWidgets('an empty text saves nothing on Back', (tester) async {
+    await start(tester);
+    await openTextCapture(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CaptureScreen), findsNothing);
+    expect(notes.all(), isEmpty);
+  });
+
+  testWidgets('a Nudge button saves with its time', (tester) async {
+    await start(tester);
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'water the plants');
+    await tap(tester, nudge10);
+
+    expect(find.byType(CaptureScreen), findsNothing);
+    expect(notes.all().single.nudge, now.add(const Duration(minutes: 10)));
+  });
+
+  testWidgets('the iPhone keeps a back arrow top left that saves as Back '
+      'does', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
       await start(tester);
       await openTextCapture(tester);
-      await tap(tester, spawnMenu);
-      await tap(tester, find.text('Routine').last);
-      await tap(
-        tester,
-        find.descendant(
-          of: find.byType(RoutineEditorScreen),
-          matching: find.widgetWithText(TextButton, 'Save'),
-        ),
+      final back = inCapture(find.byType(BackButton));
+      expect(back, findsOneWidget);
+      expect(inCapture(find.widgetWithText(TextButton, 'Save')), findsNothing);
+      expect(
+        tester.getRect(back).left,
+        lessThan(tester.getSize(find.byType(CaptureScreen)).width / 2),
       );
-      expect(find.textContaining('Routine: '), findsOneWidget);
 
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'descale the kettle');
+      await tap(tester, back);
       expect(find.byType(CaptureScreen), findsNothing);
-      expect(notes.all(), isEmpty);
-      expect(Routines(store).all(), isEmpty);
-    });
+      final note = notes.all().single;
+      expect(note.text, 'descale the kettle');
+      expect(note.nudge, now.add(Notes.defaultNudge));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 
-    testWidgets('"To full editor" waits for something to save', (tester) async {
+  group('More', () {
+    testWidgets('waits for something to save', (tester) async {
       await start(tester);
       await openTextCapture(tester);
-      expect(tester.widget<TextButton>(toEditor).onPressed, isNull);
+      expect(tester.widget<TextButton>(more).onPressed, isNull);
 
       await tester.enterText(find.byType(TextField), 'ring the plumber');
       await tester.pump();
-      expect(tester.widget<TextButton>(toEditor).onPressed, isNotNull);
+      expect(tester.widget<TextButton>(more).onPressed, isNotNull);
     });
-  });
 
-  group('"To full editor"', () {
     testWidgets('saves the Note Unsorted with the default Nudge and opens '
         'the editor on it; filing there drops the Nudge, and leaving comes '
         'back to the Agenda', (tester) async {
@@ -183,7 +190,7 @@ void main() {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'descale the kettle');
-      await tap(tester, toEditor);
+      await tap(tester, more);
 
       expect(find.byType(CaptureScreen), findsNothing);
       expect(find.byType(NoteEditorScreen), findsOneWidget);
@@ -220,177 +227,81 @@ void main() {
       await openTextCapture(tester);
 
       expect(find.byType(CaptureScreen), findsOneWidget);
-      expect(toEditor, findsNothing);
+      expect(more, findsNothing);
+      expect(nudge10, findsOneWidget);
+    });
+  });
+
+  group('Every way in that brings something', () {
+    testWidgets('a photo shows above the text, and More takes it on', (
+      tester,
+    ) async {
+      await start(tester);
+      await tap(tester, find.byIcon(Icons.add));
+      await tap(tester, fanEntry('photo'));
+
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      final note = notes.all().single;
+      expect(note.photos, hasLength(1));
+      expect(tester.widget<TextButton>(more).onPressed, isNotNull);
+      await tap(tester, more);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(notes.all().single.id, note.id);
+    });
+
+    testWidgets('pictures picked show above the text', (tester) async {
+      await start(tester);
+      await tap(tester, find.byIcon(Icons.add));
+      await tap(tester, fanEntry('gallery'));
+
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      expect(notes.all().single.photos, hasLength(1));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(notes.all().single.nudge, now.add(Notes.defaultNudge));
+    });
+
+    testWidgets('voice records at once with the big stop button; Stop comes '
+        'back to the text with the recording, and Back saves', (tester) async {
+      await start(tester);
+      await tap(tester, find.byIcon(Icons.add));
+      await tap(tester, fanEntry('voice'));
+
+      expect(find.byKey(const ValueKey('stopRecording')), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('stopRecording')));
+      expect(find.byKey(const ValueKey('stopRecording')), findsNothing);
+      expect(inCapture(find.byType(TextField)), findsOneWidget);
+      expect(notes.all().single.recordings, hasLength(1));
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureScreen), findsNothing);
+      expect(notes.all().single.recordings, hasLength(1));
     });
   });
 
   group('Settings ▸ Quick note', () {
-    testWidgets('switches each control on and off again, on this Device', (
-      tester,
-    ) async {
+    testWidgets('shows only the Nudge buttons switch, the others of before '
+        'hidden with their stored values untouched', (tester) async {
+      store.setQuickNoteShows(QuickNoteControl.fileInto, true);
       await start(tester);
       await openDeviceSettings(tester);
 
       for (final control in QuickNoteControl.values) {
-        final key = find.byKey(ValueKey('quickNote-${control.name}'));
-        expect(tester.widget<Switch>(key).value, isFalse);
-        await tap(tester, key);
-        expect(store.quickNoteShows(control), isTrue, reason: control.name);
-        await tap(tester, key);
-        expect(store.quickNoteShows(control), isFalse, reason: control.name);
+        expect(
+          find.byKey(ValueKey('quickNote-${control.name}')),
+          findsNothing,
+          reason: control.name,
+        );
       }
-      // The alarm clock offers Routine and Reminder without it (#223);
-      // the switch adds Frog, Session and "Make it a Tally" (Q481).
-      expect(find.text('Frog, Session or Tally'), findsOneWidget);
+      expect(store.quickNoteShows(QuickNoteControl.fileInto), isTrue);
       final nudges = find.byKey(const ValueKey('quickNote-nudgeButtons'));
       expect(tester.widget<Switch>(nudges).value, isTrue);
       await tap(tester, nudges);
       expect(store.quickNoteNudgeButtonsOn, isFalse);
       await tap(tester, nudges);
       expect(store.quickNoteNudgeButtonsOn, isTrue);
-      expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
-    });
-
-    testWidgets('"File into…" brings back its button', (tester) async {
-      store.setQuickNoteShows(QuickNoteControl.fileInto, true);
-      await start(tester);
-      await openTextCapture(tester);
-      expect(fileInto, findsOneWidget);
-      expect(more, findsNothing);
-    });
-
-    testWidgets('"File into…" makes a new Area from the filter and files the '
-        'Note there on Save (#272)', (tester) async {
-      store.setQuickNoteShows(QuickNoteControl.fileInto, true);
-      places.addArea('Household');
-      await start(tester);
-      await openTextCapture(tester);
-      await tester.enterText(
-        inCapture(find.byType(TextField)),
-        'call the dentist',
-      );
-      await tap(tester, fileInto);
-      await tester.enterText(
-        find.descendant(
-          of: find.byType(FileIntoScreen),
-          matching: find.byType(TextField),
-        ),
-        'Dentist',
-      );
-      await tester.pumpAndSettle();
-      await tap(tester, find.byKey(const ValueKey('file-into-new-area')));
-      await tap(tester, find.text('Create'));
-
-      expect(find.byType(CaptureScreen), findsOneWidget);
-      expect(find.text('→ Dentist'), findsOneWidget);
-      final dentist = places.areas().singleWhere((a) => a.name == 'Dentist');
-      expect(notes.all(), isEmpty, reason: 'the Note waits for Save');
-      await tap(tester, save);
-      expect(notes.all().single.place, dentist.id);
-      expect(store.recentlyFiledInto, [dentist.id]);
-    });
-
-    testWidgets('"Frog, Session or Tally" adds Frog and Session to the alarm '
-        'clock and brings back ⋮ with "Make it a Tally" alone (Q481)', (
-      tester,
-    ) async {
-      store.setQuickNoteShows(QuickNoteControl.schedule, true);
-      await start(tester);
-      await openTextCapture(tester);
-      expect(fileInto, findsNothing);
-      await tap(tester, more);
-      expect(find.byKey(const ValueKey('note-make-tally')), findsOneWidget);
-      expect(find.byKey(const ValueKey('importance-important')), findsNothing);
-      expect(find.byKey(const ValueKey('note-add-to-shopping')), findsNothing);
-      await tester.tapAt(Offset.zero);
-      await tester.pumpAndSettle();
-      await tap(tester, spawnMenu);
-      for (final kind in ['Routine', 'Reminder', 'Frog', 'Session']) {
-        expect(find.text(kind), findsOneWidget, reason: kind);
-      }
-    });
-
-    testWidgets('in Simple "Frog, Session or Tally" is not offered (#197)', (
-      tester,
-    ) async {
-      store.advanced = false;
-      await start(tester);
-      await openDeviceSettings(tester);
-      expect(find.byKey(const ValueKey('quickNote-schedule')), findsNothing);
-      expect(find.byKey(const ValueKey('quickNote-fileInto')), findsOneWidget);
-    });
-
-    testWidgets('in Simple the menu offers Routine and Reminder only, no '
-        '"Make it a Tally" and no format bar (#197)', (tester) async {
-      store
-        ..setQuickNoteShows(QuickNoteControl.schedule, true)
-        ..setQuickNoteShows(QuickNoteControl.formatBar, true)
-        ..advanced = false;
-      await start(tester);
-      await openTextCapture(tester);
-      expect(more, findsNothing);
-      expect(find.byKey(const ValueKey('format-bold')), findsNothing);
-      await tap(tester, spawnMenu);
-      expect(find.text('Routine'), findsOneWidget);
-      expect(find.text('Reminder'), findsOneWidget);
-      expect(find.text('Frog'), findsNothing);
-      expect(find.text('Session'), findsNothing);
-    });
-
-    testWidgets('the Importance brings back ⋮ with it alone', (tester) async {
-      store.setQuickNoteShows(QuickNoteControl.importance, true);
-      await start(tester);
-      await openTextCapture(tester);
-      expect(fileInto, findsNothing);
-      await tap(tester, more);
-      expect(find.byKey(const ValueKey('importance-important')), findsWidgets);
-      expect(find.byKey(const ValueKey('note-add-to-shopping')), findsNothing);
-      expect(find.byKey(const ValueKey('note-make-tally')), findsNothing);
-    });
-
-    testWidgets('"Add to a Shopping List" brings back ⋮ with it alone', (
-      tester,
-    ) async {
-      ShoppingLists(store).make(notes.capture('Groceries').id);
-      store.setQuickNoteShows(QuickNoteControl.shopping, true);
-      await start(tester);
-      await openTextCapture(tester);
-      await tap(tester, more);
-      expect(find.byKey(const ValueKey('note-add-to-shopping')), findsWidgets);
-      expect(find.byKey(const ValueKey('importance-important')), findsNothing);
-      expect(find.byKey(const ValueKey('note-make-tally')), findsNothing);
-    });
-
-    testWidgets('the format bar formats the quick note, saved formatted', (
-      tester,
-    ) async {
-      store.setQuickNoteShows(QuickNoteControl.formatBar, true);
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await start(tester);
-      await openTextCapture(tester);
-      expect(find.byType(TwoRowTextField), findsOneWidget);
-      await tester.enterText(find.byType(TextField), 'buy milk');
-      await tester.showKeyboard(find.byType(TextField));
-      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
-      addTearDown(tester.view.resetViewInsets);
-      await tester.pumpAndSettle();
-      tester.widget<TextField>(find.byType(TextField)).controller!.selection =
-          const TextSelection.collapsed(offset: 5);
-      await tester.pump();
-      // Bold, and bold off again: the text stays formatted (ADR 0033).
-      await tester.tap(find.byKey(const ValueKey('format-bold')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('format-bold')));
-      await tester.pumpAndSettle();
-      tester.view.resetViewInsets();
-      await tester.pumpAndSettle();
-      await tap(tester, nudge10);
-
-      final note = notes.all().single;
-      expect(note.text, 'buy milk');
-      expect(note.textFormat, TextFormats.markdown);
+      expect(store.allEntries(), hasLength(0), reason: 'never synced');
     });
 
     testWidgets('the Nudge buttons off give a single Save, nudged in 1 h', (
@@ -401,6 +312,7 @@ void main() {
       await openTextCapture(tester);
       expect(nudge10, findsNothing);
       expect(save, findsOneWidget);
+      expect(more, findsOneWidget);
 
       await tester.enterText(find.byType(TextField), 'water the plants');
       await tap(tester, save);
@@ -408,67 +320,27 @@ void main() {
       expect(note.isUnsorted, isTrue);
       expect(note.nudge, now.add(Notes.defaultNudge));
     });
+  });
 
-    testWidgets('all of it on fits a small German phone, the keyboard up', (
-      tester,
-    ) async {
-      for (final control in QuickNoteControl.values) {
-        store.setQuickNoteShows(control, true);
-      }
-      ShoppingLists(store).make(notes.capture('Einkauf').id);
-      const height = 640.0;
-      const keyboard = 300.0;
-      final ratio = tester.view.devicePixelRatio;
-      tester.view.physicalSize = Size(360 * ratio, height * ratio);
-      addTearDown(tester.view.reset);
-      tester.platformDispatcher.localesTestValue = const [Locale('de')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
-      await start(tester);
-      await openTextCapture(tester);
-      await tester.showKeyboard(find.byType(TextField));
-      tester.view.viewInsets = FakeViewPadding(bottom: keyboard * ratio);
-      await tester.pumpAndSettle();
+  testWidgets('fits a small German phone, the keyboard up', (tester) async {
+    const height = 640.0;
+    const keyboard = 300.0;
+    final ratio = tester.view.devicePixelRatio;
+    tester.view.physicalSize = Size(360 * ratio, height * ratio);
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.localesTestValue = const [Locale('de')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+    await start(tester);
+    await openTextCapture(tester);
+    await tester.showKeyboard(find.byType(TextField));
+    tester.view.viewInsets = FakeViewPadding(bottom: keyboard * ratio);
+    await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
-      final room = height - keyboard - TwoRowTextField.barHeight;
-      for (final key in ['capturePhoto', 'captureVoice', 'captureGallery']) {
-        expect(
-          tester.getRect(find.byKey(ValueKey(key))).bottom,
-          lessThan(room),
-        );
-      }
-      // The text keeps two lines; the buttons under it scroll.
-      expect(
-        tester.getRect(find.byType(TextField)).height,
-        greaterThanOrEqualTo(48),
-      );
-      expect(find.text('Zum vollen Editor'), findsOneWidget);
-      final editor = tester.getRect(toEditor);
-      expect(
-        editor.right,
-        lessThanOrEqualTo(
-          tester
-              .getRect(inCapture(find.byIcon(Icons.drive_file_move_outline)))
-              .left,
-        ),
-      );
-      final words = tester.getRect(find.text('Zum vollen Editor'));
-      expect(words.right, lessThanOrEqualTo(editor.right));
-      await tester.ensureVisible(nudge10);
-      await tester.pumpAndSettle();
-      expect(tester.getRect(nudge10).bottom, lessThanOrEqualTo(room));
-      await tester.tap(nudge10);
-      await tester.pumpAndSettle();
-      expect(find.byType(CaptureScreen), findsNothing);
-    });
-
-    testWidgets('off again hides the control once more', (tester) async {
-      store
-        ..setQuickNoteShows(QuickNoteControl.fileInto, true)
-        ..setQuickNoteShows(QuickNoteControl.fileInto, false);
-      await start(tester);
-      await openTextCapture(tester);
-      expect(fileInto, findsNothing);
-    });
+    expect(tester.takeException(), isNull);
+    expect(find.text('Mehr'), findsOneWidget);
+    expect(tester.getRect(more).bottom, lessThanOrEqualTo(height - keyboard));
+    await tester.tap(nudge10);
+    await tester.pumpAndSettle();
+    expect(find.byType(CaptureScreen), findsNothing);
   });
 }

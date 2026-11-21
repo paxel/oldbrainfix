@@ -10,8 +10,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Duration, Utc};
 
 use crate::Result;
-use crate::alarms::{Alarms, instant_of, missed_from, start_of};
+use crate::alarms::{Alarms, QuietDays, instant_of, missed_from, start_of};
 use crate::entry::Entry;
+use crate::person_settings::PersonSettings;
 use crate::routines::{
     Routine, Routines, first_occurrence_from, keys, moved_occurrences, occurrences_between,
 };
@@ -362,7 +363,11 @@ impl<'a> Answers<'a> {
 /// went to the trash before, or it was skipped. Whatever was Done counts,
 /// asked for or not. Each span holds the Occurrences Tomorrow added to
 /// its schedule ([`moved_occurrences`]). An all-day Occurrence starts at
-/// `all_day_from`, as the alarm plan has it.
+/// `all_day_from`, as the alarm plan has it. One that starts on one of
+/// the `quiet_days` and is not Done is never Missed: it counts as skipped
+/// from the midnight after its quiet day, open or coming until then
+/// (obf-1044).
+#[allow(clippy::too_many_arguments)]
 pub fn routine_history(
     spans: &[ScheduleSpan],
     answers: Answers<'_>,
@@ -371,6 +376,7 @@ pub fn routine_history(
     wall: &WallClock,
     week_start: u32,
     all_day_from: ClockTime,
+    quiet_days: &QuietDays,
 ) -> RoutineHistory {
     let Answers {
         done,
@@ -447,6 +453,26 @@ pub fn routine_history(
                     is_moved,
                 );
                 asked.insert(key, e);
+            } else if let Some(settles) = quiet_days.settles_at(start, wall) {
+                // Left undone on a quiet day: skipped from its midnight on.
+                if settles <= now {
+                    let mut e = entry(
+                        *occurrence,
+                        OccurrenceStatus::Skipped,
+                        start,
+                        missed_at,
+                        is_moved,
+                    );
+                    e.skipped_at = Some(settles);
+                    asked.insert(key, e);
+                } else if span.until.is_none() {
+                    let status = if start > now {
+                        OccurrenceStatus::Coming
+                    } else {
+                        OccurrenceStatus::Open
+                    };
+                    asked.insert(key, entry(*occurrence, status, start, missed_at, is_moved));
+                }
             } else if missed_at <= now && span.until.is_none_or(|until| missed_at <= until) {
                 let e = entry(
                     *occurrence,
@@ -522,6 +548,7 @@ impl Routines<'_> {
             wall,
             week_start,
             DeviceSettings::new(self.store).all_day_from()?,
+            &PersonSettings::new(self.store).quiet_days()?,
         ))
     }
 }

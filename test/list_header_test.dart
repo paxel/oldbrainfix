@@ -1,10 +1,13 @@
 // The search bar of a list page scrolls away with the list and comes back
-// as soon as the list is scrolled up a little (#336, Q749).
+// as soon as the list is scrolled up a little (#336, Q749), on a band of
+// the top bar's colour, set off from the page, with one line under it
+// (#351, obf-1041).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/browser.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -133,6 +136,69 @@ void main() {
     throw StateError('no row in sight');
   }
 
+  /// The band the bar sits on, on the page on top.
+  final band = find
+      .descendant(
+        of: find.byType(SearchHeaderSliver),
+        matching: find.byWidgetPredicate(
+          (w) => w is DecoratedBox && w.decoration is BoxDecoration,
+        ),
+      )
+      .first;
+
+  /// The contrast of two colours, 1 for the same, as WCAG reckons it.
+  double contrast(Color a, Color b) {
+    final (light, dark) = a.computeLuminance() > b.computeLuminance()
+        ? (a.computeLuminance(), b.computeLuminance())
+        : (b.computeLuminance(), a.computeLuminance());
+    return (light + 0.05) / (dark + 0.05);
+  }
+
+  /// The fill of the top bar of the page on top.
+  Color? barColour(WidgetTester tester) => tester
+      .widget<Material>(
+        find
+            .descendant(
+              of: find.byType(AppBar).last,
+              matching: find.byType(Material),
+            )
+            .first,
+      )
+      .color;
+
+  /// The bar sits on an opaque band of the top bar's colour, top bar and
+  /// band one header set off from the page's ground, with one line along
+  /// the band's bottom that reads against it, and no line between bar and
+  /// band.
+  void onBand(WidgetTester tester) {
+    final decoration =
+        tester.widget<DecoratedBox>(band).decoration as BoxDecoration;
+    final colour = decoration.color;
+    final ground = LookTones.of(Theme.of(tester.element(band)).brightness)
+        .background;
+    expect(colour, isNotNull);
+    expect(colour, barColour(tester));
+    expect(colour, isNot(ground));
+    expect(colour?.a, 1.0);
+    final border = decoration.border;
+    expect(border, isA<Border>());
+    if (border is! Border || colour == null) return;
+    expect(border.top, BorderSide.none);
+    expect(border.left, BorderSide.none);
+    expect(border.right, BorderSide.none);
+    expect(border.bottom.width, greaterThan(0));
+    expect(contrast(border.bottom.color, colour), greaterThan(1.2));
+    // The band holds the whole bar, the line at its bottom.
+    final shown = tester.getRect(band);
+    expect(shown.top, lessThan(tester.getRect(field).top));
+    expect(shown.bottom, greaterThan(tester.getRect(field).bottom));
+  }
+
+  void systemBrightness(WidgetTester tester, Brightness brightness) {
+    tester.platformDispatcher.platformBrightnessTestValue = brightness;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+  }
+
   for (final MapEntry(key: page, value: (rows, openPage)) in pages.entries) {
     group(page, () {
       testWidgets('the bar scrolls away with the list and comes back over '
@@ -213,6 +279,60 @@ void main() {
         barShown(tester);
         expect(tester.widget<TextField>(field).controller!.text, isEmpty);
       });
+
+      for (final brightness in Brightness.values) {
+        testWidgets('in the $brightness look the bar sits on a band of the '
+            'top bar\'s colour, over the list and with a search', (
+          tester,
+        ) async {
+          systemBrightness(tester, brightness);
+          await openPage(tester);
+          onBand(tester);
+
+          // Floated back over the list.
+          await slowScroll(tester, -400);
+          await slowScroll(tester, 40);
+          barShown(tester);
+          onBand(tester);
+
+          // Kept over the list by a search.
+          await tester.tap(field);
+          await tester.pumpAndSettle();
+          tester.testTextInput.enterText('note');
+          await tester.pumpAndSettle();
+          await tester.testTextInput.receiveAction(TextInputAction.search);
+          await tester.pumpAndSettle();
+          await slowScroll(tester, -400);
+          barShown(tester);
+          onBand(tester);
+        });
+      }
+
+      testWidgets('pulled down, the bar stays on its band at the top and '
+          'the list moves away under it', (tester) async {
+        await openPage(tester);
+        final row = shownRow(tester, rows);
+        final rowTop = tester.getRect(row).top;
+        final finger = await tester.startGesture(
+          tester.getCenter(list) - const Offset(0, 100),
+        );
+        for (var i = 0; i < 10; i++) {
+          await finger.moveBy(const Offset(0, 20));
+          await tester.pump();
+        }
+        // Still pulled: the band stays fixed at the list's top.
+        expect(tester.getRect(band).top, listTop(tester));
+        onBand(tester);
+        expect(tester.getRect(row).top, greaterThan(rowTop));
+        expect(
+          tester.getRect(row).top,
+          greaterThanOrEqualTo(tester.getRect(band).bottom),
+        );
+        await finger.up();
+        await tester.pumpAndSettle();
+        barShown(tester);
+        onBand(tester);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
     });
   }
 
@@ -224,6 +344,13 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(SearchHeaderSliver), findsNothing);
         expect(field, findsNothing);
+        // Their bar keeps the page's colour.
+        expect(
+          barColour(tester),
+          LookTones.of(
+            Theme.of(tester.element(find.byType(AppBar).last)).brightness,
+          ).background,
+        );
         await tester.pageBack();
         await tester.pumpAndSettle();
       }

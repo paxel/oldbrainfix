@@ -12,7 +12,7 @@
 
 use egui::text::{CCursor, CCursorRange};
 use egui::widgets::text_edit::TextEditState;
-use egui::{Color32, Id, Key, Modifiers, Sense, Ui, WidgetInfo, WidgetType};
+use egui::{Color32, Id, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::BoxState;
 use oldbrainfix_core::markdown::{self, BlockKind, Change, Span, SpanKind};
 
@@ -63,24 +63,6 @@ impl Format {
         Format::Indent,
         Format::Outdent,
         Format::Table,
-    ];
-
-    /// The buttons of the quick note's bar, where it is switched on
-    /// (#142): those that change the text in place, without ☐, a link or
-    /// a table, which ask for more than the capture holds.
-    pub const CAPTURE: [Format; 12] = [
-        Format::Bold,
-        Format::Italic,
-        Format::Strike,
-        Format::Heading1,
-        Format::Heading2,
-        Format::Bullets,
-        Format::Numbers,
-        Format::Quote,
-        Format::Code,
-        Format::CodeBlock,
-        Format::Indent,
-        Format::Outdent,
     ];
 
     /// What a screen reader and the tooltip say for it.
@@ -308,42 +290,6 @@ pub fn bar(
         }
     });
     picked
-}
-
-/// The quick note's bar over its field `id` holding `text` (#142), with
-/// the buttons [`Format::CAPTURE`] and, while the field has the
-/// keyboard, Ctrl+B and Ctrl+I: changes `text` as one asks and selects
-/// what was formatted.
-pub fn capture_bar(ui: &mut Ui, t: &L10n, id: Id, text: &mut String, colours: (Color32, Color32)) {
-    let focused = ui.memory(|m| m.has_focus(id));
-    let selected = selection(ui, id, text);
-    let at = At::of(text, selected, markdown::uses(text));
-    let mut picked = bar(ui, t, &at, colours, &Format::CAPTURE);
-    if focused {
-        ui.input_mut(|i| {
-            if i.consume_key(Modifiers::COMMAND, Key::B) {
-                picked = Some(Format::Bold);
-            } else if i.consume_key(Modifiers::COMMAND, Key::I) {
-                picked = Some(Format::Italic);
-            }
-        });
-    }
-    if let Some(format) = picked {
-        put(ui, id, text, format);
-    }
-}
-
-/// Puts `format` on the selection of the field `id` holding `text`, as
-/// a button of the bar does, and selects what was formatted.
-pub fn put(ui: &Ui, id: Id, text: &mut String, format: Format) {
-    let selected = selection(ui, id, text);
-    match change(format, text, selected) {
-        Some(changed) => {
-            *text = changed.text;
-            select(ui, id, text, (changed.start, changed.end));
-        }
-        None => ui.memory_mut(|m| m.request_focus(id)),
-    }
 }
 
 /// One button of the bar: its icon, on the accent while its format holds.

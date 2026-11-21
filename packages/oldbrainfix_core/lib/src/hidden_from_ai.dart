@@ -103,7 +103,8 @@ extension HiddenFromAi on Store {
   /// The marked Notes and Areas that hide [entity] from the AI, sorted:
   /// its own mark, its Area's through its Topic, those of the Note it is
   /// merged into, and for a Section, Routine, Frog, Tally entry, Line or
-  /// an own choice on a Note, those of the Note. Each link is followed as
+  /// an own choice on a Note, those of the Note, for a Routine's
+  /// Heads-ups those of its Routine. Each link is followed as
   /// the log has it and as the user's own Devices last wrote it, so an
   /// entry another person's Device slipped in shows nothing. Empty when
   /// it is not hidden. [marks] are those of [hiddenFromAiMarks], when
@@ -225,6 +226,9 @@ extension HiddenFromAi on Store {
     final String? one;
     if (id.startsWith(ChecklistKeys.agendaPrefix)) {
       one = after(ChecklistKeys.agendaPrefix, note);
+    } else if (id.startsWith(HeadsUpKeys.prefix)) {
+      // A Routine's Heads-ups lie under it, and so under its Note.
+      one = after(HeadsUpKeys.prefix, const ['routine:']);
     } else if (id.startsWith(HiddenFromAiKeys.prefix)) {
       one = after(HiddenFromAiKeys.prefix, const ['note:', 'area:']);
     } else {

@@ -1,11 +1,9 @@
 import 'dart:typed_data';
 
 import 'checklists.dart';
-import 'note_kinds.dart';
 import 'notes.dart';
 import 'places.dart';
 import 'profiles.dart';
-import 'shopping_lists.dart';
 import 'store.dart';
 import 'text_format.dart';
 
@@ -16,39 +14,20 @@ class HelpTexts {
   /// The Area's name, "Old Brain Fix".
   final String areaName;
 
-  /// "Quick start" and its Lines, the steps to try, and its Description
-  /// (#260), folded under the name: a link to each step's place (#261)
-  /// and the desktop's way for each step, Markdown.
-  final String quickStartTitle;
-  final List<String> quickStartLines;
-  final String quickStartDescription;
-
-  /// "What the icons mean" in full, its title the first line, Markdown
-  /// with a link to the guide (#261), and the pictures of the icons, one
-  /// per group.
-  final String iconsText;
-  final List<Uint8List> iconPictures;
-
   /// The title of a What's new Note for a version, "What's new in 0.4.0".
   final String Function(String version) whatsNewTitle;
 
-  const HelpTexts({
-    required this.areaName,
-    required this.quickStartTitle,
-    required this.quickStartLines,
-    required this.quickStartDescription,
-    required this.iconsText,
-    required this.iconPictures,
-    required this.whatsNewTitle,
-  });
+  const HelpTexts({required this.areaName, required this.whatsNewTitle});
 }
 
-/// The app's own Notes that explain it (#180, ADR 0042): "Quick start",
-/// "What the icons mean" and one "What's new in X.Y.Z" per release, filed
-/// into their own Area "Old Brain Fix". Each has an id fixed by the
-/// person and the version, so a second Device of the same person finds
-/// it made and makes none, two Devices that make it apart write the same
-/// entities, and a Note the person deleted stays deleted.
+/// The app's own Notes that explain it (#180, ADR 0042): one "What's new
+/// in X.Y.Z" per release, filed into their own Area "Old Brain Fix". Each
+/// has an id fixed by the person and the version, so a second Device of
+/// the same person finds it made and makes none, two Devices that make it
+/// apart write the same entities, and a Note the person deleted stays
+/// deleted. "Quick start" and "What the icons mean" are made no more
+/// (obf-1043, ADR 0055), as Spotlights explain the screens; the ones
+/// made up to 0.6.1 stay as the person has them, under the ids below.
 class HelpNotes {
   /// The version before the first one that makes help Notes: an update
   /// from a Device that recorded none passed every version after it.
@@ -88,12 +67,12 @@ class HelpNotes {
   /// first start (a new person, a Device added or a Backup restored).
   /// [whatsNew] holds each release's Play notes by version and language.
   ///
-  /// Quick start and What the icons mean are made once per person. Each
-  /// What's new of a version after the one this Device last ran (or
+  /// Each What's new of a version after the one this Device last ran (or
   /// after [since], for a Device that recorded none, unless [fresh]) up
-  /// to [version] is made once per person, oldest first. Nothing is made
-  /// before the own Profile exists; then the version is recorded and the
-  /// same start again makes nothing. Returns the ids of the Notes made.
+  /// to [version] is made once per person, oldest first; a fresh start
+  /// makes none. Nothing is made before the own Profile exists; then the
+  /// version is recorded and the same start again makes nothing. Returns
+  /// the ids of the Notes made.
   List<String> makeDue({
     required String version,
     required bool fresh,
@@ -116,20 +95,6 @@ class HelpNotes {
     store.batch(() {
       String? area;
       String areaFor() => area ??= _area(person, persons, texts.areaName);
-      if (!_made(persons, quickStartId)) {
-        _quickStart(person, areaFor(), texts);
-        made.add(quickStartId(person));
-      }
-      if (!_made(persons, iconsId)) {
-        _note(
-          iconsId(person),
-          areaFor(),
-          texts.iconsText,
-          texts.iconPictures,
-          format: TextFormats.markdown,
-        );
-        made.add(iconsId(person));
-      }
       for (final v in due) {
         if (_made(persons, (p) => whatsNewId(p, v))) continue;
         final notes = whatsNew[v];
@@ -183,16 +148,9 @@ class HelpNotes {
     return id;
   }
 
-  /// Writes the Note [id] with [text] in [format] and [photos], filed
-  /// into [area], with no Nudge. Quick start and What the icons mean are
-  /// formatted, so their app links open (#261); a What's new is plain.
-  void _note(
-    String id,
-    String area,
-    String text,
-    List<Uint8List> photos, {
-    String format = TextFormats.plain,
-  }) {
+  /// Writes the Note [id] with [text] and [photos], filed into [area],
+  /// with no Nudge, plain.
+  void _note(String id, String area, String text, List<Uint8List> photos) {
     final now = store.clock().toUtc();
     final hashes = [for (final bytes in photos) store.putPhoto(bytes)];
     store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
@@ -200,58 +158,13 @@ class HelpNotes {
     store.append(
       id,
       NoteKeys.text,
-      StoredText.of(format, text).encode(),
+      StoredText.of(TextFormats.plain, text).encode(),
       date: now,
     );
     store.append(id, NoteKeys.place, area, date: now);
     for (final hash in hashes) {
       store.append(id, NoteKeys.photo(hash), NoteKeys.photoAdded, date: now);
     }
-  }
-
-  /// Writes the Quick start: a Checklist named [HelpTexts.quickStartTitle]
-  /// with its Description, whose Lines are the steps to try, under ids
-  /// fixed by the person and the Line's place, shown on the Agenda as one
-  /// row with its count.
-  void _quickStart(String person, String area, HelpTexts texts) {
-    final id = quickStartId(person);
-    final making = quickStartMaking(person);
-    final now = store.clock().toUtc();
-    _note(
-      id,
-      area,
-      NoteKinds.join(texts.quickStartTitle, texts.quickStartDescription),
-      const [],
-      format: TextFormats.markdown,
-    );
-    store.append(
-      id,
-      ChecklistKeys.kind,
-      ChecklistKeys.kindOf(making),
-      date: now,
-    );
-    store.append(id, NoteKeys.spawned, now.toIso8601String(), date: now);
-    var key = '';
-    for (final (i, line) in texts.quickStartLines.indexed) {
-      key = LineOrder.after(key);
-      writeLine(
-        store,
-        id,
-        making,
-        text: line,
-        order: key,
-        date: now,
-        id: quickStartLineId(person, i),
-      );
-    }
-    // One row on the Agenda with its count (Q549), the person's own
-    // choice as "Show on the Agenda" writes it.
-    store.append(
-      '${ChecklistKeys.agendaPrefix}$id',
-      ChecklistKeys.agenda,
-      ListOnAgenda.count.code,
-      date: now,
-    );
   }
 }
 

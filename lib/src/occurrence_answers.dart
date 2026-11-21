@@ -61,6 +61,7 @@ class AlarmSyncScope extends InheritedWidget {
         now: now,
         wallClock: deviceWallClock,
         allDayFrom: store.allDayFrom,
+        quietDays: store.quietDays,
       ).any((o) => !o.missed && o.occurrence == occurrence);
   final notToday = open && store.mayCheckOff(routine.id);
   return (

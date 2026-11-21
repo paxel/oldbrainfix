@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'spotlight.dart';
+
 /// Which of the app's two first pages shows, the Agenda or the Areas
 /// list, and the way between them (#258).
 class HomePager {
@@ -142,7 +144,11 @@ class _HomePagesState extends State<HomePages> {
       valueListenable: widget.pager.shown,
       builder: (_, shown, child) => ExcludeSemantics(
         excluding: shown != index,
-        child: HeroMode(enabled: shown == index, child: child ?? page),
+        child: HeroMode(
+          enabled: shown == index,
+          // Its tips wait until it shows (obf-1043).
+          child: SpotlightHold(held: shown != index, child: child ?? page),
+        ),
       ),
       child: page,
     ),

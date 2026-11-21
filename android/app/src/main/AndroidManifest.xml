@@ -45,6 +45,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- A voice recording goes on while the phone is locked (#350), from
+         a foreground service under a notification to stop it; it runs
+         only while the user records. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
     <!-- The App Lock and the Area Locks unlock with biometrics or the
          screen lock as well as with their PIN. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
@@ -350,6 +354,12 @@
             android:name=".RingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- Keeps a voice recording going while the phone is locked
+             (#350). -->
+        <service
+            android:name=".RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

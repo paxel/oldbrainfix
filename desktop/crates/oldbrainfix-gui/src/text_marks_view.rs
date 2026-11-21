@@ -38,24 +38,35 @@
 //! first column bold while it holds headings, each cell one line of the
 //! formats above with its boxes and tags taking clicks. A click
 //! elsewhere on it opens it in the full-screen table view.
+//!
+//! Code is coloured by its language (obf-1036, ADR 0054): a Code text by
+//! the language its Note keeps, a fenced code block by the one its fence
+//! names, each part in the colour of its kind ([`theme::code_colour`]);
+//! only the glyphs' colour changes, the font, the tint and the sizes
+//! stay. Without a language, or with one not known here, it shows in one
+//! colour as before. The grammars are the person's (obf-1037): the
+//! built-in ones and those they added, which the app hands in each frame
+//! ([`set_grammars`]).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Local, Utc};
+use egui::cache::{ComputerMut, FrameCache};
 use egui::text::{CCursor, CharIndex, Galley, LayoutJob, TextFormat};
 use egui::{
     Color32, FontId, FontSelection, Id, Modifiers, Popup, Pos2, Rect, RichText, Sense, Stroke,
     TextStyle, TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
 use oldbrainfix_core::app_link::{self, AppLink};
+use oldbrainfix_core::highlight::{CodeSpan, Grammar, Grammars};
 use oldbrainfix_core::markdown::table::{Align, Cell, Table};
 use oldbrainfix_core::markdown::{self, Block, BlockKind, CodeBlock, Span, SpanKind};
 use oldbrainfix_core::text_boxes::{self, FoundBox};
 use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 
 use crate::l10n::L10n;
-use crate::schedule_text;
+use crate::{schedule_text, theme};
 
 /// How far apart the lines of a formatted text lie (#327, obf-1020), as
 /// on the phone: a line's height in parts of its font's size.
@@ -379,13 +390,26 @@ pub fn marked_label(
 /// links and tables lie.
 pub fn formatted_label(
     ui: &mut Ui,
+    text: (&str, &str, &BoxLook),
+    shown: (usize, usize),
+    look: (Option<f32>, Color32),
+    truncate: bool,
+) -> Spots {
+    note_label(ui, text, None, shown, look, truncate)
+}
+
+/// As [`formatted_label`], a Code text coloured by `language`, the scope
+/// of the grammar its Note keeps (obf-1036).
+pub fn note_label(
+    ui: &mut Ui,
     (text, format, boxes): (&str, &str, &BoxLook),
+    language: Option<&str>,
     shown: (usize, usize),
     look: (Option<f32>, Color32),
     truncate: bool,
 ) -> Spots {
     if format == text_format::CODE {
-        code_text_label(ui, text, shown, look, (truncate, false));
+        code_text_label(ui, (text, language), shown, look, (truncate, false));
         return Spots::default();
     }
     if format != text_format::MARKDOWN {
@@ -431,7 +455,10 @@ pub fn formatted_label(
                     }
                 } else if !code.is_fence(block.line) {
                     room(ui, BlockKind::Code, &mut blank);
-                    spots.extend(block_label(ui, (text, block), &found, &look, truncate));
+                    let line = (block.line, block.line);
+                    let colours = block_colours(ui.ctx(), text, (&blocks, code), line);
+                    let drawn = block_label(ui, (text, block), &found, &look, (truncate, &colours));
+                    spots.extend(drawn);
                 }
                 continue;
             }
@@ -455,7 +482,8 @@ pub fn formatted_label(
                 }
                 _ => {
                     room(ui, block.kind, &mut blank);
-                    spots.extend(block_label(ui, (text, block), &found, &look, truncate));
+                    let drawn = block_label(ui, (text, block), &found, &look, (truncate, &[]));
+                    spots.extend(drawn);
                 }
             }
         }
@@ -471,10 +499,11 @@ pub fn formatted_label(
 /// fixed-width font, unwrapped, nothing in it a format, a tag or a box:
 /// on the background of code, cut off at the edge, or moved sideways
 /// with `sideways`; one line cut off without the background with
-/// `truncate`, as a compact card shows it.
+/// `truncate`, as a compact card shows it. Its parts are coloured by
+/// `language`, the scope of its Note's grammar (obf-1036).
 pub fn code_text_label(
     ui: &mut Ui,
-    text: &str,
+    (text, language): (&str, Option<&str>),
     (from, to): (usize, usize),
     look: (Option<f32>, Color32),
     (truncate, sideways): (bool, bool),
@@ -484,7 +513,14 @@ pub fn code_text_label(
     };
     let look = Look::of(ui, look);
     let format = TextFormat::simple(FontId::monospace(look.font.size * CODE_SCALE), look.colour);
-    let job = LayoutJob::single_section(text_boxes::strip(part), format);
+    let shown = text_boxes::strip(part);
+    let grammars = grammars(ui.ctx());
+    let colours = match grammars.by_scope(language) {
+        Some(grammar) => code_text_colours(ui.ctx(), grammar, text, (from, &shown)),
+        None => Vec::new(),
+    };
+    let mut job = LayoutJob::single_section(shown, format);
+    paint_code(&mut job, 0, &colours, look.dark);
     if truncate {
         crate::read_text::label(ui, egui::Label::new(job).truncate());
         return;
@@ -537,7 +573,9 @@ fn code_label(
     let font = FontId::monospace(look.font.size * CODE_SCALE);
     let extra = line_extra(ui, &font, CODE_LINE_HEIGHT);
     let format = TextFormat::simple(font, look.colour);
-    let job = LayoutJob::single_section(lines.join("\n"), format);
+    let colours = block_colours(ui.ctx(), text, (blocks, code), (first, last));
+    let mut job = LayoutJob::single_section(lines.join("\n"), format);
+    paint_code(&mut job, 0, &colours, look.dark);
     egui::Frame::NONE
         .fill(look.code)
         .corner_radius(4.0)
@@ -556,8 +594,9 @@ fn code_label(
 }
 
 /// How a formatted text is drawn: its font, its colour, the accent for
-/// links, tags and a quote's bar, the dimmer colour of a quote's words
-/// and the background of code.
+/// links, tags and a quote's bar, the dimmer colour of a quote's words,
+/// the background of code and whether the colours of code's parts are
+/// the dark look's.
 #[derive(Clone)]
 pub(crate) struct Look {
     font: FontId,
@@ -565,6 +604,7 @@ pub(crate) struct Look {
     accent: Color32,
     weak: Color32,
     code: Color32,
+    dark: bool,
 }
 
 impl Look {
@@ -584,6 +624,7 @@ impl Look {
             accent: visuals.hyperlink_color,
             weak: visuals.weak_text_color(),
             code: visuals.code_bg_color,
+            dark: visuals.dark_mode,
         }
     }
 
@@ -598,6 +639,288 @@ impl Look {
         look.font.size *= scale;
         look
     }
+}
+
+/// The grammars code is coloured with around a context (obf-1037) and
+/// how often the person's own ones changed, so colours worked out with
+/// one that is gone are not taken again.
+#[derive(Clone)]
+struct Held {
+    grammars: Arc<Grammars>,
+    generation: u64,
+}
+
+/// Where the context keeps the [`Held`] grammars.
+fn grammars_id() -> Id {
+    Id::new("oldbrainfix-grammars")
+}
+
+/// The built-in grammars alone, as the person's grammars before any are
+/// handed in.
+fn built_in() -> Arc<Grammars> {
+    static BUILT_IN: std::sync::OnceLock<Arc<Grammars>> = std::sync::OnceLock::new();
+    BUILT_IN
+        .get_or_init(|| Arc::new(Grammars::with_added(Vec::new())))
+        .clone()
+}
+
+/// Colours code around `ctx` with `grammars`, the person's (obf-1037),
+/// for every window; set each frame, so one added, removed or arriving
+/// by sync colours at once.
+pub fn set_grammars(ctx: &egui::Context, grammars: Arc<Grammars>) {
+    ctx.data_mut(|d| {
+        let held = d.get_temp::<Held>(grammars_id());
+        let generation = match held {
+            Some(held) if Arc::ptr_eq(&held.grammars, &grammars) => return,
+            Some(held) => {
+                let same = held.grammars.added.len() == grammars.added.len()
+                    && held
+                        .grammars
+                        .added
+                        .iter()
+                        .zip(&grammars.added)
+                        .all(|(a, b)| Arc::ptr_eq(a, b));
+                held.generation + u64::from(!same)
+            }
+            None => 0,
+        };
+        d.insert_temp(
+            grammars_id(),
+            Held {
+                grammars,
+                generation,
+            },
+        );
+    });
+}
+
+/// The grammars code is coloured with around `ctx`: the person's as last
+/// handed in, the built-in ones until then.
+pub fn grammars(ctx: &egui::Context) -> Arc<Grammars> {
+    ctx.data(|d| d.get_temp::<Held>(grammars_id()))
+        .map_or_else(built_in, |held| held.grammars)
+}
+
+/// How often the person's own grammars changed around `ctx`.
+fn generation(ctx: &egui::Context) -> u64 {
+    ctx.data(|d| d.get_temp::<Held>(grammars_id()))
+        .map_or(0, |held| held.generation)
+}
+
+/// A text to colour in a grammar, for [`ColourCache`]: told apart by the
+/// grammar, the generation of the person's grammars it is one of, and
+/// the text.
+#[derive(Clone, Copy)]
+struct Colouring<'a> {
+    grammar: &'a Grammar,
+    generation: u64,
+    text: &'a str,
+}
+
+impl std::hash::Hash for Colouring<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::ptr::from_ref(self.grammar).hash(state);
+        self.grammar.scope.hash(state);
+        self.generation.hash(state);
+        self.text.hash(state);
+    }
+}
+
+/// Colours code by its grammar, for [`ColourCache`].
+#[derive(Default)]
+struct Colourer;
+
+impl ComputerMut<Colouring<'_>, Arc<Vec<CodeSpan>>> for Colourer {
+    fn compute(&mut self, key: Colouring<'_>) -> Arc<Vec<CodeSpan>> {
+        Arc::new(key.grammar.colour(key.text))
+    }
+}
+
+/// The coloured parts of the texts drawn, by their grammar and the text,
+/// kept while they are drawn frame after frame.
+type ColourCache = FrameCache<Arc<Vec<CodeSpan>>, Colourer>;
+
+/// The coloured parts of `text` in `grammar` (obf-1036), in bytes of
+/// `text`: from the context's cache while the same text was drawn in the
+/// frame before, so a frame does not colour it again.
+pub fn code_colours(ctx: &egui::Context, grammar: &Grammar, text: &str) -> Arc<Vec<CodeSpan>> {
+    if text.is_empty() {
+        return Arc::default();
+    }
+    let key = Colouring {
+        grammar,
+        generation: generation(ctx),
+        text,
+    };
+    ctx.memory_mut(|m| m.caches.cache::<ColourCache>().get(key).clone())
+}
+
+/// The parts of `spans` within the bytes `from..to`, counted from `from`.
+fn clipped(spans: &[CodeSpan], (from, to): (usize, usize)) -> Vec<CodeSpan> {
+    spans
+        .iter()
+        .filter(|s| s.end > from && s.start < to)
+        .map(|s| CodeSpan {
+            start: s.start.max(from) - from,
+            end: s.end.min(to) - from,
+            colour: s.colour,
+        })
+        .collect()
+}
+
+/// The coloured parts of `shown`, the bytes from `from` of the Code text
+/// `text` as they show, without the ids of boxes: the whole text coloured
+/// in `grammar`, so a part in the middle of a comment or a string reads
+/// as one; `shown` coloured alone where the ids taken out move it.
+fn code_text_colours(
+    ctx: &egui::Context,
+    grammar: &Grammar,
+    text: &str,
+    (from, shown): (usize, &str),
+) -> Vec<CodeSpan> {
+    let whole = text_boxes::strip(text);
+    let at = text_boxes::strip(text.get(..from).unwrap_or_default()).len();
+    let end = at + shown.len();
+    if whole.get(at..end) == Some(shown) {
+        clipped(&code_colours(ctx, grammar, &whole), (at, end))
+    } else {
+        code_colours(ctx, grammar, shown).to_vec()
+    }
+}
+
+/// The grammar among `grammars` the fence of `code` names (obf-1036);
+/// none for a fence naming none or one not known here.
+fn fence_grammar<'a>(grammars: &'a Grammars, code: &CodeBlock) -> Option<&'a Grammar> {
+    grammars.for_fence(code.language())
+}
+
+/// The coloured parts of the lines `first..=last` of `code`, among
+/// `blocks` of `text`, as they show, without its fences and the ids of
+/// boxes and joined by line breaks: all its lines coloured as one text by
+/// the language its fence names, so what spans lines reads as one; none
+/// for a fence naming none or one not known.
+fn block_colours(
+    ctx: &egui::Context,
+    text: &str,
+    (blocks, code): (&[Block], &CodeBlock),
+    (first, last): (usize, usize),
+) -> Vec<CodeSpan> {
+    let grammars = grammars(ctx);
+    let Some(grammar) = fence_grammar(&grammars, code) else {
+        return Vec::new();
+    };
+    let (mut whole, mut from, mut to) = (String::new(), None, 0);
+    let lines = (code.first_line..=code.last_line).filter(|&l| !code.is_fence(l));
+    for (i, l) in lines.enumerate() {
+        let Some(block) = blocks.get(l) else {
+            continue;
+        };
+        if i > 0 {
+            whole.push('\n');
+        }
+        if l >= first && from.is_none() {
+            from = Some(whole.len());
+        }
+        whole.push_str(&text_boxes::strip(
+            text.get(block.start..block.end).unwrap_or_default(),
+        ));
+        if l <= last {
+            to = whole.len();
+        }
+    }
+    let Some(from) = from.filter(|&f| f <= to) else {
+        return Vec::new();
+    };
+    clipped(&code_colours(ctx, grammar, &whole), (from, to))
+}
+
+/// Draws the coloured parts `spans` of `job`'s text, counted from its
+/// byte `from`, in their colours, the dark look's while `dark`
+/// (obf-1036): its sections are cut where a part begins and ends, and
+/// only their glyphs' colour changes; font, background and every byte
+/// stay.
+pub fn paint_code(job: &mut LayoutJob, from: usize, spans: &[CodeSpan], dark: bool) {
+    if spans.is_empty() {
+        return;
+    }
+    let sections = std::mem::take(&mut job.sections);
+    let mut out = Vec::with_capacity(sections.len() + spans.len() * 2);
+    for section in sections {
+        let (start, end) = (section.byte_range.start.0, section.byte_range.end.0);
+        let mut at = start;
+        let mut piece = |a: usize, b: usize, format: TextFormat| {
+            if a < b {
+                let lead = if a == start {
+                    section.leading_space
+                } else {
+                    0.0
+                };
+                out.push(egui::text::LayoutSection {
+                    leading_space: lead,
+                    byte_range: egui::text::ByteIndex(a)..egui::text::ByteIndex(b),
+                    format,
+                });
+            }
+        };
+        for span in spans {
+            let (a, b) = ((span.start + from).max(at), (span.end + from).min(end));
+            if a >= b {
+                continue;
+            }
+            piece(at, a, section.format.clone());
+            let mut coloured = section.format.clone();
+            coloured.color = theme::code_colour(dark, span.colour);
+            piece(a, b, coloured);
+            at = b;
+        }
+        piece(at, end, section.format);
+    }
+    job.sections = out;
+}
+
+/// The coloured parts of every fenced code block of the formatted source
+/// `text` whose fence names a language known here (obf-1036), in bytes
+/// of `text`, for its edit field: each block's lines between its fences
+/// coloured as one text, as written.
+pub fn fence_colours(ctx: &egui::Context, text: &str) -> Vec<CodeSpan> {
+    let blocks = markdown::parse(text);
+    let grammars = grammars(ctx);
+    let mut spans = Vec::new();
+    let mut done = None;
+    for block in &blocks {
+        let Some(code) = &block.code else {
+            continue;
+        };
+        if done == Some(code.first_line) {
+            continue;
+        }
+        done = Some(code.first_line);
+        let Some(grammar) = fence_grammar(&grammars, code) else {
+            continue;
+        };
+        let mut content = (code.first_line..=code.last_line)
+            .filter(|&l| !code.is_fence(l))
+            .filter_map(|l| blocks.get(l));
+        let (Some(start), Some(end)) = (
+            content.clone().next().map(|b| b.start),
+            content.next_back().map(|b| b.end),
+        ) else {
+            continue;
+        };
+        let Some(written) = text.get(start..end) else {
+            continue;
+        };
+        spans.extend(
+            code_colours(ctx, grammar, written)
+                .iter()
+                .map(|s| CodeSpan {
+                    start: s.start + start,
+                    end: s.end + start,
+                    colour: s.colour,
+                }),
+        );
+    }
+    spans
 }
 
 /// The line `at`, a byte of `text`, lies on, counted from 0.
@@ -886,13 +1209,14 @@ fn item_prefix(block: &Block, look: &Look, colour: Color32) -> Option<LayoutJob>
 
 /// Draws the line `block` of `text`, cut off at the edge with `truncate`
 /// and wrapped otherwise, and gives where its marks, tags and links lie.
-/// A heading cut off keeps the size of the words around it.
+/// A heading cut off keeps the size of the words around it; a line of a
+/// code block takes the colours `colours` of its parts (obf-1036).
 fn block_label(
     ui: &mut Ui,
     (text, block): (&str, &Block),
     found: &Found,
     look: &Look,
-    truncate: bool,
+    (truncate, colours): (bool, &[CodeSpan]),
 ) -> Spots {
     let mut font = look.font.clone();
     let heading = match block.kind {
@@ -911,6 +1235,7 @@ fn block_label(
         accent: look.accent,
         weak: look.weak,
         code: look.code,
+        dark: look.dark,
     };
     let style = Style {
         bold: heading.is_some(),
@@ -945,6 +1270,7 @@ fn block_label(
         None if block.kind == BlockKind::Code => {
             let shown = text_boxes::strip(text.get(block.start..block.end).unwrap_or_default());
             line.push(&shown, part_format(&look, style, true), false);
+            paint_code(&mut line.job, 0, colours, look.dark);
         }
         None => add_spans(&mut line, text, &block.spans, style, (found, &look)),
     }
@@ -1325,6 +1651,12 @@ pub fn take_app_link(ctx: &egui::Context) -> Option<AppLink> {
         .flatten()
 }
 
+/// Hands the app link `link` to the window, as a click on one in a text
+/// does: [`take_app_link`] gives it once.
+pub fn hand_app_link(ctx: &egui::Context, link: AppLink) {
+    ctx.data_mut(|d| d.insert_temp(app_link_id(), Some(link)));
+}
+
 /// Takes the links `spots` of the text `of`, by id, as links over what
 /// was drawn under them; a click opens a web or e-mail address in the
 /// system's browser or mail program, and hands an app link (ADR 0046) to
@@ -1343,10 +1675,7 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
                 && markdown::may_open(&spot.url)
             {
                 match app_link::parse(&spot.url) {
-                    Some(link) => {
-                        ui.ctx()
-                            .data_mut(|d| d.insert_temp(app_link_id(), Some(link)));
-                    }
+                    Some(link) => hand_app_link(ui.ctx(), link),
                     None => ui.ctx().open_url(egui::OpenUrl::new_tab(&spot.url)),
                 }
             }

@@ -163,6 +163,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         picked.schedule,
         renag: picked.renag,
         escalation: picked.escalation,
+        headsUps: picked.headsUps,
       );
     });
   }
@@ -206,6 +207,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         renag: schedule.renag,
         escalation: schedule.escalation,
         session: _draft.choice,
+        headsUps: schedule.headsUps,
       ).spawnFrom(store, note.id);
     });
     Navigator.of(context).pop(id);

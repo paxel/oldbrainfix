@@ -55,16 +55,15 @@ void main() {
 
   group('Simple or Advanced', () {
     testWidgets('reads Advanced where nothing was chosen; Simple is kept for '
-        'the person and hides the quick note\'s format bar switch', (
-      tester,
-    ) async {
+        'the person', (tester) async {
       await start(tester);
       await openDeviceSettings(tester);
       final choice = find.byKey(const ValueKey('features'));
       expect(tester.widget<RadioColumn<bool>>(choice).value, isTrue);
+      // The quick note is the same in both (#352): no switch of its own.
       expect(
         find.byKey(const ValueKey('quickNote-formatBar'), skipOffstage: false),
-        findsOneWidget,
+        findsNothing,
       );
       await tap(tester, find.byKey(const ValueKey('features-simple')));
       expect(store.advanced, isFalse);
@@ -847,6 +846,34 @@ void main() {
       expect(note.boxes.map((b) => b.state), [BoxState.open, BoxState.done]);
     });
 
+    testWidgets('reads AsciiDoc, Org, reStructuredText and HTML files too, '
+        'each a formatted Note', (tester) async {
+      folders
+        ..put('Garden.ADOC', march, utf8.encode('= Garden\n*Water* daily'))
+        ..put('week.org', march, utf8.encode('* Monday'))
+        ..put('Soup.rst', march, utf8.encode('Cut **onions**'))
+        ..put('Trip.htm', march, utf8.encode('<h1>Trip</h1><script>x</script>'))
+        ..put('slides.pdf', march, utf8.encode('%PDF'));
+      await importFrom(tester);
+
+      // The file of another kind is not read.
+      expect(folders.read, ['Garden.ADOC', 'week.org', 'Soup.rst', 'Trip.htm']);
+      final area = Places(store)
+          .areas()
+          .singleWhere((a) => a.name == 'From Notes');
+      final inside = Notes(store).inside(area.id);
+      expect(
+        inside.map((n) => n.text),
+        unorderedEquals([
+          '# Garden\n**Water** daily',
+          '# week\n# Monday',
+          '# Soup\nCut **onions**',
+          '# Trip',
+        ]),
+      );
+      expect(inside.map((n) => n.textFormat).toSet(), {TextFormats.markdown});
+    });
+
     testWidgets('makes Notes of the Markdown and text files of a folder and '
         'its folders in a new Area, dated by their files, none Unsorted; '
         'the announcement opens the Area', (tester) async {
@@ -892,7 +919,7 @@ void main() {
         find.text(
           '3 Notes went into the new Area From Notes.\n\n'
           '2 files were skipped:\n'
-          'Folder: Notes\nNot Markdown or text: 1\nToo large: 1',
+          'Folder: Notes\nOther files: 1\nToo large: 1',
         ),
         findsOneWidget,
       );
@@ -973,12 +1000,14 @@ void main() {
       await expectFailureAnnounced(
         tester,
         announcements,
-        'No Markdown or text file found.',
+        'No file found to import.',
         title: 'Nothing imported',
         cause:
             'The folder and its folders hold no Markdown file (.md, '
-            '.markdown) or text file (.txt) that could be taken; other files '
-            'and files that are too large are skipped.',
+            '.markdown), text file (.txt), AsciiDoc file (.adoc, .asciidoc, '
+            '.asc), Org file (.org), reStructuredText file (.rst) or HTML '
+            'file (.html, .htm) that could be taken; other files and files '
+            'that are too large are skipped.',
         fix: 'Pick the folder the notes lie in. Nothing was changed.',
       );
     });

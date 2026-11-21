@@ -431,4 +431,85 @@ class AlarmPlanTest {
             AlarmPlan.keepsRinging(AlarmPlan.effective(listOf(alarm), listOf(done)), "routine:r", "2026-10-24T08:00"),
         )
     }
+
+    @Test
+    fun aFiringInTheQuietHoursShowsWithoutSound() {
+        // Quiet from 08:20 to 09:00 on Berlin's clock (06:20 to 07:00 UTC).
+        val alarm = nagging().copy(quiet = listOf(8, 20, 9, 0))
+        assertFalse(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 6, 10)))
+        assertTrue(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 6, 20)))
+        assertTrue(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 6, 50)))
+        assertFalse(AlarmPlan.silent(alarm, berlin, utc(2026, 10, 24, 7)))
+        // Over midnight; and none while off or escalating.
+        val night = nagging().copy(quiet = listOf(22, 0, 8, 0))
+        assertTrue(AlarmPlan.silent(night, berlin, utc(2026, 10, 24, 5, 59)))
+        assertFalse(AlarmPlan.silent(night, berlin, utc(2026, 10, 24, 6)))
+        assertTrue(AlarmPlan.silent(night, berlin, utc(2026, 10, 24, 20)))
+        assertFalse(AlarmPlan.silent(nagging(), berlin, utc(2026, 10, 24, 6, 30)))
+    }
+
+    @Test
+    fun aSnoozeKeepsTheQuietHoursOfItsOccurrence() {
+        val until = utc(2026, 10, 24, 6, 30)
+        val tapped = Action(1, "snooze", "routine:r", "2026-10-24T08:00", 0, until, "pills", "08:00")
+        val alarm = nagging().copy(quiet = listOf(8, 20, 9, 0))
+        val snoozed = AlarmPlan.effective(listOf(alarm), listOf(tapped)).single()
+        assertEquals(listOf(8, 20, 9, 0), snoozed.quiet)
+        assertTrue(AlarmPlan.silent(snoozed, berlin, until))
+    }
+
+    /** A Heads-up of [minutes] before the 08:00 Occurrence of [routine], on the wall clock. */
+    private fun headsUp(minutes: Int, local: List<Int>, routine: String = "routine:r") =
+        Alarm("headsUp:$minutes:$routine@2026-10-24T08:00", routine, "2026-10-24T08:00", local, null, "pills", "in $minutes min")
+
+    @Test
+    fun aTapOnAnOccurrenceDropsItsHeadsUps() {
+        val soon = headsUp(20, listOf(2026, 10, 24, 7, 40))
+        val other = headsUp(20, listOf(2026, 10, 24, 7, 40), routine = "routine:s")
+        for (kind in listOf("done", "snooze", EventQueue.KIND_SKIP, EventQueue.KIND_TOMORROW)) {
+            val tap = Action(1, kind, "routine:r", "2026-10-24T08:00", 0, utc(2026, 10, 24, 7), "pills", "08:00")
+            assertEquals(kind, listOf(other), AlarmPlan.headsUpsLeft(listOf(soon, other), listOf(tap)))
+        }
+        val line = Action(1, "line", "routine:r", "2026-10-24T08:00", 0, 0, "pills", "08:00", line = "l")
+        assertEquals(listOf(soon, other), AlarmPlan.headsUpsLeft(listOf(soon, other), listOf(line)))
+    }
+
+    @Test
+    fun aHeadsUpFiresOnceAtItsTimeAndArmsTheNextAlarm() {
+        // 20 min before 08:00 on Berlin's clock: 05:40 UTC.
+        val soon = headsUp(20, listOf(2026, 10, 24, 7, 40))
+        val at = utc(2026, 10, 24, 5, 40)
+        assertEquals(at, AlarmPlan.next(listOf(soon), berlin, 0, at - 60_000L))
+        assertEquals(listOf(soon), AlarmPlan.dueHeadsUps(listOf(soon), emptyList(), berlin, at, 0, at))
+        // Never again once it fired: no Re-nag.
+        assertNull(AlarmPlan.next(listOf(soon), berlin, at, at + 1))
+        assertEquals(emptyList<Alarm>(), AlarmPlan.dueHeadsUps(listOf(soon), emptyList(), berlin, at + 60_000L, at, at + 60_000L))
+    }
+
+    @Test
+    fun aLateFiringShowsTheNearestHeadsUpAndNoneOnceTheOccurrenceRings() {
+        val day = headsUp(1440, listOf(2026, 10, 23, 8, 0))
+        val soon = headsUp(20, listOf(2026, 10, 24, 7, 40))
+        // Armed for the day before, fired late after both.
+        val armed = utc(2026, 10, 23, 6)
+        val late = utc(2026, 10, 24, 5, 50)
+        assertEquals(listOf(soon), AlarmPlan.dueHeadsUps(listOf(day, soon), emptyList(), berlin, armed, 0, late))
+        // Later still, the Occurrence rings in that notification instead.
+        val rings = utc(2026, 10, 24, 6, 5)
+        assertEquals(
+            emptyList<Alarm>(),
+            AlarmPlan.dueHeadsUps(listOf(day, soon), listOf(nagging()), berlin, armed, 0, rings),
+        )
+    }
+
+    @Test
+    fun aHeadsUpInTheQuietHoursShowsWithoutSoundAndSharesItsOccurrencesNotification() {
+        val soon = headsUp(20, listOf(2026, 10, 24, 7, 40)).copy(quiet = listOf(7, 0, 7, 50))
+        assertTrue(AlarmPlan.silent(soon, berlin, utc(2026, 10, 24, 5, 40)))
+        assertFalse(AlarmPlan.silent(soon.copy(quiet = null), berlin, utc(2026, 10, 24, 5, 40)))
+        assertEquals(
+            AlarmPlan.notificationId("routine:r", "2026-10-24T08:00"),
+            AlarmPlan.notificationId(soon.routine, soon.occurrence),
+        )
+    }
 }

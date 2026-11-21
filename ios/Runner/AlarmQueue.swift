@@ -160,6 +160,8 @@ enum NotificationAnswer: Equatable {
   static let pastAlarmCategory = "obf.alarm.past"
   static let nudgeCategory = "obf.nudge"
   static let changesCategory = "obf.changes"
+  /// A Heads-up (obf-1046): nothing to answer, a tap opens its Note.
+  static let headsUpCategory = "obf.headsUp"
   static let doneAction = "obf.done"
   static let skipAction = "obf.skip"
   static let tomorrowAction = "obf.tomorrow"
@@ -185,6 +187,8 @@ enum NotificationAnswer: Equatable {
       }
     case changesCategory:
       if action == defaultAction { return .openChanges }
+    case headsUpCategory:
+      if action == defaultAction { return .openOccurrence }
     default:
       break
     }
@@ -236,7 +240,8 @@ enum PlanCodec {
       body: map["body"] as? String ?? "",
       renagMs: (int64(map["renag"]) ?? 0) * 60_000,
       end: ints(map["end"]),
-      escalate: Int(int64(map["escalate"]) ?? 0)
+      escalate: Int(int64(map["escalate"]) ?? 0),
+      quiet: ints(map["quiet"]).flatMap { $0.count == 4 ? $0 : nil }
     )
   }
 

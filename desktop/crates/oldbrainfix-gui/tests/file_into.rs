@@ -5,9 +5,8 @@
 //! Enter taking the first row shown, Esc leaving, New Area… with the
 //! filter's text filled in and New Topic… in Advanced only, both making
 //! the place and filing into it, and Cancel there making nothing. The
-//! quick note and the capture popup pick their place the same way.
-
-use std::sync::Arc;
+//! quick note files nothing itself (#352): its More opens the Note
+//! dialog, where File into… files it.
 
 use chrono::{DateTime, Utc};
 use egui::accesskit::Role;
@@ -18,7 +17,6 @@ use oldbrainfix_core::{
     DeviceSettings, Notes, NotesGo, OwnProfile, PersonSettings, Places, QuickNoteControl,
     SigningKey, Store,
 };
-use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -314,8 +312,10 @@ fn new_topic_ends_each_area_in_advanced_only_and_files_into_the_topic() -> TestR
     Ok(())
 }
 
-/// The quick note with "File into…" switched on, "Buy bread" typed.
-fn quick_note() -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+#[test]
+fn the_quick_notes_more_leads_to_file_into_in_the_note_dialog() -> TestResult {
+    // The quick note no longer files (#352): More saves it Unsorted and
+    // opens the Note dialog, where File into… files it.
     let store = store()?;
     DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
     let mut harness = harness(store);
@@ -326,99 +326,26 @@ fn quick_note() -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
         .click();
     harness.run();
     type_here(&mut harness, "Buy bread");
-    Ok(harness)
-}
-
-#[test]
-fn the_quick_note_picks_its_place_in_file_into_and_a_new_area_stays() -> TestResult {
-    let mut harness = quick_note()?;
-    press(&mut harness, "File into…")?;
-    harness.run_steps(8);
-    // Over the quick note, the filter has the keyboard.
-    assert!(harness.state().quick_note_open());
-    type_here(&mut harness, "cell");
-    harness.key_press(Key::Enter);
-    harness.run();
-    assert!(shows(&harness, "Into: Household / Cellar"));
-    let cellar = place(harness.state().store(), "Cellar")?;
-    let recent = DeviceSettings::new(harness.state().store()).recently_filed_into()?;
-    assert_eq!(recent, [cellar]);
-    // A new Area is made at once and kept, the Note saved or not.
-    press(&mut harness, "File into…")?;
-    harness.run_steps(8);
-    type_here(&mut harness, "Errands");
-    press(&mut harness, "New Area…")?;
-    press(&mut harness, "Create")?;
-    assert!(shows(&harness, "Into: Errands"));
-    assert!(harness.state().quick_note_open());
-    assert!(place(harness.state().store(), "Errands").is_ok());
+    assert!(!shows(&harness, "File into…"));
+    press(&mut harness, "More")?;
+    assert!(!harness.state().quick_note_open());
     let bread = Notes::new(harness.state().store())
         .all()?
         .into_iter()
-        .any(|n| n.text == "Buy bread");
-    assert!(!bread, "not saved yet");
-    Ok(())
-}
-
-struct Popup {
-    popup: CapturePopup,
-    closed: bool,
-}
-
-#[test]
-fn the_popup_picks_its_place_on_a_page_and_a_new_area_stays_unsaved() -> TestResult {
-    let store = Arc::new(store()?);
-    DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
-    let popup = CapturePopup::new(store.clone(), "en");
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(560.0, 900.0))
-        .build_ui_state(
-            |ui, state: &mut Popup| {
-                App::install(ui.ctx());
-                if state.popup.show(ui) == Outcome::Closed {
-                    state.closed = true;
-                }
-            },
-            Popup {
-                popup,
-                closed: false,
-            },
-        );
+        .find(|n| n.text == "Buy bread")
+        .ok_or("Buy bread")?;
+    assert_eq!(bread.place, None);
+    assert_eq!(harness.state().selected_note(), Some(bread.id.as_str()));
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
+    harness.run_steps(8);
+    type_here(&mut harness, "cell");
+    harness.key_press(Key::Enter);
     harness.run();
-    type_here(&mut harness, "Buy bread");
-    press(&mut harness, "File into…")?;
-    assert!(harness.state().popup.page_open());
-    // Esc on the page goes back to the capture, nothing picked.
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(!harness.state().popup.page_open());
-    assert!(!harness.state().closed);
-    assert_eq!(harness.state().popup.choices().place, None);
-    press(&mut harness, "File into…")?;
-    type_here(&mut harness, "Errands");
-    press(&mut harness, "New Area…")?;
-    assert!(field_with(&harness, "Errands"));
-    // Esc while naming goes back to the list, not to the capture.
-    harness.key_press(Key::Escape);
-    harness.run();
-    assert!(harness.state().popup.page_open());
-    assert!(shows(&harness, "Filter Areas and Topics"));
-    press(&mut harness, "New Area…")?;
-    press(&mut harness, "Create")?;
-    assert!(!harness.state().popup.page_open());
-    let errands = place(&store, "Errands")?;
-    assert_eq!(harness.state().popup.choices().place, Some(errands));
-    assert!(shows(&harness, "Into: Errands"));
-    // The text taken away, nothing is saved: the Area stays.
-    harness.state_mut().popup = CapturePopup::new(store.clone(), "en");
-    harness.run();
-    assert!(place(&store, "Errands").is_ok());
-    assert!(
-        !Notes::new(&store)
-            .all()?
-            .into_iter()
-            .any(|n| n.text == "Buy bread")
-    );
+    let cellar = place(harness.state().store(), "Cellar")?;
+    let filed = Notes::new(harness.state().store())
+        .by_id(&bread.id)?
+        .ok_or("Buy bread")?;
+    assert_eq!(filed.place, Some(cellar));
     Ok(())
 }
 

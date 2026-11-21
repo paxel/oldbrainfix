@@ -35,6 +35,10 @@ abstract final class NoteKeys {
   /// The Note's [Importance] by name; absent means normal.
   static const importance = 'importance';
 
+  /// The language of its Code text (obf-1036): the scope of its grammar,
+  /// `source.rust`; absent or empty when it has none.
+  static const language = 'language';
+
   /// When the Note was moved to the trash; absent while it is not there.
   static const trashed = 'trashed';
 
@@ -464,6 +468,10 @@ class Note {
   /// Whether this version may change [text]: never one in a format it
   /// does not know, which it shows as its source text (ADR 0018).
   final bool textEditable;
+
+  /// The language its text is coloured by while it is a Code text, the
+  /// scope of a grammar (`source.rust`, obf-1036), or null for none.
+  final String? codeLanguage;
   final CaptureContext context;
 
   /// The Area or Topic the Note is filed in, or null when it has none.
@@ -548,6 +556,7 @@ class Note {
     this.textFormat = TextFormats.plain,
     this.textVersion = TextFormats.version,
     this.textEditable = true,
+    this.codeLanguage,
     this.place,
     this.importance = Importance.normal,
     this.trashed,
@@ -1318,6 +1327,21 @@ class Notes {
     );
   }
 
+  /// Sets the language the Code text of the Note [noteId] is coloured
+  /// by (obf-1036): the scope of a grammar, `source.rust`, or null or
+  /// empty for none. Nothing is written when it is the same. It stays
+  /// with the Note when its text is made plain or formatted, and counts
+  /// again once it is code again.
+  void setCodeLanguage(String noteId, String? language) {
+    final note = byId(noteId);
+    if (note == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note');
+    }
+    final value = language == null || language.isEmpty ? null : language;
+    if (note.codeLanguage == value) return;
+    store.append(noteId, NoteKeys.language, value);
+  }
+
   /// Takes the Transcript or Photo Text [generated] over into the text
   /// of the Note [noteId] (ADR 0025): it becomes the text, or with
   /// [append] goes on a line of its own after it. Into a formatted text
@@ -1844,6 +1868,10 @@ class Notes {
       textFormat: text.format,
       textVersion: text.version,
       textEditable: text.editable,
+      codeLanguage: switch (fields[NoteKeys.language]) {
+        final l? when l.isNotEmpty => l,
+        _ => null,
+      },
       context: _context(captured, fields),
       place: place != null && Places(store).isPlace(place) ? place : null,
       importance:
