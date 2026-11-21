@@ -161,6 +161,13 @@ The app icon comes from the build (`ios/Runner/Assets.xcassets`); App
 Store Connect needs no separate one.
 
 
+## Kit pages
+
+The two pages `store-kit` publishes on every release, updated in place:
+
+- Play Kit: <https://claude.ai/artifact/Ds5iewxVwTLoPwAWFbpWiJ>
+- App Store Kit: <https://claude.ai/artifact/PvZUte3cRrwyoHg2feLj1T>
+
 ## Glossary
 
 | English        | arb key             |
