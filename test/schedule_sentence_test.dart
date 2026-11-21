@@ -73,6 +73,22 @@ void main() {
     ];
   }
 
+  /// Scrolls back up to the line, which [times] scrolled away from: the
+  /// editor's list lets it go below the Heads-ups (obf-1046).
+  Future<void> backToLine(WidgetTester tester) async {
+    await tester.scrollUntilVisible(
+      line,
+      -200,
+      scrollable: find
+          .descendant(
+            of: find.byType(RoutineEditorScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+  }
+
   bool picked(WidgetTester tester, String chip) =>
       tester.widget<FilterChip>(find.widgetWithText(FilterChip, chip)).selected;
 
@@ -137,12 +153,13 @@ void main() {
       isTrue,
     );
     expect(await times(tester), isEmpty);
-    await tester.ensureVisible(line);
+    await backToLine(tester);
     await type(tester, 'Every day at 08:00 please');
     expect(await times(tester), ['08:00']);
     // Left, the line shows the schedule again, without the unknown word.
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
+    await backToLine(tester);
     expect(shown(tester), 'Every day at 08:00');
     expect(
       find.text('Marked words are not understood and change nothing.'),
