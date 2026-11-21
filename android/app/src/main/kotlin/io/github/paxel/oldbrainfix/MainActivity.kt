@@ -249,11 +249,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "granted" -> result.success(Voice.granted(this@MainActivity))
                     "request" -> requestMicrophone(result)
-                    "start" -> {
-                        val started = voice.start()
-                        if (started) recordingStarted()
-                        result.success(started)
-                    }
+                    "start" -> result.success(VoiceStart.run(voice::start, ::recordingStarted))
                     "stop" -> {
                         recordingEnded()
                         val stopped = voice.stop() ?: return@setMethodCallHandler result.success(null)
