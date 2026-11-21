@@ -10,10 +10,12 @@ import 'voice_platform.dart';
 
 /// One voice recording into a Note, for the quick note and the Note
 /// editor alike: it starts at once, the microphone asked for with an
-/// explanation the first time, and ends by one big stop button, by Stop
-/// on its notification or by its screen going, and what was recorded is
-/// kept with [keep] (UI laws, "Capture"). The recording goes on with the
-/// app in the background and the phone locked (#350).
+/// explanation the first time, and ends by one big stop button or by its
+/// screen going, and what was recorded is kept with [keep] (UI laws,
+/// "Capture"). On the iPhone the recording goes on with the app in the
+/// background and the phone locked (#350); on Android, which records
+/// under no foreground service, leaving the app or locking the phone ends
+/// and keeps it (#368).
 class VoiceRecorder {
   final VoicePlatform voice;
 
@@ -26,13 +28,14 @@ class VoiceRecorder {
   /// The running time, counted while it records.
   final elapsed = ValueNotifier(Duration.zero);
 
-  /// Stop tapped on the recording's notification (#350).
-  late final StreamSubscription<void> _stopAsked;
+  /// Ends the recording on Android once the app is left or the phone
+  /// locked (#368).
+  late final AppLifecycleListener _lifecycle;
 
   /// The recorder whose recording runs, if one does. A recording goes on
-  /// in the background (#350), so another can be asked for meanwhile, as
-  /// by a tile or widget: it ends and keeps that one first, as the
-  /// microphone records one at a time.
+  /// in the background on the iPhone (#350), and another screen can ask
+  /// for one meanwhile, as a voice Capture over the editor's: it ends and
+  /// keeps that one first, as the microphone records one at a time.
   static VoiceRecorder? _running;
 
   /// The recording being started and then running, whether it did start;
@@ -46,7 +49,15 @@ class VoiceRecorder {
   Timer? _ticker;
 
   VoiceRecorder(this.voice, {required this.keep, this.ended}) {
-    _stopAsked = voice.stopAsked.listen((_) => unawaited(stop()));
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (state) {
+        if (defaultTargetPlatform == TargetPlatform.iOS) return;
+        if (state == AppLifecycleState.paused ||
+            state == AppLifecycleState.hidden) {
+          unawaited(stop());
+        }
+      },
+    );
   }
 
   /// Whether a recording is being started or runs.
@@ -76,17 +87,10 @@ class VoiceRecorder {
     final running = _running;
     if (running != null && running != this) await running.stop();
     if (!context.mounted || !wanted() || _recording != null) return null;
-    final t = context.t;
-    final recording = _recording = voice.start(
-      RecordingNotice(
-        channel: t.recordingChannel,
-        title: t.recordingNotice,
-        stop: t.stopRecording,
-      ),
-    );
+    final recording = _recording = voice.start();
     _running = this;
     final started = await recording;
-    // Stopped meanwhile, by leaving or the notification: nothing to count.
+    // Stopped meanwhile, as by leaving: nothing to count.
     if (_recording != recording) return null;
     if (!started) {
       _recording = null;
@@ -126,7 +130,7 @@ class VoiceRecorder {
   /// Ends a recording still running and keeps it, as when its screen was
   /// closed from elsewhere, so the screen times out again.
   void dispose() {
-    unawaited(_stopAsked.cancel());
+    _lifecycle.dispose();
     if (_recording != null) unawaited(stop());
     _ticker?.cancel();
     elapsed.dispose();
@@ -234,8 +238,9 @@ class VoicePanel extends StatelessWidget {
 
 /// Records a voice recording into the Note [noteId] from its editor: the
 /// recording starts at once on a page of its own with the big stop
-/// button; Stop, Back or Stop on its notification end it, write it into
-/// the Note, also when the editor was left meanwhile, and close the page.
+/// button; Stop or Back end it, on Android also leaving the app or locking
+/// the phone (#368), write it into the Note, also when the editor was left
+/// meanwhile, and close the page.
 Future<void> recordInto(BuildContext context, Notes notes, String noteId) =>
     Navigator.of(context).push<void>(
       MaterialPageRoute(

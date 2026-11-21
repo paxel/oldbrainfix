@@ -249,11 +249,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "granted" -> result.success(Voice.granted(this@MainActivity))
                     "request" -> requestMicrophone(result)
-                    "start" -> {
-                        val started = voice.start()
-                        if (started) recordingStarted(call.arguments as? Map<*, *>)
-                        result.success(started)
-                    }
+                    "start" -> result.success(VoiceStart.run(voice::start, ::recordingStarted))
                     "stop" -> {
                         recordingEnded()
                         val stopped = voice.stop() ?: return@setMethodCallHandler result.success(null)
@@ -1099,24 +1095,16 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * A recording started (#350): the screen stays on while it runs, and
-     * locked anyway, [RecordingService] keeps it going under a
-     * notification with the [labels] the app handed over.
+     * A recording started (#350): the screen stays on while it runs. Locked
+     * or left anyway, the app ends and keeps it (#368).
      */
-    private fun recordingStarted(labels: Map<*, *>?) {
+    private fun recordingStarted() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        RecordingService.start(
-            this,
-            labels?.get("channel") as? String,
-            labels?.get("title") as? String,
-            labels?.get("stop") as? String,
-        )
     }
 
     /** The recording ended or went: the screen times out again. */
     private fun recordingEnded() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        RecordingService.stop()
     }
 
     /**
@@ -1350,18 +1338,6 @@ class MainActivity : FlutterActivity() {
                 channel.invokeMethod("wanted", null)
             }
             return over
-        }
-
-        /**
-         * The recording notification's Stop was tapped (#350): the app
-         * ends the recording and keeps it as its own Stop does. False when
-         * there is no app to tell.
-         */
-        fun recordingStopAsked(): Boolean {
-            val activity = active ?: return false
-            val channel = activity.voiceChannel ?: return false
-            activity.runOnUiThread { channel.invokeMethod("stopAsked", null) }
-            return true
         }
 
         /**

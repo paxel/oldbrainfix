@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
@@ -151,28 +150,66 @@ void main() {
     expect(notes.all(), hasLength(1));
   });
 
-  testWidgets('a voice request while a recording goes on in the background '
-      'ends and keeps that one first (#350)', (tester) async {
+  /// The app goes to the background and comes back.
+  void leaveAndComeBack(WidgetTester tester) {
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+  }
+
+  testWidgets('on the iPhone, a voice request while a recording goes on in '
+      'the background ends and keeps that one first (#350)', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await start(tester);
+      // Recording started in the app: a Capture a request opened keeps the
+      // next request waiting until it closes, as two never stack.
+      await openCaptureBy(tester, 'voice');
+      expect(voice.starts, 1);
+
+      // Out of the app, recording on, the tile asks for voice again.
+      leaveAndComeBack(tester);
+      await tester.pump();
+      expect(voice.stops, 0);
+      requests.request(CaptureMode.voice);
+      await tester.pumpAndSettle();
+
+      expect(voice.stops, 1);
+      expect(voice.starts, 2);
+      expect(voice.recording, isTrue);
+      expect(notes.all().single.recordings, hasLength(1));
+      await tap(tester, stop.last);
+      expect(notes.all(), hasLength(2));
+      expect(notes.all().every((n) => n.recordings.length == 1), isTrue);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('on Android, leaving the app already ended and kept the '
+      'recording, and a voice request records anew (#368)', (tester) async {
     await start(tester);
-    // Recording started in the app: a Capture a request opened keeps the
-    // next request waiting until it closes, as two never stack.
     await openCaptureBy(tester, 'voice');
     expect(voice.starts, 1);
 
-    // Out of the app, recording on, the tile asks for voice again.
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    leaveAndComeBack(tester);
+    await tester.pumpAndSettle();
+    expect(voice.stops, 1);
+    expect(voice.recording, isFalse);
+    expect(notes.all().single.recordings, hasLength(1));
+
     requests.request(CaptureMode.voice);
     await tester.pumpAndSettle();
-
     expect(voice.stops, 1);
     expect(voice.starts, 2);
     expect(voice.recording, isTrue);
-    expect(notes.all().single.recordings, hasLength(1));
     await tap(tester, stop.last);
     expect(notes.all(), hasLength(2));
     expect(notes.all().every((n) => n.recordings.length == 1), isTrue);

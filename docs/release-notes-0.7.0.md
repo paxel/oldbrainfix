@@ -37,7 +37,7 @@ Changed
 • One Remind me… for a Routine or a Reminder.
 • Quiet Hours are silent unless Escalation is on.
 Fixed
-• A voice recording goes on when the phone locks.
+• The screen stays on while a voice recording runs.
 ```
 
 <!-- block id=play_notes_de limit=500 lang=de title="Versionshinweise, de-DE" where="Internal testing release" -->
@@ -54,7 +54,7 @@ Geändert
 • „Erinnere mich …“ für Routine oder Erinnerung.
 • Ruhezeit ist still, außer bei Eskalation.
 Behoben
-• Sprachaufnahmen laufen weiter, wenn das Handy sperrt.
+• Der Bildschirm bleibt während einer Sprachaufnahme an.
 ```
 
 ## App Store: What's New

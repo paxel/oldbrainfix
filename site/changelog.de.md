@@ -2,7 +2,13 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.7.0]
+## [0.7.1]
+
+### Geändert
+
+- Auf Android beendet das Sperren des Handys oder das Verlassen der App eine Sprachaufnahme und behält sie; der Bildschirm bleibt während der Aufnahme an. ([obf-1057](https://github.com/paxel/oldbrainfix/issues/368))
+
+## [0.7.0] - 2026-11-21
 
 ### Neu
 

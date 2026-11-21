@@ -35,11 +35,7 @@ class FakeVoice implements VoicePlatform {
   /// The speed the player plays at.
   double speed = 1;
 
-  /// The notice the last recording was started with.
-  RecordingNotice? notice;
-
   final _ended = StreamController<void>.broadcast();
-  final _stopAsked = StreamController<void>.broadcast();
 
   FakeVoice({
     this.allowed = true,
@@ -49,9 +45,6 @@ class FakeVoice implements VoicePlatform {
 
   /// The recording playing reaches its end.
   void finishPlaying() => _ended.add(null);
-
-  /// Stop on the recording's notification is tapped.
-  void askStop() => _stopAsked.add(null);
 
   @override
   bool get available => true;
@@ -67,9 +60,8 @@ class FakeVoice implements VoicePlatform {
   }
 
   @override
-  Future<bool> start(RecordingNotice notice) async {
+  Future<bool> start() async {
     if (!allowed) return false;
-    this.notice = notice;
     starts++;
     recording = true;
     return true;
@@ -96,7 +88,4 @@ class FakeVoice implements VoicePlatform {
 
   @override
   Stream<void> get playbackEnded => _ended.stream;
-
-  @override
-  Stream<void> get stopAsked => _stopAsked.stream;
 }
