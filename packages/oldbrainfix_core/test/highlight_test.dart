@@ -15,6 +15,22 @@ List<String> _parts(Grammar g, String text) => [
 
 Grammar _rust() => Grammars.builtIn.byScope('source.rust')!;
 
+/// A grammar of [contexts], which follow its `contexts:` key.
+Grammar _grammar(String contexts) =>
+    Grammar.parse('name: T\nscope: source.t\ncontexts:\n$contexts');
+
+/// A grammar whose `main` context has one item that matches [regex]
+/// with [scope].
+Grammar _matching(String regex, [String scope = 'keyword']) => _grammar(
+  "  main:\n    - match: '${regex.replaceAll("'", "''")}'\n"
+  '      scope: $scope\n',
+);
+
+/// Refused with a reason that holds [why].
+Matcher _refused(String why) => throwsA(
+  isA<GrammarRefused>().having((r) => r.reason, 'reason', contains(why)),
+);
+
 void main() {
   group('built-in grammars (obf-1036)', () {
     test('the generated file holds the grammar files as they are', () {
@@ -152,6 +168,255 @@ void main() {
     });
   });
 
+  group('a span and a refusal', () {
+    test('a span is equal to one of the same place and colour', () {
+      const a = CodeSpan(1, 4, CodeColour.keyword);
+      expect(a, const CodeSpan(1, 4, CodeColour.keyword));
+      expect(a.hashCode, const CodeSpan(1, 4, CodeColour.keyword).hashCode);
+      expect(a, isNot(const CodeSpan(1, 4, CodeColour.string)));
+      expect(a, isNot(const CodeSpan(0, 4, CodeColour.keyword)));
+      expect(a.toString(), 'CodeSpan(1, 4, keyword)');
+      expect(
+        const GrammarRefused('no main').toString(),
+        'GrammarRefused: no main',
+      );
+    });
+  });
+
+  group('contexts', () {
+    test('a set replaces the context, an anonymous one too', () {
+      final t = _grammar(
+        '  main:\n'
+        "    - match: '<'\n"
+        '      set:\n'
+        '        - meta_scope: entity.name.tag\n'
+        "        - match: '>'\n"
+        '          set: main\n'
+        "    - match: 'b'\n"
+        '      scope: keyword\n',
+      );
+      // The `>` takes the scopes of the context it sets, main's: none.
+      expect(_parts(t, 'b <b> b'), ['b:keyword', '<b:tag', 'b:keyword']);
+    });
+
+    test('a push of a list of names pushes each, the last on top', () {
+      final t = _grammar(
+        '  main:\n'
+        "    - match: '\\['\n"
+        '      push: [inner, outer]\n'
+        '  inner:\n'
+        '    - meta_scope: string\n'
+        "    - match: '\\]'\n"
+        '      pop: true\n'
+        '  outer:\n'
+        '    - meta_scope: comment\n'
+        "    - match: ';'\n"
+        '      pop: true\n',
+      );
+      // outer pops at `;`, then inner at `]`.
+      expect(_parts(t, 'a [b;c] d'), ['[b;:comment', 'c]:string']);
+    });
+
+    test(
+      'the prototype comes first in each context, unless it is left out',
+      () {
+        final t = _grammar(
+          '  prototype:\n'
+          "    - match: '#.*'\n"
+          '      scope: comment\n'
+          '  main:\n'
+          "    - match: '\"'\n"
+          '      push: str\n'
+          "    - match: '\\('\n"
+          '      push: paren\n'
+          '  str:\n'
+          '    - meta_include_prototype: false\n'
+          '    - meta_scope: string\n'
+          "    - match: '\"'\n"
+          '      pop: true\n'
+          '  paren:\n'
+          '    - meta_scope: keyword\n'
+          "    - match: '\\)'\n"
+          '      pop: true\n',
+        );
+        expect(_parts(t, '"a # b" # c\n(d # e\n)'), [
+          '"a # b":string',
+          '# c:comment',
+          '(d :keyword',
+          '# e:comment',
+          '\n):keyword',
+        ]);
+      },
+    );
+
+    test('variables are put in, one inside another too', () {
+      final t = Grammar.parse(
+        'name: T\nscope: source.t\n'
+        'variables:\n'
+        "  id: '[a-z_]\\w*'\n"
+        "  call: '{{id}}(?=\\()'\n"
+        'contexts:\n'
+        '  main:\n'
+        "    - match: '{{call}}'\n"
+        '      scope: variable.function\n',
+      );
+      expect(_parts(t, 'f(x) g (y) h_1()'), ['f:function', 'h_1:function']);
+    });
+
+    test('empty matches in a row leave the rest of the line as it is', () {
+      // Each push and each pop matches nothing, so the line would never
+      // end; after the most in a row it is left, and the next line read.
+      final t = _grammar(
+        '  main:\n'
+        "    - match: '(?=x)'\n"
+        '      push: other\n'
+        "    - match: 'y'\n"
+        '      scope: keyword\n'
+        '  other:\n'
+        "    - match: '(?=x)'\n"
+        '      pop: true\n',
+      );
+      expect(t.colour('yx y\ny'), const [
+        CodeSpan(0, 1, CodeColour.keyword),
+        CodeSpan(5, 6, CodeColour.keyword),
+      ]);
+    });
+
+    test('what a context may not hold is refused, with its reason', () {
+      Grammar parse(String contexts) => _grammar(contexts);
+      for (final (contexts, why) in [
+        ('  main:\n    - meta_scope: a\n      match: b\n', 'the key match'),
+        ('  main:\n    - match: a\n    - meta_scope: b\n', 'a meta item late'),
+        ('  main:\n    - meta_include_prototype: 1\n', 'meta_include'),
+        (
+          '  main:\n    - match: (a)\n      captures:\n        2: keyword\n',
+          'the capture 2',
+        ),
+        ('  main:\n    - match: a\n      push: nope\n', 'no context nope'),
+        ('  main:\n    - match: a\n      push: []\n', 'a push or set'),
+        ('  main:\n    - match: a\n      set: 12\n', 'a push or set'),
+        (
+          '  main:\n    - match: a\n      push: [main, {match: b}]\n',
+          'a push or set',
+        ),
+        ("  main:\n    - match: '{{nope}}'\n", 'no variable nope'),
+      ]) {
+        expect(() => parse(contexts), _refused(why), reason: contexts);
+      }
+      expect(
+        () => Grammar.parse(
+          "name: T\nscope: source.t\nvariables:\n  a: '{{b}}x'\n"
+          'contexts:\n  main: []\n',
+        ),
+        _refused('no variable b'),
+      );
+    });
+  });
+
+  group('the regex subset', () {
+    test('(?x) leaves out blanks and comments', () {
+      final t = _grammar(
+        '  main:\n'
+        '    - match: |\n'
+        '        (?x)\n'
+        '        a \\  b  # one\n'
+        '        \\# c\n'
+        '      scope: keyword\n',
+      );
+      expect(_parts(t, 'ab#c a b#c'), ['a b#c:keyword']);
+    });
+
+    test(r'\W, \D and \B are the ASCII sets and boundary', () {
+      expect(_parts(_matching(r'\W+', 'keyword.operator'), 'a+-b é'), [
+        '+-:operator',
+        ' é:operator',
+      ]);
+      expect(_parts(_matching(r'\D+'), '12ab3'), ['ab:keyword']);
+      expect(_matching(r'a\B').colour('ab a a_'), const [
+        CodeSpan(0, 1, CodeColour.keyword),
+        CodeSpan(5, 6, CodeColour.keyword),
+      ]);
+    });
+
+    test(r'\xHH, \x{H…} and \uHHHH are the characters they name', () {
+      expect(_parts(_matching(r'\x41\x{1F600}\u00e9\x{62}'), 'A😀é Ab A😀éb'), [
+        'A😀éb:keyword',
+      ]);
+      expect(_parts(_matching(r'[\x61-\x{63}]+'), 'abcd'), ['abc:keyword']);
+      expect(_parts(_matching(r'[\uFF21-\uFF3A]'), 'aＢc'), ['Ｂ:keyword']);
+    });
+
+    test('a { that starts no quantifier is a literal', () {
+      expect(_parts(_matching('a{b'), 'a{b'), ['a{b:keyword']);
+      expect(_parts(_matching('a{2'), 'aa a{2'), ['a{2:keyword']);
+      expect(_parts(_matching('a{2,x}'), 'aa a{2,x}'), ['a{2,x}:keyword']);
+      expect(_parts(_matching('{a'), '{a'), ['{a:keyword']);
+    });
+
+    test('{n,} is at least n', () {
+      expect(_matching('a{2,}').colour('a aa aaa'), const [
+        CodeSpan(2, 4, CodeColour.keyword),
+        CodeSpan(5, 8, CodeColour.keyword),
+      ]);
+    });
+
+    test(
+      'captures in alternatives and inside captures lie where they match',
+      () {
+        final alt = _grammar(
+          '  main:\n'
+          "    - match: '(?:(a)|(b))c'\n"
+          '      captures:\n'
+          '        1: keyword\n'
+          '        2: string\n',
+        );
+        expect(alt.colour('ac bc ab'), const [
+          CodeSpan(0, 1, CodeColour.keyword),
+          CodeSpan(3, 4, CodeColour.string),
+        ]);
+        final inner = _grammar(
+          '  main:\n'
+          "    - match: 'x((a)b|c)'\n"
+          '      captures:\n'
+          '        1: string\n'
+          '        2: keyword\n',
+        );
+        expect(inner.colour('xab xc'), const [
+          CodeSpan(1, 2, CodeColour.keyword),
+          CodeSpan(2, 3, CodeColour.string),
+          CodeSpan(5, 6, CodeColour.string),
+        ]);
+      },
+    );
+
+    test('what goes beyond it is refused, with its reason', () {
+      for (final (regex, why) in [
+        ('a{2}{3}', 'a doubled quantifier'),
+        ('(?=a)*', 'a quantifier on a lookaround'),
+        ('*a', 'a quantifier without anything before it'),
+        ('{2}', 'a quantifier without anything before it'),
+        ('(?=(a))', 'a capture in a lookaround'),
+        (r'\x{}', r'a \x{…} not closed'),
+        (r'\x{41', r'a \x{…} not closed'),
+        (r'\x{1234567}', r'a \x{…} not closed'),
+        (r'\x4', 'a short hex escape'),
+        (r'\xG1', 'a short hex escape'),
+        (r'\u12', 'a short hex escape'),
+        (r'\x{110000}', 'no character 110000'),
+        (r'\uD800', 'no character d800'),
+        (r'[\W]', r'\W in a class'),
+        (r'[\b]', r'\b in a class'),
+        (r'[a-\w]', 'a range to a class'),
+        (r'[a-\D]', 'a range to a class'),
+        ('[a-[]', 'a [ in a class'),
+        (r'[a-\', r'a \ at the end'),
+        (r'[\', r'a \ at the end'),
+      ]) {
+        expect(() => CodeRegex.parse(regex), _refused(why), reason: regex);
+      }
+    });
+  });
+
   group('a lookbehind (obf-1037)', () {
     test('of one fixed width is read, of no fixed width refused', () {
       for (final read in [
@@ -218,6 +483,17 @@ void main() {
         'source.python',
       );
       expect(all.guess('plain words'), isNull);
+    });
+
+    test('a guess reads the first line without its \\r', () {
+      final all = Grammars([
+        Grammar.parse(
+          "name: G\nscope: source.g\nfirst_line_match: '^#!g\$'\n"
+          'contexts:\n  main: []\n',
+        ),
+      ]);
+      expect(all.guess('\r\n#!g\r\nx')?.scope, 'source.g');
+      expect(all.guess('#!g x\r\n'), isNull);
     });
   });
 
