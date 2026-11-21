@@ -123,6 +123,78 @@ void main() {
         'include::secret.adoc\\[]\ninclude::https://x.org/a.adoc\\[]',
       );
     });
+
+    test('reads its other blocks, closed headings, numbers and cells', () {
+      expect(
+        adoc(
+          '== Title ==\n'
+          '> quoted *x*\n'
+          '3. Three\n'
+          '. Four\n'
+          '\n'
+          '____\n'
+          'One.\n'
+          '\n'
+          'Two.\n'
+          '____\n'
+          '////\n'
+          'secret *x*\n'
+          '////\n'
+          'after\n'
+          '|===\n'
+          'lead\n'
+          '|A |B\n'
+          '2+^.^|Wide\n'
+          'more\n'
+          '|===\n'
+          '++++\n'
+          '<b>x</b>',
+        ),
+        '## Title\n'
+        '> quoted **x**\n'
+        '3. Three\n'
+        '4. Four\n'
+        '\n'
+        '> One.\n'
+        '\n'
+        '> Two.\n'
+        '\n'
+        '////\n'
+        'secret \\*x\\*\n'
+        '////\n'
+        'after\n'
+        '\n'
+        '| lead | A |\n'
+        '| --- | --- |\n'
+        '| B | Wide more |\n'
+        '\n'
+        '++++\n'
+        '<b>x</b>',
+      );
+    });
+
+    test('reads nested marks, escapes, passthroughs and links', () {
+      expect(
+        adoc(
+          'ä_ö and a_\u00a0b\n'
+          '*a _b_ c*\n'
+          '\\*a\\* \\_b\\_ \\~c \\d\n'
+          '`+*x*+` and ``a`b``\n'
+          'x ++*a*++ y a+b\n'
+          'mailto:ada@x.org[Ada], https://x.org/a[] and '
+          'http://x.org/b[the page^]\n'
+          'see https://x.org/_a_ now',
+        ),
+        'ä_ö and a\\_\u00a0b\n'
+        '**a *b* c**\n'
+        '\\*a\\* \\_b\\_ ~c \\d\n'
+        '`*x*` and ``a`b``\n'
+        'x \\*a\\* y a+b\n'
+        '[Ada](mailto:ada@x.org), [https://x.org/a](https://x.org/a) and '
+        '[the page](http://x.org/b)\n'
+        'see https://x.org/\\_a\\_ now',
+      );
+    });
   });
 
   group('Org', () {
@@ -196,6 +268,58 @@ void main() {
 
     test('reads an include as the line it is, and nothing of its file', () {
       expect(org('#+INCLUDE: "secret.org"'), '#+INCLUDE: "secret.org"');
+    });
+
+    test('reads its other blocks, breaks, bare links and list ends', () {
+      expect(
+        org(
+          'a\n'
+          '\\\\\n'
+          'b\n'
+          '\n'
+          'c\n'
+          '- one\n'
+          'plain\n'
+          '  - two\n'
+          '#+begin_example\n'
+          '  *x*\n'
+          '  ,* y\n'
+          '#+end_example\n'
+          '#+begin_quote\n'
+          'A.\n'
+          '\n'
+          'B.\n'
+          '#+end_quote\n'
+          '#+begin_verse\n'
+          'Roses *red*\n'
+          '#+end_verse\n'
+          '[[https://x.org]] and https://x.org/+a+ now\n'
+          '#+begin_center\n'
+          'open',
+        ),
+        'a\n'
+        '\n'
+        'b\n'
+        '\n'
+        'c\n'
+        '- one\n'
+        'plain\n'
+        '- two\n'
+        '```\n'
+        '*x*\n'
+        '* y\n'
+        '```\n'
+        '> A.\n'
+        '\n'
+        '> B.\n'
+        '\n'
+        '#+begin_verse\n'
+        'Roses \\*red\\*\n'
+        '#+end_verse\n'
+        '[https://x.org](https://x.org) and https://x.org/+a+ now\n'
+        '#+begin_center\n'
+        'open',
+      );
     });
   });
 
@@ -303,6 +427,40 @@ void main() {
         '.. include:: secret.rst\n   :literal:\n\nAfter',
       );
     });
+
+    test('reads its numbers, transitions, literal blocks and references', () {
+      expect(
+        rst(
+          '1. one\n'
+          '2) two\n'
+          '(3) three\n'
+          '#. four\n'
+          '\n'
+          '----\n'
+          '\n'
+          'Code ::\n'
+          '\n'
+          '    x = 1\n'
+          '\n'
+          '``a``\\ ``b`` and `the docs`_ at https://x.org/*a* now\n'
+          'End::',
+        ),
+        '1. one\n'
+        '2. two\n'
+        '3. three\n'
+        '4. four\n'
+        '\n'
+        '----\n'
+        '\n'
+        'Code\n'
+        '```\n'
+        'x = 1\n'
+        '```\n'
+        '\n'
+        '`ab` and the docs at https://x.org/\\*a\\* now\n'
+        'End:',
+      );
+    });
   });
 
   group('HTML', () {
@@ -375,6 +533,47 @@ void main() {
         html('a &#0; &#xD800; &#x110000; &amp b < c <b>bold'),
         'a &#0; &#xD800; &#x110000; &amp b < c **bold**',
       );
+    });
+
+    test(
+      'reads a textarea, self-closing tags, and tables and pre in cells',
+      () {
+        expect(
+          html(
+            '<textarea>a &lt;b&gt;</textarea>'
+            '<p><b/>x <i>y</i></p>'
+            '<p><a href = "https://x.org" >link</a></p>'
+            '<pre>a<br>b</pre>'
+            'c</pre>d'
+            '<table><tr><td>e<br>f</td>'
+            '<td><a href="https://x.org/a|b">g</a></td></tr>'
+            '<tr><td><pre>h</pre></td>'
+            '<td>i<table><tr><td>j</td></tr></table> k</td></tr></table>',
+          ),
+          'a <b>\n'
+          '\n'
+          'x *y*\n'
+          '\n'
+          '[link](https://x.org)\n'
+          '\n'
+          '```\n'
+          'a\n'
+          'b\n'
+          '```\n'
+          '\n'
+          'c\n'
+          'd\n'
+          '\n'
+          '| e f | g |\n'
+          '| --- | --- |\n'
+          '| h | i j k |',
+        );
+      },
+    );
+
+    test('ends a pre and a table the document leaves open', () {
+      expect(html('<pre>a\n b'), '```\na\n b\n```');
+      expect(html('<table><tr><td>l<td>m'), '| l | m |\n| --- | --- |');
     });
   });
 
