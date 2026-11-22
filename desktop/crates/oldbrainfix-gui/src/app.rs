@@ -557,6 +557,100 @@ fn show_ticks_key(note: &str) -> String {
     format!("showTicks:{note}")
 }
 
+/// The cards of the list shown and what they show, as [`View`] holds
+/// them: read anew only where they can have changed (obf-1069).
+struct CardsRead {
+    notes: Vec<Placed>,
+    sections: BTreeMap<String, Vec<Section>>,
+    /// The Notes linking to each card, none for the Note shown alone.
+    linked_from: BTreeMap<String, Vec<Note>>,
+    card_today: HashMap<String, Vec<CardOccurrence>>,
+    checklists: BTreeMap<String, (Checklist, bool)>,
+    shopping_lists: BTreeMap<String, (ShoppingList, bool)>,
+    tallies: HashSet<String>,
+    sessions: HashSet<String>,
+    card_changes: HashSet<String>,
+    card_may: HashSet<String>,
+    compact: bool,
+    switched: HashSet<String>,
+    glances: HashMap<String, Vec<String>>,
+    card_tallies: HashMap<String, TallyShown>,
+    card_sessions: HashMap<String, SessionCardShown>,
+}
+
+impl CardsRead {
+    /// The cards `view` shows, as it read them.
+    fn kept(view: &View) -> CardsRead {
+        let listed: HashSet<&str> = view.notes.iter().map(|p| p.note.id.as_str()).collect();
+        CardsRead {
+            notes: view.notes.clone(),
+            sections: view.sections.clone(),
+            linked_from: view
+                .linked_from
+                .iter()
+                .filter(|(id, _)| listed.contains(id.as_str()))
+                .map(|(id, linking)| (id.clone(), linking.clone()))
+                .collect(),
+            card_today: view.card_today.clone(),
+            checklists: view.checklists.clone(),
+            shopping_lists: view.shopping_lists.clone(),
+            tallies: view.tallies.clone(),
+            sessions: view.sessions.clone(),
+            card_changes: view.card_changes.clone(),
+            card_may: view.card_may.clone(),
+            compact: view.compact,
+            switched: view.switched.clone(),
+            glances: view.glances.clone(),
+            card_tallies: view.card_tallies.clone(),
+            card_sessions: view.card_sessions.clone(),
+        }
+    }
+}
+
+/// What an [`Action`] can change of what shows (obf-1069), told by
+/// [`Reads::of`]: what is not named reads it all again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reads {
+    /// Only what the window holds: which cards are selected, a field's
+    /// clipboard.
+    Nothing,
+    /// The view of the cards, compact or detailed.
+    Look,
+    /// The Note shown alone, its dialog opened or closed: the cards stay
+    /// as they were read.
+    Detail,
+    All,
+}
+
+impl Reads {
+    fn of(action: &Action) -> Reads {
+        match action {
+            Action::PickCard(..)
+            | Action::ClearCards
+            | Action::StepCards { .. }
+            | Action::SelectAllCards
+            | Action::Clip(_) => Reads::Nothing,
+            Action::SwitchView(_) | Action::Compact(_) => Reads::Look,
+            Action::SelectNote(_) | Action::CloseNote | Action::Find | Action::Badge(_) => {
+                Reads::Detail
+            }
+            _ => Reads::All,
+        }
+    }
+}
+
+/// What the cards were read for: read again once any of it changed
+/// (obf-1069).
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CardsKey {
+    selection: Selection,
+    query: String,
+    people: PersonFilter,
+    seq: i64,
+    day: Day,
+    alone: bool,
+}
+
 /// What the panes show, read once per change.
 #[derive(Debug, Clone, Default)]
 struct View {
@@ -2041,6 +2135,20 @@ pub struct App {
     /// Bumped by the alerts when a notification changed the log.
     changes: Option<Arc<AtomicU64>>,
     seen_changes: u64,
+    /// Whether the next read may keep the cards read last
+    /// ([`App::kept_cards`]): set only by what changes none of them.
+    keep_cards: bool,
+    /// What the cards shown were read for.
+    cards_read: Option<CardsKey>,
+    /// How often the cards were read anew, and the panes at all: what a
+    /// test counts the reads by (obf-1069).
+    card_reads: std::cell::Cell<usize>,
+    refreshes: usize,
+    /// The height each card of a list took when it was drawn last, for
+    /// the room it takes out of view (obf-1069).
+    card_heights: HashMap<(String, bool), f32>,
+    /// How many cards the list laid out in the frame drawn last.
+    cards_laid_out: usize,
     /// Tells the alerts to look again after a change here.
     wake: Option<Sender<Event>>,
     /// The login start the Settings switch.
@@ -2633,6 +2741,12 @@ impl App {
             region: region_of(sys_locale::get_locale().as_deref()),
             changes: None,
             seen_changes: 0,
+            keep_cards: false,
+            cards_read: None,
+            card_reads: std::cell::Cell::new(0),
+            refreshes: 0,
+            card_heights: HashMap::new(),
+            cards_laid_out: 0,
             wake: None,
             autostart: None,
             read_at,
@@ -5762,6 +5876,18 @@ impl App {
         &self.query
     }
 
+    /// How often the panes were read, and how often their cards among
+    /// them: what a test counts the reads by (obf-1069).
+    pub fn reads(&self) -> (usize, usize) {
+        (self.refreshes, self.card_reads.get())
+    }
+
+    /// How many cards the list laid out in the frame drawn last
+    /// (obf-1069).
+    pub fn cards_laid_out(&self) -> usize {
+        self.cards_laid_out
+    }
+
     /// How far the list shown is scrolled, as it was drawn last (#278).
     pub fn list_scrolled(&self) -> f32 {
         self.list_offset
@@ -5953,6 +6079,7 @@ impl App {
     /// Reads what the panes show from the log. A selected place that is
     /// gone falls back to All Notes.
     fn refresh(&mut self) {
+        self.refreshes += 1;
         // The Lines of a Note left: stored, those left empty dropped
         // (#141).
         let left = match &self.lines.note {
@@ -6026,6 +6153,7 @@ impl App {
         match read {
             Ok(view) => {
                 self.view = view;
+                self.cards_read = self.cards_key_now();
                 self.error = None;
                 // The page's draft of a Session Note, read again with it
                 // (#191); its tag filter stays while the page is open
@@ -6055,8 +6183,12 @@ impl App {
                 let shown = self.shown_cards();
                 self.cards.retain(&shown);
             }
-            Err(e) => self.error = Some(e.to_string()),
+            Err(e) => {
+                self.cards_read = None;
+                self.error = Some(e.to_string());
+            }
         }
+        self.keep_cards = false;
         if let Some(e) = left {
             self.error = Some(e.to_string());
         }
@@ -6259,37 +6391,17 @@ impl App {
         self.note_shown
     }
 
-    fn read(&self) -> oldbrainfix_core::Result<View> {
+    /// The cards of the list shown and what they show, read anew
+    /// (obf-1069): the list's Notes found, whose each is and what this
+    /// Device may do to it, their Sections, links, today's Occurrences,
+    /// lists, Tallies and Sessions and their view.
+    fn read_cards(&self, areas: &[(Area, Vec<Topic>)]) -> oldbrainfix_core::Result<CardsRead> {
+        self.card_reads.set(self.card_reads.get() + 1);
         let notes = Notes::new(&self.store);
         let places = Places::new(&self.store);
-        let mut areas = Vec::new();
-        let mut access = std::collections::HashMap::new();
-        let mut people = std::collections::HashMap::new();
-        let mut names = std::collections::HashMap::new();
-        let mut shown_people = std::collections::HashMap::new();
-        let mut mine = std::collections::HashMap::new();
-        // In the person's own order (#280), the sidebar's and every list
-        // of Areas read from here.
-        let t = self.t;
-        for area in PersonSettings::new(&self.store).areas_in_order_by(|a| area_name(&t, a))? {
-            let topics = places.topics(&area.id)?;
-            access.insert(area.id.clone(), self.store.access_in(&area.id, None)?);
-            if let Some(grants) = self.store.grants_of(&area.id)? {
-                let shared = self.store.people(&area.id)?;
-                for person in &shared {
-                    let shown = self.store.person_shown(&person.id)?;
-                    names.insert(person.id.clone(), shown.name.clone());
-                    shown_people.insert(person.id.clone(), shown);
-                }
-                people.insert(area.id.clone(), shared);
-                if let Some(person) = grants.person_of(&self.store.device_id()?) {
-                    mine.insert(area.id.clone(), person.to_string());
-                }
-            }
-            areas.push((area, topics));
-        }
         let routines = Routines::new(&self.store);
         let search = Search::new(&self.store);
+        let store = &self.store;
         let shown = match &self.selection {
             // A Note window shows its Note alone (#287).
             _ if self.alone.is_some() => Vec::new(),
@@ -6336,21 +6448,9 @@ impl App {
             // Its search (#274) keeps the trash's order.
             Selection::Trash => search.among(&self.query, notes.trashed()?)?,
         };
-        let store = &self.store;
-        let place = |note: Note| place_note(store, &places, note);
-        let frogs = Frogs::new(store);
-        let shown_frogs = |list: Vec<Frog>| frogs_shown(store, &places, &*self.wall, list);
-        let detail = match &self.selected_note {
-            Some(id) => match notes.by_id(id)? {
-                Some(note) if !note.is_merged() => Some((place(note)?, notes.sections(id)?)),
-                _ => None,
-            },
-            None => None,
-        };
-        let mut placed = Vec::new();
-        for note in shown {
-            placed.push(place(note)?);
-        }
+        // Whose each card is and whether this Device may change it, read
+        // for all of them at once (obf-1069).
+        let (placed, changes) = place_notes(store, &places, shown)?;
         // Once per read for every card, never per frame.
         let listed: Vec<String> = placed.iter().map(|p| p.note.id.clone()).collect();
         let sections = if listed.is_empty() {
@@ -6364,7 +6464,7 @@ impl App {
         let backlinks = Backlinks::new(store);
         let mut linked_from = BTreeMap::new();
         let linked = listed.iter().filter(|_| self.selection != Selection::Trash);
-        for id in linked.chain(detail.as_ref().map(|(p, _)| &p.note.id)) {
+        for id in linked {
             let linking = backlinks.to(id, &HashSet::new())?;
             if !linking.is_empty() {
                 linked_from.insert(id.clone(), linking);
@@ -6409,40 +6509,11 @@ impl App {
                 sessions.insert(id.clone());
             }
         }
-        // What a shield marks, read once for all of them (ADR 0049).
-        let hidden_notes = store.hidden_from_ai_among(
-            placed
-                .iter()
-                .chain(detail.as_ref().map(|(p, _)| p))
-                .map(|p| p.note.id.as_str()),
-        )?;
-        let marks = store.hidden_from_ai_marks()?;
-        let hidden_areas: HashSet<String> = areas
-            .iter()
-            .filter(|(a, _)| marks.contains(&a.id))
-            .map(|(a, _)| a.id.clone())
-            .collect();
-        let mut hideable_areas = HashSet::new();
-        for (area, _) in &areas {
-            if store.may_hide_from_ai(&area.id)? {
-                hideable_areas.insert(area.id.clone());
-            }
-        }
-        let note_hidden = match &detail {
-            Some((p, _)) if !p.note.is_trashed() => {
-                let id = &p.note.id;
-                let own = marks.contains(id);
-                let by = store.hidden_from_ai_by(id)?;
-                let other = by.iter().any(|m| m != id);
-                (own || store.may_hide_from_ai(id)?).then_some((own, other))
-            }
-            _ => None,
-        };
         let mut card_changes = HashSet::new();
         let mut card_may = HashSet::new();
         for p in &placed {
             let note = &p.note;
-            if !store.may_change(&note.id)? {
+            if !changes.contains(&note.id) {
                 continue;
             }
             card_may.insert(note.id.clone());
@@ -6450,37 +6521,9 @@ impl App {
                 card_changes.insert(note.id.clone());
             }
         }
-        // Every text with boxes listed or shown, with the Note it is of
-        // and whether that is in the trash.
-        let mut texts: Vec<(&str, &[ShownBox], &str, bool)> = Vec::new();
-        for p in placed.iter().chain(detail.as_ref().map(|(p, _)| p)) {
-            let note = &p.note;
-            texts.push((&note.id, &note.boxes, &note.id, note.is_trashed()));
-            let of_note = sections.get(&note.id).into_iter().flatten();
-            let detailed = detail
-                .as_ref()
-                .filter(|(d, _)| d.note.id == note.id)
-                .map(|(_, s)| s.as_slice())
-                .unwrap_or_default();
-            for section in of_note.chain(detailed) {
-                texts.push((&section.id, &section.boxes, &note.id, note.is_trashed()));
-            }
-        }
-        let (box_looks, box_ticks, show_ticks) = self.box_looks(&texts)?;
         let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
-        let (compact, switched) = match cards_key(&self.selection, &self.people, is_area) {
-            Some(key) => (
-                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true"),
-                self.store
-                    .local_setting(&switched_setting(&key))?
-                    .unwrap_or_default()
-                    .split(',')
-                    .filter(|id| !id.is_empty())
-                    .map(str::to_string)
-                    .collect(),
-            ),
-            None => (false, HashSet::new()),
-        };
+        let (compact, switched) =
+            self.card_view(cards_key(&self.selection, &self.people, is_area))?;
         let glances = card_glance::read(store, &self.t, &*self.wall, self.unit_system()?, &listed)?;
         // The Tallies on a detailed card, with their chart and entries
         // (#190).
@@ -6518,6 +6561,226 @@ impl App {
                 card_sessions.insert(id.clone(), card);
             }
         }
+        Ok(CardsRead {
+            notes: placed,
+            sections,
+            linked_from,
+            card_today,
+            checklists,
+            shopping_lists,
+            tallies,
+            sessions,
+            card_changes,
+            card_may,
+            compact,
+            switched,
+            glances,
+            card_tallies,
+            card_sessions,
+        })
+    }
+
+    /// Whether the cards of the list kept under `key` show compact, and
+    /// those switched to the other view.
+    fn card_view(&self, key: Option<String>) -> oldbrainfix_core::Result<(bool, HashSet<String>)> {
+        Ok(match key {
+            Some(key) => (
+                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true"),
+                self.store
+                    .local_setting(&switched_setting(&key))?
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter(|id| !id.is_empty())
+                    .map(str::to_string)
+                    .collect(),
+            ),
+            None => (false, HashSet::new()),
+        })
+    }
+
+    /// The cards' view as kept now, none where it cannot be read.
+    fn card_view_now(&self) -> Option<(bool, HashSet<String>)> {
+        self.card_view(self.cards_key()).ok()
+    }
+
+    /// Shows the cards' view as kept now without reading the cards again
+    /// (obf-1069), where it was `before` and no Tally or Session among
+    /// them changes between its compact and its detailed view: those
+    /// read what their detailed view shows. Whether it could.
+    fn look_in_place(&mut self, before: Option<(bool, HashSet<String>)>) -> bool {
+        let (Some(before), Some(now)) = (before, self.card_view_now()) else {
+            return false;
+        };
+        let detailed = |(compact, switched): &(bool, HashSet<String>), id: &String| {
+            *compact == switched.contains(id)
+        };
+        let view = &self.view;
+        let flips = view
+            .tallies
+            .iter()
+            .chain(&view.sessions)
+            .any(|id| detailed(&before, id) != detailed(&now, id));
+        if flips || (view.compact, &view.switched) != (before.0, &before.1) {
+            return false;
+        }
+        (self.view.compact, self.view.switched) = now;
+        true
+    }
+
+    /// The View read last, where its cards are still as the log and the
+    /// list asked for show them: only after what changes none of them
+    /// (obf-1069), the list, its search and its person filter as they
+    /// were, nothing written and still the same day.
+    fn kept_cards(&self) -> Option<&View> {
+        if !self.keep_cards {
+            return None;
+        }
+        let now = self.cards_key_now()?;
+        (self.cards_read.as_ref() == Some(&now)).then_some(&self.view)
+    }
+
+    /// What the cards read now are of: the list, its search and person
+    /// filter, the log's high-water mark and the day.
+    fn cards_key_now(&self) -> Option<CardsKey> {
+        Some(CardsKey {
+            selection: self.selection.clone(),
+            query: self.query.clone(),
+            people: self.people.clone(),
+            seq: self.store.current_seq().ok()?,
+            day: Day::today(self.store.now(), &*self.wall),
+            alone: self.alone.is_some(),
+        })
+    }
+
+    fn read(&self) -> oldbrainfix_core::Result<View> {
+        let notes = Notes::new(&self.store);
+        let places = Places::new(&self.store);
+        let mut areas = Vec::new();
+        let mut access = std::collections::HashMap::new();
+        let mut people = std::collections::HashMap::new();
+        let mut names = std::collections::HashMap::new();
+        let mut shown_people = std::collections::HashMap::new();
+        let mut mine = std::collections::HashMap::new();
+        // In the person's own order (#280), the sidebar's and every list
+        // of Areas read from here.
+        let t = self.t;
+        for area in PersonSettings::new(&self.store).areas_in_order_by(|a| area_name(&t, a))? {
+            let topics = places.topics(&area.id)?;
+            access.insert(area.id.clone(), self.store.access_in(&area.id, None)?);
+            if let Some(grants) = self.store.grants_of(&area.id)? {
+                let shared = self.store.people(&area.id)?;
+                for person in &shared {
+                    let shown = self.store.person_shown(&person.id)?;
+                    names.insert(person.id.clone(), shown.name.clone());
+                    shown_people.insert(person.id.clone(), shown);
+                }
+                people.insert(area.id.clone(), shared);
+                if let Some(person) = grants.person_of(&self.store.device_id()?) {
+                    mine.insert(area.id.clone(), person.to_string());
+                }
+            }
+            areas.push((area, topics));
+        }
+        let routines = Routines::new(&self.store);
+        let search = Search::new(&self.store);
+        let store = &self.store;
+        let place = |note: Note| place_note(store, &places, note);
+        let frogs = Frogs::new(store);
+        let shown_frogs = |list: Vec<Frog>| frogs_shown(store, &places, &*self.wall, list);
+        let detail = match &self.selected_note {
+            Some(id) => match notes.by_id(id)? {
+                Some(note) if !note.is_merged() => Some((place(note)?, notes.sections(id)?)),
+                _ => None,
+            },
+            None => None,
+        };
+        // The cards as the last read left them where nothing they show can
+        // have changed since (obf-1069), else read anew.
+        let kept = self.kept_cards();
+        let cards = match kept {
+            Some(view) => CardsRead::kept(view),
+            None => self.read_cards(&areas)?,
+        };
+        let CardsRead {
+            notes: placed,
+            sections,
+            mut linked_from,
+            card_today,
+            checklists,
+            shopping_lists,
+            tallies,
+            sessions,
+            card_changes,
+            card_may,
+            compact,
+            switched,
+            glances,
+            card_tallies,
+            card_sessions,
+        } = cards;
+        // A card in the trash shows none, also kept from the Note shown
+        // last.
+        if self.selection == Selection::Trash {
+            linked_from.clear();
+        }
+        // The Note shown links from where the cards do not tell.
+        if let Some((p, _)) = &detail
+            && !linked_from.contains_key(&p.note.id)
+        {
+            let linking = Backlinks::new(store).to(&p.note.id, &HashSet::new())?;
+            if !linking.is_empty() {
+                linked_from.insert(p.note.id.clone(), linking);
+            }
+        }
+        let lists = Checklists::new(store);
+        let shopping = ShoppingLists::new(store);
+        let session_notes = Sessions::new(store);
+        // What a shield marks, read once for all of them (ADR 0049).
+        let hidden_notes = store.hidden_from_ai_among(
+            placed
+                .iter()
+                .chain(detail.as_ref().map(|(p, _)| p))
+                .map(|p| p.note.id.as_str()),
+        )?;
+        let marks = store.hidden_from_ai_marks()?;
+        let hidden_areas: HashSet<String> = areas
+            .iter()
+            .filter(|(a, _)| marks.contains(&a.id))
+            .map(|(a, _)| a.id.clone())
+            .collect();
+        let mut hideable_areas = HashSet::new();
+        for (area, _) in &areas {
+            if store.may_hide_from_ai(&area.id)? {
+                hideable_areas.insert(area.id.clone());
+            }
+        }
+        let note_hidden = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => {
+                let id = &p.note.id;
+                let own = marks.contains(id);
+                let by = store.hidden_from_ai_by(id)?;
+                let other = by.iter().any(|m| m != id);
+                (own || store.may_hide_from_ai(id)?).then_some((own, other))
+            }
+            _ => None,
+        };
+        // Every text with boxes listed or shown, with the Note it is of
+        // and whether that is in the trash.
+        let mut texts: Vec<(&str, &[ShownBox], &str, bool)> = Vec::new();
+        for p in placed.iter().chain(detail.as_ref().map(|(p, _)| p)) {
+            let note = &p.note;
+            texts.push((&note.id, &note.boxes, &note.id, note.is_trashed()));
+            let of_note = sections.get(&note.id).into_iter().flatten();
+            let detailed = detail
+                .as_ref()
+                .filter(|(d, _)| d.note.id == note.id)
+                .map(|(_, s)| s.as_slice())
+                .unwrap_or_default();
+            for section in of_note.chain(detailed) {
+                texts.push((&section.id, &section.boxes, &note.id, note.is_trashed()));
+            }
+        }
+        let (box_looks, box_ticks, show_ticks) = self.box_looks(&texts)?;
         let kept_open = |prefix: &str| -> oldbrainfix_core::Result<HashSet<String>> {
             Ok(store
                 .local_settings_with_prefix(prefix)?
@@ -6792,7 +7055,11 @@ impl App {
                 .filter(|(_, v)| v == "true")
                 .filter_map(|(k, _)| k.strip_prefix(AREA_FOLDED).map(str::to_string))
                 .collect(),
-            unsorted: notes.unsorted()?.len(),
+            // Nothing written since, the count is as it was.
+            unsorted: match kept {
+                Some(view) => view.unsorted,
+                None => notes.unsorted_count()?,
+            },
             access,
             people,
             names,
@@ -7006,7 +7273,27 @@ impl App {
     }
 
     fn apply(&mut self, action: Action) {
-        let sorting = self.sorting_now();
+        // What it can change of what shows, told before it is done
+        // (obf-1069): the read after it is no longer than that needs.
+        let reads = match &action {
+            // Into the search of the list shown, from no Note: only the
+            // keyboard moves.
+            Action::Find if self.selected_note.is_none() && self.searches() => Reads::Nothing,
+            action => Reads::of(action),
+        };
+        let before = match reads {
+            Reads::All => None,
+            _ => self.cards_key_now(),
+        };
+        let looks = match &action {
+            Action::SwitchView(_) | Action::Compact(_) => Some(self.card_view_now()),
+            _ => None,
+        };
+        // Nothing but what reads all of it files a Note.
+        let sorting = match reads {
+            Reads::All => self.sorting_now(),
+            _ => None,
+        };
         let done = self.act(action);
         // A recording into a Note that is no longer open, whatever closed
         // it, goes onto it (#352).
@@ -7039,7 +7326,22 @@ impl App {
             }
         }
 
-        self.refresh();
+        // Nothing written, the list as it was: what was asked needs no
+        // read, or the Note shown alone is read again.
+        let unchanged = before.is_some() && before == self.cards_key_now();
+        let looked = unchanged && looks.is_some_and(|before| self.look_in_place(before));
+        let read = match reads {
+            Reads::Nothing if unchanged => false,
+            Reads::Look if looked => false,
+            Reads::Detail if unchanged => {
+                self.keep_cards = true;
+                true
+            }
+            _ => true,
+        };
+        if read {
+            self.refresh();
+        }
         // Sorted in Unsorted, it goes on to the next Note (#313).
         let done = match (done, sorting) {
             (Ok(()), Some(sorting)) => self.move_on(sorting),
@@ -7052,6 +7354,10 @@ impl App {
                 self.notice = Some(self.t.sync_paused_error().to_string());
             }
             Err(e) => self.error = Some(e.to_string()),
+        }
+        // Nor does anyone else need to look again.
+        if unchanged && reads != Reads::All {
+            return;
         }
         if let Some(wake) = &self.wake {
             drop(wake.send(Event::Wake));
@@ -10784,6 +11090,10 @@ impl App {
             if let Some(c) = &self.changes {
                 self.seen_changes = c.load(Ordering::SeqCst);
             }
+            // The clock alone: the cards stay as read while nothing was
+            // written and it is the same day (obf-1069), only the Note
+            // shown and the Agenda follow it.
+            self.keep_cards = !changed;
             self.refresh();
         }
         ui.ctx()
@@ -12482,7 +12792,7 @@ impl App {
                     sorted.push(id.clone());
                 }
             }
-            (sorted, notes.unsorted()?.is_empty())
+            (sorted, notes.unsorted_count()? == 0)
         };
         let moved = match &before.open {
             Some(open) => sorted.contains(open) && self.selected_note.is_some(),
@@ -14311,8 +14621,66 @@ impl App {
             let switches = self.cards_key().is_some();
             // The card Up or Down selected comes into view (#274), once.
             let scroll_to = self.scroll_card.take();
-            for placed in &self.view.notes {
+            // Only the cards in view and near it are laid out (obf-1069),
+            // the others take the room they took when last drawn, or a
+            // guess that stays the same, so no card moves as others are
+            // measured.
+            let near = ui.clip_rect().expand2(egui::vec2(
+                0.0,
+                CARDS_NEAR.max(ui.clip_rect().height() * 2.0),
+            ));
+            // What the cards above the view grew by as they were laid
+            // out, against the room they took: scrolled away again, so
+            // the cards in view stay where they were.
+            let view_top = ui.clip_rect().top();
+            let mut grown = 0.0;
+            // The card scrolled to is laid out with those around it as
+            // far as the view will reach from it, so it lies where it will
+            // stay.
+            let around = scroll_to
+                .as_deref()
+                .and_then(|to| self.view.notes.iter().position(|p| p.note.id == to))
+                .map(|at| {
+                    let reach = near.height();
+                    let least = |at: usize| {
+                        let Some(p) = self.view.notes.get(at) else {
+                            return 0.0;
+                        };
+                        let full = self.view.compact == self.view.switched.contains(&p.note.id);
+                        let held = self.card_heights.get(&(p.note.id.clone(), full));
+                        held.copied().unwrap_or(CARD_LEAST) + 16.0
+                    };
+                    let (mut from, mut room) = (at, 0.0);
+                    while from > 0 && room < reach {
+                        from -= 1;
+                        room += least(from);
+                    }
+                    let (mut to, mut room) = (at, 0.0);
+                    while to + 1 < self.view.notes.len() && room < reach {
+                        to += 1;
+                        room += least(to);
+                    }
+                    from..=to
+                });
+            self.cards_laid_out = 0;
+            for (at, placed) in self.view.notes.iter().enumerate() {
                 let id = &placed.note.id;
+                let top = ui.cursor().top();
+                let full = self.view.compact == self.view.switched.contains(id);
+                let held = (id.clone(), full);
+                let height = self.card_heights.get(&held).copied().unwrap_or(CARD_GUESS);
+                if (top > near.bottom() || top + height < near.top())
+                    && !around.as_ref().is_some_and(|r| r.contains(&at))
+                {
+                    let width = ui.available_width();
+                    let (rect, _) =
+                        ui.allocate_exact_size(egui::vec2(width, height), Sense::hover());
+                    if order.first() == Some(id) {
+                        spotlight::anchor(ui, "first-card", rect);
+                    }
+                    continue;
+                }
+                self.cards_laid_out += 1;
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
                 let picked = self.cards.contains(id);
                 // A Note in the trash is restored, not filed.
@@ -14324,7 +14692,7 @@ impl App {
                     transcribing: transcribing.as_deref(),
                 };
                 let look = CardLook {
-                    full: self.view.compact == self.view.switched.contains(id),
+                    full,
                     glance: self.view.glances.get(id).map_or(&[], Vec::as_slice),
                     switches,
                     folds: CardFolds {
@@ -14358,17 +14726,31 @@ impl App {
                         _ => true,
                     },
                 };
-                let clicks = note_card(
-                    ui,
-                    &self.t,
-                    tones,
-                    placed,
-                    (selected, picked, draggable),
-                    look,
-                    media,
-                );
+                // Its own id, however many cards above were laid out.
+                let card = egui::UiBuilder::new().id(Id::new(("list card", id)));
+                let drawn = ui.scope_builder(card, |ui| {
+                    note_card(
+                        ui,
+                        &self.t,
+                        tones,
+                        placed,
+                        (selected, picked, draggable),
+                        look,
+                        media,
+                    )
+                });
+                let drawn_height = drawn.response.rect.height();
+                if top < view_top {
+                    grown += drawn_height - height;
+                }
+                self.card_heights.insert(held, drawn_height);
+                let clicks = drawn.inner;
+                // At once: the room of the cards above it follows as they
+                // are laid out, which would end a scroll under way.
                 if scroll_to.as_deref() == Some(id.as_str()) {
-                    clicks.card.scroll_to_me(None);
+                    clicks
+                        .card
+                        .scroll_to_me_animation(None, egui::style::ScrollAnimation::none());
                 }
                 if order.first() == Some(id) {
                     spotlight::anchor(ui, "first-card", clicks.card.rect);
@@ -14455,6 +14837,13 @@ impl App {
                     };
                     actions.push(Action::PickCard(id.clone(), pick));
                 }
+            }
+            if grown.abs() > 0.5 && scroll_to.is_none() {
+                ui.scroll_with_delta_animation(
+                    egui::vec2(0.0, -grown),
+                    egui::style::ScrollAnimation::none(),
+                );
+                ui.ctx().request_repaint();
             }
         });
         if output.state.offset.y != self.scrolled {
@@ -19715,7 +20104,7 @@ fn read_agenda(
             today: rows(agenda.today_rows)?,
             tomorrow: rows(agenda.tomorrow_rows)?,
             missed: Alarms::new(store).missed(wall)?,
-            unsorted: notes.unsorted()?.len(),
+            unsorted: notes.unsorted_count()?,
             // Counted from the pending sets, without reading each
             // held file.
             waiting: store
@@ -19759,6 +20148,72 @@ fn place_note(store: &Store, places: &Places, note: Note) -> oldbrainfix_core::R
         author,
         pack_from,
     })
+}
+
+/// [`place_note`] for each of `notes`, in their order, for a list, with
+/// whether this Device may change each: whose they are and what it may
+/// do read for all of them at once, each Area and Topic once (obf-1069),
+/// as the phone's `placeNotes`.
+fn place_notes(
+    store: &Store,
+    places: &Places,
+    notes: Vec<Note>,
+) -> oldbrainfix_core::Result<(Vec<Placed>, HashSet<String>)> {
+    let ids: Vec<String> = notes.iter().map(|n| n.id.clone()).collect();
+    let mut access = if ids.is_empty() {
+        HashMap::new()
+    } else {
+        store.access_of(&ids)?
+    };
+    let mut topics: HashMap<String, Option<Topic>> = HashMap::new();
+    let mut areas: HashMap<String, Option<Area>> = HashMap::new();
+    let mut placed = Vec::with_capacity(notes.len());
+    let mut changes = HashSet::new();
+    for note in notes {
+        let (author, may) = match access.remove(&note.id) {
+            Some(a) => (a.author, a.changes),
+            None => (store.author_of(&note.id)?, store.may_change(&note.id)?),
+        };
+        if may {
+            changes.insert(note.id.clone());
+        }
+        let pack_from = store.pack_from(&note.id)?;
+        let Some(id) = note.place.clone() else {
+            placed.push(Placed {
+                note,
+                area: None,
+                topic: None,
+                author,
+                pack_from,
+            });
+            continue;
+        };
+        let topic = match topics.get(&id) {
+            Some(held) => held.clone(),
+            None => {
+                let read = places.topic_by_id(&id)?;
+                topics.insert(id.clone(), read.clone());
+                read
+            }
+        };
+        let area_id = topic.as_ref().map_or(id, |t| t.area_id.clone());
+        let area = match areas.get(&area_id) {
+            Some(held) => held.clone(),
+            None => {
+                let read = places.area_by_id(&area_id)?;
+                areas.insert(area_id, read.clone());
+                read
+            }
+        };
+        placed.push(Placed {
+            note,
+            area,
+            topic,
+            author,
+            pack_from,
+        });
+    }
+    Ok((placed, changes))
 }
 
 /// The Frogs of `list` as they show, their Done on `wall`; one whose Note
@@ -21505,6 +21960,16 @@ fn note_dialog_edges(
 /// how far to scroll (#278), with the frames left to try, and where the
 /// list drawn tells it how far it is scrolled.
 const LIST_RESTORE: &str = "list scroll restore";
+
+/// How far above and below the list's view its cards are still laid
+/// out at least (obf-1069), and the height guessed for a card not drawn
+/// yet.
+const CARDS_NEAR: f32 = 1000.0;
+const CARD_GUESS: f32 = 160.0;
+
+/// The least room a card takes, for how many cards around one scrolled
+/// to are laid out with it (obf-1069).
+const CARD_LEAST: f32 = 48.0;
 const LIST_OFFSET: &str = "list scroll offset";
 
 /// The frames a list keeps scrolling to where it was while it is
