@@ -2,6 +2,12 @@
 
 Changes of versions before the current one, moved here from [CHANGELOG.md](CHANGELOG.md) on each version bump.
 
+## [0.7.1] - 2026-11-21
+
+### Changed
+
+- On Android, locking the phone or leaving the app ends a voice recording and keeps it; the screen still stays on while recording. ([obf-1057](https://github.com/paxel/oldbrainfix/issues/368))
+
 ## [0.7.0] - 2026-11-21
 
 ### Added
