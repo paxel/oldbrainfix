@@ -1,6 +1,8 @@
 //! Areas and Topics as the Dart core's `Places` reads and writes them:
 //! exactly two levels.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 
 use crate::notes::{Notes, keys as note_keys};
@@ -439,6 +441,26 @@ impl<'a> Places<'a> {
     /// Whether `id` is an Area or a Topic that exists.
     pub fn is_place(&self, id: &str) -> Result<bool> {
         Ok(self.area_by_id(id)?.is_some() || self.topic_by_id(id)?.is_some())
+    }
+
+    /// Every Area and Topic that exists, by id: those
+    /// [`Places::is_place`] holds for, read at once for a list of many
+    /// Notes (obf-1069), as the Dart core's `ids`.
+    pub fn ids(&self) -> Result<HashSet<String>> {
+        let mut ids: HashSet<String> = self
+            .store
+            .current_fields_of_type(keys::TYPE_AREA)?
+            .into_keys()
+            .collect();
+        let topics: Vec<String> = self
+            .store
+            .current_fields_of_type(keys::TYPE_TOPIC)?
+            .into_iter()
+            .filter(|(_, fields)| fields.get(keys::AREA).is_some_and(|a| ids.contains(a)))
+            .map(|(id, _)| id)
+            .collect();
+        ids.extend(topics);
+        Ok(ids)
     }
 }
 

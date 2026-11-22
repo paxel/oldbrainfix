@@ -396,3 +396,74 @@ fn text_orders_by_utf16_code_units_like_dart() {
     assert_eq!(utf16_cmp("\u{FF5E}", "\u{1F600}"), Ordering::Greater);
     assert_eq!(utf16_cmp("a", "b"), Ordering::Less);
 }
+
+#[test]
+fn it_lists_the_entities_of_a_type_in_one_read_as_one_by_one() -> Result<()> {
+    let store = store();
+    // More than one query names at once.
+    for i in 0..600 {
+        let id = format!("thing:{i}");
+        store.append(&id, "$type", Some("thing"), None)?;
+        store.append(&id, "text", Some(&format!("t{i}")), None)?;
+    }
+    store.append("thing:0", "$type", Some("other"), None)?;
+    store.append("thing:1", "$type", None, None)?;
+    // Dated before it was a thing: it stays one.
+    let early = Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).single();
+    store.append("thing:2", "$type", Some("other"), early)?;
+    store.append("other:a", "$type", Some("other"), None)?;
+    // Shown pending changes count as they do one by one.
+    let set = store.open_pending("ai-task", true, None)?;
+    store.draft_pending(&set, "thing:new", "$type", Some("thing"), None)?;
+    store.draft_pending(&set, "thing:3", "$type", Some("other"), None)?;
+    store.draft_pending(&set, "other:a", "$type", Some("thing"), None)?;
+    let before = store.history_reads.load(AtomicOrdering::SeqCst);
+    let listed = store.entities_of_type("thing")?;
+    assert_eq!(store.history_reads.load(AtomicOrdering::SeqCst) - before, 1);
+    let mut one_by_one = Vec::new();
+    for id in store.ever_of_type("thing")? {
+        if store.current(&id, "$type")?.as_deref() == Some("thing") {
+            one_by_one.push(id);
+        }
+    }
+    assert_eq!(listed, one_by_one);
+    for id in ["thing:2", "thing:new", "other:a"] {
+        assert!(listed.iter().any(|l| l == id), "{id}");
+    }
+    for id in ["thing:0", "thing:1", "thing:3"] {
+        assert!(!listed.iter().any(|l| l == id), "{id}");
+    }
+    let among: HashSet<String> = ["thing:2", "thing:3", "thing:5", "other:a"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    assert_eq!(
+        store.entities_of_type_among("thing", &among)?,
+        one_by_one
+            .iter()
+            .filter(|id| among.contains(*id))
+            .cloned()
+            .collect::<Vec<_>>()
+    );
+    assert!(store.entities_of_type("none")?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_read_sees_what_another_connection_wrote_after_it() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oldbrainfix.db");
+    let first = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+    let second = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+    assert!(first.history("note:a")?.is_empty());
+    assert_eq!(first.local_setting("seen")?, None);
+    let seq = first.current_seq()?;
+    second.append("note:a", "text", Some("from the other one"), None)?;
+    second.set_local_setting("seen", "yes")?;
+    let read = first.history("note:a")?;
+    assert_eq!(read.len(), 1);
+    assert_eq!(read[0].value.as_deref(), Some("from the other one"));
+    assert_eq!(first.local_setting("seen")?.as_deref(), Some("yes"));
+    assert_eq!(first.current_seq()?, seq + 1);
+    Ok(())
+}

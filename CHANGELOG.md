@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Changed
 
 - On the phone and the desktop, moving an Area to the trash and importing from Google Keep are faster when you use a Shared Area. ([obf-1092](https://github.com/paxel/oldbrainfix/issues/405))
+- On the phone and the desktop, the app answers faster when you keep many Notes. ([obf-1069](https://github.com/paxel/oldbrainfix/issues/382))
 
 ### Fixed
 

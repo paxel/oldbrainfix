@@ -246,7 +246,30 @@ class Store {
     return store;
   }
 
-  void close() => _db.close();
+  void close() {
+    for (final statement in _prepared.values) {
+      statement.close();
+    }
+    _prepared.clear();
+    _db.close();
+  }
+
+  /// The statements of the reads that run again and again, each prepared
+  /// once: preparing it anew was most of what a read of one entity took
+  /// (obf-1069).
+  final _prepared = <String, PreparedStatement>{};
+
+  /// What [sql] selects with [args], its statement prepared once and kept
+  /// for every later call. Only for a text that stays the same: one that
+  /// names a varying number of values goes to the database itself.
+  ResultSet _select(String sql, [List<Object?> args = const []]) {
+    final statement = _prepared[sql] ??= _db.prepare(
+      sql,
+      persistent: true,
+      checkNoTail: true,
+    );
+    return statement.select(args);
+  }
 
   /// This installation's stable device id; created once.
   String get deviceId =>
@@ -270,7 +293,7 @@ class Store {
 
   /// A setting of this Device. Never synced (ADR 0008).
   String? localSetting(String key) {
-    final rows = _db.select('SELECT value FROM local_settings WHERE key = ?', [
+    final rows = _select('SELECT value FROM local_settings WHERE key = ?', [
       key,
     ]);
     return rows.isEmpty ? null : rows.first['value'] as String;
@@ -598,7 +621,7 @@ class Store {
   /// for an empty log. `seq` is AUTOINCREMENT, so a mark keeps meaning
   /// the same moment.
   int currentSeq() =>
-      _db.select('SELECT COALESCE(MAX(seq), 0) AS n FROM entries').first['n']
+      _select('SELECT COALESCE(MAX(seq), 0) AS n FROM entries').first['n']
           as int;
 
   // ------------------------------------------------------------ moments
@@ -1181,7 +1204,7 @@ class Store {
     while (next.isNotEmpty) {
       final found = [
         for (var i = 0; i < next.length; i += _inChunk)
-          ..._entries(
+          ..._entriesOnce(
             'SELECT * FROM entries WHERE $_applied AND entity IN '
             '(${List.filled(min(_inChunk, next.length - i), '?').join(', ')}) '
             'ORDER BY seq',
@@ -1244,7 +1267,7 @@ class Store {
     final shown = _shown;
     final all = [
       for (var i = 0; i < list.length; i += _inChunk)
-        ..._entries(
+        ..._entriesOnce(
           'SELECT * FROM entries WHERE $_applied AND entity IN '
           '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
           'ORDER BY seq',
@@ -1274,10 +1297,47 @@ class Store {
   static const _inChunk = 500;
 
   /// Entities whose current `$type` is [type].
-  List<String> entitiesOfType(String type) => [
-    for (final id in _everOfType(type))
-      if (current(id, r'$type') == type) id,
-  ];
+  List<String> entitiesOfType(String type) {
+    final ever = _everOfType(type);
+    final now = _typesOf(ever);
+    return [
+      for (final id in ever)
+        if (now[id] == type) id,
+    ];
+  }
+
+  /// The current `$type` of each of [entities], as [current] gives it,
+  /// read from their `$type` entries alone in one query rather than one
+  /// history per entity (obf-1069); those without one that counts are
+  /// left out. It counts as one [history] read.
+  Map<String, String?> _typesOf(Set<String> entities) {
+    if (entities.isEmpty) return {};
+    historyReads++;
+    final list = entities.toList();
+    final shown = _shown;
+    final all = [
+      for (var i = 0; i < list.length; i += _inChunk)
+        ..._entriesOnce(
+          "SELECT * FROM entries WHERE $_applied AND field = '\$type' "
+          'AND entity IN '
+          '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
+          'ORDER BY seq',
+          list.sublist(i, min(i + _inChunk, list.length)),
+        ),
+      for (final e in shown)
+        if (e.field == r'$type' && entities.contains(e.entity)) e,
+    ];
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    final latest = <String, Entry>{};
+    for (final e in all) {
+      if (ignored.contains(e.id)) continue;
+      final held = latest[e.entity];
+      if (held == null || _newer(e, held)) latest[e.entity] = e;
+    }
+    return {
+      for (final MapEntry(:key, :value) in latest.entries) key: value.value,
+    };
+  }
 
   /// What [currentFields] gives for each entity whose current `$type` is
   /// [type], read in one [currentFieldsOf] query rather than one per
@@ -1338,22 +1398,37 @@ class Store {
 
   static bool _newer(Entry a, Entry b) => latestWins(a, b) > 0;
 
+  /// The entries [sql] selects with [args], its statement kept
+  /// ([_select]).
   List<Entry> _entries(String sql, [List<Object?> args = const []]) => [
-    for (final r in _db.select(sql, args))
-      Entry(
-        seq: r['seq'] as int,
-        device: r['device'] as String,
-        dseq: r['dseq'] as int,
-        entity: r['entity'] as String,
-        field: r['field'] as String,
-        value: r['value'] as String?,
-        date: DateTime.parse(r['date'] as String),
-        author: r['author'] as String,
-        recorded: DateTime.parse(r['recorded'] as String),
-        sig: r['sig'] as String?,
-        ctx: r['ctx'] as String?,
-      ).withRaw(r['raw'] as String?),
+    for (final r in _select(sql, args)) _entryOf(r),
   ];
+
+  /// The entries [sql] selects with [args], for a text that names a
+  /// varying number of values: its statement is not kept.
+  List<Entry> _entriesOnce(String sql, List<Object?> args) => [
+    for (final r in _db.select(sql, args)) _entryOf(r),
+  ];
+
+  static Entry _entryOf(Row r) {
+    final dateText = r['date'] as String;
+    final recordedText = r['recorded'] as String;
+    final date = parseStoredDate(dateText);
+    return Entry(
+      seq: r['seq'] as int,
+      device: r['device'] as String,
+      dseq: r['dseq'] as int,
+      entity: r['entity'] as String,
+      field: r['field'] as String,
+      value: r['value'] as String?,
+      date: date,
+      author: r['author'] as String,
+      // Most entries are dated when they were recorded: read once.
+      recorded: recordedText == dateText ? date : parseStoredDate(recordedText),
+      sig: r['sig'] as String?,
+      ctx: r['ctx'] as String?,
+    ).withRaw(r['raw'] as String?);
+  }
 
   /// The entries this version applies (ADR 0019): those of a later
   /// structure are only held and passed on, so they count for what is
@@ -1467,6 +1542,48 @@ bool laterSetting(String value) {
   bool later(Object? o) =>
       o is Map && o.containsKey('v') && !(o['v'] is int && o['v'] == 1);
   return later(json) || (json is List && json.any(later));
+}
+
+/// The instant [text] holds, as [DateTime.parse] reads it. What the log
+/// keeps, a UTC time as `toIso8601String` writes it
+/// (`2026-11-22T10:00:00.000Z`, microseconds only when there are any),
+/// is read by its positions: parsing it was a third of a read (obf-1069).
+/// Every other form goes to [DateTime.parse] itself.
+@visibleForTesting
+DateTime parseStoredDate(String text) {
+  final length = text.length;
+  if ((length != 24 && length != 27) ||
+      text.codeUnitAt(length - 1) != 0x5A || // Z
+      text.codeUnitAt(4) != 0x2D || // -
+      text.codeUnitAt(7) != 0x2D ||
+      text.codeUnitAt(10) != 0x54 || // T
+      text.codeUnitAt(13) != 0x3A || // :
+      text.codeUnitAt(16) != 0x3A ||
+      text.codeUnitAt(19) != 0x2E) {
+    return DateTime.parse(text);
+  }
+  var bad = false;
+  int digits(int from, int count) {
+    var n = 0;
+    for (var i = from; i < from + count; i++) {
+      final d = text.codeUnitAt(i) - 0x30;
+      if (d < 0 || d > 9) bad = true;
+      n = n * 10 + d;
+    }
+    return n;
+  }
+
+  final at = DateTime.utc(
+    digits(0, 4),
+    digits(5, 2),
+    digits(8, 2),
+    digits(11, 2),
+    digits(14, 2),
+    digits(17, 2),
+    digits(20, 3),
+    length == 27 ? digits(23, 3) : 0,
+  );
+  return bad ? DateTime.parse(text) : at;
 }
 
 /// What [Store.judged] holds: the judgement, which entities link to

@@ -598,7 +598,7 @@ impl Store {
             let mut found = Vec::new();
             for chunk in next.chunks(IN_CHUNK) {
                 let marks = vec!["?"; chunk.len()].join(", ");
-                found.extend(self.entries(
+                found.extend(self.entries_once(
                     &format!(
                         "SELECT * FROM entries WHERE {APPLIED} AND entity IN ({marks}) ORDER BY seq"
                     ),
@@ -663,11 +663,8 @@ impl Store {
         Ok(self
             .db
             .lock()
-            .query_row(
-                "SELECT value FROM local_settings WHERE key = ?",
-                [key],
-                |r| r.get(0),
-            )
+            .prepare_cached("SELECT value FROM local_settings WHERE key = ?")?
+            .query_row([key], |r| r.get(0))
             .optional()?)
     }
 
@@ -1121,9 +1118,8 @@ impl Store {
         Ok(self
             .db
             .lock()
-            .query_row("SELECT COALESCE(MAX(seq), 0) FROM entries", [], |r| {
-                r.get(0)
-            })?)
+            .prepare_cached("SELECT COALESCE(MAX(seq), 0) FROM entries")?
+            .query_row([], |r| r.get(0))?)
     }
 
     /// Every entry written after the mark `seq`, in log order.
@@ -1580,7 +1576,7 @@ impl Store {
         let mut all = Vec::new();
         for chunk in ids.chunks(IN_CHUNK) {
             let marks = vec!["?"; chunk.len()].join(", ");
-            all.extend(self.entries(
+            all.extend(self.entries_once(
                 &format!(
                     "SELECT * FROM entries WHERE {APPLIED} AND entity IN ({marks}) ORDER BY seq"
                 ),
@@ -1629,24 +1625,80 @@ impl Store {
         ty: &str,
         among: &HashSet<String>,
     ) -> Result<Vec<String>> {
-        let mut out = Vec::new();
-        for id in self.ever_of_type(ty)? {
-            if among.contains(&id) && self.current(&id, "$type")?.as_deref() == Some(ty) {
-                out.push(id);
-            }
-        }
-        Ok(out)
+        let mut ids = self.ever_of_type(ty)?;
+        ids.retain(|id| among.contains(id));
+        let now = self.types_of(&ids)?;
+        ids.retain(|id| now.get(id).is_some_and(|t| t.as_deref() == Some(ty)));
+        Ok(ids)
     }
 
     /// Entities whose current `$type` is `ty`.
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
-        let mut out = Vec::new();
-        for id in self.ever_of_type(ty)? {
-            if self.current(&id, "$type")?.as_deref() == Some(ty) {
-                out.push(id);
+        let mut ids = self.ever_of_type(ty)?;
+        let now = self.types_of(&ids)?;
+        ids.retain(|id| now.get(id).is_some_and(|t| t.as_deref() == Some(ty)));
+        Ok(ids)
+    }
+
+    /// The current `$type` of each of `entities`, as [`Store::current`]
+    /// gives it, read from their `$type` entries alone in one query rather
+    /// than one history per entity (obf-1069), as the Dart core's
+    /// `_typesOf`; those without one that counts are left out. It counts
+    /// as one [`Store::history`] read.
+    fn types_of(&self, entities: &[String]) -> Result<HashMap<String, Option<String>>> {
+        let mut ids: Vec<&str> = Vec::new();
+        let mut wanted = HashSet::new();
+        for id in entities {
+            if !self.ai_hides(id)? && wanted.insert(id.as_str()) {
+                ids.push(id);
             }
         }
-        Ok(out)
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        #[cfg(test)]
+        self.history_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let shown = self.shown()?;
+        let mut all = Vec::new();
+        for chunk in ids.chunks(IN_CHUNK) {
+            let marks = vec!["?"; chunk.len()].join(", ");
+            all.extend(self.entries_once(
+                &format!(
+                    "SELECT * FROM entries WHERE {APPLIED} AND field = '$type' \
+                     AND entity IN ({marks}) ORDER BY seq"
+                ),
+                rusqlite::params_from_iter(chunk.iter()),
+            )?);
+        }
+        all.extend(
+            shown
+                .iter()
+                .filter(|e| e.field == "$type" && wanted.contains(e.entity.as_str()))
+                .cloned(),
+        );
+        let judged = if shown.is_empty() {
+            self.judged()?
+        } else {
+            self.display_judged(&shown)?
+        };
+        let mut latest: HashMap<String, Entry> = HashMap::new();
+        for e in all {
+            if judged.ignored.contains(&e.id()) {
+                continue;
+            }
+            match latest.get_mut(&e.entity) {
+                Some(held) => {
+                    if Self::latest_wins(&e, held) == Ordering::Greater {
+                        *held = e;
+                    }
+                }
+                None => {
+                    latest.insert(e.entity.clone(), e);
+                }
+            }
+        }
+        Ok(latest.into_iter().map(|(id, e)| (id, e.value)).collect())
     }
 
     /// What [`Store::current_fields`] gives for each entity whose current
@@ -1726,9 +1778,27 @@ impl Store {
             .then(a.dseq.cmp(&b.dseq))
     }
 
+    /// The entries `sql` selects with `args`, its statement prepared once
+    /// and kept: preparing it anew was most of what a read of one entity
+    /// took (obf-1069), as in the Dart core.
     fn entries(&self, sql: &str, args: impl rusqlite::Params) -> Result<Vec<Entry>> {
         let db = self.db.lock();
+        let mut stmt = db.prepare_cached(sql)?;
+        Self::entries_from(&mut stmt, args)
+    }
+
+    /// The entries `sql` selects with `args`, for a text that names a
+    /// varying number of values: its statement is not kept.
+    fn entries_once(&self, sql: &str, args: impl rusqlite::Params) -> Result<Vec<Entry>> {
+        let db = self.db.lock();
         let mut stmt = db.prepare(sql)?;
+        Self::entries_from(&mut stmt, args)
+    }
+
+    fn entries_from(
+        stmt: &mut rusqlite::Statement<'_>,
+        args: impl rusqlite::Params,
+    ) -> Result<Vec<Entry>> {
         let rows = stmt.query_map(args, raw_row)?;
         let mut out = Vec::new();
         for row in rows {
@@ -1953,12 +2023,19 @@ pub const ACCEPTED_PENDING_PREFIX: &str = "pending:";
 
 /// `wire` as the store reads it, at the local handle `seq`.
 pub(crate) fn entry_of(seq: i64, wire: WireEntry) -> Result<Entry> {
+    let date_at = parse_time(&wire.date)?;
+    // Most entries are dated when they were recorded: read once.
+    let recorded_at = if wire.recorded == wire.date {
+        date_at
+    } else {
+        parse_time(&wire.recorded)?
+    };
     Ok(Entry {
         seq,
         extra: wire.extra,
         raw: wire.raw,
-        date_at: parse_time(&wire.date)?,
-        recorded_at: parse_time(&wire.recorded)?,
+        date_at,
+        recorded_at,
         device: wire.device,
         dseq: wire.dseq,
         entity: wire.entity,

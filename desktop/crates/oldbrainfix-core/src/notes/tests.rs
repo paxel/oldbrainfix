@@ -2272,3 +2272,185 @@ fn a_members_machine_gives_anothers_file_its_text_and_only_the_owner_removes_it(
     }
     Ok(())
 }
+
+/// The Notes [`Notes::all`] lists, each made on its own by
+/// [`Notes::by_id`] from the entities whose current `$type` is a Note's,
+/// as before obf-1069.
+fn one_by_one(store: &Store) -> Result<Vec<Note>> {
+    let notes = Notes::new(store);
+    let mut listed = Vec::new();
+    for id in store.ever_of_type(keys::TYPE_NOTE)? {
+        if store.current(&id, keys::TYPE)?.as_deref() != Some(keys::TYPE_NOTE) {
+            continue;
+        }
+        if let Some(note) = notes.by_id(&id)?
+            && !note.is_trashed()
+            && !note.is_merged()
+        {
+            listed.push(note);
+        }
+    }
+    listed.sort_by_key(|n| std::cmp::Reverse(n.captured));
+    Ok(listed)
+}
+
+/// A store with Areas and Topics, some gone, two Named Places and a
+/// Note with a ticked box, as the Dart core's `many_notes_test`: (store,
+/// home, gone, desk, orphan).
+fn many_notes() -> Result<(Store, [String; 4])> {
+    use crate::named_places::keys as named_keys;
+    use crate::places::keys as place_keys;
+    let store = crate::store::tests::store();
+    let places = Places::new(&store);
+    let home = places.add_area("Home")?.id;
+    let gone = places.add_area("Gone")?.id;
+    let work = places.add_area("Work")?.id;
+    let desk = places.add_topic(&work, "Desk")?.id;
+    let old = places.add_area("Old")?.id;
+    let orphan = places.add_topic(&old, "Orphan")?.id;
+    // An Area that is gone leaves its Notes and its Topics' Notes
+    // Unsorted.
+    store.append(&gone, place_keys::TYPE, None, None)?;
+    store.append(&old, place_keys::TYPE, None, None)?;
+    for (id, name, radius) in [
+        ("namedplace:home", "Home", "500.0"),
+        ("namedplace:kitchen", "Kitchen", "50.0"),
+    ] {
+        put(
+            &store,
+            id,
+            &[
+                (named_keys::TYPE, Some(named_keys::TYPE_NAMED_PLACE)),
+                (named_keys::NAME, Some(name)),
+                (named_keys::CENTRE, Some("52.5,13.4")),
+                (named_keys::RADIUS, Some(radius)),
+            ],
+        )?;
+    }
+    let boxed = Notes::new(&store).capture("☐ milk", None, None)?;
+    Boxes::new(&store).tick(
+        &boxed.id,
+        &boxed.boxes[0].id,
+        crate::text_boxes::BoxState::Done,
+    )?;
+    Ok((store, [home, gone, desk, orphan]))
+}
+
+/// Adds `rounds` times one Note of every kind a list tells apart.
+fn seed_many(store: &Store, places: &[String; 4], rounds: usize) -> Result<()> {
+    let [home, gone, desk, orphan] = places;
+    let notes = Notes::new(store);
+    let plain = |text: &str| -> Result<String> { Ok(notes.capture(text, None, None)?.id) };
+    for i in 0..rounds {
+        plain(&format!("plain {i}"))?;
+        notes.capture(&format!("home {i}"), Some(home), None)?;
+        notes.capture(&format!("desk {i}"), Some(desk), None)?;
+        store.append(&plain(&format!("gone {i}"))?, keys::PLACE, Some(gone), None)?;
+        store.append(
+            &plain(&format!("orphan {i}"))?,
+            keys::PLACE,
+            Some(orphan),
+            None,
+        )?;
+        let located = plain(&format!("located {i}"))?;
+        store.append(&located, keys::LOCATION, Some("52.5,13.4001"), None)?;
+        let far = plain(&format!("far {i}"))?;
+        store.append(&far, keys::LOCATION, Some("48.1,11.6"), None)?;
+        store.append(
+            &plain(&format!("spawned {i}"))?,
+            keys::SPAWNED,
+            Some("x"),
+            None,
+        )?;
+        notes.trash(&plain(&format!("trashed {i}"))?)?;
+        let a = plain(&format!("a {i}"))?;
+        let b = plain(&format!("b {i}"))?;
+        let c = plain(&format!("c {i}"))?;
+        notes.merge(&a, &b)?;
+        notes.merge(&b, &c)?;
+        // Merged both ways on two Devices before they synced.
+        let x = plain(&format!("x {i}"))?;
+        let y = plain(&format!("y {i}"))?;
+        store.append(&x, keys::MERGED, Some(&y), None)?;
+        store.append(&y, keys::MERGED, Some(&x), None)?;
+        // Merged into a Note this Device does not hold, and a Merge undone.
+        let away = format!("note:away{i}");
+        store.append(&plain(&format!("z {i}"))?, keys::MERGED, Some(&away), None)?;
+        let undone = plain(&format!("undone {i}"))?;
+        store.append(&undone, keys::MERGED, Some(&c), None)?;
+        store.append(&undone, keys::MERGED, None, None)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn many_notes_are_listed_as_made_one_by_one() -> Result<()> {
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let listed = Notes::new(&store).all()?;
+    assert_eq!(listed, one_by_one(&store)?);
+    // The smaller of the two Named Places holding it.
+    for note in &listed {
+        let name = note.context.named_place.as_ref().map(|p| p.name.as_str());
+        let located = note.text.starts_with("located");
+        assert_eq!(name, located.then_some("Kitchen"), "{}", note.text);
+    }
+    assert!(listed.iter().any(|n| n.place.is_some()));
+    assert!(listed.iter().any(|n| !n.boxes.is_empty()));
+    Ok(())
+}
+
+#[test]
+fn the_unsorted_notes_are_counted_as_they_are_listed() -> Result<()> {
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let notes = Notes::new(&store);
+    assert_eq!(notes.unsorted_count()?, notes.unsorted()?.len());
+    assert!(notes.unsorted_count()? > 0);
+    Ok(())
+}
+
+#[test]
+fn many_notes_take_no_more_reads_than_a_few() -> Result<()> {
+    let (store, places) = many_notes()?;
+    let notes = Notes::new(&store);
+    let reads_of = |read: &dyn Fn() -> Result<()>| -> Result<usize> {
+        let before = store.history_reads.load(Ordering::SeqCst);
+        read()?;
+        Ok(store.history_reads.load(Ordering::SeqCst) - before)
+    };
+    let all = || notes.all().map(drop);
+    let count = || notes.unsorted_count().map(drop);
+    seed_many(&store, &places, 1)?;
+    let few = reads_of(&all)?;
+    let few_count = reads_of(&count)?;
+    seed_many(&store, &places, 4)?;
+    assert_eq!(reads_of(&all)?, few);
+    assert_eq!(reads_of(&count)?, few_count);
+    Ok(())
+}
+
+#[test]
+fn a_type_the_roles_ignore_does_not_count_when_a_type_is_listed() -> TestResult {
+    let devices = Devices::new();
+    let ann = devices.device(1, "Ann")?;
+    let ben = devices.device(2, "Ben")?;
+    let (area, _) = household(&ann, &ben)?;
+    let milk = Notes::new(&ann).capture("Buy milk", Some(&area), None)?.id;
+    exchange(&ben, &ann, None)?;
+    // Not Ben's to do, as a modified app would write it all the same.
+    ben.append(&milk, keys::TYPE, None, None)?;
+    exchange(&ben, &ann, None)?;
+    assert!(!ann.judged()?.ignored.is_empty());
+    let listed = ann.entities_of_type(keys::TYPE_NOTE)?;
+    assert!(listed.contains(&milk));
+    let mut by_one = Vec::new();
+    for id in ann.ever_of_type(keys::TYPE_NOTE)? {
+        if ann.current(&id, keys::TYPE)?.as_deref() == Some(keys::TYPE_NOTE) {
+            by_one.push(id);
+        }
+    }
+    assert_eq!(listed, by_one);
+    assert_eq!(Notes::new(&ann).all()?, one_by_one(&ann)?);
+    Ok(())
+}

@@ -318,6 +318,18 @@ class Places {
   /// Whether [id] is an Area or a Topic that exists.
   bool isPlace(String id) => areaById(id) != null || topicById(id) != null;
 
+  /// Every Area and Topic that exists, by id: those [isPlace] holds for,
+  /// read at once for a list of many Notes (obf-1069).
+  Set<String> ids() {
+    final areas = store.currentFieldsOfType(PlaceKeys.typeArea).keys.toSet();
+    return {
+      ...areas,
+      for (final MapEntry(key: id, value: fields)
+          in store.currentFieldsOfType(PlaceKeys.typeTopic).entries)
+        if (areas.contains(fields[PlaceKeys.area])) id,
+    };
+  }
+
   List<Note> _notesInside(String id) => Notes(store).inside(id);
 
   /// Sends the Notes inside [id] where [notesGo] says; [areaId] is where
