@@ -422,6 +422,20 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
   return JudgedLog(ignored, areas);
 }
 
+/// The entity [e] links its own to as [judgeLog] judges them: the Area,
+/// Topic or Note its value names; null for none. Judging an entity looks
+/// at nothing but its own entries and those of the entities they link
+/// to, linked on in turn, so the store judges again only those an entry
+/// can change ([Store.judged]). A rule that looks further widens this.
+String? judgedLink(Entry e) => switch (e.value) {
+  final value?
+      when value.startsWith('area:') ||
+          value.startsWith('topic:') ||
+          value.startsWith('note:') =>
+    value,
+  _ => null,
+};
+
 /// The Area of the filing that counts at [e]: the last one before it,
 /// else the first one.
 String? areaAt(List<(Entry, String?)> filings, Entry e) {

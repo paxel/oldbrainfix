@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.7.2]
 
+### Geändert
+
+- Mit geteilten Bereichen gehen auf dem Handy und dem Desktop das Verschieben eines Bereichs in den Papierkorb und der Import aus Google Keep schneller. ([obf-1092](https://github.com/paxel/oldbrainfix/issues/405))
+
 ### Behoben
 
 - Auf dem Handy öffnet „Mehr“ in der Schnellnotiz den Notiz-Editor auch, während ein Tipp zu sehen ist, statt die App abstürzen zu lassen. ([obf-1058](https://github.com/paxel/oldbrainfix/issues/371))

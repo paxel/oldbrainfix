@@ -130,7 +130,7 @@ class Store {
 
   /// Forgets what was worked out or read of the log.
   void _forget() {
-    _judged = null;
+    _judgement = null;
     _overlay = null;
     _shownJudged = null;
     _forgetWorkedOut();
@@ -451,11 +451,14 @@ class Store {
         ctx,
       ],
     );
+    final held = _judgement;
     _changed();
-    return _entries('SELECT * FROM entries WHERE device = ? AND dseq = ?', [
-      device,
-      dseq,
-    ]).single;
+    final entry = _entries(
+      'SELECT * FROM entries WHERE device = ? AND dseq = ?',
+      [device, dseq],
+    ).single;
+    if (held != null) _judgement = _judgedWith(held, entry);
+    return entry;
   }
 
   /// The causal context of a write to [unit] on [entity] by [device]
@@ -652,7 +655,7 @@ class Store {
       _db.execute('COMMIT');
     } catch (_) {
       _db.execute('ROLLBACK');
-      _judged = null;
+      _judgement = null;
       _forgetWorkedOut();
       rethrow;
     } finally {
@@ -1078,7 +1081,7 @@ class Store {
     ];
   }
 
-  JudgedLog? _judged;
+  _Judgement? _judgement;
 
   final _workedOut = <Object, Object?>{};
   var _generation = 0;
@@ -1111,21 +1114,105 @@ class Store {
     _workedOut.clear();
   }
 
+  /// How often [judged] was worked out from the whole log: what a test
+  /// counts it by.
+  @visibleForTesting
+  var judgedBuilds = 0;
+
   /// What the roles of the Shared Areas allow (ADR 0013), worked out
   /// from the whole log after every change; nothing to work out while no
-  /// Area was ever shared. Pending Changes never count here: this is
-  /// what decides who may do what, what is refused and what is deleted.
-  JudgedLog get judged => _judged ??=
-      _db
-          .select(
-            "SELECT 1 FROM entries WHERE $_applied "
-            "AND substr(field, 1, 5) = 'role:' LIMIT 1",
-          )
-          .isEmpty
-      ? JudgedLog.none
-      : judgeLog(
-          _entries('SELECT * FROM entries WHERE $_applied ORDER BY seq'),
-        );
+  /// Area was ever shared. Inside a batch, this Device's own entries are
+  /// judged again only with the entities they can change ([judgedLink]),
+  /// so many writes with reads between them work it out once. Pending
+  /// Changes never count here: this is what decides who may do what,
+  /// what is refused and what is deleted.
+  JudgedLog get judged => (_judgement ??= _judge()).log;
+
+  _Judgement _judge() {
+    judgedBuilds++;
+    if (_db
+        .select(
+          "SELECT 1 FROM entries WHERE $_applied "
+          "AND substr(field, 1, 5) = 'role:' LIMIT 1",
+        )
+        .isEmpty) {
+      return _Judgement(JudgedLog.none, {}, inBatch: _inBatch);
+    }
+    final entries = _entries(
+      'SELECT * FROM entries WHERE $_applied ORDER BY seq',
+    );
+    final linkedFrom = <String, Set<String>>{};
+    for (final e in entries) {
+      if (judgedLink(e) case final to?) {
+        linkedFrom.putIfAbsent(to, () => {}).add(e.entity);
+      }
+    }
+    return _Judgement(judgeLog(entries), linkedFrom, inBatch: _inBatch);
+  }
+
+  /// What is judged with [e] appended to the log [held] judged, [e] this
+  /// Device's entry: null when it is worked out from the whole log again. Only a judgement worked out
+  /// inside the batch running is carried on, since in it nothing but this
+  /// store writes (it holds the write lock) and every other change forgets
+  /// it; the batch's end forgets it too. Judged again are the entities
+  /// whose entries link to [e]'s entity, on and on, as they can judge
+  /// otherwise now, with all they link to, so each is judged as in the
+  /// whole log; the rest stays as judged.
+  _Judgement? _judgedWith(_Judgement held, Entry e) {
+    if (!held.inBatch) return null;
+    if (identical(held.log, JudgedLog.none)) {
+      // Still nothing to work out, but for the first grant.
+      return e.field.startsWith(ShareKeys.rolePrefix) ? null : held;
+    }
+    final linkedFrom = held.linkedFrom;
+    if (judgedLink(e) case final to?) {
+      linkedFrom.putIfAbsent(to, () => {}).add(e.entity);
+    }
+    final changed = {e.entity};
+    final linking = [e.entity];
+    while (linking.isNotEmpty) {
+      for (final from in linkedFrom[linking.removeLast()] ?? const <String>{}) {
+        if (changed.add(from)) linking.add(from);
+      }
+    }
+    final read = {...changed};
+    final entries = <Entry>[];
+    var next = changed.toList();
+    while (next.isNotEmpty) {
+      final found = [
+        for (var i = 0; i < next.length; i += _inChunk)
+          ..._entries(
+            'SELECT * FROM entries WHERE $_applied AND entity IN '
+            '(${List.filled(min(_inChunk, next.length - i), '?').join(', ')}) '
+            'ORDER BY seq',
+            next.sublist(i, min(i + _inChunk, next.length)),
+          ),
+      ];
+      entries.addAll(found);
+      next = [
+        for (final f in found)
+          if (judgedLink(f) case final to? when read.add(to)) to,
+      ];
+    }
+    final part = judgeLog(entries);
+    final rejudged = {for (final f in entries) f.id};
+    return _Judgement(
+      JudgedLog(
+        {
+          for (final id in held.log.ignored)
+            if (!rejudged.contains(id)) id,
+          ...part.ignored,
+        },
+        {
+          for (final MapEntry(:key, :value) in held.log.areas.entries)
+            if (!read.contains(key)) key: value,
+          ...part.areas,
+        },
+      ),
+      linkedFrom,
+      inBatch: true,
+    );
+  }
 
   /// Every entry, in log order, those of a later structure too: what a
   /// Backup carries.
@@ -1380,4 +1467,18 @@ bool laterSetting(String value) {
   bool later(Object? o) =>
       o is Map && o.containsKey('v') && !(o['v'] is int && o['v'] == 1);
   return later(json) || (json is List && json.any(later));
+}
+
+/// What [Store.judged] holds: the judgement, which entities link to
+/// each ([judgedLink]), and whether it was worked out inside the batch
+/// running.
+class _Judgement {
+  final JudgedLog log;
+
+  /// The entities whose entries link to each one, by the one linked to.
+  final Map<String, Set<String>> linkedFrom;
+
+  final bool inBatch;
+
+  _Judgement(this.log, this.linkedFrom, {required this.inBatch});
 }

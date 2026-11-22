@@ -42,7 +42,7 @@ use crate::pending::{
     PendingState,
 };
 use crate::photos::strip_jpeg_metadata;
-use crate::shared::{JudgedLog, judge_log};
+use crate::shared::{JudgedLog, ROLE_PREFIX, judge_log, judged_link};
 use crate::signing::{SigningKey, device_id_from_key, entry_bytes};
 use crate::{Error, Result};
 
@@ -117,6 +117,18 @@ const SCHEMA: &str = "
 struct WorkedOut {
     seq: i64,
     held: HashMap<&'static str, Arc<dyn std::any::Any + Send + Sync>>,
+}
+
+/// What [`Store::judged`] holds: the judgement, which entities link to
+/// each ([`judged_link`]), and whether it was worked out inside the
+/// batch running, as the Dart core's `_Judgement`.
+struct Judgement {
+    log: Arc<JudgedLog>,
+    /// Whether the log holds a grant at all; nothing is judged without.
+    shared: bool,
+    /// The entities whose entries link to each one, by the one linked to.
+    linked_from: HashMap<String, HashSet<String>>,
+    in_batch: bool,
 }
 
 /// The current fields of one entity, in the order they were first
@@ -261,7 +273,7 @@ pub struct Store {
     files: Box<dyn Blobs>,
     /// What the roles of the Shared Areas allow, worked out after every
     /// change ([`Store::judged`]).
-    judged: Mutex<Option<Arc<JudgedLog>>>,
+    judged: Mutex<Option<Judgement>>,
     /// Counts the changes, so a judgement worked out while another
     /// thread wrote is not kept.
     generation: std::sync::atomic::AtomicU64,
@@ -271,6 +283,10 @@ pub struct Store {
     /// by.
     #[cfg(test)]
     pub(crate) history_reads: std::sync::atomic::AtomicUsize,
+    /// How often [`Store::judged`] was worked out from the whole log:
+    /// what a test counts it by.
+    #[cfg(test)]
+    pub(crate) judged_builds: std::sync::atomic::AtomicUsize,
     /// Other people's Profiles as read from the local settings, until
     /// one is kept ([`crate::people`]).
     pub(crate) people: Mutex<Option<Arc<crate::people::PeopleIndex>>>,
@@ -355,6 +371,8 @@ impl Store {
             worked_out: Mutex::new(WorkedOut::default()),
             #[cfg(test)]
             history_reads: std::sync::atomic::AtomicUsize::new(0),
+            #[cfg(test)]
+            judged_builds: std::sync::atomic::AtomicUsize::new(0),
             people: Mutex::new(None),
             own_keys: Mutex::new(None),
             pending_files,
@@ -478,13 +496,22 @@ impl Store {
     /// What the roles of the Shared Areas allow (ADR 0013), worked out
     /// from the whole log after every change, as the Dart core's
     /// `judged`; nothing to work out while no Area was ever shared.
-    /// Pending Changes never count here: this is what decides who may do
-    /// what, what is refused and what is deleted.
+    /// Inside a batch, this Device's own entries are judged again only
+    /// with the entities they can change ([`judged_link`]), so many
+    /// writes with reads between them work it out once. Pending Changes
+    /// never count here: this is what decides who may do what, what is
+    /// refused and what is deleted.
     pub fn judged(&self) -> Result<Arc<JudgedLog>> {
         if let Some(held) = self.judged.lock().as_ref() {
-            return Ok(held.clone());
+            return Ok(held.log.clone());
         }
         let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        #[cfg(test)]
+        self.judged_builds
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        // An open transaction is this thread's own batch: another one's
+        // holds the connection until it ends.
+        let in_batch = !self.db.lock().is_autocommit();
         let shared = self
             .db
             .lock()
@@ -497,19 +524,117 @@ impl Store {
             )
             .optional()?
             .is_some();
+        let mut linked_from: HashMap<String, HashSet<String>> = HashMap::new();
         let judged = Arc::new(if shared {
-            judge_log(&self.entries(
+            let entries = self.entries(
                 &format!("SELECT * FROM entries WHERE {APPLIED} ORDER BY seq"),
                 params![],
-            )?)
+            )?;
+            for e in &entries {
+                if let Some(to) = judged_link(e) {
+                    linked_from
+                        .entry(to.to_string())
+                        .or_default()
+                        .insert(e.entity.clone());
+                }
+            }
+            judge_log(&entries)
         } else {
             JudgedLog::default()
         });
         let mut held = self.judged.lock();
         if self.generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
-            *held = Some(judged.clone());
+            *held = Some(Judgement {
+                log: judged.clone(),
+                shared,
+                linked_from,
+                in_batch,
+            });
         }
         Ok(judged)
+    }
+
+    /// What is judged with `e` appended to the log `held` judged, `e`
+    /// this Device's entry, as the Dart core's `_judgedWith`: `None` when
+    /// it is worked out from the whole log again. Only a judgement worked
+    /// out inside the batch running is carried on, since in it nothing
+    /// but this store writes (it holds the write lock) and every other
+    /// change forgets it; the batch's end forgets it too. Judged again
+    /// are the entities whose entries link to `e`'s entity, on and on, as
+    /// they can judge otherwise now, with all they link to, so each is
+    /// judged as in the whole log; the rest stays as judged.
+    fn judged_with(&self, held: Judgement, e: &Entry) -> Result<Option<Judgement>> {
+        if !held.in_batch {
+            return Ok(None);
+        }
+        if !held.shared {
+            // Still nothing to work out, but for the first grant.
+            return Ok((!e.field.starts_with(ROLE_PREFIX)).then_some(held));
+        }
+        let Judgement {
+            log,
+            mut linked_from,
+            ..
+        } = held;
+        if let Some(to) = judged_link(e) {
+            linked_from
+                .entry(to.to_string())
+                .or_default()
+                .insert(e.entity.clone());
+        }
+        let mut changed: HashSet<String> = HashSet::from([e.entity.clone()]);
+        let mut linking = vec![e.entity.clone()];
+        while let Some(to) = linking.pop() {
+            for from in linked_from.get(&to).into_iter().flatten() {
+                if changed.insert(from.clone()) {
+                    linking.push(from.clone());
+                }
+            }
+        }
+        let mut read = changed.clone();
+        let mut entries: Vec<Entry> = Vec::new();
+        let mut next: Vec<String> = changed.into_iter().collect();
+        while !next.is_empty() {
+            let mut found = Vec::new();
+            for chunk in next.chunks(IN_CHUNK) {
+                let marks = vec!["?"; chunk.len()].join(", ");
+                found.extend(self.entries(
+                    &format!(
+                        "SELECT * FROM entries WHERE {APPLIED} AND entity IN ({marks}) ORDER BY seq"
+                    ),
+                    rusqlite::params_from_iter(chunk.iter()),
+                )?);
+            }
+            next = found
+                .iter()
+                .filter_map(judged_link)
+                .filter(|to| read.insert(to.to_string()))
+                .map(str::to_string)
+                .collect();
+            entries.extend(found);
+        }
+        let part = judge_log(&entries);
+        let rejudged: HashSet<String> = entries.iter().map(Entry::id).collect();
+        let mut ignored: HashSet<String> = log
+            .ignored
+            .iter()
+            .filter(|id| !rejudged.contains(*id))
+            .cloned()
+            .collect();
+        ignored.extend(part.ignored);
+        let mut areas: std::collections::BTreeMap<_, _> = log
+            .areas
+            .iter()
+            .filter(|(id, _)| !read.contains(*id))
+            .map(|(id, grants)| (id.clone(), grants.clone()))
+            .collect();
+        areas.extend(part.areas);
+        Ok(Some(Judgement {
+            log: Arc::new(JudgedLog { ignored, areas }),
+            shared: true,
+            linked_from,
+            in_batch: true,
+        }))
     }
 
     /// This installation's stable device id.
@@ -771,13 +896,26 @@ impl Store {
                 ctx
             ],
         )?;
+        let held = self.judged.lock().take();
         self.changed();
-        self.entries(
-            "SELECT * FROM entries WHERE device = ? AND dseq = ?",
-            params![device, dseq],
-        )?
-        .pop()
-        .ok_or_else(|| Error::Invalid("the appended entry is gone".into()))
+        let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        let entry = self
+            .entries(
+                "SELECT * FROM entries WHERE device = ? AND dseq = ?",
+                params![device, dseq],
+            )?
+            .pop()
+            .ok_or_else(|| Error::Invalid("the appended entry is gone".into()))?;
+        if let Some(held) = held
+            && let Some(next) = self.judged_with(held, &entry)?
+        {
+            let mut judged = self.judged.lock();
+            // Kept only when nothing changed while it was worked out.
+            if self.generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                *judged = Some(next);
+            }
+        }
+        Ok(entry)
     }
 
     /// The causal context of a write to `unit` on `entity` by `device`

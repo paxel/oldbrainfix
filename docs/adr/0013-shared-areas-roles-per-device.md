@@ -78,3 +78,7 @@ Both cores offer it as `Notes.mayUnfile`/`unfile` (`may_unfile`/`unfile` in Rust
 ## Attached files (ADR 0047)
 
 Amended by #267: attaching a file to a Note (`file:<hash>`) is an edit of the Note, so a Member attaches files to their own Notes only. A Member's machine adds Attachment Texts (`fileText:<hash>`) to any Note, as Photo Texts; removing one stays the owner's or a Manager's (ADR 0025). A file of a Note in a Shared Area goes to the Devices that get the Area (`blob_in`, `blobIn`).
+
+## Judging again inside a batch (#405)
+
+Amended by #405: what the roles allow stays what the whole raw log says, but a Device no longer works it out from the whole log after each of its own entries inside a batch. Judging an entity looks only at its own entries and at those of the Areas, Topics and Notes their values name, linked on in turn (`judgedLink`, `judged_link`). After an own entry inside a batch, both cores judge again the entity it lies on, every entity that links to it, directly or through others, and everything those link to, and keep the rest as judged; the result is the one the whole log gives, which the tests check after every entry. A judgement worked out before the batch is not carried on, and an entry taken in from another Device, a deletion and the end of the batch forget it, so it is worked out from the whole log again. A rule that looks at an entity beyond these links widens `judgedLink` with it.

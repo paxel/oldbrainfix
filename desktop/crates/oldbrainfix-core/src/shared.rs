@@ -309,6 +309,18 @@ type Filing = (Entry, Option<String>);
 /// Whether a Device of `AreaAccess` may write the entry in the Area.
 type May<'a> = &'a dyn Fn(&JudgedLog, AreaAccess, &Entry, Option<&str>) -> bool;
 
+/// The entity `e` links its own to as [`judge_log`] judges them: the
+/// Area, Topic or Note its value names; `None` for none, as the Dart
+/// core's `judgedLink`. Judging an entity looks at nothing but its own
+/// entries and those of the entities they link to, linked on in turn,
+/// so the store judges again only those an entry can change
+/// ([`Store::judged`]). A rule that looks further widens this.
+pub(crate) fn judged_link(e: &Entry) -> Option<&str> {
+    e.value.as_deref().filter(|value| {
+        value.starts_with("area:") || value.starts_with("topic:") || value.starts_with("note:")
+    })
+}
+
 /// The Area of the filing that counts at `e`: the last one before it,
 /// else the first one.
 fn area_at<'f>(filings: &'f [Filing], e: &Entry) -> Option<&'f str> {
