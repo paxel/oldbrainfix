@@ -104,6 +104,22 @@ impl NotePicker {
         Ok(())
     }
 
+    /// What is typed into its field.
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    /// The Note being added alone, if one is.
+    pub fn alone(&self) -> Option<&str> {
+        self.alone.as_deref()
+    }
+
+    /// Shows the Notes `found` for what is typed, found elsewhere
+    /// ([`offered`]), such as on a thread of its own (obf-1068).
+    pub fn set_found(&mut self, found: Vec<Listed>) {
+        self.found = found;
+    }
+
     /// Draws Add to Note… under its title and says what was asked.
     pub fn show(&mut self, ui: &mut Ui, (t, tones): (&L10n, Tones)) -> Option<NoteAsk> {
         let weak = ui.visuals().weak_text_color();
@@ -176,7 +192,7 @@ pub fn picked(store: &Store, id: &str) -> oldbrainfix_core::Result<()> {
 /// by id and the title they show under: those this Device may write in
 /// (ADR 0013), but not the Note `alone` being added. The search leaves
 /// out the trash and the Notes merged into others.
-fn offered(
+pub fn offered(
     store: &Store,
     t: &L10n,
     query: &str,

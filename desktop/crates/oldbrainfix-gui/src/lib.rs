@@ -71,6 +71,7 @@ pub mod read_text;
 pub mod ring;
 pub mod routine_editor;
 pub mod schedule_text;
+pub mod search_aside;
 pub mod session_editor;
 pub mod session_view;
 pub mod setting_badges;

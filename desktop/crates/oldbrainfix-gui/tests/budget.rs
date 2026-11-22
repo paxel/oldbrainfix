@@ -5,8 +5,10 @@
 //! the 500 ms of a page change, a click on a card and a switch of its
 //! view at most the 100 ms of a tap, and every letter typed into the
 //! search, with its results, at most 500 ms (ui-laws.md, obf-1032;
-//! obf-1068). Each step is timed from the event to the frame that shows
-//! its effect, a few times, and its median held against the budget.
+//! obf-1068): the letter shows within a tap's time, its search runs once
+//! typing stopped and is timed from its start, the pause before it left
+//! out. Each step is timed from the event to the frame that shows its
+//! effect, a few times, and its median held against the budget.
 //!
 //! Timed in a release build only, as the app ships; CI runs it in a step
 //! of its own:
@@ -187,6 +189,35 @@ fn until(
     Err("the step never took effect".into())
 }
 
+/// Steps frames until the search of `letters` starts on its thread, the
+/// typing rested, and on to the frame that shows what it found; how long
+/// that took from the frame that started it (obf-1068).
+fn searched(
+    harness: &mut Harness<'_, App>,
+    letters: &str,
+) -> Result<Elapsed, Box<dyn std::error::Error>> {
+    let mut start = None;
+    for _ in 0..20 {
+        let before = Instant::now();
+        harness.step();
+        if harness.state().searching() {
+            start = Some(before);
+            break;
+        }
+    }
+    let start = start.ok_or("the search never started")?;
+    // The window looks every 30 ms while it runs, as the app does.
+    while harness.state().searched() != letters {
+        if start.elapsed() > Elapsed::from_secs(30) {
+            return Err("the search never came".into());
+        }
+        std::thread::sleep(Elapsed::from_millis(30));
+        harness.step();
+    }
+    harness.step();
+    Ok(start.elapsed())
+}
+
 /// Lets more than a double-click's time pass, untimed.
 fn pause(harness: &mut Harness<'_, App>) {
     harness.run_steps(50);
@@ -243,6 +274,10 @@ fn all_notes_a_card_and_the_search_on_5000_notes_keep_the_budget() -> TestResult
     println!("{NOTES} Notes written in {:?}", built.elapsed());
     let mut app = App::new(store.clone(), "en");
     app.select(Selection::All);
+    // The search's thread on the window's own connection: an in-memory
+    // store has no other.
+    let aside = store.clone();
+    app.set_agenda_store(move || aside.clone());
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .with_max_steps(200)
@@ -343,6 +378,10 @@ fn all_notes_a_card_and_the_search_on_5000_notes_keep_the_budget() -> TestResult
 
     // A letter typed into the search, its results shown: the first, the
     // second and the third.
+    // Each letter shows at once; its search starts once typing stopped
+    // and is timed from there to the frame showing what it found
+    // (obf-1068).
+    let mut letters_shown = Vec::new();
     let mut typed: [Vec<Elapsed>; 3] = Default::default();
     for _ in 0..REPEATS {
         harness.state_mut().set_query("");
@@ -355,12 +394,18 @@ fn all_notes_a_card_and_the_search_on_5000_notes_keep_the_budget() -> TestResult
             assert_eq!(field.accesskit_node().role(), Role::TextInput);
             let start = Instant::now();
             field.type_text(letter);
-            times.push(until(&mut harness, start, |app| app.query() == letters)?);
+            letters_shown.push(until(&mut harness, start, |app| app.query() == letters)?);
+            times.push(searched(&mut harness, letters)?);
             harness.run();
         }
     }
     let found = harness.state().shown_notes().len();
     assert!(0 < found && found < all, "{found} Notes found for \"mil\"");
+    steps.push(Step {
+        name: "A letter shown",
+        budget: TAP,
+        times: letters_shown,
+    });
     for (name, times) in [
         "A first letter searched",
         "A second letter searched",

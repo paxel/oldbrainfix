@@ -65,7 +65,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 
 use chrono::{DateTime, Duration, Local, NaiveDateTime, Utc};
@@ -164,6 +164,7 @@ use crate::read_text;
 use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
+use crate::search_aside::{Searching, Work};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::session_view::{self, PicksShown, SessionAction, SessionCardShown, SessionPart};
 use crate::setting_badges::{
@@ -459,12 +460,15 @@ struct AgendaView {
     quiet: bool,
 }
 
+/// Hands a thread its connection to the window's database.
+type StoreOpener = Arc<dyn Fn() -> Arc<Store> + Send + Sync>;
+
 /// The Agenda read on a thread of its own (#207): the window draws on
 /// while it reads, the last rows showing.
 struct AgendaReads {
     /// Hands the thread its connection to the window's database as it
     /// reads.
-    open: Arc<dyn Fn() -> Arc<Store> + Send + Sync>,
+    open: StoreOpener,
     /// The rows read last, shown until the next read is in.
     shown: Option<AgendaView>,
     /// The read running, with whether it wrote today's picks.
@@ -607,6 +611,30 @@ impl CardsRead {
     }
 }
 
+/// What the cards of a list are read for ([`read_cards`]), on the
+/// window's thread or handed to the search's own (obf-1068).
+struct CardsAsk {
+    selection: Selection,
+    query: String,
+    people: PersonFilter,
+    /// Whether the window shows a Note alone (#287).
+    alone: bool,
+    areas: Vec<(Area, Vec<Topic>)>,
+    t: L10n,
+    wall: Wall,
+    /// The system's region, which picks the units of the Tallies.
+    region: Option<String>,
+    tally_whose: HashMap<String, Whose>,
+}
+
+/// What the search's thread read (obf-1068): the cards found, under what
+/// they were read for.
+type CardsArrived = (CardsKey, oldbrainfix_core::Result<CardsRead>);
+
+/// What a dialog's search found on its thread (obf-1068): the Notes by
+/// id and the title they show under.
+type DialogFound = oldbrainfix_core::Result<Vec<(String, String)>>;
+
 /// What an [`Action`] can change of what shows (obf-1069), told by
 /// [`Reads::of`]: what is not named reads it all again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -634,6 +662,9 @@ impl Reads {
             Action::SelectNote(_) | Action::CloseNote | Action::Find | Action::Badge(_) => {
                 Reads::Detail
             }
+            // A letter in a dialog's search changes only the dialog
+            // (obf-1068).
+            Action::MergeQuery | Action::AddToNotePicked(NoteAsk::Find) => Reads::Nothing,
             _ => Reads::All,
         }
     }
@@ -2140,6 +2171,18 @@ pub struct App {
     keep_cards: bool,
     /// What the cards shown were read for.
     cards_read: Option<CardsKey>,
+    /// The search of the list shown (obf-1068): what its cards were
+    /// found for while `query` holds what is typed, and its search on a
+    /// thread of its own once typing stops.
+    searching: Searching<CardsArrived>,
+    /// The cards that search brought, for the next read to show.
+    cards_arrived: std::cell::Cell<Option<(CardsKey, CardsRead)>>,
+    /// The search of Merge into… or Add to Note… (obf-1068), as the
+    /// list's.
+    dialog_searching: Searching<DialogFound>,
+    /// The log's mark at the last search on the search's connection: one
+    /// moved since forgets what that connection worked out (obf-1068).
+    search_mark: Arc<AtomicI64>,
     /// How often the cards were read anew, and the panes at all: what a
     /// test counts the reads by (obf-1069).
     card_reads: std::cell::Cell<usize>,
@@ -2743,6 +2786,10 @@ impl App {
             seen_changes: 0,
             keep_cards: false,
             cards_read: None,
+            searching: Searching::default(),
+            cards_arrived: std::cell::Cell::new(None),
+            dialog_searching: Searching::default(),
+            search_mark: Arc::new(AtomicI64::new(-1)),
             card_reads: std::cell::Cell::new(0),
             refreshes: 0,
             card_heights: HashMap::new(),
@@ -5326,6 +5373,132 @@ impl App {
         ctx.request_repaint();
     }
 
+    /// The searches typed into (obf-1068): each runs on a thread of its
+    /// own once typing stopped for a moment, on a connection the Agenda's
+    /// opener hands it, and what it found shows once it is in, unless
+    /// what was typed, the list or the log changed since. Without the
+    /// opener the window searches at every letter itself.
+    fn search_arrived(&mut self, ctx: &egui::Context) {
+        let Some(open) = self.agenda_reads.as_ref().map(|reads| reads.open.clone()) else {
+            return;
+        };
+        // What the connection worked out from the log, the rights among
+        // it, forgotten once the window wrote since its last search.
+        let (window, mark) = (self.store.clone(), self.search_mark.clone());
+        let open: StoreOpener = Arc::new(move || {
+            let store = open();
+            let now = store.current_seq().unwrap_or_default();
+            if !Arc::ptr_eq(&store, &window) && mark.swap(now, Ordering::SeqCst) != now {
+                store.changed_elsewhere();
+            }
+            store
+        });
+        self.list_search_arrived(ctx, &open);
+        self.dialog_search_arrived(ctx, &open);
+    }
+
+    /// The list's search: its cards read on the thread with the Notes
+    /// found, shown by the next read of the rest.
+    fn list_search_arrived(&mut self, ctx: &egui::Context, open: &StoreOpener) {
+        let mut searching = std::mem::take(&mut self.searching);
+        let arrived = searching.frame(ctx, &self.query, |query| {
+            let mut key = self.cards_key_now()?;
+            key.query = query.to_string();
+            let ask = self.cards_ask(query, &self.view.areas);
+            let open = open.clone();
+            let work: Work<CardsArrived> = Box::new(move || (key, read_cards(&open(), &ask)));
+            Some(work)
+        });
+        self.searching = searching;
+        let Some((_, (key, read))) = arrived else {
+            return;
+        };
+        let mut now = self.cards_key_now();
+        if let Some(now) = &mut now {
+            now.query = key.query.clone();
+        }
+        // Read before the log or the list changed: searched again.
+        if now.as_ref() != Some(&key) {
+            return;
+        }
+        self.searching.set_searched(&key.query);
+        match read {
+            Ok(cards) => self.cards_arrived.set(Some((key, cards))),
+            // Read here again, which says what failed.
+            Err(_) => self.cards_arrived.set(None),
+        }
+        self.refresh();
+        self.cards_arrived.set(None);
+    }
+
+    /// The cards the list's search brought, where they are still those
+    /// of the list as it is now.
+    fn arrived_cards(&self) -> Option<CardsRead> {
+        let (key, cards) = self.cards_arrived.take()?;
+        (self.cards_key_now().as_ref() == Some(&key)).then_some(cards)
+    }
+
+    /// The search of Merge into… or Add to Note…, whichever shows: the
+    /// Notes it offers, found on the thread.
+    fn dialog_search_arrived(&mut self, ctx: &egui::Context, open: &StoreOpener) {
+        // Merge into… offers what the Notes merged may go into, Add to
+        // Note… what the Note added alone may be added to.
+        let (query, merging, alone) = match &self.dialog {
+            Some(Dialog::Merge { notes, query, .. }) => (query.clone(), Some(notes.clone()), None),
+            Some(Dialog::AddToNote { picker, .. }) => (
+                picker.query().to_string(),
+                None,
+                picker.alone().map(str::to_string),
+            ),
+            // Another dialog, or none: the next starts on its own.
+            _ => {
+                self.dialog_searching = Searching::default();
+                return;
+            }
+        };
+        let t = self.t;
+        // Enter picks the first Note found for what is typed now: one
+        // typed since the last search is searched here at once.
+        let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter));
+        let arrived = if enter && query != self.dialog_searching.searched() {
+            let found = match &merging {
+                Some(merging) => merge_candidates(&self.store, &t, &query, merging),
+                None => add_to_note::offered(&self.store, &t, &query, alone.as_deref()),
+            };
+            Some((query, found))
+        } else {
+            let open = open.clone();
+            let start = |query: &str| -> Option<Work<DialogFound>> {
+                let query = query.to_string();
+                Some(match merging {
+                    Some(merging) => {
+                        Box::new(move || merge_candidates(&open(), &t, &query, &merging))
+                    }
+                    None => Box::new(move || {
+                        add_to_note::offered(&open(), &t, &query, alone.as_deref())
+                    }),
+                })
+            };
+            self.dialog_searching.frame(ctx, &query, start)
+        };
+        let Some((asked, found)) = arrived else {
+            return;
+        };
+        self.dialog_searching.set_searched(&asked);
+        let found = match found {
+            Ok(found) => found,
+            Err(e) => {
+                self.error = Some(e.to_string());
+                return;
+            }
+        };
+        match &mut self.dialog {
+            Some(Dialog::Merge { others, .. }) => *others = found,
+            Some(Dialog::AddToNote { picker, .. }) => picker.set_found(found),
+            _ => {}
+        }
+    }
+
     /// Shows Unsorted, what the phone's Nudge screen shows, whenever a
     /// click on the Nudge raised `wanted`.
     pub fn set_unsorted_wanted(&mut self, wanted: Arc<AtomicBool>) {
@@ -5868,12 +6041,25 @@ impl App {
     /// The text the Notes shown are searched for.
     pub fn set_query(&mut self, query: &str) {
         self.query = query.to_string();
+        self.searching.set_searched(query);
         self.refresh();
     }
 
-    /// What the Notes shown are searched for.
+    /// What is typed into the search of the list shown.
     pub fn query(&self) -> &str {
         &self.query
+    }
+
+    /// What the Notes shown were found for (obf-1068): what was typed
+    /// before typing stopped, until the search of what is typed now is in.
+    pub fn searched(&self) -> &str {
+        self.searching.searched()
+    }
+
+    /// Whether the search of the list shown or of a dialog runs on its
+    /// thread (obf-1068).
+    pub fn searching(&self) -> bool {
+        self.searching.running() || self.dialog_searching.running()
     }
 
     /// How often the panes were read, and how often their cards among
@@ -6397,210 +6583,31 @@ impl App {
     /// lists, Tallies and Sessions and their view.
     fn read_cards(&self, areas: &[(Area, Vec<Topic>)]) -> oldbrainfix_core::Result<CardsRead> {
         self.card_reads.set(self.card_reads.get() + 1);
-        let notes = Notes::new(&self.store);
-        let places = Places::new(&self.store);
-        let routines = Routines::new(&self.store);
-        let search = Search::new(&self.store);
-        let store = &self.store;
-        let shown = match &self.selection {
-            // A Note window shows its Note alone (#287).
-            _ if self.alone.is_some() => Vec::new(),
-            Selection::Agenda
-            | Selection::SentItemsWaiting
-            | Selection::AreaOffersWaiting
-            | Selection::AiReview
-            | Selection::Frogs
-            | Selection::AllRoutines
-            | Selection::Tags
-            | Selection::Ask
-            | Selection::History(_) => Vec::new(),
-            Selection::All => self
-                .store
-                .notes_by(search.notes(&self.query, None)?, &self.people)?,
-            Selection::Unsorted => {
-                // Its search (#274) keeps the list's order, oldest first.
-                let mut unsorted = notes.unsorted()?;
-                if !self.query.trim().is_empty() {
-                    let found: HashSet<String> = search
-                        .notes(&self.query, None)?
-                        .into_iter()
-                        .map(|n| n.id)
-                        .collect();
-                    unsorted.retain(|n| found.contains(&n.id));
-                }
-                self.store.notes_by(unsorted, &self.people)?
-            }
-            Selection::Place(id) => {
-                let found = search.notes(&self.query, Some(id))?;
-                // A Topic's Notes show inside the Topic; a search in its
-                // Area still finds them, their cards naming the Topic.
-                let area = areas.iter().any(|(a, _)| a.id == *id);
-                let found = if self.query.trim().is_empty() && area {
-                    found
-                        .into_iter()
-                        .filter(|n| n.place.as_deref() == Some(id.as_str()))
-                        .collect()
-                } else {
-                    found
-                };
-                self.store.notes_by(found, &self.people)?
-            }
-            // Its search (#274) keeps the trash's order.
-            Selection::Trash => search.among(&self.query, notes.trashed()?)?,
-        };
-        // Whose each card is and whether this Device may change it, read
-        // for all of them at once (obf-1069).
-        let (placed, changes) = place_notes(store, &places, shown)?;
-        // Once per read for every card, never per frame.
-        let listed: Vec<String> = placed.iter().map(|p| p.note.id.clone()).collect();
-        let sections = if listed.is_empty() {
-            BTreeMap::new()
-        } else {
-            notes.sections_of(&listed)?
-        };
-        // From what the core keeps until the log changes (obf-1035); the
-        // desktop has no Area Locks, so nothing is closed. A card in the
-        // trash shows none, as on the phone.
-        let backlinks = Backlinks::new(store);
-        let mut linked_from = BTreeMap::new();
-        let linked = listed.iter().filter(|_| self.selection != Selection::Trash);
-        for id in linked {
-            let linking = backlinks.to(id, &HashSet::new())?;
-            if !linking.is_empty() {
-                linked_from.insert(id.clone(), linking);
-            }
-        }
-        // A Note in the trash ticks nothing.
-        let card_today = if listed.is_empty() || self.selection == Selection::Trash {
-            HashMap::new()
-        } else {
-            let today = routines.today_by_note(&*self.wall)?;
-            card_occurrences::read(store, today, &listed)?
-        };
-        let lists = Checklists::new(store);
-        let mut checklists = BTreeMap::new();
-        if !listed.is_empty() {
-            for (id, list) in lists.of_notes_now(&listed, &*self.wall)? {
-                let checks = checklist_view::may_check_shown(store, &list)?;
-                checklists.insert(id, (list, checks));
-            }
-        }
-        let shopping = ShoppingLists::new(store);
-        let mut shopping_lists = BTreeMap::new();
-        if !listed.is_empty() {
-            for (id, list) in shopping.of_notes(&listed, &*self.wall)? {
-                let checks = shopping.may_check(&id)?;
-                shopping_lists.insert(id, (list, checks));
-            }
-        }
-        // A Tally wins over a list (ADR 0030).
-        let mut tallies = HashSet::new();
-        let tally_notes = Tallies::new(store);
-        for id in &listed {
-            if tally_notes.is_tally(id)? {
-                tallies.insert(id.clone());
-            }
-        }
-        // A Tally wins over a Session too (ADR 0039).
-        let session_notes = Sessions::new(store);
-        let mut sessions = HashSet::new();
-        for id in listed.iter().filter(|id| !tallies.contains(*id)) {
-            if session_notes.is_session_note(id)? {
-                sessions.insert(id.clone());
-            }
-        }
-        let mut card_changes = HashSet::new();
-        let mut card_may = HashSet::new();
-        for p in &placed {
-            let note = &p.note;
-            if !changes.contains(&note.id) {
-                continue;
-            }
-            card_may.insert(note.id.clone());
-            if !note.is_trashed() && note.text_editable {
-                card_changes.insert(note.id.clone());
-            }
-        }
-        let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
-        let (compact, switched) =
-            self.card_view(cards_key(&self.selection, &self.people, is_area))?;
-        let glances = card_glance::read(store, &self.t, &*self.wall, self.unit_system()?, &listed)?;
-        // The Tallies on a detailed card, with their chart and entries
-        // (#190).
-        let mut card_tallies = HashMap::new();
-        for id in listed.iter().filter(|id| tallies.contains(*id)) {
-            if compact != switched.contains(id) {
-                continue;
-            }
-            let whose = self.tally_whose.get(id);
-            if let Some(shown) =
-                tally_view::read(store, id, whose, self.unit_system()?, &*self.wall)?
-            {
-                card_tallies.insert(id.clone(), shown);
-            }
-        }
-        // The Sessions on a detailed card, with their pool, today's picks
-        // and last weeks (#191); today's picks as the Agenda shows them,
-        // written there, not here.
-        let detailed: Vec<&String> = listed
-            .iter()
-            .filter(|id| sessions.contains(*id) && compact == switched.contains(*id))
-            .collect();
-        let mut card_sessions = HashMap::new();
-        if !detailed.is_empty() {
-            let mut today = session_notes.today(&*self.wall)?;
-            for id in detailed {
-                let Some(setup) = session_notes.setup_of(id)? else {
-                    continue;
-                };
-                let (own, rest) = today.into_iter().partition(|o| o.session.note_id() == *id);
-                today = rest;
-                let wall: &oldbrainfix_core::WallClock = &*self.wall;
-                let shown = (self.unit_system()?, wall);
-                let card = SessionCardShown::read(store, &self.t, &setup, own, shown)?;
-                card_sessions.insert(id.clone(), card);
-            }
-        }
-        Ok(CardsRead {
-            notes: placed,
-            sections,
-            linked_from,
-            card_today,
-            checklists,
-            shopping_lists,
-            tallies,
-            sessions,
-            card_changes,
-            card_may,
-            compact,
-            switched,
-            glances,
-            card_tallies,
-            card_sessions,
-        })
+        read_cards(
+            &self.store,
+            &self.cards_ask(self.searching.searched(), areas),
+        )
     }
 
-    /// Whether the cards of the list kept under `key` show compact, and
-    /// those switched to the other view.
-    fn card_view(&self, key: Option<String>) -> oldbrainfix_core::Result<(bool, HashSet<String>)> {
-        Ok(match key {
-            Some(key) => (
-                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true"),
-                self.store
-                    .local_setting(&switched_setting(&key))?
-                    .unwrap_or_default()
-                    .split(',')
-                    .filter(|id| !id.is_empty())
-                    .map(str::to_string)
-                    .collect(),
-            ),
-            None => (false, HashSet::new()),
-        })
+    /// What the cards of the list shown are read for, searched for
+    /// `query`.
+    fn cards_ask(&self, query: &str, areas: &[(Area, Vec<Topic>)]) -> CardsAsk {
+        CardsAsk {
+            selection: self.selection.clone(),
+            query: query.to_string(),
+            people: self.people.clone(),
+            alone: self.alone.is_some(),
+            areas: areas.to_vec(),
+            t: self.t,
+            wall: self.wall.clone(),
+            region: self.region.clone(),
+            tally_whose: self.tally_whose.clone(),
+        }
     }
 
     /// The cards' view as kept now, none where it cannot be read.
     fn card_view_now(&self) -> Option<(bool, HashSet<String>)> {
-        self.card_view(self.cards_key()).ok()
+        card_view(&self.store, self.cards_key()).ok()
     }
 
     /// Shows the cards' view as kept now without reading the cards again
@@ -6644,7 +6651,7 @@ impl App {
     fn cards_key_now(&self) -> Option<CardsKey> {
         Some(CardsKey {
             selection: self.selection.clone(),
-            query: self.query.clone(),
+            query: self.searching.searched().to_string(),
             people: self.people.clone(),
             seq: self.store.current_seq().ok()?,
             day: Day::today(self.store.now(), &*self.wall),
@@ -6697,9 +6704,10 @@ impl App {
         // The cards as the last read left them where nothing they show can
         // have changed since (obf-1069), else read anew.
         let kept = self.kept_cards();
-        let cards = match kept {
-            Some(view) => CardsRead::kept(view),
-            None => self.read_cards(&areas)?,
+        let cards = match (kept, self.arrived_cards()) {
+            (Some(view), _) => CardsRead::kept(view),
+            (None, Some(arrived)) => arrived,
+            (None, None) => self.read_cards(&areas)?,
         };
         let CardsRead {
             notes: placed,
@@ -6980,14 +6988,15 @@ impl App {
         }
         // The trash's search (#274) finds its Routines and Frogs by their
         // Note, as it finds the cards; one whose Note is gone it does not.
-        if self.selection == Selection::Trash && !self.query.trim().is_empty() {
+        let searched = self.searching.searched();
+        if self.selection == Selection::Trash && !searched.trim().is_empty() {
             let theirs: Vec<Note> = trashed_routines
                 .iter()
                 .filter_map(|(_, note)| note.clone())
                 .chain(trashed_frogs.iter().filter_map(|(_, note, _)| note.clone()))
                 .collect();
             let found: HashSet<String> = search
-                .among(&self.query, theirs)?
+                .among(searched, theirs)?
                 .into_iter()
                 .map(|n| n.id)
                 .collect();
@@ -7279,6 +7288,9 @@ impl App {
             // Into the search of the list shown, from no Note: only the
             // keyboard moves.
             Action::Find if self.selected_note.is_none() && self.searches() => Reads::Nothing,
+            // A letter in the list's search, searched once typing stops
+            // (obf-1068).
+            Action::Search if self.agenda_reads.is_some() => Reads::Nothing,
             action => Reads::of(action),
         };
         let before = match reads {
@@ -7710,6 +7722,11 @@ impl App {
                     });
                 }
             }
+            // Searched on the window's thread where the search has no
+            // thread of its own, else once typing stops (obf-1068).
+            Action::Search if self.agenda_reads.is_none() => {
+                self.searching.set_searched(&self.query);
+            }
             Action::Search => {}
             Action::SearchFor(query) => {
                 // All Notes' search, whatever list shows: the tag is
@@ -7719,6 +7736,7 @@ impl App {
                 if self.selection != Selection::All {
                     self.act(Action::Select(Selection::All))?;
                 }
+                self.searching.set_searched(&query);
                 self.query = query;
             }
             Action::FilterPeople(people) => self.people = people,
@@ -8044,6 +8062,9 @@ impl App {
                     others,
                 });
             }
+            // Searched once typing stops where the search has a thread
+            // of its own (obf-1068).
+            Action::MergeQuery if self.agenda_reads.is_some() => {}
             Action::MergeQuery => {
                 if let Some(Dialog::Merge { notes, query, .. }) = &self.dialog {
                     let found = self.merge_candidates(&query.clone(), &notes.clone())?;
@@ -10391,12 +10412,13 @@ impl App {
     /// tree's order kept; none in the Trash, whose Notes the tree leaves
     /// out.
     fn tag_suggestions(&self) -> oldbrainfix_core::Result<Vec<String>> {
-        let wanted = self.query.trim().to_lowercase();
+        let searched = self.searching.searched();
+        let wanted = searched.trim().to_lowercase();
         if !wanted.starts_with('#') || !self.searches() || self.selection == Selection::Trash {
             return Ok(Vec::new());
         }
         Ok(TagTree::new(&self.store)
-            .suggestions(&self.query, &HashSet::new())?
+            .suggestions(searched, &HashSet::new())?
             .into_iter()
             .map(|node| node.tag)
             .filter(|tag| tag.to_lowercase() != wanted)
@@ -10521,24 +10543,13 @@ impl App {
     }
 
     /// The Notes the Notes `merging` can be merged into that the core's
-    /// search finds for `query`, by id and the title they show under: a
-    /// single one is not offered itself, several are, as one of them
-    /// picked takes the others in (#273).
+    /// search finds for `query` ([`merge_candidates`]).
     fn merge_candidates(
         &self,
         query: &str,
         merging: &[String],
     ) -> oldbrainfix_core::Result<Vec<(String, String)>> {
-        let alone = match merging {
-            [one] => Some(one.as_str()),
-            _ => None,
-        };
-        Ok(Search::new(&self.store)
-            .notes(query, None)?
-            .into_iter()
-            .filter(|n| Some(n.id.as_str()) != alone)
-            .map(|n| (n.id.clone(), row_title(&self.t, Some(&n))))
-            .collect())
+        merge_candidates(&self.store, &self.t, query, merging)
     }
 
     /// Keeps a change made in the Settings.
@@ -10878,6 +10889,7 @@ impl App {
             self.ask_left();
         }
         if to != self.selection {
+            self.searching.set_searched(&left.query);
             self.query = left.query;
             self.people = left.people;
             // The cards selected were those of the list left (#148).
@@ -11068,6 +11080,7 @@ impl App {
     pub fn show(&mut self, ui: &mut Ui) {
         self.save_ticks(ui.ctx());
         self.agenda_arrived(ui.ctx());
+        self.search_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
         self.ask_arrived(ui.ctx());
         // However its page went, what a Backup opened held goes with it.
@@ -12659,6 +12672,9 @@ impl App {
     /// merged into it, as Merge into… merges them.
     fn add_to_note_picked(&mut self, asked: NoteAsk) -> oldbrainfix_core::Result<()> {
         let into = match asked {
+            // Searched once typing stops where the search has a thread
+            // of its own (obf-1068).
+            NoteAsk::Find if self.agenda_reads.is_some() => return Ok(()),
             NoteAsk::Find => {
                 if let Some(Dialog::AddToNote { picker, .. }) = &mut self.dialog {
                     picker.find(&self.store, &self.t)?;
@@ -14589,7 +14605,7 @@ impl App {
             self.trashed_frogs(ui, tones, actions);
         }
         if self.view.notes.is_empty() {
-            let empty = if !self.query.trim().is_empty() {
+            let empty = if !self.searching.searched().trim().is_empty() {
                 // A search that finds nothing, not an empty list.
                 self.t.nothing_found()
             } else if trash {
@@ -18376,6 +18392,233 @@ fn switched_setting(key: &str) -> String {
 /// (#114), the phone's; none while it shows in full, the default.
 fn compact_setting(key: &str) -> String {
     format!("compactNotes:{key}")
+}
+
+/// The Notes the Notes `merging` can be merged into that the core's
+/// search finds for `query`, by id and the title they show under: a
+/// single one is not offered itself, several are, as one of them picked
+/// takes the others in (#273).
+fn merge_candidates(
+    store: &Store,
+    t: &L10n,
+    query: &str,
+    merging: &[String],
+) -> oldbrainfix_core::Result<Vec<(String, String)>> {
+    let alone = match merging {
+        [one] => Some(one.as_str()),
+        _ => None,
+    };
+    Ok(Search::new(store)
+        .notes(query, None)?
+        .into_iter()
+        .filter(|n| Some(n.id.as_str()) != alone)
+        .map(|n| (n.id.clone(), row_title(t, Some(&n))))
+        .collect())
+}
+
+/// Whether the cards of the list kept under `key` show compact, and
+/// those switched to the other view.
+fn card_view(
+    store: &Store,
+    key: Option<String>,
+) -> oldbrainfix_core::Result<(bool, HashSet<String>)> {
+    Ok(match key {
+        Some(key) => (
+            store.local_setting(&compact_setting(&key))?.as_deref() == Some("true"),
+            store
+                .local_setting(&switched_setting(&key))?
+                .unwrap_or_default()
+                .split(',')
+                .filter(|id| !id.is_empty())
+                .map(str::to_string)
+                .collect(),
+        ),
+        None => (false, HashSet::new()),
+    })
+}
+
+/// The cards of a list and what they show, read anew (obf-1069) as
+/// `ask` says, on the window's thread or on the search's own (obf-1068):
+/// the list's Notes found, whose each is and what this Device may do to
+/// it, their Sections, links, today's Occurrences, lists, Tallies and
+/// Sessions and their view.
+fn read_cards(store: &Store, ask: &CardsAsk) -> oldbrainfix_core::Result<CardsRead> {
+    let notes = Notes::new(store);
+    let units = DeviceSettings::new(store).unit_system(ask.region.as_deref())?;
+    let places = Places::new(store);
+    let routines = Routines::new(store);
+    let search = Search::new(store);
+    let shown = match &ask.selection {
+        // A Note window shows its Note alone (#287).
+        _ if ask.alone => Vec::new(),
+        Selection::Agenda
+        | Selection::SentItemsWaiting
+        | Selection::AreaOffersWaiting
+        | Selection::AiReview
+        | Selection::Frogs
+        | Selection::AllRoutines
+        | Selection::Tags
+        | Selection::Ask
+        | Selection::History(_) => Vec::new(),
+        Selection::All => store.notes_by(search.notes(&ask.query, None)?, &ask.people)?,
+        Selection::Unsorted => {
+            // Its search (#274) keeps the list's order, oldest first.
+            let mut unsorted = notes.unsorted()?;
+            if !ask.query.trim().is_empty() {
+                let found: HashSet<String> = search
+                    .notes(&ask.query, None)?
+                    .into_iter()
+                    .map(|n| n.id)
+                    .collect();
+                unsorted.retain(|n| found.contains(&n.id));
+            }
+            store.notes_by(unsorted, &ask.people)?
+        }
+        Selection::Place(id) => {
+            let found = search.notes(&ask.query, Some(id))?;
+            // A Topic's Notes show inside the Topic; a search in its
+            // Area still finds them, their cards naming the Topic.
+            let area = ask.areas.iter().any(|(a, _)| a.id == *id);
+            let found = if ask.query.trim().is_empty() && area {
+                found
+                    .into_iter()
+                    .filter(|n| n.place.as_deref() == Some(id.as_str()))
+                    .collect()
+            } else {
+                found
+            };
+            store.notes_by(found, &ask.people)?
+        }
+        // Its search (#274) keeps the trash's order.
+        Selection::Trash => search.among(&ask.query, notes.trashed()?)?,
+    };
+    // Whose each card is and whether this Device may change it, read
+    // for all of them at once (obf-1069).
+    let (placed, changes) = place_notes(store, &places, shown)?;
+    // Once per read for every card, never per frame.
+    let listed: Vec<String> = placed.iter().map(|p| p.note.id.clone()).collect();
+    let sections = if listed.is_empty() {
+        BTreeMap::new()
+    } else {
+        notes.sections_of(&listed)?
+    };
+    // From what the core keeps until the log changes (obf-1035); the
+    // desktop has no Area Locks, so nothing is closed. A card in the
+    // trash shows none, as on the phone.
+    let backlinks = Backlinks::new(store);
+    let mut linked_from = BTreeMap::new();
+    let linked = listed.iter().filter(|_| ask.selection != Selection::Trash);
+    for id in linked {
+        let linking = backlinks.to(id, &HashSet::new())?;
+        if !linking.is_empty() {
+            linked_from.insert(id.clone(), linking);
+        }
+    }
+    // A Note in the trash ticks nothing.
+    let card_today = if listed.is_empty() || ask.selection == Selection::Trash {
+        HashMap::new()
+    } else {
+        let today = routines.today_by_note(&*ask.wall)?;
+        card_occurrences::read(store, today, &listed)?
+    };
+    let lists = Checklists::new(store);
+    let mut checklists = BTreeMap::new();
+    if !listed.is_empty() {
+        for (id, list) in lists.of_notes_now(&listed, &*ask.wall)? {
+            let checks = checklist_view::may_check_shown(store, &list)?;
+            checklists.insert(id, (list, checks));
+        }
+    }
+    let shopping = ShoppingLists::new(store);
+    let mut shopping_lists = BTreeMap::new();
+    if !listed.is_empty() {
+        for (id, list) in shopping.of_notes(&listed, &*ask.wall)? {
+            let checks = shopping.may_check(&id)?;
+            shopping_lists.insert(id, (list, checks));
+        }
+    }
+    // A Tally wins over a list (ADR 0030).
+    let mut tallies = HashSet::new();
+    let tally_notes = Tallies::new(store);
+    for id in &listed {
+        if tally_notes.is_tally(id)? {
+            tallies.insert(id.clone());
+        }
+    }
+    // A Tally wins over a Session too (ADR 0039).
+    let session_notes = Sessions::new(store);
+    let mut sessions = HashSet::new();
+    for id in listed.iter().filter(|id| !tallies.contains(*id)) {
+        if session_notes.is_session_note(id)? {
+            sessions.insert(id.clone());
+        }
+    }
+    let mut card_changes = HashSet::new();
+    let mut card_may = HashSet::new();
+    for p in &placed {
+        let note = &p.note;
+        if !changes.contains(&note.id) {
+            continue;
+        }
+        card_may.insert(note.id.clone());
+        if !note.is_trashed() && note.text_editable {
+            card_changes.insert(note.id.clone());
+        }
+    }
+    let is_area = matches!(&ask.selection, Selection::Place(id) if ask.areas.iter().any(|(a, _)| a.id == *id));
+    let (compact, switched) = card_view(store, cards_key(&ask.selection, &ask.people, is_area))?;
+    let glances = card_glance::read(store, &ask.t, &*ask.wall, units, &listed)?;
+    // The Tallies on a detailed card, with their chart and entries
+    // (#190).
+    let mut card_tallies = HashMap::new();
+    for id in listed.iter().filter(|id| tallies.contains(*id)) {
+        if compact != switched.contains(id) {
+            continue;
+        }
+        let whose = ask.tally_whose.get(id);
+        if let Some(shown) = tally_view::read(store, id, whose, units, &*ask.wall)? {
+            card_tallies.insert(id.clone(), shown);
+        }
+    }
+    // The Sessions on a detailed card, with their pool, today's picks
+    // and last weeks (#191); today's picks as the Agenda shows them,
+    // written there, not here.
+    let detailed: Vec<&String> = listed
+        .iter()
+        .filter(|id| sessions.contains(*id) && compact == switched.contains(*id))
+        .collect();
+    let mut card_sessions = HashMap::new();
+    if !detailed.is_empty() {
+        let mut today = session_notes.today(&*ask.wall)?;
+        for id in detailed {
+            let Some(setup) = session_notes.setup_of(id)? else {
+                continue;
+            };
+            let (own, rest) = today.into_iter().partition(|o| o.session.note_id() == *id);
+            today = rest;
+            let wall: &oldbrainfix_core::WallClock = &*ask.wall;
+            let shown = (units, wall);
+            let card = SessionCardShown::read(store, &ask.t, &setup, own, shown)?;
+            card_sessions.insert(id.clone(), card);
+        }
+    }
+    Ok(CardsRead {
+        notes: placed,
+        sections,
+        linked_from,
+        card_today,
+        checklists,
+        shopping_lists,
+        tallies,
+        sessions,
+        card_changes,
+        card_may,
+        compact,
+        switched,
+        glances,
+        card_tallies,
+        card_sessions,
+    })
 }
 
 /// Which Note list `selection` shows, by the phone's names, each keeping
