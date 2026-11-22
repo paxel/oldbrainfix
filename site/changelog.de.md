@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.7.2]
 
+### Behoben
+
+- Auf dem Handy öffnet „Mehr“ in der Schnellnotiz den Notiz-Editor auch, während ein Tipp zu sehen ist, statt die App abstürzen zu lassen. ([obf-1058](https://github.com/paxel/oldbrainfix/issues/371))
+
 ## [0.7.1] - 2026-11-21
 
 ### Geändert

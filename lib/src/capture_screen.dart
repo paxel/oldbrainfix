@@ -720,8 +720,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final notes = widget.notes;
     final drafts = DraftsScope.of(context);
     final editing = Completer<void>();
+    final navigator = Navigator.of(context);
+    // A tip that came up over this screen while it was saving closes
+    // first, answering nothing: the editor takes this screen's place,
+    // never the tip's (#371).
+    if (ModalRoute.of(context) case final route?) {
+      navigator.popUntil((top) => top == route);
+    }
     unawaited(
-      Navigator.of(context)
+      navigator
           .pushReplacement<void, Captured>(
             MaterialPageRoute(
               builder: (_) => NoteEditorScreen(
