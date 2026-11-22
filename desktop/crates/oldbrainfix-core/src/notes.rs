@@ -2165,37 +2165,59 @@ impl<'a> Notes<'a> {
     pub fn sections_of(&self, note_ids: &[String]) -> Result<BTreeMap<String, Vec<Section>>> {
         let mut of: BTreeMap<String, Vec<Section>> =
             note_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
+        // Every Note's fields, and the histories of the Sections and of
+        // the Notes merged into them, each read once for all of them
+        // however many there are (obf-1069).
+        let pass = Pass::read(self.store)?;
         // Where each Note merged into one of them shows: its Amends show
         // there as well as under itself.
         let mut into: HashMap<String, String> = HashMap::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
-            let Some(end) = self.merged_into(&id, None)? else {
+        let mut merged: Vec<String> = Vec::new();
+        for id in &pass.ever {
+            if !pass.notes.contains_key(id) {
+                continue;
+            }
+            let Some(end) = self.merged_into(id, Some(&pass))? else {
                 continue;
             };
-            if !of.contains_key(&end) || into.contains_key(&id) {
+            if !of.contains_key(&end) || into.contains_key(id) {
                 continue;
             }
-            let note = self.by_id(&id)?;
-            if let (Some(note), Some(list)) = (note, of.get_mut(&end)) {
-                list.push(self.merged_section(note, &end)?);
-            }
-            into.insert(id, end);
+            merged.push(id.clone());
+            into.insert(id.clone(), end);
         }
-        for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
-            let Some(owner) = self.store.current(&id, keys::NOTE)? else {
+        let sections = self.store.ever_of_type(keys::TYPE_SECTION)?;
+        let histories = self
+            .store
+            .histories_of(merged.iter().chain(sections.iter()).map(String::as_str))?;
+        let history_of = |id: &str| histories.get(id).map(Vec::as_slice).unwrap_or(&[]);
+        for id in &merged {
+            let (Some(end), Some(held)) = (into.get(id), pass.notes.get(id)) else {
                 continue;
             };
-            let under: Vec<&str> = [Some(owner.as_str()), into.get(&owner).map(String::as_str)]
+            let note = self.note_of(id, held, Some(&pass))?;
+            if let (Some(note), Some(list)) = (note, of.get_mut(end)) {
+                list.push(self.merged_section_in(note, end, Some(history_of(id)))?);
+            }
+        }
+        for id in &sections {
+            let history = history_of(id);
+            let fields = Store::latest_fields(history.iter().cloned());
+            // As [`Store::entities_of_type`] lists them.
+            if fields.get(keys::TYPE) != Some(keys::TYPE_SECTION) {
+                continue;
+            }
+            let Some(owner) = fields.get(keys::NOTE) else {
+                continue;
+            };
+            let under: Vec<&str> = [Some(owner), into.get(owner).map(String::as_str)]
                 .into_iter()
                 .flatten()
                 .filter(|note_id| of.contains_key(*note_id))
                 .collect();
-            if under.is_empty() {
-                continue;
-            }
-            let fields = self.store.current_fields(&id)?;
             for note_id in under {
-                if let Some(section) = self.section(&id, note_id, &fields)?
+                if let Some(section) =
+                    self.section_in(id, note_id, &fields, Some(history), Some(&pass))?
                     && let Some(list) = of.get_mut(note_id)
                 {
                     list.push(section);
@@ -2210,7 +2232,18 @@ impl<'a> Notes<'a> {
 
     /// The Note `note`, merged into `note_id`, as a Section of it.
     fn merged_section(&self, note: Note, note_id: &str) -> Result<Section> {
-        let (modified, edited_by) = self.last_edit(&note.id)?;
+        self.merged_section_in(note, note_id, None)
+    }
+
+    /// [`Notes::merged_section`], its edits told by `history` when
+    /// given.
+    fn merged_section_in(
+        &self,
+        note: Note,
+        note_id: &str,
+        history: Option<&[Entry]>,
+    ) -> Result<Section> {
+        let (modified, edited_by) = self.last_edit(&note.id, history)?;
         Ok(Section {
             id: note.id,
             note_id: note_id.to_string(),
@@ -2244,17 +2277,28 @@ impl<'a> Notes<'a> {
     /// one; `None` while there is only the text it was captured with.
     /// Ordered by latest wins, not by the log, so every Device finds the
     /// same.
-    fn last_edit(&self, id: &str) -> Result<(Option<DateTime<Utc>>, Option<Profile>)> {
-        let mut latest: Option<Entry> = None;
+    fn last_edit(
+        &self,
+        id: &str,
+        history: Option<&[Entry]>,
+    ) -> Result<(Option<DateTime<Utc>>, Option<Profile>)> {
+        let read;
+        let history = match history {
+            Some(given) => given,
+            None => {
+                read = self.store.history(id)?;
+                &read
+            }
+        };
+        let mut latest: Option<&Entry> = None;
         let mut texts = 0;
-        for e in self.store.history(id)? {
+        for e in history {
             if e.field != keys::TEXT {
                 continue;
             }
             texts += 1;
             let newer = latest
-                .as_ref()
-                .is_none_or(|held| Store::latest_wins(&e, held) == std::cmp::Ordering::Greater);
+                .is_none_or(|held| Store::latest_wins(e, held) == std::cmp::Ordering::Greater);
             if newer {
                 latest = Some(e);
             }
@@ -2267,6 +2311,19 @@ impl<'a> Notes<'a> {
 
     /// The Section `id` from its `fields`, shown under `note_id`.
     fn section(&self, id: &str, note_id: &str, fields: &Fields) -> Result<Option<Section>> {
+        self.section_in(id, note_id, fields, None, None)
+    }
+
+    /// [`Notes::section`]; its `history`, when given, is not read again,
+    /// nor what `pass` read.
+    fn section_in(
+        &self,
+        id: &str,
+        note_id: &str,
+        fields: &Fields,
+        history: Option<&[Entry]>,
+        pass: Option<&Pass>,
+    ) -> Result<Option<Section>> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_SECTION) {
             return Ok(None);
         }
@@ -2275,7 +2332,7 @@ impl<'a> Notes<'a> {
         };
         let text = StoredText::read(fields.get(keys::TEXT));
         let boxes = self.boxes(id, &text, fields)?;
-        let (modified, edited_by) = self.last_edit(id)?;
+        let (modified, edited_by) = self.last_edit(id, history)?;
         Ok(Some(Section {
             id: id.to_string(),
             note_id: note_id.to_string(),
@@ -2284,7 +2341,7 @@ impl<'a> Notes<'a> {
             text_version: text.version,
             text_editable: text.editable,
             captured: parse_time(captured)?,
-            context: self.context(fields, None)?,
+            context: self.context(fields, pass)?,
             photos: Vec::new(),
             recordings: Vec::new(),
             transcripts: BTreeMap::new(),

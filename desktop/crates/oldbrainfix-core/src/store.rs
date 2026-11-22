@@ -283,6 +283,11 @@ pub struct Store {
     /// by.
     #[cfg(test)]
     pub(crate) history_reads: std::sync::atomic::AtomicUsize,
+    /// How often [`Store::logged_history`] was read, for itself or for
+    /// [`Store::history`]: what a test counts the reads of the log alone
+    /// by (obf-1069).
+    #[cfg(test)]
+    pub(crate) logged_reads: std::sync::atomic::AtomicUsize,
     /// How often [`Store::judged`] was worked out from the whole log:
     /// what a test counts it by.
     #[cfg(test)]
@@ -371,6 +376,8 @@ impl Store {
             worked_out: Mutex::new(WorkedOut::default()),
             #[cfg(test)]
             history_reads: std::sync::atomic::AtomicUsize::new(0),
+            #[cfg(test)]
+            logged_reads: std::sync::atomic::AtomicUsize::new(0),
             #[cfg(test)]
             judged_builds: std::sync::atomic::AtomicUsize::new(0),
             people: Mutex::new(None),
@@ -1477,6 +1484,9 @@ impl Store {
     /// pending change among them: what decides where an entity is
     /// sealed, and what the user's own Devices wrote.
     pub fn logged_history(&self, entity: &str) -> Result<Vec<Entry>> {
+        #[cfg(test)]
+        self.logged_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if self.ai_hides(entity)? {
             return Ok(Vec::new());
         }
@@ -1535,8 +1545,16 @@ impl Store {
 
     /// The current value of every field on `entity`: latest wins.
     pub fn current_fields(&self, entity: &str) -> Result<Fields> {
+        Ok(Self::latest_fields(self.history(entity)?))
+    }
+
+    /// The current value of every field in `history`, one entity's
+    /// entries as [`Store::history`] gives them: what
+    /// [`Store::current_fields`] makes of them, as the Dart core's
+    /// `latestFields`.
+    pub fn latest_fields(history: impl IntoIterator<Item = Entry>) -> Fields {
         let mut latest: Vec<Entry> = Vec::new();
-        for e in self.history(entity)? {
+        for e in history {
             match latest.iter_mut().find(|held| held.field == e.field) {
                 Some(held) => {
                     if Self::latest_wins(&e, held) == Ordering::Greater {
@@ -1546,9 +1564,7 @@ impl Store {
                 None => latest.push(e),
             }
         }
-        Ok(Fields(
-            latest.into_iter().map(|e| (e.field, e.value)).collect(),
-        ))
+        Fields(latest.into_iter().map(|e| (e.field, e.value)).collect())
     }
 
     /// What [`Store::current_fields`] gives for each of `entities`, read
@@ -1559,13 +1575,22 @@ impl Store {
         &self,
         entities: impl IntoIterator<Item = &'a str>,
     ) -> Result<HashMap<String, Fields>> {
-        let mut ids: Vec<&str> = Vec::new();
-        let mut wanted = std::collections::HashSet::new();
-        for id in entities {
-            if !self.ai_hides(id)? && wanted.insert(id) {
-                ids.push(id);
-            }
-        }
+        Ok(self
+            .histories_of(entities)?
+            .into_iter()
+            .map(|(id, history)| (id, Self::latest_fields(history)))
+            .collect())
+    }
+
+    /// What [`Store::history`] gives for each of `entities`, read in one
+    /// query per few hundred rather than one each (obf-1069), as the Dart
+    /// core's `historiesOf`; those without an entry that counts are left
+    /// out. It counts as one [`Store::history`] read.
+    pub fn histories_of<'a>(
+        &self,
+        entities: impl IntoIterator<Item = &'a str>,
+    ) -> Result<HashMap<String, Vec<Entry>>> {
+        let (ids, wanted) = self.unhidden(entities)?;
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
@@ -1573,16 +1598,7 @@ impl Store {
         self.history_reads
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let shown = self.shown()?;
-        let mut all = Vec::new();
-        for chunk in ids.chunks(IN_CHUNK) {
-            let marks = vec!["?"; chunk.len()].join(", ");
-            all.extend(self.entries_once(
-                &format!(
-                    "SELECT * FROM entries WHERE {APPLIED} AND entity IN ({marks}) ORDER BY seq"
-                ),
-                rusqlite::params_from_iter(chunk.iter()),
-            )?);
-        }
+        let mut all = self.logged_of(&ids)?;
         all.extend(
             shown
                 .iter()
@@ -1594,28 +1610,58 @@ impl Store {
         } else {
             self.display_judged(&shown)?
         };
-        let mut latest: HashMap<String, Vec<Entry>> = HashMap::new();
-        for e in all {
-            if judged.ignored.contains(&e.id()) {
-                continue;
-            }
-            let fields = latest.entry(e.entity.clone()).or_default();
-            match fields.iter_mut().find(|held| held.field == e.field) {
-                Some(held) => {
-                    if Self::latest_wins(&e, held) == Ordering::Greater {
-                        *held = e;
-                    }
-                }
-                None => fields.push(e),
+        Ok(grouped(all, &judged.ignored))
+    }
+
+    /// What [`Store::logged_history`] gives for each of `entities`, read
+    /// in one query per few hundred rather than one each (obf-1069), as
+    /// the Dart core's `loggedHistoriesOf`; those without an entry that
+    /// counts are left out. It counts as one [`Store::logged_history`]
+    /// read.
+    pub fn logged_histories_of<'a>(
+        &self,
+        entities: impl IntoIterator<Item = &'a str>,
+    ) -> Result<HashMap<String, Vec<Entry>>> {
+        let (ids, _) = self.unhidden(entities)?;
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        #[cfg(test)]
+        self.logged_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let all = self.logged_of(&ids)?;
+        Ok(grouped(all, &self.judged()?.ignored))
+    }
+
+    /// `entities` but those hidden from the AI, each once, in their
+    /// order and as a set.
+    fn unhidden<'a>(
+        &self,
+        entities: impl IntoIterator<Item = &'a str>,
+    ) -> Result<(Vec<&'a str>, HashSet<&'a str>)> {
+        let mut ids: Vec<&str> = Vec::new();
+        let mut wanted = HashSet::new();
+        for id in entities {
+            if !self.ai_hides(id)? && wanted.insert(id) {
+                ids.push(id);
             }
         }
-        Ok(latest
-            .into_iter()
-            .map(|(id, fields)| {
-                let fields = fields.into_iter().map(|e| (e.field, e.value)).collect();
-                (id, Fields(fields))
-            })
-            .collect())
+        Ok((ids, wanted))
+    }
+
+    /// The entries of `ids` in the log, in log order.
+    fn logged_of(&self, ids: &[&str]) -> Result<Vec<Entry>> {
+        let mut all = Vec::new();
+        for chunk in ids.chunks(IN_CHUNK) {
+            let marks = vec!["?"; chunk.len()].join(", ");
+            all.extend(self.entries_once(
+                &format!(
+                    "SELECT * FROM entries WHERE {APPLIED} AND entity IN ({marks}) ORDER BY seq"
+                ),
+                rusqlite::params_from_iter(chunk.iter()),
+            )?);
+        }
+        Ok(all)
     }
 
     /// The entities [`Store::entities_of_type`] gives that are among
@@ -2022,6 +2068,18 @@ impl Store {
 pub const ACCEPTED_PENDING_PREFIX: &str = "pending:";
 
 /// `wire` as the store reads it, at the local handle `seq`.
+/// `all` by entity, each in their order, but those `ignored`.
+fn grouped(all: Vec<Entry>, ignored: &HashSet<String>) -> HashMap<String, Vec<Entry>> {
+    let mut by: HashMap<String, Vec<Entry>> = HashMap::new();
+    for e in all {
+        if ignored.contains(&e.id()) {
+            continue;
+        }
+        by.entry(e.entity.clone()).or_default().push(e);
+    }
+    by
+}
+
 pub(crate) fn entry_of(seq: i64, wire: WireEntry) -> Result<Entry> {
     let date_at = parse_time(&wire.date)?;
     // Most entries are dated when they were recorded: read once.

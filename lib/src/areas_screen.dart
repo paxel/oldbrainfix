@@ -1333,7 +1333,7 @@ List<PlacedNote> _search(
   DiaryOrder order = DiaryOrder.time,
   bool hideUnimportant = false,
   PersonFilter people = PersonFilter.everyone,
-}) => [
+}) => placeNotes(places, [
   for (final note in diary(
     places.store.notesBy(
       Search(places.store).notes(query, within: within),
@@ -1342,8 +1342,8 @@ List<PlacedNote> _search(
     order: order,
     hideUnimportant: hideUnimportant,
   ))
-    if (!(lock?.hides(note) ?? false)) placeNote(places, note),
-];
+    if (!(lock?.hides(note) ?? false)) note,
+]);
 
 /// Every hit of a search on one page, or a line saying there is none.
 List<Widget> _hitCards(

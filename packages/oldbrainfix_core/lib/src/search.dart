@@ -112,9 +112,14 @@ class Search {
     Note? note(String id) => read.putIfAbsent(id, () => notes.byId(id));
     String shownUnder(String owner) => note(owner)?.mergedInto ?? owner;
     final found = <String>{};
-    final makings = <String, ({String? making, bool shopping})>{};
     // Read in one query per few hundred rather than one each (#204).
     final fieldsOf = store.currentFieldsOf(candidates);
+    final makings = _makings([
+      for (final fields in fieldsOf.values)
+        if (fields[NoteKeys.type] == ChecklistKeys.typeLine &&
+            fields[ChecklistKeys.trashed] == null)
+          ?fields[ChecklistKeys.note],
+    ]);
     for (final id in candidates) {
       final fields = fieldsOf[id] ?? const <String, String?>{};
       switch (fields[NoteKeys.type]) {
@@ -141,10 +146,7 @@ class Search {
         case ChecklistKeys.typeLine:
           final owner = fields[ChecklistKeys.note];
           if (owner == null || fields[ChecklistKeys.trashed] != null) continue;
-          final (:making, :shopping) = makings.putIfAbsent(
-            owner,
-            () => _making(owner),
-          );
+          final (:making, :shopping) = makings[owner] ?? _noList;
           if (making == null || fields[ChecklistKeys.made] != making) continue;
           if (shopping && ShoppingLists.isGone(fields)) continue;
           if (holds(StoredText.read(fields[ChecklistKeys.text]).text)) {
@@ -164,13 +166,32 @@ class Search {
       note.attachmentTexts.values.any(holds) ||
       note.attachments.any((a) => holds(a.name));
 
-  /// The making of the Checklist or Shopping List of the Note [owner]
-  /// whose Lines count now, and whether it is a Shopping List.
-  ({String? making, bool shopping}) _making(String owner) {
-    final listed = Checklists(store).byNote(owner)?.making;
-    if (listed != null) return (making: listed, shopping: false);
-    return (making: ShoppingLists(store).making(owner), shopping: true);
+  /// The making of the Checklist or Shopping List of each Note of
+  /// [owners] whose Lines count now, and whether it is a Shopping List:
+  /// read for all of them at once, not once per Note (obf-1068).
+  Map<String, ({String? making, bool shopping})> _makings(
+    Iterable<String> owners,
+  ) {
+    final ids = owners.toSet();
+    final lists = Checklists(store).makingsOf(ids);
+    final shopping = ShoppingLists(store).makingsOf([
+      for (final id in ids)
+        if (!lists.containsKey(id)) id,
+    ]);
+    return {
+      for (final id in ids)
+        id: switch (lists[id]) {
+          final making? => (making: making, shopping: false),
+          null => (making: shopping[id], shopping: true),
+        },
+    };
   }
+
+  /// What [_makings] gives a Note that is no list.
+  static const ({String? making, bool shopping}) _noList = (
+    making: null,
+    shopping: true,
+  );
 
   /// Those of [scope] [wanted], in lower case and not blank, is found
   /// in, each Note read in full: the search without the index.
@@ -224,15 +245,20 @@ class Search {
       final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
       (texts[shownUnder] ??= []).add(line);
     }
-    final makings = <String, ({String? making, bool shopping})>{};
-    for (final id in store.entitiesOfType(ChecklistKeys.typeLine)) {
-      final fields = store.currentFields(id);
+    // Every Line's fields, then the lists of their Notes, read at once.
+    final lines = [
+      for (final MapEntry(key: id, value: fields)
+          in store.currentFieldsOfType(ChecklistKeys.typeLine).entries)
+        (id, fields),
+    ];
+    final makings = _makings([
+      for (final (_, fields) in lines)
+        if (fields[ChecklistKeys.trashed] == null) ?fields[ChecklistKeys.note],
+    ]);
+    for (final (_, fields) in lines) {
       final owner = fields[ChecklistKeys.note];
       if (owner == null || fields[ChecklistKeys.trashed] != null) continue;
-      final (:making, :shopping) = makings.putIfAbsent(
-        owner,
-        () => _making(owner),
-      );
+      final (:making, :shopping) = makings[owner] ?? _noList;
       if (making == null || fields[ChecklistKeys.made] != making) continue;
       if (shopping && ShoppingLists.isGone(fields)) continue;
       final shownUnder = notes.byId(owner)?.mergedInto ?? owner;

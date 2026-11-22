@@ -223,25 +223,62 @@ extension AreaKeys on Store {
   /// (ADR 0022) moves nothing into an Area before it is accepted.
   String scopeOf(String entity) {
     if (entity.startsWith('area:')) return entity;
-    String? next;
-    if (entity.startsWith('topic:')) {
-      next = logged(entity, PlaceKeys.area);
-    } else if (entity.startsWith('note:')) {
-      next = logged(entity, NoteKeys.place);
-    } else if (entity.startsWith('section:')) {
-      next = logged(entity, SectionKeys.note);
-    } else if (entity.startsWith('routine:')) {
-      next = logged(entity, RoutineKeys.note);
-    } else if (entity.startsWith(FrogKeys.prefix)) {
-      next = logged(entity, FrogKeys.note);
-    } else if (entity.startsWith(TallyKeys.entryPrefix)) {
-      next = logged(entity, TallyKeys.note);
-    } else if (entity.startsWith(ChecklistKeys.linePrefix)) {
-      next = logged(entity, ChecklistKeys.note);
-    }
+    final field = _upField(entity);
+    final next = field == null ? null : logged(entity, field);
     // Each step goes to a kind further up, so the walk ends.
     if (next == null || !_above(entity, next)) return personalScope;
     return scopeOf(next);
+  }
+
+  /// What [scopeOf] gives for each of [entities], walked up a kind at a
+  /// time for all of them, one read of the log for each step rather
+  /// than one per entity (obf-1069).
+  Map<String, String> scopesOf(Iterable<String> entities) {
+    // The entity one kind further up that each lies in, null for none.
+    final up = <String, String?>{};
+    var step = entities.toSet();
+    while (step.isNotEmpty) {
+      final read = loggedHistoriesOf([
+        for (final e in step)
+          if (!e.startsWith('area:') && _upField(e) != null) e,
+      ]);
+      final next = <String>{};
+      for (final e in step) {
+        final field = e.startsWith('area:') ? null : _upField(e);
+        final value = field == null
+            ? null
+            : Store.latestFields(read[e] ?? const [])[field];
+        final above = value != null && _above(e, value) ? value : null;
+        up[e] = above;
+        if (above != null) next.add(above);
+      }
+      step = {
+        for (final e in next)
+          if (!up.containsKey(e)) e,
+      };
+    }
+    String scope(String e) {
+      if (e.startsWith('area:')) return e;
+      return switch (up[e]) {
+        final above? => scope(above),
+        null => personalScope,
+      };
+    }
+
+    return {for (final e in entities) e: scope(e)};
+  }
+
+  /// The field naming what [entity] lies in, one kind further up, as
+  /// [scopeOf] follows it; null for a kind that lies in nothing.
+  static String? _upField(String entity) {
+    if (entity.startsWith('topic:')) return PlaceKeys.area;
+    if (entity.startsWith('note:')) return NoteKeys.place;
+    if (entity.startsWith('section:')) return SectionKeys.note;
+    if (entity.startsWith('routine:')) return RoutineKeys.note;
+    if (entity.startsWith(FrogKeys.prefix)) return FrogKeys.note;
+    if (entity.startsWith(TallyKeys.entryPrefix)) return TallyKeys.note;
+    if (entity.startsWith(ChecklistKeys.linePrefix)) return ChecklistKeys.note;
+    return null;
   }
 
   /// The key [entity] is sealed with: its scope's writing key, or the

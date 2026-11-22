@@ -7,6 +7,8 @@
 //! every reader tries each, every writer seals with the lowest id, and
 //! none is ever dropped.
 
+use std::collections::HashMap;
+
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
@@ -161,6 +163,21 @@ pub fn area_keys_of(json: Option<&Value>) -> Vec<AreaKey> {
 }
 
 /// How far up an entity id's kind is, for the walk to its Area.
+/// The field naming what `entity` lies in, one kind further up, as
+/// [`Store::scope_of`] follows it; none for a kind that lies in nothing.
+fn up_field(entity: &str) -> Option<&'static str> {
+    match entity.split_once(':').map(|(kind, _)| kind) {
+        Some("topic") => Some(place_keys::AREA),
+        Some("note") => Some(note_keys::PLACE),
+        Some("section") => Some(note_keys::NOTE),
+        Some("routine") => Some(routine_keys::NOTE),
+        Some("frog") => Some(frog_keys::NOTE),
+        Some(tally_keys::TYPE_ENTRY) => Some(tally_keys::NOTE),
+        Some(checklist_keys::TYPE_LINE) => Some(checklist_keys::NOTE),
+        _ => None,
+    }
+}
+
 fn rank(id: &str) -> u8 {
     match id.split_once(':').map(|(kind, _)| kind) {
         Some("area") => 0,
@@ -244,20 +261,68 @@ impl Store {
         if entity.starts_with("area:") {
             return Ok(entity.to_string());
         }
-        let field = match entity.split_once(':').map(|(kind, _)| kind) {
-            Some("topic") => place_keys::AREA,
-            Some("note") => note_keys::PLACE,
-            Some("section") => note_keys::NOTE,
-            Some("routine") => routine_keys::NOTE,
-            Some("frog") => frog_keys::NOTE,
-            Some(tally_keys::TYPE_ENTRY) => tally_keys::NOTE,
-            Some(checklist_keys::TYPE_LINE) => checklist_keys::NOTE,
-            _ => return Ok(PERSONAL_SCOPE.to_string()),
+        let Some(field) = up_field(entity) else {
+            return Ok(PERSONAL_SCOPE.to_string());
         };
         match self.logged(entity, field)? {
             Some(next) if rank(&next) < rank(entity) => self.scope_of(&next),
             _ => Ok(PERSONAL_SCOPE.to_string()),
         }
+    }
+
+    /// What [`Store::scope_of`] gives for each of `entities`, walked up a
+    /// kind at a time for all of them, one read of the log for each step
+    /// rather than one per entity (obf-1069), as the Dart core's
+    /// `scopesOf`.
+    pub fn scopes_of(&self, entities: &[String]) -> Result<HashMap<String, String>> {
+        // The entity one kind further up that each lies in, none for none.
+        let mut up: HashMap<String, Option<String>> = HashMap::new();
+        let mut step: Vec<String> = entities.to_vec();
+        step.sort();
+        step.dedup();
+        while !step.is_empty() {
+            let read = self.logged_histories_of(
+                step.iter()
+                    .filter(|e| !e.starts_with("area:") && up_field(e).is_some())
+                    .map(String::as_str),
+            )?;
+            let mut next: Vec<String> = Vec::new();
+            for e in &step {
+                let field = if e.starts_with("area:") {
+                    None
+                } else {
+                    up_field(e)
+                };
+                let value = match (field, read.get(e)) {
+                    (Some(field), Some(history)) => Store::latest_fields(history.iter().cloned())
+                        .get(field)
+                        .map(str::to_string),
+                    _ => None,
+                };
+                let above = value.filter(|v| rank(v) < rank(e));
+                if let Some(above) = &above {
+                    next.push(above.clone());
+                }
+                up.insert(e.clone(), above);
+            }
+            next.retain(|e| !up.contains_key(e));
+            next.sort();
+            next.dedup();
+            step = next;
+        }
+        fn scope(up: &HashMap<String, Option<String>>, e: &str) -> String {
+            if e.starts_with("area:") {
+                return e.to_string();
+            }
+            match up.get(e) {
+                Some(Some(above)) => scope(up, above),
+                _ => PERSONAL_SCOPE.to_string(),
+            }
+        }
+        Ok(entities
+            .iter()
+            .map(|e| (e.clone(), scope(&up, e)))
+            .collect())
     }
 
     /// The key `entity` is sealed with: its scope's writing key, or the

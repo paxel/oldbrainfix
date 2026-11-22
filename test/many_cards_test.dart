@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -70,6 +71,47 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(store.historyReads, before);
+  });
+
+  test('a list places its Notes as each is placed on its own, in as many '
+      'reads for many Notes as for a few', () {
+    final places = Places(store);
+    final home = places.addArea('Home').id;
+    final desk = places.addTopic(home, 'Desk').id;
+    void seed(int count) {
+      for (var i = 0; i < count; i++) {
+        notes.capture('Home $i', place: home);
+        notes.capture('Desk $i', place: desk);
+        notes.capture('Unsorted $i');
+      }
+    }
+
+    String shown(PlacedNote p) => [
+      p.note.id,
+      p.area?.id,
+      p.topic?.id,
+      p.changes,
+      p.schedules,
+      p.amends,
+      p.author?.id,
+    ].join(' ');
+    int reads() {
+      final all = notes.all();
+      final before = store.historyReads;
+      placeNotes(places, all);
+      return store.historyReads - before;
+    }
+
+    seed(2);
+    final all = notes.all();
+    expect(
+      placeNotes(places, all).map(shown),
+      all.map((note) => shown(placeNote(places, note))),
+    );
+    expect(placeNotes(places, all).where((p) => p.topic != null), hasLength(2));
+    final few = reads();
+    seed(20);
+    expect(reads(), few);
   });
 
   testWidgets('the Note editor shows before the Notes linking to its Note '

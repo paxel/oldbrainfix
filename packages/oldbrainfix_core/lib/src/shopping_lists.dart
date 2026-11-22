@@ -392,23 +392,28 @@ class ShoppingLists {
   bool isShoppingList(String noteId) => making(noteId) != null;
 
   /// The Shopping Lists of the Notes [noteIds] that are one, read in one
-  /// pass over the Lines: for a list that shows many Notes in full.
+  /// pass over the Lines: for a list that shows many Notes in full. The
+  /// Notes and the Lines are read in a few queries however many there
+  /// are (obf-1069).
   Map<String, ShoppingList> ofNotes(
     Iterable<String> noteIds,
     WallClock wallClock,
   ) {
-    final makings = <String, String>{};
-    for (final id in noteIds) {
-      if (making(id) case final making?) makings[id] = making;
-    }
+    final makings = makingsOf(noteIds);
     if (makings.isEmpty) return const {};
     final today = Day.today(store.clock(), wallClock);
     final read = <String, List<_Read>>{};
-    for (final id in store.entitiesOfType(ChecklistKeys.typeLine)) {
+    final ever = store.everOfType(ChecklistKeys.typeLine);
+    final histories = store.historiesOf(ever);
+    for (final id in ever) {
       final latest = <String, Entry>{};
-      for (final e in store.history(id)) {
+      for (final e in histories[id] ?? const <Entry>[]) {
         final held = latest[e.field];
         if (held == null || Store.latestWins(e, held) > 0) latest[e.field] = e;
+      }
+      // As [Store.entitiesOfType] lists them.
+      if (latest[ChecklistKeys.type]?.value != ChecklistKeys.typeLine) {
+        continue;
       }
       final note = latest[ChecklistKeys.note]?.value;
       if (note == null || latest[ChecklistKeys.trashed]?.value != null) {
@@ -547,8 +552,26 @@ class ShoppingLists {
 
   /// The making of the Shopping List the Note [noteId] is now, or null
   /// when it is none: no Note, another list, or a Tally.
-  String? making(String noteId) {
-    final fields = store.currentFields(noteId);
+  String? making(String noteId) =>
+      _makingOf(noteId, store.currentFields(noteId));
+
+  /// The making of each of [noteIds] that is a Shopping List now, as
+  /// [making] tells it, in their order: their fields read in one query
+  /// rather than one per Note (obf-1069).
+  Map<String, String> makingsOf(Iterable<String> noteIds) {
+    final read = store.currentFieldsOf(noteIds);
+    final makings = <String, String>{};
+    for (final id in noteIds) {
+      if (_makingOf(id, read[id] ?? const {}) case final making?) {
+        makings[id] = making;
+      }
+    }
+    return makings;
+  }
+
+  /// The making of the Shopping List the Note [noteId] of the current
+  /// [fields] is ([making]).
+  String? _makingOf(String noteId, Map<String, String?> fields) {
     if (fields[NoteKeys.type] != NoteKeys.typeNote) return null;
     final kind = parseListKind(fields[ChecklistKeys.kind]);
     if (kind == null || kind.list != ShoppingKeys.shopping) return null;

@@ -54,10 +54,53 @@ typedef PlacedNote = ({
 /// whose it is.
 PlacedNote placeNote(Places places, Note note) {
   final store = places.store;
-  final changes = store.mayChange(note.id);
-  final schedules = store.mayManage(store.areaOf(note.id));
-  final amends = store.mayWriteIn(note.id);
-  final author = store.authorOf(note.id);
+  return _placed(
+    places,
+    note,
+    changes: store.mayChange(note.id),
+    schedules: store.mayManage(store.areaOf(note.id)),
+    amends: store.mayWriteIn(note.id),
+    author: store.authorOf(note.id),
+  );
+}
+
+/// [placeNote] for each of [notes], in their order, for a list: what
+/// this Device may do to them and whose they are read for all of them
+/// at once, and each Area and Topic once (obf-1069).
+List<PlacedNote> placeNotes(Places places, Iterable<Note> notes) {
+  final list = notes.toList();
+  final access = places.store.accessOf([for (final note in list) note.id]);
+  final topics = <String, Topic?>{};
+  final areas = <String, Area?>{};
+  return [
+    for (final note in list)
+      if (access[note.id] case final a?)
+        _placed(
+          places,
+          note,
+          changes: a.changes,
+          schedules: a.schedules,
+          amends: a.amends,
+          author: a.author,
+          topics: topics,
+          areas: areas,
+        ),
+  ];
+}
+
+/// [note] with what this Device may do to it and whose it is, and where
+/// it is filed, its Topic and Area looked up in [topics] and [areas]
+/// first when given.
+PlacedNote _placed(
+  Places places,
+  Note note, {
+  required bool changes,
+  required bool schedules,
+  required bool amends,
+  required Profile? author,
+  Map<String, Topic?>? topics,
+  Map<String, Area?>? areas,
+}) {
   final place = note.place;
   if (place == null) {
     return (
@@ -70,8 +113,18 @@ PlacedNote placeNote(Places places, Note note) {
       author: author,
     );
   }
-  final topic = places.topicById(place);
-  final area = places.areaById(topic?.areaId ?? place);
+  Topic? topicById(String id) => switch (topics) {
+    null => places.topicById(id),
+    final held when held.containsKey(id) => held[id],
+    final held => held[id] = places.topicById(id),
+  };
+  Area? areaById(String id) => switch (areas) {
+    null => places.areaById(id),
+    final held when held.containsKey(id) => held[id],
+    final held => held[id] = places.areaById(id),
+  };
+  final topic = topicById(place);
+  final area = areaById(topic?.areaId ?? place);
   return (
     note: note,
     area: area,

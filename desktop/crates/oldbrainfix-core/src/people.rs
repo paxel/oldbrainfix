@@ -13,7 +13,7 @@
 //! 0021), so its signature no longer holds and it is never passed on;
 //! any record of theirs at the same version or newer replaces it.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use base64::Engine;
@@ -22,6 +22,7 @@ use serde_json::{Value, json};
 
 use crate::Result;
 use crate::entry::dart_iso;
+use crate::keys::PERSONAL_SCOPE;
 use crate::notes::Note;
 use crate::profile::{
     ALIASES, FIRST, KEYS, OwnProfile, Profile, ProfileAlias, ProfileChoice, RECORD, SentProfile,
@@ -87,6 +88,7 @@ pub struct PeopleIndex {
 }
 
 /// Who wrote a Note: the user, another person, or nobody known.
+#[derive(Clone)]
 enum Writer {
     Own,
     Theirs(Profile),
@@ -97,6 +99,25 @@ impl Writer {
     fn theirs(author: Option<Profile>) -> Writer {
         author.map_or(Writer::Unknown, Writer::Theirs)
     }
+}
+
+/// What this Device may do to a Note or Section in a Shared Area (ADR
+/// 0013) and whose it is ([`Store::access_of`]), as the Dart core's
+/// `NoteAccess`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteAccess {
+    /// The Area it lies in; none for none.
+    pub area: Option<String>,
+    /// Whether this Device may change it ([`Store::may_change`]).
+    pub changes: bool,
+    /// Whether it may give it Routines and Reminders
+    /// ([`Store::may_manage`]).
+    pub schedules: bool,
+    /// Whether it may add to it ([`Store::may_write_in`]).
+    pub amends: bool,
+    /// The Profile of the other person who wrote it
+    /// ([`Store::author_of`]); none for the user's own.
+    pub author: Option<Profile>,
 }
 
 /// Which people's Notes the notes browser shows (#53), the Dart core's
@@ -873,7 +894,86 @@ impl Store {
     /// Who wrote the Note or Section `entity`: the user, another person
     /// as their Profile shows without the Override, or nobody known.
     fn writer_of(&self, entity: &str) -> Result<Writer> {
-        if let Some((key, person)) = self.received_from(entity)? {
+        let received = self.received_from(entity)?;
+        self.writer_from(
+            received,
+            || {
+                Ok(self
+                    .history(entity)?
+                    .into_iter()
+                    .find(|e| e.field == "$type")
+                    .map(|e| e.device))
+            },
+            |device| self.device_writer(device, entity),
+        )
+    }
+
+    /// What this Device may do to each Note or Section of `ids` and whose
+    /// it is, as [`Store::may_change`], [`Store::may_manage`] of its
+    /// [`Store::area_of`], [`Store::may_write_in`] and
+    /// [`Store::author_of`] tell it one by one: read for all of them in a
+    /// few queries however many there are (obf-1069), as the Dart core's
+    /// `accessOf`.
+    pub fn access_of(&self, ids: &[String]) -> Result<HashMap<String, NoteAccess>> {
+        let mut list = ids.to_vec();
+        list.sort();
+        list.dedup();
+        let scopes = self.scopes_of(&list)?;
+        let histories = self.histories_of(list.iter().map(String::as_str))?;
+        let logged = self.logged_histories_of(list.iter().map(String::as_str))?;
+        let mut own = HashMap::new();
+        let mut writers: HashMap<(String, Option<String>), Writer> = HashMap::new();
+        let mut overrides = HashMap::new();
+        let mut out = HashMap::new();
+        for id in list {
+            let area = scopes
+                .get(&id)
+                .filter(|scope| scope.as_str() != PERSONAL_SCOPE)
+                .cloned();
+            let history = histories.get(&id).map(Vec::as_slice).unwrap_or(&[]);
+            let creator = || -> Result<Option<String>> {
+                Ok(history
+                    .iter()
+                    .find(|e| e.field == "$type")
+                    .map(|e| e.device.clone()))
+            };
+            let kept = logged.get(&id).map(Vec::as_slice).unwrap_or(&[]);
+            let received = received_link(self.latest_by_own(kept, "received", &mut own)?);
+            let writer = self.writer_from(received, creator, |device| {
+                let key = (device.to_string(), area.clone());
+                if let Some(held) = writers.get(&key) {
+                    return Ok(held.clone());
+                }
+                let made = self.device_writer_in(device, || Ok(area.clone()))?;
+                writers.insert(key, made.clone());
+                Ok(made)
+            })?;
+            let author = match writer {
+                Writer::Theirs(author) => Some(self.with_override_in(author, &mut overrides)?),
+                Writer::Own | Writer::Unknown => None,
+            };
+            let access = NoteAccess {
+                changes: self.may_change_in(area.as_deref(), creator)?,
+                schedules: self.may_manage(area.as_deref())?,
+                amends: self.may_write_in_area(area.as_deref())?,
+                author,
+                area,
+            };
+            out.insert(id, access);
+        }
+        Ok(out)
+    }
+
+    /// Who wrote a Note or Section: `received` the link it keeps from a
+    /// Sent Item, else the Device of the first `$type` in its history,
+    /// `creator`, told by `by_device`.
+    fn writer_from(
+        &self,
+        received: Option<(String, String)>,
+        creator: impl FnOnce() -> Result<Option<String>>,
+        by_device: impl FnOnce(&str) -> Result<Writer>,
+    ) -> Result<Writer> {
+        if let Some((key, person)) = received {
             if self.own_keys()?.bound.contains(&key) {
                 return Ok(Writer::Own);
             }
@@ -891,21 +991,26 @@ impl Store {
             let named = kept.then_some(person);
             return Ok(Writer::theirs(self.shown_for(Some(&key), named)?));
         }
-        let Some(device) = self
-            .history(entity)?
-            .into_iter()
-            .find(|e| e.field == "$type")
-            .map(|e| e.device)
-        else {
+        let Some(device) = creator()? else {
             return Ok(Writer::Unknown);
         };
-        self.device_writer(&device, entity)
+        by_device(&device)
     }
 
     /// Who the Device `device` writes for in the place of `entity`: the
     /// user, another person as their Profile shows without the Override,
     /// or nobody known.
     fn device_writer(&self, device: &str, entity: &str) -> Result<Writer> {
+        self.device_writer_in(device, || self.area_of(entity))
+    }
+
+    /// [`Store::device_writer`] for an entity whose Area `area` gives,
+    /// read only when the Device is not the user's own.
+    fn device_writer_in(
+        &self,
+        device: &str,
+        area: impl FnOnce() -> Result<Option<String>>,
+    ) -> Result<Writer> {
         if device == self.device_id()? || self.is_own_device(device)? {
             return Ok(Writer::Own);
         }
@@ -917,7 +1022,7 @@ impl Store {
         {
             return Ok(Writer::Own);
         }
-        let named = match self.area_of(entity)? {
+        let named = match area()? {
             Some(area) => self
                 .grants_of(&area)?
                 .and_then(|g| g.person_of(device).map(str::to_string)),
@@ -936,21 +1041,8 @@ impl Store {
     /// one of the user's own Devices wrote counts: another person's
     /// Device in a Shared Area could write any.
     fn received_from(&self, entity: &str) -> Result<Option<(String, String)>> {
-        let Some(raw) = self.own_current(entity, "received", &mut Default::default())? else {
-            return Ok(None);
-        };
-        let Ok(link) = serde_json::from_str::<Value>(&raw) else {
-            return Ok(None);
-        };
-        Ok(
-            match (
-                link.get("from").and_then(Value::as_str),
-                link.get("profile").and_then(Value::as_str),
-            ) {
-                (Some(key), Some(person)) => Some((key.to_string(), person.to_string())),
-                _ => None,
-            },
-        )
+        let raw = self.own_current(entity, "received", &mut Default::default())?;
+        Ok(received_link(raw))
     }
 
     /// The Profile shown for a writer with the key `key`: the one `named`
@@ -989,6 +1081,18 @@ impl Store {
             }
         }
         Ok(Some(placeholder(target)))
+    }
+}
+
+/// The sender's key and Profile id in the `received` link `raw`.
+fn received_link(raw: Option<String>) -> Option<(String, String)> {
+    let link = serde_json::from_str::<Value>(&raw?).ok()?;
+    match (
+        link.get("from").and_then(Value::as_str),
+        link.get("profile").and_then(Value::as_str),
+    ) {
+        (Some(key), Some(person)) => Some((key.to_string(), person.to_string())),
+        _ => None,
     }
 }
 

@@ -171,7 +171,15 @@ impl<'a> Search<'a> {
             .store
             .current_fields_of(candidates.iter().map(String::as_str))?;
         let mut found = HashSet::new();
-        let mut makings: HashMap<String, (Option<String>, bool)> = HashMap::new();
+        let owners: Vec<String> = fields_of
+            .values()
+            .filter(|f| {
+                f.get(keys::TYPE) == Some(checklist_keys::TYPE_LINE)
+                    && f.get(checklist_keys::TRASHED).is_none()
+            })
+            .filter_map(|f| f.get(checklist_keys::NOTE).map(str::to_string))
+            .collect();
+        let makings = self.makings(owners)?;
         for id in &candidates {
             let Some(fields) = fields_of.get(id) else {
                 continue;
@@ -211,14 +219,7 @@ impl<'a> Search<'a> {
                     if fields.get(checklist_keys::TRASHED).is_some() {
                         continue;
                     }
-                    let (making, shopping) = match makings.get(owner) {
-                        Some(held) => held.clone(),
-                        None => {
-                            let held = self.making(owner)?;
-                            makings.insert(owner.to_string(), held.clone());
-                            held
-                        }
-                    };
+                    let (making, shopping) = makings.get(owner).cloned().unwrap_or((None, true));
                     if making.is_none() || fields.get(checklist_keys::MADE) != making.as_deref() {
                         continue;
                     }
@@ -235,13 +236,30 @@ impl<'a> Search<'a> {
         Ok(Some(found))
     }
 
-    /// The making of the Checklist or Shopping List of the Note `owner`
-    /// whose Lines count now, and whether it is a Shopping List.
-    fn making(&self, owner: &str) -> Result<(Option<String>, bool)> {
-        Ok(match Checklists::new(self.store).by_note(owner)? {
-            Some(list) => (Some(list.making), false),
-            None => (ShoppingLists::new(self.store).making(owner)?, true),
-        })
+    /// The making of the Checklist or Shopping List of each Note of
+    /// `owners` whose Lines count now, and whether it is a Shopping List:
+    /// read for all of them at once, not once per Note (obf-1068), as the
+    /// Dart core's `_makings`.
+    fn makings(&self, mut owners: Vec<String>) -> Result<HashMap<String, (Option<String>, bool)>> {
+        owners.sort();
+        owners.dedup();
+        let lists = Checklists::new(self.store).makings_of(&owners)?;
+        let rest: Vec<String> = owners
+            .iter()
+            .filter(|id| !lists.contains_key(*id))
+            .cloned()
+            .collect();
+        let mut shopping = ShoppingLists::new(self.store).makings_of(&rest)?;
+        Ok(owners
+            .into_iter()
+            .map(|id| {
+                let making = match lists.get(&id) {
+                    Some(making) => (Some(making.clone()), false),
+                    None => (shopping.remove(&id), true),
+                };
+                (id, making)
+            })
+            .collect())
     }
 
     /// Those of `scope` `wanted`, in lower case and not blank, is found
@@ -310,30 +328,29 @@ impl<'a> Search<'a> {
                 .unwrap_or_else(|| owner.to_string());
             texts.entry(shown_under).or_default().push(line.to_string());
         }
-        let mut makings: HashMap<String, (Option<String>, bool)> = HashMap::new();
-        for id in self.store.entities_of_type(checklist_keys::TYPE_LINE)? {
-            let fields = self.store.current_fields(&id)?;
+        // Every Line's fields, then the lists of their Notes, read at once.
+        let lines = self
+            .store
+            .current_fields_of_type(checklist_keys::TYPE_LINE)?;
+        let makings = self.makings(
+            lines
+                .values()
+                .filter(|f| f.get(checklist_keys::TRASHED).is_none())
+                .filter_map(|f| f.get(checklist_keys::NOTE).map(str::to_string))
+                .collect(),
+        )?;
+        for fields in lines.values() {
             let Some(owner) = fields.get(checklist_keys::NOTE) else {
                 continue;
             };
             if fields.get(checklist_keys::TRASHED).is_some() {
                 continue;
             }
-            let (making, shopping) = match makings.get(owner) {
-                Some(found) => found.clone(),
-                None => {
-                    let found = match Checklists::new(self.store).by_note(owner)? {
-                        Some(list) => (Some(list.making), false),
-                        None => (ShoppingLists::new(self.store).making(owner)?, true),
-                    };
-                    makings.insert(owner.to_string(), found.clone());
-                    found
-                }
-            };
+            let (making, shopping) = makings.get(owner).cloned().unwrap_or((None, true));
             if making.is_none() || fields.get(checklist_keys::MADE) != making.as_deref() {
                 continue;
             }
-            if shopping && ShoppingLists::is_gone(&fields) {
+            if shopping && ShoppingLists::is_gone(fields) {
                 continue;
             }
             let shown_under = notes

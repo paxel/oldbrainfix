@@ -656,27 +656,25 @@ impl<'a> ShoppingLists<'a> {
     }
 
     /// The Shopping Lists of the Notes `note_ids` that are one, read in
-    /// one pass over the Lines, by Note.
+    /// one pass over the Lines, by Note. The Notes and the Lines are read
+    /// in a few queries however many there are (obf-1069).
     pub fn of_notes(
         &self,
         note_ids: &[String],
         wall: &WallClock,
     ) -> Result<BTreeMap<String, ShoppingList>> {
-        let mut makings: HashMap<String, String> = HashMap::new();
-        for id in note_ids {
-            if let Some(making) = self.making(id)? {
-                makings.insert(id.clone(), making);
-            }
-        }
+        let makings = self.makings_of(note_ids)?;
         let mut out = BTreeMap::new();
         if makings.is_empty() {
             return Ok(out);
         }
         let today = Day::today(self.store.now(), wall);
         let mut read: HashMap<String, Vec<Read>> = HashMap::new();
-        for id in self.store.entities_of_type(checklist_keys::TYPE_LINE)? {
+        let ever = self.store.ever_of_type(checklist_keys::TYPE_LINE)?;
+        let mut histories = self.store.histories_of(ever.iter().map(String::as_str))?;
+        for id in ever {
             let mut latest: HashMap<String, Entry> = HashMap::new();
-            for e in self.store.history(&id)? {
+            for e in histories.remove(&id).unwrap_or_default() {
                 let newer = latest
                     .get(&e.field)
                     .is_none_or(|held| Store::latest_wins(&e, held) == Ordering::Greater);
@@ -685,6 +683,10 @@ impl<'a> ShoppingLists<'a> {
                 }
             }
             let value_of = |field: &str| latest.get(field).and_then(|e| e.value.clone());
+            // As [`Store::entities_of_type`] lists them.
+            if value_of(checklist_keys::TYPE).as_deref() != Some(checklist_keys::TYPE_LINE) {
+                continue;
+            }
             let Some(note) = value_of(checklist_keys::NOTE) else {
                 continue;
             };
@@ -834,6 +836,30 @@ impl<'a> ShoppingLists<'a> {
     /// `None` when it is none: no Note, another list, or a Tally.
     pub fn making(&self, note_id: &str) -> Result<Option<String>> {
         let fields = self.store.current_fields(note_id)?;
+        self.making_of(note_id, &fields)
+    }
+
+    /// The making of each of `note_ids` that is a Shopping List now, as
+    /// [`ShoppingLists::making`] tells it, by Note: their fields read in
+    /// one query rather than one per Note (obf-1069), as the Dart core's
+    /// `makingsOf`.
+    pub fn makings_of(&self, note_ids: &[String]) -> Result<HashMap<String, String>> {
+        let read = self
+            .store
+            .current_fields_of(note_ids.iter().map(String::as_str))?;
+        let none = Fields::default();
+        let mut makings = HashMap::new();
+        for id in note_ids {
+            if let Some(making) = self.making_of(id, read.get(id).unwrap_or(&none))? {
+                makings.insert(id.clone(), making);
+            }
+        }
+        Ok(makings)
+    }
+
+    /// The making of the Shopping List the Note `note_id` of the current
+    /// `fields` is ([`ShoppingLists::making`]).
+    fn making_of(&self, note_id: &str, fields: &Fields) -> Result<Option<String>> {
         if fields.get(note_keys::TYPE) != Some(note_keys::TYPE_NOTE) {
             return Ok(None);
         }

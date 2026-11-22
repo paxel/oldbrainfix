@@ -744,21 +744,27 @@ impl<'a> Checklists<'a> {
     }
 
     /// The Checklists of the Notes `note_ids` that are one, read in one
-    /// pass over the Lines, by Note.
+    /// pass over the Lines, by Note. The Notes and the Lines are read in
+    /// a few queries however many there are (obf-1069).
     pub fn of_notes(&self, note_ids: &[String]) -> Result<BTreeMap<String, Checklist>> {
-        let mut makings: HashMap<String, String> = HashMap::new();
-        for id in note_ids {
-            if let Some(making) = self.making(id)? {
-                makings.insert(id.clone(), making);
-            }
-        }
+        let makings = self.makings_of(note_ids)?;
         let mut out = BTreeMap::new();
         if makings.is_empty() {
             return Ok(out);
         }
         let mut raw: HashMap<String, Vec<Raw>> = HashMap::new();
-        for id in self.store.entities_of_type(keys::TYPE_LINE)? {
-            let fields = self.store.current_fields(&id)?;
+        let ever = self.store.ever_of_type(keys::TYPE_LINE)?;
+        let read = self
+            .store
+            .current_fields_of(ever.iter().map(String::as_str))?;
+        for id in ever {
+            // As [`Store::entities_of_type`] lists them.
+            let Some(fields) = read.get(&id) else {
+                continue;
+            };
+            if fields.get(keys::TYPE) != Some(keys::TYPE_LINE) {
+                continue;
+            }
             let Some(note) = fields.get(keys::NOTE) else {
                 continue;
             };
@@ -772,7 +778,7 @@ impl<'a> Checklists<'a> {
                 continue;
             }
             let note = note.to_string();
-            raw.entry(note).or_default().push(Raw::new(id, &fields));
+            raw.entry(note).or_default().push(Raw::new(id, fields));
         }
         for (note, making) in makings {
             let lines = shown(&note, raw.remove(&note).unwrap_or_default());
@@ -852,14 +858,26 @@ impl<'a> Checklists<'a> {
             }
         }
         let today = Day::today(self.store.now(), wall);
+        let on: HashMap<String, RoutineOccurrence> = lists
+            .keys()
+            .filter_map(|id| {
+                let routines = spawned.get(id).map(Vec::as_slice).unwrap_or(&[]);
+                now_of(routines, today).map(|on| (id.clone(), on))
+            })
+            .collect();
+        // The checks of every Routine they are on, read in one go.
+        let checks = self
+            .store
+            .histories_of(on.values().map(|o| o.routine_id.as_str()))?;
         let mut out = BTreeMap::new();
         for (id, list) in lists {
-            let on = now_of(spawned.get(&id).map(Vec::as_slice).unwrap_or(&[]), today);
-            let shown = match on {
+            let shown = match on.get(&id) {
                 None => list,
                 Some(on) => {
-                    let checks = LineChecks::of(self.store, &on.routine_id)?;
-                    checked_for(list, &on, &checks)
+                    let history = checks.get(&on.routine_id).map(Vec::as_slice);
+                    let checks =
+                        LineChecks::read(self.store, &on.routine_id, history.unwrap_or(&[]))?;
+                    checked_for(list, on, &checks)
                 }
             };
             out.insert(id, shown);
@@ -1476,6 +1494,30 @@ impl<'a> Checklists<'a> {
     /// when it is no Checklist: no Note, another list, or a Tally.
     fn making(&self, note_id: &str) -> Result<Option<String>> {
         let fields = self.store.current_fields(note_id)?;
+        self.making_of(note_id, &fields)
+    }
+
+    /// The making of each of `note_ids` that is a Checklist now, as
+    /// [`Checklists::is_checklist`] tells it, by Note: their fields read
+    /// in one query rather than one per Note (obf-1069), as the Dart
+    /// core's `makingsOf`.
+    pub fn makings_of(&self, note_ids: &[String]) -> Result<HashMap<String, String>> {
+        let read = self
+            .store
+            .current_fields_of(note_ids.iter().map(String::as_str))?;
+        let none = Fields::default();
+        let mut makings = HashMap::new();
+        for id in note_ids {
+            if let Some(making) = self.making_of(id, read.get(id).unwrap_or(&none))? {
+                makings.insert(id.clone(), making);
+            }
+        }
+        Ok(makings)
+    }
+
+    /// The making of the Checklist the Note `note_id` of the current
+    /// `fields` is ([`Checklists::making`]).
+    fn making_of(&self, note_id: &str, fields: &Fields) -> Result<Option<String>> {
         if fields.get(note_keys::TYPE) != Some(note_keys::TYPE_NOTE) {
             return Ok(None);
         }

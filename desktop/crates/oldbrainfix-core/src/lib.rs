@@ -131,7 +131,7 @@ pub use pairing::PairedDevice;
 pub use pending::{
     AcceptedChanges, KeptEdit, PendingChange, PendingDraft, PendingEntry, PendingSet,
 };
-pub use people::{PersonFilter, PersonTaken};
+pub use people::{NoteAccess, PersonFilter, PersonTaken};
 pub use person_settings::PersonSettings;
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};

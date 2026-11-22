@@ -45,13 +45,13 @@ class _AllNotesScreenState extends State<AllNotesScreen>
 
   List<PlacedNote> _load() {
     final lock = LockScope.of(context);
-    return [
+    return placeNotes(widget.places, [
       for (final note in widget.notes.store.notesBy(
         widget.notes.all(),
         _people,
       ))
-        if (!(lock?.hides(note) ?? false)) placeNote(widget.places, note),
-    ];
+        if (!(lock?.hides(note) ?? false)) note,
+    ]);
   }
 
   void _filter(PersonFilter people) => setState(() {

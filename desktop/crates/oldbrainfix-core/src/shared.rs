@@ -648,24 +648,38 @@ impl Store {
     /// Whether this Device may change the Note or Section `id`.
     pub fn may_change(&self, id: &str) -> Result<bool> {
         let area = self.area_of(id)?;
-        if self.may_manage(area.as_deref())? {
+        self.may_change_in(area.as_deref(), || {
+            Ok(self
+                .history(id)?
+                .into_iter()
+                .find(|e| e.field == "$type")
+                .map(|e| e.device))
+        })
+    }
+
+    /// [`Store::may_change`] for a Note or Section that lies in `area`,
+    /// `creator` giving the Device that wrote its first `$type`, read
+    /// only for a Member: what a list of many reads once for all of them
+    /// (obf-1069), as the Dart core's `mayChangeIn`.
+    pub(crate) fn may_change_in(
+        &self,
+        area: Option<&str>,
+        creator: impl FnOnce() -> Result<Option<String>>,
+    ) -> Result<bool> {
+        if self.may_manage(area)? {
             return Ok(true);
         }
         let Some(area) = area else { return Ok(false) };
-        if self.access_in(&area, None)? != AreaAccess::Member {
+        if self.access_in(area, None)? != AreaAccess::Member {
             return Ok(false);
         }
-        let Some(grants) = self.grants_of(&area)? else {
+        let Some(grants) = self.grants_of(area)? else {
             return Ok(false);
         };
         let Some(mine) = grants.person_of(&self.device_id()?).map(str::to_string) else {
             return Ok(false);
         };
-        let creator = self
-            .history(id)?
-            .into_iter()
-            .find(|e| e.field == "$type")
-            .and_then(|e| grants.person_of(&e.device).map(str::to_string));
+        let creator = creator()?.and_then(|device| grants.person_of(&device).map(str::to_string));
         Ok(creator.as_deref() == Some(mine.as_str()))
     }
 
@@ -677,9 +691,15 @@ impl Store {
         } else {
             self.area_of(entity)?
         };
+        self.may_write_in_area(area.as_deref())
+    }
+
+    /// [`Store::may_write_in`] for what lies in `area`, as the Dart
+    /// core's `mayWriteInArea`.
+    pub(crate) fn may_write_in_area(&self, area: Option<&str>) -> Result<bool> {
         match area {
             None => Ok(true),
-            Some(area) => Ok(self.access_in(&area, None)? != AreaAccess::None),
+            Some(area) => Ok(self.access_in(area, None)? != AreaAccess::None),
         }
     }
 

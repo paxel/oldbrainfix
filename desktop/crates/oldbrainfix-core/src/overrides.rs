@@ -153,14 +153,39 @@ impl Store {
     /// `profile` as the user sees it: the name and picture of its
     /// Override, where they gave one.
     pub(crate) fn with_override(&self, profile: Profile) -> Result<Profile> {
-        let Some(o) = self.person_override(&profile.id)? else {
-            return Ok(profile);
+        let o = self.person_override(&profile.id)?;
+        Ok(Self::overridden(profile, o))
+    }
+
+    /// [`Store::with_override`], each Override read once into `read`, for
+    /// a list of many.
+    pub(crate) fn with_override_in(
+        &self,
+        profile: Profile,
+        read: &mut HashMap<String, Option<PersonOverride>>,
+    ) -> Result<Profile> {
+        let o = match read.get(&profile.id) {
+            Some(held) => held.clone(),
+            None => {
+                let held = self.person_override(&profile.id)?;
+                read.insert(profile.id.clone(), held.clone());
+                held
+            }
         };
-        Ok(Profile {
+        Ok(Self::overridden(profile, o))
+    }
+
+    /// `profile` with the name and picture of the Override `o`, where it
+    /// gave one.
+    fn overridden(profile: Profile, o: Option<PersonOverride>) -> Profile {
+        let Some(o) = o else {
+            return profile;
+        };
+        Profile {
             name: o.name.unwrap_or(profile.name),
             picture: o.picture.or(profile.picture),
             ..profile
-        })
+        }
     }
 
     /// The newest value of `field` on `entity` that one of the user's own
@@ -175,19 +200,27 @@ impl Store {
         field: &str,
         own: &mut HashMap<String, bool>,
     ) -> Result<Option<String>> {
-        let mut held: Option<Entry> = None;
-        for e in self.logged_history(entity)? {
+        self.latest_by_own(&self.logged_history(entity)?, field, own)
+    }
+
+    /// [`Store::own_current`] of the entries `logged` of one entity in the
+    /// log, as the Dart core's `_latestByOwn`.
+    pub(crate) fn latest_by_own(
+        &self,
+        logged: &[Entry],
+        field: &str,
+        own: &mut HashMap<String, bool>,
+    ) -> Result<Option<String>> {
+        let mut held: Option<&Entry> = None;
+        for e in logged {
             if e.field != field || !self.written_by_own_in(&e.device, own)? {
                 continue;
             }
-            if held
-                .as_ref()
-                .is_none_or(|h| Store::latest_wins(&e, h) == Ordering::Greater)
-            {
+            if held.is_none_or(|h| Store::latest_wins(e, h) == Ordering::Greater) {
                 held = Some(e);
             }
         }
-        Ok(held.and_then(|e| e.value))
+        Ok(held.and_then(|e| e.value.clone()))
     }
 
     /// `written_by_own`, remembered in `own`.

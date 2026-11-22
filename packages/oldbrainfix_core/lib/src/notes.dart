@@ -1592,24 +1592,50 @@ class Notes {
   /// that is not a Note with the Sections that name it, if any.
   Map<String, List<Section>> sectionsOf(Iterable<String> noteIds) {
     final of = {for (final id in noteIds) id: <Section>[]};
+    // Every Note's fields, and the histories of the Sections and of the
+    // Notes merged into them, each read once for all of them however
+    // many there are (obf-1069).
+    final pass = _Pass(store);
     // Where each Note merged into one of them shows: its Amends show
     // there as well as under itself.
     final into = <String, String>{};
-    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-      final end = _mergedInto(id);
-      if (end == null) continue;
-      if (of[end] case final list?) {
-        into[id] = end;
-        if (byId(id) case final note?) list.add(_merged(note, end));
+    final merged = <(String, Map<String, String?>)>[];
+    for (final id in pass.ever) {
+      final held = pass.notes[id];
+      if (held == null) continue;
+      final end = _mergedInto(id, pass);
+      if (end == null || !of.containsKey(end)) continue;
+      into[id] = end;
+      merged.add((id, held));
+    }
+    final sections = store.everOfType(SectionKeys.typeSection);
+    final histories = store.historiesOf([...into.keys, ...sections]);
+    for (final (id, held) in merged) {
+      final end = into[id];
+      final list = of[end];
+      if (end == null || list == null) continue;
+      if (_note(id, held, pass) case final note?) {
+        list.add(_merged(note, end, histories[id] ?? const []));
       }
     }
-    for (final id in store.entitiesOfType(SectionKeys.typeSection)) {
-      final owner = store.current(id, SectionKeys.note);
+    for (final id in sections) {
+      final history = histories[id] ?? const <Entry>[];
+      final fields = Store.latestFields(history);
+      // As [Store.entitiesOfType] lists them.
+      if (fields[SectionKeys.type] != SectionKeys.typeSection) continue;
+      final owner = fields[SectionKeys.note];
       if (owner == null) continue;
       for (final noteId in [owner, ?into[owner]]) {
         final list = of[noteId];
         if (list == null) continue;
-        if (_section(id, noteId: noteId) case final section?) {
+        if (_section(
+              id,
+              noteId: noteId,
+              fields: fields,
+              history: history,
+              pass: pass,
+            )
+            case final section?) {
           list.add(section);
         }
       }
@@ -1620,9 +1646,10 @@ class Notes {
     return of;
   }
 
-  /// The Note [note], merged into [noteId], as a Section of it.
-  Section _merged(Note note, String noteId) {
-    final edit = _lastEdit(note.id);
+  /// The Note [note], merged into [noteId], as a Section of it; its
+  /// edits told by [history] when given.
+  Section _merged(Note note, String noteId, [List<Entry>? history]) {
+    final edit = _lastEdit(note.id, history);
     return Section(
       id: note.id,
       noteId: noteId,
@@ -1654,10 +1681,10 @@ class Notes {
   /// count, once there is more than one; null while there is only the
   /// text it was captured with. Ordered by latest wins, not by the log,
   /// so every Device finds the same.
-  ({DateTime at, Profile? by})? _lastEdit(String id) {
+  ({DateTime at, Profile? by})? _lastEdit(String id, [List<Entry>? history]) {
     Entry? latest;
     var texts = 0;
-    for (final e in store.history(id)) {
+    for (final e in history ?? store.history(id)) {
       if (e.field != SectionKeys.text) continue;
       texts++;
       if (latest == null || Store.latestWins(e, latest) > 0) latest = e;
@@ -2063,15 +2090,22 @@ class Notes {
   }
 
   /// The Section [id]; shown under [noteId] when given, for the Amends of
-  /// a merged Note.
-  Section? _section(String id, {String? noteId}) {
-    final fields = store.currentFields(id);
+  /// a merged Note. Its current [fields] and its [history], when given,
+  /// are not read again, nor what [pass] read.
+  Section? _section(
+    String id, {
+    String? noteId,
+    Map<String, String?>? fields,
+    List<Entry>? history,
+    _Pass? pass,
+  }) {
+    fields ??= store.currentFields(id);
     if (fields[SectionKeys.type] != SectionKeys.typeSection) return null;
     final owner = fields[SectionKeys.note];
     final captured = fields[SectionKeys.captured];
     if (owner == null || captured == null) return null;
     final text = StoredText.read(fields[SectionKeys.text]);
-    final edit = _lastEdit(id);
+    final edit = _lastEdit(id, history);
     return Section(
       id: id,
       noteId: noteId ?? owner,
@@ -2079,7 +2113,7 @@ class Notes {
       textFormat: text.format,
       textVersion: text.version,
       textEditable: text.editable,
-      context: _context(captured, fields),
+      context: _context(captured, fields, pass),
       boxes: _boxes(id, text, fields),
       modified: edit?.at,
       editedBy: edit?.by,

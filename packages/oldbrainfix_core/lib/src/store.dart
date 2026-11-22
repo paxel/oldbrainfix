@@ -1046,6 +1046,11 @@ class Store {
   @visibleForTesting
   var historyReads = 0;
 
+  /// How often [loggedHistory] was read, for itself or for [history]:
+  /// what a test counts the reads of the log alone by (obf-1069).
+  @visibleForTesting
+  var loggedReads = 0;
+
   /// Every entry of [entity] that counts, in log order, then those of
   /// the shown pending sets: what no role in a Shared Area allows is left
   /// out, judged with those sets too.
@@ -1073,6 +1078,7 @@ class Store {
   /// pending change among them: what decides where an entity is sealed,
   /// and what the user's own Devices wrote.
   List<Entry> loggedHistory(String entity) {
+    loggedReads++;
     final all = _entries(
       'SELECT * FROM entries WHERE $_applied AND entity = ? ORDER BY seq',
       [entity],
@@ -1245,9 +1251,26 @@ class Store {
   String? current(String entity, String field) => currentFields(entity)[field];
 
   /// The current value of every field on [entity] — latest wins.
-  Map<String, String?> currentFields(String entity) {
+  Map<String, String?> currentFields(String entity) =>
+      latestFields(history(entity));
+
+  /// What [currentFields] gives for each of [entities], read in one
+  /// query rather than one per entity (#204); those without an entry
+  /// that counts are left out. It counts as one [history] read.
+  Map<String, Map<String, String?>> currentFieldsOf(
+    Iterable<String> entities,
+  ) => {
+    for (final MapEntry(key: id, value: history) in historiesOf(
+      entities,
+    ).entries)
+      id: latestFields(history),
+  };
+
+  /// The current value of every field in [history], one entity's entries
+  /// as [history] gives them: what [currentFields] makes of them.
+  static Map<String, String?> latestFields(Iterable<Entry> history) {
     final latest = <String, Entry>{};
-    for (final e in history(entity)) {
+    for (final e in history) {
       final held = latest[e.field];
       if (held == null || _newer(e, held)) latest[e.field] = e;
     }
@@ -1256,16 +1279,37 @@ class Store {
     };
   }
 
-  /// What [currentFields] gives for each of [entities], read in one
-  /// query rather than one per entity (#204); those without an entry
+  /// What [history] gives for each of [entities], read in one query per
+  /// few hundred rather than one each (obf-1069); those without an entry
   /// that counts are left out. It counts as one [history] read.
-  Map<String, Map<String, String?>> currentFieldsOf(Iterable<String> entities) {
+  Map<String, List<Entry>> historiesOf(Iterable<String> entities) {
     final ids = entities.toSet();
     if (ids.isEmpty) return {};
     historyReads++;
-    final list = ids.toList();
     final shown = _shown;
-    final all = [
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    return _grouped([
+      ..._loggedOf(ids),
+      for (final e in shown)
+        if (ids.contains(e.entity)) e,
+    ], ignored);
+  }
+
+  /// What [loggedHistory] gives for each of [entities], read in one query
+  /// per few hundred rather than one each (obf-1069); those without an
+  /// entry that counts are left out. It counts as one [loggedHistory]
+  /// read.
+  Map<String, List<Entry>> loggedHistoriesOf(Iterable<String> entities) {
+    final ids = entities.toSet();
+    if (ids.isEmpty) return {};
+    loggedReads++;
+    return _grouped(_loggedOf(ids), judged.ignored);
+  }
+
+  /// The entries of [ids] in the log, in log order.
+  List<Entry> _loggedOf(Set<String> ids) {
+    final list = ids.toList();
+    return [
       for (var i = 0; i < list.length; i += _inChunk)
         ..._entriesOnce(
           'SELECT * FROM entries WHERE $_applied AND entity IN '
@@ -1273,23 +1317,20 @@ class Store {
           'ORDER BY seq',
           list.sublist(i, min(i + _inChunk, list.length)),
         ),
-      for (final e in shown)
-        if (ids.contains(e.entity)) e,
     ];
-    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
-    final latest = <String, Map<String, Entry>>{};
+  }
+
+  /// [all] by entity, in their order, but those [ignored].
+  static Map<String, List<Entry>> _grouped(
+    List<Entry> all,
+    Set<String> ignored,
+  ) {
+    final by = <String, List<Entry>>{};
     for (final e in all) {
       if (ignored.contains(e.id)) continue;
-      final fields = latest.putIfAbsent(e.entity, () => {});
-      final held = fields[e.field];
-      if (held == null || _newer(e, held)) fields[e.field] = e;
+      (by[e.entity] ??= []).add(e);
     }
-    return {
-      for (final MapEntry(key: id, value: fields) in latest.entries)
-        id: {
-          for (final MapEntry(:key, :value) in fields.entries) key: value.value,
-        },
-    };
+    return by;
   }
 
   /// How many entities one query of [currentFieldsOf] names, well under

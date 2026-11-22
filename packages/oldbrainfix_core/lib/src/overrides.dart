@@ -108,9 +108,12 @@ extension Overrides on Store {
       '${OverrideKeys.prefix}${resolvePerson(id)}';
 
   /// [profile] as the user sees it: the name and picture of its
-  /// Override, where they gave one.
-  Profile _withOverride(Profile profile) {
-    final o = personOverride(profile.id);
+  /// Override, where they gave one; each Override read once into [read]
+  /// when given, for a list of many.
+  Profile _withOverride(Profile profile, [Map<String, PersonOverride?>? read]) {
+    final o = read == null
+        ? personOverride(profile.id)
+        : read.putIfAbsent(profile.id, () => personOverride(profile.id));
     if (o == null) return profile;
     return Profile(
       id: profile.id,
@@ -127,10 +130,17 @@ extension Overrides on Store {
   /// calls, which Devices are one's own. Read from the log alone: a
   /// pending change (ADR 0022) is trusted for nothing.
   @internal
-  String? currentByOwn(String entity, String field, [Map<String, bool>? own]) {
-    own ??= {};
+  String? currentByOwn(String entity, String field, [Map<String, bool>? own]) =>
+      _latestByOwn(loggedHistory(entity), field, own ?? {});
+
+  /// [currentByOwn] of the entries [logged] of one entity in the log.
+  String? _latestByOwn(
+    List<Entry> logged,
+    String field,
+    Map<String, bool> own,
+  ) {
     Entry? held;
-    for (final e in loggedHistory(entity)) {
+    for (final e in logged) {
       if (e.field != field) continue;
       if (!own.putIfAbsent(e.device, () => writtenByOwn(e.device))) continue;
       if (held == null || Store.latestWins(e, held) > 0) held = e;
