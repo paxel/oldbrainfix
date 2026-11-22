@@ -495,9 +495,11 @@ void main() {
       expect(find.byType(NoteCard), findsOneWidget);
       expect(find.text('Ben buys bread'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'milk');
+      await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
       expect(find.text('No Note matches.'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'bread');
+      await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
       expect(find.byType(NoteCard), findsOneWidget);
       expect(find.text('Ben buys bread'), findsOneWidget);
@@ -518,6 +520,7 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('browse')));
       expect(find.byKey(const ValueKey('personFilter')), findsNothing);
       await tester.enterText(find.byType(TextField), 'bread');
+      await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
       expect(find.byType(NoteCard), findsNWidgets(2));
       await pick(tester, benId);

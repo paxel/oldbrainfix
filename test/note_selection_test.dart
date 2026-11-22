@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
@@ -137,6 +138,7 @@ void main() {
 
     // The Areas list beside the Agenda: its search's hits select.
     await tester.enterText(find.byType(TextField), 'apples');
+    await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
     await select(tester, [a.id]);
     expect(find.text('1 selected'), findsOneWidget);
@@ -172,6 +174,7 @@ void main() {
 
     await tap(tester, find.byTooltip('Search and browse'));
     await tester.enterText(find.byType(TextField), 'apples');
+    await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await reachSelect();
@@ -345,6 +348,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(key('selectNotes'), findsNothing);
     await tester.enterText(find.byType(TextField), 'bread');
+    await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
     await tap(tester, key('selectNotes'));
     await tap(tester, box(b.id));

@@ -8,7 +8,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 - Mit geteilten Bereichen gehen auf dem Handy und dem Desktop das Verschieben eines Bereichs in den Papierkorb und der Import aus Google Keep schneller. ([obf-1092](https://github.com/paxel/oldbrainfix/issues/405))
 - Auf dem Handy und dem Desktop antwortet die App schneller, wenn du viele Notizen hast. ([obf-1069](https://github.com/paxel/oldbrainfix/issues/382))
-- Auf dem Desktop wartet das Tippen in ein Suchfeld nicht mehr; die Ergebnisse folgen kurz, nachdem du mit dem Tippen aufhörst. ([obf-1068](https://github.com/paxel/oldbrainfix/issues/381))
+- Auf dem Handy und dem Desktop wartet das Tippen in ein Suchfeld nicht mehr; die Ergebnisse folgen kurz, nachdem du mit dem Tippen aufhörst. ([obf-1068](https://github.com/paxel/oldbrainfix/issues/381))
 
 ### Behoben
 

@@ -119,6 +119,7 @@ void _cardReads(Store store, List<PlacedNote> shown) {
   ShoppingLists(store).ofNotes(ids, deviceWallClock);
   Routines(store).todayByNote(deviceWallClock);
   store.hiddenFromAiAmong(ids);
+  store.packFromsOf(ids);
 }
 
 /// How long [body] took, its median of [_repeats], each after [before].

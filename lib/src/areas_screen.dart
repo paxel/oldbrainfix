@@ -68,8 +68,11 @@ class AreasScreen extends StatefulWidget {
 }
 
 class _AreasScreenState extends State<AreasScreen>
-    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes, SearchesAfterPause {
   late final _query = TextEditingController(text: widget.query);
+
+  /// The text [_hits] were searched for; the field's own may be newer.
+  String _searched = '';
   List<Area> _areas = const [];
 
   /// What this Device may do in each Area, and who shares the shared
@@ -148,11 +151,12 @@ class _AreasScreenState extends State<AreasScreen>
     };
     // Only a search shows Notes on this level; without one, reading
     // every Note for nothing made each change wait on all of them.
-    _hits = _query.text.trim().isEmpty
+    _searched = _query.text;
+    _hits = _searched.trim().isEmpty
         ? const []
         : _search(
             widget.places,
-            _query.text,
+            _searched,
             lock: LockScope.of(context),
             people: _filter,
           );
@@ -166,16 +170,24 @@ class _AreasScreenState extends State<AreasScreen>
 
   void _reload() => setState(_load);
 
-  /// The search changed; with no hits to show the selection goes too.
-  void _searched(String query) {
+  /// A letter typed: the search runs once typing pauses, an emptied
+  /// field shows the Areas at once.
+  void _typed(String query) {
+    if (query.trim().isEmpty) return _set(query);
+    searchAfterPause(_reload);
+  }
+
+  /// The search set as a whole runs now; with no hits to show the
+  /// selection goes too.
+  void _set(String query) {
     if (query.trim().isEmpty) stopSelecting();
-    _reload();
+    searchNow(_reload);
   }
 
   /// A tag tapped on a hit searches for it here.
   void _searchTag(BuildContext _, String query) {
     _query.text = query;
-    _reload();
+    searchNow(_reload);
   }
 
   @override
@@ -473,7 +485,7 @@ class _AreasScreenState extends State<AreasScreen>
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final searching = _query.text.trim().isNotEmpty;
+    final searching = _searched.trim().isNotEmpty;
     // The tags offered leave out the Notes of a closed locked Area, as
     // every list does (#267).
     final lock = LockScope.of(context);
@@ -552,7 +564,8 @@ class _AreasScreenState extends State<AreasScreen>
                       BrowserSearchField(
                         controller: _query,
                         hint: t.searchAllHint,
-                        onChanged: _searched,
+                        onChanged: _typed,
+                        onSet: _set,
                         tags: widget.places.store,
                         closedTags: closed,
                       ),
@@ -659,8 +672,11 @@ class AreaScreen extends StatefulWidget {
 }
 
 class _AreaScreenState extends State<AreaScreen>
-    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes, SearchesAfterPause {
   final _query = TextEditingController();
+
+  /// The text [_diary] was searched for; the field's own may be newer.
+  String _searched = '';
   Area? _area;
   List<Topic> _topics = const [];
   List<PlacedNote> _diary = const [];
@@ -703,9 +719,10 @@ class _AreaScreenState extends State<AreaScreen>
           a,
         ).toLowerCase().compareTo(topicName(t, b).toLowerCase()),
       );
+    _searched = _query.text;
     final found = _search(
       widget.places,
-      _query.text,
+      _searched,
       within: widget.areaId,
       lock: LockScope.of(context),
       order: _order,
@@ -714,7 +731,7 @@ class _AreaScreenState extends State<AreaScreen>
     );
     // A Topic's Notes show inside the Topic; a search still finds them,
     // their cards naming the Topic.
-    _diary = _query.text.trim().isNotEmpty
+    _diary = _searched.trim().isNotEmpty
         ? found
         : [
             for (final placed in found)
@@ -724,6 +741,14 @@ class _AreaScreenState extends State<AreaScreen>
   }
 
   void _reload() => setState(_load);
+
+  /// A letter typed: the search runs once typing pauses, an emptied
+  /// field shows the list at once.
+  void _typed(String query) =>
+      query.trim().isEmpty ? _set(query) : searchAfterPause(_reload);
+
+  /// The search set as a whole runs now.
+  void _set(String _) => searchNow(_reload);
 
   void _filtered(PersonFilter people) => setState(() {
     _filter = people;
@@ -918,7 +943,7 @@ class _AreaScreenState extends State<AreaScreen>
     final t = context.t;
     final area = _area;
     if (area == null) return Scaffold(appBar: AppBar());
-    final searching = _query.text.trim().isNotEmpty;
+    final searching = _searched.trim().isNotEmpty;
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       child: selectionBack(
@@ -978,7 +1003,8 @@ class _AreaScreenState extends State<AreaScreen>
                       child: BrowserSearchField(
                         controller: _query,
                         hint: t.searchAreaHint,
-                        onChanged: (_) => _reload(),
+                        onChanged: _typed,
+                        onSet: _set,
                       ),
                     ),
                     PersonFilterChips(
@@ -1062,8 +1088,11 @@ class TopicScreen extends StatefulWidget {
 }
 
 class _TopicScreenState extends State<TopicScreen>
-    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes, SearchesAfterPause {
   final _query = TextEditingController();
+
+  /// The text [_diary] was searched for; the field's own may be newer.
+  String _searched = '';
   late Topic? _topic;
   late List<PlacedNote> _diary;
   DiaryOrder _order = DiaryOrder.time;
@@ -1088,9 +1117,10 @@ class _TopicScreenState extends State<TopicScreen>
   void _load() {
     _topic = widget.places.topicById(widget.topicId);
     _writes = widget.places.store.mayWriteIn(widget.topicId);
+    _searched = _query.text;
     _diary = _search(
       widget.places,
-      _query.text,
+      _searched,
       within: widget.topicId,
       lock: LockScope.of(context),
       order: _order,
@@ -1101,6 +1131,14 @@ class _TopicScreenState extends State<TopicScreen>
   }
 
   void _reload() => setState(_load);
+
+  /// A letter typed: the search runs once typing pauses, an emptied
+  /// field shows the list at once.
+  void _typed(String query) =>
+      query.trim().isEmpty ? _set(query) : searchAfterPause(_reload);
+
+  /// The search set as a whole runs now.
+  void _set(String _) => searchNow(_reload);
 
   void _filtered(PersonFilter people) => setState(() {
     _filter = people;
@@ -1176,7 +1214,7 @@ class _TopicScreenState extends State<TopicScreen>
     final t = context.t;
     final topic = _topic;
     if (topic == null) return Scaffold(appBar: AppBar());
-    final searching = _query.text.trim().isNotEmpty;
+    final searching = _searched.trim().isNotEmpty;
     return BrowserSwipes(
       child: selectionBack(
         Scaffold(
@@ -1235,7 +1273,8 @@ class _TopicScreenState extends State<TopicScreen>
                       child: BrowserSearchField(
                         controller: _query,
                         hint: t.searchTopicHint,
-                        onChanged: (_) => _reload(),
+                        onChanged: _typed,
+                        onSet: _set,
                       ),
                     ),
                     PersonFilterChips(
@@ -1333,17 +1372,18 @@ List<PlacedNote> _search(
   DiaryOrder order = DiaryOrder.time,
   bool hideUnimportant = false,
   PersonFilter people = PersonFilter.everyone,
-}) => placeNotes(places, [
-  for (final note in diary(
+}) => placeNotesShown(
+  places,
+  diary(
     places.store.notesBy(
       Search(places.store).notes(query, within: within),
       people,
     ),
     order: order,
     hideUnimportant: hideUnimportant,
-  ))
-    if (!(lock?.hides(note) ?? false)) note,
-]);
+  ),
+  lock,
+);
 
 /// Every hit of a search on one page, or a line saying there is none.
 List<Widget> _hitCards(

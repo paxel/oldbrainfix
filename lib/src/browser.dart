@@ -689,11 +689,18 @@ class _SwipeDrag extends HorizontalDragGestureRecognizer {
 /// [tags], typing `#` shows the tags of the tag tree that start with what
 /// is typed as chips under it (#267, Q639), whose tap fills one in; the
 /// Notes of the Areas of [closedTags], the locked Areas closed now, are
-/// left out of them.
+/// left out of them. Each letter typed shows at once, ✕ with it, and
+/// runs [onChanged]; a text set as a whole, cleared, a tag picked or
+/// Search on the keyboard, runs [onSet], or [onChanged] without it.
 class BrowserSearchField extends StatelessWidget {
+  /// How long typing pauses before a search over the Notes runs
+  /// (obf-1068, C11): a search per letter made each letter wait on it.
+  static const pause = Duration(milliseconds: 300);
+
   final TextEditingController controller;
   final String hint;
   final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSet;
   final Store? tags;
   final Set<String> closedTags;
 
@@ -702,13 +709,16 @@ class BrowserSearchField extends StatelessWidget {
     required this.controller,
     required this.hint,
     required this.onChanged,
+    this.onSet,
     this.tags,
     this.closedTags = const {},
   });
 
+  ValueChanged<String> get _set => onSet ?? onChanged;
+
   void _clear() {
     controller.clear();
-    onChanged('');
+    _set('');
   }
 
   void _pick(String tag) {
@@ -716,28 +726,33 @@ class BrowserSearchField extends StatelessWidget {
       text: tag,
       selection: TextSelection.collapsed(offset: tag.length),
     );
-    onChanged(tag);
+    _set(tag);
   }
 
   @override
   Widget build(BuildContext context) {
     final field = Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: hint,
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: controller.text.isEmpty
-              ? null
-              : IconButton(
-                  tooltip: context.t.clearSearch,
-                  onPressed: _clear,
-                  icon: const Icon(Icons.close),
-                ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      // ✕ follows the text itself, not the page's next search.
+      child: ListenableBuilder(
+        listenable: controller,
+        builder: (context, _) => TextField(
+          controller: controller,
+          onChanged: onChanged,
+          onSubmitted: _set,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: controller.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: context.t.clearSearch,
+                    onPressed: _clear,
+                    icon: const Icon(Icons.close),
+                  ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+          ),
         ),
       ),
     );
@@ -756,6 +771,38 @@ class BrowserSearchField extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// A page whose search over the Notes runs [BrowserSearchField.pause]
+/// after the last letter typed (obf-1068, C11): each letter shows at
+/// once, and a letter typed before the pause is over puts the search
+/// off again, so no result of an older query replaces a newer one. A
+/// search runs on the field's text as it is then.
+mixin SearchesAfterPause<T extends StatefulWidget> on State<T> {
+  Timer? _searchTimer;
+
+  /// Runs [search] once typing pauses, in place of any still waiting.
+  void searchAfterPause(VoidCallback search) {
+    _searchTimer?.cancel();
+    _searchTimer = Timer(BrowserSearchField.pause, () {
+      _searchTimer = null;
+      if (mounted) search();
+    });
+  }
+
+  /// Runs [search] now, in place of any still waiting: for a text set as
+  /// a whole.
+  void searchNow(VoidCallback search) {
+    _searchTimer?.cancel();
+    _searchTimer = null;
+    search();
+  }
+
+  @override
+  void dispose() {
+    _searchTimer?.cancel();
+    super.dispose();
   }
 }
 
@@ -1062,12 +1109,11 @@ List<Widget> diaryCards(
               placed,
               onChanged,
               onEdit: () => onOpen(note),
-              // Read once for the list, not for every card (obf-1069).
+              // Read once for the list, not for every card (obf-1069),
+              // the Pack badges of all its Notes in one query (obf-1068).
               advanced: reads.advanced ??= notes.store.advanced,
-              packFrom: () => reads.packFrom.putIfAbsent(
-                note.id,
-                () => notes.store.packFrom(note.id),
-              ),
+              packFrom: () =>
+                  (reads.packFrom ??= notes.store.packFromsOf(ids()))[note.id],
             ),
             full: full(note),
             sections: () => sectionsOf(note),
@@ -1127,7 +1173,7 @@ class _ListReads {
   final linked = <String, List<Note>>{};
   final kinds = <String, NoteKind>{};
   final glances = <String, List<String>>{};
-  final packFrom = <String, ({String id, String name})?>{};
+  Map<String, ({String id, String name})>? packFrom;
 }
 
 /// The app bar buttons of a diary: order by time or by Importance, and

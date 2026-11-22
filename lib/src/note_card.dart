@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'app_links.dart' show LinkedFrom;
+import 'app_lock.dart';
 import 'area_look.dart';
 import 'attachment_views.dart';
 import 'calendar_platform.dart';
@@ -85,6 +86,29 @@ List<PlacedNote> placeNotes(Places places, Iterable<Note> notes) {
           topics: topics,
           areas: areas,
         ),
+  ];
+}
+
+/// [placeNotes] of [notes] without those [lock] hides, filed into a
+/// locked Area closed now: each Area's lock is read once for the list,
+/// from where the Notes are placed, not once per Note (obf-1068).
+List<PlacedNote> placeNotesShown(
+  Places places,
+  Iterable<Note> notes,
+  AppLock? lock,
+) {
+  final placed = placeNotes(places, notes);
+  if (lock == null) return placed;
+  final closed = <String, bool>{};
+  bool hides(PlacedNote p) {
+    // The Area as the lock finds it: a Topic's, or the place itself.
+    final area = p.topic?.areaId ?? p.area?.id;
+    return area != null && (closed[area] ??= lock.isAreaClosed(area));
+  }
+
+  return [
+    for (final p in placed)
+      if (!hides(p)) p,
   ];
 }
 
