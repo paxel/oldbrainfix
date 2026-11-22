@@ -570,13 +570,6 @@ fn shown_text(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
     text_boxes::shown(text, &ticks).text
 }
 
-/// A Note's photos or recordings, their texts and those removed.
-type Waiting<'n> = (
-    &'n Vec<String>,
-    &'n BTreeMap<String, String>,
-    &'n Vec<String>,
-);
-
 /// A photo or a voice recording of a Note, by its hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Blob {
@@ -1143,14 +1136,14 @@ impl<'a> Notes<'a> {
     /// those of every Note not in the trash, merged ones included. One
     /// whose Transcript was removed is not among them.
     pub fn untranscribed(&self) -> Result<Vec<Blob>> {
-        self.waiting(|n| (&n.recordings, &n.transcripts, &n.removed_transcripts))
+        self.waiting(keys::AUDIO_PREFIX, keys::transcript)
     }
 
     /// The photos without a Photo Text, newest capture first: those of
     /// every Note not in the trash, merged ones included. One whose Photo
     /// Text was removed is not among them.
     pub fn unread_photos(&self) -> Result<Vec<Blob>> {
-        self.waiting(|n| (&n.photos, &n.photo_texts, &n.removed_photo_texts))
+        self.waiting(keys::PHOTO_PREFIX, keys::ocr)
     }
 
     /// Whether this Device may remove the photo `hash` of the Note
@@ -1333,38 +1326,60 @@ impl<'a> Notes<'a> {
         }
     }
 
-    /// The blobs `of` every Note not in the trash that have no text yet,
-    /// nor one that was removed.
-    fn waiting(&self, of: impl Fn(&Note) -> Waiting<'_>) -> Result<Vec<Blob>> {
-        let waits = |note: &Note, hash: &String| {
-            let (_, texts, removed) = of(note);
-            !texts.contains_key(hash) && !removed.contains(hash)
-        };
+    /// The photos or recordings, fields under `prefix` holding
+    /// [`keys::ADDED`], without a text in their `text` field, nor one
+    /// that was removed, newest capture first: those of every Note not in
+    /// the trash, merged ones included. Told from the fields of the Notes
+    /// holding one, read in one query, without making a Note: made one by
+    /// one, they held the reader up for each photo or recording read after
+    /// an import (obf-1094), as the Dart core's `_waiting`.
+    fn waiting(&self, prefix: &str, text: fn(&str) -> String) -> Result<Vec<Blob>> {
+        let holding: HashSet<String> = self
+            .store
+            .fields_with_prefix(prefix)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        let mut ids = self.store.ever_of_type(keys::TYPE_NOTE)?;
+        ids.retain(|id| holding.contains(id));
+        let mut read = self
+            .store
+            .current_fields_of(ids.iter().map(String::as_str))?;
         let mut notes = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
-            if let Some(note) = self.by_id(&id)?
-                && !note.is_trashed()
+        for id in ids {
+            let Some(fields) = read.remove(&id) else {
+                continue;
+            };
+            if fields.get(keys::TYPE) != Some(keys::TYPE_NOTE)
+                || fields.get(keys::TRASHED).is_some()
             {
-                let (blobs, _, _) = of(&note);
-                if blobs.iter().any(|h| waits(&note, h)) {
-                    notes.push(note);
-                }
+                continue;
+            }
+            let Some(captured) = fields.get(keys::CAPTURED) else {
+                continue;
+            };
+            // Absent means not read yet; empty or null, read or removed.
+            let hashes: Vec<String> = added(&fields, prefix)
+                .into_iter()
+                .filter(|hash| {
+                    let field = text(hash);
+                    !fields.iter().any(|(key, _)| key == field.as_str())
+                })
+                .collect();
+            if !hashes.is_empty() {
+                notes.push((parse_time(captured)?, id, hashes));
             }
         }
-        notes.sort_by_key(|n| std::cmp::Reverse(n.captured));
-        let mut out = Vec::new();
-        for note in &notes {
-            let (blobs, _, _) = of(note);
-            for hash in blobs {
-                if waits(note, hash) {
-                    out.push(Blob {
-                        note_id: note.id.clone(),
-                        hash: hash.clone(),
-                    });
-                }
-            }
-        }
-        Ok(out)
+        notes.sort_by_key(|(captured, _, _)| std::cmp::Reverse(*captured));
+        Ok(notes
+            .into_iter()
+            .flat_map(|(_, note_id, hashes)| {
+                hashes.into_iter().map(move |hash| Blob {
+                    note_id: note_id.clone(),
+                    hash,
+                })
+            })
+            .collect())
     }
 
     /// Files the Note `note_id` into the Area or Topic `place_id`, out of

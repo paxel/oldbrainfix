@@ -2512,3 +2512,174 @@ fn a_type_the_roles_ignore_does_not_count_when_a_type_is_listed() -> TestResult 
     assert_eq!(Notes::new(&ann).all()?, one_by_one(&ann)?);
     Ok(())
 }
+
+// ------------------------------- the photos and recordings waiting (obf-1094)
+
+/// What [`Notes::unread_photos`], or [`Notes::untranscribed`] when
+/// `photos` is false, listed before obf-1094: each Note made on its own
+/// by [`Notes::by_id`].
+fn waiting_one_by_one(store: &Store, photos: bool) -> Result<Vec<Blob>> {
+    let notes = Notes::new(store);
+    let blobs = |note: &Note| -> Vec<String> {
+        if photos {
+            note.photos.clone()
+        } else {
+            note.recordings.clone()
+        }
+    };
+    let waits = |note: &Note, hash: &String| {
+        if photos {
+            !note.photo_texts.contains_key(hash) && !note.removed_photo_texts.contains(hash)
+        } else {
+            !note.transcripts.contains_key(hash) && !note.removed_transcripts.contains(hash)
+        }
+    };
+    let mut listed = Vec::new();
+    for id in store.entities_of_type(keys::TYPE_NOTE)? {
+        if let Some(note) = notes.by_id(&id)?
+            && !note.is_trashed()
+            && blobs(&note).iter().any(|h| waits(&note, h))
+        {
+            listed.push(note);
+        }
+    }
+    listed.sort_by_key(|n| std::cmp::Reverse(n.captured));
+    let mut out = Vec::new();
+    for note in &listed {
+        for hash in blobs(note) {
+            if waits(note, &hash) {
+                out.push(Blob {
+                    note_id: note.id.clone(),
+                    hash,
+                });
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Notes of every kind the readers tell apart, their photos and
+/// recordings made from `n` up to `n` + 10, as the Dart core's
+/// `unread_media_test`; the photos left waiting.
+fn seed_media(store: &Store, n: u8) -> Result<Vec<String>> {
+    let notes = Notes::new(store);
+    notes.capture(&format!("plain {n}"), None, None)?;
+    let several = notes.capture_with(
+        "several",
+        None,
+        None,
+        &[photo(n), photo(n + 1), photo(n + 2)],
+        &[voice(n), voice(n + 1)],
+    )?;
+    notes.set_photo_text(&several.id, &several.photos[1], "Read")?;
+    notes.set_photo_text(&several.id, &several.photos[2], "")?;
+    notes.set_transcript(&several.id, &several.recordings[0], "Heard")?;
+    for (i, kind) in (0u8..).zip(["read", "removed text", "removed"]) {
+        let note =
+            notes.capture_with(kind, None, None, &[photo(n + 3 + i)], &[voice(n + 2 + i)])?;
+        let (p, r) = (&note.photos[0], &note.recordings[0]);
+        notes.set_photo_text(&note.id, p, "Text")?;
+        notes.set_transcript(&note.id, r, "Words")?;
+        if kind == "removed text" {
+            notes.remove_photo_text(&note.id, p)?;
+            notes.remove_transcript(&note.id, r)?;
+        } else if kind == "removed" {
+            notes.remove_photo(&note.id, p)?;
+            notes.remove_recording(&note.id, r)?;
+        }
+    }
+    let trashed = notes.capture_with("trashed", None, None, &[photo(n + 6)], &[voice(n + 5)])?;
+    notes.trash(&trashed.id)?;
+    let restored = notes.capture_with("restored", None, None, &[photo(n + 7)], &[voice(n + 6)])?;
+    notes.trash(&restored.id)?;
+    notes.restore(&restored.id)?;
+    let merged = notes.capture_with("merged", None, None, &[photo(n + 8)], &[voice(n + 7)])?;
+    let target = notes.capture("target", None, None)?;
+    notes.merge(&merged.id, &target.id)?;
+    let discarded =
+        notes.capture_with("discarded", None, None, &[photo(n + 9)], &[voice(n + 8)])?;
+    notes.discard(&discarded.id)?;
+    let twin = notes.capture_with("twin", None, None, &[photo(n + 10)], &[voice(n + 9)])?;
+    let captured = store.current(&several.id, keys::CAPTURED)?;
+    store.append(&twin.id, keys::CAPTURED, captured.as_deref(), None)?;
+    Ok(vec![
+        several.photos[0].clone(),
+        restored.photos[0].clone(),
+        merged.photos[0].clone(),
+        twin.photos[0].clone(),
+    ])
+}
+
+#[test]
+fn the_photos_and_recordings_waiting_are_those_each_note_made_on_its_own_leaves() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let mut waiting = seed_media(&ann, 0)?;
+    waiting.extend(seed_media(&ann, 20)?);
+    let photos = notes.unread_photos()?;
+    assert_eq!(photos, waiting_one_by_one(&ann, true)?);
+    assert_eq!(notes.untranscribed()?, waiting_one_by_one(&ann, false)?);
+    let mut hashes: Vec<String> = photos.into_iter().map(|b| b.hash).collect();
+    hashes.sort();
+    waiting.sort();
+    assert_eq!(hashes, waiting);
+    assert_eq!(notes.untranscribed()?.len(), 8);
+    Ok(())
+}
+
+#[test]
+fn the_reads_for_the_media_waiting_do_not_grow_with_the_notes() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let reads = |read: &dyn Fn() -> Result<Vec<Blob>>| -> Result<usize> {
+        // What the store works out once per change is not counted.
+        read()?;
+        let count =
+            || ann.history_reads.load(Ordering::SeqCst) + ann.logged_reads.load(Ordering::SeqCst);
+        let before = count();
+        read()?;
+        Ok(count() - before)
+    };
+    let photos = || notes.unread_photos();
+    let recordings = || notes.untranscribed();
+    seed_media(&ann, 0)?;
+    let few_photos = reads(&photos)?;
+    let few_recordings = reads(&recordings)?;
+    for i in 1..6 {
+        seed_media(&ann, 20 * i)?;
+    }
+    for i in 0..40 {
+        notes.capture(&format!("plain {i}"), None, None)?;
+    }
+    assert_eq!(reads(&photos)?, few_photos);
+    assert_eq!(reads(&recordings)?, few_recordings);
+    assert!(few_photos <= 2, "{few_photos}");
+    Ok(())
+}
+
+#[test]
+fn a_text_removal_written_by_one_who_may_not_leaves_the_media_waiting() -> TestResult {
+    let devices = Devices::new();
+    let ann = devices.device(1, "Ann")?;
+    let ben = devices.device(2, "Ben")?;
+    let (area, _) = household(&ann, &ben)?;
+    let note =
+        Notes::new(&ann).capture_with("Shed", Some(&area), None, &[photo(1)], &[voice(1)])?;
+    let (p, r) = (note.photos[0].clone(), note.recordings[0].clone());
+    exchange(&ben, &ann, None)?;
+    // As a modified app would write it: a Member removes a text only on
+    // their own Note.
+    ben.append(&note.id, &keys::ocr(&p), None, None)?;
+    ben.append(&note.id, &keys::transcript(&r), None, None)?;
+    exchange(&ben, &ann, None)?;
+    for store in [&ann, &ben] {
+        let notes = Notes::new(store);
+        let blob = |hash: &str| Blob {
+            note_id: note.id.clone(),
+            hash: hash.to_string(),
+        };
+        assert_eq!(notes.unread_photos()?, vec![blob(&p)]);
+        assert_eq!(notes.untranscribed()?, vec![blob(&r)]);
+    }
+    Ok(())
+}

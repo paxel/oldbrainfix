@@ -10,6 +10,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop antwortet die App schneller, wenn du viele Notizen hast. ([obf-1069](https://github.com/paxel/oldbrainfix/issues/382))
 - Auf dem Handy und dem Desktop wartet das Tippen in ein Suchfeld nicht mehr; die Ergebnisse folgen kurz, nachdem du mit dem Tippen aufhörst. ([obf-1068](https://github.com/paxel/oldbrainfix/issues/381))
 - Auf dem Desktop öffnen sich Seiten schneller, während die Alarme im Hintergrund geplant werden. ([obf-1091](https://github.com/paxel/oldbrainfix/issues/404))
+- Auf dem Handy und dem Desktop bleibt die App nach dem Import von Fotos oder Sprachaufnahmen flüssig, während ihr Text gelesen wird. ([obf-1094](https://github.com/paxel/oldbrainfix/issues/407))
 
 ### Behoben
 

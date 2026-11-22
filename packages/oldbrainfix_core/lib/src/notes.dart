@@ -1058,18 +1058,11 @@ class Notes {
   /// The voice recordings without a Transcript, newest capture first:
   /// those of every Note not in the trash, merged ones included. One
   /// whose Transcript was removed is not among them.
-  List<({String noteId, String hash})> untranscribed() {
-    final notes = [
-      for (final note in _holding(NoteKeys.audioPrefix))
-        if (note.recordings.any((h) => _untranscribed(note, h))) note,
-    ];
-    notes.sort((a, b) => b.captured.compareTo(a.captured));
-    return [
-      for (final note in notes)
-        for (final hash in note.recordings)
-          if (_untranscribed(note, hash)) (noteId: note.id, hash: hash),
-    ];
-  }
+  List<({String noteId, String hash})> untranscribed() => _waiting(
+    NoteKeys.audioPrefix,
+    NoteKeys.audioAdded,
+    NoteKeys.transcriptPrefix,
+  );
 
   /// Keeps [text] as the Photo Text of the photo [hash] of the Note
   /// [noteId], a merged one included, next to the photo; the photo stays
@@ -1086,16 +1079,48 @@ class Notes {
   /// The photos without a Photo Text, newest capture first: those of
   /// every Note not in the trash, merged ones included. One whose Photo
   /// Text was removed is not among them.
-  List<({String noteId, String hash})> unreadPhotos() {
-    final notes = [
-      for (final note in _holding(NoteKeys.photoPrefix))
-        if (note.photos.any((h) => _unread(note, h))) note,
+  List<({String noteId, String hash})> unreadPhotos() =>
+      _waiting(NoteKeys.photoPrefix, NoteKeys.photoAdded, NoteKeys.ocrPrefix);
+
+  /// The photos or recordings, fields under [prefix] holding [added],
+  /// without a text under [textPrefix], nor one that was removed, newest
+  /// capture first: those of every Note not in the trash, merged ones
+  /// included. Told from the fields of the Notes holding one, read in one
+  /// query, without making a Note: made one by one, they held the phone
+  /// up for each photo or recording read after an import (obf-1094).
+  List<({String noteId, String hash})> _waiting(
+    String prefix,
+    String added,
+    String textPrefix,
+  ) {
+    final holding = {for (final (id, _) in store.fieldsWithPrefix(prefix)) id};
+    final ids = [
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (holding.contains(id)) id,
     ];
+    final read = store.currentFieldsOf(ids);
+    final notes = <({String id, DateTime captured, List<String> hashes})>[];
+    for (final id in ids) {
+      final fields = read[id];
+      if (fields == null ||
+          fields[NoteKeys.type] != NoteKeys.typeNote ||
+          fields[NoteKeys.trashed] != null) {
+        continue;
+      }
+      final captured = fields[NoteKeys.captured];
+      if (captured == null) continue;
+      // Absent means not read yet; empty or null, read or removed.
+      final hashes = [
+        for (final hash in _blobs(fields, prefix, added))
+          if (!fields.containsKey('$textPrefix$hash')) hash,
+      ];
+      if (hashes.isEmpty) continue;
+      notes.add((id: id, captured: DateTime.parse(captured), hashes: hashes));
+    }
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
       for (final note in notes)
-        for (final hash in note.photos)
-          if (_unread(note, hash)) (noteId: note.id, hash: hash),
+        for (final hash in note.hashes) (noteId: note.id, hash: hash),
     ];
   }
 
@@ -1112,14 +1137,6 @@ class Notes {
           if (byId(id) case final note? when !note.isTrashed) note,
     ];
   }
-
-  static bool _untranscribed(Note note, String hash) =>
-      !note.transcripts.containsKey(hash) &&
-      !note.removedTranscripts.contains(hash);
-
-  static bool _unread(Note note, String hash) =>
-      !note.photoTexts.containsKey(hash) &&
-      !note.removedPhotoTexts.contains(hash);
 
   /// Whether this Device may remove the photo [hash] of the Note
   /// [noteId], a merged one included, and keep its Photo Text: the photo
