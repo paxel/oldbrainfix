@@ -919,8 +919,10 @@ impl Store {
         list.sort();
         list.dedup();
         let scopes = self.scopes_of(&list)?;
-        let histories = self.histories_of(list.iter().map(String::as_str))?;
-        let logged = self.logged_histories_of(list.iter().map(String::as_str))?;
+        // Of each, only what tells whose it is: its `$type` entries for
+        // the Device that made it, the link it keeps from a Sent Item.
+        let histories = self.histories_fields_of(list.iter().map(String::as_str), &["$type"])?;
+        let logged = self.logged_fields_of(list.iter().map(String::as_str), &["received"])?;
         let mut own = HashMap::new();
         let mut writers: HashMap<(String, Option<String>), Writer> = HashMap::new();
         let mut overrides = HashMap::new();

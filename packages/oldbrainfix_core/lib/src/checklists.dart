@@ -920,7 +920,8 @@ class Checklists {
   /// [isChecklist] tells it, in their order: their fields read in one
   /// query rather than one per Note (obf-1069).
   Map<String, String> makingsOf(Iterable<String> noteIds) {
-    final read = store.currentFieldsOf(noteIds);
+    // What a list of the Notes read already is not read again.
+    final read = Notes(store).currentFieldsOf(noteIds);
     final makings = <String, String>{};
     for (final id in noteIds) {
       if (_makingOf(id, read[id] ?? const {}) case final making?) {

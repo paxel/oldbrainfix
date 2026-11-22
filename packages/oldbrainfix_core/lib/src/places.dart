@@ -231,9 +231,23 @@ class Places {
 
   /// The Topics of the Area [areaId], by stored name.
   List<Topic> topics(String areaId) {
+    // None while the Area is gone ([topicById]); every Topic's fields
+    // read at once, not one by one (obf-1069), in the order
+    // [Store.entitiesOfType] lists them.
+    if (areaById(areaId) == null) return [];
+    final ever = store.everOfType(PlaceKeys.typeTopic);
+    final fields = store.currentFieldsOf(ever);
     final topics = [
-      for (final id in store.entitiesOfType(PlaceKeys.typeTopic))
-        if (store.current(id, PlaceKeys.area) == areaId) ?topicById(id),
+      for (final id in ever)
+        if (fields[id] case final held?
+            when held[PlaceKeys.type] == PlaceKeys.typeTopic &&
+                held[PlaceKeys.area] == areaId)
+          Topic(
+            id: id,
+            areaId: areaId,
+            name: held[PlaceKeys.name] ?? '',
+            starter: held[PlaceKeys.starter],
+          ),
     ];
     topics.sort((a, b) => a.name.compareTo(b.name));
     return topics;

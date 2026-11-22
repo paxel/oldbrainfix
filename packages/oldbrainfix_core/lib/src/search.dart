@@ -55,6 +55,8 @@ class Search {
     final places = within == null
         ? null
         : {within, for (final topic in Places(store).topics(within)) topic.id};
+    // The Notes found and not read yet, those merged into, read at once.
+    _readAll(notes, found, read);
     // As [Notes.all] and [Notes.inside] list them.
     final hits = [
       for (final id in found)
@@ -112,14 +114,32 @@ class Search {
     Note? note(String id) => read.putIfAbsent(id, () => notes.byId(id));
     String shownUnder(String owner) => note(owner)?.mergedInto ?? owner;
     final found = <String>{};
-    // Read in one query per few hundred rather than one each (#204).
-    final fieldsOf = store.currentFieldsOf(candidates);
+    // Read in one query per few hundred rather than one each (#204),
+    // the Notes' from a list of them read already (obf-1069).
+    final fieldsOf = notes.currentFieldsOf(candidates);
     final makings = _makings([
       for (final fields in fieldsOf.values)
         if (fields[NoteKeys.type] == ChecklistKeys.typeLine &&
             fields[ChecklistKeys.trashed] == null)
           ?fields[ChecklistKeys.note],
     ]);
+    // The Notes among the candidates and those the others name, read in
+    // one pass rather than one each (obf-1069).
+    _readAll(
+      notes,
+      {
+        for (final MapEntry(key: id, value: fields) in fieldsOf.entries)
+          switch (fields[NoteKeys.type]) {
+            NoteKeys.typeNote => id,
+            SectionKeys.typeSection => fields[SectionKeys.note],
+            TallyKeys.typeEntry => fields[TallyKeys.note],
+            ChecklistKeys.typeLine => fields[ChecklistKeys.note],
+            _ => null,
+          },
+      }.nonNulls,
+      read,
+      known: fieldsOf,
+    );
     for (final id in candidates) {
       final fields = fieldsOf[id] ?? const <String, String?>{};
       switch (fields[NoteKeys.type]) {
@@ -155,6 +175,26 @@ class Search {
       }
     }
     return found;
+  }
+
+  /// The Notes of [ids] not in [read] yet, read in one pass and kept
+  /// there, null for an id that is no Note, as [Notes.byId] gives them;
+  /// the current fields in [known] are not read again.
+  static void _readAll(
+    Notes notes,
+    Iterable<String> ids,
+    Map<String, Note?> read, {
+    Map<String, Map<String, String?>> known = const {},
+  }) {
+    final wanted = [
+      for (final id in ids)
+        if (!read.containsKey(id)) id,
+    ];
+    if (wanted.isEmpty) return;
+    final built = notes.byIds(wanted, read: known);
+    for (final id in wanted) {
+      read[id] = built[id];
+    }
   }
 
   /// Whether the Note's own text, Transcripts, Photo Texts, Attachment
@@ -213,8 +253,13 @@ class Search {
   /// its Note is now under its Note, or where that Note was merged into.
   Map<String, List<String>> _sectionTexts(Notes notes) {
     final texts = <String, List<String>>{};
-    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-      if (notes.byId(id) case final note?) {
+    // Every Note, read in one pass (obf-1069): what [Notes.byId] gives
+    // for an id, null for one that is no Note.
+    final ids = store.entitiesOfType(NoteKeys.typeNote);
+    final every = notes.byIds(ids);
+    String shownUnder(String owner) => every[owner]?.mergedInto ?? owner;
+    for (final id in ids) {
+      if (every[id] case final note?) {
         final into = note.mergedInto;
         if (into == null) continue;
         (texts[into] ??= []).addAll([
@@ -230,8 +275,7 @@ class Search {
       final fields = store.currentFields(id);
       final owner = fields[SectionKeys.note];
       if (owner == null) continue;
-      final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
-      (texts[shownUnder] ??= []).add(
+      (texts[shownUnder(owner)] ??= []).add(
         StoredText.read(fields[SectionKeys.text]).visible,
       );
     }
@@ -242,8 +286,7 @@ class Search {
       if (owner == null || line == null || fields[TallyKeys.trashed] != null) {
         continue;
       }
-      final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
-      (texts[shownUnder] ??= []).add(line);
+      (texts[shownUnder(owner)] ??= []).add(line);
     }
     // Every Line's fields, then the lists of their Notes, read at once.
     final lines = [
@@ -261,8 +304,7 @@ class Search {
       final (:making, :shopping) = makings[owner] ?? _noList;
       if (making == null || fields[ChecklistKeys.made] != making) continue;
       if (shopping && ShoppingLists.isGone(fields)) continue;
-      final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
-      (texts[shownUnder] ??= []).add(
+      (texts[shownUnder(owner)] ??= []).add(
         StoredText.read(fields[ChecklistKeys.text]).text,
       );
     }

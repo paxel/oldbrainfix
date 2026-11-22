@@ -1502,9 +1502,9 @@ impl<'a> Checklists<'a> {
     /// in one query rather than one per Note (obf-1069), as the Dart
     /// core's `makingsOf`.
     pub fn makings_of(&self, note_ids: &[String]) -> Result<HashMap<String, String>> {
-        let read = self
-            .store
-            .current_fields_of(note_ids.iter().map(String::as_str))?;
+        // What a list of the Notes read already is not read again.
+        let read =
+            crate::notes::current_fields_of(self.store, note_ids.iter().map(String::as_str))?;
         let none = Fields::default();
         let mut makings = HashMap::new();
         for id in note_ids {

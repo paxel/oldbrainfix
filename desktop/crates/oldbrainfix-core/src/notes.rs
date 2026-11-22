@@ -6,8 +6,8 @@
 //! and the Capture Context of Notes and Sections. Every write appends the same entries, in the same order and read from the
 //! clock as often, as the Dart core's, so both logs come out alike.
 
-use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::{Arc, OnceLock};
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -1852,6 +1852,37 @@ impl<'a> Notes<'a> {
         self.note_of(id, &fields, None)
     }
 
+    /// The Notes of `ids`, trashed or not, by id, each as
+    /// [`Notes::by_id`] reads it; an id that is no Note is left out. Read
+    /// in one pass for all of them, not once per Note (obf-1069), as the
+    /// Dart core's `byIds`.
+    pub fn by_ids<'i>(
+        &self,
+        ids: impl IntoIterator<Item = &'i str>,
+    ) -> Result<HashMap<String, Note>> {
+        self.by_ids_read(ids, &HashMap::new())
+    }
+
+    /// [`Notes::by_ids`], where the current fields of the entities in
+    /// `known` were read already ([`Store::current_fields_of`]) and are
+    /// not read again.
+    pub(crate) fn by_ids_read<'i>(
+        &self,
+        ids: impl IntoIterator<Item = &'i str>,
+        known: &HashMap<String, Fields>,
+    ) -> Result<HashMap<String, Note>> {
+        let pass = Pass::of(self.store, ids, known)?;
+        let mut notes = HashMap::new();
+        for id in &pass.ever {
+            if let Some(held) = pass.notes.get(id)
+                && let Some(note) = self.note_of(id, held, Some(&pass))?
+            {
+                notes.insert(id.clone(), note);
+            }
+        }
+        Ok(notes)
+    }
+
     /// The Note `id` made of its current `fields`, as [`Notes::by_id`]
     /// reads it; what `pass` read once for a list of many Notes is not
     /// read again.
@@ -2432,49 +2463,146 @@ impl<'a> Notes<'a> {
 /// What a list of many Notes reads once rather than for each Note
 /// (obf-1069), as the Dart core's `_Pass`: every Note's fields, its Merge
 /// chain followed in them; which Areas and Topics exist; the Named
-/// Places, once a Note has a location.
+/// Places, once a Note has a location. The pass over every Note is kept
+/// until the log changes ([`Store::worked_out`]), so the lists of one
+/// read share it.
 struct Pass<'a> {
     store: &'a Store,
+    read: Arc<PassRead>,
+}
+
+/// What a [`Pass`] read.
+struct PassRead {
     /// The entities whose `$type` was a Note's at some time, in the order
-    /// [`Store::entities_of_type`] keeps.
+    /// [`Store::entities_of_type`] keeps; in a pass over some Notes
+    /// ([`Pass::of`]), those asked for.
     ever: Vec<String>,
     /// The fields of every Note, by id: those whose current `$type` is a
-    /// Note's, as [`Store::current_fields_of_type`] reads them.
+    /// Note's, as [`Store::current_fields_of_type`] reads them; in a pass
+    /// over some Notes, of those and of the Notes their Merge chains lead
+    /// to.
     notes: HashMap<String, Fields>,
-    places: OnceCell<HashSet<String>>,
-    named: OnceCell<Vec<NamedPlace>>,
+    places: OnceLock<HashSet<String>>,
+    named: OnceLock<Vec<NamedPlace>>,
+}
+
+impl PassRead {
+    fn new(ever: Vec<String>, notes: HashMap<String, Fields>) -> PassRead {
+        PassRead {
+            ever,
+            notes,
+            places: OnceLock::new(),
+            named: OnceLock::new(),
+        }
+    }
+}
+
+impl std::ops::Deref for Pass<'_> {
+    type Target = PassRead;
+
+    fn deref(&self) -> &PassRead {
+        &self.read
+    }
+}
+
+/// What [`Pass::read`] is kept under.
+const PASS: &str = "notes:pass";
+
+/// What [`Store::current_fields_of`] gives for each of `entities`; those
+/// of the Notes taken from the pass over every Note where one is kept
+/// (obf-1069), not read again.
+pub(crate) fn current_fields_of<'i>(
+    store: &Store,
+    entities: impl IntoIterator<Item = &'i str>,
+) -> Result<HashMap<String, Fields>> {
+    let Some(pass) = store.worked_out_held::<PassRead>(PASS)? else {
+        return store.current_fields_of(entities);
+    };
+    let mut out = HashMap::new();
+    let mut rest = Vec::new();
+    for id in entities {
+        match pass.notes.get(id) {
+            Some(fields) => {
+                out.insert(id.to_string(), fields.clone());
+            }
+            None => rest.push(id),
+        }
+    }
+    out.extend(store.current_fields_of(rest)?);
+    Ok(out)
 }
 
 impl<'a> Pass<'a> {
     fn read(store: &'a Store) -> Result<Pass<'a>> {
-        let ever = store.ever_of_type(keys::TYPE_NOTE)?;
-        let mut notes = store.current_fields_of(ever.iter().map(String::as_str))?;
-        notes.retain(|_, fields| fields.get(keys::TYPE) == Some(keys::TYPE_NOTE));
+        let read = store.worked_out(PASS, || {
+            let ever = store.ever_of_type(keys::TYPE_NOTE)?;
+            let mut notes = store.current_fields_of(ever.iter().map(String::as_str))?;
+            notes.retain(|_, fields| fields.get(keys::TYPE) == Some(keys::TYPE_NOTE));
+            Ok(PassRead::new(ever, notes))
+        })?;
+        Ok(Pass { store, read })
+    }
+
+    /// The pass over the Notes of `ids` alone, `ever` in their order: the
+    /// fields of those that are Notes, and of the Notes their Merge
+    /// chains lead to, read a few hundred at a time; those in `known`,
+    /// the current fields of some entities already read, not again.
+    fn of<'i>(
+        store: &'a Store,
+        ids: impl IntoIterator<Item = &'i str>,
+        known: &HashMap<String, Fields>,
+    ) -> Result<Pass<'a>> {
+        let mut ever = Vec::new();
+        let mut seen = HashSet::new();
+        for id in ids {
+            if seen.insert(id.to_string()) {
+                ever.push(id.to_string());
+            }
+        }
+        let mut notes = HashMap::new();
+        let mut reading = ever.clone();
+        while !reading.is_empty() {
+            let unknown = reading.iter().filter(|id| !known.contains_key(*id));
+            let mut read = current_fields_of(store, unknown.map(String::as_str))?;
+            let mut next = Vec::new();
+            for id in reading {
+                let Some(fields) = read.remove(&id).or_else(|| known.get(&id).cloned()) else {
+                    continue;
+                };
+                if fields.get(keys::TYPE) != Some(keys::TYPE_NOTE) {
+                    continue;
+                }
+                if let Some(into) = fields.get(keys::MERGED)
+                    && seen.insert(into.to_string())
+                {
+                    next.push(into.to_string());
+                }
+                notes.insert(id, fields);
+            }
+            reading = next;
+        }
         Ok(Pass {
             store,
-            ever,
-            notes,
-            places: OnceCell::new(),
-            named: OnceCell::new(),
+            read: Arc::new(PassRead::new(ever, notes)),
         })
     }
 
     /// Every Area and Topic that exists ([`Places::ids`]).
     fn places(&self) -> Result<&HashSet<String>> {
-        if let Some(held) = self.places.get() {
+        if let Some(held) = self.read.places.get() {
             return Ok(held);
         }
         let read = Places::new(self.store).ids()?;
-        Ok(self.places.get_or_init(|| read))
+        Ok(self.read.places.get_or_init(|| read))
     }
 
     /// Every Named Place ([`NamedPlaces::all`]).
     fn named(&self) -> Result<&[NamedPlace]> {
-        if let Some(held) = self.named.get() {
+        if let Some(held) = self.read.named.get() {
             return Ok(held);
         }
         let read = NamedPlaces::new(self.store).all()?;
-        Ok(self.named.get_or_init(|| read))
+        Ok(self.read.named.get_or_init(|| read))
     }
 }
 

@@ -2401,6 +2401,35 @@ fn many_notes_are_listed_as_made_one_by_one() -> Result<()> {
 }
 
 #[test]
+fn many_notes_are_read_by_their_ids_as_made_one_by_one() -> Result<()> {
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let notes = Notes::new(&store);
+    let mut ids = store.ever_of_type(keys::TYPE_NOTE)?;
+    ids.extend([places[0].clone(), places[2].clone(), "note:none".into()]);
+    let mut one_by_one = HashMap::new();
+    for id in &ids {
+        if let Some(note) = notes.by_id(id)? {
+            one_by_one.insert(id.clone(), note);
+        }
+    }
+    let listed = notes.all()?;
+    assert!(listed.iter().all(|n| one_by_one.get(&n.id) == Some(n)));
+    assert!(one_by_one.len() > listed.len());
+    let asked = || ids.iter().map(String::as_str);
+    // Read anew, with some of their fields read already, and from the
+    // pass over every Note a list keeps.
+    store.changed_elsewhere();
+    assert_eq!(notes.by_ids(asked())?, one_by_one);
+    store.changed_elsewhere();
+    let known = store.current_fields_of(asked().take(9))?;
+    assert_eq!(notes.by_ids_read(asked(), &known)?, one_by_one);
+    notes.all()?;
+    assert_eq!(notes.by_ids(asked())?, one_by_one);
+    Ok(())
+}
+
+#[test]
 fn the_unsorted_notes_are_counted_as_they_are_listed() -> Result<()> {
     let (store, places) = many_notes()?;
     seed_many(&store, &places, 3)?;

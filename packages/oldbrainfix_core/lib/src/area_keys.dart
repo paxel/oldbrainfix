@@ -238,10 +238,14 @@ extension AreaKeys on Store {
     final up = <String, String?>{};
     var step = entities.toSet();
     while (step.isNotEmpty) {
-      final read = loggedHistoriesOf([
+      // The field naming what each lies in, its entries alone.
+      final walked = [
         for (final e in step)
           if (!e.startsWith('area:') && _upField(e) != null) e,
-      ]);
+      ];
+      final read = loggedFieldsOf(walked, {
+        for (final e in walked) ?_upField(e),
+      });
       final next = <String>{};
       for (final e in step) {
         final field = e.startsWith('area:') ? null : _upField(e);

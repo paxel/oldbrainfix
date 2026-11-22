@@ -115,6 +115,37 @@ void main() {
     expect(listed.where((n) => n.boxes.isNotEmpty), isNotEmpty);
   });
 
+  test('reads Notes by their ids as made one by one (obf-1069)', () {
+    seed(3);
+    final ids = [
+      ...store.everOfType(NoteKeys.typeNote),
+      home,
+      desk,
+      'note:none',
+    ];
+    final oneByOne = {
+      for (final id in ids)
+        if (notes.byId(id) case final note?) id: _shown(note),
+    };
+    Map<String, String> shown(Map<String, Note> read) => {
+      for (final MapEntry(key: id, value: note) in read.entries)
+        id: _shown(note),
+    };
+    expect(oneByOne.keys, containsAll([for (final n in notes.all()) n.id]));
+    expect(oneByOne.length, greaterThan(notes.all().length));
+    store.changedElsewhere();
+    // Read anew, with some of their fields read already, and from the
+    // pass over every Note a list keeps.
+    expect(shown(notes.byIds(ids)), oneByOne);
+    store.changedElsewhere();
+    expect(
+      shown(notes.byIds(ids, read: store.currentFieldsOf(ids.take(9)))),
+      oneByOne,
+    );
+    notes.all();
+    expect(shown(notes.byIds(ids)), oneByOne);
+  });
+
   test('counts the Unsorted Notes as it lists them (obf-1069)', () {
     seed(3);
     expect(notes.unsortedCount(), notes.unsorted().length);

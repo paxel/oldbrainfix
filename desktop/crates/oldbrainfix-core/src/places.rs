@@ -428,10 +428,30 @@ impl<'a> Places<'a> {
 
     /// The Topics of the Area `area_id`, by stored name.
     pub fn topics(&self, area_id: &str) -> Result<Vec<Topic>> {
+        // None while the Area is gone ([`Places::topic_by_id`]); every
+        // Topic's fields read at once, not one by one (obf-1069), in the
+        // order [`Store::entities_of_type`] lists them.
+        if self.area_by_id(area_id)?.is_none() {
+            return Ok(Vec::new());
+        }
+        let ever = self.store.ever_of_type(keys::TYPE_TOPIC)?;
+        let fields = self
+            .store
+            .current_fields_of(ever.iter().map(String::as_str))?;
         let mut topics = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_TOPIC)? {
-            if self.store.current(&id, keys::AREA)?.as_deref() == Some(area_id) {
-                topics.extend(self.topic_by_id(&id)?);
+        for id in ever {
+            let Some(held) = fields.get(&id) else {
+                continue;
+            };
+            if held.get(keys::TYPE) == Some(keys::TYPE_TOPIC)
+                && held.get(keys::AREA) == Some(area_id)
+            {
+                topics.push(Topic {
+                    id: id.clone(),
+                    area_id: area_id.to_string(),
+                    name: held.get(keys::NAME).unwrap_or_default().to_string(),
+                    starter: held.get(keys::STARTER).map(str::to_string),
+                });
             }
         }
         topics.sort_by(|a, b| utf16_cmp(&a.name, &b.name));

@@ -109,6 +109,8 @@ const SCHEMA: &str = "
         ON entries (device, dseq);
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
         ON entries (entity, field);
+      CREATE INDEX IF NOT EXISTS idx_entries_types
+        ON entries (value) WHERE field = '$type';
     ";
 
 /// What [`Store::worked_out`] keeps, by key, and the log's high-water
@@ -498,6 +500,28 @@ impl Store {
             }
         }
         Ok(value)
+    }
+
+    /// What [`Store::worked_out`] keeps under `key` now, without working
+    /// it out: none when nothing is kept, or nothing would be, as the
+    /// Dart core's `workedOutHeld`.
+    pub(crate) fn worked_out_held<T: Send + Sync + 'static>(
+        &self,
+        key: &'static str,
+    ) -> Result<Option<Arc<T>>> {
+        if self.reads_log_only() || self.reads_for_ai() {
+            return Ok(None);
+        }
+        let seq = self.current_seq()?;
+        let worked = self.worked_out.lock();
+        if worked.seq != seq {
+            return Ok(None);
+        }
+        Ok(worked
+            .held
+            .get(key)
+            .cloned()
+            .and_then(|held| held.downcast::<T>().ok()))
     }
 
     /// What the roles of the Shared Areas allow (ADR 0013), worked out
@@ -1631,6 +1655,78 @@ impl Store {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let all = self.logged_of(&ids)?;
         Ok(grouped(all, &self.judged()?.ignored))
+    }
+
+    /// [`Store::histories_of`] with only the entries of `fields`, for
+    /// what reads a field or two of many entities (obf-1069), as the Dart
+    /// core's `historiesFieldsOf`. It counts as one [`Store::history`]
+    /// read.
+    pub(crate) fn histories_fields_of<'a>(
+        &self,
+        entities: impl IntoIterator<Item = &'a str>,
+        fields: &[&str],
+    ) -> Result<HashMap<String, Vec<Entry>>> {
+        let (ids, wanted) = self.unhidden(entities)?;
+        if ids.is_empty() || fields.is_empty() {
+            return Ok(HashMap::new());
+        }
+        #[cfg(test)]
+        self.history_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let shown = self.shown()?;
+        let mut all = self.logged_fields(&ids, fields)?;
+        all.extend(
+            shown
+                .iter()
+                .filter(|e| {
+                    wanted.contains(e.entity.as_str()) && fields.contains(&e.field.as_str())
+                })
+                .cloned(),
+        );
+        let judged = if shown.is_empty() {
+            self.judged()?
+        } else {
+            self.display_judged(&shown)?
+        };
+        Ok(grouped(all, &judged.ignored))
+    }
+
+    /// [`Store::logged_histories_of`] with only the entries of `fields`,
+    /// for what reads a field or two of many entities (obf-1069), as the
+    /// Dart core's `loggedFieldsOf`. It counts as one
+    /// [`Store::logged_history`] read.
+    pub(crate) fn logged_fields_of<'a>(
+        &self,
+        entities: impl IntoIterator<Item = &'a str>,
+        fields: &[&str],
+    ) -> Result<HashMap<String, Vec<Entry>>> {
+        let (ids, _) = self.unhidden(entities)?;
+        if ids.is_empty() || fields.is_empty() {
+            return Ok(HashMap::new());
+        }
+        #[cfg(test)]
+        self.logged_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let all = self.logged_fields(&ids, fields)?;
+        Ok(grouped(all, &self.judged()?.ignored))
+    }
+
+    /// The entries of `fields` of `ids` in the log, each entity's in log
+    /// order.
+    fn logged_fields(&self, ids: &[&str], fields: &[&str]) -> Result<Vec<Entry>> {
+        let names = vec!["?"; fields.len()].join(", ");
+        let mut all = Vec::new();
+        for chunk in ids.chunks(IN_CHUNK) {
+            let marks = vec!["?"; chunk.len()].join(", ");
+            all.extend(self.entries_once(
+                &format!(
+                    "SELECT * FROM entries WHERE {APPLIED} AND field IN ({names}) \
+                     AND entity IN ({marks}) ORDER BY seq"
+                ),
+                rusqlite::params_from_iter(fields.iter().chain(chunk.iter())),
+            )?);
+        }
+        Ok(all)
     }
 
     /// `entities` but those hidden from the AI, each once, in their

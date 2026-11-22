@@ -20,7 +20,7 @@ use crate::notes::{Note, Notes, keys};
 use crate::places::Places;
 use crate::search_index;
 use crate::shopping_lists::ShoppingLists;
-use crate::store::Store;
+use crate::store::{Fields, Store};
 use crate::tallies::keys as tally_keys;
 use crate::text_format::StoredText;
 
@@ -96,6 +96,10 @@ impl<'a> Search<'a> {
             }
             None => None,
         };
+        // The Notes found and not read yet, those merged into, read at
+        // once.
+        let found_now = read_now(found.iter().map(String::as_str), &read);
+        read_all(&notes, found_now, &HashMap::new(), &mut read)?;
         // As [`Notes::all`] and [`Notes::inside`] list them.
         let mut hits = Vec::new();
         for id in found {
@@ -166,10 +170,10 @@ impl<'a> Search<'a> {
         };
         let notes = Notes::new(self.store);
         let holds = |text: &str| lower_case(text).contains(wanted);
-        // Read in one query per few hundred rather than one each (#204).
-        let fields_of = self
-            .store
-            .current_fields_of(candidates.iter().map(String::as_str))?;
+        // Read in one query per few hundred rather than one each (#204),
+        // the Notes' from a list of them read already (obf-1069).
+        let fields_of =
+            crate::notes::current_fields_of(self.store, candidates.iter().map(String::as_str))?;
         let mut found = HashSet::new();
         let owners: Vec<String> = fields_of
             .values()
@@ -180,6 +184,20 @@ impl<'a> Search<'a> {
             .filter_map(|f| f.get(checklist_keys::NOTE).map(str::to_string))
             .collect();
         let makings = self.makings(owners)?;
+        // The Notes among the candidates and those the others name, read
+        // in one pass rather than one each (obf-1069).
+        let named: Vec<&str> = fields_of
+            .iter()
+            .filter_map(|(id, fields)| match fields.get(keys::TYPE) {
+                Some(keys::TYPE_NOTE) => Some(id.as_str()),
+                Some(keys::TYPE_SECTION) => fields.get(keys::NOTE),
+                Some(tally_keys::TYPE_ENTRY) => fields.get(tally_keys::NOTE),
+                Some(checklist_keys::TYPE_LINE) => fields.get(checklist_keys::NOTE),
+                _ => None,
+            })
+            .collect();
+        let named: HashSet<&str> = named.into_iter().collect();
+        read_all(&notes, read_now(named, read), &fields_of, read)?;
         for id in &candidates {
             let Some(fields) = fields_of.get(id) else {
                 continue;
@@ -286,16 +304,26 @@ impl<'a> Search<'a> {
     /// was merged into.
     fn section_texts(&self, notes: &Notes) -> Result<HashMap<String, Vec<String>>> {
         let mut texts: HashMap<String, Vec<String>> = HashMap::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
-            if let Some(note) = notes.by_id(&id)?
-                && let Some(into) = note.merged_into.clone()
+        // Every Note, read in one pass (obf-1069): what [`Notes::by_id`]
+        // gives for an id, none for one that is no Note.
+        let ids = self.store.entities_of_type(keys::TYPE_NOTE)?;
+        let every = notes.by_ids(ids.iter().map(String::as_str))?;
+        let under = |owner: &str| {
+            every
+                .get(owner)
+                .and_then(|n| n.merged_into.clone())
+                .unwrap_or_else(|| owner.to_string())
+        };
+        for id in &ids {
+            if let Some(note) = every.get(id)
+                && let Some(into) = &note.merged_into
             {
-                let list = texts.entry(into).or_default();
+                let list = texts.entry(into.clone()).or_default();
                 list.push(note.visible_text());
-                list.extend(note.transcripts.into_values());
-                list.extend(note.photo_texts.into_values());
-                list.extend(note.attachment_texts.into_values());
-                list.extend(note.attachments.into_iter().map(|a| a.name));
+                list.extend(note.transcripts.values().cloned());
+                list.extend(note.photo_texts.values().cloned());
+                list.extend(note.attachment_texts.values().cloned());
+                list.extend(note.attachments.iter().map(|a| a.name.clone()));
             }
         }
         for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
@@ -303,12 +331,8 @@ impl<'a> Search<'a> {
             let Some(owner) = fields.get(keys::NOTE) else {
                 continue;
             };
-            let shown_under = notes
-                .by_id(owner)?
-                .and_then(|n| n.merged_into)
-                .unwrap_or_else(|| owner.to_string());
             texts
-                .entry(shown_under)
+                .entry(under(owner))
                 .or_default()
                 .push(StoredText::read(fields.get(keys::TEXT)).visible());
         }
@@ -322,11 +346,10 @@ impl<'a> Search<'a> {
             if fields.get(tally_keys::TRASHED).is_some() {
                 continue;
             }
-            let shown_under = notes
-                .by_id(owner)?
-                .and_then(|n| n.merged_into)
-                .unwrap_or_else(|| owner.to_string());
-            texts.entry(shown_under).or_default().push(line.to_string());
+            texts
+                .entry(under(owner))
+                .or_default()
+                .push(line.to_string());
         }
         // Every Line's fields, then the lists of their Notes, read at once.
         let lines = self
@@ -353,12 +376,8 @@ impl<'a> Search<'a> {
             if shopping && ShoppingLists::is_gone(fields) {
                 continue;
             }
-            let shown_under = notes
-                .by_id(owner)?
-                .and_then(|n| n.merged_into)
-                .unwrap_or_else(|| owner.to_string());
             texts
-                .entry(shown_under)
+                .entry(under(owner))
                 .or_default()
                 .push(StoredText::read(fields.get(checklist_keys::TEXT)).text);
         }
@@ -374,6 +393,34 @@ fn holds_own(note: &Note, holds: &impl Fn(&str) -> bool) -> bool {
         || note.photo_texts.values().any(|t| holds(t))
         || note.attachment_texts.values().any(|t| holds(t))
         || note.attachments.iter().any(|a| holds(&a.name))
+}
+
+/// Those of `ids` not in `read` yet.
+fn read_now<'i>(ids: impl IntoIterator<Item = &'i str>, read: &Read) -> Vec<String> {
+    ids.into_iter()
+        .filter(|id| !read.contains_key(*id))
+        .map(str::to_string)
+        .collect()
+}
+
+/// The Notes of `ids` read in one pass and kept in `read`, `None` for an
+/// id that is no Note, as [`Notes::by_id`] gives them; the current fields
+/// in `known` are not read again.
+fn read_all(
+    notes: &Notes,
+    ids: Vec<String>,
+    known: &HashMap<String, Fields>,
+    read: &mut Read,
+) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let mut built = notes.by_ids_read(ids.iter().map(String::as_str), known)?;
+    for id in ids {
+        let note = built.remove(&id);
+        read.insert(id, note);
+    }
+    Ok(())
 }
 
 /// The Note `id`, read once.

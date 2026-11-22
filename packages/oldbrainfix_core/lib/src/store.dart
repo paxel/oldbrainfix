@@ -232,6 +232,8 @@ class Store {
         ON entries (device, dseq);
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
         ON entries (entity, field);
+      CREATE INDEX IF NOT EXISTS idx_entries_types
+        ON entries (value) WHERE field = '\$type';
     ''');
     // Today's tables: a database from before the version was recorded
     // gets it. A later version adds its steps here, one per version.
@@ -1138,6 +1140,12 @@ class Store {
     return value;
   }
 
+  /// What [workedOut] keeps under [key] now, without working it out:
+  /// null when nothing is kept.
+  @internal
+  T? workedOutHeld<T>(Object key) =>
+      currentSeq() == _workedSeq ? _workedOut[key] as T? : null;
+
   void _forgetWorkedOut() {
     _generation++;
     _workedOut.clear();
@@ -1306,6 +1314,57 @@ class Store {
     return _grouped(_loggedOf(ids), judged.ignored);
   }
 
+  /// [historiesOf] with only the entries of [fields], for what reads a
+  /// field or two of many entities (obf-1069). It counts as one
+  /// [history] read.
+  @internal
+  Map<String, List<Entry>> historiesFieldsOf(
+    Iterable<String> entities,
+    Set<String> fields,
+  ) {
+    final ids = entities.toSet();
+    if (ids.isEmpty || fields.isEmpty) return {};
+    historyReads++;
+    final shown = _shown;
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    return _grouped([
+      ..._loggedFields(ids, fields),
+      for (final e in shown)
+        if (ids.contains(e.entity) && fields.contains(e.field)) e,
+    ], ignored);
+  }
+
+  /// [loggedHistoriesOf] with only the entries of [fields], for what
+  /// reads a field or two of many entities (obf-1069). It counts as one
+  /// [loggedHistory] read.
+  @internal
+  Map<String, List<Entry>> loggedFieldsOf(
+    Iterable<String> entities,
+    Set<String> fields,
+  ) {
+    final ids = entities.toSet();
+    if (ids.isEmpty || fields.isEmpty) return {};
+    loggedReads++;
+    return _grouped(_loggedFields(ids, fields), judged.ignored);
+  }
+
+  /// The entries of [fields] of [ids] in the log, each entity's in log
+  /// order.
+  List<Entry> _loggedFields(Set<String> ids, Set<String> fields) {
+    final list = ids.toList();
+    final names = List.filled(fields.length, '?').join(', ');
+    return [
+      for (var i = 0; i < list.length; i += _inChunk)
+        ..._entriesOnce(
+          'SELECT * FROM entries WHERE $_applied AND field IN ($names) '
+          'AND entity IN '
+          '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
+          'ORDER BY seq',
+          [...fields, ...list.sublist(i, min(i + _inChunk, list.length))],
+        ),
+    ];
+  }
+
   /// The entries of [ids] in the log, in log order.
   List<Entry> _loggedOf(Set<String> ids) {
     final list = ids.toList();
@@ -1414,16 +1473,23 @@ class Store {
   /// sets included, in the order [entitiesOfType] keeps: those that may
   /// hold it now, found without reading every entity (#339).
   @internal
-  Set<String> everWith(String field, String value) => {
-    for (final r in _db.select(
-      'SELECT DISTINCT entity FROM entries WHERE $_applied '
-      'AND field = ? AND value = ?',
-      [field, value],
-    ))
-      r['entity'] as String,
-    for (final e in _shown)
-      if (e.field == field && e.value == value) e.entity,
-  };
+  Set<String> everWith(String field, String value) {
+    // A `$type` named in the query, as the index of the types holds it
+    // (obf-1069), which a bound field cannot use.
+    final (named, args) = field == r'$type'
+        ? (r"field = '$type'", [value])
+        : ('field = ?', [field, value]);
+    return {
+      for (final r in _db.select(
+        'SELECT DISTINCT entity FROM entries WHERE $_applied AND $named '
+        'AND value = ?',
+        args,
+      ))
+        r['entity'] as String,
+      for (final e in _shown)
+        if (e.field == field && e.value == value) e.entity,
+    };
+  }
 
   /// Latest-wins order: date, then recording time, then device, then
   /// dseq. Sorting a field's entries by it puts the current value last.

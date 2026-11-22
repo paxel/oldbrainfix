@@ -17,6 +17,8 @@ CREATE UNIQUE INDEX idx_entries_device_dseq
         ON entries (device, dseq);
 CREATE INDEX idx_entries_entity_field
         ON entries (entity, field);
+CREATE INDEX idx_entries_types
+        ON entries (value) WHERE field = '$type';
 CREATE TABLE local_settings (
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL

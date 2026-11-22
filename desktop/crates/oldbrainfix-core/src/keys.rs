@@ -281,11 +281,15 @@ impl Store {
         step.sort();
         step.dedup();
         while !step.is_empty() {
-            let read = self.logged_histories_of(
-                step.iter()
-                    .filter(|e| !e.starts_with("area:") && up_field(e).is_some())
-                    .map(String::as_str),
-            )?;
+            // The field naming what each lies in, its entries alone.
+            let walked: Vec<&String> = step
+                .iter()
+                .filter(|e| !e.starts_with("area:") && up_field(e).is_some())
+                .collect();
+            let mut fields: Vec<&str> = walked.iter().filter_map(|e| up_field(e)).collect();
+            fields.sort_unstable();
+            fields.dedup();
+            let read = self.logged_fields_of(walked.iter().map(|e| e.as_str()), &fields)?;
             let mut next: Vec<String> = Vec::new();
             for e in &step {
                 let field = if e.starts_with("area:") {

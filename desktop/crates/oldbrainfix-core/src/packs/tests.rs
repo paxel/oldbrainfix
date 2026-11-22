@@ -683,8 +683,13 @@ fn what_another_persons_device_wrote_neither_sets_changes_nor_hides_the_badge() 
     }
     assert_eq!(ben.pack_from(&badged)?, Some(badge.clone()));
     assert_eq!(ben.pack_from(&own)?, None);
+    // Read for many Notes at once, the same (obf-1069).
+    let both = [badged.clone(), own.clone()];
+    let only_badged = HashMap::from([(badged.clone(), badge.clone())]);
+    assert_eq!(ben.pack_froms_of(&both)?, only_badged);
     ben.insert(&cy.append(&badged, keys::FROM, None, later(2))?.wire())?;
     assert_eq!(ben.pack_from(&badged)?, Some(badge.clone()));
+    assert_eq!(ben.pack_froms_of(&both)?, only_badged);
     ben.remove_pack_from(&badged)?;
     assert_eq!(ben.pack_from(&badged)?, None);
     ben.remove_pack_from(&own)?;
@@ -693,6 +698,7 @@ fn what_another_persons_device_wrote_neither_sets_changes_nor_hides_the_badge() 
     // one gets none.
     ben.restore_pack_from(&badged)?;
     assert_eq!(ben.pack_from(&badged)?, Some(badge));
+    assert_eq!(ben.pack_froms_of(&both)?, only_badged);
     let before = ben.all_entries()?.len();
     ben.restore_pack_from(&own)?;
     assert_eq!(ben.pack_from(&own)?, None);

@@ -131,14 +131,11 @@ extension Overrides on Store {
   /// pending change (ADR 0022) is trusted for nothing.
   @internal
   String? currentByOwn(String entity, String field, [Map<String, bool>? own]) =>
-      _latestByOwn(loggedHistory(entity), field, own ?? {});
+      latestByOwn(loggedHistory(entity), field, own ?? {});
 
   /// [currentByOwn] of the entries [logged] of one entity in the log.
-  String? _latestByOwn(
-    List<Entry> logged,
-    String field,
-    Map<String, bool> own,
-  ) {
+  @internal
+  String? latestByOwn(List<Entry> logged, String field, Map<String, bool> own) {
     Entry? held;
     for (final e in logged) {
       if (e.field != field) continue;

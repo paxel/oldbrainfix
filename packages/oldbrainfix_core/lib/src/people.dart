@@ -710,8 +710,10 @@ extension People on Store {
   Map<String, NoteAccess> accessOf(Iterable<String> ids) {
     final list = ids.toSet();
     final scopes = scopesOf(list);
-    final histories = historiesOf(list);
-    final logged = loggedHistoriesOf(list);
+    // Of each, only what tells whose it is: its `$type` entries for the
+    // Device that made it, the link it keeps from a Sent Item.
+    final histories = historiesFieldsOf(list, const {r'$type'});
+    final logged = loggedFieldsOf(list, const {'received'});
     final own = <String, bool>{};
     final writers = <(String, String?), _Writer>{};
     final overrides = <String, PersonOverride?>{};
@@ -720,7 +722,7 @@ extension People on Store {
       final area = scope == personalScope ? null : scope;
       final history = histories[id] ?? const <Entry>[];
       final writer = _writerFrom(
-        _receivedLink(_latestByOwn(logged[id] ?? const [], 'received', own)),
+        _receivedLink(latestByOwn(logged[id] ?? const [], 'received', own)),
         () => history,
         (device) => writers.putIfAbsent((
           device,

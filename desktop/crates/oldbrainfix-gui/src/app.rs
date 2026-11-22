@@ -12750,17 +12750,14 @@ impl App {
         if self.selection != Selection::Unsorted || self.alone.is_some() {
             return None;
         }
-        let notes = Notes::new(&self.store);
-        let order: Vec<String> = self
-            .shown_cards()
+        // Read in one pass for all the cards (obf-1069).
+        let shown = self.shown_cards();
+        let notes = Notes::new(&self.store)
+            .by_ids(shown.iter().map(String::as_str))
+            .ok()?;
+        let order: Vec<String> = shown
             .into_iter()
-            .filter(|id| {
-                notes
-                    .by_id(id)
-                    .ok()
-                    .flatten()
-                    .is_some_and(|n| n.is_unsorted())
-            })
+            .filter(|id| notes.get(id).is_some_and(Note::is_unsorted))
             .collect();
         if order.is_empty() {
             return None;
@@ -12783,10 +12780,11 @@ impl App {
         }
         let (sorted, empty) = {
             let notes = Notes::new(&self.store);
+            let now = notes.by_ids(before.order.iter().map(String::as_str))?;
             let mut sorted = Vec::new();
             for id in &before.order {
-                if notes
-                    .by_id(id)?
+                if now
+                    .get(id)
                     .is_some_and(|n| !n.is_trashed() && !n.is_unsorted())
                 {
                     sorted.push(id.clone());
@@ -20151,19 +20149,19 @@ fn place_note(store: &Store, places: &Places, note: Note) -> oldbrainfix_core::R
 }
 
 /// [`place_note`] for each of `notes`, in their order, for a list, with
-/// whether this Device may change each: whose they are and what it may
-/// do read for all of them at once, each Area and Topic once (obf-1069),
-/// as the phone's `placeNotes`.
+/// whether this Device may change each: whose they are, what it may do
+/// and the Pack each came from read for all of them at once, each Area
+/// and Topic once (obf-1069), as the phone's `placeNotes`.
 fn place_notes(
     store: &Store,
     places: &Places,
     notes: Vec<Note>,
 ) -> oldbrainfix_core::Result<(Vec<Placed>, HashSet<String>)> {
     let ids: Vec<String> = notes.iter().map(|n| n.id.clone()).collect();
-    let mut access = if ids.is_empty() {
-        HashMap::new()
+    let (mut access, mut packs) = if ids.is_empty() {
+        (HashMap::new(), HashMap::new())
     } else {
-        store.access_of(&ids)?
+        (store.access_of(&ids)?, store.pack_froms_of(&ids)?)
     };
     let mut topics: HashMap<String, Option<Topic>> = HashMap::new();
     let mut areas: HashMap<String, Option<Area>> = HashMap::new();
@@ -20177,7 +20175,7 @@ fn place_notes(
         if may {
             changes.insert(note.id.clone());
         }
-        let pack_from = store.pack_from(&note.id)?;
+        let pack_from = packs.remove(&note.id);
         let Some(id) = note.place.clone() else {
             placed.push(Placed {
                 note,

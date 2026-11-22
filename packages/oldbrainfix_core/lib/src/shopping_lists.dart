@@ -536,8 +536,11 @@ class ShoppingLists {
   List<Note> addable() {
     final notes = Notes(store);
     final found = <Note>[];
-    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-      if (making(id) == null || !mayCheck(id)) continue;
+    final ids = store.entitiesOfType(NoteKeys.typeNote);
+    // Their makings read at once, not once per Note (obf-1069).
+    final makings = makingsOf(ids);
+    for (final id in ids) {
+      if (!makings.containsKey(id) || !mayCheck(id)) continue;
       if (notes.byId(id) case final note?
           when !note.isTrashed && !note.isMerged) {
         found.add(note);
@@ -559,7 +562,8 @@ class ShoppingLists {
   /// [making] tells it, in their order: their fields read in one query
   /// rather than one per Note (obf-1069).
   Map<String, String> makingsOf(Iterable<String> noteIds) {
-    final read = store.currentFieldsOf(noteIds);
+    // What a list of the Notes read already is not read again.
+    final read = Notes(store).currentFieldsOf(noteIds);
     final makings = <String, String>{};
     for (final id in noteIds) {
       if (_makingOf(id, read[id] ?? const {}) case final making?) {

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import 'boxes.dart';
 import 'checklists.dart';
 import 'entry.dart';
@@ -1862,6 +1864,41 @@ class Notes {
   /// The Note [id], trashed or not, or null when there is none.
   Note? byId(String id) => _note(id, store.currentFields(id));
 
+  /// The Notes of [ids], trashed or not, by id, each as [byId] reads it;
+  /// an id that is no Note is left out. Read in one pass for all of
+  /// them, not once per Note (obf-1069); the current fields of the
+  /// entities in [read], as [Store.currentFieldsOf] gives them, are not
+  /// read again.
+  Map<String, Note> byIds(
+    Iterable<String> ids, {
+    Map<String, Map<String, String?>> read = const {},
+  }) {
+    final pass = _Pass.of(store, ids, read);
+    return {
+      for (final id in pass.ever)
+        if (pass.notes[id] case final held?) id: ?_note(id, held, pass),
+    };
+  }
+
+  /// What [Store.currentFieldsOf] gives for each of [entities]; those of
+  /// the Notes taken from the pass over every Note where one is kept
+  /// (obf-1069), not read again.
+  @internal
+  Map<String, Map<String, String?>> currentFieldsOf(Iterable<String> entities) {
+    final pass = store.workedOutHeld<_Pass>(_Pass);
+    if (pass == null) return store.currentFieldsOf(entities);
+    final rest = <String>[];
+    final out = <String, Map<String, String?>>{};
+    for (final id in entities) {
+      if (pass.notes[id] case final fields?) {
+        out[id] = fields;
+      } else {
+        rest.add(id);
+      }
+    }
+    return out..addAll(store.currentFieldsOf(rest));
+  }
+
   /// The Note [id] made of its current [fields], as [byId] reads it;
   /// what [pass] read once for a list of many Notes is not read again.
   Note? _note(String id, Map<String, String?> fields, [_Pass? pass]) {
@@ -2194,16 +2231,19 @@ class Notes {
 /// What a list of many Notes reads once rather than for each Note
 /// (obf-1069): every Note's fields, its Merge chain followed in them;
 /// which Areas and Topics exist; the Named Places, once a Note has a
-/// location.
+/// location. The pass over every Note is kept until the log changes
+/// ([Store.workedOut]), so the lists of one read share it.
 class _Pass {
   final Store store;
 
   /// The entities whose `$type` was a Note's at some time, in the order
-  /// [Store.entitiesOfType] keeps.
+  /// [Store.entitiesOfType] keeps; in a pass over some Notes
+  /// ([_Pass.of]), those asked for.
   final Set<String> ever;
 
   /// The fields of every Note, by id: those whose current `$type` is a
-  /// Note's, as [Store.currentFieldsOfType] reads them.
+  /// Note's, as [Store.currentFieldsOfType] reads them; in a pass over
+  /// some Notes, of those and of the Notes their Merge chains lead to.
   final Map<String, Map<String, String?>> notes;
 
   /// Every Area and Topic that exists ([Places.ids]).
@@ -2212,13 +2252,45 @@ class _Pass {
   /// Every Named Place ([NamedPlaces.all]).
   late final named = NamedPlaces(store).all();
 
-  factory _Pass(Store store) {
+  factory _Pass(Store store) => store.workedOut(_Pass, () {
     final ever = store.everOfType(NoteKeys.typeNote);
     return _Pass._(store, ever, {
       for (final MapEntry(key: id, value: fields)
           in store.currentFieldsOf(ever).entries)
         if (fields[NoteKeys.type] == NoteKeys.typeNote) id: fields,
     });
+  });
+
+  /// The pass over the Notes of [ids] alone, [ever] in their order: the
+  /// fields of those that are Notes, and of the Notes their Merge chains
+  /// lead to, read a few hundred at a time; those in [known], the current
+  /// fields of some entities already read, not again.
+  factory _Pass.of(
+    Store store,
+    Iterable<String> ids,
+    Map<String, Map<String, String?>> known,
+  ) {
+    final asked = ids.toSet();
+    final notes = <String, Map<String, String?>>{};
+    final seen = <String>{};
+    var reading = asked;
+    while (reading.isNotEmpty) {
+      seen.addAll(reading);
+      final read = Notes(store)
+          .currentFieldsOf(reading.where((id) => !known.containsKey(id)));
+      for (final id in reading) {
+        final fields = read[id] ?? known[id];
+        if (fields != null && fields[NoteKeys.type] == NoteKeys.typeNote) {
+          notes[id] = fields;
+        }
+      }
+      reading = {
+        for (final id in reading)
+          if (notes[id]?[NoteKeys.merged] case final next?)
+            if (!seen.contains(next)) next,
+      };
+    }
+    return _Pass._(store, asked, notes);
   }
 
   _Pass._(this.store, this.ever, this.notes);

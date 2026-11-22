@@ -844,9 +844,9 @@ impl<'a> ShoppingLists<'a> {
     /// one query rather than one per Note (obf-1069), as the Dart core's
     /// `makingsOf`.
     pub fn makings_of(&self, note_ids: &[String]) -> Result<HashMap<String, String>> {
-        let read = self
-            .store
-            .current_fields_of(note_ids.iter().map(String::as_str))?;
+        // What a list of the Notes read already is not read again.
+        let read =
+            crate::notes::current_fields_of(self.store, note_ids.iter().map(String::as_str))?;
         let none = Fields::default();
         let mut makings = HashMap::new();
         for id in note_ids {
@@ -1162,11 +1162,13 @@ impl<'a> ShoppingLists<'a> {
             .into_iter()
             .map(|(id, _)| id)
             .collect();
-        for id in self
+        let ids = self
             .store
-            .entities_of_type_among(note_keys::TYPE_NOTE, &lists)?
-        {
-            if self.making(&id)?.is_none() || !self.may_check(&id)? {
+            .entities_of_type_among(note_keys::TYPE_NOTE, &lists)?;
+        // Their makings read at once, not once per Note (obf-1069).
+        let makings = self.makings_of(&ids)?;
+        for id in ids {
+            if !makings.contains_key(&id) || !self.may_check(&id)? {
                 continue;
             }
             if let Some(note) = notes.by_id(&id)?
