@@ -45,6 +45,10 @@ import 'src/voice_platform.dart';
 /// again.
 Store? _store;
 
+/// Stops what the running app does on its own before Restart closes its
+/// store (obf-1059).
+final _runStop = RunStop();
+
 /// What the app has to say; one for the whole run, across Restarts.
 final _announcements = Announcements();
 
@@ -62,6 +66,11 @@ Future<void> main() async {
     await initCrashGuard(
       dir,
       restart: () {
+        // The app that crashed first: its timers would read the closed
+        // store, as its screens may never be taken down.
+        try {
+          _runStop.stop();
+        } catch (_) {}
         try {
           _store?.close();
         } catch (_) {}
@@ -112,6 +121,7 @@ Future<void> _openAndRun(Directory dir) async {
   runApp(
     OldBrainFixApp(
       store: store,
+      runStop: _runStop,
       announcements: _announcements,
       navigatorKey: _navigator,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),

@@ -11,6 +11,7 @@ import 'line_editing.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
+import 'run_over.dart';
 import 'setting_badges.dart';
 import 'tick_saves.dart';
 
@@ -39,7 +40,8 @@ mixin _ReadsAtDayStart<T extends StatefulWidget> on State<T> {
     final wall = deviceWallClock(dayStore.clock().toUtc());
     final next = DateTime(wall.year, wall.month, wall.day + 1);
     _dayTimer = Timer(next.difference(wall) + const Duration(seconds: 1), () {
-      if (mounted) onDay();
+      // Not in a run a Restart ended: its store is closed (obf-1059).
+      if (mounted && !runOver(dayStore)) onDay();
     });
   }
 

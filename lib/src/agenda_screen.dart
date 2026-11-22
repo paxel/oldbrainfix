@@ -42,6 +42,7 @@ import 'profile.dart';
 import 'profile_screen.dart';
 import 'routine_editor_screen.dart';
 import 'routine_history_screen.dart';
+import 'run_over.dart';
 import 'schedule_text.dart';
 import 'session_view.dart';
 import 'setup_screen.dart';
@@ -250,6 +251,8 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
       // Maybe a new day, maybe something shared or a capture asked
       // for meanwhile.
       onResume: () {
+        // A run a Restart ended reads its closed store no more (obf-1059).
+        if (runOver(widget.notes.store)) return;
         _reload();
         unawaited(_readCalendar());
         unawaited(_openWaiting());
@@ -311,6 +314,7 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
     if (missed != null && missed < wait) wait = missed;
     wait += const Duration(seconds: 1);
     _timer = Timer(wait.isNegative ? Duration.zero : wait, () {
+      if (runOver(widget.notes.store)) return;
       _reload();
       unawaited(_readCalendar());
     });

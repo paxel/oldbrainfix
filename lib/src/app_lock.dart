@@ -31,6 +31,10 @@ class AppLock extends ChangeNotifier {
   DateTime? _hiddenAt;
   var _asking = 0;
 
+  /// Whether the run it locked is over: the app going away and coming
+  /// back reads nothing then (obf-1059).
+  var _disposed = false;
+
   AppLock({required this.store, this.platform = const NoBiometrics()});
 
   /// Whether the App Lock stands in front of browsing now.
@@ -79,13 +83,14 @@ class AppLock extends ChangeNotifier {
   /// The app went to the background. While the system asks for
   /// biometrics or the screen lock, it does not count.
   void hidden() {
-    if (_asking > 0) return;
+    if (_disposed || _asking > 0) return;
     _hiddenAt ??= store.clock();
   }
 
   /// The app is back: it locks again, and its Areas close, once it was
   /// away for the re-lock time.
   void shown() {
+    if (_disposed) return;
     final at = _hiddenAt;
     _hiddenAt = null;
     if (at == null || store.clock().difference(at) < store.relockAfter) {
@@ -108,6 +113,12 @@ class AppLock extends ChangeNotifier {
     } finally {
       _asking--;
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 

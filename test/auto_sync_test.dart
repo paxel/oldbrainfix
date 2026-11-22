@@ -296,6 +296,22 @@ void main() {
   });
 
   group('while the app is open', () {
+    testWidgets('a sync that ends after it was stopped and its store '
+        'closed writes nothing there (obf-1059)', (tester) async {
+      pairDesk();
+      failure = SyncFailure.updateThere;
+      parked = Completer<void>();
+      final auto = autoSync()..shown();
+      await tester.pump();
+      expect(joined, hasLength(1));
+      auto.dispose();
+      phone.close();
+      parked!.complete();
+      parked = null;
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('syncs at once, where the computer was last, and keeps '
         'looking', (tester) async {
       pairDesk();
@@ -681,6 +697,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(joined, hasLength(2), reason: 'tried again');
       expect(announcements.visible, isNull);
+    });
+
+    testWidgets('a Restart stops the run that crashed before its store '
+        'closes: nothing reads the closed store (obf-1059)', (tester) async {
+      pairDesk();
+      final runStop = RunStop();
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: phone,
+          runStop: runStop,
+          announcements: announcements,
+          sync: sync,
+          autoJoin: join,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(joined, hasLength(1));
+      final before = joined.length;
+      // The crashed run's screens stay up, as when taking them down
+      // failed; Restart stops it and closes its store.
+      runStop.stop();
+      phone.close();
+      // The periodic work and discovery speak, the app goes away and
+      // comes back, its timers come due, the Agenda's at midnight too.
+      sync
+        ..want()
+        ..find(FoundHost(desk.deviceId, '192.168.1.9', 4100));
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await wait(tester, const Duration(hours: 16));
+      expect(tester.takeException(), isNull);
+      expect(joined, hasLength(before), reason: 'the stopped run syncs not');
     });
 
     testWidgets('a setting a newer version saved is kept and said once '

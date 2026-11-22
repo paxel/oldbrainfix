@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Fixed
 
 - On the phone, More on the quick note opens the Note editor even while a tip shows, instead of crashing the app. ([obf-1058](https://github.com/paxel/oldbrainfix/issues/371))
+- On the phone, restarting the app after a crash no longer makes it crash again shortly after. ([obf-1059](https://github.com/paxel/oldbrainfix/issues/372))
 
 ---
 

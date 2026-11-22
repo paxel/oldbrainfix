@@ -58,6 +58,7 @@ import 'restore_screen.dart';
 import 'ring_screen.dart';
 import 'session_view.dart';
 import 'routine_editor_screen.dart';
+import 'run_over.dart';
 import 'sent_item_screen.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
@@ -72,8 +73,28 @@ import 'tally_entry_screen.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
+/// Stops what a run of the app does on its own, apart from its screens:
+/// the automatic sync, the alarms' and the calendar mirror's timers, the
+/// readers in the background and the App Lock. The crash guard's Restart
+/// stops the run that crashed before it closes the store, as the screens
+/// of that run may never be taken down (obf-1059).
+class RunStop {
+  VoidCallback? _stop;
+
+  /// Stops the run that started last, once; nothing without one.
+  void stop() {
+    final stop = _stop;
+    _stop = null;
+    stop?.call();
+  }
+}
+
 class OldBrainFixApp extends StatefulWidget {
   final Store store;
+
+  /// Where the crash guard's Restart stops this run; none in tests that
+  /// do not restart.
+  final RunStop? runStop;
 
   /// What the app has to say; the app keeps its own when none is given.
   final Announcements? announcements;
@@ -199,6 +220,7 @@ class OldBrainFixApp extends StatefulWidget {
   const OldBrainFixApp({
     super.key,
     required this.store,
+    this.runStop,
     this.announcements,
     this.navigatorKey,
     this.drafts,
@@ -295,6 +317,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   @override
   void initState() {
     super.initState();
+    widget.runStop?._stop = _restarted;
     // What has been in the trash for 30 days goes for good.
     _notes.purgeTrash();
     Routines(widget.store).purgeTrash();
@@ -330,21 +353,53 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     }
   }
 
+  /// Restart stops this run: its screens, should they stay, read nothing
+  /// more either.
+  void _restarted() {
+    endRun(widget.store);
+    _stopWork();
+  }
+
+  /// Whether what this run does on its own was stopped, by [dispose] or
+  /// by a Restart before it.
+  var _stopped = false;
+
+  /// Stops what this run does on its own, once: each part even when one
+  /// before it fails, which is then thrown.
+  void _stopWork() {
+    if (_stopped) return;
+    _stopped = true;
+    (Object, StackTrace)? failed;
+    for (final stop in <VoidCallback>[
+      _alarms.dispose,
+      _autoSync.dispose,
+      _mirror.dispose,
+      _playback.dispose,
+      _transcriber.dispose,
+      _speechModel.dispose,
+      _photoReader.dispose,
+      _attachmentReader.dispose,
+      _lock.dispose,
+      _profile.dispose,
+      _frameTimes.dispose,
+    ]) {
+      try {
+        stop();
+      } on Object catch (e, stack) {
+        failed ??= (e, stack);
+      }
+    }
+    if (failed case (final e, final stack)) {
+      Error.throwWithStackTrace(e, stack);
+    }
+  }
+
   @override
   void dispose() {
-    _alarms.dispose();
-    _autoSync.dispose();
-    _mirror.dispose();
-    _playback.dispose();
-    _transcriber.dispose();
-    _speechModel.dispose();
-    _photoReader.dispose();
-    _attachmentReader.dispose();
-    _lock.dispose();
-    _profile.dispose();
+    if (widget.runStop?._stop == _restarted) widget.runStop?._stop = null;
+    _stopWork();
     _pager.dispose();
     _scroll.dispose();
-    _frameTimes.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
   }

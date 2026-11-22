@@ -237,8 +237,10 @@ class AutoSync extends ChangeNotifier {
     if (_backingUp case final running?) return running;
     final run = openAutoBackup(folders)
         .then(
-          (auto) =>
-              backUpIfDue(store, folders.openBackups, work, autoBackup: auto),
+          // Stopped meanwhile, its store may be closed (obf-1059).
+          (auto) => _disposed
+              ? null
+              : backUpIfDue(store, folders.openBackups, work, autoBackup: auto),
         )
         .then(
           (_) {},
@@ -510,6 +512,8 @@ class AutoSync extends ChangeNotifier {
               }
               break;
             } on SyncException catch (e) {
+              // Stopped meanwhile, its store may be closed (obf-1059).
+              if (_disposed) return;
               // An update is needed: announced once, tried again all the
               // same.
               _noteUpdate(store, device.id, e);
