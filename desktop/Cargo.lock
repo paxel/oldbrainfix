@@ -3426,7 +3426,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-l10n"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "serde_json",
  "tempfile",
