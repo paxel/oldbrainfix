@@ -845,7 +845,10 @@ jobs:
   testflight:
     name: iOS to TestFlight
     needs: [ios, sonar-gate]
-    runs-on: macos-26
+    # The same image and Xcode as ios.yml: the iOS 27 SDK (#392).
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
       - name: Apple secrets present
         id: secrets
