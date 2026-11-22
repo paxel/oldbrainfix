@@ -152,6 +152,25 @@ void main() {
     expect(notes.unsortedCount(), greaterThan(0));
   });
 
+  test('plans the Nudge over the Unsorted Notes as it lists them '
+      '(obf-1091)', () {
+    seed(3);
+    notes.capture('soon', nudgeIn: const Duration(minutes: 10));
+    final unreadable = notes.capture('unreadable').id;
+    store.append(unreadable, NoteKeys.nudge, 'not a time');
+    expect(
+      notes.nudgeAnchors(),
+      unorderedEquals([
+        for (final n in notes.unsorted())
+          (n.id, (due: n.nudgeAt.toUtc(), captured: n.captured.toUtc())),
+      ]),
+    );
+    // The Nudge counts what Unsorted lists, without making a Note.
+    final nudge = Alarms(store).nudge((utc) => utc);
+    expect(nudge?.count, notes.unsorted().length);
+    expect(nudge?.count, notes.unsortedCount());
+  });
+
   test('reads no more for many Notes than for a few (obf-1069)', () {
     seed(1);
     final few = readsOf(notes.all);

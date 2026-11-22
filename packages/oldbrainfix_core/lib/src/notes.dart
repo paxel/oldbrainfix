@@ -9,6 +9,7 @@ import 'entry.dart';
 import 'file_text.dart';
 import 'hidden_from_ai.dart';
 import 'named_places.dart';
+import 'nudges.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'shared_areas.dart';
@@ -2054,20 +2055,45 @@ class Notes {
 
   /// How many Notes are Unsorted: [unsorted]'s length, worked out from
   /// the fields alone, without making a Note (obf-1069).
-  int unsortedCount() {
-    final pass = _Pass(store);
-    var count = 0;
-    for (final MapEntry(key: id, value: fields) in pass.notes.entries) {
-      final place = fields[NoteKeys.place];
-      if (fields[NoteKeys.captured] != null &&
-          fields[NoteKeys.spawned] == null &&
-          (place == null || !pass.places.contains(place)) &&
-          _listed(id, fields, pass)) {
-        count++;
-      }
-    }
-    return count;
-  }
+  int unsortedCount() => _unsortedFields(_Pass(store)).length;
+
+  /// Every Unsorted Note's id with its own Nudge time and its capture,
+  /// what the Nudge is planned over ([Alarms.nudge]): worked out from the
+  /// fields alone, as [unsortedCount], without making a Note (obf-1091).
+  /// Read as [Note.nudgeAt] and [Note.captured] are.
+  List<(String, NudgeAnchor)> nudgeAnchors() => [
+    for (final (id, fields) in _unsortedFields(_Pass(store)))
+      if (fields[NoteKeys.captured] case final captured?)
+        (
+          id,
+          _anchor(
+            DateTime.parse(captured),
+            DateTime.tryParse(fields[NoteKeys.nudge] ?? '')?.toUtc(),
+          ),
+        ),
+  ];
+
+  static NudgeAnchor _anchor(DateTime captured, DateTime? nudge) => (
+    due: (nudge ?? captured.add(defaultNudge)).toUtc(),
+    captured: captured.toUtc(),
+  );
+
+  /// The ids and fields of every Unsorted Note [pass] read, in its order,
+  /// told from the fields alone.
+  List<(String, Map<String, String?>)> _unsortedFields(_Pass pass) => [
+    for (final id in pass.ever)
+      if (pass.notes[id] case final fields?)
+        if (fields[NoteKeys.captured] != null &&
+            fields[NoteKeys.spawned] == null &&
+            !_filed(fields[NoteKeys.place], pass) &&
+            _listed(id, fields, pass))
+          (id, fields),
+  ];
+
+  /// Whether [place] is an Area or a Topic that exists, as [pass] read
+  /// them.
+  bool _filed(String? place, _Pass pass) =>
+      place != null && pass.places.contains(place);
 
   /// Whether the Note [id] of [fields] is neither in the trash nor
   /// merged: told before it is made.

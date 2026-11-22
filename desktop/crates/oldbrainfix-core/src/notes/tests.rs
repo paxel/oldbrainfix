@@ -2440,6 +2440,35 @@ fn the_unsorted_notes_are_counted_as_they_are_listed() -> Result<()> {
 }
 
 #[test]
+fn the_nudge_is_planned_over_the_unsorted_notes_as_they_are_listed() -> TestResult {
+    use crate::Alarms;
+    use crate::nudges::NudgeAnchor;
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let notes = Notes::new(&store);
+    notes.capture("soon", None, Some(Duration::minutes(10)))?;
+    let unreadable = notes.capture("unreadable", None, None)?.id;
+    store.append(&unreadable, keys::NUDGE, Some("not a time"), None)?;
+    let key = |(id, a): &(String, NudgeAnchor)| (id.clone(), a.captured, a.due);
+    let mut listed: Vec<_> = notes
+        .unsorted()?
+        .iter()
+        .map(|n| (n.id.clone(), n.captured, n.nudge_at()))
+        .collect();
+    let mut anchors: Vec<_> = notes.nudge_anchors()?.iter().map(key).collect();
+    listed.sort();
+    anchors.sort();
+    assert_eq!(anchors, listed);
+    // The Nudge counts what Unsorted lists, without making a Note
+    // (obf-1091).
+    let wall = |at: DateTime<Utc>| at.naive_utc();
+    let nudge = Alarms::new(&store).nudge(&wall)?.ok_or("a Nudge")?;
+    assert_eq!(nudge.count(), notes.unsorted()?.len());
+    assert_eq!(nudge.count(), notes.unsorted_count()?);
+    Ok(())
+}
+
+#[test]
 fn many_notes_take_no_more_reads_than_a_few() -> Result<()> {
     let (store, places) = many_notes()?;
     let notes = Notes::new(&store);

@@ -15,6 +15,7 @@ use crate::boxes::{self, Boxes};
 use crate::entry::{Entry, dart_iso, parse_time};
 use crate::file_text::{self, FileKind};
 use crate::named_places::{Coordinates, NamedPlace, NamedPlaces, named_place_at};
+use crate::nudges::NudgeAnchor;
 use crate::places::Places;
 use crate::profile::Profile;
 use crate::store::{Fields, Store};
@@ -2058,8 +2059,39 @@ impl<'a> Notes<'a> {
     /// Dart core's `unsortedCount`.
     pub fn unsorted_count(&self) -> Result<usize> {
         let pass = Pass::read(self.store)?;
-        let mut count = 0;
-        for (id, fields) in &pass.notes {
+        Ok(self.unsorted_fields(&pass)?.len())
+    }
+
+    /// Every Unsorted Note's id with its own Nudge time and its capture,
+    /// what the Nudge is planned over ([`Alarms::nudge`]): worked out from
+    /// the fields alone, as [`Notes::unsorted_count`], without making a
+    /// Note (obf-1091), as the Dart core's `nudgeAnchors`. Read as
+    /// [`Note::nudge_at`] and [`Note::captured`] are.
+    ///
+    /// [`Alarms::nudge`]: crate::Alarms::nudge
+    pub fn nudge_anchors(&self) -> Result<Vec<(String, NudgeAnchor)>> {
+        let pass = Pass::read(self.store)?;
+        let mut anchors = Vec::new();
+        for (id, fields) in self.unsorted_fields(&pass)? {
+            let Some(captured) = fields.get(keys::CAPTURED) else {
+                continue;
+            };
+            let captured = parse_time(captured)?;
+            let nudge = fields.get(keys::NUDGE).and_then(|n| parse_time(n).ok());
+            let due = nudge.unwrap_or(captured + Notes::default_nudge());
+            anchors.push((id.clone(), NudgeAnchor { due, captured }));
+        }
+        Ok(anchors)
+    }
+
+    /// The ids and fields of every Unsorted Note `pass` read, in its
+    /// order, told from the fields alone.
+    fn unsorted_fields<'p>(&self, pass: &'p Pass) -> Result<Vec<(&'p String, &'p Fields)>> {
+        let mut unsorted = Vec::new();
+        for id in &pass.ever {
+            let Some(fields) = pass.notes.get(id) else {
+                continue;
+            };
             let filed = match fields.get(keys::PLACE) {
                 Some(place) => pass.places()?.contains(place),
                 None => false,
@@ -2067,12 +2099,12 @@ impl<'a> Notes<'a> {
             if fields.get(keys::CAPTURED).is_some()
                 && fields.get(keys::SPAWNED).is_none()
                 && !filed
-                && self.listed(id, fields, &pass)?
+                && self.listed(id, fields, pass)?
             {
-                count += 1;
+                unsorted.push((id, fields));
             }
         }
-        Ok(count)
+        Ok(unsorted)
     }
 
     /// Whether the Note `id` of `fields` is neither in the trash nor

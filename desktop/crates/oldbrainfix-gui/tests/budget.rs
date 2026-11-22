@@ -24,8 +24,9 @@
 )]
 
 use std::io::Cursor;
+use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration as Elapsed, Instant};
 
 use chrono::{DateTime, Duration, Utc};
@@ -35,14 +36,24 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::named_places::keys as place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
+use oldbrainfix_core::schedule::Recurrence;
 use oldbrainfix_core::text_format::{MARKDOWN, PLAIN};
-use oldbrainfix_core::{Checklists, Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_core::{
+    Checklists, ClockTime, Day, Notes, OwnProfile, Places, Routines, Schedule, SigningKey, Store,
+};
+use oldbrainfix_gui::alerts::Alerts;
+use oldbrainfix_gui::app::local_wall;
+use oldbrainfix_gui::l10n::L10n;
+use oldbrainfix_gui::notify::RecordingNotifier;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 /// How many Notes the store holds (C12).
 const NOTES: usize = 5000;
+/// How many daily Reminders the alarms plan in the timing of a click
+/// beside them (obf-1091).
+const ROUTINES: usize = 300;
 /// How often each step is timed; its median counts.
 const REPEATS: usize = 5;
 /// A tap or a click, and a page change, from the event to the frame
@@ -92,17 +103,37 @@ fn photo(n: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 /// The store of [`NOTES`] Notes, "Note 0" the oldest, written in one
 /// batch, on a clock that stands still after them.
 fn store() -> Result<Store, Box<dyn std::error::Error>> {
+    store_at(None, 0)
+}
+
+/// [`store`]'s Notes, in the database at `path` when given (obf-1091),
+/// else in memory, after `routines` daily Reminders through the day.
+fn store_at(path: Option<&Path>, routines: usize) -> Result<Store, Box<dyn std::error::Error>> {
     let start = DateTime::parse_from_rfc3339("2026-03-01T09:00:00Z")?.with_timezone(&Utc);
     let at = Arc::new(AtomicI64::new(0));
     let read = at.clone();
     let clock = Box::new(move || start + Duration::seconds(read.load(Ordering::SeqCst)));
-    let store = Store::in_memory(clock, || Ok(SigningKey::from_seed([3; 32])))?;
+    let key = || Ok(SigningKey::from_seed([3; 32]));
+    let store = match path {
+        Some(path) => Store::open(path, clock, key)?,
+        None => Store::in_memory(clock, key)?,
+    };
     OwnProfile::new(&store).apply_defaults("Ann", None)?;
     let photos = (0..NOTES)
         .filter(|n| n % 25 == 0)
         .map(|n| photo(n).map(|p| (n, p)))
         .collect::<Result<std::collections::HashMap<_, _>, _>>()?;
+    let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;
+    let from = Day::today(start, &local_wall).add_days(-3);
     store.batch(|| {
+        let made = Routines::new(&store);
+        for r in 0..routines {
+            let time = ClockTime::new((r % 24) as u32, (r * 7 % 60) as u32);
+            let schedule = time
+                .and_then(|t| Schedule::new(from, &[t], Some(rule.clone())))
+                .ok_or_else(|| oldbrainfix_core::Error::Invalid("a schedule".into()))?;
+            made.create(&format!("Reminder {r}"), &schedule)?;
+        }
         let places = Places::new(&store);
         let mut homes = Vec::new();
         for a in 0..6 {
@@ -441,5 +472,142 @@ fn all_notes_a_card_and_the_search_on_5000_notes_keep_the_budget() -> TestResult
         }
     }
     assert!(over.is_empty(), "over the budget: {over:?}");
+    Ok(())
+}
+
+/// The window with All Notes on `store`, laid out.
+fn all_notes(store: &Arc<Store>) -> Harness<'static, App> {
+    let mut app = App::new(store.clone(), "en");
+    app.select(Selection::All);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .with_max_steps(200)
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    harness
+}
+
+/// A click on a card and All Notes read anew while the alarms tick
+/// again and again over daily Reminders, their plan, Heads-ups, Nudge
+/// and Changes Nudge, on the window's connection as before obf-1091 and
+/// on one of their own as the app runs them now, and with no alarms
+/// running to compare: on their own the click keeps a tap's budget.
+#[test]
+#[ignore = "a timing test: run in release by CI's own step"]
+fn a_click_and_a_page_wait_on_no_alarms_tick_on_5000_notes() -> TestResult {
+    if cfg!(debug_assertions) {
+        return Err("timed in a release build only: cargo test --release".into());
+    }
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oldbrainfix.db");
+    let store = Arc::new(store_at(Some(&path), ROUTINES)?);
+    let now = store.now();
+    let own = Arc::new(Store::open(&path, Box::new(move || now), || {
+        Ok(SigningKey::from_seed([3; 32]))
+    })?);
+    // What the Nudge built before obf-1091, every Note, and what it reads
+    // now, each worked out anew.
+    let notes = Notes::new(&store);
+    store.changed_elsewhere();
+    let start = Instant::now();
+    let unsorted = notes.unsorted()?.len();
+    let built = start.elapsed();
+    store.changed_elsewhere();
+    let start = Instant::now();
+    assert_eq!(notes.nudge_anchors()?.len(), unsorted);
+    println!(
+        "The Nudge over {unsorted} Unsorted Notes: {built:.1?} with every Note made, {:.1?} now",
+        start.elapsed()
+    );
+    let mut harness = all_notes(&store);
+    pause(&mut harness);
+    let cards = plain_in_view(&harness);
+    assert!(
+        cards.len() >= REPEATS,
+        "{} plain cards in view",
+        cards.len()
+    );
+    let all = harness.state().shown_notes().len();
+    let mut click = Elapsed::ZERO;
+    for (name, alarms) in [
+        ("not running", None),
+        ("on the window's connection", Some(store.clone())),
+        ("on a connection of their own", Some(own.clone())),
+    ] {
+        let stop = Arc::new(AtomicBool::new(false));
+        let ticking = {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                let mut alerts = Alerts::new(
+                    Box::new(RecordingNotifier::default()),
+                    L10n::new("en"),
+                    Arc::new(AtomicU64::new(0)),
+                );
+                let mut ticks = Vec::new();
+                let Some(alarms) = alarms else {
+                    return ticks;
+                };
+                while !stop.load(Ordering::SeqCst) {
+                    let start = Instant::now();
+                    alerts.tick(&alarms, &local_wall).unwrap();
+                    ticks.push(start.elapsed());
+                }
+                ticks
+            })
+        };
+        let mut times = Vec::new();
+        for _ in 0..3 {
+            for (id, label) in cards.iter().take(REPEATS) {
+                let card = harness.get_by_role_and_label(Role::Button, label);
+                let start = Instant::now();
+                card.click();
+                times.push(until(&mut harness, start, |app| {
+                    app.selected_cards() == [id.clone()]
+                })?);
+                pause(&mut harness);
+            }
+        }
+        // All Notes from another list, read anew as after a write.
+        let mut pages = Vec::new();
+        for _ in 0..REPEATS {
+            harness.state_mut().select(Selection::Unsorted);
+            harness.run();
+            store.changed_elsewhere();
+            let start = Instant::now();
+            harness.get_by_label("All Notes").click();
+            pages.push(until(&mut harness, start, |app| {
+                *app.selection() == Selection::All && app.shown_notes().len() == all
+            })?);
+            harness.run();
+        }
+        stop.store(true, Ordering::SeqCst);
+        let mut ticks = ticking.join().map_err(|_| "the alarms thread")?;
+        ticks.sort();
+        let tick = ticks.get(ticks.len() / 2).copied().unwrap_or_default();
+        println!(
+            "The alarms {name}: {} ticks, median {tick:.1?}",
+            ticks.len()
+        );
+        let mut medians = Vec::new();
+        for (step, mut times) in [("A card clicked", times), ("All Notes read anew", pages)] {
+            times.sort();
+            let median = times[times.len() / 2];
+            println!(
+                "  {step:<20} median {median:>9.1?}  max {:>9.1?}",
+                times[times.len() - 1],
+            );
+            medians.push(median);
+        }
+        click = medians[0];
+    }
+    // All Notes is only shown: on disk and beside the Reminders it is
+    // read slower than the budget's own store in memory, alarms or not.
+    assert!(click <= TAP, "a card clicked: {click:.1?} over {TAP:?}");
     Ok(())
 }

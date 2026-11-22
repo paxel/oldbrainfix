@@ -9,7 +9,6 @@ use std::fmt;
 use chrono::{DateTime, Duration, Timelike, Utc};
 
 use crate::alarms::instant_of;
-use crate::notes::Note;
 use crate::schedule::{ClockTime, Day, WallClock};
 use crate::{Error, Result};
 
@@ -95,8 +94,9 @@ pub struct NudgeAnchor {
 /// ends; a firing in Quiet Hours waits for their end.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlannedNudge {
-    /// The Unsorted Notes, oldest first.
-    pub notes: Vec<Note>,
+    /// The Unsorted Notes by id, the oldest capture first.
+    pub note_ids: Vec<String>,
+    /// Their own Nudge times, in the same order.
     pub anchors: Vec<NudgeAnchor>,
     pub snooze: Option<NudgeSnooze>,
     pub repeat: Duration,
@@ -111,7 +111,7 @@ pub struct PlannedNudge {
 impl PlannedNudge {
     /// How many Notes are Unsorted.
     pub fn count(&self) -> usize {
-        self.notes.len()
+        self.anchors.len()
     }
 
     /// When it fires first after `after`, on `wall`.
@@ -199,14 +199,15 @@ impl Rule<'_> {
     }
 }
 
-/// The Nudge at `now` over the `unsorted` Notes, `None` when there are
-/// none. It repeats every `repeat` while ignored and waits out `quiet`
-/// (`None` when Quiet Hours are off); `snooze` is this Device's latest.
-/// On a quiet day it waits until `quiet_until`, the end of the quiet
-/// stretch `now` lies in (obf-1044): no own time and no snooze comes
-/// before it.
+/// The Nudge at `now` over the Unsorted Notes, `None` when there are
+/// none: `unsorted` holds each one's id with its own time and capture
+/// ([`crate::Notes::nudge_anchors`]). It repeats every `repeat` while
+/// ignored and waits out `quiet` (`None` when Quiet Hours are off);
+/// `snooze` is this Device's latest. On a quiet day it waits until
+/// `quiet_until`, the end of the quiet stretch `now` lies in (obf-1044):
+/// no own time and no snooze comes before it.
 pub fn nudge_plan(
-    unsorted: &[Note],
+    unsorted: &[(String, NudgeAnchor)],
     snooze: Option<NudgeSnooze>,
     now: DateTime<Utc>,
     wall: &WallClock,
@@ -222,13 +223,15 @@ pub fn nudge_plan(
             "a Nudge repeats after a minute at least".into(),
         ));
     }
+    // By capture, then by own time and id: the same order whatever order
+    // they came in.
     let mut notes = unsorted.to_vec();
-    notes.sort_by_key(|n| n.captured);
+    notes.sort_by(|(a, x), (b, y)| (x.captured, x.due, a).cmp(&(y.captured, y.due, b)));
     let anchors = notes
         .iter()
-        .map(|n| NudgeAnchor {
-            due: waited_out(n.nudge_at(), quiet_until),
-            captured: n.captured,
+        .map(|(_, a)| NudgeAnchor {
+            due: waited_out(a.due, quiet_until),
+            captured: a.captured,
         })
         .collect();
     let snooze = snooze.map(|s| NudgeSnooze {
@@ -236,7 +239,7 @@ pub fn nudge_plan(
         until: waited_out(s.until, quiet_until),
     });
     let mut plan = PlannedNudge {
-        notes,
+        note_ids: notes.into_iter().map(|(id, _)| id).collect(),
         anchors,
         snooze,
         repeat,

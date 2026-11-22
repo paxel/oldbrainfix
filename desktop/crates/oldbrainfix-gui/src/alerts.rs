@@ -315,6 +315,8 @@ pub struct Alerts {
     /// The Heads-ups shown, by id, with when each fired: each shows once,
     /// also when the clock is set back.
     heads_ups_fired: BTreeMap<String, DateTime<Utc>>,
+    /// The log's mark when the last tick looked ([`Store::current_seq`]).
+    mark: Option<i64>,
 }
 
 impl Alerts {
@@ -331,6 +333,7 @@ impl Alerts {
             changes_wanted: Arc::new(AtomicBool::new(false)),
             ringer: None,
             heads_ups_fired: BTreeMap::new(),
+            mark: None,
         }
     }
 
@@ -436,6 +439,13 @@ impl Alerts {
         store: &Store,
         wall: &WallClock,
     ) -> oldbrainfix_core::Result<DateTime<Utc>> {
+        // On a connection of its own (obf-1091), what it worked out from
+        // the log, the rights among it, is forgotten once the window or a
+        // sync wrote since the last tick.
+        let mark = store.current_seq()?;
+        if self.mark.replace(mark).is_some_and(|last| last != mark) {
+            store.changed_elsewhere();
+        }
         let now = store.now();
         let settings = DeviceSettings::new(store);
         let first = self.last.is_none();
@@ -696,7 +706,9 @@ impl Alerts {
 
 /// Runs the alerts over `store` until `events` is closed: a tick, then
 /// waiting for the next one or for an event. `on_tap` is called after
-/// each tap applied, with true when the window is to open.
+/// each tap applied, with true when the window is to open. On a
+/// connection of its own, a wake forgets what it read of the local
+/// settings too (obf-1091): a Profile kept elsewhere moves no mark.
 pub fn run(
     store: &Store,
     wall: &WallClock,
@@ -723,7 +735,8 @@ pub fn run(
                 }
                 on_tap(std::mem::take(&mut alerts.open_requested));
             }
-            Ok(Event::Wake) | Err(RecvTimeoutError::Timeout) => {}
+            Ok(Event::Wake) => store.changed_elsewhere(),
+            Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => return,
         }
     }

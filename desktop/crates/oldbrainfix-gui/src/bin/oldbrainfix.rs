@@ -610,8 +610,8 @@ fn open_store(dir: &Path) -> Result<Store, Error> {
 }
 
 /// A store of its own on the database in `dir`, for a sync thread
-/// (#225): its merge never holds the window's connection. The window's
-/// `shared` one when it does not open.
+/// (#225) or the alarms (obf-1091): its work never holds the window's
+/// connection. The window's `shared` one when it does not open.
 fn own_store(dir: &Path, shared: &Arc<Store>) -> Arc<Store> {
     match open_store(dir) {
         Ok(store) => Arc::new(store),
@@ -787,14 +787,18 @@ fn run() -> Result<i32, String> {
     let (command_tx, command_rx) = std::sync::mpsc::channel::<Command>();
     let commands = Arc::new(Mutex::new(command_rx));
 
-    // The alarm layer, on its own thread for as long as the app runs.
+    // The alarm layer, on its own thread for as long as the app runs, on
+    // a connection of its own (obf-1091): its plan and Nudge never hold
+    // the window's. A tap's Done or snooze is written there, so the
+    // window forgets what it worked out before it reads again.
     let (events_tx, events_rx) = std::sync::mpsc::channel::<Event>();
     let changes = Arc::new(AtomicU64::new(0));
     let unsorted_wanted = Arc::new(AtomicBool::new(false));
     let changes_wanted = Arc::new(AtomicBool::new(false));
     let occurrence_wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
     {
-        let store = store.clone();
+        let (shown, tapped) = (store.clone(), changes.clone());
+        let store = own_store(&dir, &store);
         let notifier = DesktopNotifier::new(events_tx.clone());
         let mut alerts = Alerts::new(Box::new(notifier), t, changes.clone());
         alerts.set_unsorted_wanted(unsorted_wanted.clone());
@@ -814,6 +818,8 @@ fn run() -> Result<i32, String> {
                         let _ = open.send(Command::Open);
                     }
                     // The window reads a Done or a snooze at once.
+                    shown.changed_elsewhere();
+                    tapped.fetch_add(1, Ordering::SeqCst);
                     wake_window();
                 },
             );

@@ -190,7 +190,7 @@ void main() {
 
     test('fires once at the earliest own time and covers every Unsorted '
         'Note', () {
-      notes.capture('in an hour');
+      final hour = notes.capture('in an hour');
       now = now.add(const Duration(minutes: 5));
       notes.capture('in 10 min', nudgeIn: min10);
       now = now.add(const Duration(minutes: 1));
@@ -198,7 +198,7 @@ void main() {
       final nudge = alarms.nudge(europe);
       expect(nudge?.at, local(24, 9, 15));
       expect(nudge?.count, 3);
-      expect(nudge?.notes.first.text, 'in an hour');
+      expect(nudge?.noteIds.first, hour.id);
       // Covered at 09:15: the others' own times bring no second Nudge.
       expect(firings(3), ['24. 09:15', '24. 10:15', '24. 11:15']);
     });
