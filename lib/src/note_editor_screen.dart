@@ -376,22 +376,27 @@ String noteCopyText(Notes notes, String noteId) {
 /// the Note editor offers beyond filing, scheduling and merging, as far
 /// as this Device may (ADR 0013).
 /// [changed] runs after each step that may have changed the Note.
+/// A list of cards gives [advanced] and [packFrom] as it read them once
+/// for all its cards (obf-1069); else they are read here.
 NoteActions noteActions(
   BuildContext context,
   Notes notes,
   PlacedNote placed,
   VoidCallback changed, {
   VoidCallback? onEdit,
+  bool? advanced,
+  ({String id, String name})? Function()? packFrom,
 }) {
   final id = placed.note.id;
-  final from = notes.store.packFrom(id);
+  final from = packFrom != null ? packFrom() : notes.store.packFrom(id);
+  final advancedOn = advanced ?? notes.store.advanced;
   void then(Future<Object?> step) => unawaited(
     step.then((_) {
       if (context.mounted) changed();
     }),
   );
   return NoteActions(
-    advanced: notes.store.advanced,
+    advanced: advancedOn,
     onEdit: onEdit,
     onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
     onShare: () => unawaited(shareNoteToApp(context, notes, id)),
@@ -427,7 +432,7 @@ NoteActions noteActions(
     // Only a Note in the lists becomes a Tally (ADR 0028), and no Code
     // text (#213); only in Advanced (#197).
     onMakeTally:
-        notes.store.advanced &&
+        advancedOn &&
             placed.changes &&
             !placed.note.isTrashed &&
             !placed.note.isMerged &&
@@ -1050,10 +1055,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       NoteKind.session => {if (listed) NoteKind.plain},
     };
     _sections = widget.notes.sections(widget.noteId);
-    _linkedFrom = Backlinks(widget.notes.store).to(
-      widget.noteId,
-      closed: LockScope.of(context)?.closedAreas ?? const <String>{},
-    );
+    _readLinkedFromSoon();
     _routines = _routineBook.ofNote(widget.noteId);
     _open = note == null || note.isTrashed
         ? const []
@@ -1191,6 +1193,45 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _reload() => setState(_load);
+
+  /// Whether the Notes linking here are to be read once the page shows.
+  var _linkedFromAsked = false;
+
+  /// Reads the Notes that link to this one once the page has shown and
+  /// stopped sliding in, not before its first frame (obf-1069): working
+  /// them out may take a while in a large store. Asked again after a
+  /// change, it reads once; the Notes read before show meanwhile.
+  void _readLinkedFromSoon() {
+    if (_linkedFromAsked) return;
+    _linkedFromAsked = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final animation = ModalRoute.of(context)?.animation;
+      if (animation == null || !animation.isAnimating) {
+        _readLinkedFrom();
+        return;
+      }
+      void shown(AnimationStatus status) {
+        if (status.isAnimating) return;
+        animation.removeStatusListener(shown);
+        _readLinkedFrom();
+      }
+
+      animation.addStatusListener(shown);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _readLinkedFrom() {
+    _linkedFromAsked = false;
+    if (!mounted) return;
+    final linking = Backlinks(widget.notes.store).to(
+      widget.noteId,
+      closed: LockScope.of(context)?.closedAreas ?? const <String>{},
+    );
+    if (linking.isEmpty && _linkedFrom.isEmpty) return;
+    setState(() => _linkedFrom = linking);
+  }
 
   /// The Note's History (#193); a text brought back there shows here, in
   /// the Note's field and its Sections'.
@@ -2201,7 +2242,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         ),
       );
-    } else if (widget.notes.unsorted().isEmpty) {
+    } else if (widget.notes.unsortedCount() == 0) {
       showAgendaSorted(context);
     } else {
       navigator.pop();

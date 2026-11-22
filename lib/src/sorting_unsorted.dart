@@ -25,7 +25,7 @@ Note? nextUnsorted(List<String> before, List<Note> now, String sorted) {
 /// (#313): one of them is now filed, merged or set up as something, not
 /// in the trash, and nothing is Unsorted any more.
 bool sortedTheLast(Notes notes, Iterable<String> shown) {
-  if (notes.unsorted().isNotEmpty) return false;
+  if (notes.unsortedCount() > 0) return false;
   return shown.any((id) {
     final note = notes.byId(id);
     return note != null && !note.isTrashed && !note.isUnsorted;

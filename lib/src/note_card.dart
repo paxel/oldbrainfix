@@ -510,7 +510,8 @@ class NoteCard extends StatelessWidget {
                   full: full,
                 ),
               if (tally != null) CardTally(notes: tally, noteId: note.id),
-              if (session != null) CardSession(notes: session, noteId: note.id),
+              if (session != null)
+                CardSession(notes: session, noteId: note.id, kind: kind),
             ],
           );
     final acts =

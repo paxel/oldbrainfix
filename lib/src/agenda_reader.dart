@@ -228,7 +228,7 @@ AgendaLoad _read(
     ),
     frogs: frogs,
     missed: Alarms(store).missed(wallClock),
-    unsorted: Notes(store).unsorted().length,
+    unsorted: Notes(store).unsortedCount(),
     seq: seq,
     wrote: before != null && before != seq,
   );
