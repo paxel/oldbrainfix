@@ -485,6 +485,38 @@ class Routines {
     });
   }
 
+  /// Moves the listed [notes] to the trash, in their order, each as
+  /// [trashNote] moves it and with what [trashNote] takes along: the
+  /// Routines and Reminders are read once for all of them, not once per
+  /// Note, and a Note's trash moment is the one just written, not read
+  /// back (obf-1093). Each Note is a transaction of its own, so another
+  /// connection to the database, such as the app's while this runs
+  /// beside it, waits at most for one Note; [progress] hears how many
+  /// are in, before the first and after each.
+  void trashNotes(
+    List<Note> notes, {
+    void Function(int trashed, int of)? progress,
+  }) {
+    final byNote = <String, List<Routine>>{};
+    for (final routine in all()) {
+      if (note(routine) case final note?) {
+        (byNote[note.id] ??= []).add(routine);
+      }
+    }
+    progress?.call(0, notes.length);
+    for (final (i, note) in notes.indexed) {
+      store.batch(() {
+        final at = _now();
+        store.append(note.id, NoteKeys.trashed, at);
+        for (final routine in byNote[note.id] ?? const <Routine>[]) {
+          store.append(routine.id, RoutineKeys.trashed, at);
+          store.append(routine.id, RoutineKeys.trashedWith, note.id);
+        }
+      });
+      progress?.call(i + 1, notes.length);
+    }
+  }
+
   /// Brings the Note [noteId] back from the trash, with the Routines and
   /// Reminders that went there with it.
   void restoreNote(String noteId) {

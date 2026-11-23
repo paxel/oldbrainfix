@@ -25,8 +25,8 @@ Future<ImportSummary> importFolder(
   return Imports(store).folder(areaName, files, progress: progress);
 }
 
-/// [importFolder] of [folder] into [areaName] as a job for an
-/// [ImportRunner] (obf-1061).
+/// [importFolder] of [folder] into [areaName] as a job for a
+/// [JobRunner] (obf-1061).
 ImportWork folderImport(String folder, String areaName) =>
     (store, folders, progress) =>
         importFolder(store, folders, folder, areaName, progress: progress);

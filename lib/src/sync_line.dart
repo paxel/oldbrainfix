@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'area_deletion.dart';
 import 'auto_sync.dart';
 import 'import_run.dart';
 
@@ -10,13 +11,15 @@ const syncLineHeight = 3.0;
 const syncLineSweep = Duration(milliseconds: 900);
 
 /// The line at the bottom of a page's bar while a sync of this Device
-/// runs (#225, UI laws "The sync line"), and while an Import does
-/// (obf-1061): a short stretch in the accent
+/// runs (#225, UI laws "The sync line"), while an Import does
+/// (obf-1061) and while an Area is being deleted (obf-1093): a short
+/// stretch in the accent
 /// moving back and forth, the whole width standing still while the
 /// system's "remove animations" setting is on. It takes no room of its
 /// own and nothing else on the page changes; nothing without the app's
-/// [AutoSyncScope] and [ImportJobsScope]. Screen readers hear of the
-/// sync from the app, once, not from every page's bar.
+/// [AutoSyncScope], [ImportJobsScope] and [AreaDeletionsScope]. Screen
+/// readers hear of the sync from the app, once, not from every page's
+/// bar.
 class SyncLine extends StatelessWidget {
   const SyncLine({super.key});
 
@@ -24,11 +27,16 @@ class SyncLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final syncing = AutoSyncScope.of(context)?.syncing;
     final importing = ImportJobsScope.of(context)?.running;
-    if (syncing == null && importing == null) return const SizedBox.shrink();
+    final deleting = AreaDeletionsScope.of(context);
+    if (syncing == null && importing == null && deleting == null) {
+      return const SizedBox.shrink();
+    }
     return ListenableBuilder(
-      listenable: Listenable.merge([?syncing, ?importing]),
+      listenable: Listenable.merge([?syncing, ?importing, ?deleting]),
       builder: (context, _) =>
-          (syncing?.value ?? false) || importing?.value != null
+          (syncing?.value ?? false) ||
+              importing?.value != null ||
+              (deleting?.running ?? false)
           ? const Align(
               alignment: Alignment.bottomCenter,
               child: ExcludeSemantics(

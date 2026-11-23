@@ -2141,6 +2141,27 @@ class Notes {
     ];
   }
 
+  /// How many Notes [inside] lists for [placeId]: worked out from the
+  /// fields alone, without making a Note (obf-1093), as [unsortedCount].
+  int countInside(String placeId) {
+    final pass = _Pass(store);
+    final ids = {
+      placeId,
+      for (final topic in Places(store).topics(placeId)) topic.id,
+    };
+    var count = 0;
+    for (final id in pass.ever) {
+      if (pass.notes[id] case final fields?
+          when fields[NoteKeys.captured] != null &&
+              ids.contains(fields[NoteKeys.place]) &&
+              _filed(fields[NoteKeys.place], pass) &&
+              _listed(id, fields, pass)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   /// The Note [id] ends up in at the end of its Merge chain, or null when
   /// it stands alone. A chain stops before a Note this Device does not
   /// hold. A loop, from Devices merging both ways before they synced,

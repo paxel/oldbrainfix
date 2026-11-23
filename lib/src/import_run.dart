@@ -8,72 +8,68 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'folder_platform.dart';
 import 'sync_runner.dart';
 
-/// One Import as a job (obf-1061): it reads what was picked through
-/// [folders] and writes its Notes into [store], telling [progress] how
-/// far the writing is. It crosses into an isolate: a closure made by a
-/// top-level function, holding only the strings it was handed.
-typedef ImportWork = Future<ImportSummary> Function(
+/// How far a long job is: [done] of [of] (obf-1061, obf-1093).
+typedef JobProgress = void Function(int done, int of);
+
+/// A long job, such as an Import (obf-1061) or deleting an Area
+/// (obf-1093): it reads what it needs through [folders] and writes into
+/// [store], telling [progress] how far it is. It crosses into an
+/// isolate: a closure made by a top-level function, holding only the
+/// strings it was handed.
+typedef LongWork<T> = Future<T> Function(
   Store store,
   FolderPlatform folders,
-  ImportProgress progress,
+  JobProgress progress,
 );
 
-/// Where an Import runs (obf-1061): the app runs it in an isolate of its
-/// own ([IsolateImportRunner]), so it stays usable and draws on while
+/// One Import as a job (obf-1061), telling how far the writing is.
+typedef ImportWork = LongWork<ImportSummary>;
+
+/// Where a long job runs (obf-1061): the app runs it in an isolate of
+/// its own ([IsolateJobRunner]), so it stays usable and draws on while
 /// thousands of entries are written; tests on the store they read
-/// ([InlineImportRunner]).
-abstract interface class ImportRunner {
+/// ([InlineJobRunner]).
+abstract interface class JobRunner {
   /// [work] on [store], or on a connection of its own to its database,
   /// [progress] told here as it goes.
-  Future<ImportSummary> run(
-    Store store,
-    ImportWork work,
-    ImportProgress progress,
-  );
+  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress);
 }
 
-/// Runs an Import on the store the app reads, in its isolate, reading
+/// Runs a long job on the store the app reads, in its isolate, reading
 /// through [folders].
-class InlineImportRunner implements ImportRunner {
+class InlineJobRunner implements JobRunner {
   final FolderPlatform folders;
 
-  const InlineImportRunner(this.folders);
+  const InlineJobRunner(this.folders);
 
   @override
-  Future<ImportSummary> run(
-    Store store,
-    ImportWork work,
-    ImportProgress progress,
-  ) => work(store, folders, progress);
+  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) =>
+      work(store, folders, progress);
 }
 
-/// Runs an Import in an isolate of its own on a connection of its own to
-/// the database at [path] (SQLite WAL), as the sync does (#225), reading
-/// through [folders] there: a platform without state, such as
+/// Runs a long job in an isolate of its own on a connection of its own
+/// to the database at [path] (SQLite WAL), as the sync does (#225),
+/// reading through [folders] there: a platform without state, such as
 /// [AndroidFolders], whose channel the isolate reaches with [token]. The
-/// store the app reads hears of the new Notes afterwards
+/// store the app reads hears of what it wrote afterwards
 /// ([runIsolated]); how far it is comes back as it goes.
-class IsolateImportRunner implements ImportRunner {
+class IsolateJobRunner implements JobRunner {
   final String path;
   final FolderPlatform folders;
   final RootIsolateToken? token;
 
-  const IsolateImportRunner({
+  const IsolateJobRunner({
     required this.path,
     required this.folders,
     this.token,
   });
 
   @override
-  Future<ImportSummary> run(
-    Store store,
-    ImportWork work,
-    ImportProgress progress,
-  ) async {
+  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) async {
     final told = ReceivePort();
     told.listen((message) {
-      if (message case (final int written, final int of)) {
-        progress(written, of);
+      if (message case (final int done, final int of)) {
+        progress(done, of);
       }
     });
     try {
@@ -86,17 +82,17 @@ class IsolateImportRunner implements ImportRunner {
 
 // Static, so the closure that crosses into the isolate holds only what
 // it is handed, not what tells the page here.
-Future<ImportSummary> _isolated(
+Future<T> _isolated<T>(
   Store store,
   String path,
   FolderPlatform folders,
   RootIsolateToken? token,
-  ImportWork work,
+  LongWork<T> work,
   SendPort told,
 ) => runIsolated(
   store,
   path,
-  (s) => work(s, folders, (written, of) => told.send((written, of))),
+  (s) => work(s, folders, (done, of) => told.send((done, of))),
   token: token,
 );
 
@@ -145,7 +141,7 @@ class ImportJob extends ChangeNotifier {
 /// (UI laws, "The sync line").
 class ImportJobs {
   final Store store;
-  final ImportRunner runner;
+  final JobRunner runner;
 
   /// The Import running now; null while none is.
   final running = ValueNotifier<ImportJob?>(null);

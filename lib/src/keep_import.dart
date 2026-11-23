@@ -57,7 +57,7 @@ Future<ImportSummary> importKeepZip(
 }
 
 /// [importKeepZip] of [zip], or [importKeepFolder] of [source] when it
-/// is no [zip], into [areaName], as a job for an [ImportRunner]
+/// is no [zip], into [areaName], as a job for a [JobRunner]
 /// (obf-1061).
 ImportWork keepImport(String source, String areaName, {required bool zip}) =>
     (store, folders, progress) => zip

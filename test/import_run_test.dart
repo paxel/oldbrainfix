@@ -32,19 +32,15 @@ Future<ImportSummary> _namesItsIsolate(
 
 /// Runs an Import inline once [gate] opens, telling the page how far it
 /// is through [told] meanwhile, as the isolate's port does.
-class _GatedRunner implements ImportRunner {
+class _GatedRunner implements JobRunner {
   final FolderPlatform folders;
   final gate = Completer<void>();
-  ImportProgress? told;
+  JobProgress? told;
 
   _GatedRunner(this.folders);
 
   @override
-  Future<ImportSummary> run(
-    Store store,
-    ImportWork work,
-    ImportProgress progress,
-  ) async {
+  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) async {
     told = progress;
     await gate.future;
     return work(store, folders, progress);
@@ -73,10 +69,7 @@ void main() {
     });
 
     test('runs off the app\'s isolate', () async {
-      final runner = IsolateImportRunner(
-        path: path,
-        folders: FakeImportFolders(),
-      );
+      final runner = IsolateJobRunner(path: path, folders: FakeImportFolders());
       await runner.run(app, _namesItsIsolate, (_, _) {});
       final where = Notes(app).all().single.text;
       expect(where, isNot(Isolate.current.debugName));
@@ -88,12 +81,11 @@ void main() {
         ..put('Dentist.txt', march, utf8.encode('Tuesday 9:00'))
         ..put('Plan.md', march, utf8.encode('Ship it'));
       final told = <(int, int)>[];
-      final summary = await IsolateImportRunner(path: path, folders: folders)
-          .run(
-            app,
-            folderImport('content://tree/Notes', 'From Notes'),
-            (written, of) => told.add((written, of)),
-          );
+      final summary = await IsolateJobRunner(path: path, folders: folders).run(
+        app,
+        folderImport('content://tree/Notes', 'From Notes'),
+        (written, of) => told.add((written, of)),
+      );
       expect(summary.notes, 2);
       expect(told, [(0, 2), (1, 2), (2, 2)]);
       expect(heard, 1);
@@ -131,7 +123,7 @@ void main() {
           alarms: FakeAlarms(),
           folders: folders,
           announcements: announcements,
-          importRunner: runner,
+          jobRunner: runner,
         ),
       );
       await tester.pumpAndSettle();

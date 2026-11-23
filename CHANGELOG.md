@@ -19,6 +19,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, More on the quick note opens the Note editor even while a tip shows, instead of crashing the app. ([obf-1058](https://github.com/paxel/oldbrainfix/issues/371))
 - On the phone, restarting the app after a crash no longer makes it crash again shortly after. ([obf-1059](https://github.com/paxel/oldbrainfix/issues/372))
 - On the phone, an Import no longer freezes the app: it runs beside the app on a page counting its Notes, which you can leave. ([obf-1061](https://github.com/paxel/oldbrainfix/issues/374))
+- On the phone, moving an Area to the trash no longer freezes the app: its row counts the Notes moved while the app stays usable. ([obf-1093](https://github.com/paxel/oldbrainfix/issues/406))
 
 ---
 

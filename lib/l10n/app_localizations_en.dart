@@ -143,6 +143,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get whereNotesGo => 'Where should they go?';
 
   @override
+  String get areaDeletingStarted => 'Being deleted…';
+
+  @override
+  String areaDeleting(int moved, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Being deleted: $moved of $count Notes moved',
+      one: 'Being deleted: $moved of 1 Note moved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get areaDeleteFailed => 'The Area could not be deleted.';
+
+  @override
+  String get areaDeleteFailedTitle => 'Area not deleted';
+
+  @override
+  String get areaDeleteFailedCause => 'Not all of its Notes could be moved.';
+
+  @override
+  String get areaDeleteFailedFix =>
+      'The Notes already moved stay where they went. Delete the Area again to move the rest.';
+
+  @override
   String get moveToUnsorted => 'Move to Unsorted';
 
   @override

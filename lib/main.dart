@@ -159,9 +159,9 @@ Future<void> _openAndRun(Directory dir) async {
       // The Agenda's reads and the alarms' plan there too, so the app
       // draws on while they read (#207).
       agendaReader: IsolateAgendaReader(path),
-      // An Import there too, so the app stays usable while it writes
-      // (obf-1061).
-      importRunner: IsolateImportRunner(
+      // An Import there too, and deleting an Area, so the app stays
+      // usable while they write (obf-1061, obf-1093).
+      jobRunner: IsolateJobRunner(
         path: path,
         folders: const AndroidFolders(),
         token: RootIsolateToken.instance,

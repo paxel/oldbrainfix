@@ -332,6 +332,42 @@ abstract class AppLocalizations {
   /// **'Where should they go?'**
   String get whereNotesGo;
 
+  /// Under an Area's name in the Areas list on the phone while it is deleted beside the app, before its Notes are counted (obf-1093).
+  ///
+  /// In en, this message translates to:
+  /// **'Being deleted…'**
+  String get areaDeletingStarted;
+
+  /// Under an Area's name in the Areas list on the phone while it is deleted beside the app (obf-1093): how many of its Notes went to Unsorted or the trash so far.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Being deleted: {moved} of 1 Note moved} other{Being deleted: {moved} of {count} Notes moved}}'**
+  String areaDeleting(int moved, int count);
+
+  /// Announced at the top on the phone when deleting an Area beside the app failed (obf-1093).
+  ///
+  /// In en, this message translates to:
+  /// **'The Area could not be deleted.'**
+  String get areaDeleteFailed;
+
+  /// Title of the dialog behind 'areaDeleteFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Area not deleted'**
+  String get areaDeleteFailedTitle;
+
+  /// The cause in the dialog behind 'areaDeleteFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Not all of its Notes could be moved.'**
+  String get areaDeleteFailedCause;
+
+  /// The fix in the dialog behind 'areaDeleteFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes already moved stay where they went. Delete the Area again to move the rest.'**
+  String get areaDeleteFailedFix;
+
   /// No description provided for @moveToUnsorted.
   ///
   /// In en, this message translates to:

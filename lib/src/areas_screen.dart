@@ -7,10 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'announcements.dart';
 import 'app_lock.dart';
+import 'area_deletion.dart';
 import 'area_look.dart';
 import 'browser.dart';
 import 'browser_add.dart';
+import 'failure_dialog.dart';
 import 'file_into_screen.dart';
 import 'frogs_screen.dart';
 import 'hidden_from_ai_view.dart';
@@ -27,6 +30,7 @@ import 'page_bar.dart';
 import 'place_names.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
+import 'run_over.dart';
 import 'share_area_screen.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
@@ -89,9 +93,18 @@ class _AreasScreenState extends State<AreasScreen>
   PersonFilter _filter = PersonFilter.everyone;
   bool _loaded = false;
 
+  /// The Areas being deleted beside the app (obf-1093), whose rows say
+  /// how far they are; none without the app.
+  AreaDeletions? _deletions;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final deletions = AreaDeletionsScope.of(context);
+    if (deletions != _deletions) {
+      _deletions?.removeListener(_deletionsChanged);
+      _deletions = deletions?..addListener(_deletionsChanged);
+    }
     if (_loaded) return;
     _load();
     _loaded = true;
@@ -102,6 +115,10 @@ class _AreasScreenState extends State<AreasScreen>
     super.initState();
     widget.pageShown?.addListener(_pageChanged);
   }
+
+  /// An Area's deletion started, moved on or ended: its row shows it;
+  /// the Area leaves the list as the log says it is gone.
+  void _deletionsChanged() => setState(() {});
 
   @override
   void didUpdateWidget(AreasScreen old) {
@@ -115,6 +132,7 @@ class _AreasScreenState extends State<AreasScreen>
   @override
   void dispose() {
     widget.pageShown?.removeListener(_pageChanged);
+    _deletions?.removeListener(_deletionsChanged);
     _query.dispose();
     super.dispose();
   }
@@ -358,7 +376,7 @@ class _AreasScreenState extends State<AreasScreen>
       case _AreaAction.delete:
         final go = await confirmDeleteArea(context, widget.places, area);
         if (!mounted || go == null) return;
-        widget.places.deleteArea(area.id, go);
+        unawaited(_delete(area, go));
       case _AreaAction.share:
         // Nothing Hidden from AI goes to anyone (#267): asked before how.
         final store = widget.places.store;
@@ -396,41 +414,98 @@ class _AreasScreenState extends State<AreasScreen>
     _reload();
   }
 
+  /// Deletes [area], its Notes going where [go] says, beside the app
+  /// (obf-1093): its row shows how far it is meanwhile, and a failure is
+  /// announced at the top in [AppLocalizations] taken before the wait,
+  /// even after this page closed. Without the app, at once.
+  Future<void> _delete(Area area, NotesGo go) async {
+    final deletions = _deletions;
+    if (deletions == null) {
+      widget.places.deleteArea(area.id, go);
+      return;
+    }
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final store = widget.places.store;
+    try {
+      await deletions.run(area.id, go);
+    } on Object catch (e) {
+      // A Restart ended this run of the app meanwhile: its store is
+      // closed, and nobody is left to tell.
+      if (runOver(store)) return;
+      announceFailureWith(
+        announcements,
+        navigator,
+        t.areaDeleteFailed,
+        title: t.areaDeleteFailedTitle,
+        cause: t.areaDeleteFailedCause,
+        fix: t.areaDeleteFailedFix,
+        details: '$e',
+      );
+    }
+  }
+
   List<Widget> _areaRows(AppLocalizations t) {
     if (_areas.isEmpty) return [BrowserEmpty(text: t.noAreasYet)];
     final last = widget.trail.area(widget.places)?.id;
     final lock = LockScope.of(context);
     return [
       for (final (index, area) in _areas.indexed)
-        _PlaceRow(
-          key: ValueKey('area-row-${area.id}'),
-          title: areaName(t, area),
-          subtitle: _people[area.id] == null
-              ? null
-              : [
-                  for (final p in _people[area.id] ?? const <Person>[])
-                    profileDisplayName(t, _names[p.id] ?? ''),
-                ].join(', '),
-          leading: _AreaMark(area: area),
-          locked: lock?.isAreaClosed(area.id) ?? false,
-          shared: _people.containsKey(area.id),
-          hiddenFromAi: _hidden.contains(area.id),
-          highlighted: area.id == last,
-          onTap: () => _open(area),
-          menu: _areaMenu(t, area),
-          // The order is the person's own, so every Area moves, a Shared
-          // one too (#280). A screen reader moves it by the row's own
-          // actions, Move up and Move down, so the handle says nothing.
-          handle: _VerticalDragStart(
-            key: ValueKey('area-move-${area.id}'),
-            index: index,
-            child: const SizedBox(
+        if (_deletions?.of(area.id) case final deleting?)
+          // Being deleted beside the app (obf-1093): how far it is, a
+          // spinner where its menu was, nothing to tap or drag.
+          _PlaceRow(
+            key: ValueKey('area-row-${area.id}'),
+            title: areaName(t, area),
+            subtitle: switch (deleting.of) {
+              final of? => t.areaDeleting(deleting.moved, of),
+              null => t.areaDeletingStarted,
+            },
+            leading: _AreaMark(area: area),
+            handle: const SizedBox(width: 48, height: 48),
+            menu: SizedBox(
+              key: ValueKey('area-deleting-${area.id}'),
               width: 48,
               height: 48,
-              child: Icon(Icons.drag_handle),
+              child: const Center(
+                child: SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+              ),
+            ),
+          )
+        else
+          _PlaceRow(
+            key: ValueKey('area-row-${area.id}'),
+            title: areaName(t, area),
+            subtitle: _people[area.id] == null
+                ? null
+                : [
+                    for (final p in _people[area.id] ?? const <Person>[])
+                      profileDisplayName(t, _names[p.id] ?? ''),
+                  ].join(', '),
+            leading: _AreaMark(area: area),
+            locked: lock?.isAreaClosed(area.id) ?? false,
+            shared: _people.containsKey(area.id),
+            hiddenFromAi: _hidden.contains(area.id),
+            highlighted: area.id == last,
+            onTap: () => _open(area),
+            menu: _areaMenu(t, area),
+            // The order is the person's own, so every Area moves, a Shared
+            // one too (#280). A screen reader moves it by the row's own
+            // actions, Move up and Move down, so the handle says nothing.
+            handle: _VerticalDragStart(
+              key: ValueKey('area-move-${area.id}'),
+              index: index,
+              child: const SizedBox(
+                width: 48,
+                height: 48,
+                child: Icon(Icons.drag_handle),
+              ),
             ),
           ),
-        ),
     ];
   }
 

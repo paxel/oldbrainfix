@@ -16,6 +16,7 @@ import 'attachment_reader.dart';
 import 'attachment_views.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
+import 'area_deletion.dart';
 import 'areas_screen.dart';
 import 'auto_sync.dart';
 import 'browser.dart';
@@ -185,9 +186,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// an isolate of their own (#207); without one, on [store] at once.
   final AgendaReader agendaReader;
 
-  /// Where an Import runs: the app hands in an isolate of its own
-  /// (obf-1061); without one, on [store] with [folders].
-  final ImportRunner? importRunner;
+  /// Where an Import and deleting an Area run: the app hands in an
+  /// isolate of its own (obf-1061, obf-1093); without one, on [store]
+  /// with [folders].
+  final JobRunner? jobRunner;
 
   /// Starts this Device's paired host for automatic sync; while none is
   /// given, this Device only joins.
@@ -250,7 +252,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.autoJoin = quickPairedSync,
     this.syncRunner,
     this.agendaReader = const InlineAgendaReader(),
-    this.importRunner,
+    this.jobRunner,
     this.pairedHost,
     this.join = lanSync,
     this.hosting = startPairingHost,
@@ -319,10 +321,9 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     store: widget.store,
     platform: widget.profile,
   );
-  late final _imports = ImportJobs(
-    store: widget.store,
-    runner: widget.importRunner ?? InlineImportRunner(widget.folders),
-  );
+  late final _jobs = widget.jobRunner ?? InlineJobRunner(widget.folders);
+  late final _imports = ImportJobs(store: widget.store, runner: _jobs);
+  late final _deletions = AreaDeletions(store: widget.store, runner: _jobs);
 
   @override
   void initState() {
@@ -401,6 +402,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       _profile.dispose,
       _frameTimes.dispose,
       _imports.dispose,
+      _deletions.dispose,
     ]) {
       try {
         stop();
@@ -548,9 +550,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                                 child: ImportJobsScope(
                                                                   jobs:
                                                                       _imports,
-                                                                  child: _spotlit(
-                                                                    child ??
-                                                                        const SizedBox.shrink(),
+                                                                  child: AreaDeletionsScope(
+                                                                    deletions:
+                                                                        _deletions,
+                                                                    child: _spotlit(
+                                                                      child ??
+                                                                          const SizedBox.shrink(),
+                                                                    ),
                                                                   ),
                                                                 ),
                                                               ),
