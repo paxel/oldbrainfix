@@ -316,7 +316,12 @@ void main() {
     expect(find.byKey(const ValueKey('find-bar')), findsOneWidget);
     // The magnifier stays on the bar, out of ⋮.
     expect(find.byKey(const ValueKey('find-in-note')), findsOneWidget);
-    for (final key in ['find-previous', 'find-next', 'find-close']) {
+    for (final key in [
+      'find-previous',
+      'find-next',
+      'find-search-all',
+      'find-close',
+    ]) {
       final rect = tester.getRect(find.byKey(ValueKey(key)));
       expect(rect.right, lessThanOrEqualTo(360));
     }

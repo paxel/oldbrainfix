@@ -11,6 +11,7 @@ import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'selection_toolbar.dart';
 import 'table_grid.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
@@ -1211,15 +1212,54 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     editable.userUpdateTextEditingValue(changed, SelectionChangedCause.toolbar);
   }
 
-  /// The system's menu, with Delete added for a selection.
+  /// The toolbar above a selection in place of the system's menu
+  /// (obf-1055): Copy, Paste and Search, then Delete for a selection that
+  /// may change.
   Widget _menu(BuildContext context, EditableTextState editable) {
     final value = editable.textEditingValue;
     final selection = value.selection;
-    return AdaptiveTextSelectionToolbar.buttonItems(
+    final controller = widget.controller;
+    final selected = selection.isValid && !selection.isCollapsed;
+    final words = selected
+        ? selectionWords(
+            selection.textInside(value.text),
+            controller is TagTextController && controller.markdown
+                ? TextFormats.markdown
+                : TextFormats.plain,
+          )
+        : '';
+    // A long press on an empty spot selects its line break: Paste puts
+    // in what it holds there, the line break kept.
+    final system = [
+      for (final item in editable.contextMenuButtonItems)
+        if (selected &&
+            words.isEmpty &&
+            item.type == ContextMenuButtonType.paste)
+          item.copyWith(
+            onPressed: () {
+              editable.userUpdateTextEditingValue(
+                value.copyWith(
+                  selection: TextSelection.collapsed(offset: selection.start),
+                ),
+                SelectionChangedCause.toolbar,
+              );
+              item.onPressed?.call();
+            },
+          )
+        else
+          item,
+    ];
+    return selectionToolbar(
+      context,
       anchors: editable.contextMenuAnchors,
-      buttonItems: [
-        ...editable.contextMenuButtonItems,
-        if (!widget.readOnly && selection.isValid && !selection.isCollapsed)
+      system: system,
+      words: words,
+      hide: editable.hideToolbar,
+      // The menu is built in the overlay: the field's own place knows
+      // the Note it is in.
+      onSearch: SelectionSearchScope.of(this.context),
+      extra: [
+        if (!widget.readOnly && words.isNotEmpty)
           ContextMenuButtonItem(
             label: context.t.delete,
             onPressed: () {
@@ -1276,6 +1316,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           decoration: widget.decoration,
           onChanged: _userChanged,
           inputFormatters: _formatters,
+          contextMenuBuilder: _menu,
           scrollPadding: scrollPadding,
           textInputAction: _nextAction,
           onEditingComplete: _onEditingComplete,

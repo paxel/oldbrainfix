@@ -310,6 +310,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get findClose => 'Close the find bar';
 
   @override
+  String get selectionSearch => 'Search';
+
+  @override
   String get noNotesHere => 'No Notes here yet. Tap + to add one.';
 
   @override

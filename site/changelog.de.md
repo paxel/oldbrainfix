@@ -7,6 +7,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Neu
 
 - Auf dem Handy und dem Desktop zeigt eine Suche, wo jede Notiz passt, und eine Suchleiste hebt jeden Treffer in einer Notiz hervor. ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
+- Auf dem Handy schwebt über einer Auswahl eine Leiste mit Kopieren, Einfügen und Suchen; auf dem Desktop bekommt das Rechtsklickmenü Suchen. ([obf-1055](https://github.com/paxel/oldbrainfix/issues/366))
 
 ### Geändert
 

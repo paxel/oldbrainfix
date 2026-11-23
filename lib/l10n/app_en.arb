@@ -166,6 +166,10 @@
   "findPrevious": "Previous place found",
   "findNext": "Next place found",
   "findClose": "Close the find bar",
+  "selectionSearch": "Search",
+  "@selectionSearch": {
+    "description": "In the small toolbar above selected words: opens the Note's find bar with them (obf-1055)."
+  },
   "noNotesHere": "No Notes here yet. Tap + to add one.",
   "noteTitle": "Note",
   "importance": "Importance",

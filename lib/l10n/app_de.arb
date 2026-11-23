@@ -89,6 +89,7 @@
   "findPrevious": "Vorherige Stelle",
   "findNext": "Nächste Stelle",
   "findClose": "Suchleiste schließen",
+  "selectionSearch": "Suchen",
   "noNotesHere": "Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen.",
   "noteTitle": "Notiz",
   "importance": "Wichtigkeit",

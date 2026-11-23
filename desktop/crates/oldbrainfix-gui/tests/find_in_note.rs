@@ -5,9 +5,10 @@
 //! table unfolds the table on the card. The opened Note shows every
 //! place tinted, the current one stronger, with the find bar "2 of 4",
 //! Previous and Next, Enter and Shift+Enter, its words editable there,
-//! ✕ and Esc closing it as leaving the Note does. Ctrl+F opens the bar
-//! over the Note dialog and in a Note's own window, its reading view
-//! too; over the list it still searches the list.
+//! Search all Notes beside them (obf-1055), ✕ and Esc closing it as
+//! leaving the Note does. Ctrl+F opens the bar over the Note dialog and
+//! in a Note's own window, its reading view too; over the list it still
+//! searches the list.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -459,7 +460,12 @@ fn the_bars_buttons_fit_beside_words_found_nowhere_in_german() -> TestResult {
             .is_some()
     );
     let window = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
-    for label in ["Suchleiste schließen", "Nächste Stelle", "Vorherige Stelle"] {
+    for label in [
+        "Suchleiste schließen",
+        "Alle Notizen durchsuchen",
+        "Nächste Stelle",
+        "Vorherige Stelle",
+    ] {
         let rect = harness.get_by_label(label).rect();
         assert!(window.contains_rect(rect), "{label} at {rect:?}");
     }

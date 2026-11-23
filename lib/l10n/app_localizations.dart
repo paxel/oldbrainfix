@@ -632,6 +632,12 @@ abstract class AppLocalizations {
   /// **'Close the find bar'**
   String get findClose;
 
+  /// In the small toolbar above selected words: opens the Note's find bar with them (obf-1055).
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get selectionSearch;
+
   /// No description provided for @noNotesHere.
   ///
   /// In en, this message translates to:

@@ -11817,6 +11817,10 @@ impl App {
         self.dragged(ui.ctx(), tones);
         // The menu of a text only shown, over everything (#255).
         read_text::menu(ui.ctx(), &self.t);
+        // Search in a menu of the Note open (obf-1055).
+        if let Some(words) = text_menu::take_searched(ui.ctx()) {
+            self.open_find(Some(&words));
+        }
         // An app link clicked in any text this frame (#261).
         if let Some(link) = text_marks_view::take_app_link(ui.ctx()) {
             actions.push(Action::FollowLink(link));
@@ -12159,6 +12163,9 @@ impl App {
             }
         }
         read_text::menu(&ctx, &self.t);
+        if let Some(words) = text_menu::take_searched(&ctx) {
+            self.open_find(Some(&words));
+        }
         if let Some(link) = text_marks_view::take_app_link(&ctx) {
             actions.push(Action::FollowLink(link));
         }
@@ -12263,9 +12270,12 @@ impl App {
     /// badge, field, button or capture line shows.
     fn reading_view(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         // The find bar over it too (obf-1047), finding in its texts.
-        let marks = self.find_row(ui, true);
+        let marks = self.find_row(ui, true, actions);
         let before = find_marks::set(ui.ctx(), marks);
+        // Its texts' menus offer Search (obf-1055).
+        let searched = text_menu::searches(ui.ctx(), true);
         self.reading_content(ui, tones, actions);
+        text_menu::searches(ui.ctx(), searched);
         find_marks::set(ui.ctx(), before);
     }
 
@@ -15347,18 +15357,27 @@ impl App {
     /// selects to be copied.
     fn note_editor(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         // The find bar over it (obf-1047), its places marked in it.
-        let marks = self.find_row(ui, false);
+        let marks = self.find_row(ui, false, actions);
         let before = find_marks::set(ui.ctx(), marks);
+        // The menus of its fields and texts offer Search (obf-1055).
+        let searched = text_menu::searches(ui.ctx(), true);
         self.note_content(ui, tones, actions);
+        text_menu::searches(ui.ctx(), searched);
         find_marks::set(ui.ctx(), before);
     }
 
     /// The find bar of the Note open (obf-1047), while it is open: drawn
     /// across `ui`, its words found anew in the Note and its Sections as
-    /// they changed, ✕ closing it. Gives what it marks in the Note drawn
+    /// they changed, ✕ closing it, Search all Notes searching All Notes
+    /// for its words (obf-1055). Gives what it marks in the Note drawn
     /// under it; in the reading view, `texts`, only the places in the
     /// texts, which alone it shows.
-    fn find_row(&mut self, ui: &mut Ui, texts: bool) -> Option<Arc<find_marks::FindMarks>> {
+    fn find_row(
+        &mut self,
+        ui: &mut Ui,
+        texts: bool,
+        actions: &mut Vec<Action>,
+    ) -> Option<Arc<find_marks::FindMarks>> {
         let (placed, sections) = self.view.detail.as_ref()?;
         let note = &placed.note;
         // A bar left from another Note goes.
@@ -15366,9 +15385,17 @@ impl App {
             self.find = None;
         }
         let (_, bar) = self.find.as_mut()?;
-        if bar.show(ui, &self.t) == Some(find_bar::Asked::Close) {
-            self.find = None;
-            return None;
+        match bar.show(ui, &self.t) {
+            Some(find_bar::Asked::Close) => {
+                self.find = None;
+                return None;
+            }
+            // As a tag clicked does, the Note left; from a Note's own
+            // window, in the main window.
+            Some(find_bar::Asked::SearchAll) => {
+                actions.push(Action::SearchFor(bar.query().trim().to_string()));
+            }
+            None => {}
         }
         bar.find(found_in(note, sections, texts), |query| {
             let mut found = findings::of_note(note, query, sections);

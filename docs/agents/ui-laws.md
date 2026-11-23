@@ -1433,8 +1433,8 @@ replace a law of Both apps where they say so. A desktop law marked
   search's card that lists places found opens on a tap, at its first
   place, and a tap on a place opens the Note there (obf-1047).
 - In the Note editor a text that is only read, the Note's or a
-  Section's, selects with a long press, with Copy in the system's menu
-  (#183).
+  Section's, selects with a long press, with Copy and Search in the
+  toolbar above the selection (#183, obf-1055; see Text editor).
 - **Several Notes are selected with "Select"** (#273, Q655): every Note
   list, Unsorted and its Nudge page, an Area, a Topic, All Notes, the
   search's hits and the Trash, has Select in its bar while it shows a
@@ -1492,8 +1492,8 @@ replace a law of Both apps where they say so. A desktop law marked
   keyboard's suggestions, autocorrect, swipe typing and voice input
   work. A tap puts the cursor where the finger is (#312, Q717); there is
   no magnifier and no dragging the cursor. A long press selects a word
-  as usual, its handles drag its ends, with Copy, Cut and Delete in the
-  system's menu.
+  as usual, its handles drag its ends, with Copy, Paste, Search and
+  Delete in the toolbar above the selection.
 - The bottom row shows the cursor's line as a text field does: from
   its start, the cursor right after the text before it; a line wider
   than the row scrolls sideways only as far as keeps the cursor in
@@ -1505,10 +1505,27 @@ replace a law of Both apps where they say so. A desktop law marked
   emoji is one); held, they repeat, faster the longer they are held.
 - **A long press on the bottom row starts selecting** where the cursor
   is and never moves it. While selecting, ◀ and ▶ show in inverted
-  colours and move only the selection's moving end; the system's menu
-  offers Copy, Cut and Delete; typing replaces the selection and ends
+  colours and move only the selection's moving end; the toolbar above
+  the selection offers Copy, Paste, Search and Delete; typing replaces the selection and ends
   selecting; another long press ends it with the cursor at the moving
   end.
+- **A small toolbar floats just above a selection** (obf-1055), in
+  place of the system's menu, wherever a Note's words are read or typed:
+  the Note editor's fields and Section texts, a Line, a table's cell,
+  Amend and a table's own page. It offers Copy, Paste where the field
+  may change and the clipboard holds text, Search in the Note editor,
+  and Delete where the field may change; no Cut, no Select all. A long
+  press on an empty spot of a field shows only Paste, which puts the
+  text in there, or nothing with nothing to paste. Search opens the
+  Note's find bar with the words selected as they read, their first
+  line holding any. The toolbar sits above the selection, below it
+  where there is no room, not at the finger. Other selectable texts,
+  such as an error report or a code to read out, and Capture keep the
+  system's menu; a card selects no text.
+- **The find bar's "Search all Notes"** (obf-1055), between ↓ and ✕,
+  opens the search over every Note for its words on top, as a tap on a
+  tag does, greyed while it holds none; back returns to the Note with
+  its find bar.
 - A screen reader reads both rows and the buttons by name, and the
   character the cursor passes.
 - **On the phone a table in the field is its grid**, never its
@@ -2075,6 +2092,14 @@ replace a law of Both apps where they say so. A desktop law marked
   the selection keeps it, and the field keeps the cursor through the
   menu, so nothing it does on losing the cursor happens. Cut, Copy and
   Paste work as their keys do. No spelling entries.
+  In the Note dialog and a Note's own window the menu also has
+  **Search** (obf-1055) after Paste, greyed without a selection: it opens
+  the Note's find bar with the words selected, as they read, its lines
+  one line. A text only read there (#255) has Copy, Search and Select
+  all, no Paste. No field outside the Note open offers Search, and a
+  card's right-click stays its ⋮ menu. The find bar has **Search all
+  Notes**, an icon button beside ✕, greyed while its field is empty: All
+  Notes' search finds its words in the main window.
 - **A selection scrolls while it is dragged** (#256): in every text
   field and in the Note dialog's texts that are only read, while the
   button is held the wheel scrolls and the selection follows the

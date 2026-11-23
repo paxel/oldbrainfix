@@ -42,6 +42,7 @@ import 'place_names.dart';
 import 'profile.dart' show profileDisplayName;
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'selection_toolbar.dart';
 import 'sent_item_screen.dart';
 import 'session_editor.dart';
 import 'session_note.dart';
@@ -850,6 +851,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// moving finds nothing anew.
   String _foundIn = '';
   final _scroll = ScrollController();
+
+  /// What is selected in each Section's text only read, by its id: the
+  /// words Search in the toolbar above it finds (obf-1055).
+  final _readSelected = <String, String>{};
 
   @override
   void initState() {
@@ -3116,6 +3121,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         )
       else if (section.text.isNotEmpty)
         SelectionArea(
+          onSelectionChanged: (content) =>
+              _readSelected[section.id] = content?.plainText ?? '',
+          // The toolbar above a selection, Copy and Search (obf-1055).
+          contextMenuBuilder: (context, region) => selectionToolbar(
+            context,
+            anchors: region.contextMenuAnchors,
+            system: region.contextMenuButtonItems,
+            words: selectionWords(
+              _readSelected[section.id] ?? '',
+              TextFormats.plain,
+            ),
+            hide: region.hideToolbar,
+            onSearch: _openFind,
+          ),
           child: MarkedText(
             section.shownText,
             format: section.textFormat,
@@ -3577,19 +3596,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onPrevious: () => _stepHit(-1),
                 onNext: () => _stepHit(1),
                 onClose: _closeFind,
+                onSearchAll: TagSearchScope.of(context) == null
+                    ? null
+                    : _searchAll,
               ),
             Expanded(
               child: FindScope(
                 marks: _findMarks,
-                child: _body(
-                  t,
-                  placed,
-                  note,
-                  editable,
-                  amends,
-                  when,
-                  place,
-                  colour,
+                child: SelectionSearchScope(
+                  onSearch: _openFind,
+                  child: _body(
+                    t,
+                    placed,
+                    note,
+                    editable,
+                    amends,
+                    when,
+                    place,
+                    colour,
+                  ),
                 ),
               ),
             ),
@@ -3597,6 +3622,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         ),
       ),
     );
+  }
+
+  /// "Search all Notes" in the find bar (obf-1055): the search over every
+  /// Note for its words opens on top, as a tap on a tag does (ADR 0032);
+  /// back comes back to this Note.
+  void _searchAll() {
+    final words = _findWords.text.trim();
+    if (words.isEmpty) return;
+    _saveText();
+    TagSearchScope.of(context)?.call(context, words);
   }
 
   /// The page under the top bar and the find bar.

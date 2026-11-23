@@ -2,6 +2,7 @@
 //! Note dialog, a Note's own window and its reading view, its search word
 //! in a field of its own, how many places it finds and which is current
 //! ("3 of 12"), Previous and Next (Shift+Enter and Enter in its field),
+//! Search all Notes, which searches All Notes for its words (obf-1055),
 //! and ✕, which closes it as Esc and leaving the Note do. Every place
 //! found shows on a tint while it is open, the current one on a stronger
 //! one, and comes into view as it becomes current ([`crate::find_marks`]).
@@ -28,6 +29,9 @@ use crate::l10n::L10n;
 pub enum Asked {
     /// ✕: the bar closes.
     Close,
+    /// Search all Notes: All Notes' search is to find its words
+    /// (obf-1055).
+    SearchAll,
 }
 
 /// A find bar's state: its words, the places they were found last and
@@ -163,8 +167,8 @@ impl FindBar {
     }
 
     /// Draws the bar across `ui`: the search icon, its field, how many
-    /// places its words find and which is current, Previous, Next and
-    /// ✕. Enter in its field goes to the next place, Shift+Enter back,
+    /// places its words find and which is current, Previous, Next,
+    /// Search all Notes and ✕. Enter in its field goes to the next place, Shift+Enter back,
     /// the field keeping the keyboard. What was asked comes back.
     pub fn show(&mut self, ui: &mut Ui, t: &L10n) -> Option<Asked> {
         let text = ui.visuals().text_color();
@@ -177,6 +181,16 @@ impl FindBar {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if icon_button(ui, icons::CLOSE, t.desk_find_close(), text).clicked() {
                     asked = Some(Asked::Close);
+                }
+                let typed = !self.query.trim().is_empty();
+                let shade = if typed { text } else { weak };
+                let all = ui
+                    .add_enabled_ui(typed, |ui| {
+                        icon_button(ui, icons::ALL_NOTES, t.search_all_hint(), shade)
+                    })
+                    .inner;
+                if all.clicked() {
+                    asked = Some(Asked::SearchAll);
                 }
                 let count = self.found.len();
                 let some = count > 0;

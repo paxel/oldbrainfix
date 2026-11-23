@@ -595,8 +595,9 @@ void main() {
         const TextSelection(baseOffset: 6, extentOffset: 8),
       );
       await tester.pumpAndSettle();
+      // The toolbar above a selection, Cut not in it (obf-1055).
       expect(find.text('Copy'), findsOneWidget);
-      expect(find.text('Cut'), findsOneWidget);
+      expect(find.text('Cut'), findsNothing);
       expect(find.text('Delete'), findsOneWidget);
 
       await press(tester, back);

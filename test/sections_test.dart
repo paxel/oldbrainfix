@@ -428,11 +428,29 @@ void main() {
       );
       await edit(tester, anns, on: ben);
 
-      await tester.longPress(find.text('Two litres'));
+      await tester.longPressAt(
+        tester.getTopLeft(find.text('Two litres')) + const Offset(8, 8),
+      );
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Select all'));
+      // The toolbar above it (obf-1055): nothing is pasted into it.
+      expect(find.text('Paste'), findsNothing);
+      expect(find.text('Select all'), findsNothing);
       await tap(tester, find.text('Copy'));
-      expect(copied, ['Two litres']);
+      expect(copied, ['Two']);
+
+      // Search opens the Note's find bar with the words selected.
+      await tester.longPressAt(
+        tester.getTopLeft(find.text('Two litres')) + const Offset(8, 8),
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Search'));
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('find-field')))
+            .controller
+            ?.text,
+        'Two',
+      );
     });
   });
 }

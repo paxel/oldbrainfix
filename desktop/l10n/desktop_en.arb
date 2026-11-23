@@ -521,6 +521,8 @@
   "@menuCut": {"description": "Edit ▸ Cut: cuts the text selected in the field the cursor was in."},
   "menuCopy": "Copy",
   "@menuCopy": {"description": "Edit ▸ Copy: copies the text selected in the field the cursor was in."},
+  "menuSearch": "Search",
+  "@menuSearch": {"description": "The right-click menu of a text of the Note open, in the Note dialog and a Note's own window (obf-1055): opens the Note's find bar with the words selected."},
   "menuSelectAll": "Select all",
   "@menuSelectAll": {"description": "The right-click menu of a text field (#253): selects all of its text."},
   "menuFind": "Find",

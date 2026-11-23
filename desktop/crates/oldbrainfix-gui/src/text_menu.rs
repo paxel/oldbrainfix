@@ -13,6 +13,12 @@
 //! asked for it. The field keeps the keyboard through the menu, and a
 //! right-click on its selection keeps it selected, which a press in a
 //! field otherwise turns into the cursor at the pointer.
+//!
+//! In the fields of the Note open, in the Note dialog and a Note's own
+//! window, the menu also has Search (obf-1055, C9c): the words selected
+//! go into the Note's find bar, as they read. The App says where it is offered with
+//! [`searches`] and takes the words asked with [`take_searched`]; the
+//! menu of a text only shown asks the same ([`crate::read_text`]).
 
 use egui::plugin::Plugin;
 use egui::text::CCursorRange;
@@ -21,6 +27,8 @@ use egui::{
     Context, Event, Id, PointerButton, Popup, RawInput, Response, RichText, Ui, ViewportCommand,
     ViewportId,
 };
+
+use oldbrainfix_core::text_format;
 
 use crate::format_bar::{self, Format};
 use crate::l10n::L10n;
@@ -41,6 +49,9 @@ pub enum Pick {
     Copy,
     Paste,
     SelectAll,
+    /// The words selected into the Note's find bar (obf-1055), asked of
+    /// the App by [`ask_search`].
+    Search,
     /// One of the format bar's, for the field to put on as its bar does.
     Format(Format),
 }
@@ -87,6 +98,16 @@ fn entries(
     keep_selection(ui, response);
     let (start, end) = format_bar::selection(ui, id, text);
     let selected = start < end;
+    // As the find bar finds: a formatted text as it reads, without the
+    // ids of its boxes.
+    let format = if formats.is_empty() {
+        text_format::PLAIN
+    } else {
+        text_format::MARKDOWN
+    };
+    let selection = text.get(start..end).unwrap_or_default();
+    let words = search_words(&text_format::visible(format, selection));
+    let offers_search = offers_search(ui.ctx());
     let mut picked = None;
     let shown = Popup::context_menu(response).show(|ui| {
         let colour = ui.visuals().text_color();
@@ -100,6 +121,9 @@ fn entries(
         entry(ui, t.menu_cut(), copies && selected, Pick::Cut);
         entry(ui, t.menu_copy(), copies && selected, Pick::Copy);
         entry(ui, t.paste(), true, Pick::Paste);
+        if offers_search {
+            entry(ui, t.menu_search(), !words.is_empty(), Pick::Search);
+        }
         entry(ui, t.menu_select_all(), !text.is_empty(), Pick::SelectAll);
         let offered: Vec<Format> = FORMATS
             .into_iter()
@@ -122,10 +146,61 @@ fn entries(
                     .is_some_and(|at| shown.response.rect.contains(at))
         })
     });
-    if picked.is_some() || clicked_menu {
+    if picked == Some(Pick::Search) {
+        // The find bar takes the keyboard.
+        ask_search(ui.ctx(), &words);
+    } else if picked.is_some() || clicked_menu {
         ui.memory_mut(|m| m.request_focus(id));
     }
     picked
+}
+
+/// Where the fields and texts drawn offer Search, in the window drawn
+/// now.
+fn searches_id(ctx: &Context) -> Id {
+    Id::new(("text menu searches", ctx.viewport_id()))
+}
+
+/// The words Search asked in the window drawn now.
+fn searched_id(ctx: &Context) -> Id {
+    Id::new(("text menu searched", ctx.viewport_id()))
+}
+
+/// Whether the menus of the fields and texts drawn from now on offer
+/// Search (obf-1055): the App's while it draws the Note open. Gives what
+/// it was, to be put back.
+pub fn searches(ctx: &Context, on: bool) -> bool {
+    let id = searches_id(ctx);
+    ctx.data_mut(|d| {
+        let before = d.get_temp::<bool>(id).unwrap_or(false);
+        d.insert_temp(id, on);
+        before
+    })
+}
+
+/// Whether what is drawn now offers Search.
+pub(crate) fn offers_search(ctx: &Context) -> bool {
+    ctx.data(|d| d.get_temp::<bool>(searches_id(ctx)))
+        .unwrap_or(false)
+}
+
+/// The words of `selected` as the find bar's one line takes them: its
+/// lines and spaces each one space, none at the ends.
+pub(crate) fn search_words(selected: &str) -> String {
+    selected.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Asks the App to find `words` in the Note open: Search picked.
+pub(crate) fn ask_search(ctx: &Context, words: &str) {
+    let id = searched_id(ctx);
+    ctx.data_mut(|d| d.insert_temp(id, words.to_string()));
+    ctx.request_repaint();
+}
+
+/// The words Search asked in the window drawn now, once.
+pub fn take_searched(ctx: &Context) -> Option<String> {
+    let id = searched_id(ctx);
+    ctx.data_mut(|d| d.remove_temp::<String>(id))
 }
 
 /// Does `pick` in the field `id` holding `text`; a format is left to its
@@ -139,7 +214,7 @@ pub fn apply(ui: &Ui, id: Id, text: &str, pick: Pick) {
             format_bar::select(ui, id, text, (0, text.len()));
             return;
         }
-        Pick::Format(_) => return,
+        Pick::Search | Pick::Format(_) => return,
     };
     clip_into(ui.ctx(), id, clip);
 }

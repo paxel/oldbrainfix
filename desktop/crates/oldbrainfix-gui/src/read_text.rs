@@ -2,7 +2,9 @@
 //! Sections, Transcripts, Photo Texts and the History. They select as
 //! labels do, by a drag, across their lines and formats, and Ctrl+C
 //! copies what is selected; a right-click on one opens Copy and Select
-//! all at the pointer.
+//! all at the pointer, and, on a text of the Note open, Search, which
+//! puts the words selected into its find bar (obf-1055). Nothing there
+//! is edited, so the menu has no Paste.
 //!
 //! The selection is egui's own, which takes any press for a new one: a
 //! right-click would lose it, and so would the click on the menu. So the
@@ -24,6 +26,8 @@ use crate::l10n::L10n;
 struct Region {
     rect: Rect,
     layer: LayerId,
+    /// Whether its menu offers Search ([`crate::text_menu::searches`]).
+    searches: bool,
 }
 
 /// The menu, open at `at` over `region`, with what was selected there;
@@ -254,15 +258,20 @@ impl Plugin for ReadText {
 /// Marks `rect` as a text only shown: its right-click opens the menu.
 pub fn region(ui: &Ui, rect: Rect) {
     let layer = ui.layer_id();
+    let searches = crate::text_menu::offers_search(ui.ctx());
     ui.ctx()
         .plugin_or_default::<ReadText>()
         .lock()
         .drawn
-        .push(Region { rect, layer });
+        .push(Region {
+            rect,
+            layer,
+            searches,
+        });
 }
 
 /// The menu, where it is open: Copy, greyed while nothing is selected,
-/// and Select all.
+/// Search on a text of the Note open, greyed so too, and Select all.
 pub fn menu(ctx: &Context, t: &L10n) {
     let plugin = ctx.plugin_or_default::<ReadText>();
     let Some(open) = plugin.lock().open.clone() else {
@@ -270,6 +279,8 @@ pub fn menu(ctx: &Context, t: &L10n) {
     };
     let mut copy = false;
     let mut all = false;
+    let mut search = false;
+    let words = crate::text_menu::search_words(&open.selected);
     let shown = egui::Area::new(Id::new("read text menu"))
         .order(egui::Order::Foreground)
         .fixed_pos(open.at)
@@ -283,6 +294,9 @@ pub fn menu(ctx: &Context, t: &L10n) {
                     picked.clicked() || (enabled && open.clicked.is_some_and(at))
                 };
                 copy = entry(ui, t.menu_copy(), !open.selected.is_empty());
+                if open.region.searches {
+                    search = entry(ui, t.menu_search(), !words.is_empty());
+                }
                 all = entry(ui, t.menu_select_all(), true);
             });
         });
@@ -300,7 +314,10 @@ pub fn menu(ctx: &Context, t: &L10n) {
         state.drag = ReadText::ends(ctx, open.region).map(|(from, to)| Drag::Press(from, to));
         ctx.request_repaint();
     }
-    if copy || all || pressed_beside {
+    if search {
+        crate::text_menu::ask_search(ctx, &words);
+    }
+    if copy || all || search || pressed_beside {
         state.open = None;
     } else if let Some(open) = &mut state.open {
         open.rect = Some(shown.response.rect);

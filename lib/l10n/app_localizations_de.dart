@@ -312,6 +312,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get findClose => 'Suchleiste schließen';
 
   @override
+  String get selectionSearch => 'Suchen';
+
+  @override
   String get noNotesHere =>
       'Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen.';
 

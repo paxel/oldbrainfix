@@ -119,8 +119,9 @@ class NoteHit {
 
 /// The find bar of an opened Note (obf-1047), under its top bar: the
 /// words it finds, editable, how many places it found and which of them
-/// is shown ("3 of 12"), ↑ and ↓ to the one before and after, and ✕ to
-/// close it. Where the page is narrow the buttons go on a line under the
+/// is shown ("3 of 12"), ↑ and ↓ to the one before and after, "Search
+/// all Notes" for its words where [onSearchAll] is given (obf-1055), and
+/// ✕ to close it. Where the page is narrow the buttons go on a line under the
 /// field, so nothing shrinks.
 class FindBar extends StatelessWidget {
   final TextEditingController controller;
@@ -133,6 +134,7 @@ class FindBar extends StatelessWidget {
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final VoidCallback onClose;
+  final VoidCallback? onSearchAll;
 
   const FindBar({
     super.key,
@@ -144,6 +146,7 @@ class FindBar extends StatelessWidget {
     required this.onPrevious,
     required this.onNext,
     required this.onClose,
+    this.onSearchAll,
   });
 
   @override
@@ -187,6 +190,13 @@ class FindBar extends StatelessWidget {
         onPressed: count == 0 ? null : onNext,
         icon: const Icon(Icons.keyboard_arrow_down),
       ),
+      if (onSearchAll case final searchAll?)
+        IconButton(
+          key: const ValueKey('find-search-all'),
+          tooltip: t.searchAllHint,
+          onPressed: words.isEmpty ? null : searchAll,
+          icon: const Icon(Icons.manage_search),
+        ),
       IconButton(
         key: const ValueKey('find-close'),
         tooltip: t.findClose,
@@ -207,7 +217,8 @@ class FindBar extends StatelessWidget {
             builder: (context, constraints) {
               // The field keeps room for some words at the text's size.
               final room =
-                  4 * 48 + MediaQuery.textScalerOf(context).scale(16) * 12;
+                  (buttons.length + 1) * 48 +
+                  MediaQuery.textScalerOf(context).scale(16) * 12;
               if (constraints.maxWidth >= room) {
                 return Row(
                   children: [
