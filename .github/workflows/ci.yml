@@ -171,10 +171,11 @@ jobs:
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
       # The time budget on 5000 Notes (obf-1069, C12), timed as the app
-      # ships: in a release build, the debug one being far slower.
+      # ships: in a release build, the debug one being far slower, and one
+      # test at a time, each alone on the runner.
       - name: All Notes, a card and the search keep the time budget on a large store
         working-directory: desktop
-        run: cargo test -p oldbrainfix-gui --test budget --release --locked -- --ignored --nocapture
+        run: cargo test -p oldbrainfix-gui --test budget --release --locked -- --ignored --nocapture --test-threads=1
       # The desktop half of the guide's frames (#134), drawn by the software
       # Vulkan as on any machine without a GPU.
       - name: The guide's desktop frames match their screens
