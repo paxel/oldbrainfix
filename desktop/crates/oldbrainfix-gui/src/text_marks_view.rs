@@ -70,7 +70,7 @@ use oldbrainfix_core::text_boxes::{self, FoundBox};
 use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 
 use crate::l10n::L10n;
-use crate::{schedule_text, theme};
+use crate::{find_marks, schedule_text, theme};
 
 /// How far apart the lines of a formatted text lie (#327, obf-1020), as
 /// on the phone: a line's height in parts of its font's size.
@@ -265,6 +265,18 @@ pub fn unfold_table(ctx: &egui::Context, of: Id, at: usize, row: usize) {
     ctx.request_repaint();
 }
 
+/// Unfolds the table beginning at the byte `at` of the text whose card
+/// takes its clicks as `of`, as "Show all" does, and brings no row into
+/// view: on a card of a search's list whose Note was found in a row the
+/// card folds away (obf-1047).
+pub fn show_all_rows(ctx: &egui::Context, of: Id, at: usize) {
+    let key = table_key(of, at);
+    ctx.data_mut(|d| {
+        let state: &mut TableState = d.get_temp_mut_or_default(key);
+        state.unfolded = true;
+    });
+}
+
 /// A cell of a table of a formatted text as it is drawn: the table's
 /// [`TableSpot::at`], the cell's row and column, and where it lies.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -409,7 +421,10 @@ pub fn marked_label(
         .any(|b| b.0.start >= from && b.0.end <= to);
     let tagged = found.tags.iter().any(|t| t.start >= from && t.end <= to);
     let linked = found.links.iter().any(|&(s, e)| s >= from && e <= to);
-    if !marked && !tagged && !linked {
+    // The places a find found in it (obf-1047).
+    let finds = TextFound::of(ui.ctx(), text, text_format::PLAIN);
+    let finding = finds.as_ref().is_some_and(|f| !f.ranges(shown).is_empty());
+    if !marked && !tagged && !linked && !finding {
         // At the Device's text size, as [`Look::of`] has it (#326,
         // obf-1019).
         let size = look
@@ -427,7 +442,8 @@ pub fn marked_label(
     } else {
         TextWrapMode::Wrap
     };
-    let look = Look::of(ui, look);
+    let mut look = Look::of(ui, look);
+    look.found = finds;
     let mut line = Line::default();
     add_written(&mut line, text, shown, Style::default(), (&found, &look));
     let galley = WidgetText::from(std::mem::take(&mut line.job)).into_galley(
@@ -437,6 +453,12 @@ pub fn marked_label(
         FontSelection::Default,
     );
     let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
+    reveal_line(
+        ui,
+        (&galley, response.rect.min),
+        &line,
+        look.found.as_deref(),
+    );
     line_spots(&galley, response.rect.min, &line)
 }
 
@@ -500,7 +522,7 @@ pub fn room_label(
     if text.get(from..to).is_none() {
         return Spots::default();
     }
-    let look = Look::of(ui, look);
+    let look = Look::of(ui, look).finding(ui.ctx(), text, format);
     let parsed = parsed(ui.ctx(), text, true);
     let found = Found::in_parsed(&parsed, boxes);
     let blocks = &parsed.blocks;
@@ -601,13 +623,23 @@ pub fn code_text_label(
         Some(grammar) => code_text_colours(ui.ctx(), grammar, text, (from, &shown)),
         None => Vec::new(),
     };
+    // The places a find found in it (obf-1047), where its ids took no
+    // room.
+    let found = TextFound::of(ui.ctx(), text, text_format::CODE);
+    let ranges = found
+        .as_ref()
+        .filter(|_| shown.len() == part.len())
+        .map(|f| f.ranges((from, to)))
+        .unwrap_or_default();
+    let reveals = found.as_ref().filter(|f| f.reveals((from, to)));
     let mut job = LayoutJob::single_section(shown, format);
     paint_code(&mut job, 0, &colours, look.dark);
+    find_marks::mark_job(&mut job, &ranges, look.dark);
     if truncate {
         crate::read_text::label(ui, egui::Label::new(job).truncate());
         return;
     }
-    egui::Frame::NONE
+    let framed = egui::Frame::NONE
         .fill(look.code)
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(8, 6))
@@ -631,6 +663,9 @@ pub fn code_text_label(
                 .with_clip_rect(rect.intersect(ui.clip_rect()))
                 .galley(rect.min, galley, look.colour);
         });
+    if let Some(found) = reveals {
+        find_marks::reveal(ui, &found.marks, framed.response.rect);
+    }
 }
 
 /// Draws the lines of `code`, among `blocks` of `text`, from the line
@@ -643,11 +678,32 @@ fn code_label(
     (first, last): (usize, usize),
     look: &Look,
 ) {
-    let lines: Vec<String> = (code.first_line.max(first)..=code.last_line.min(last))
+    let shown: Vec<&Block> = (code.first_line.max(first)..=code.last_line.min(last))
         .filter(|&l| !code.is_fence(l))
         .filter_map(|l| blocks.get(l))
+        .collect();
+    let lines: Vec<String> = shown
+        .iter()
         .map(|b| text_boxes::strip(text.get(b.start..b.end).unwrap_or_default()))
         .collect();
+    // The places a find found in its lines (obf-1047), each where it
+    // lies among the lines joined; a line whose ids took room has none.
+    let mut ranges = Vec::new();
+    let mut reveals = None;
+    if let Some(found) = &look.found {
+        let mut at = 0;
+        for (block, line) in shown.iter().zip(&lines) {
+            let source = (block.start, block.end);
+            if line.len() == block.end - block.start {
+                let found_here = found.ranges(source);
+                ranges.extend(found_here.into_iter().map(|(a, b, c)| (a + at, b + at, c)));
+            }
+            if found.reveals(source) {
+                reveals = Some(found.marks.clone());
+            }
+            at += line.len() + 1;
+        }
+    }
     // Only its closing fence shown: nothing to draw.
     if lines.is_empty() && code.first_line < first {
         return;
@@ -658,7 +714,8 @@ fn code_label(
     let colours = block_colours(ui.ctx(), text, (blocks, code), (first, last));
     let mut job = LayoutJob::single_section(lines.join("\n"), format);
     paint_code(&mut job, 0, &colours, look.dark);
-    egui::Frame::NONE
+    find_marks::mark_job(&mut job, &ranges, look.dark);
+    let framed = egui::Frame::NONE
         .fill(look.code)
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(8, 6))
@@ -673,6 +730,9 @@ fn code_label(
             let galley = spread(galley, |_, _| extra);
             crate::read_text::label(ui, egui::Label::new(galley));
         });
+    if let Some(marks) = reveals {
+        find_marks::reveal(ui, &marks, framed.response.rect);
+    }
 }
 
 /// How a formatted text is drawn: its font, its colour, the accent for
@@ -687,6 +747,55 @@ pub(crate) struct Look {
     weak: Color32,
     code: Color32,
     dark: bool,
+    /// The places a find found in the text drawn (obf-1047).
+    found: Option<Arc<TextFound>>,
+}
+
+/// The places the find marks set found in a text drawn, and which of them
+/// is the current one (obf-1047).
+pub(crate) struct TextFound {
+    hits: Arc<find_marks::Hits>,
+    marks: Arc<find_marks::FindMarks>,
+    current: Option<usize>,
+}
+
+impl TextFound {
+    /// Those of the source `text` in `format`, while find marks are set
+    /// that find something in it.
+    fn of(ctx: &egui::Context, text: &str, format: &str) -> Option<Arc<TextFound>> {
+        let (hits, marks) = find_marks::hits(ctx, text, format)?;
+        let current = hits.current(&marks);
+        Some(Arc::new(TextFound {
+            hits,
+            marks,
+            current,
+        }))
+    }
+
+    /// The ranges of the source bytes `from..to` that are places found,
+    /// in bytes of that part from its start, each with whether it is the
+    /// current one.
+    fn ranges(&self, (from, to): (usize, usize)) -> Vec<(usize, usize, bool)> {
+        self.hits
+            .across((from, to), self.current)
+            .into_iter()
+            .map(|(h, current)| {
+                let a = h.source.0.max(from) - from;
+                let b = h.source.1.min(to) - from;
+                (a, b, current)
+            })
+            .collect()
+    }
+
+    /// Whether the current place lies across the source bytes
+    /// `from..to` and is to come into view.
+    fn reveals(&self, (from, to): (usize, usize)) -> bool {
+        self.marks.reveal
+            && self
+                .current
+                .and_then(|i| self.hits.found.get(i))
+                .is_some_and(|h| h.source.0 < to && from < h.source.1.max(h.source.0 + 1))
+    }
 }
 
 impl Look {
@@ -707,7 +816,15 @@ impl Look {
             weak: visuals.weak_text_color(),
             code: visuals.code_bg_color,
             dark: visuals.dark_mode,
+            found: None,
         }
+    }
+
+    /// As it is, with the places a find found in the source `text` in
+    /// `format` (obf-1047).
+    pub(crate) fn finding(mut self, ctx: &egui::Context, text: &str, format: &str) -> Look {
+        self.found = TextFound::of(ctx, text, format);
+        self
     }
 
     /// Its font, at the size it shows.
@@ -1140,9 +1257,65 @@ struct Line {
     boxes: Vec<(String, BoxState, (usize, usize))>,
     tags: Vec<(usize, String, (usize, usize))>,
     links: Vec<(usize, String, (usize, usize))>,
+    /// Where the current place a find found lies in it, in characters,
+    /// while it is to come into view (obf-1047).
+    current: Option<(usize, usize)>,
 }
 
 impl Line {
+    /// Adds `shown`, which stands for the source bytes `source`, in
+    /// `format`, the places found across them on their tints (obf-1047):
+    /// cut where they lie while it shows as written, else on it whole, as
+    /// a box's glyph or a link without an id. Gives where it lies, in
+    /// characters.
+    fn push_src(
+        &mut self,
+        shown: &str,
+        (format, bold): (TextFormat, bool),
+        source: (usize, usize),
+        look: &Look,
+    ) -> (usize, usize) {
+        let Some(found) = look.found.as_ref() else {
+            return self.push(shown, format, bold);
+        };
+        let ranges = found.ranges(source);
+        if ranges.is_empty() {
+            return self.push(shown, format, bold);
+        }
+        let from = self.chars;
+        let reveal = found.reveals(source);
+        let note = |line: &mut Line, chars: (usize, usize)| {
+            line.current = Some(match line.current {
+                Some((a, b)) => (a.min(chars.0), b.max(chars.1)),
+                None => chars,
+            });
+        };
+        if shown.len() != source.1.saturating_sub(source.0) {
+            let current = ranges.iter().any(|r| r.2);
+            let chars = self.push(shown, find_marks::marked(&format, look.dark, current), bold);
+            if current && reveal {
+                note(self, chars);
+            }
+            return (from, self.chars);
+        }
+        let mut at = 0;
+        for (a, b, current) in ranges {
+            let a = a.max(at);
+            let (Some(before), Some(piece)) = (shown.get(at..a), shown.get(a..b)) else {
+                continue;
+            };
+            self.push(before, format.clone(), bold);
+            let marked = find_marks::marked(&format, look.dark, current);
+            let chars = self.push(piece, marked, bold);
+            if current && reveal {
+                note(self, chars);
+            }
+            at = b;
+        }
+        self.push(shown.get(at..).unwrap_or_default(), format, bold);
+        (from, self.chars)
+    }
+
     /// Adds `shown` in `format`; gives where it lies, in characters.
     fn push(&mut self, shown: &str, format: TextFormat, bold: bool) -> (usize, usize) {
         let from = self.chars;
@@ -1206,11 +1379,14 @@ fn add_spans(line: &mut Line, text: &str, spans: &[Span], style: Style, ctx: (&F
             // Never an id drawn, of a box or of a glyph copied in.
             SpanKind::Text => {
                 let shown = text_boxes::strip(&span.text);
-                line.push(&shown, part_format(look, style, false), style.bold);
+                let format = (part_format(look, style, false), style.bold);
+                line.push_src(&shown, format, (span.start, span.end), look);
             }
             SpanKind::Code => {
                 let shown = text_boxes::strip(&span.text);
-                line.push(&shown, part_format(look, style, true), style.bold);
+                let format = (part_format(look, style, true), style.bold);
+                let source = (span.content_start, span.content_end);
+                line.push_src(&shown, format, source, look);
             }
             SpanKind::Bold => {
                 let inner = Style {
@@ -1301,14 +1477,14 @@ fn add_written(
         let (Some(before), Some(piece)) = (text.get(at..a), text.get(a..b)) else {
             continue;
         };
-        line.push(before, format.clone(), style.bold);
+        line.push_src(before, (format.clone(), style.bold), (at, a), look);
         match cut {
             Cut::Box(i) => {
                 let Some((found, state, after)) = found.boxes.get(i) else {
                     continue;
                 };
                 let glyph = state.glyph().to_string();
-                let chars = line.push(&glyph, format.clone(), style.bold);
+                let chars = line.push_src(&glyph, (format.clone(), style.bold), (a, b), look);
                 line.boxes.push((found.id.clone(), *state, chars));
                 if let Some(after) = after {
                     let small =
@@ -1319,7 +1495,7 @@ fn add_written(
             Cut::Tag => {
                 let mut tagged = format.clone();
                 tagged.color = look.accent;
-                let chars = line.push(piece, tagged, style.bold);
+                let chars = line.push_src(piece, (tagged, style.bold), (a, b), look);
                 line.tags.push((a, piece.to_string(), chars));
             }
             Cut::Link => {
@@ -1329,7 +1505,8 @@ fn add_written(
                     link: true,
                     ..style
                 };
-                let chars = line.push(&url, part_format(look, linked, false), style.bold);
+                let format = (part_format(look, linked, false), style.bold);
+                let chars = line.push_src(&url, format, (a, b), look);
                 if markdown::may_open(&url) {
                     line.links.push((a, url, chars));
                 }
@@ -1337,7 +1514,8 @@ fn add_written(
         }
         at = b;
     }
-    line.push(text.get(at..end).unwrap_or_default(), format, style.bold);
+    let rest = text.get(at..end).unwrap_or_default();
+    line.push_src(rest, (format, style.bold), (at, end), look);
 }
 
 /// What goes before an item's words: its bullet or its number.
@@ -1383,6 +1561,7 @@ fn block_label(
         weak: look.weak,
         code: look.code,
         dark: look.dark,
+        found: look.found.clone(),
     };
     let style = Style {
         bold: heading.is_some(),
@@ -1418,6 +1597,18 @@ fn block_label(
             let shown = text_boxes::strip(text.get(block.start..block.end).unwrap_or_default());
             line.push(&shown, part_format(&look, style, true), false);
             paint_code(&mut line.job, 0, colours, look.dark);
+            // The places found, over its colours (obf-1047).
+            if let Some(found) = &look.found {
+                let source = (block.start, block.end);
+                let ranges = found.ranges(source);
+                find_marks::mark_job(&mut line.job, &ranges, look.dark);
+                if found.reveals(source)
+                    && let Some(&(a, b, _)) = ranges.iter().find(|r| r.2)
+                {
+                    let chars = |at: usize| shown.get(..at).map_or(0, |s| s.chars().count());
+                    line.current = Some((chars(a), chars(b)));
+                }
+            }
         }
         None => add_spans(&mut line, text, &block.spans, style, (found, &look)),
     }
@@ -1466,6 +1657,7 @@ fn block_label(
         let galley = spread(galley, |_, _| extra);
         let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
         let origin = response.rect.min;
+        reveal_line(ui, (&galley, origin), &line, look.found.as_deref());
         if line.bold && ui.is_rect_visible(response.rect) {
             let mut ghost = std::mem::take(&mut line.ghost);
             ghost.wrap = galley.job.wrap.clone();
@@ -1850,6 +2042,23 @@ fn table_label(
     } else {
         0.0
     };
+    // The cell of the current place a find found moves into the part
+    // shown, once (obf-1047).
+    let current = laid.iter().enumerate().find_map(|(r, row)| {
+        let c = row.iter().position(|cell| cell.line.current.is_some())?;
+        Some((r, c))
+    });
+    if let Some((_, c)) = current
+        && sideways
+        && !(c == 0 && pinned > 0.0)
+        && let (Some(x), Some(width)) = (xs.get(c), widths.get(c))
+    {
+        if *x - state.offset < pinned {
+            state.offset = (*x - pinned).clamp(0.0, most);
+        } else if *x + *width - state.offset > shown {
+            state.offset = (*x + *width - shown).clamp(0.0, most);
+        }
+    }
     let split = (rect.left() + pinned, header_top + head);
     // Four parts, each clipped to its own: the body, the first column, the
     // header row and the corner of the two, the cells' labels in parts of
@@ -1911,6 +2120,11 @@ fn table_label(
             let inset = aligned(align, width, words.x, pad.x);
             let pos = egui::pos2(x + inset, y + pad.y);
             spots.extend(spots_in(cell.paint(cells, pos, look.colour, true), part));
+            if current == Some((r, c))
+                && let Some(found) = &look.found
+            {
+                find_marks::reveal(ui, &found.marks, at);
+            }
             if seen.is_positive() {
                 spots.cells.push(CellSpot {
                     at: table.start,
@@ -2020,6 +2234,20 @@ pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Optio
 
 /// Where the boxes, tags and links of `line`, laid out in `galley` at
 /// `origin`, lie on the screen.
+/// Brings the current place a find found in `line`, laid out in `galley`
+/// at `origin`, into view while it is to (obf-1047).
+fn reveal_line(ui: &Ui, (galley, origin): (&Galley, Pos2), line: &Line, found: Option<&TextFound>) {
+    let (Some(chars), Some(found)) = (line.current, found) else {
+        return;
+    };
+    let rect = row_rects(galley, chars)
+        .into_iter()
+        .reduce(|a, b| a.union(b));
+    if let Some(rect) = rect {
+        find_marks::reveal(ui, &found.marks, rect.translate(origin.to_vec2()));
+    }
+}
+
 fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
     let at =
         |chars: (usize, usize)| place_chars(galley, chars).map(|r| r.translate(origin.to_vec2()));
@@ -2476,6 +2704,21 @@ pub fn field_job(mut job: LayoutJob, look: &BoxLook, gap: &dyn Fn(&str) -> f32) 
     }
     job.sections = out;
     job
+}
+
+/// Brings the current place a find found in the text `typed` of an edit
+/// field in `format`, laid out in `galley` at `origin`, into view while
+/// it is to (obf-1047).
+pub fn reveal_typed(ui: &Ui, (galley, origin): (&Galley, Pos2), (typed, format): (&str, &str)) {
+    let Some((hits, marks)) = find_marks::hits(ui.ctx(), typed, format) else {
+        return;
+    };
+    let Some(hit) = hits.current(&marks).and_then(|i| hits.found.get(i)) else {
+        return;
+    };
+    if let Some(rect) = place(galley, typed, 0, hit.source) {
+        find_marks::reveal(ui, &marks, rect.translate(origin.to_vec2()));
+    }
 }
 
 /// Where the last character before the byte `end` of `text` begins.

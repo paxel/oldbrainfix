@@ -281,6 +281,19 @@ pub fn code_tint(text: Color32) -> Color32 {
     Color32::from_rgba_unmultiplied(text.r(), text.g(), text.b(), alpha)
 }
 
+/// The tint behind a place a search or a find bar found (obf-1047), the
+/// current one's stronger, in the dark look while `dark`: amber, which
+/// the look uses nowhere else, behind the text's own colour, dark on the
+/// light look's and light on the dark look's.
+pub fn found_tint(dark: bool, current: bool) -> Color32 {
+    match (dark, current) {
+        (false, false) => argb(0xFFFFE9A8),
+        (false, true) => argb(0xFFFFC34D),
+        (true, false) => argb(0xFF5C4A12),
+        (true, true) => argb(0xFF8A6400),
+    }
+}
+
 /// The colour a part of code of the kind `part` is drawn in (obf-1036),
 /// in the dark look while `dark`, readable on [`code_tint`]: GitHub's
 /// palette, as the phone's.

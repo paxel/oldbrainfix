@@ -82,6 +82,7 @@ use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
 use oldbrainfix_core::checklists::keys as checklist_keys;
+use oldbrainfix_core::findings::{self, Finding, FindingPart};
 use oldbrainfix_core::highlight::Grammars;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::note_kinds::{self, NoteKind};
@@ -131,6 +132,8 @@ use crate::checklist_view::{
 use crate::enrich::Enricher;
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::file_into::{self, FileIntoPicker, Picked};
+use crate::find_bar::{self, FindBar};
+use crate::find_marks;
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
@@ -663,9 +666,11 @@ impl Reads {
             | Action::SelectAllCards
             | Action::Clip(_) => Reads::Nothing,
             Action::SwitchView(_) | Action::Compact(_) => Reads::Look,
-            Action::SelectNote(_) | Action::CloseNote | Action::Find | Action::Badge(_) => {
-                Reads::Detail
-            }
+            Action::SelectNote(_)
+            | Action::OpenFinding(..)
+            | Action::CloseNote
+            | Action::Find
+            | Action::Badge(_) => Reads::Detail,
             // A letter in a dialog's search changes only the dialog
             // (obf-1068).
             Action::MergeQuery | Action::AddToNotePicked(NoteAsk::Find) => Reads::Nothing,
@@ -1461,8 +1466,9 @@ enum Action {
     QuickNote,
     /// File ▸ Quit: the app ends, also where the tray would keep it.
     Quit,
-    /// Edit ▸ Find (Ctrl+F): the cursor into the list's search, of All
-    /// Notes where the list has none.
+    /// Edit ▸ Find (Ctrl+F): over a Note open, its find bar with the
+    /// cursor in it (obf-1047); else the cursor into the list's search, of
+    /// All Notes where the list has none.
     Find,
     /// Edit ▸ Cut, Copy or Paste, on the field the cursor was in.
     Clip(Clip),
@@ -1507,6 +1513,10 @@ enum Action {
     /// Opens the Note in the Note dialog (#146): a double-click on its
     /// card or Edit (#114).
     SelectNote(String),
+    /// Opens the Note in the Note dialog at a place the search found in
+    /// it (obf-1047), its find bar at that place, or at the first one
+    /// while none is given: a click on a finding under its card.
+    OpenFinding(String, Option<Box<Finding>>),
     /// Opens the Checklist or Shopping List of this Note in the Note
     /// dialog with the keyboard in a new empty Line after its open ones,
     /// as a click on its group's heading on the Agenda does (#276).
@@ -2063,6 +2073,14 @@ pub struct App {
     /// quick note's field or the search, until it has it.
     capture_focus: bool,
     search_focus: bool,
+    /// The find bar over the Note open (obf-1047), while it is open: from
+    /// a search's card, by Ctrl+F or by Edit ▸ Find; leaving the Note
+    /// closes it.
+    find: Option<(String, FindBar)>,
+    /// The places the search found on each card laid out (obf-1047), by
+    /// its Note's id, with the words searched and what they were found
+    /// in ([`found_in`]).
+    card_findings: HashMap<String, (String, u64, Arc<Vec<Finding>>)>,
     /// The tags of the tag tree whose levels below show (#267), by
     /// [`tag_tree_view::key`]: a view only, kept while the app runs.
     tags_unfolded: HashSet<String>,
@@ -2192,8 +2210,9 @@ pub struct App {
     card_reads: std::cell::Cell<usize>,
     refreshes: usize,
     /// The height each card of a list took when it was drawn last, for
-    /// the room it takes out of view (obf-1069).
-    card_heights: HashMap<(String, bool), f32>,
+    /// the room it takes out of view (obf-1069): by its Note, its view and
+    /// the words searched, whose places found show under it (obf-1047).
+    card_heights: HashMap<(String, bool, u64), f32>,
     /// How many cards the list laid out in the frame drawn last.
     cards_laid_out: usize,
     /// Tells the alerts to look again after a change here.
@@ -2773,6 +2792,8 @@ impl App {
             clip: None,
             capture_focus: false,
             search_focus: false,
+            find: None,
+            card_findings: HashMap::new(),
             tags_unfolded: HashSet::new(),
             scroll_card: None,
             quit_wanted: false,
@@ -6133,6 +6154,15 @@ impl App {
         self.searching.searched()
     }
 
+    /// The find bar over the Note open (obf-1047), while it is open: its
+    /// words, which place found is current, counted from 0, and how many
+    /// it found.
+    pub fn find_bar(&self) -> Option<(&str, usize, usize)> {
+        self.find
+            .as_ref()
+            .map(|(_, bar)| (bar.query(), bar.at(), bar.found().len()))
+    }
+
     /// Whether the search of the list shown or of a dialog runs on its
     /// thread (obf-1068).
     pub fn searching(&self) -> bool {
@@ -7381,6 +7411,8 @@ impl App {
             // Into the search of the list shown, from no Note: only the
             // keyboard moves.
             Action::Find if self.selected_note.is_none() && self.searches() => Reads::Nothing,
+            // Over a Note open, its find bar: the Note stays.
+            Action::Find if self.selected_note.is_some() => Reads::Nothing,
             // A letter in the list's search, searched once typing stops
             // (obf-1068).
             Action::Search if self.agenda_reads.is_some() => Reads::Nothing,
@@ -7594,6 +7626,9 @@ impl App {
             }
             Action::QuickNote => self.quick_note_wanted = true,
             Action::Quit => self.quit_wanted = true,
+            // Over the Note open, its find bar takes the keyboard (obf-1047,
+            // C7d), opened without words where it was closed.
+            Action::Find if self.selected_note.is_some() => self.open_find(None),
             Action::Find => {
                 self.leave_note()?;
                 // All Notes, Unsorted, an Area, a Topic and the trash have
@@ -7651,12 +7686,29 @@ impl App {
                 if self.quick_open {
                     self.act(Action::CloseQuickNote)?;
                 }
-                if self.selected_note.as_deref() != Some(id.as_str()) {
+                let other = self.selected_note.as_deref() != Some(id.as_str());
+                if other {
                     self.leave_note()?;
+                    self.find = None;
+                }
+                // Opened from a search's list, at the first place it found
+                // (obf-1047, C7b); not where its card showed none.
+                if other && let Some(query) = self.found_on_card(&id) {
+                    self.find = Some((id.clone(), FindBar::new(&query, false)));
                 }
                 self.selected_note = Some(id);
                 self.editor = None;
                 self.tally_form = None;
+            }
+            Action::OpenFinding(id, finding) => {
+                self.act(Action::SelectNote(id.clone()))?;
+                let query = self.searching.searched().trim().to_string();
+                let bar = FindBar::new(&query, false);
+                let bar = match finding {
+                    Some(finding) => bar.starting_at(*finding),
+                    None => bar,
+                };
+                self.find = Some((id, bar));
             }
             Action::StartLine(id) => {
                 self.act(Action::SelectNote(id))?;
@@ -10273,7 +10325,49 @@ impl App {
         self.selected_note = None;
         self.badge = None;
         self.start_lines = false;
+        // Leaving the Note closes its find bar (obf-1047).
+        self.find = None;
         Ok(())
+    }
+
+    /// Whether the find bar of the Note open is open (obf-1047).
+    fn find_open(&self) -> bool {
+        matches!((&self.find, &self.selected_note), (Some((of, _)), Some(id)) if of == id)
+    }
+
+    /// Opens the find bar over the Note open (obf-1047), the cursor in its
+    /// field, its words selected: with `words` in it, else with those it
+    /// had while it was open, else empty. Ctrl+F opens it without words;
+    /// a right-click's Search on words selected in the Note is to open it
+    /// with them (obf-1055).
+    fn open_find(&mut self, words: Option<&str>) {
+        let Some(note) = self.selected_note.clone() else {
+            return;
+        };
+        match (&mut self.find, words) {
+            (Some((of, bar)), None) if *of == note => bar.focus(),
+            (_, words) => {
+                let bar = FindBar::new(words.unwrap_or_default(), true);
+                self.find = Some((note, bar));
+            }
+        }
+    }
+
+    /// The words the search of the list shown found the Note `id` by
+    /// (obf-1047), while it is among the cards found and its card did
+    /// not show it found nowhere in it.
+    fn found_on_card(&self, id: &str) -> Option<String> {
+        let query = self.searching.searched().trim();
+        if query.is_empty() || !self.searches() || self.alone.is_some() {
+            return None;
+        }
+        if !self.view.notes.iter().any(|p| p.note.id == id) {
+            return None;
+        }
+        match self.card_findings.get(id) {
+            Some((searched, _, found)) if searched == query && found.is_empty() => None,
+            _ => Some(query.to_string()),
+        }
     }
 
     /// Where what "+" makes goes: the Area or Topic the list shows, none
@@ -11912,6 +12006,14 @@ impl App {
             && self.table.is_none()
             && !egui::Popup::is_any_open(ui.ctx());
         if bare {
+            // Its find bar (obf-1047): Ctrl+F opens it or puts the cursor
+            // back into it, also while typing; Esc closes it first.
+            if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::F)) {
+                actions.push(Action::Find);
+            }
+            if self.find_open() && ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+                self.find = None;
+            }
             if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F9)) {
                 actions.push(Action::ReadingView(!reading));
             } else if reading {
@@ -12160,6 +12262,15 @@ impl App {
     /// card, tags and links work, a table and a photo open full screen; no
     /// badge, field, button or capture line shows.
     fn reading_view(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        // The find bar over it too (obf-1047), finding in its texts.
+        let marks = self.find_row(ui, true);
+        let before = find_marks::set(ui.ctx(), marks);
+        self.reading_content(ui, tones, actions);
+        find_marks::set(ui.ctx(), before);
+    }
+
+    /// What the reading view shows, as [`App::reading_view`] says.
+    fn reading_content(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
@@ -13915,7 +14026,12 @@ impl App {
             && !table_grid::cell_had_keyboard(ctx)
             && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
         {
-            actions.push(Action::CloseNote);
+            // Its find bar closes first (obf-1047).
+            if self.find_open() {
+                self.find = None;
+            } else {
+                actions.push(Action::CloseNote);
+            }
         }
         // As large as it was left on this computer (#278), in the room
         // the window has.
@@ -14805,6 +14921,29 @@ impl App {
         }
         // Each place's list scrolls on its own (#278).
         let place = self.selection.clone();
+        // A search's cards show where it found their Notes (obf-1047,
+        // C7b): its places marked in them, and listed under each.
+        let searched = self.searching.searched().trim().to_string();
+        // Those of other words are of no use any more.
+        if self
+            .card_findings
+            .values()
+            .next()
+            .is_some_and(|(q, _, _)| *q != searched)
+        {
+            self.card_findings.clear();
+        }
+        let marks = (!searched.is_empty()).then(|| {
+            Arc::new(find_marks::FindMarks {
+                query: searched.clone(),
+                ..Default::default()
+            })
+        });
+        let before = find_marks::set(ui.ctx(), marks);
+        let words = match searched.is_empty() {
+            true => 0,
+            false => find_marks::text_key(&searched),
+        };
         let output = list_scroll(ui, ("notes", place), |ui| {
             // Room for the emboss around every card.
             ui.spacing_mut().item_spacing.y = 16.0;
@@ -14844,7 +14983,7 @@ impl App {
                             return 0.0;
                         };
                         let full = self.view.compact == self.view.switched.contains(&p.note.id);
-                        let held = self.card_heights.get(&(p.note.id.clone(), full));
+                        let held = self.card_heights.get(&(p.note.id.clone(), full, words));
                         held.copied().unwrap_or(CARD_LEAST) + 16.0
                     };
                     let (mut from, mut room) = (at, 0.0);
@@ -14864,7 +15003,7 @@ impl App {
                 let id = &placed.note.id;
                 let top = ui.cursor().top();
                 let full = self.view.compact == self.view.switched.contains(id);
-                let held = (id.clone(), full);
+                let held = (id.clone(), full, words);
                 let height = self.card_heights.get(&held).copied().unwrap_or(CARD_GUESS);
                 if (top > near.bottom() || top + height < near.top())
                     && !around.as_ref().is_some_and(|r| r.contains(&at))
@@ -14878,6 +15017,25 @@ impl App {
                     continue;
                 }
                 self.cards_laid_out += 1;
+                // Its places found, once per card laid out and search, not
+                // in the search itself (obf-1047).
+                let found = if searched.is_empty() {
+                    None
+                } else {
+                    let sections = self.view.sections.get(id).map_or(&[][..], Vec::as_slice);
+                    let texts = found_in(&placed.note, sections, false);
+                    let fresh = !matches!(
+                        self.card_findings.get(id),
+                        Some((q, k, _)) if *q == searched && *k == texts
+                    );
+                    if fresh {
+                        let found = findings::of_note(&placed.note, &searched, sections);
+                        show_found_rows(ui.ctx(), &placed.note, sections, &found);
+                        let found = (searched.clone(), texts, Arc::new(found));
+                        self.card_findings.insert(id.clone(), found);
+                    }
+                    self.card_findings.get(id).map(|(_, _, f)| f.clone())
+                };
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
                 let picked = self.cards.contains(id);
                 // A Note in the trash is restored, not filed.
@@ -14926,7 +15084,7 @@ impl App {
                 // Its own id, however many cards above were laid out.
                 let card = egui::UiBuilder::new().id(Id::new(("list card", id)));
                 let drawn = ui.scope_builder(card, |ui| {
-                    note_card(
+                    let clicks = note_card(
                         ui,
                         &self.t,
                         tones,
@@ -14934,14 +15092,19 @@ impl App {
                         (selected, picked, draggable),
                         look,
                         media,
-                    )
+                    );
+                    let opened = found
+                        .as_deref()
+                        .and_then(|found| card_findings(ui, &self.t, id, found));
+                    (clicks, opened)
                 });
                 let drawn_height = drawn.response.rect.height();
                 if top < view_top {
                     grown += drawn_height - height;
                 }
                 self.card_heights.insert(held, drawn_height);
-                let clicks = drawn.inner;
+                let (clicks, opened) = drawn.inner;
+                actions.extend(opened);
                 // At once: the room of the cards above it follows as they
                 // are laid out, which would end a scroll under way.
                 if scroll_to.as_deref() == Some(id.as_str()) {
@@ -15043,6 +15206,7 @@ impl App {
                 ui.ctx().request_repaint();
             }
         });
+        find_marks::set(ui.ctx(), before);
         if output.state.offset.y != self.scrolled {
             // The marks follow on the next pass.
             self.scrolled = output.state.offset.y;
@@ -15182,6 +15346,49 @@ impl App {
     /// field of its own, as the Note's text (#183); a text only read
     /// selects to be copied.
     fn note_editor(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        // The find bar over it (obf-1047), its places marked in it.
+        let marks = self.find_row(ui, false);
+        let before = find_marks::set(ui.ctx(), marks);
+        self.note_content(ui, tones, actions);
+        find_marks::set(ui.ctx(), before);
+    }
+
+    /// The find bar of the Note open (obf-1047), while it is open: drawn
+    /// across `ui`, its words found anew in the Note and its Sections as
+    /// they changed, ✕ closing it. Gives what it marks in the Note drawn
+    /// under it; in the reading view, `texts`, only the places in the
+    /// texts, which alone it shows.
+    fn find_row(&mut self, ui: &mut Ui, texts: bool) -> Option<Arc<find_marks::FindMarks>> {
+        let (placed, sections) = self.view.detail.as_ref()?;
+        let note = &placed.note;
+        // A bar left from another Note goes.
+        if self.find.as_ref().is_some_and(|(of, _)| *of != note.id) {
+            self.find = None;
+        }
+        let (_, bar) = self.find.as_mut()?;
+        if bar.show(ui, &self.t) == Some(find_bar::Asked::Close) {
+            self.find = None;
+            return None;
+        }
+        bar.find(found_in(note, sections, texts), |query| {
+            let mut found = findings::of_note(note, query, sections);
+            if texts {
+                found.retain(|f| f.part == FindingPart::Text);
+            }
+            found
+        });
+        // A Note of a kind edited here shows its name and its description
+        // in fields of their own (#188); read, or in the reading view, it
+        // shows its whole text.
+        let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
+        let writes = !note.is_trashed() && self.view.may.changes && note.text_editable;
+        let split = kinded && writes && !texts;
+        Some(bar.marks(ui.ctx(), |f| finding_text(note, sections, f, split)))
+    }
+
+    /// What the Note dialog and a Note's own window show of the Note open:
+    /// its texts, its kind's content, its media and its badges.
+    fn note_content(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
@@ -22664,6 +22871,11 @@ fn edited_text(
         let small = FontId::proportional(13.0);
         let grammars = text_marks_view::grammars(ui.ctx());
         let grammar = grammars.by_scope(edit.language);
+        let typed_format = match (as_code, formatted) {
+            (true, _) => text_format::CODE,
+            (false, true) => text_format::MARKDOWN,
+            (false, false) => text_format::PLAIN,
+        };
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(typed_size);
@@ -22676,6 +22888,8 @@ fn edited_text(
                     let colours = text_marks_view::code_colours(ui.ctx(), grammar, typed);
                     text_marks_view::paint_code(&mut job, 0, &colours, dark);
                 }
+                // The places the find bar found (obf-1047).
+                find_marks::mark_typed(ui.ctx(), &mut job, (typed, text_format::CODE), dark);
                 return ui.fonts_mut(|f| f.layout_job(job));
             }
             let (job, lines) = if formatted {
@@ -22704,6 +22918,9 @@ fn edited_text(
             if let Some(grids) = &grids {
                 job = grids.hide(typed, job);
             }
+            // The places the find bar found (obf-1047); none in a table's
+            // source hidden under its grid.
+            find_marks::mark_typed(ui.ctx(), &mut job, (typed, typed_format), dark);
             job.wrap.max_width = width;
             let galley = ui.fonts_mut(|f| f.layout_job(job));
             if !formatted {
@@ -22815,6 +23032,8 @@ fn edited_text(
         if cut {
             ui.ctx().request_repaint();
         }
+        let place = (&*output.galley, output.galley_pos);
+        text_marks_view::reveal_typed(ui, place, (edited, typed_format));
         name_field(ui, &output.response.response, edit.name);
         // With Show ticks, who ticked each box, after it; a
         // click on a box ticks it, no edit of the text (ADR
@@ -23197,6 +23416,11 @@ fn name_edit(
             }
         });
     }
+    let typed_format = if formatted {
+        text_format::MARKDOWN
+    } else {
+        text_format::PLAIN
+    };
     let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
         let typed = typed.as_str();
         let font = FontId::proportional(theme::content(ui, NAME_SIZE));
@@ -23206,6 +23430,9 @@ fn name_edit(
             text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
         };
         let mut job = text_marks_view::field_job(job, boxes, &|_: &str| 0.0);
+        // The places the find bar found (obf-1047).
+        let dark = ui.visuals().dark_mode;
+        find_marks::mark_typed(ui.ctx(), &mut job, (typed, typed_format), dark);
         job.wrap.max_width = width;
         ui.fonts_mut(|f| f.layout_job(job))
     };
@@ -23228,6 +23455,8 @@ fn name_edit(
     if cut {
         ui.ctx().request_repaint();
     }
+    let place = (&*output.galley, output.galley_pos);
+    text_marks_view::reveal_typed(ui, place, (name, typed_format));
     text_marks_view::remember_text(ui, id, name);
     let field = &output.response.response;
     name_field(ui, field, t.note_name());
@@ -23285,6 +23514,88 @@ fn box_action(entity: String, asked: BoxAsk) -> Action {
 /// Whether a box of `look` has been ticked: it offers its History then.
 fn ticked_in(boxes: &[ShownBox]) -> impl Fn(&str) -> bool + '_ {
     move |id| boxes.iter().any(|b| b.id == id && b.last.is_some())
+}
+
+/// What a find bar over `note` and its `sections` finds in, as one key
+/// that changes with any text it finds in (obf-1047); in the reading
+/// view, `texts`, a key of its own.
+fn found_in(note: &Note, sections: &[Section], texts: bool) -> u64 {
+    let names = |files: &[oldbrainfix_core::Attachment]| -> Vec<String> {
+        files.iter().map(|f| f.name.clone()).collect()
+    };
+    let part = |text: &str, media: [&BTreeMap<String, String>; 3], files: Vec<String>| {
+        Id::new((text, media, files)).value()
+    };
+    let mut keys = vec![
+        u64::from(texts),
+        part(
+            &note.text,
+            [&note.transcripts, &note.photo_texts, &note.attachment_texts],
+            names(&note.attachments),
+        ),
+    ];
+    for s in sections {
+        let media = [&s.transcripts, &s.photo_texts, &s.attachment_texts];
+        keys.push(part(&s.text, media, names(&s.attachments)));
+    }
+    Id::new(keys).value()
+}
+
+/// Where `finding` lies as [`find_marks::Current`] names it: in the text
+/// of `note` or of one of its `sections` as it is drawn, a text's
+/// source, a Transcript, a Photo Text, an Attachment Text or a file's
+/// name; with `split`, the Note's own text as its name and description
+/// are drawn apart (#188).
+fn finding_text(
+    note: &Note,
+    sections: &[Section],
+    finding: &Finding,
+    split: bool,
+) -> Option<find_marks::Current> {
+    let at = |text: &str, start: usize| find_marks::Current {
+        text: find_marks::text_key(text),
+        start,
+    };
+    if split && finding.part == FindingPart::Text && finding.section.is_none() {
+        let whole = note.text.as_str();
+        let name = note_kinds::name(whole);
+        let description = note_kinds::description(whole);
+        let from = whole.len() - description.len();
+        // Where the description begins as the whole text shows.
+        let shown = find_marks::shown_of(whole.get(..from).unwrap_or_default())
+            .0
+            .len();
+        return Some(match finding.start.checked_sub(shown) {
+            Some(start) => at(description, start),
+            None => at(name, finding.start),
+        });
+    }
+    let section = match &finding.section {
+        Some(id) => Some(sections.iter().find(|s| &s.id == id)?),
+        None => None,
+    };
+    let (text, transcripts, photo_texts, attachment_texts) = match section {
+        Some(s) => (&s.text, &s.transcripts, &s.photo_texts, &s.attachment_texts),
+        None => (
+            &note.text,
+            &note.transcripts,
+            &note.photo_texts,
+            &note.attachment_texts,
+        ),
+    };
+    let files = match section {
+        Some(s) => s.attachments.iter(),
+        None => note.attachments.iter(),
+    };
+    let key = finding.key.as_str();
+    let said = match finding.part {
+        FindingPart::Text => text.as_str(),
+        FindingPart::Transcript => transcripts.get(key)?.as_str(),
+        FindingPart::PhotoText => photo_texts.get(key)?.as_str(),
+        FindingPart::AttachmentText => attachment_texts.get(key)?.as_str(),
+        FindingPart::FileName => files.into_iter().find(|f| f.hash == key)?.name.as_str(),
+    };
+    Some(at(said, finding.start))
 }
 
 /// The size of a Note's text as the Note dialog and the reading view show
@@ -23496,6 +23807,112 @@ fn card_tables(id: &str) -> TableRoom {
     TableRoom {
         card: Some(Id::new(("card", id))),
         wide: None,
+    }
+}
+
+/// How many places a search found a card's Note by show under its card
+/// (obf-1047, C7b); "+n more" stands for the others.
+const CARD_FINDINGS: usize = 3;
+
+/// The places the search found in a card's Note `id` (obf-1047, C7b),
+/// under its card: the first [`CARD_FINDINGS`], each its context line
+/// with the words found on their tint, a Transcript's, Photo Text's,
+/// Attachment Text's or file name's after what it is, then "+n more"
+/// for the others. A click on one opens the Note at it, "+n more" at the
+/// first not shown.
+fn card_findings(ui: &mut Ui, t: &L10n, id: &str, found: &[Finding]) -> Option<Action> {
+    if found.is_empty() {
+        return None;
+    }
+    let mut asked = None;
+    let open =
+        |finding: &Finding| Action::OpenFinding(id.to_string(), Some(Box::new(finding.clone())));
+    ui.horizontal(|ui| {
+        ui.add_space(20.0);
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 4.0;
+            for (at, finding) in found.iter().take(CARD_FINDINGS).enumerate() {
+                let job = finding_job(ui, t, finding);
+                let said = t.desk_finding_open(&job.text);
+                let shown = ui.add(egui::Label::new(job).truncate());
+                let click = ui.interact(shown.rect, Id::new(("finding", id, at)), Sense::click());
+                click.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &said));
+                if click
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .clicked()
+                {
+                    asked = Some(open(finding));
+                }
+            }
+            if let Some(next) = found.get(CARD_FINDINGS) {
+                let more = (found.len() - CARD_FINDINGS) as i64;
+                let accent = theme::tones(ui.visuals()).accent;
+                let label = RichText::new(t.desk_find_more(more))
+                    .size(theme::content(ui, 13.0))
+                    .color(accent);
+                let button = ui.add(egui::Button::new(label).frame(false));
+                if button
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .clicked()
+                {
+                    asked = Some(open(next));
+                }
+            }
+        });
+    });
+    asked
+}
+
+/// A place found under its card (obf-1047): what it lies in, but for a
+/// text, then its context line, the words found on their tint.
+fn finding_job(ui: &Ui, t: &L10n, finding: &Finding) -> egui::text::LayoutJob {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let font = FontId::proportional(theme::content(ui, 14.0));
+    let plain = egui::TextFormat::simple(font.clone(), text);
+    let mut job = egui::text::LayoutJob::default();
+    let what = match finding.part {
+        FindingPart::Text => None,
+        FindingPart::Transcript => Some(t.transcript_label()),
+        FindingPart::PhotoText => Some(t.photo_text_label()),
+        FindingPart::FileName => Some(t.attachment()),
+        FindingPart::AttachmentText => Some(t.attachment_text_label()),
+    };
+    if let Some(what) = what {
+        let small = FontId::proportional(theme::content(ui, 12.0));
+        job.append(
+            &format!("{what}: "),
+            0.0,
+            egui::TextFormat::simple(small, weak),
+        );
+    }
+    let context = &finding.context;
+    let (a, b) = (finding.context_start, finding.context_end);
+    job.append(context.get(..a).unwrap_or_default(), 0.0, plain.clone());
+    let found = find_marks::marked(&plain, ui.visuals().dark_mode, false);
+    job.append(context.get(a..b).unwrap_or_default(), 0.0, found);
+    job.append(context.get(b..).unwrap_or_default(), 0.0, plain);
+    job
+}
+
+/// Unfolds on a card each table of `note` or of its `sections` the
+/// search `found` a place in under its first rows (obf-1047), so that
+/// the place shows on the card.
+fn show_found_rows(ctx: &egui::Context, note: &Note, sections: &[Section], found: &[Finding]) {
+    for finding in found {
+        let Some(cell) = finding.cell.filter(|c| c.row > text_marks_view::CARD_ROWS) else {
+            continue;
+        };
+        let (of, text) = match &finding.section {
+            None => (note.id.as_str(), note.text.as_str()),
+            Some(id) => match sections.iter().find(|s| &s.id == id) {
+                Some(s) => (s.id.as_str(), s.text.as_str()),
+                None => continue,
+            },
+        };
+        let (_, cuts) = find_marks::shown_of(text);
+        let at = find_marks::source_at(&cuts, cell.table_start);
+        text_marks_view::show_all_rows(ctx, Id::new(("card", of)), at);
     }
 }
 

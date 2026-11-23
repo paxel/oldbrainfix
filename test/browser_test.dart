@@ -123,6 +123,10 @@ void main() {
     testWidgets('finds Note text everywhere on one page; ✕ clears', (
       tester,
     ) async {
+      // Room for every card with the places found under it (obf-1047).
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       capture('sauce in the kitchen', kitchen.id);
       capture('sauce at work', work.id);
       capture('nees mor sauce');
@@ -167,9 +171,10 @@ void main() {
       expect(find.text('Kitchen'), findsNothing);
       // The Topic's Note is marked with its Topic.
       expect(find.text('Household / Kitchen'), findsOneWidget);
+      // The card's text, drawn with the places found (obf-1047).
       final kitchenCard = tester.widget<NoteCard>(
         find.ancestor(
-          of: find.text('sauce in the kitchen'),
+          of: find.text('sauce in the kitchen', findRichText: true).first,
           matching: find.byType(NoteCard),
         ),
       );
@@ -196,6 +201,10 @@ void main() {
     testWidgets('a search across every Area names each hit\'s place', (
       tester,
     ) async {
+      // Room for every card with the places found under it (obf-1047).
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       capture('sauce in the kitchen', kitchen.id);
       capture('sauce at work', work.id);
       capture('nees mor sauce');

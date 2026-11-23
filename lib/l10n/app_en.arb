@@ -142,6 +142,30 @@
   "searchTopicHint": "Search this Topic",
   "clearSearch": "Clear search",
   "nothingFound": "No Note matches.",
+  "findingsMore": "+{count} more",
+  "@findingsMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "findInNote": "Find in Note",
+  "findCount": "{at} of {count}",
+  "@findCount": {
+    "placeholders": {
+      "at": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "findNone": "Not in this Note",
+  "findPrevious": "Previous place found",
+  "findNext": "Next place found",
+  "findClose": "Close the find bar",
   "noNotesHere": "No Notes here yet. Tap + to add one.",
   "noteTitle": "Note",
   "importance": "Importance",

@@ -169,7 +169,8 @@ void main() {
 
       expect(find.byType(NoteCard), findsOneWidget);
       expect(inCard(find.text('doctor')), findsOneWidget);
-      expect(inCard(find.text('Room 12')), findsOneWidget);
+      // Its Photo Text, and among the places found under it (obf-1047).
+      expect(inCard(find.text('Room 12')), findsNWidgets(2));
     });
 
     testWidgets('Cancel keeps the recording', (tester) async {

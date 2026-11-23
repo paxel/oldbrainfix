@@ -12,6 +12,7 @@ import 'attachment_views.dart';
 import 'calendar_platform.dart';
 import 'card_occurrences.dart';
 import 'checklist_view.dart';
+import 'found_marks.dart';
 import 'frogs_screen.dart' show FrogIcon;
 import 'hidden_from_ai_view.dart';
 import 'iphone_words.dart';
@@ -459,6 +460,17 @@ class NoteCard extends StatelessWidget {
   /// says so.
   final bool hiddenFromAi;
 
+  /// The places a search found in the Note (obf-1047), listed over its
+  /// text in the detailed view and under it in the compact one: the
+  /// first [shownFindings], each its line with the place on a tint, whose
+  /// tap runs [onFinding] with it, then how many more, whose tap runs it
+  /// with the first of them. None when empty.
+  final List<Finding> findings;
+  final ValueChanged<Finding>? onFinding;
+
+  /// How many places a search found a card lists.
+  static const shownFindings = 3;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -499,6 +511,8 @@ class NoteCard extends StatelessWidget {
     this.onSelect,
     this.selected = false,
     this.hiddenFromAi = false,
+    this.findings = const [],
+    this.onFinding,
   });
 
   /// Where the first line with words of [text] starts and ends, without
@@ -697,6 +711,13 @@ class NoteCard extends StatelessWidget {
         // Under where it is filed, over its text (#215).
         if (occurrences case final occurrences?)
           CardOccurrences(noteId: note.id, occurrences: occurrences),
+        // The places found lead the detailed view, over a long text or
+        // a table unfolded to them (obf-1047); a compact one has them
+        // under its lines.
+        if (full && findings.isNotEmpty) ...[
+          _Findings(findings: findings, onTap: onFinding),
+          const SizedBox(height: 8),
+        ],
         if (full)
           // With nothing over its text it starts with it, the Important
           // marker beside it.
@@ -726,6 +747,8 @@ class NoteCard extends StatelessWidget {
             glance: glance,
             ticking: boxes?.call(note.id, note.boxes),
           ),
+        if (!full && findings.isNotEmpty)
+          _Findings(findings: findings, onTap: onFinding),
       ],
     );
     if (!full && (menu != null || marker != null)) {
@@ -816,6 +839,96 @@ class NoteCard extends StatelessWidget {
         : card;
   }
 }
+
+/// The places a search found in a Note, on its card (obf-1047):
+/// the first [NoteCard.shownFindings], each with the icon of the part it
+/// lies in and its line, the place on a tint, then "+n more".
+class _Findings extends StatelessWidget {
+  final List<Finding> findings;
+  final ValueChanged<Finding>? onTap;
+
+  const _Findings({required this.findings, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final weak = theme.colorScheme.onSurfaceVariant;
+    final style = theme.textTheme.bodyMedium;
+    final shown = findings.take(NoteCard.shownFindings).toList();
+    final more = findings.length - shown.length;
+    Widget row(Key key, Widget icon, Widget words, Finding at) {
+      final tap = onTap;
+      return InkWell(
+        key: key,
+        onTap: tap == null ? null : () => tap(at),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                icon,
+                const SizedBox(width: 8),
+                Expanded(child: words),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      key: const ValueKey('card-findings'),
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, finding) in shown.indexed)
+            row(
+              ValueKey('finding-$i'),
+              Icon(_findingIcon(finding.part), size: 18, color: weak),
+              ContentText(
+                child: Text.rich(
+                  TextSpan(
+                    children: foundSpans(
+                      context,
+                      finding.context,
+                      0,
+                      finding.context.length,
+                      FoundMarks([(finding.contextStart, finding.contextEnd)]),
+                    ),
+                  ),
+                  style: style,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              finding,
+            ),
+          if (more > 0)
+            row(
+              const ValueKey('findings-more'),
+              const SizedBox(width: 18),
+              Text(
+                t.findingsMore(more),
+                style: style?.copyWith(color: theme.colorScheme.primary),
+              ),
+              findings[shown.length],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The icon of the part of a Note a place found lies in.
+IconData _findingIcon(FindingPart part) => switch (part) {
+  FindingPart.text => Icons.short_text,
+  FindingPart.transcript => Icons.mic_none,
+  FindingPart.photoText => Icons.image_outlined,
+  FindingPart.fileName || FindingPart.attachmentText => Icons.attach_file,
+};
 
 /// A Note's action row, icons only, so it stays one line in every
 /// language; the words show on a long press: file it, spawn one of
@@ -1672,6 +1785,8 @@ class _CompactNoteState extends State<_CompactNote> {
     final text = theme.textTheme;
     final note = widget.note;
     final shown = note.shownText;
+    // The places a search found in it (obf-1047).
+    final found = FindScope.of(context, note.id, FindingPart.text, '');
     Widget marked(
       int start,
       int end, {
@@ -1691,6 +1806,7 @@ class _CompactNoteState extends State<_CompactNote> {
       source: note.text,
       ticking: widget.ticking,
       language: note.codeLanguage,
+      found: found,
     );
     final glance = [
       for (final (i, line) in _glance.indexed)
@@ -2058,6 +2174,9 @@ class _Whole extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge;
     final list = this.list;
+    // The places a search found in it, a table holding one unfolded
+    // (obf-1047).
+    final found = FindScope.of(context, id, FindingPart.text, '');
     // A photo Note may have no words; a list without a name shows its
     // kind.
     final Widget? words = text.isEmpty && untitled == null
@@ -2083,6 +2202,8 @@ class _Whole extends StatelessWidget {
             tableEdit: onTable,
             language: language,
             rows: MarkedText.cardRows,
+            found: found,
+            unfoldAt: found?.unfoldAt,
           );
     final parts = <Widget>[
       if (list == null)
@@ -2251,6 +2372,7 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
     final from = text.length - NoteKinds.description(text).length;
     final description = text.substring(from);
     final (start, end) = NoteCard.firstLine(description);
+    final found = FindScope.of(context, widget.noteId, FindingPart.text, '');
     Widget part({required int start, int? end, TextStyle? style, int? lines}) =>
         MarkedText(
           text,
@@ -2265,6 +2387,8 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
           ticking: widget.ticking,
           tableEdit: widget.onTable,
           rows: MarkedText.cardRows,
+          found: found,
+          unfoldAt: found?.unfoldAt,
         );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

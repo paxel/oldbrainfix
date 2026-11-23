@@ -590,6 +590,48 @@ abstract class AppLocalizations {
   /// **'No Note matches.'**
   String get nothingFound;
 
+  /// No description provided for @findingsMore.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String findingsMore(int count);
+
+  /// No description provided for @findInNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in Note'**
+  String get findInNote;
+
+  /// No description provided for @findCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{at} of {count}'**
+  String findCount(int at, int count);
+
+  /// No description provided for @findNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in this Note'**
+  String get findNone;
+
+  /// No description provided for @findPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous place found'**
+  String get findPrevious;
+
+  /// No description provided for @findNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next place found'**
+  String get findNext;
+
+  /// No description provided for @findClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the find bar'**
+  String get findClose;
+
   /// No description provided for @noNotesHere.
   ///
   /// In en, this message translates to:

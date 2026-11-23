@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'found_marks.dart';
 import 'l10n.dart';
 
 /// The platform seam for Photo Texts: RustO with its models bundled in
@@ -310,8 +311,11 @@ class _PhotoTextState extends State<PhotoText> {
     final text = _text;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final shown = Text(
+    // The places a search or the find bar found in it (obf-1047).
+    final shown = foundText(
+      context,
       text,
+      FindScope.of(context, widget.noteId, FindingPart.photoText, widget.hash),
       maxLines: widget.compact ? 3 : null,
       overflow: widget.compact ? TextOverflow.ellipsis : null,
       style: theme.textTheme.bodyMedium?.copyWith(

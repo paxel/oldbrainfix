@@ -287,6 +287,31 @@ class AppLocalizationsDe extends AppLocalizations {
   String get nothingFound => 'Keine Notiz passt.';
 
   @override
+  String findingsMore(int count) {
+    return '+$count weitere';
+  }
+
+  @override
+  String get findInNote => 'In der Notiz suchen';
+
+  @override
+  String findCount(int at, int count) {
+    return '$at von $count';
+  }
+
+  @override
+  String get findNone => 'Nicht in dieser Notiz';
+
+  @override
+  String get findPrevious => 'Vorherige Stelle';
+
+  @override
+  String get findNext => 'Nächste Stelle';
+
+  @override
+  String get findClose => 'Suchleiste schließen';
+
+  @override
   String get noNotesHere =>
       'Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen.';
 

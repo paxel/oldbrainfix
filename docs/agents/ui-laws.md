@@ -1429,7 +1429,9 @@ replace a law of Both apps where they say so. A desktop law marked
   is hidden, a Note by its own mark or its Area's; the editor's badge
   says "Off, hidden by its Area" when only the Area hides it.
 - The editor opens only through a long press on the card, Edit in its
-  ⋮ or the pencil of a detailed card's action row (#281).
+  ⋮ or the pencil of a detailed card's action row (#281). Only a
+  search's card that lists places found opens on a tap, at its first
+  place, and a tap on a place opens the Note there (obf-1047).
 - In the Note editor a text that is only read, the Note's or a
   Section's, selects with a long press, with Copy in the system's menu
   (#183).
@@ -1725,7 +1727,9 @@ replace a law of Both apps where they say so. A desktop law marked
   (#274). Ctrl+F searches the list shown where it has a search field
   (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
   finds its Routines, Reminders and Frogs by their Note), else All
-  Notes'; over the Settings dialog it searches the Settings (#282). On the desktop the menu bar leads to Settings, Backups and
+  Notes'; over the Note dialog and in a Note's own window it opens the
+  Note's find bar (obf-1047); over the Settings dialog it searches the
+  Settings (#282). On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture, and only Help ▸ About Old Brain
   Fix to About, which the Settings do not show (#325, Q728).
 - **View ▸ Text size** (#326, obf-1019): Normal, Larger and Largest,
@@ -1854,7 +1858,7 @@ replace a law of Both apps where they say so. A desktop law marked
   a one-line field of a dialog takes it; Ctrl+B and Ctrl+I make bold
   and italic while the Note's text is edited.
 - **Esc closes what lies on top** (draft, #196): a menu, a photo or
-  table full screen, the top dialog, the quick note keeping what was
+  table full screen, a Note's find bar (obf-1047), the top dialog, the quick note keeping what was
   typed, a Note window's reading view (#322), and over the list without a
   dialog the cards selected.
 - **The keyboard stays in the dialog on top** (draft, #196): while the

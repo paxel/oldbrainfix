@@ -285,6 +285,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nothingFound => 'No Note matches.';
 
   @override
+  String findingsMore(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String get findInNote => 'Find in Note';
+
+  @override
+  String findCount(int at, int count) {
+    return '$at of $count';
+  }
+
+  @override
+  String get findNone => 'Not in this Note';
+
+  @override
+  String get findPrevious => 'Previous place found';
+
+  @override
+  String get findNext => 'Next place found';
+
+  @override
+  String get findClose => 'Close the find bar';
+
+  @override
   String get noNotesHere => 'No Notes here yet. Tap + to add one.';
 
   @override

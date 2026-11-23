@@ -12,6 +12,7 @@ import 'attachment_reader.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'file_platform.dart';
+import 'found_marks.dart';
 import 'l10n.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart' show packSizeText;
@@ -121,8 +122,18 @@ class AttachmentRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      // The places a search or the find bar found in its
+                      // name (obf-1047), where it shows as it is.
+                      foundText(
+                        context,
                         name,
+                        name == file.name
+                            ? FindScope.ofKey(
+                                context,
+                                FindingPart.fileName,
+                                file.hash,
+                              )
+                            : null,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: large
@@ -199,8 +210,11 @@ class AttachmentText extends StatelessWidget {
       );
     }
     if (text.isEmpty) return const SizedBox.shrink();
-    final shown = Text(
+    // The places a search or the find bar found in it (obf-1047).
+    final shown = foundText(
+      context,
       text,
+      FindScope.ofKey(context, FindingPart.attachmentText, file.hash),
       key: ValueKey('file-text:${file.hash}'),
       maxLines: compact ? 3 : null,
       overflow: compact ? TextOverflow.ellipsis : null,

@@ -355,14 +355,37 @@ fn close_button(ui: &mut Ui, t: &L10n, rect: egui::Rect) -> bool {
 }
 
 /// A Transcript or Photo Text `said` whole on a full card, dimmed under
-/// its small `label`, so it never reads as typed text (#114).
-fn labelled(ui: &mut Ui, label: &str, said: RichText) {
+/// its small `label`, so it never reads as typed text (#114); the places
+/// a search found in it marked (obf-1047). A line that is no text of the
+/// file, as "Transcribing…", comes as a [`Said::Line`] instead.
+fn labelled(ui: &mut Ui, label: &str, said: Said<'_>) {
     let weak = ui.visuals().weak_text_color();
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         ui.label(RichText::new(label).small().color(weak));
-        ui.label(said.color(weak));
+        match said {
+            Said::Text(said) => {
+                crate::find_marks::said_label(ui, said, weak, false);
+            }
+            Said::Line(line) => {
+                ui.label(line.color(weak));
+            }
+        }
     });
+}
+
+/// What shows under a recording or photo: its text, or a line in its
+/// place such as "Transcribing…".
+enum Said<'a> {
+    Text(&'a str),
+    Line(Box<RichText>),
+}
+
+impl Said<'_> {
+    /// `line` in italics, in a text's place.
+    fn line(line: &str) -> Said<'static> {
+        Said::Line(Box::new(RichText::new(line).italics()))
+    }
 }
 
 /// The photos and voice recordings of a Note or Section in full on a
@@ -387,12 +410,12 @@ pub fn whole_media(
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut shown = Vec::new();
-    let said = |texts: &BTreeMap<String, String>, hash: &String| {
+    fn said<'a>(texts: &'a BTreeMap<String, String>, hash: &str) -> Option<Said<'a>> {
         texts
             .get(hash)
             .filter(|s| !s.trim().is_empty())
-            .map(RichText::new)
-    };
+            .map(|s| Said::Text(s))
+    }
     for hash in photos {
         if let Some(rect) = card_photo(ui, t, (&mut *cache, store), hash) {
             shown.push((hash.clone(), rect));
@@ -412,11 +435,9 @@ pub fn whole_media(
             ui.label(RichText::new(t.voice_recording()).color(text));
         });
         let line = match transcripts.get(hash) {
-            Some(said) if said.is_empty() => Some(RichText::new(t.no_words_heard()).italics()),
-            Some(said) => Some(RichText::new(said)),
-            None if transcribing == Some(hash.as_str()) => {
-                Some(RichText::new(t.transcribing()).italics())
-            }
+            Some(said) if said.is_empty() => Some(Said::line(t.no_words_heard())),
+            Some(said) => Some(Said::Text(said)),
+            None if transcribing == Some(hash.as_str()) => Some(Said::line(t.transcribing())),
             None => None,
         };
         if let Some(line) = line {
@@ -572,9 +593,7 @@ pub fn photos(
         // A photo without text, or not read yet, shows none.
         let said = photo_texts.get(hash);
         if let Some(said) = said.filter(|s| !s.trim().is_empty()) {
-            crate::read_text::shown(ui, |ui| {
-                crate::read_text::label(ui, egui::Label::new(RichText::new(said).color(weak)))
-            });
+            crate::find_marks::said_label(ui, said, weak, true);
         }
         if let Some(asked) = generated_buttons(ui, t, hash, said, offered, true) {
             clicked = Some(Photo::Text(asked));
@@ -611,13 +630,7 @@ pub fn removed_texts(
         let Some(said) = said.filter(|s| !s.trim().is_empty()) else {
             continue;
         };
-        if selects {
-            crate::read_text::shown(ui, |ui| {
-                crate::read_text::label(ui, egui::Label::new(RichText::new(said).color(weak)))
-            });
-        } else {
-            ui.label(RichText::new(said).color(weak));
-        }
+        crate::find_marks::said_label(ui, said, weak, selects);
         if let Some(asked) = generated_buttons(ui, t, hash, Some(said), offers(hash, photo), photo)
         {
             clicked = Some((photo, asked));
@@ -681,22 +694,26 @@ pub fn recordings(
             ui.label(RichText::new(t.voice_recording()).color(text));
         });
         let line = match transcripts.get(hash) {
-            Some(said) if said.is_empty() => Some(RichText::new(t.no_words_heard()).italics()),
-            Some(said) => Some(RichText::new(said)),
-            None if transcribing == Some(hash.as_str()) => {
-                Some(RichText::new(t.transcribing()).italics())
-            }
+            Some(said) if said.is_empty() => Some(Said::line(t.no_words_heard())),
+            Some(said) => Some(Said::Text(said)),
+            None if transcribing == Some(hash.as_str()) => Some(Said::line(t.transcribing())),
             None => None,
         };
-        if let Some(line) = line {
-            // In the Note dialog it selects to be copied (#255).
-            if selects {
+        // In the Note dialog it selects to be copied (#255); the places
+        // found marked (obf-1047).
+        match line {
+            Some(Said::Text(said)) => {
+                crate::find_marks::said_label(ui, said, weak, selects);
+            }
+            Some(Said::Line(line)) if selects => {
                 crate::read_text::shown(ui, |ui| {
                     crate::read_text::label(ui, egui::Label::new(line.color(weak)))
                 });
-            } else {
+            }
+            Some(Said::Line(line)) => {
                 ui.label(line.color(weak));
             }
+            None => {}
         }
         let offered = offers(hash);
         let said = transcripts.get(hash);

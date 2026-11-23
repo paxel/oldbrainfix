@@ -37,6 +37,8 @@ pub mod cli;
 pub mod enrich;
 pub mod feedback_view;
 pub mod file_into;
+pub mod find_bar;
+pub mod find_marks;
 pub mod folder_import;
 pub mod folder_sync;
 pub mod format_bar;

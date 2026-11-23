@@ -490,7 +490,8 @@ void main() {
       await tester.enterText(find.byType(TextField), 'Pill');
       await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
-      expect(find.text('Pills for the cat'), findsOneWidget);
+      // On the card and among the places found under it (obf-1047).
+      expect(find.text('Pills for the cat'), findsNWidgets(2));
       expect(find.text('Pills'), findsNothing);
 
       await tap(tester, find.byTooltip(en.allNotesTitle));

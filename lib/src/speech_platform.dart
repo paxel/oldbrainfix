@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'found_marks.dart';
 import 'l10n.dart';
 import 'ocr_platform.dart' show GeneratedTextLabel;
 import 'place_names.dart';
@@ -703,8 +704,16 @@ class _TranscriptTextState extends State<TranscriptText> {
       _ when _transcribing => Text(t.transcribing, style: quiet),
       null => Text(t.transcribing, style: quiet),
       '' => Text(t.noWordsHeard, style: quiet),
-      _ => Text(
+      // The places a search or the find bar found in it (obf-1047).
+      _ => foundText(
+        context,
         text,
+        FindScope.of(
+          context,
+          widget.noteId,
+          FindingPart.transcript,
+          widget.hash,
+        ),
         maxLines: compact ? 3 : null,
         overflow: compact ? TextOverflow.ellipsis : null,
         style: labelled

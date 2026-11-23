@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import 'app_links.dart';
 import 'box_ids.dart';
+import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'person_screen.dart';
@@ -537,10 +538,20 @@ TextStyle tagStyle(BuildContext context, [TextStyle? style]) =>
 /// one block, never ending inside it ([snapOutOfTables]). With [grid] the
 /// field draws each table as what [grid] gives, the grid it is edited in
 /// (#257); the table [rawTable] shows as its lines, edited as text.
+///
+/// The places of [found] are drawn on a tint (obf-1047), the current one
+/// on a stronger one, in a table's grid too.
 class TagTextController extends TextEditingController {
   final bool hideMarks;
 
   TagTextController({super.text, this.hideMarks = false});
+
+  /// The places the find bar found in [text] (obf-1047). Set, they show
+  /// once the field is built again, as the page that sets them does: no
+  /// listener of the text hears of them.
+  FoundMarks? found;
+
+  bool get _finds => !(found?.isEmpty ?? true);
 
   bool _markdown = false;
 
@@ -671,7 +682,7 @@ class TagTextController extends TextEditingController {
       final spans = grammar == null
           ? const <CodeSpan>[]
           : codeSpans(grammar, text);
-      if (spans.isEmpty) {
+      if (spans.isEmpty && !_finds) {
         return super.buildTextSpan(
           context: context,
           style: mono,
@@ -681,7 +692,7 @@ class TagTextController extends TextEditingController {
       return _colouredCode(context, mono, spans, composing);
     }
     final runs = tagRuns(text);
-    if (_markdown || runs.isNotEmpty) {
+    if (_markdown || runs.isNotEmpty || _finds) {
       return _formatted(context, style, composing, runs);
     }
     final tags = Markdown.plainTags(text);
@@ -733,11 +744,13 @@ class TagTextController extends TextEditingController {
   ) {
     final text = this.text;
     final brightness = Theme.of(context).brightness;
+    final marks = found;
     final cuts = <int>{
       0,
       text.length,
       for (final span in spans) ...[span.start, span.end],
       if (composing.isValid) ...[composing.start, composing.end],
+      for (final (a, b) in marks?.ranges ?? const <(int, int)>[]) ...[a, b],
     }.where((at) => at >= 0 && at <= text.length).toList()..sort();
     var next = 0;
     final children = <InlineSpan>[];
@@ -752,15 +765,19 @@ class TagTextController extends TextEditingController {
           : null;
       final composed =
           composing.isValid && composing.start <= from && to <= composing.end;
+      final plain = colour == null && !composed
+          ? null
+          : TextStyle(
+              color: colour,
+              decoration: composed ? TextDecoration.underline : null,
+            );
       children.add(
         TextSpan(
           text: text.substring(from, to),
-          style: colour == null && !composed
-              ? null
-              : TextStyle(
-                  color: colour,
-                  decoration: composed ? TextDecoration.underline : null,
-                ),
+          style: switch (marks?.at(from, to)) {
+            final current? => foundStyle(context, plain, current: current),
+            null => plain,
+          },
         ),
       );
     }
@@ -815,10 +832,12 @@ class TagTextController extends TextEditingController {
   static const _id = 4096;
   static const _grid = 8192;
   static const _codeLine = 16384;
+  static const _found = 32768;
+  static const _foundNow = 65536;
 
   /// Above the other bits: a code block's character's [CodeColour], one
   /// more than its index, or 0.
-  static const _colourShift = 15;
+  static const _colourShift = 17;
 
   /// The text formatted, character for character: each one gets the bits
   /// of what it is, and neighbours with the same bits share a span. A
@@ -973,6 +992,12 @@ class TagTextController extends TextEditingController {
       }
     }
     if (composing.isValid) set(composing.start, composing.end, _composing);
+    // The places the find bar found.
+    if (found case final marks?) {
+      for (final (i, (a, b)) in marks.ranges.indexed) {
+        set(a, b, i == marks.current ? _foundNow : _found);
+      }
+    }
     // A table's grid stands for its first character; the others are word
     // joiners, which take no room and keep the grid on its line.
     final grids = <int, (int, MarkdownTable)>{};
@@ -1017,6 +1042,7 @@ class TagTextController extends TextEditingController {
                         format: TextFormats.markdown,
                         style: style,
                         ticking: _boxes,
+                        found: found?.shifted(-table.start),
                       ),
                     ),
                   ),
@@ -1094,6 +1120,19 @@ class TagTextController extends TextEditingController {
           : null,
       decoration: lines.isEmpty ? null : TextDecoration.combine(lines),
     );
+    if (has(_found) || has(_foundNow)) {
+      // Found: on its tint; a mark and an id are drawn as they are.
+      final tinted = has(_foundNow)
+          ? TextStyle(
+              backgroundColor: scheme.tertiary,
+              color: scheme.onTertiary,
+            )
+          : TextStyle(
+              backgroundColor: scheme.tertiaryContainer,
+              color: scheme.onTertiaryContainer,
+            );
+      if (!has(_id) && !has(_mark)) return style.merge(tinted);
+    }
     if (has(_id)) {
       return style.copyWith(
         fontSize: 0.01,
@@ -1210,6 +1249,9 @@ int storedOffset(List<ShownBox> boxes, int shown) {
 /// it full screen ([openTable]) in the text as stored ([source]), where
 /// [tableEdit] changes it; it is only read there without one. A compact
 /// line ([maxLines]) of a table shows the words of its row.
+///
+/// The places of [found], in [text] as it shows, are drawn on a tint
+/// (obf-1047), in a table's cells too; its current one on a stronger one.
 class MarkedText extends StatefulWidget {
   /// How many rows under its header a table on a card shows before
   /// "Show all" (obf-1048).
@@ -1236,6 +1278,9 @@ class MarkedText extends StatefulWidget {
   /// holding it shows all its rows.
   final int? unfoldAt;
 
+  /// The places a search or the find bar found in [text] (obf-1047).
+  final FoundMarks? found;
+
   const MarkedText(
     this.text, {
     super.key,
@@ -1252,6 +1297,7 @@ class MarkedText extends StatefulWidget {
     this.language,
     this.rows,
     this.unfoldAt,
+    this.found,
   }) : assert(
          boxes == null || source != null || tableEdit == null,
          'a table is changed in the text as stored, its ids in it',
@@ -1270,6 +1316,9 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
 
   @override
   BoxTicking? get _ticking => widget.ticking;
+
+  @override
+  FoundMarks? get _marks => widget.found;
 
   _FoundIn? _found;
 
@@ -1312,7 +1361,11 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       for (final tag in found.tags)
         if (tag.start >= from && tag.end <= to) tag,
     ];
-    if (boxes.isEmpty && tags.isEmpty && links.isEmpty) {
+    final marks = widget.found;
+    if (boxes.isEmpty &&
+        tags.isEmpty &&
+        links.isEmpty &&
+        (marks == null || marks.isEmpty)) {
       return Text(
         text.substring(from, to),
         style: widget.style,
@@ -1327,7 +1380,8 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       widget.style ?? DefaultTextStyle.of(context).style,
     );
     // Boxes, tags and web addresses never overlap: a glyph is no tag
-    // character, and neither is a box or a tag inside an address.
+    // character, and neither is a box or a tag inside an address. A tag
+    // or an address a place found touches is drawn found as a whole.
     final parts = <({int start, int end, List<InlineSpan> spans})>[
       for (final (start, end) in links)
         (
@@ -1338,7 +1392,12 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
               context,
               start,
               end,
-              widget.style ?? DefaultTextStyle.of(context).style,
+              _foundOver(
+                context,
+                start,
+                end,
+                widget.style ?? DefaultTextStyle.of(context).style,
+              ),
             ),
           ],
         ),
@@ -1352,19 +1411,27 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         (
           start: tag.start,
           end: tag.end,
-          spans: [_tagSpan(context, t, tag, highlighted, onSearch)],
+          spans: [
+            _tagSpan(
+              context,
+              t,
+              tag,
+              _foundOver(context, tag.start, tag.end, highlighted),
+              onSearch,
+            ),
+          ],
         ),
     ]..sort((a, b) => a.start.compareTo(b.start));
     var at = from;
     final spans = <InlineSpan>[];
     for (final part in parts) {
       if (part.start > at) {
-        spans.add(TextSpan(text: text.substring(at, part.start)));
+        spans.addAll(foundSpans(context, text, at, part.start, marks));
       }
       spans.addAll(part.spans);
       at = part.end;
     }
-    if (to > at) spans.add(TextSpan(text: text.substring(at, to)));
+    if (to > at) spans.addAll(foundSpans(context, text, at, to, marks));
     return Text.rich(
       TextSpan(children: spans),
       style: widget.style,
@@ -1387,9 +1454,15 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         .copyWith(fontFamily: 'monospace');
     // The whole text is read, so what began before [from] reads so.
     final grammar = codeGrammars(context).byScope(widget.language);
-    final coloured = grammar == null
+    final marks = widget.found;
+    final painted = grammar == null
         ? null
         : colouredCode(context, text, codeSpans(grammar, text), from, to);
+    final coloured = painted != null
+        ? markSpans(context, painted, from, marks)
+        : marks == null || marks.isEmpty
+        ? null
+        : foundSpans(context, text, from, to, marks);
     final lines = coloured == null
         ? Text(
             text.substring(from, to),
@@ -1592,9 +1665,30 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final start = first ?? 0;
     final end = first == null ? 0 : last;
     final grammar = codeGrammars(context).forFence(code.language);
-    final coloured = grammar == null
+    // The places found, from the text to where they lie in its lines.
+    final marks = widget.found;
+    FoundMarks? inLines;
+    if (marks != null && !marks.isEmpty) {
+      final ranges = <(int, int)>[];
+      int? current;
+      for (final (i, (a, b)) in marks.ranges.indexed) {
+        for (final MapEntry(key: l, value: at) in starts.entries) {
+          final line = found.blocks[l];
+          if (a < line.start || a > line.end) continue;
+          if (i == marks.current) current = ranges.length;
+          ranges.add((at + a - line.start, at + b - line.start));
+        }
+      }
+      inLines = FoundMarks(ranges, current);
+    }
+    final painted = grammar == null
         ? null
         : colouredCode(context, all, codeSpans(grammar, all), start, end);
+    final coloured = painted != null
+        ? markSpans(context, painted, start, inLines)
+        : inLines == null
+        ? null
+        : foundSpans(context, all, start, end, inLines);
     final scheme = Theme.of(context).colorScheme;
     final grow = _grown(context, base.fontSize ?? 14);
     final style = codeStyle(
@@ -2089,6 +2183,9 @@ class MarkedCell extends StatefulWidget {
   final TextAlign textAlign;
   final BoxTicking? ticking;
 
+  /// The places found in [text] (obf-1047).
+  final FoundMarks? found;
+
   const MarkedCell(
     this.text,
     this.cell, {
@@ -2099,6 +2196,7 @@ class MarkedCell extends StatefulWidget {
     this.style,
     this.textAlign = TextAlign.start,
     this.ticking,
+    this.found,
   });
 
   @override
@@ -2114,6 +2212,9 @@ class _MarkedCellState extends State<MarkedCell> with _InlineSpans {
 
   @override
   BoxTicking? get _ticking => widget.ticking;
+
+  @override
+  FoundMarks? get _marks => widget.found;
 
   // A table's cell grows with the Device's text size too (#326, obf-1019).
   @override
@@ -2145,6 +2246,21 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
   String get _source;
   List<(int, int)> get _addresses;
   BoxTicking? get _ticking;
+
+  /// The places found in [_source] (obf-1047).
+  FoundMarks? get _marks;
+
+  /// [style] as found where [start] to [end] of [_source] touches a
+  /// place found, else as it is.
+  TextStyle _foundOver(
+    BuildContext context,
+    int start,
+    int end,
+    TextStyle style,
+  ) => switch (_marks?.at(start, end)) {
+    final current? => foundStyle(context, style, current: current),
+    null => style,
+  };
 
   // What is drawn anew follows one of these: the taps of the links
   // drawn before go with them.
@@ -2194,14 +2310,25 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
     switch (span.kind) {
       case MarkdownSpanKind.text when span.contentStart > span.start:
         // An escaped character.
-        out.add(TextSpan(text: span.text, style: style, recognizer: link));
+        out.add(
+          TextSpan(
+            text: span.text,
+            style: _foundOver(context, span.start, span.end, style),
+            recognizer: link,
+          ),
+        );
       case MarkdownSpanKind.text:
         _literal(context, span.start, span.end, style, link, boxes, tags, out);
       case MarkdownSpanKind.code:
         out.add(
           TextSpan(
             text: span.text,
-            style: codeStyle(scheme, style),
+            style: _foundOver(
+              context,
+              span.start,
+              span.end,
+              codeStyle(scheme, style),
+            ),
             recognizer: link,
           ),
         );
@@ -2282,7 +2409,18 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
     ];
     final parts = <({int start, int end, List<InlineSpan> spans})>[
       for (final (from, to) in addresses)
-        (start: from, end: to, spans: [_addressSpan(context, from, to, style)]),
+        (
+          start: from,
+          end: to,
+          spans: [
+            _addressSpan(
+              context,
+              from,
+              to,
+              _foundOver(context, from, to, style),
+            ),
+          ],
+        ),
       for (final box in boxes)
         if (box.start >= start &&
             box.end <= end &&
@@ -2300,16 +2438,32 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
               start: tag.start,
               end: tag.end,
               spans: [
-                _tagSpan(context, t, tag, tagStyle(context, style), onSearch),
+                _tagSpan(
+                  context,
+                  t,
+                  tag,
+                  _foundOver(
+                    context,
+                    tag.start,
+                    tag.end,
+                    tagStyle(context, style),
+                  ),
+                  onSearch,
+                ),
               ],
             ),
     ]..sort((a, b) => a.start.compareTo(b.start));
     var at = start;
+    final marks = _marks;
     for (final part in parts) {
       if (part.start > at) {
-        out.add(
-          TextSpan(
-            text: text.substring(at, part.start),
+        out.addAll(
+          foundSpans(
+            context,
+            text,
+            at,
+            part.start,
+            marks,
             style: style,
             recognizer: link,
           ),
@@ -2319,8 +2473,16 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
       at = part.end;
     }
     if (end > at) {
-      out.add(
-        TextSpan(text: text.substring(at, end), style: style, recognizer: link),
+      out.addAll(
+        foundSpans(
+          context,
+          text,
+          at,
+          end,
+          marks,
+          style: style,
+          recognizer: link,
+        ),
       );
     }
   }

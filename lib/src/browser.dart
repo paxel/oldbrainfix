@@ -9,6 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
 import 'card_glance.dart';
+import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
@@ -1012,6 +1013,11 @@ class _TagSuggestionsState extends State<TagSuggestions> {
 /// in the Area or Topic the list is of (#330). While [selected] is given
 /// the list selects (#273): each card this Device may change has a box,
 /// ticked for those in it, whose tap runs [onSelect].
+///
+/// The cards of a search for [find] list the places it found in their
+/// Notes (obf-1047), read as each card is first built, and draw them on a
+/// tint; a tap on one runs [onFind] with it, and a tap on the card, a
+/// long press and Edit run it with the first, where there is one.
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
@@ -1027,6 +1033,8 @@ List<Widget> diaryCards(
   void Function(Note note)? onSwitch,
   Set<String>? selected,
   void Function(Note note, bool on)? onSelect,
+  String find = '',
+  void Function(Note note, Finding at)? onFind,
 }) {
   final locale = Localizations.localeOf(context).toString();
   final when = DateFormat.yMd(locale).add_Hm();
@@ -1076,6 +1084,19 @@ List<Widget> diaryCards(
     closed: reads.closed ??= lock?.closedAreas ?? const <String>{},
   );
   bool full(Note note) => compact == switched.contains(note.id);
+  // The places found, with the Sections the list read or else the
+  // Note's own: a search with many hits reads only those built.
+  final query = find.trim();
+  if (reads.findQuery != query) {
+    reads.findings.clear();
+    reads.findQuery = query;
+  }
+  List<Finding> findingsOf(Note note) =>
+      reads.findings[note.id] ??= Findings.ofNote(
+        note,
+        query,
+        sections: reads.sections?[note.id] ?? notes.sections(note.id),
+      );
   return [
     for (final placed in shown)
       if (placed case (
@@ -1089,8 +1110,10 @@ List<Widget> diaryCards(
       ))
         // Built as it scrolls into sight: a card out of sight reads
         // nothing.
-        Builder(
-          builder: (_) => NoteCard(
+        _FoundCard(
+          read: query.isEmpty || onFind == null ? null : () => findingsOf(note),
+          noteId: note.id,
+          card: (found) => NoteCard(
             note: note,
             when: when,
             area: area,
@@ -1108,7 +1131,10 @@ List<Widget> diaryCards(
               notes,
               placed,
               onChanged,
-              onEdit: () => onOpen(note),
+              onEdit: switch ((found.firstOrNull, onFind)) {
+                (final at?, final find?) => () => find(note, at),
+                _ => () => onOpen(note),
+              },
               // Read once for the list, not for every card (obf-1069),
               // the Pack badges of all its Notes in one query (obf-1068).
               advanced: reads.advanced ??= notes.store.advanced,
@@ -1128,16 +1154,73 @@ List<Widget> diaryCards(
             boxes: boxTicks(notes, placed, onChanged),
             onTable: tableEdit(notes, placed, onChanged),
             occurrences: (read: () => todayOf(note), routines: routines),
-            onTap: onSwitch == null ? null : () => onSwitch(note),
-            onEdit: () => onOpen(note),
+            onTap: switch ((found.firstOrNull, onFind)) {
+              (final at?, final find?) => () => find(note, at),
+              _ => onSwitch == null ? null : () => onSwitch(note),
+            },
+            onEdit: switch ((found.firstOrNull, onFind)) {
+              (final at?, final find?) => () => find(note, at),
+              _ => () => onOpen(note),
+            },
             hiddenFromAi: hiddenFromAi(note),
             onSelect: selected == null || onSelect == null || !changes
                 ? null
                 : (on) => onSelect(note, on),
             selected: selected?.contains(note.id) ?? false,
+            findings: found,
+            onFinding: onFind == null ? null : (at) => onFind(note, at),
           ),
         ),
   ];
+}
+
+/// A card of a list, built as it scrolls into sight: with [read], the
+/// places a search found in its Note [noteId] (obf-1047), read once it
+/// is first built rather than while the list is, and drawn on a tint by
+/// the texts below it ([FindScope]).
+class _FoundCard extends StatefulWidget {
+  final List<Finding> Function()? read;
+  final String noteId;
+  final Widget Function(List<Finding> found) card;
+
+  const _FoundCard({
+    required this.read,
+    required this.noteId,
+    required this.card,
+  });
+
+  @override
+  State<_FoundCard> createState() => _FoundCardState();
+}
+
+class _FoundCardState extends State<_FoundCard> {
+  List<Finding> _found = const [];
+  Map<(String, FindingPart, String), FoundMarks> _marks = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(_FoundCard old) {
+    super.didUpdateWidget(old);
+    // Kept with the list: read anew only for a new list or search.
+    _read();
+  }
+
+  void _read() {
+    final found = widget.read?.call() ?? const <Finding>[];
+    if (identical(found, _found)) return;
+    _found = found;
+    _marks = foundMarksOf(widget.noteId, found);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FindScope(marks: _marks, child: widget.card(_found));
+  }
 }
 
 /// What the cards of one list read from the store, kept with the list
@@ -1174,6 +1257,10 @@ class _ListReads {
   final kinds = <String, NoteKind>{};
   final glances = <String, List<String>>{};
   Map<String, ({String id, String name})>? packFrom;
+
+  /// The places the search [findQuery] found in each Note (obf-1047).
+  String findQuery = '';
+  final findings = <String, List<Finding>>{};
 }
 
 /// The app bar buttons of a diary: order by time or by Importance, and

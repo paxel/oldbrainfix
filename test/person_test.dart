@@ -502,7 +502,8 @@ void main() {
       await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
       expect(find.byType(NoteCard), findsOneWidget);
-      expect(find.text('Ben buys bread'), findsOneWidget);
+      // On the card and among the places found under it (obf-1047).
+      expect(find.text('Ben buys bread'), findsNWidgets(2));
       await pick(tester, 'everyone');
       expect(chip(benId), findsNothing);
       expect(find.byType(NoteCard), findsNWidgets(2));
@@ -525,7 +526,8 @@ void main() {
       expect(find.byType(NoteCard), findsNWidgets(2));
       await pick(tester, benId);
       expect(find.byType(NoteCard), findsOneWidget);
-      expect(find.text('Ben buys bread'), findsOneWidget);
+      // On the card and among the places found under it (obf-1047).
+      expect(find.text('Ben buys bread'), findsNWidgets(2));
     });
 
     testWidgets('Unsorted keeps only the own Notes with "Me"', (tester) async {

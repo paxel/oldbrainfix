@@ -183,6 +183,11 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tap(tester, find.byTooltip('Search and browse'));
+    // The Area's row, not the card found: a tap on that opens its Note
+    // at what was found (obf-1047).
+    if (find.byTooltip('Clear search').evaluate().isNotEmpty) {
+      await tap(tester, find.byTooltip('Clear search'));
+    }
     await tap(tester, find.text('Household'));
     expect(tester.takeException(), isNull);
     await reachSelect();

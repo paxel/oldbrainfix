@@ -193,7 +193,14 @@ fn the_edit_menu_finds_opens_the_settings_and_hands_the_clipboard_to_the_field()
     let value = harness.query_by(|n| n.is_focused()).and_then(|n| n.value());
     assert_eq!(value.as_deref(), Some(""));
 
-    // Find: All Notes' search on the Agenda, which has none.
+    // Find: over the Note its find bar (obf-1047), the Note staying;
+    // without one All Notes' search on the Agenda, which has none.
+    pick(&mut harness, "Edit", "Find Ctrl+F");
+    harness.run();
+    assert!(harness.state().note_open());
+    assert_eq!(focused(&harness).as_deref(), Some("Find in this Note"));
+    harness.state_mut().close_note();
+    harness.run();
     pick(&mut harness, "Edit", "Find Ctrl+F");
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::All);

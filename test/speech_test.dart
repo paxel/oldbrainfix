@@ -800,9 +800,10 @@ void main() {
 
       final card = find.byType(NoteCard);
       expect(card, findsOneWidget);
+      // Its Transcript, and among the places found under it (obf-1047).
       expect(
         find.descendant(of: card, matching: find.text('buy more sauce')),
-        findsOneWidget,
+        findsNWidgets(2),
       );
     });
   });

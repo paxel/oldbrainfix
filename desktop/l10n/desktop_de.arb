@@ -472,5 +472,13 @@
   "spotDeskSettingsSearch": "Findet eine Einstellung über jedes ihrer Wörter.",
   "spotDeskSettingsShowTips": "„Tipps wieder zeigen“ holt alle Tipps auf diesem Computer zurück.",
   "spotDeskSettingsGrammar": "„Grammatik hinzufügen …“ färbt Code in weiteren Sprachen, auf allen deinen Geräten.",
-  "spotDeskSettingsFeatures": "„Einfach“ verbirgt nur das Anlegen von Strichlisten, Einheiten, Fröschen und Themen."
+  "spotDeskSettingsFeatures": "„Einfach“ verbirgt nur das Anlegen von Strichlisten, Einheiten, Fröschen und Themen.",
+  "deskFindHint": "In dieser Notiz suchen",
+  "deskFindCount": "{at} von {count}",
+  "deskFindNone": "Nicht in dieser Notiz",
+  "deskFindPrevious": "Vorherige Stelle",
+  "deskFindNext": "Nächste Stelle",
+  "deskFindClose": "Suchleiste schließen",
+  "deskFindMore": "{count, plural, =1{+1 weitere} other{+{count} weitere}}",
+  "deskFindingOpen": "Öffnen bei „{place}“"
 }

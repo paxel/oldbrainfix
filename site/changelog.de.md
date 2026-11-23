@@ -4,9 +4,14 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.8.0]
 
+### Neu
+
+- Auf dem Handy und dem Desktop zeigt eine Suche, wo jede Notiz passt, und eine Suchleiste hebt jeden Treffer in einer Notiz hervor. ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
+
 ### Geändert
 
 - Auf dem Handy und dem Desktop behält eine Tabelle die Textgröße, bricht lange Zellen um und scrollt seitwärts; eine Karte zeigt ihre ersten 10 Zeilen. ([obf-1048](https://github.com/paxel/oldbrainfix/issues/359))
+- Auf dem Handy und dem Desktop übergeht die Suche Akzente und Umlaute, sodass „muller“ „Müller“ und „strasse“ „Straße“ findet. ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
 
 ## [0.7.2] - 2026-11-23
 

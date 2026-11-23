@@ -20,6 +20,7 @@ import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'file_platform.dart';
+import 'found_marks.dart';
 import 'frogs_screen.dart';
 import 'hidden_from_ai_view.dart';
 import 'home_shortcuts.dart';
@@ -29,6 +30,7 @@ import 'location.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
+import 'note_find.dart';
 import 'note_history_screen.dart';
 import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
@@ -62,7 +64,9 @@ import 'voice_recorder.dart';
 
 /// Opens the editor of [note]; returns once the user left it, or once it
 /// moved on to the next of [sorting]. With [typeLines] the cursor starts
-/// in a new Line of a list after its open ones (#161, #276).
+/// in a new Line of a list after its open ones (#161, #276). With [find]
+/// it opens with its find bar finding the search's words, at the place
+/// the search found (obf-1047).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
@@ -70,6 +74,7 @@ Future<void> openNote(
   Note note, {
   bool typeLines = false,
   UnsortedShown? sorting,
+  NoteFind? find,
 }) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (_) => NoteEditorScreen(
@@ -79,6 +84,7 @@ Future<void> openNote(
       noteId: note.id,
       typeLines: typeLines,
       sorting: sorting,
+      find: find,
     ),
   ),
 );
@@ -673,6 +679,10 @@ class NoteEditorScreen extends StatefulWidget {
   /// else.
   final UnsortedShown? sorting;
 
+  /// The words of a search to open the find bar with and the place to
+  /// show (obf-1047); the find bar is closed when null.
+  final NoteFind? find;
+
   const NoteEditorScreen({
     super.key,
     required this.notes,
@@ -681,6 +691,7 @@ class NoteEditorScreen extends StatefulWidget {
     required this.noteId,
     this.typeLines = false,
     this.sorting,
+    this.find,
   });
 
   @override
@@ -825,15 +836,41 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// the Note.
   List<Note> _toShopping = const [];
 
+  /// The find bar (obf-1047): whether it shows, the words it finds, the
+  /// places it found in the page's order and the one shown, and those
+  /// drawn outside the fields, as [FindScope] holds them.
+  var _finding = false;
+  final _findWords = TextEditingController();
+  final _findFocus = FocusNode();
+  List<NoteHit> _hits = const [];
+  var _hitAt = 0;
+  Map<(String, FindingPart, String), FoundMarks> _findMarks = const {};
+
+  /// The texts of the fields as [_hits] were found in them: the cursor
+  /// moving finds nothing anew.
+  String _foundIn = '';
+  final _scroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _load();
     _show();
-    _text.addListener(_typed);
+    if (widget.find case final find?) {
+      _finding = true;
+      _findWords.text = find.query;
+      _findAll();
+      if (find.at case final at?) _hitAt = NoteHit.indexOf(_hits, at);
+      _showHits();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit());
+    }
+    _text
+      ..addListener(_typed)
+      ..addListener(_findTyped);
     _name
       ..addListener(_typed)
-      ..addListener(_nameTyped);
+      ..addListener(_nameTyped)
+      ..addListener(_findTyped);
     _descriptionFocus.addListener(_descriptionFocused);
     _lifecycle = AppLifecycleListener(onStateChange: _lifecycleChanged);
     // Fire and forget: a draft cut off mid-write reads as none, and
@@ -875,6 +912,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _name.dispose();
     _descriptionFocus.dispose();
     _pasteEmpty.dispose();
+    _findWords.dispose();
+    _findFocus.dispose();
+    _scroll.dispose();
     _sessionDraft?.dispose();
     for (final field in _sectionTexts.values) {
       field.dispose();
@@ -1159,6 +1199,248 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         (note?.boxes.isNotEmpty ?? false) ||
         _sections.any((section) => section.boxes.isNotEmpty);
     _loadSectionTexts(editable: note != null && !note.isTrashed);
+    // What the find bar found, in the Note as read now.
+    if (_finding) _findAll();
+  }
+
+  /// Opens the find bar (obf-1047), finding [words] when given, else what
+  /// it found last, the cursor in its field; open, the cursor goes there.
+  /// The magnifier in the top bar opens it.
+  void _openFind([String words = '']) {
+    setState(() {
+      if (words.isNotEmpty) {
+        _findWords.text = words;
+        _hitAt = 0;
+      }
+      _finding = true;
+      _findAll();
+    });
+    if (words.isEmpty) {
+      _findFocus.requestFocus();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit());
+    }
+  }
+
+  /// Closes the find bar: nothing is drawn as found any more.
+  void _closeFind() {
+    setState(() {
+      _finding = false;
+      _hits = const [];
+      _hitAt = 0;
+      _foundIn = '';
+      _showHits();
+    });
+  }
+
+  /// The find bar's words changed: their first place shows.
+  void _findChanged(String _) {
+    setState(() {
+      _hitAt = 0;
+      _findAll();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit());
+  }
+
+  /// ↑ or ↓ in the find bar: the place [by] before or after the one shown,
+  /// from the last on to the first and back.
+  void _stepHit(int by) {
+    if (_hits.isEmpty) return;
+    final from = _hitAt;
+    setState(() {
+      _hitAt = (_hitAt + by) % _hits.length;
+      _showHits();
+    });
+    final down = _hitAt > from;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit(down));
+  }
+
+  /// Scrolls the place shown into sight; a folded description it lies in
+  /// unfolds first, without the cursor.
+  void _revealHit([bool down = true]) {
+    if (!mounted || _hits.isEmpty) return;
+    final hit = _hits[_hitAt];
+    if (_named && identical(hit.field, _text) && !_descriptionOpen) {
+      setState(() => _descriptionOpen = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit(down));
+      return;
+    }
+    unawaited(revealFound(context, _scroll, down: down));
+  }
+
+  /// A field's text changed: what the find bar finds is found anew in
+  /// it. A move of the cursor finds nothing anew.
+  void _findTyped() {
+    if (!_finding || !mounted || _findSource() == _foundIn) return;
+    setState(_findAll);
+  }
+
+  /// The texts of all the fields, as [_foundIn] keeps them.
+  String _findSource() => [
+    _name.text,
+    _text.text,
+    for (final field in _sectionTexts.values) field.text,
+  ].join('\u0000');
+
+  /// Finds the find bar's words in the Note as the page shows it, the
+  /// fields as they hold their texts now, in the page's order: the
+  /// Note's text, then, for a plain Note, its Sections, then its photos'
+  /// Photo Texts, its recordings' Transcripts and its files' names and
+  /// Attachment Texts; a Note of a kind's Sections come last. Each
+  /// Section is its text and then its media.
+  void _findAll() {
+    _foundIn = _findSource();
+    final note = _placed?.note;
+    final query = _findWords.text;
+    if (note == null || query.trim().isEmpty) {
+      _hits = const [];
+      _hitAt = 0;
+      _showHits();
+      return;
+    }
+    final format = note.textFormat;
+    List<NoteHit> media(
+      String? section, {
+      required List<String> photos,
+      required List<String> removedPhotos,
+      required Map<String, String> photoTexts,
+      required List<String> recordings,
+      required List<String> removedRecordings,
+      required Map<String, String> transcripts,
+      required List<Attachment> files,
+      required List<Attachment> removedFiles,
+      required Map<String, String> fileTexts,
+    }) {
+      List<NoteHit> find(FindingPart part, String key, String text) =>
+          NoteHit.inText(
+            text,
+            TextFormats.plain,
+            query,
+            part: part,
+            key: key,
+            section: section,
+          );
+      return [
+        for (final hash in [...photos, ...removedPhotos])
+          ...find(FindingPart.photoText, hash, photoTexts[hash] ?? ''),
+        for (final hash in [...recordings, ...removedRecordings])
+          ...find(FindingPart.transcript, hash, transcripts[hash] ?? ''),
+        for (final file in files) ...[
+          ...find(FindingPart.fileName, file.hash, file.name),
+          ...find(
+            FindingPart.attachmentText,
+            file.hash,
+            fileTexts[file.hash] ?? '',
+          ),
+        ],
+        for (final file in removedFiles)
+          ...find(
+            FindingPart.attachmentText,
+            file.hash,
+            fileTexts[file.hash] ?? '',
+          ),
+      ];
+    }
+
+    List<NoteHit> ofSection(Section section) => [
+      if (_sectionTexts[section.id] case final field?)
+        ...NoteHit.inField(
+          field,
+          section.textFormat,
+          query,
+          section: section.id,
+        )
+      else
+        ...NoteHit.inText(
+          section.shownText,
+          section.textFormat,
+          query,
+          part: FindingPart.text,
+          section: section.id,
+        ),
+      ...media(
+        section.id,
+        photos: section.photos,
+        removedPhotos: section.removedPhotos,
+        photoTexts: section.photoTexts,
+        recordings: section.recordings,
+        removedRecordings: section.removedRecordings,
+        transcripts: section.transcripts,
+        files: section.attachments,
+        removedFiles: section.removedAttachments,
+        fileTexts: section.attachmentTexts,
+      ),
+    ];
+    final hits = [
+      if (_named) ...[
+        ...NoteHit.inField(_name, format, query),
+        ...NoteHit.inField(
+          _text,
+          format,
+          query,
+          shift: TextBoxes.shown(_name.text).text.length + 1,
+        ),
+      ] else ...[
+        ...NoteHit.inField(_text, format, query),
+        for (final section in _sections) ...ofSection(section),
+      ],
+      ...media(
+        null,
+        photos: note.photos,
+        removedPhotos: note.removedPhotos,
+        photoTexts: note.photoTexts,
+        recordings: note.recordings,
+        removedRecordings: note.removedRecordings,
+        transcripts: note.transcripts,
+        files: note.attachments,
+        removedFiles: note.removedAttachments,
+        fileTexts: note.attachmentTexts,
+      ),
+      if (_named)
+        for (final section in _sections) ...ofSection(section),
+    ];
+    _hits = hits;
+    _hitAt = hits.isEmpty ? 0 : _hitAt.clamp(0, hits.length - 1);
+    _showHits();
+  }
+
+  /// Hands the places found to the fields and to [_findMarks], the one
+  /// shown as the current one; they show once the page is built again.
+  void _showHits() {
+    final inFields = <TagTextController, List<(int, int)>>{};
+    final currents = <TagTextController, int>{};
+    final elsewhere = <Finding>[];
+    int? current;
+    for (final (i, hit) in _hits.indexed) {
+      if (hit.field case final field?) {
+        final list = inFields.putIfAbsent(field, () => []);
+        if (i == _hitAt) currents[field] = list.length;
+        list.add((hit.start, hit.end));
+        continue;
+      }
+      if (i == _hitAt) current = elsewhere.length;
+      elsewhere.add(
+        Finding(
+          part: hit.part,
+          key: hit.key,
+          section: hit.section,
+          start: hit.start,
+          end: hit.end,
+          line: 0,
+          cell: null,
+          context: '',
+          contextStart: 0,
+          contextEnd: 0,
+        ),
+      );
+    }
+    for (final field in [_name, _text, ..._sectionTexts.values]) {
+      field.found = switch (inFields[field]) {
+        final ranges? => FoundMarks(ranges, currents[field]),
+        null => null,
+      };
+    }
+    _findMarks = foundMarksOf(widget.noteId, elsewhere, current: current);
   }
 
   /// Gives each Section this Device may edit its field, and only those
@@ -1186,7 +1468,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         section.id,
         () => TagTextController(hideMarks: _twoRows)
           ..markdown = section.textFormat == TextFormats.markdown
-          ..text = section.text,
+          ..text = section.text
+          ..addListener(_findTyped),
       );
       field.boxes = _sectionTicking[section.id];
     }
@@ -2840,6 +3123,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             boxes: section.boxes,
             source: section.text,
             ticking: _sectionTicking[section.id],
+            // What the find bar found in it (obf-1047).
+            found: _findMarks[(section.id, FindingPart.text, '')],
           ),
         ),
       for (final hash in section.photos) ...[
@@ -3184,6 +3469,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           context,
           title: t.noteTitle,
           actions: [
+            // Finds words in the Note, with or without a search (obf-1047).
+            BarAction(
+              key: const ValueKey('find-in-note'),
+              label: t.findInNote,
+              onPressed: _openFind,
+              icon: Icons.search,
+            ),
             BarAction(
               key: const ValueKey('send-note-file'),
               label: t.sendToPerson,
@@ -3273,234 +3565,279 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ],
           ],
         ),
-        body: ListView(
-          padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+        body: Column(
           children: [
-            if (!note.textEditable) ...[
-              const NewerFormatNote(key: ValueKey('note-newer-format')),
-              const SizedBox(height: 8),
-            ],
-            ..._openLines(t, changes),
-            ValueListenableBuilder(
-              valueListenable: _pasteEmpty,
-              builder: (context, empty, _) => empty
-                  ? Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        t.pasteEmpty,
-                        key: const ValueKey('paste-empty'),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            // The Note's text and its Sections read on as one text, each
-            // Section under a tear line, in no box of its own (#307).
-            Embossed(
-              strong: note.importance == Importance.important,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_named)
-                      _nameAndDescription(note, editable: editable)
-                    else
-                      TwoRowTextField(
-                        key: const ValueKey('note-text'),
-                        controller: _text,
-                        twoRows: _twoRows,
-                        readOnly: !editable,
-                        // ☐ goes in at the cursor; a tap on a box ticks it,
-                        // also where the text is only read (ADR 0035).
-                        boxes: true,
-                        bar: widget.notes.store.advanced,
-                        onBox: _tapBox,
-                        // The first format is written at once (ADR 0033).
-                        formats: true,
-                        onFormatted: () => setState(_saveText),
-                        // A paste that looks like code offers it (#213).
-                        onCodePasted:
-                            editable &&
-                                _kind == NoteKind.plain &&
-                                note.textFormat != TextFormats.code
-                            ? (pasted) => setState(() {
-                                _offersCode = true;
-                                _pastedCode = pasted;
-                              })
-                            : null,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                        decoration: const InputDecoration(
-                          filled: false,
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    // A Note of a kind keeps them below, as its diary part
-                    // (#188).
-                    if (!_named) ...[
-                      for (final (i, section) in _sections.indexed)
-                        ..._sectionPart(i, section, note, when),
-                      if (_sections.isNotEmpty) const SizedBox(height: 16),
-                    ],
-                  ],
+            if (_finding)
+              FindBar(
+                controller: _findWords,
+                focusNode: _findFocus,
+                at: _hitAt,
+                count: _hits.length,
+                onChanged: _findChanged,
+                onPrevious: () => _stepHit(-1),
+                onNext: () => _stepHit(1),
+                onClose: _closeFind,
+              ),
+            Expanded(
+              child: FindScope(
+                marks: _findMarks,
+                child: _body(
+                  t,
+                  placed,
+                  note,
+                  editable,
+                  amends,
+                  when,
+                  place,
+                  colour,
                 ),
               ),
             ),
-            if (_offersCode && !_named) _codeOffer(t),
-            // The kind's content right under its name (#188): nothing
-            // while the Note is no Checklist, Shopping List or Tally.
-            ChecklistSection(
-              notes: widget.notes,
-              noteId: widget.noteId,
-              typed: _lines,
-              startLine: widget.typeLines,
-            ),
-            ShoppingSection(
-              notes: widget.notes,
-              noteId: widget.noteId,
-              typed: _lines,
-              startLine: widget.typeLines,
-            ),
-            if (_kind == NoteKind.tally) const SizedBox(height: 16),
-            TallySetup(notes: widget.notes, noteId: widget.noteId),
-            if (_sessionDraft case final draft?) ...[
-              const SizedBox(height: 16),
-              SessionNoteSetup(
-                draft: draft,
-                changes: _setsUp,
-                onChanged: _sessionChanged,
-                onNewTally: _newPoolTally,
-              ),
-            ],
-            // A list's or Tally's panel keeps its own space under it.
-            if (!_named) const SizedBox(height: 16),
-            _badges(placed, when, place, colour),
-            // Its past runs (#264), under its settings.
-            if (_sessionDraft != null) ...[
-              const SizedBox(height: 16),
-              EditorPanel(
-                heading: context.t.sessionRuns,
-                child: SessionRuns(notes: widget.notes, noteId: widget.noteId),
-              ),
-            ],
-            for (final hash in note.photos) ...[
-              const SizedBox(height: 16),
-              NotePhoto(
-                key: ValueKey(hash),
-                hash: hash,
-                onTap: () => viewPhoto(context, hash),
-              ),
-              PhotoText(
-                key: ValueKey('ocr:$hash'),
-                noteId: note.id,
-                hash: hash,
-                photoText: note.photoTexts[hash],
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.photoTexts[hash],
-                photo: true,
-              ),
-              ..._removeButton(note.id, hash, photo: true),
-            ],
-            // Removed, the file shows no more; its text stays.
-            for (final hash in note.removedPhotos) ...[
-              PhotoText(
-                key: ValueKey('ocr:$hash'),
-                noteId: note.id,
-                hash: hash,
-                photoText: note.photoTexts[hash],
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.photoTexts[hash],
-                photo: true,
-              ),
-            ],
-            for (final hash in note.recordings) ...[
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: RecordingButton(
-                  key: ValueKey(hash),
-                  hash: hash,
-                  compact: false,
-                ),
-              ),
-              TranscriptText(
-                key: ValueKey('transcript:$hash'),
-                noteId: note.id,
-                hash: hash,
-                transcript: note.transcripts[hash],
-                compact: false,
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.transcripts[hash],
-                photo: false,
-              ),
-              ..._removeButton(note.id, hash, photo: false),
-            ],
-            for (final hash in note.removedRecordings) ...[
-              TranscriptText(
-                key: ValueKey('transcript:$hash'),
-                noteId: note.id,
-                hash: hash,
-                transcript: note.transcripts[hash],
-                compact: false,
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.transcripts[hash],
-                photo: false,
-              ),
-            ],
-            ..._fileParts(
-              note.id,
-              note.attachments,
-              note.attachmentTexts,
-              note.removedAttachments,
-            ),
-            // A Note of a kind's Sections, its diary part under all else
-            // (#188), each under a tear line in no box, its text where
-            // the text above begins (#307).
-            if (_named)
-              for (final (i, section) in _sections.indexed)
-                Padding(
-                  key: ValueKey('section:${section.id}'),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _sectionPart(i, section, note, when),
-                  ),
-                ),
-            // At the Note's end, after its Sections (obf-1035).
-            if (_linkedFrom.isEmpty)
-              LinkedFrom(linking: _linkedFrom)
-            else
-              Spotlight(
-                id: 'editor-linked-from',
-                child: LinkedFrom(linking: _linkedFrom),
-              ),
-            const SizedBox(height: 24),
-            if (amends)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  onPressed: _amend,
-                  icon: const Icon(Icons.add),
-                  label: Text(t.amend),
-                ),
-              ),
           ],
         ),
       ),
+    );
+  }
+
+  /// The page under the top bar and the find bar.
+  Widget _body(
+    AppLocalizations t,
+    PlacedNote placed,
+    Note note,
+    bool editable,
+    bool amends,
+    DateFormat when,
+    String place,
+    Color? colour,
+  ) {
+    final changes = placed.changes;
+    return ListView(
+      controller: _scroll,
+      padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+      children: [
+        if (!note.textEditable) ...[
+          const NewerFormatNote(key: ValueKey('note-newer-format')),
+          const SizedBox(height: 8),
+        ],
+        ..._openLines(t, changes),
+        ValueListenableBuilder(
+          valueListenable: _pasteEmpty,
+          builder: (context, empty, _) => empty
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    t.pasteEmpty,
+                    key: const ValueKey('paste-empty'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+        // The Note's text and its Sections read on as one text, each
+        // Section under a tear line, in no box of its own (#307).
+        Embossed(
+          strong: note.importance == Importance.important,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_named)
+                  _nameAndDescription(note, editable: editable)
+                else
+                  TwoRowTextField(
+                    key: const ValueKey('note-text'),
+                    controller: _text,
+                    twoRows: _twoRows,
+                    readOnly: !editable,
+                    // ☐ goes in at the cursor; a tap on a box ticks it,
+                    // also where the text is only read (ADR 0035).
+                    boxes: true,
+                    bar: widget.notes.store.advanced,
+                    onBox: _tapBox,
+                    // The first format is written at once (ADR 0033).
+                    formats: true,
+                    onFormatted: () => setState(_saveText),
+                    // A paste that looks like code offers it (#213).
+                    onCodePasted:
+                        editable &&
+                            _kind == NoteKind.plain &&
+                            note.textFormat != TextFormats.code
+                        ? (pasted) => setState(() {
+                            _offersCode = true;
+                            _pastedCode = pasted;
+                          })
+                        : null,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                    decoration: const InputDecoration(
+                      filled: false,
+                      border: InputBorder.none,
+                    ),
+                  ),
+                // A Note of a kind keeps them below, as its diary part
+                // (#188).
+                if (!_named) ...[
+                  for (final (i, section) in _sections.indexed)
+                    ..._sectionPart(i, section, note, when),
+                  if (_sections.isNotEmpty) const SizedBox(height: 16),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (_offersCode && !_named) _codeOffer(t),
+        // The kind's content right under its name (#188): nothing
+        // while the Note is no Checklist, Shopping List or Tally.
+        ChecklistSection(
+          notes: widget.notes,
+          noteId: widget.noteId,
+          typed: _lines,
+          startLine: widget.typeLines,
+        ),
+        ShoppingSection(
+          notes: widget.notes,
+          noteId: widget.noteId,
+          typed: _lines,
+          startLine: widget.typeLines,
+        ),
+        if (_kind == NoteKind.tally) const SizedBox(height: 16),
+        TallySetup(notes: widget.notes, noteId: widget.noteId),
+        if (_sessionDraft case final draft?) ...[
+          const SizedBox(height: 16),
+          SessionNoteSetup(
+            draft: draft,
+            changes: _setsUp,
+            onChanged: _sessionChanged,
+            onNewTally: _newPoolTally,
+          ),
+        ],
+        // A list's or Tally's panel keeps its own space under it.
+        if (!_named) const SizedBox(height: 16),
+        _badges(placed, when, place, colour),
+        // Its past runs (#264), under its settings.
+        if (_sessionDraft != null) ...[
+          const SizedBox(height: 16),
+          EditorPanel(
+            heading: context.t.sessionRuns,
+            child: SessionRuns(notes: widget.notes, noteId: widget.noteId),
+          ),
+        ],
+        for (final hash in note.photos) ...[
+          const SizedBox(height: 16),
+          NotePhoto(
+            key: ValueKey(hash),
+            hash: hash,
+            onTap: () => viewPhoto(context, hash),
+          ),
+          PhotoText(
+            key: ValueKey('ocr:$hash'),
+            noteId: note.id,
+            hash: hash,
+            photoText: note.photoTexts[hash],
+          ),
+          ..._generatedButtons(
+            note.id,
+            hash,
+            note.photoTexts[hash],
+            photo: true,
+          ),
+          ..._removeButton(note.id, hash, photo: true),
+        ],
+        // Removed, the file shows no more; its text stays.
+        for (final hash in note.removedPhotos) ...[
+          PhotoText(
+            key: ValueKey('ocr:$hash'),
+            noteId: note.id,
+            hash: hash,
+            photoText: note.photoTexts[hash],
+          ),
+          ..._generatedButtons(
+            note.id,
+            hash,
+            note.photoTexts[hash],
+            photo: true,
+          ),
+        ],
+        for (final hash in note.recordings) ...[
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: RecordingButton(
+              key: ValueKey(hash),
+              hash: hash,
+              compact: false,
+            ),
+          ),
+          TranscriptText(
+            key: ValueKey('transcript:$hash'),
+            noteId: note.id,
+            hash: hash,
+            transcript: note.transcripts[hash],
+            compact: false,
+          ),
+          ..._generatedButtons(
+            note.id,
+            hash,
+            note.transcripts[hash],
+            photo: false,
+          ),
+          ..._removeButton(note.id, hash, photo: false),
+        ],
+        for (final hash in note.removedRecordings) ...[
+          TranscriptText(
+            key: ValueKey('transcript:$hash'),
+            noteId: note.id,
+            hash: hash,
+            transcript: note.transcripts[hash],
+            compact: false,
+          ),
+          ..._generatedButtons(
+            note.id,
+            hash,
+            note.transcripts[hash],
+            photo: false,
+          ),
+        ],
+        ..._fileParts(
+          note.id,
+          note.attachments,
+          note.attachmentTexts,
+          note.removedAttachments,
+        ),
+        // A Note of a kind's Sections, its diary part under all else
+        // (#188), each under a tear line in no box, its text where
+        // the text above begins (#307).
+        if (_named)
+          for (final (i, section) in _sections.indexed)
+            Padding(
+              key: ValueKey('section:${section.id}'),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: _sectionPart(i, section, note, when),
+              ),
+            ),
+        // At the Note's end, after its Sections (obf-1035).
+        if (_linkedFrom.isEmpty)
+          LinkedFrom(linking: _linkedFrom)
+        else
+          Spotlight(
+            id: 'editor-linked-from',
+            child: LinkedFrom(linking: _linkedFrom),
+          ),
+        const SizedBox(height: 24),
+        if (amends)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              onPressed: _amend,
+              icon: const Icon(Icons.add),
+              label: Text(t.amend),
+            ),
+          ),
+      ],
     );
   }
 }

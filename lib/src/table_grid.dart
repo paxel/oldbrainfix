@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
+import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'table_screen.dart';
@@ -60,6 +61,10 @@ class TableGrid extends StatefulWidget {
   final MarkdownTable table;
   final TextStyle? style;
   final BoxTicking? ticking;
+
+  /// The places the find bar found in [text] (obf-1047), drawn in the
+  /// cells that are not edited.
+  final FoundMarks? found;
   final bool bar;
   final FocusNode? focusParent;
   final GridWritten Function(MarkdownChange change) onChange;
@@ -75,6 +80,7 @@ class TableGrid extends StatefulWidget {
     required this.onShowLines,
     this.style,
     this.ticking,
+    this.found,
     this.bar = true,
     this.focusParent,
   });
@@ -777,6 +783,7 @@ class TableGridState extends State<TableGrid> {
             style: style,
             textAlign: cellAlign(table.aligns[c]),
             ticking: widget.ticking,
+            found: widget.found,
           );
     return Semantics(
       label: context.t.tableCell(r + 1, TableScreen.letter(c)),

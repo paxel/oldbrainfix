@@ -1015,6 +1015,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         final TagTextController controller => controller.boxes,
         _ => null,
       },
+      found: switch (controller) {
+        final TagTextController controller => controller.found,
+        _ => null,
+      },
       bar: widget.bar,
       focusParent: _scope,
       onChange: _writeTable,

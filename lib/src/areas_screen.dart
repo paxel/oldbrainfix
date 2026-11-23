@@ -344,6 +344,20 @@ class _AreasScreenState extends State<AreasScreen>
     _reload();
   }
 
+  /// Opens [note] at [at], a place the search found in it, with the find
+  /// bar for the search (obf-1047).
+  Future<void> _openAt(Note note, Finding at) async {
+    await openNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      find: (query: _searched, at: at),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
@@ -674,6 +688,8 @@ class _AreasScreenState extends State<AreasScreen>
                               onSwitch: switchView,
                               selected: selecting ? selected : null,
                               onSelect: setSelected,
+                              find: _searched,
+                              onFind: _openAt,
                             )
                           : [...rows, _tagsRow(t)],
                     ),
@@ -921,6 +937,20 @@ class _AreaScreenState extends State<AreaScreen>
     _reload();
   }
 
+  /// Opens [note] at [at], a place the search found in it, with the find
+  /// bar for the search (obf-1047).
+  Future<void> _openAt(Note note, Finding at) async {
+    await openNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      find: (query: _searched, at: at),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
@@ -1119,6 +1149,8 @@ class _AreaScreenState extends State<AreaScreen>
                           onSwitch: switchView,
                           selected: selecting ? selected : null,
                           onSelect: setSelected,
+                          find: _searched,
+                          onFind: _openAt,
                         )
                       : _browsing(t, area),
                 ),
@@ -1272,6 +1304,20 @@ class _TopicScreenState extends State<TopicScreen>
     _reload();
   }
 
+  /// Opens [note] at [at], a place the search found in it, with the find
+  /// bar for the search (obf-1047).
+  Future<void> _openAt(Note note, Finding at) async {
+    await openNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      find: (query: _searched, at: at),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
@@ -1389,6 +1435,8 @@ class _TopicScreenState extends State<TopicScreen>
                           onSwitch: switchView,
                           selected: selecting ? selected : null,
                           onSelect: setSelected,
+                          find: _searched,
+                          onFind: _openAt,
                         )
                       : _diary.isEmpty
                       ? [
@@ -1476,6 +1524,8 @@ List<Widget> _hitCards(
   required void Function(Note note) onSwitch,
   Set<String>? selected,
   void Function(Note note, bool on)? onSelect,
+  required String find,
+  required void Function(Note note, Finding at) onFind,
 }) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
@@ -1493,6 +1543,8 @@ List<Widget> _hitCards(
         onSwitch: onSwitch,
         selected: selected,
         onSelect: onSelect,
+        find: find,
+        onFind: onFind,
       );
 
 /// Opens "file into…" for [note] and files it; true when it moved.
