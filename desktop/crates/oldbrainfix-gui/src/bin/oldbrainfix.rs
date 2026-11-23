@@ -419,15 +419,16 @@ impl Shell {
     /// Opens the window, at once hidden into the tray when `hidden`, and
     /// runs it until it closes; whether the app is to quit.
     fn window(&self, hidden: bool) -> Result<bool, String> {
-        let mut app = App::new(self.store.clone(), self.locale);
+        // The Agenda read on its thread from the start (obf-1090): the
+        // window shows at once.
+        let agenda = self.agenda_store.clone();
+        let mut app = App::opening(self.store.clone(), self.locale, move || agenda.clone());
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         let window = self.window.clone();
         app.set_redraw(Arc::new(move || wake(&window)));
         app.set_folder_wanted(self.folder_wanted.clone());
         app.set_syncing(self.syncing.clone());
-        let agenda = self.agenda_store.clone();
-        app.set_agenda_store(move || agenda.clone());
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_occurrence_wanted(self.occurrence_wanted.clone());

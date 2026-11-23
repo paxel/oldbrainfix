@@ -1506,3 +1506,76 @@ fn an_agenda_choice_another_persons_device_wrote_counts_for_nothing() -> TestRes
     assert!(agenda_rows(&ann)?.is_empty());
     Ok(())
 }
+
+#[test]
+fn the_routines_and_their_lines_read_together_are_as_read_one_by_one() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let lists = Checklists::new(&ann);
+    let routines = Routines::new(&ann);
+    let gym = checklist(&ann, "Gym\nTowel\nShoes\n  Laces", None)?;
+    let shop = checklist(&ann, "Shop\nMilk\nEggs", None)?;
+    let tidy = checklist(&ann, "Tidy\nDesk\nBin", None)?;
+    let plain = notes.capture("Water the plants", None, None)?.id;
+    let morning = spawn(&ann, &gym, &daily(&[time(8)?])?)?;
+    let evening = spawn(&ann, &gym, &daily(&[time(19)?])?)?;
+    let shopping = spawn(&ann, &shop, &daily(&[])?)?;
+    let tidying = spawn(&ann, &tidy, &daily(&[])?)?;
+    spawn(&ann, &plain, &daily(&[])?)?;
+    // Every Line checked for one day, some for others.
+    for line in ["Towel", "Shoes", "Laces"] {
+        lists.check_for(&id_of(&ann, &gym, line)?, &on(&morning, 0, Some(time(8)?)))?;
+    }
+    lists.check_for(
+        &id_of(&ann, &gym, "Towel")?,
+        &on(&morning, 1, Some(time(8)?)),
+    )?;
+    lists.check_for(
+        &id_of(&ann, &gym, "Shoes")?,
+        &on(&evening, 0, Some(time(19)?)),
+    )?;
+    // A Line added after a Done, and one deleted.
+    for line in ["Milk", "Eggs"] {
+        lists.check_for(&id_of(&ann, &shop, line)?, &on(&shopping, 0, None))?;
+    }
+    lists.add(&shop, "Bread", None, false)?;
+    lists.check_for(&id_of(&ann, &tidy, "Desk")?, &on(&tidying, 0, None))?;
+    lists.delete(&id_of(&ann, &tidy, "Bin")?)?;
+    // A Checklist merged into another Note: its Routine links to that one.
+    let old = checklist(&ann, "Old\nKeys", None)?;
+    let keys_of = spawn(&ann, &old, &daily(&[])?)?;
+    lists.check_for(&id_of(&ann, &old, "Keys")?, &on(&keys_of, 0, None))?;
+    notes.merge(&old, &plain)?;
+
+    let all = routines.all()?;
+    assert_eq!(all.len(), 6);
+    for routine in &all {
+        assert_eq!(Some(routine), routines.by_id(&routine.id)?.as_ref());
+    }
+    assert_eq!(all.iter().filter(|r| !r.done.is_empty()).count(), 4);
+    let mut wanted = Vec::new();
+    for routine in &all {
+        let note = routines.note(routine)?.ok_or("a Note")?;
+        for days in 0..3 {
+            for occurrence in routine.on(Day::new(2026, 1, 1).add_days(days)) {
+                let at = RoutineOccurrence {
+                    routine_id: routine.id.clone(),
+                    occurrence,
+                };
+                wanted.push((at, note.id.clone()));
+            }
+        }
+    }
+    let read = lists.for_occurrences(&wanted)?;
+    for (at, _) in &wanted {
+        let key = (at.routine_id.clone(), at.occurrence.key());
+        assert_eq!(
+            read.get(&key),
+            lists.for_occurrence(at)?.as_ref(),
+            "{key:?}"
+        );
+    }
+    assert_eq!(read.len(), 12);
+    assert!(read.values().any(|l| l.checked_count() > 0));
+    Ok(())
+}

@@ -475,6 +475,9 @@ struct AgendaReads {
     running: Option<std::sync::mpsc::Receiver<AgendaRead>>,
     /// A change asked for one more read meanwhile.
     again: bool,
+    /// The window has not drawn its first frame yet: the reads asked for
+    /// until then wait for it, and run as one (obf-1090).
+    held: bool,
 }
 
 /// What the Agenda's thread read, at its mark, and whether it wrote.
@@ -2693,13 +2696,38 @@ impl App {
     /// the system's local time.
     pub fn new(store: impl Into<Arc<Store>>, locale: &str) -> App {
         let mut app = App::bare(store.into(), locale);
-        app.refresh();
-        // An AI Task left when the window went waits for its review.
-        match app.review_ai() {
-            Ok(()) => app.refresh(),
-            Err(e) => app.error = Some(e.to_string()),
-        }
+        app.first_read();
         app
+    }
+
+    /// The App over `store`, speaking `locale`, as the window opens it
+    /// (obf-1090): the Agenda read on its thread from the start, on the
+    /// store `open` hands it each time ([`App::set_agenda_store`]), so
+    /// that the window's first frame waits for no read of it. Its first
+    /// read starts with that frame, once what the window is set up with
+    /// is written; the line under the menu bar moves until it is in.
+    pub fn opening(
+        store: impl Into<Arc<Store>>,
+        locale: &str,
+        open: impl Fn() -> Arc<Store> + Send + Sync + 'static,
+    ) -> App {
+        let mut app = App::bare(store.into(), locale);
+        app.set_agenda_store(open);
+        if let Some(reads) = &mut app.agenda_reads {
+            reads.held = true;
+        }
+        app.first_read();
+        app
+    }
+
+    /// Reads the panes for the first time, and again for an AI Task left
+    /// waiting for its review when the window went.
+    fn first_read(&mut self) {
+        self.refresh();
+        match self.review_ai() {
+            Ok(()) => self.refresh(),
+            Err(e) => self.error = Some(e.to_string()),
+        }
     }
 
     /// The App over `store` before it read anything.
@@ -5291,6 +5319,7 @@ impl App {
             shown: self.view.agenda.clone(),
             running: None,
             again: false,
+            held: false,
         });
     }
 
@@ -5311,7 +5340,7 @@ impl App {
         let Some(reads) = &mut self.agenda_reads else {
             return;
         };
-        if reads.running.is_some() {
+        if reads.running.is_some() || reads.held {
             reads.again = true;
             return;
         }
@@ -5333,6 +5362,13 @@ impl App {
     /// log changed since it was read: then it reads again (#207). The
     /// window looks again shortly while it runs.
     fn agenda_arrived(&mut self, ctx: &egui::Context) {
+        // The first frame: the read held since the window opened starts.
+        if let Some(reads) = &mut self.agenda_reads
+            && std::mem::take(&mut reads.held)
+            && std::mem::take(&mut reads.again)
+        {
+            self.read_agenda_aside();
+        }
         let Some(reads) = &mut self.agenda_reads else {
             return;
         };
@@ -6066,6 +6102,22 @@ impl App {
     /// them: what a test counts the reads by (obf-1069).
     pub fn reads(&self) -> (usize, usize) {
         (self.refreshes, self.card_reads.get())
+    }
+
+    /// Whether the Agenda shows rows read, and whether a read of it runs
+    /// on its thread or waits for the first frame (obf-1090).
+    pub fn agenda_read(&self) -> (bool, bool) {
+        let running = self
+            .agenda_reads
+            .as_ref()
+            .is_some_and(|r| r.running.is_some() || r.held);
+        (self.view.agenda.is_some(), running)
+    }
+
+    /// Whether the Agenda shows and waits for the rows of its first read
+    /// on its thread (obf-1090): the line under the menu bar moves.
+    fn agenda_waiting(&self) -> bool {
+        self.selection == Selection::Agenda && self.view.agenda.is_none() && self.agenda_read().1
     }
 
     /// How many cards the list laid out in the frame drawn last
@@ -11482,6 +11534,10 @@ impl App {
             } else if drawn && self.pack_opening() {
                 // And while a Pack opens off the window's thread.
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.pack_opening());
+            } else if drawn && self.agenda_waiting() {
+                // And while the Agenda is read for the first time
+                // (obf-1090).
+                sync_line::show(ui, bar.response.rect, tones.accent, self.t.agenda_reading());
             }
         }
         // What the Note dialog lies over: all but the menu bar, which
@@ -20207,6 +20263,27 @@ fn read_agenda(
     } else {
         lists.of_notes(&row_notes)?.into_keys().collect()
     };
+    // Their Lines for each Occurrence, read for all of them at once
+    // (obf-1090); a Session's picks win over Lines.
+    let on_lists: Vec<(RoutineOccurrence, String)> = agenda
+        .today_rows
+        .iter()
+        .chain(&agenda.tomorrow_rows)
+        .chain(agenda.later_rows.iter().flatten())
+        .filter(|row| {
+            let key = (row.routine.id.clone(), row.occurrence.key());
+            !picked.contains_key(&key) && !counts.contains_key(&row.routine.id)
+        })
+        .filter_map(|row| {
+            let note = row.note.as_ref().filter(|n| list_notes.contains(&n.id))?;
+            let on = RoutineOccurrence {
+                routine_id: row.routine.id.clone(),
+                occurrence: row.occurrence,
+            };
+            Some((on, note.id.clone()))
+        })
+        .collect();
+    let occurrence_lists = lists.for_occurrences(&on_lists)?;
     let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
         let area = match &row.note {
             Some(note) => place(note.clone())?.area,
@@ -20219,23 +20296,12 @@ fn read_agenda(
                 .get(&row.routine.id)
                 .map(|s| SessionPart::Later(s.count_on(row.occurrence.day))),
         };
-        // A Session's picks win over Lines.
+        // A Session's picks win over Lines: its rows have none read.
         let mut lines = None;
-        if session.is_none()
-            && row
-                .note
-                .as_ref()
-                .is_some_and(|n| list_notes.contains(&n.id))
+        if let Some(list) = occurrence_lists.get(&key)
+            && list.count() > 0
         {
-            let on = RoutineOccurrence {
-                routine_id: row.routine.id.clone(),
-                occurrence: row.occurrence,
-            };
-            if let Some(list) = lists.for_occurrence(&on)?
-                && list.count() > 0
-            {
-                lines = Some((list, store.may_check_off(&row.routine.id)?));
-            }
+            lines = Some((list.clone(), store.may_check_off(&row.routine.id)?));
         }
         let answers = occurrence_answers::answers(store, &row.routine, &row.occurrence, wall)?;
         Ok(Row {

@@ -328,9 +328,9 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   void initState() {
     super.initState();
     widget.runStop?._stop = _restarted;
-    // What has been in the trash for 30 days goes for good.
-    _notes.purgeTrash();
-    Routines(widget.store).purgeTrash();
+    // What has been in the trash for 30 days goes for good, once the
+    // first frame shows: it builds every Note in the trash (obf-1090).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _purgeTrash());
     _alarms = AlarmSync(
       store: widget.store,
       platform: widget.alarms,
@@ -361,6 +361,14 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     if (widget.spotlights) {
       seedSpotlights(widget.store, firstStartDue: _places.starterSetDue);
     }
+  }
+
+  /// Purges what has been in the trash for 30 days, after the first frame
+  /// (obf-1090); not once the app is gone.
+  void _purgeTrash() {
+    if (!mounted) return;
+    _notes.purgeTrash();
+    Routines(widget.store).purgeTrash();
   }
 
   /// Restart stops this run: its screens, should they stay, read nothing

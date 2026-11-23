@@ -7,8 +7,10 @@
 //! search, with its results, at most 500 ms (ui-laws.md, obf-1032;
 //! obf-1068): the letter shows within a tap's time, its search runs once
 //! typing stopped and is timed from its start, the pause before it left
-//! out. Each step is timed from the event to the frame that shows its
-//! effect, a few times, and its median held against the budget.
+//! out. The window's first frame, as the app opens it, comes within a
+//! page change's 500 ms, its Agenda read on its thread meanwhile
+//! (obf-1090). Each step is timed from the event to the frame that shows
+//! its effect, a few times, and its median held against the budget.
 //!
 //! Timed in a release build only, as the app ships; CI runs it in a step
 //! of its own:
@@ -34,6 +36,7 @@ use egui::accesskit::Role;
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
+use oldbrainfix_core::checklists::keys as list_keys;
 use oldbrainfix_core::named_places::keys as place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::schedule::Recurrence;
@@ -54,6 +57,9 @@ const NOTES: usize = 5000;
 /// How many daily Reminders the alarms plan in the timing of a click
 /// beside them (obf-1091).
 const ROUTINES: usize = 300;
+/// How many daily Routines are spawned from Checklists, their Lines
+/// checked for each day (obf-1090).
+const LISTS: usize = 40;
 /// How often each step is timed; its median counts.
 const REPEATS: usize = 5;
 /// A tap or a click, and a page change, from the event to the frame
@@ -103,12 +109,18 @@ fn photo(n: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 /// The store of [`NOTES`] Notes, "Note 0" the oldest, written in one
 /// batch, on a clock that stands still after them.
 fn store() -> Result<Store, Box<dyn std::error::Error>> {
-    store_at(None, 0)
+    store_at(None, 0, 0)
 }
 
 /// [`store`]'s Notes, in the database at `path` when given (obf-1091),
-/// else in memory, after `routines` daily Reminders through the day.
-fn store_at(path: Option<&Path>, routines: usize) -> Result<Store, Box<dyn std::error::Error>> {
+/// else in memory, after `routines` daily Reminders through the day, and
+/// with daily Routines spawned from the first `lists` Checklists a month
+/// ago, their Lines checked for every Occurrence since (obf-1090).
+fn store_at(
+    path: Option<&Path>,
+    routines: usize,
+    lists: usize,
+) -> Result<Store, Box<dyn std::error::Error>> {
     let start = DateTime::parse_from_rfc3339("2026-03-01T09:00:00Z")?.with_timezone(&Utc);
     let at = Arc::new(AtomicI64::new(0));
     let read = at.clone();
@@ -154,7 +166,8 @@ fn store_at(path: Option<&Path>, routines: usize) -> Result<Store, Box<dyn std::
         store.append(home, place_keys::CENTRE, Some("52.52,13.405"), None)?;
         store.append(home, place_keys::RADIUS, Some("300"), None)?;
         let notes = Notes::new(&store);
-        let lists = Checklists::new(&store);
+        let checklists = Checklists::new(&store);
+        let mut made_lists = Vec::new();
         for n in 0..NOTES {
             at.fetch_add(60, Ordering::SeqCst);
             // Two of three filed, the others Unsorted.
@@ -191,11 +204,34 @@ fn store_at(path: Option<&Path>, routines: usize) -> Result<Store, Box<dyn std::
                 notes.capture_with(&text, place, None, &photo, &[])?.id
             };
             if n % 10 == 0 {
-                lists.make(&id)?;
+                checklists.make(&id)?;
+                made_lists.push(id.clone());
             }
             if n % 4 == 0 {
                 let location = format!("52.52{},13.405", n % 9);
                 store.append(&id, note_keys::LOCATION, Some(&location), None)?;
+            }
+        }
+        // All of a day's Lines checked on two days of three, the first
+        // two on the third, as the Agenda reads them (obf-1090).
+        let since = Day::today(store.now(), &local_wall).add_days(-30);
+        let yesterday = Day::today(store.now(), &local_wall).add_days(-1);
+        let checked = oldbrainfix_core::dart_iso(store.now());
+        for (r, id) in made_lists.iter().take(lists).enumerate() {
+            let time = ClockTime::new(7 + (r % 12) as u32, 30);
+            let schedule = time
+                .and_then(|t| Schedule::new(since, &[t], Some(rule.clone())))
+                .ok_or_else(|| oldbrainfix_core::Error::Invalid("a schedule".into()))?;
+            let routine = made.spawn(id, &schedule)?;
+            let list = checklists
+                .by_note(id)?
+                .ok_or_else(|| oldbrainfix_core::Error::Invalid("a Checklist".into()))?;
+            for (d, occurrence) in routine.between(since, yesterday).iter().enumerate() {
+                let lines = if d % 3 == 2 { 2 } else { list.lines.len() };
+                for line in list.lines.iter().take(lines) {
+                    let field = list_keys::check_for(occurrence, &line.id);
+                    store.append(&routine.id, &field, Some(&checked), None)?;
+                }
             }
         }
         Ok(())
@@ -506,7 +542,7 @@ fn a_click_and_a_page_wait_on_no_alarms_tick_on_5000_notes() -> TestResult {
     }
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("oldbrainfix.db");
-    let store = Arc::new(store_at(Some(&path), ROUTINES)?);
+    let store = Arc::new(store_at(Some(&path), ROUTINES, 0)?);
     let now = store.now();
     let own = Arc::new(Store::open(&path, Box::new(move || now), || {
         Ok(SigningKey::from_seed([3; 32]))
@@ -609,5 +645,92 @@ fn a_click_and_a_page_wait_on_no_alarms_tick_on_5000_notes() -> TestResult {
     // All Notes is only shown: on disk and beside the Reminders it is
     // read slower than the budget's own store in memory, alarms or not.
     assert!(click <= TAP, "a card clicked: {click:.1?} over {TAP:?}");
+    Ok(())
+}
+
+/// Steps `harness` until the Agenda's read on its thread is in; how long
+/// from `start` that took.
+fn agenda_in(
+    harness: &mut Harness<'_, App>,
+    start: Instant,
+) -> Result<Elapsed, Box<dyn std::error::Error>> {
+    loop {
+        harness.step();
+        if !harness.state().agenda_read().1 {
+            return Ok(start.elapsed());
+        }
+        if start.elapsed() > Elapsed::from_secs(300) {
+            return Err("the Agenda never came".into());
+        }
+        std::thread::sleep(Elapsed::from_millis(5));
+    }
+}
+
+/// The window's first frame on 5000 Notes, daily Reminders and Routines
+/// spawned from Checklists, opened as the app opens it, on a database on
+/// disk with the Agenda's thread on a connection of its own: drawn within
+/// a page change's 500 ms of the start, the Agenda read meanwhile
+/// (obf-1090).
+#[test]
+#[ignore = "a timing test: run in release by CI's own step"]
+fn the_first_frame_comes_before_the_agenda_is_read_on_5000_notes() -> TestResult {
+    if cfg!(debug_assertions) {
+        return Err("timed in a release build only: cargo test --release".into());
+    }
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oldbrainfix.db");
+    let built = Instant::now();
+    let store = Arc::new(store_at(Some(&path), ROUTINES, LISTS)?);
+    println!(
+        "{NOTES} Notes, {ROUTINES} Reminders and {LISTS} Checklist Routines written in {:?}",
+        built.elapsed()
+    );
+    let now = store.now();
+    let own = Arc::new(Store::open(&path, Box::new(move || now), || {
+        Ok(SigningKey::from_seed([3; 32]))
+    })?);
+
+    // Opened as the app opens it, what the store worked out forgotten
+    // each time as after a start.
+    let (mut frames, mut reads) = (Vec::new(), Vec::new());
+    for _ in 0..3 {
+        store.changed_elsewhere();
+        own.changed_elsewhere();
+        let start = Instant::now();
+        let aside = own.clone();
+        let mut app = App::opening(store.clone(), "en", move || aside.clone());
+        app.offer_restore();
+        app.set_spotlights(true)?;
+        app.set_help(env!("CARGO_PKG_VERSION"))?;
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1280.0, 900.0))
+            .with_max_steps(200)
+            .build_ui_state(
+                |ui, app: &mut App| {
+                    App::install(ui.ctx());
+                    app.show(ui);
+                },
+                app,
+            );
+        harness.step();
+        let frame = start.elapsed();
+        assert_eq!(harness.state().agenda_read(), (false, true));
+        let read = agenda_in(&mut harness, start)? - frame;
+        assert!(harness.state().agenda_read().0, "the Agenda read");
+        println!("  the first frame in {frame:.1?}, the Agenda read then in {read:.1?}");
+        frames.push(frame);
+        reads.push(read);
+    }
+    frames.sort();
+    reads.sort();
+    println!(
+        "The first frame: median {:.1?}; the Agenda read on its thread: median {:.1?}",
+        frames[1], reads[1]
+    );
+    assert!(
+        frames[1] <= PAGE,
+        "the first frame: {:.1?} over {PAGE:?}",
+        frames[1]
+    );
     Ok(())
 }

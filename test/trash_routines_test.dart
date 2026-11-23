@@ -347,6 +347,29 @@ void main() {
       await openTrash(tester);
       expect(find.text('The trash is empty.'), findsOneWidget);
     });
+
+    testWidgets('the trash is purged once the first frame shows, not before '
+        '(obf-1090)', (tester) async {
+      final note = notes.capture('old letter');
+      notes.trash(note.id);
+      final routine = routines.create('pills', daily([at(20)]));
+      routines.trash(routine.id);
+      now = now.add(Notes.trashKeep);
+      // Registered before the app's: it runs first, after the first
+      // frame is built.
+      bool? kept;
+      tester.binding.addPostFrameCallback((_) {
+        kept =
+            find.byType(OldBrainFixApp).evaluate().isNotEmpty &&
+            notes.byId(note.id) != null &&
+            routines.byId(routine.id) != null;
+      });
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      expect(kept, isTrue, reason: 'nothing purged before the first frame');
+      expect(notes.byId(note.id), isNull);
+      expect(routines.byId(routine.id), isNull);
+      await tester.pumpAndSettle();
+    });
   });
 
   testWidgets('the announcement and the trash fit a phone in German', (

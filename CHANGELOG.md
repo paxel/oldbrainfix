@@ -12,6 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, typing in a search field no longer waits; the results follow shortly after you stop typing. ([obf-1068](https://github.com/paxel/oldbrainfix/issues/381))
 - On the desktop, pages open faster while the alarms are planned in the background. ([obf-1091](https://github.com/paxel/oldbrainfix/issues/404))
 - On the phone and the desktop, the app stays responsive after importing photos or voice recordings while their text is read. ([obf-1094](https://github.com/paxel/oldbrainfix/issues/407))
+- On the phone and the desktop, the app opens faster; the desktop shows its window while the Agenda is still read. ([obf-1090](https://github.com/paxel/oldbrainfix/issues/403))
 
 ### Fixed
 
