@@ -1438,6 +1438,8 @@
   "importKeepFailed": "Der Export konnte nicht importiert werden.",
   "importKeepFailedCause": "Die ZIP-Datei oder der Ordner oder eine der Dateien darin ließ sich nicht lesen.",
   "importKeepFailedFix": "Es wurde nichts importiert. Lade den Export noch einmal herunter, kopiere ihn auf das Telefon und importiere ihn von dort.",
+  "importWritten": "{count, plural, =1{{written} von 1 Notiz} other{{written} von {count} Notizen}}",
+  "importGoesOn": "Du kannst diese Seite verlassen. Der Import läuft neben der App weiter, und oben auf dem Bildschirm steht, wenn er fertig ist.",
   "settingBadgeLabel": "{setting}: {value}",
   "badgePlace": "Bereich und Thema",
   "badgeKind": "Art",

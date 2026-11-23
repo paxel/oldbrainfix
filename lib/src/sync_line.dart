@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'auto_sync.dart';
+import 'import_run.dart';
 
 /// How thick the line is.
 const syncLineHeight = 3.0;
@@ -9,22 +10,25 @@ const syncLineHeight = 3.0;
 const syncLineSweep = Duration(milliseconds: 900);
 
 /// The line at the bottom of a page's bar while a sync of this Device
-/// runs (#225, UI laws "The sync line"): a short stretch in the accent
+/// runs (#225, UI laws "The sync line"), and while an Import does
+/// (obf-1061): a short stretch in the accent
 /// moving back and forth, the whole width standing still while the
 /// system's "remove animations" setting is on. It takes no room of its
 /// own and nothing else on the page changes; nothing without the app's
-/// [AutoSyncScope]. Screen readers hear of the sync from the app, once,
-/// not from every page's bar.
+/// [AutoSyncScope] and [ImportJobsScope]. Screen readers hear of the
+/// sync from the app, once, not from every page's bar.
 class SyncLine extends StatelessWidget {
   const SyncLine({super.key});
 
   @override
   Widget build(BuildContext context) {
     final syncing = AutoSyncScope.of(context)?.syncing;
-    if (syncing == null) return const SizedBox.shrink();
-    return ValueListenableBuilder<bool>(
-      valueListenable: syncing,
-      builder: (context, on, _) => on
+    final importing = ImportJobsScope.of(context)?.running;
+    if (syncing == null && importing == null) return const SizedBox.shrink();
+    return ListenableBuilder(
+      listenable: Listenable.merge([?syncing, ?importing]),
+      builder: (context, _) =>
+          (syncing?.value ?? false) || importing?.value != null
           ? const Align(
               alignment: Alignment.bottomCenter,
               child: ExcludeSemantics(

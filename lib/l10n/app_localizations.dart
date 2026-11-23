@@ -8678,6 +8678,18 @@ abstract class AppLocalizations {
   /// **'Nothing was imported. Download the export again, copy it onto the phone and import it from there.'**
   String get importKeepFailedFix;
 
+  /// On the phone's page of a running Import (obf-1061): how many of the Notes it makes are in so far.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{written} of 1 Note} other{{written} of {count} Notes}}'**
+  String importWritten(int written, int count);
+
+  /// Under the count on the phone's page of a running Import (obf-1061).
+  ///
+  /// In en, this message translates to:
+  /// **'You can leave this page. The Import goes on beside the app, and the top of the screen says when it is done.'**
+  String get importGoesOn;
+
   /// What a screen reader reads for a badge of a Note's setting in the Note editor (#160): the setting's name and its current value.
   ///
   /// In en, this message translates to:

@@ -993,8 +993,8 @@ replace a law of Both apps where they say so. A desktop law marked
   quarter of its width moving back and forth (Knight Rider), taking no
   room, so nothing else on the screen moves. It shows only while a
   folder round or a join of this Device runs, on the desktop also while
-  its paired host answers, and the app is in view; every sync shows it,
-  also the one each minute. The sync runs beside the app (an isolate on
+  its paired host answers, or an Import runs (obf-1061), and the app is
+  in view; every sync shows it, also the one each minute. The sync runs beside the app (an isolate on
   the phone, a thread with its own connection on the desktop): the app
   stays usable and draws on. With the system's "remove animations" the
   phone's line stands still across the whole width; the desktop reads
@@ -1002,6 +1002,9 @@ replace a law of Both apps where they say so. A desktop law marked
   reader hears "Syncing…" once each time the app comes into view, not
   with every sync; on the desktop the line is a progress indicator named
   "Syncing…".
+- On the desktop the same line moves while the Agenda is read for the
+  first time after the window opened (obf-1090), named "Reading the
+  Agenda…": the window shows at once, the Agenda read on its thread.
 
 ### Alarms and notifications
 

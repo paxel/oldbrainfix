@@ -5480,6 +5480,21 @@ class AppLocalizationsDe extends AppLocalizations {
       'Es wurde nichts importiert. Lade den Export noch einmal herunter, kopiere ihn auf das Telefon und importiere ihn von dort.';
 
   @override
+  String importWritten(int written, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$written von $count Notizen',
+      one: '$written von 1 Notiz',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importGoesOn =>
+      'Du kannst diese Seite verlassen. Der Import läuft neben der App weiter, und oben auf dem Bildschirm steht, wenn er fertig ist.';
+
+  @override
   String settingBadgeLabel(String setting, String value) {
     return '$setting: $value';
   }

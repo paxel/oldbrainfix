@@ -3,25 +3,33 @@ import 'dart:typed_data';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'folder_platform.dart';
+import 'import_run.dart';
 
 /// Reads the files of the [folder] picked through [folders] and makes
 /// Notes of them in a new Area named [areaName] (ADR 0036). Only what
 /// may become a Note is read, and none larger than
 /// [Imports.maxFileBytes]; every other file is handed over unread, so
 /// the core counts it as skipped. A file that cannot be read throws, and
-/// then nothing is written.
+/// then nothing is written. [progress] hears how far the writing is.
 Future<ImportSummary> importFolder(
   Store store,
   FolderPlatform folders,
   String folder,
-  String areaName,
-) async {
+  String areaName, {
+  ImportProgress? progress,
+}) async {
   final files = <ImportFile>[];
   for (final file in await folders.files(folder)) {
     files.add(await _read(folders, file));
   }
-  return Imports(store).folder(areaName, files);
+  return Imports(store).folder(areaName, files, progress: progress);
 }
+
+/// [importFolder] of [folder] into [areaName] as a job for an
+/// [ImportRunner] (obf-1061).
+ImportWork folderImport(String folder, String areaName) =>
+    (store, folders, progress) =>
+        importFolder(store, folders, folder, areaName, progress: progress);
 
 Future<ImportFile> _read(FolderPlatform folders, FolderFile file) async {
   if (!mayBecomeNote(file.path)) {

@@ -16,6 +16,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 - Auf dem Handy öffnet „Mehr“ in der Schnellnotiz den Notiz-Editor auch, während ein Tipp zu sehen ist, statt die App abstürzen zu lassen. ([obf-1058](https://github.com/paxel/oldbrainfix/issues/371))
 - Auf dem Handy stürzt die App nach einem Absturz und „App neu starten“ nicht kurz darauf erneut ab. ([obf-1059](https://github.com/paxel/oldbrainfix/issues/372))
+- Auf dem Handy friert ein Import die App nicht mehr ein: Er läuft neben der App auf einer Seite, die seine Notizen zählt und die du verlassen kannst. ([obf-1061](https://github.com/paxel/oldbrainfix/issues/374))
 
 ## [0.7.1] - 2026-11-21
 

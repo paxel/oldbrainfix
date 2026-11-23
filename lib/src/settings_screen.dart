@@ -19,6 +19,8 @@ import 'feedback_screen.dart';
 import 'file_platform.dart';
 import 'folder_import.dart';
 import 'folder_platform.dart';
+import 'import_run.dart';
+import 'import_screen.dart';
 import 'keep_import.dart';
 import 'l10n.dart';
 import 'lock_settings.dart';
@@ -28,6 +30,7 @@ import 'page_bar.dart';
 import 'place_names.dart';
 import 'print_platform.dart';
 import 'routine_editor_screen.dart';
+import 'run_over.dart';
 import 'schedule_text.dart';
 import 'settings_search.dart';
 import 'setup_screen.dart';
@@ -41,9 +44,6 @@ export 'settings_search.dart' show SettingsHeading, SettingsSection;
 /// How this Device shows the known units of Tallies: as its region
 /// does, or a system chosen.
 enum _UnitChoice { region, metric, imperial }
-
-/// The Imports in Settings: a folder of files, or Google Keep's export.
-enum _Importing { folder, keep }
 
 /// This Device's settings (ADR 0008), reached only through the Profile
 /// page: the theme, the text size (#326, obf-1019) and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
@@ -259,31 +259,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _twoRows = on);
   }
 
-  /// Which Import is reading its folder or zip, null while none is.
-  _Importing? _importing;
-
   /// Picks a folder with the system's picker and makes Notes of its
   /// Markdown and text files in a new Area (ADR 0036), announced as
   /// [_runImport] does.
-  Future<void> _import() async {
-    if (_importing != null) return;
+  Future<void> _import(ImportJobs jobs) async {
+    if (jobs.running.value != null) return;
     final t = context.t;
     final folders = FolderScope.of(context);
     final announcements = AnnouncementsScope.of(context);
     final navigator = Navigator.of(context, rootNavigator: true);
     final store = widget.store;
     final folder = await folders.pick();
-    if (folder == null) return;
-    var name = '';
+    if (folder == null || jobs.running.value != null) return;
+    final name = await folders.displayName(folder);
+    if (jobs.running.value != null) return;
     await _runImport(
-      _Importing.folder,
+      ImportKind.folder,
       t,
       announcements,
       navigator,
-      run: () async {
-        name = await folders.displayName(folder);
-        return importFolder(store, folders, folder, t.importAreaName(name));
-      },
+      jobs,
+      work: folderImport(folder, t.importAreaName(name)),
       finished: (summary, area) => [
         t.importFinishedNotes(summary.notes, area),
         if (summary.skipped > 0) ...[
@@ -318,8 +314,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// folder, picks it with the system's picker and makes Notes of its
   /// Google Keep notes in the new Area "From Google Keep" (ADR 0036),
   /// announced as [_runImport] does.
-  Future<void> _importKeep() async {
-    if (_importing != null) return;
+  Future<void> _importKeep(ImportJobs jobs) async {
+    if (jobs.running.value != null) return;
     final t = context.t;
     final folders = FolderScope.of(context);
     final announcements = AnnouncementsScope.of(context);
@@ -359,17 +355,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (zip == null || !mounted || _importing != null) return;
+    if (zip == null || !mounted || jobs.running.value != null) return;
     final source = zip ? await folders.pickZip() : await folders.pick();
-    if (source == null) return;
+    if (source == null || jobs.running.value != null) return;
     await _runImport(
-      _Importing.keep,
+      ImportKind.keep,
       t,
       announcements,
       navigator,
-      run: () => zip
-          ? importKeepZip(store, folders, source, t.importKeepAreaName)
-          : importKeepFolder(store, folders, source, t.importKeepAreaName),
+      jobs,
+      work: keepImport(source, t.importKeepAreaName, zip: zip),
       finished: (summary, area) => [
         t.importFinishedNotes(summary.notes, area),
         if (summary.checklists > 0) t.importKeepChecklists(summary.checklists),
@@ -408,19 +403,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         summary.notText,
       );
 
-  /// Runs the Import [kind] by [run], its row showing that it reads
-  /// meanwhile, and announces at the top in [t], taken before any await,
-  /// once done, even after this page closed, without values (UI laws):
-  /// its tap shows what went where, [finished] says it of the new Area,
-  /// with a way into the Area; or, with nothing to import, why
-  /// ([nothing]); or that it [failed]. Then gives up what was picked for
-  /// it ([release]).
+  /// Runs the Import [kind] as [work] beside the app in [jobs]
+  /// (obf-1061), on a page of its own that counts its Notes and that the
+  /// user may leave, and announces at the top in [t], taken before any
+  /// await, once done, even after this page closed, without values (UI
+  /// laws): its tap shows what went where, [finished] says it of the new
+  /// Area, with a way into the Area; or, with nothing to import, why
+  /// ([nothing]); or that it [failed]. The page says the same. Then gives
+  /// up what was picked for it ([release]).
   Future<void> _runImport(
-    _Importing kind,
+    ImportKind kind,
     AppLocalizations t,
     Announcements? announcements,
-    NavigatorState navigator, {
-    required Future<ImportSummary> Function() run,
+    NavigatorState navigator,
+    ImportJobs jobs, {
+    required ImportWork work,
     required String Function(ImportSummary summary, String area) finished,
     required ({String announced, String cause, String fix, String details})
     Function(ImportSummary summary)
@@ -430,15 +427,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) async {
     final store = widget.store;
     final trail = widget.trail ?? BrowserTrail();
-    if (mounted) setState(() => _importing = kind);
+    final job = ImportJob(kind);
+    _showImport(navigator, store, trail, job);
     try {
-      final summary = await run();
+      final summary = await jobs.run(job, work);
+      // A Restart ended this run of the app meanwhile: its store is
+      // closed, and nobody is left to tell.
+      if (runOver(store)) return;
       final area = switch (summary.areaId) {
         final id? => Places(store).areaById(id),
         null => null,
       };
       if (area == null) {
         final why = nothing(summary);
+        job.ended(ImportEnd('${why.announced}\n\n${why.cause} ${why.fix}'));
         announceFailureWith(
           announcements,
           navigator,
@@ -451,6 +453,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
       final details = finished(summary, areaName(t, area));
+      job.ended(ImportEnd(details, area: area));
       announcements?.announce(
         t.importFinished,
         onTap: () => unawaited(
@@ -478,6 +481,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
     } on Exception catch (e) {
+      if (runOver(store)) return;
+      job.ended(
+        ImportEnd('${failed.announced}\n\n${failed.cause} ${failed.fix}'),
+      );
       announceFailureWith(
         announcements,
         navigator,
@@ -488,8 +495,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         details: '$e',
       );
     } finally {
-      unawaited(release());
-      if (mounted) setState(() => _importing = null);
+      // Not on a store a Restart closed meanwhile, which [release] reads.
+      if (!runOver(store)) unawaited(release());
     }
   }
 
@@ -530,32 +537,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// The row of the Import [kind]: [title] over [detail], or over
-  /// [reading] with a spinner while it runs; no row takes a tap while
-  /// any Import runs.
+  /// The row of the Import [kind] in [jobs]: [title] over [detail], or
+  /// over [reading] with a spinner while it runs, its tap then opening
+  /// its page again (obf-1061); the other row takes no tap meanwhile.
   Widget _importRow(
-    _Importing kind, {
+    ImportJobs jobs,
+    ImportKind kind, {
     required Key key,
     required IconData icon,
     required String title,
     required String detail,
     required String reading,
     required VoidCallback onTap,
-  }) {
-    final running = _importing == kind;
-    return ListTile(
-      key: key,
-      leading: Icon(icon),
-      title: Text(title),
-      subtitle: Text(running ? reading : detail),
-      trailing: running
-          ? const SizedBox.square(
-              dimension: 24,
-              child: CircularProgressIndicator(strokeWidth: 3),
-            )
-          : null,
-      enabled: _importing == null,
-      onTap: onTap,
+  }) => ValueListenableBuilder<ImportJob?>(
+    valueListenable: jobs.running,
+    builder: (context, job, _) {
+      final running = job != null && job.kind == kind;
+      return ListTile(
+        key: key,
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(running ? reading : detail),
+        trailing: running
+            ? const SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              )
+            : null,
+        enabled: job == null || running,
+        onTap: running
+            ? () => _showImport(
+                Navigator.of(context, rootNavigator: true),
+                widget.store,
+                widget.trail ?? BrowserTrail(),
+                job,
+              )
+            : onTap,
+      );
+    },
+  );
+
+  /// The page of the Import [job] on top, its Open opening the new Area
+  /// as [_openImported] does; once left, the running Import's row opens
+  /// it again.
+  static void _showImport(
+    NavigatorState navigator,
+    Store store,
+    BrowserTrail trail,
+    ImportJob job,
+  ) {
+    unawaited(
+      navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => ImportScreen(
+            job: job,
+            onOpen: (area) => _openImported(navigator, store, trail, area),
+          ),
+        ),
+      ),
     );
   }
 
@@ -577,6 +616,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     final soundDetail = _sound == null ? t.alarmSoundOwn : t.alarmSoundChosen;
     final typed = _search.text.trim();
+    final imports = ImportJobsScope.of(context);
     return Scaffold(
       appBar: pageBar(context, title: t.settingsTitle),
       body: Column(
@@ -1045,7 +1085,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    if (FolderScope.of(context).available)
+                    if (FolderScope.of(context).available && imports != null)
                       SettingsGroup(
                         heading: t.settingsImport,
                         headingKey: _heading('import'),
@@ -1055,25 +1095,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               SettingsRow(
                                 words: [t.importFolder, t.importFolderDetail],
                                 child: _importRow(
-                                  _Importing.folder,
+                                  imports,
+                                  ImportKind.folder,
                                   key: const ValueKey('importFolder'),
                                   icon: Icons.drive_folder_upload_outlined,
                                   title: t.importFolder,
                                   detail: t.importFolderDetail,
                                   reading: t.importReading,
-                                  onTap: _import,
+                                  onTap: () => unawaited(_import(imports)),
                                 ),
                               ),
                               SettingsRow(
                                 words: [t.importKeep, t.importKeepDetail],
                                 child: _importRow(
-                                  _Importing.keep,
+                                  imports,
+                                  ImportKind.keep,
                                   key: const ValueKey('importKeep'),
                                   icon: Icons.sticky_note_2_outlined,
                                   title: t.importKeep,
                                   detail: t.importKeepDetail,
                                   reading: t.importKeepReading,
-                                  onTap: _importKeep,
+                                  onTap: () => unawaited(_importKeep(imports)),
                                 ),
                               ),
                             ],

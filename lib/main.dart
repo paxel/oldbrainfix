@@ -27,6 +27,7 @@ import 'src/file_platform.dart';
 import 'src/folder_platform.dart';
 import 'src/help_notes.dart';
 import 'src/home_shortcuts.dart';
+import 'src/import_run.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
@@ -158,6 +159,13 @@ Future<void> _openAndRun(Directory dir) async {
       // The Agenda's reads and the alarms' plan there too, so the app
       // draws on while they read (#207).
       agendaReader: IsolateAgendaReader(path),
+      // An Import there too, so the app stays usable while it writes
+      // (obf-1061).
+      importRunner: IsolateImportRunner(
+        path: path,
+        folders: const AndroidFolders(),
+        token: RootIsolateToken.instance,
+      ),
       bundles: AndroidBundles(),
       profile: AndroidProfile(),
       workDir: work.path,

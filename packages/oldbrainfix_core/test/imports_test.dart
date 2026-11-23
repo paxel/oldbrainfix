@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -262,6 +263,71 @@ void main() {
       final dates = notes.inside(summary.areaId!).map((n) => n.captured);
       expect(dates, isNot(contains(march)));
       expect(dates.first, march.add(const Duration(minutes: 131)));
+    });
+  });
+
+  group('beside the app (obf-1061)', () {
+    test('tells how far it is, before the first Note and after each', () {
+      final told = <(int, int)>[];
+      final summary = imports.folder('From Notes', [
+        file('a.txt', 'a', march),
+        file('b.txt', 'b', may),
+        file('photo.png', 'not text', march),
+      ], progress: (written, of) => told.add((written, of)));
+      expect(summary.notes, 2);
+      expect(told, [(0, 2), (1, 2), (2, 2)]);
+      expect(notes.inside(summary.areaId!), hasLength(2));
+    });
+
+    test('tells nothing when nothing is written', () {
+      final told = <(int, int)>[];
+      imports.folder('From Notes', [
+        file('photo.png', 'x'),
+      ], progress: (written, of) => told.add((written, of)));
+      expect(told, isEmpty);
+    });
+
+    test('lets another connection write between its Notes', () {
+      final dir = Directory.systemTemp.createTempSync('obf');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = '${dir.path}/log.db';
+      final importing = Store.open(path);
+      final app = Store.open(path);
+      addTearDown(() {
+        importing.close();
+        app.close();
+      });
+      final captured = <String>[];
+      final watch = Stopwatch()..start();
+      final summary = Imports(importing).keep(
+        'From Google Keep',
+        [
+          for (final name in ['One', 'Two', 'Three'])
+            ImportFile(
+              'Keep/$name.json',
+              null,
+              Uint8List.fromList(
+                utf8.encode(
+                  jsonEncode({
+                    'createdTimestampUsec': march.microsecondsSinceEpoch,
+                    'title': name,
+                    'listContent': [
+                      {'text': 'Line', 'isChecked': false},
+                    ],
+                  }),
+                ),
+              ),
+            ),
+        ],
+        progress: (written, _) {
+          // A write here waits for no lock the Import holds.
+          captured.add(Notes(app).capture('Meanwhile $written').id);
+        },
+      );
+      expect(watch.elapsed, lessThan(const Duration(seconds: 4)));
+      expect(summary.notes, 3);
+      expect(captured, hasLength(4));
+      expect(Notes(importing).inside(summary.areaId!), hasLength(3));
     });
   });
 

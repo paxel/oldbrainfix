@@ -37,6 +37,7 @@ import 'help_notes.dart';
 import 'home_shortcuts.dart';
 import 'home_pages.dart';
 import 'host_screen.dart';
+import 'import_run.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'lock_platform.dart';
@@ -184,6 +185,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// an isolate of their own (#207); without one, on [store] at once.
   final AgendaReader agendaReader;
 
+  /// Where an Import runs: the app hands in an isolate of its own
+  /// (obf-1061); without one, on [store] with [folders].
+  final ImportRunner? importRunner;
+
   /// Starts this Device's paired host for automatic sync; while none is
   /// given, this Device only joins.
   final StartPairedHost? pairedHost;
@@ -245,6 +250,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.autoJoin = quickPairedSync,
     this.syncRunner,
     this.agendaReader = const InlineAgendaReader(),
+    this.importRunner,
     this.pairedHost,
     this.join = lanSync,
     this.hosting = startPairingHost,
@@ -312,6 +318,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _profile = OwnProfileModel(
     store: widget.store,
     platform: widget.profile,
+  );
+  late final _imports = ImportJobs(
+    store: widget.store,
+    runner: widget.importRunner ?? InlineImportRunner(widget.folders),
   );
 
   @override
@@ -382,6 +392,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       _lock.dispose,
       _profile.dispose,
       _frameTimes.dispose,
+      _imports.dispose,
     ]) {
       try {
         stop();
@@ -526,9 +537,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                               child: HomeShortcutsScope(
                                                                 shortcuts: widget
                                                                     .shortcuts,
-                                                                child: _spotlit(
-                                                                  child ??
-                                                                      const SizedBox.shrink(),
+                                                                child: ImportJobsScope(
+                                                                  jobs:
+                                                                      _imports,
+                                                                  child: _spotlit(
+                                                                    child ??
+                                                                        const SizedBox.shrink(),
+                                                                  ),
                                                                 ),
                                                               ),
                                                             ),
