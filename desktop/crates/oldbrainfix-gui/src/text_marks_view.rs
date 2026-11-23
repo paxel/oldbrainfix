@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Local, Utc};
-use egui::cache::{ComputerMut, FrameCache};
+use egui::cache::{CacheTrait, ComputerMut, FrameCache};
 use egui::text::{CCursor, CharIndex, Galley, LayoutJob, TextFormat};
 use egui::{
     Color32, FontId, FontSelection, Id, Modifiers, Popup, Pos2, Rect, RichText, Sense, Stroke,
@@ -343,7 +343,7 @@ pub fn marked_label(
     let Some(part) = text.get(from..to) else {
         return Spots::default();
     };
-    let found = Found::of(text, text_format::PLAIN, boxes);
+    let found = Found::in_parsed(&parsed(ui.ctx(), text, false), boxes);
     let marked = found
         .boxes
         .iter()
@@ -420,8 +420,9 @@ pub fn note_label(
         return Spots::default();
     }
     let look = Look::of(ui, look);
-    let found = Found::of(text, format, boxes);
-    let blocks = markdown::parse(text);
+    let parsed = parsed(ui.ctx(), text, true);
+    let found = Found::in_parsed(&parsed, boxes);
+    let blocks = &parsed.blocks;
     let (first, last) = (line_at(text, from), line_at(text, to));
     let mut spots = Spots::default();
     let size = look.font.size;
@@ -451,12 +452,12 @@ pub fn note_label(
                 if !truncate {
                     if block.line == code.first_line.max(first) {
                         room(ui, BlockKind::Code, &mut blank);
-                        code_label(ui, text, (&blocks, code), (first, last), &look);
+                        code_label(ui, text, (blocks, code), (first, last), &look);
                     }
                 } else if !code.is_fence(block.line) {
                     room(ui, BlockKind::Code, &mut blank);
                     let line = (block.line, block.line);
-                    let colours = block_colours(ui.ctx(), text, (&blocks, code), line);
+                    let colours = block_colours(ui.ctx(), text, (blocks, code), line);
                     let drawn = block_label(ui, (text, block), &found, &look, (truncate, &colours));
                     spots.extend(drawn);
                 }
@@ -946,27 +947,99 @@ impl Found {
     /// Those of the source `text` in `format`, its boxes as `look` says.
     pub(crate) fn of(text: &str, format: &str, look: &BoxLook) -> Found {
         let markdown = format == text_format::MARKDOWN;
-        let links = if markdown {
-            markdown::autolinks(text)
-        } else {
-            markdown::plain_autolinks(text)
-        };
-        let boxes = text_boxes::find(text)
-            .into_iter()
+        Found::in_parsed(&Parsed::of(text, markdown), look)
+    }
+
+    /// Those `parsed` holds, its boxes as `look` says.
+    fn in_parsed(parsed: &Parsed, look: &BoxLook) -> Found {
+        let links = parsed.links.clone();
+        let boxes = parsed
+            .boxes
+            .iter()
             .filter(|b| !links.iter().any(|&(s, e)| b.start < e && s < b.end))
             .map(|b| {
-                let state = look.state(&b);
+                let state = look.state(b);
                 let after = look.after.get(&b.id).cloned();
-                (b, state, after)
+                (b.clone(), state, after)
             })
             .collect();
-        let tags = if markdown {
-            markdown::tags(text)
-        } else {
-            markdown::plain_tags(text)
-        };
-        Found { boxes, tags, links }
+        Found {
+            boxes,
+            tags: parsed.tags.clone(),
+            links,
+        }
     }
+}
+
+/// What a text is parsed into before it is drawn: its lines, its web
+/// addresses, boxes and tags, as Markdown or as plain text.
+struct Parsed {
+    blocks: Vec<Block>,
+    links: Vec<(usize, usize)>,
+    boxes: Vec<FoundBox>,
+    tags: Vec<FoundTag>,
+}
+
+impl Parsed {
+    fn of(text: &str, markdown: bool) -> Parsed {
+        let (blocks, links, tags) = if markdown {
+            (
+                markdown::parse(text),
+                markdown::autolinks(text),
+                markdown::tags(text),
+            )
+        } else {
+            (
+                Vec::new(),
+                markdown::plain_autolinks(text),
+                markdown::plain_tags(text),
+            )
+        };
+        Parsed {
+            blocks,
+            links,
+            boxes: text_boxes::find(text),
+            tags,
+        }
+    }
+}
+
+/// Parses each text once while it is drawn frame after frame (obf-1069),
+/// forgotten the first frame it is not.
+#[derive(Default)]
+struct Parser;
+
+impl ComputerMut<(&str, bool), Arc<Parsed>> for Parser {
+    fn compute(&mut self, (text, markdown): (&str, bool)) -> Arc<Parsed> {
+        Arc::new(Parsed::of(text, markdown))
+    }
+}
+
+type ParsedTexts = FrameCache<Arc<Parsed>, Parser>;
+
+/// Where [`parses`] counts.
+const PARSES: &str = "text parses";
+
+/// `text` parsed, as Markdown or plain, from what was drawn the frame
+/// before where it was.
+fn parsed(ctx: &egui::Context, text: &str, markdown: bool) -> Arc<Parsed> {
+    ctx.memory_mut(|m| {
+        let cache = m.caches.cache::<ParsedTexts>();
+        let held = CacheTrait::len(cache);
+        let parsed = cache.get((text, markdown)).clone();
+        if CacheTrait::len(cache) > held {
+            *m.data
+                .get_temp_mut_or_default::<usize>(egui::Id::new(PARSES)) += 1;
+        }
+        parsed
+    })
+}
+
+/// How often a text drawn was parsed in `ctx`: what a test counts by
+/// (obf-1069).
+pub fn parses(ctx: &egui::Context) -> usize {
+    ctx.data(|d| d.get_temp::<usize>(egui::Id::new(PARSES)))
+        .unwrap_or_default()
 }
 
 /// What a part of a line is inside of.

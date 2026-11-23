@@ -904,7 +904,7 @@ impl<'a> Alarms<'a> {
             None
         };
         nudge_plan(
-            &Notes::new(self.store).unsorted()?,
+            &Notes::new(self.store).nudge_anchors()?,
             self.nudge_snooze()?,
             self.store.now(),
             wall,

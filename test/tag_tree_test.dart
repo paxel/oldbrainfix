@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/tag_tree_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -195,9 +196,10 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // Without the lock its tags are there again.
+    // Without the lock its tags are there again, once the search runs.
     store.setAreaLocked(diary.id, false);
     await tester.enterText(field, '#');
+    await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
     expect(key('search-tag-#affair'), findsOneWidget);
     expect(key('search-tag-#life/love'), findsOneWidget);

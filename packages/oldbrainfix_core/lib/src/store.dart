@@ -130,7 +130,7 @@ class Store {
 
   /// Forgets what was worked out or read of the log.
   void _forget() {
-    _judged = null;
+    _judgement = null;
     _overlay = null;
     _shownJudged = null;
     _forgetWorkedOut();
@@ -232,6 +232,8 @@ class Store {
         ON entries (device, dseq);
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
         ON entries (entity, field);
+      CREATE INDEX IF NOT EXISTS idx_entries_types
+        ON entries (value) WHERE field = '\$type';
     ''');
     // Today's tables: a database from before the version was recorded
     // gets it. A later version adds its steps here, one per version.
@@ -246,7 +248,30 @@ class Store {
     return store;
   }
 
-  void close() => _db.close();
+  void close() {
+    for (final statement in _prepared.values) {
+      statement.close();
+    }
+    _prepared.clear();
+    _db.close();
+  }
+
+  /// The statements of the reads that run again and again, each prepared
+  /// once: preparing it anew was most of what a read of one entity took
+  /// (obf-1069).
+  final _prepared = <String, PreparedStatement>{};
+
+  /// What [sql] selects with [args], its statement prepared once and kept
+  /// for every later call. Only for a text that stays the same: one that
+  /// names a varying number of values goes to the database itself.
+  ResultSet _select(String sql, [List<Object?> args = const []]) {
+    final statement = _prepared[sql] ??= _db.prepare(
+      sql,
+      persistent: true,
+      checkNoTail: true,
+    );
+    return statement.select(args);
+  }
 
   /// This installation's stable device id; created once.
   String get deviceId =>
@@ -270,7 +295,7 @@ class Store {
 
   /// A setting of this Device. Never synced (ADR 0008).
   String? localSetting(String key) {
-    final rows = _db.select('SELECT value FROM local_settings WHERE key = ?', [
+    final rows = _select('SELECT value FROM local_settings WHERE key = ?', [
       key,
     ]);
     return rows.isEmpty ? null : rows.first['value'] as String;
@@ -451,11 +476,14 @@ class Store {
         ctx,
       ],
     );
+    final held = _judgement;
     _changed();
-    return _entries('SELECT * FROM entries WHERE device = ? AND dseq = ?', [
-      device,
-      dseq,
-    ]).single;
+    final entry = _entries(
+      'SELECT * FROM entries WHERE device = ? AND dseq = ?',
+      [device, dseq],
+    ).single;
+    if (held != null) _judgement = _judgedWith(held, entry);
+    return entry;
   }
 
   /// The causal context of a write to [unit] on [entity] by [device]
@@ -595,7 +623,7 @@ class Store {
   /// for an empty log. `seq` is AUTOINCREMENT, so a mark keeps meaning
   /// the same moment.
   int currentSeq() =>
-      _db.select('SELECT COALESCE(MAX(seq), 0) AS n FROM entries').first['n']
+      _select('SELECT COALESCE(MAX(seq), 0) AS n FROM entries').first['n']
           as int;
 
   // ------------------------------------------------------------ moments
@@ -652,7 +680,7 @@ class Store {
       _db.execute('COMMIT');
     } catch (_) {
       _db.execute('ROLLBACK');
-      _judged = null;
+      _judgement = null;
       _forgetWorkedOut();
       rethrow;
     } finally {
@@ -1020,6 +1048,11 @@ class Store {
   @visibleForTesting
   var historyReads = 0;
 
+  /// How often [loggedHistory] was read, for itself or for [history]:
+  /// what a test counts the reads of the log alone by (obf-1069).
+  @visibleForTesting
+  var loggedReads = 0;
+
   /// Every entry of [entity] that counts, in log order, then those of
   /// the shown pending sets: what no role in a Shared Area allows is left
   /// out, judged with those sets too.
@@ -1047,6 +1080,7 @@ class Store {
   /// pending change among them: what decides where an entity is sealed,
   /// and what the user's own Devices wrote.
   List<Entry> loggedHistory(String entity) {
+    loggedReads++;
     final all = _entries(
       'SELECT * FROM entries WHERE $_applied AND entity = ? ORDER BY seq',
       [entity],
@@ -1078,7 +1112,7 @@ class Store {
     ];
   }
 
-  JudgedLog? _judged;
+  _Judgement? _judgement;
 
   final _workedOut = <Object, Object?>{};
   var _generation = 0;
@@ -1106,26 +1140,116 @@ class Store {
     return value;
   }
 
+  /// What [workedOut] keeps under [key] now, without working it out:
+  /// null when nothing is kept.
+  @internal
+  T? workedOutHeld<T>(Object key) =>
+      currentSeq() == _workedSeq ? _workedOut[key] as T? : null;
+
   void _forgetWorkedOut() {
     _generation++;
     _workedOut.clear();
   }
 
+  /// How often [judged] was worked out from the whole log: what a test
+  /// counts it by.
+  @visibleForTesting
+  var judgedBuilds = 0;
+
   /// What the roles of the Shared Areas allow (ADR 0013), worked out
   /// from the whole log after every change; nothing to work out while no
-  /// Area was ever shared. Pending Changes never count here: this is
-  /// what decides who may do what, what is refused and what is deleted.
-  JudgedLog get judged => _judged ??=
-      _db
-          .select(
-            "SELECT 1 FROM entries WHERE $_applied "
-            "AND substr(field, 1, 5) = 'role:' LIMIT 1",
-          )
-          .isEmpty
-      ? JudgedLog.none
-      : judgeLog(
-          _entries('SELECT * FROM entries WHERE $_applied ORDER BY seq'),
-        );
+  /// Area was ever shared. Inside a batch, this Device's own entries are
+  /// judged again only with the entities they can change ([judgedLink]),
+  /// so many writes with reads between them work it out once. Pending
+  /// Changes never count here: this is what decides who may do what,
+  /// what is refused and what is deleted.
+  JudgedLog get judged => (_judgement ??= _judge()).log;
+
+  _Judgement _judge() {
+    judgedBuilds++;
+    if (_db
+        .select(
+          "SELECT 1 FROM entries WHERE $_applied "
+          "AND substr(field, 1, 5) = 'role:' LIMIT 1",
+        )
+        .isEmpty) {
+      return _Judgement(JudgedLog.none, {}, inBatch: _inBatch);
+    }
+    final entries = _entries(
+      'SELECT * FROM entries WHERE $_applied ORDER BY seq',
+    );
+    final linkedFrom = <String, Set<String>>{};
+    for (final e in entries) {
+      if (judgedLink(e) case final to?) {
+        linkedFrom.putIfAbsent(to, () => {}).add(e.entity);
+      }
+    }
+    return _Judgement(judgeLog(entries), linkedFrom, inBatch: _inBatch);
+  }
+
+  /// What is judged with [e] appended to the log [held] judged, [e] this
+  /// Device's entry: null when it is worked out from the whole log again. Only a judgement worked out
+  /// inside the batch running is carried on, since in it nothing but this
+  /// store writes (it holds the write lock) and every other change forgets
+  /// it; the batch's end forgets it too. Judged again are the entities
+  /// whose entries link to [e]'s entity, on and on, as they can judge
+  /// otherwise now, with all they link to, so each is judged as in the
+  /// whole log; the rest stays as judged.
+  _Judgement? _judgedWith(_Judgement held, Entry e) {
+    if (!held.inBatch) return null;
+    if (identical(held.log, JudgedLog.none)) {
+      // Still nothing to work out, but for the first grant.
+      return e.field.startsWith(ShareKeys.rolePrefix) ? null : held;
+    }
+    final linkedFrom = held.linkedFrom;
+    if (judgedLink(e) case final to?) {
+      linkedFrom.putIfAbsent(to, () => {}).add(e.entity);
+    }
+    final changed = {e.entity};
+    final linking = [e.entity];
+    while (linking.isNotEmpty) {
+      for (final from in linkedFrom[linking.removeLast()] ?? const <String>{}) {
+        if (changed.add(from)) linking.add(from);
+      }
+    }
+    final read = {...changed};
+    final entries = <Entry>[];
+    var next = changed.toList();
+    while (next.isNotEmpty) {
+      final found = [
+        for (var i = 0; i < next.length; i += _inChunk)
+          ..._entriesOnce(
+            'SELECT * FROM entries WHERE $_applied AND entity IN '
+            '(${List.filled(min(_inChunk, next.length - i), '?').join(', ')}) '
+            'ORDER BY seq',
+            next.sublist(i, min(i + _inChunk, next.length)),
+          ),
+      ];
+      entries.addAll(found);
+      next = [
+        for (final f in found)
+          if (judgedLink(f) case final to? when read.add(to)) to,
+      ];
+    }
+    final part = judgeLog(entries);
+    final rejudged = {for (final f in entries) f.id};
+    return _Judgement(
+      JudgedLog(
+        {
+          for (final id in held.log.ignored)
+            if (!rejudged.contains(id)) id,
+          ...part.ignored,
+        },
+        {
+          for (final MapEntry(:key, :value) in held.log.areas.entries)
+            if (!read.contains(key)) key: value,
+          ...part.areas,
+        },
+      ),
+      linkedFrom,
+      inBatch: true,
+    );
+  }
 
   /// Every entry, in log order, those of a later structure too: what a
   /// Backup carries.
@@ -1135,9 +1259,26 @@ class Store {
   String? current(String entity, String field) => currentFields(entity)[field];
 
   /// The current value of every field on [entity] — latest wins.
-  Map<String, String?> currentFields(String entity) {
+  Map<String, String?> currentFields(String entity) =>
+      latestFields(history(entity));
+
+  /// What [currentFields] gives for each of [entities], read in one
+  /// query rather than one per entity (#204); those without an entry
+  /// that counts are left out. It counts as one [history] read.
+  Map<String, Map<String, String?>> currentFieldsOf(
+    Iterable<String> entities,
+  ) => {
+    for (final MapEntry(key: id, value: history) in historiesOf(
+      entities,
+    ).entries)
+      id: latestFields(history),
+  };
+
+  /// The current value of every field in [history], one entity's entries
+  /// as [history] gives them: what [currentFields] makes of them.
+  static Map<String, String?> latestFields(Iterable<Entry> history) {
     final latest = <String, Entry>{};
-    for (final e in history(entity)) {
+    for (final e in history) {
       final held = latest[e.field];
       if (held == null || _newer(e, held)) latest[e.field] = e;
     }
@@ -1146,40 +1287,109 @@ class Store {
     };
   }
 
-  /// What [currentFields] gives for each of [entities], read in one
-  /// query rather than one per entity (#204); those without an entry
+  /// What [history] gives for each of [entities], read in one query per
+  /// few hundred rather than one each (obf-1069); those without an entry
   /// that counts are left out. It counts as one [history] read.
-  Map<String, Map<String, String?>> currentFieldsOf(Iterable<String> entities) {
+  Map<String, List<Entry>> historiesOf(Iterable<String> entities) {
     final ids = entities.toSet();
     if (ids.isEmpty) return {};
     historyReads++;
-    final list = ids.toList();
     final shown = _shown;
-    final all = [
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    return _grouped([
+      ..._loggedOf(ids),
+      for (final e in shown)
+        if (ids.contains(e.entity)) e,
+    ], ignored);
+  }
+
+  /// What [loggedHistory] gives for each of [entities], read in one query
+  /// per few hundred rather than one each (obf-1069); those without an
+  /// entry that counts are left out. It counts as one [loggedHistory]
+  /// read.
+  Map<String, List<Entry>> loggedHistoriesOf(Iterable<String> entities) {
+    final ids = entities.toSet();
+    if (ids.isEmpty) return {};
+    loggedReads++;
+    return _grouped(_loggedOf(ids), judged.ignored);
+  }
+
+  /// [historiesOf] with only the entries of [fields], for what reads a
+  /// field or two of many entities (obf-1069). It counts as one
+  /// [history] read.
+  @internal
+  Map<String, List<Entry>> historiesFieldsOf(
+    Iterable<String> entities,
+    Set<String> fields,
+  ) {
+    final ids = entities.toSet();
+    if (ids.isEmpty || fields.isEmpty) return {};
+    historyReads++;
+    final shown = _shown;
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    return _grouped([
+      ..._loggedFields(ids, fields),
+      for (final e in shown)
+        if (ids.contains(e.entity) && fields.contains(e.field)) e,
+    ], ignored);
+  }
+
+  /// [loggedHistoriesOf] with only the entries of [fields], for what
+  /// reads a field or two of many entities (obf-1069). It counts as one
+  /// [loggedHistory] read.
+  @internal
+  Map<String, List<Entry>> loggedFieldsOf(
+    Iterable<String> entities,
+    Set<String> fields,
+  ) {
+    final ids = entities.toSet();
+    if (ids.isEmpty || fields.isEmpty) return {};
+    loggedReads++;
+    return _grouped(_loggedFields(ids, fields), judged.ignored);
+  }
+
+  /// The entries of [fields] of [ids] in the log, each entity's in log
+  /// order.
+  List<Entry> _loggedFields(Set<String> ids, Set<String> fields) {
+    final list = ids.toList();
+    final names = List.filled(fields.length, '?').join(', ');
+    return [
       for (var i = 0; i < list.length; i += _inChunk)
-        ..._entries(
+        ..._entriesOnce(
+          'SELECT * FROM entries WHERE $_applied AND field IN ($names) '
+          'AND entity IN '
+          '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
+          'ORDER BY seq',
+          [...fields, ...list.sublist(i, min(i + _inChunk, list.length))],
+        ),
+    ];
+  }
+
+  /// The entries of [ids] in the log, in log order.
+  List<Entry> _loggedOf(Set<String> ids) {
+    final list = ids.toList();
+    return [
+      for (var i = 0; i < list.length; i += _inChunk)
+        ..._entriesOnce(
           'SELECT * FROM entries WHERE $_applied AND entity IN '
           '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
           'ORDER BY seq',
           list.sublist(i, min(i + _inChunk, list.length)),
         ),
-      for (final e in shown)
-        if (ids.contains(e.entity)) e,
     ];
-    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
-    final latest = <String, Map<String, Entry>>{};
+  }
+
+  /// [all] by entity, in their order, but those [ignored].
+  static Map<String, List<Entry>> _grouped(
+    List<Entry> all,
+    Set<String> ignored,
+  ) {
+    final by = <String, List<Entry>>{};
     for (final e in all) {
       if (ignored.contains(e.id)) continue;
-      final fields = latest.putIfAbsent(e.entity, () => {});
-      final held = fields[e.field];
-      if (held == null || _newer(e, held)) fields[e.field] = e;
+      (by[e.entity] ??= []).add(e);
     }
-    return {
-      for (final MapEntry(key: id, value: fields) in latest.entries)
-        id: {
-          for (final MapEntry(:key, :value) in fields.entries) key: value.value,
-        },
-    };
+    return by;
   }
 
   /// How many entities one query of [currentFieldsOf] names, well under
@@ -1187,10 +1397,47 @@ class Store {
   static const _inChunk = 500;
 
   /// Entities whose current `$type` is [type].
-  List<String> entitiesOfType(String type) => [
-    for (final id in _everOfType(type))
-      if (current(id, r'$type') == type) id,
-  ];
+  List<String> entitiesOfType(String type) {
+    final ever = _everOfType(type);
+    final now = _typesOf(ever);
+    return [
+      for (final id in ever)
+        if (now[id] == type) id,
+    ];
+  }
+
+  /// The current `$type` of each of [entities], as [current] gives it,
+  /// read from their `$type` entries alone in one query rather than one
+  /// history per entity (obf-1069); those without one that counts are
+  /// left out. It counts as one [history] read.
+  Map<String, String?> _typesOf(Set<String> entities) {
+    if (entities.isEmpty) return {};
+    historyReads++;
+    final list = entities.toList();
+    final shown = _shown;
+    final all = [
+      for (var i = 0; i < list.length; i += _inChunk)
+        ..._entriesOnce(
+          "SELECT * FROM entries WHERE $_applied AND field = '\$type' "
+          'AND entity IN '
+          '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
+          'ORDER BY seq',
+          list.sublist(i, min(i + _inChunk, list.length)),
+        ),
+      for (final e in shown)
+        if (e.field == r'$type' && entities.contains(e.entity)) e,
+    ];
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    final latest = <String, Entry>{};
+    for (final e in all) {
+      if (ignored.contains(e.id)) continue;
+      final held = latest[e.entity];
+      if (held == null || _newer(e, held)) latest[e.entity] = e;
+    }
+    return {
+      for (final MapEntry(:key, :value) in latest.entries) key: value.value,
+    };
+  }
 
   /// What [currentFields] gives for each entity whose current `$type` is
   /// [type], read in one [currentFieldsOf] query rather than one per
@@ -1226,16 +1473,23 @@ class Store {
   /// sets included, in the order [entitiesOfType] keeps: those that may
   /// hold it now, found without reading every entity (#339).
   @internal
-  Set<String> everWith(String field, String value) => {
-    for (final r in _db.select(
-      'SELECT DISTINCT entity FROM entries WHERE $_applied '
-      'AND field = ? AND value = ?',
-      [field, value],
-    ))
-      r['entity'] as String,
-    for (final e in _shown)
-      if (e.field == field && e.value == value) e.entity,
-  };
+  Set<String> everWith(String field, String value) {
+    // A `$type` named in the query, as the index of the types holds it
+    // (obf-1069), which a bound field cannot use.
+    final (named, args) = field == r'$type'
+        ? (r"field = '$type'", [value])
+        : ('field = ?', [field, value]);
+    return {
+      for (final r in _db.select(
+        'SELECT DISTINCT entity FROM entries WHERE $_applied AND $named '
+        'AND value = ?',
+        args,
+      ))
+        r['entity'] as String,
+      for (final e in _shown)
+        if (e.field == field && e.value == value) e.entity,
+    };
+  }
 
   /// Latest-wins order: date, then recording time, then device, then
   /// dseq. Sorting a field's entries by it puts the current value last.
@@ -1251,22 +1505,37 @@ class Store {
 
   static bool _newer(Entry a, Entry b) => latestWins(a, b) > 0;
 
+  /// The entries [sql] selects with [args], its statement kept
+  /// ([_select]).
   List<Entry> _entries(String sql, [List<Object?> args = const []]) => [
-    for (final r in _db.select(sql, args))
-      Entry(
-        seq: r['seq'] as int,
-        device: r['device'] as String,
-        dseq: r['dseq'] as int,
-        entity: r['entity'] as String,
-        field: r['field'] as String,
-        value: r['value'] as String?,
-        date: DateTime.parse(r['date'] as String),
-        author: r['author'] as String,
-        recorded: DateTime.parse(r['recorded'] as String),
-        sig: r['sig'] as String?,
-        ctx: r['ctx'] as String?,
-      ).withRaw(r['raw'] as String?),
+    for (final r in _select(sql, args)) _entryOf(r),
   ];
+
+  /// The entries [sql] selects with [args], for a text that names a
+  /// varying number of values: its statement is not kept.
+  List<Entry> _entriesOnce(String sql, List<Object?> args) => [
+    for (final r in _db.select(sql, args)) _entryOf(r),
+  ];
+
+  static Entry _entryOf(Row r) {
+    final dateText = r['date'] as String;
+    final recordedText = r['recorded'] as String;
+    final date = parseStoredDate(dateText);
+    return Entry(
+      seq: r['seq'] as int,
+      device: r['device'] as String,
+      dseq: r['dseq'] as int,
+      entity: r['entity'] as String,
+      field: r['field'] as String,
+      value: r['value'] as String?,
+      date: date,
+      author: r['author'] as String,
+      // Most entries are dated when they were recorded: read once.
+      recorded: recordedText == dateText ? date : parseStoredDate(recordedText),
+      sig: r['sig'] as String?,
+      ctx: r['ctx'] as String?,
+    ).withRaw(r['raw'] as String?);
+  }
 
   /// The entries this version applies (ADR 0019): those of a later
   /// structure are only held and passed on, so they count for what is
@@ -1380,4 +1649,60 @@ bool laterSetting(String value) {
   bool later(Object? o) =>
       o is Map && o.containsKey('v') && !(o['v'] is int && o['v'] == 1);
   return later(json) || (json is List && json.any(later));
+}
+
+/// The instant [text] holds, as [DateTime.parse] reads it. What the log
+/// keeps, a UTC time as `toIso8601String` writes it
+/// (`2026-11-22T10:00:00.000Z`, microseconds only when there are any),
+/// is read by its positions: parsing it was a third of a read (obf-1069).
+/// Every other form goes to [DateTime.parse] itself.
+@visibleForTesting
+DateTime parseStoredDate(String text) {
+  final length = text.length;
+  if ((length != 24 && length != 27) ||
+      text.codeUnitAt(length - 1) != 0x5A || // Z
+      text.codeUnitAt(4) != 0x2D || // -
+      text.codeUnitAt(7) != 0x2D ||
+      text.codeUnitAt(10) != 0x54 || // T
+      text.codeUnitAt(13) != 0x3A || // :
+      text.codeUnitAt(16) != 0x3A ||
+      text.codeUnitAt(19) != 0x2E) {
+    return DateTime.parse(text);
+  }
+  var bad = false;
+  int digits(int from, int count) {
+    var n = 0;
+    for (var i = from; i < from + count; i++) {
+      final d = text.codeUnitAt(i) - 0x30;
+      if (d < 0 || d > 9) bad = true;
+      n = n * 10 + d;
+    }
+    return n;
+  }
+
+  final at = DateTime.utc(
+    digits(0, 4),
+    digits(5, 2),
+    digits(8, 2),
+    digits(11, 2),
+    digits(14, 2),
+    digits(17, 2),
+    digits(20, 3),
+    length == 27 ? digits(23, 3) : 0,
+  );
+  return bad ? DateTime.parse(text) : at;
+}
+
+/// What [Store.judged] holds: the judgement, which entities link to
+/// each ([judgedLink]), and whether it was worked out inside the batch
+/// running.
+class _Judgement {
+  final JudgedLog log;
+
+  /// The entities whose entries link to each one, by the one linked to.
+  final Map<String, Set<String>> linkedFrom;
+
+  final bool inBatch;
+
+  _Judgement(this.log, this.linkedFrom, {required this.inBatch});
 }

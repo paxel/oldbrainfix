@@ -3101,7 +3101,7 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
             })).collect::<Vec<_>>(),
         },
         "nudge": nudge.map(|n| json!({
-            "notes": n.notes.iter().map(|n| n.id.clone()).collect::<Vec<_>>(),
+            "notes": n.note_ids,
             "at": dart_iso(n.at),
             "since": iso(n.since),
             "firesAfterLater": dart_iso(n.fires_after(later, &berlin)),

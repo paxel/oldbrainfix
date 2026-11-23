@@ -7,6 +7,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/app_links.dart';
 import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/lock_settings.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart'
@@ -256,6 +257,7 @@ void main() {
     await openAreas(tester);
     expect(key('area-move-${car.id}'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'milk');
+    await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
     expect(key('area-move-${car.id}'), findsNothing);
   });

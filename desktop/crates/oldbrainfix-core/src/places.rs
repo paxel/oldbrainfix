@@ -1,6 +1,8 @@
 //! Areas and Topics as the Dart core's `Places` reads and writes them:
 //! exactly two levels.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 
 use crate::notes::{Notes, keys as note_keys};
@@ -40,6 +42,11 @@ pub fn starter_id(ty: &str, slug: &str) -> String {
 pub fn starter_date() -> DateTime<Utc> {
     DateTime::<Utc>::from_timestamp(946_684_800, 0).unwrap_or_default()
 }
+
+/// How far deleting an Area is, as `(moved, of)`: `moved` of the `of`
+/// Notes inside it have gone where they go (obf-1093), told before the
+/// first and after each, as the Dart core's `MoveProgress`.
+pub type MoveProgress<'a> = &'a dyn Fn(usize, usize);
 
 /// Where a deleted place's Notes go.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,9 +238,9 @@ impl<'a> Places<'a> {
     }
 
     /// How many Notes sit in `id`; for an Area, its Topics' Notes count
-    /// too.
+    /// too. Told from their fields, without making a Note (obf-1093).
     pub fn notes_inside(&self, id: &str) -> Result<usize> {
-        Ok(Notes::new(self.store).inside(id)?.len())
+        Notes::new(self.store).count_inside(id)
     }
 
     /// Deletes the Topic `topic_id`; its Notes go where `notes_go` says.
@@ -242,21 +249,37 @@ impl<'a> Places<'a> {
             .topic_by_id(topic_id)?
             .ok_or_else(|| Error::Invalid(format!("not a Topic: {topic_id}")))?;
         self.store.batch(|| {
-            self.move_notes(topic_id, notes_go, Some(&topic.area_id))?;
+            self.move_notes(topic_id, notes_go, Some(&topic.area_id), &|_, _| ())?;
             self.store.append(topic_id, keys::TYPE, None, None)?;
             Ok(())
         })
     }
 
     /// Deletes the Area `area_id` with its Topics; their Notes go where
-    /// `notes_go` says: back to Unsorted or into the trash.
+    /// `notes_go` says: back to Unsorted or into the trash. As
+    /// [`Places::delete_area_reporting`], hearing nothing.
     pub fn delete_area(&self, area_id: &str, notes_go: NotesGo) -> Result<()> {
+        self.delete_area_reporting(area_id, notes_go, &|_, _| ())
+    }
+
+    /// Deletes the Area `area_id` with its Topics; their Notes go where
+    /// `notes_go` says: back to Unsorted or into the trash. Each Note goes
+    /// in a transaction of its own, then the Area with its Topics in one
+    /// more (obf-1093), so another connection to the database, such as the
+    /// window's while this runs beside it, waits at most for one Note;
+    /// `progress` hears how many have gone.
+    pub fn delete_area_reporting(
+        &self,
+        area_id: &str,
+        notes_go: NotesGo,
+        progress: MoveProgress<'_>,
+    ) -> Result<()> {
         self.require_area(area_id)?;
         if notes_go == NotesGo::Area {
             return Err(Error::Invalid("an Area has no Area".into()));
         }
+        self.move_notes(area_id, notes_go, None, progress)?;
         self.store.batch(|| {
-            self.move_notes(area_id, notes_go, None)?;
             for topic in self.topics(area_id)? {
                 self.store.append(&topic.id, keys::TYPE, None, None)?;
             }
@@ -312,28 +335,41 @@ impl<'a> Places<'a> {
         Ok(true)
     }
 
-    /// Sends the Notes inside `id` where `notes_go` says; `area_id` is
-    /// where [`NotesGo::Area`] leads.
-    fn move_notes(&self, id: &str, notes_go: NotesGo, area_id: Option<&str>) -> Result<()> {
-        let notes = Notes::new(self.store);
-        for note in notes.inside(id)? {
-            match notes_go {
-                NotesGo::Unsorted => {
-                    // Back to Unsorted, even when it spawned a Routine
-                    // (CONTEXT.md).
-                    self.store.append(&note.id, note_keys::PLACE, None, None)?;
-                    if note.spawned {
-                        self.store
-                            .append(&note.id, note_keys::SPAWNED, None, None)?;
-                    }
+    /// Sends the Notes inside `id` where `notes_go` says, each Note in a
+    /// transaction of its own unless a batch holds them all; `area_id` is
+    /// where [`NotesGo::Area`] leads. `progress` hears how many have gone.
+    fn move_notes(
+        &self,
+        id: &str,
+        notes_go: NotesGo,
+        area_id: Option<&str>,
+        progress: MoveProgress<'_>,
+    ) -> Result<()> {
+        let notes = Notes::new(self.store).inside(id)?;
+        if notes_go == NotesGo::Trash {
+            // With their Routines and Reminders, as every deletion (#262),
+            // those read once for all of them (obf-1093).
+            return Routines::new(self.store).trash_notes(&notes, progress);
+        }
+        progress(0, notes.len());
+        for (i, note) in notes.iter().enumerate() {
+            self.store.batch(|| {
+                if notes_go == NotesGo::Area {
+                    return self
+                        .store
+                        .append(&note.id, note_keys::PLACE, area_id, None)
+                        .map(drop);
                 }
-                NotesGo::Area => {
+                // Back to Unsorted, even when it spawned a Routine
+                // (CONTEXT.md).
+                self.store.append(&note.id, note_keys::PLACE, None, None)?;
+                if note.spawned {
                     self.store
-                        .append(&note.id, note_keys::PLACE, area_id, None)?;
+                        .append(&note.id, note_keys::SPAWNED, None, None)?;
                 }
-                // With its Routines and Reminders, as every deletion (#262).
-                NotesGo::Trash => Routines::new(self.store).trash_note(&note.id)?,
-            }
+                Ok(())
+            })?;
+            progress(i + 1, notes.len());
         }
         Ok(())
     }
@@ -426,10 +462,30 @@ impl<'a> Places<'a> {
 
     /// The Topics of the Area `area_id`, by stored name.
     pub fn topics(&self, area_id: &str) -> Result<Vec<Topic>> {
+        // None while the Area is gone ([`Places::topic_by_id`]); every
+        // Topic's fields read at once, not one by one (obf-1069), in the
+        // order [`Store::entities_of_type`] lists them.
+        if self.area_by_id(area_id)?.is_none() {
+            return Ok(Vec::new());
+        }
+        let ever = self.store.ever_of_type(keys::TYPE_TOPIC)?;
+        let fields = self
+            .store
+            .current_fields_of(ever.iter().map(String::as_str))?;
         let mut topics = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_TOPIC)? {
-            if self.store.current(&id, keys::AREA)?.as_deref() == Some(area_id) {
-                topics.extend(self.topic_by_id(&id)?);
+        for id in ever {
+            let Some(held) = fields.get(&id) else {
+                continue;
+            };
+            if held.get(keys::TYPE) == Some(keys::TYPE_TOPIC)
+                && held.get(keys::AREA) == Some(area_id)
+            {
+                topics.push(Topic {
+                    id: id.clone(),
+                    area_id: area_id.to_string(),
+                    name: held.get(keys::NAME).unwrap_or_default().to_string(),
+                    starter: held.get(keys::STARTER).map(str::to_string),
+                });
             }
         }
         topics.sort_by(|a, b| utf16_cmp(&a.name, &b.name));
@@ -439,6 +495,26 @@ impl<'a> Places<'a> {
     /// Whether `id` is an Area or a Topic that exists.
     pub fn is_place(&self, id: &str) -> Result<bool> {
         Ok(self.area_by_id(id)?.is_some() || self.topic_by_id(id)?.is_some())
+    }
+
+    /// Every Area and Topic that exists, by id: those
+    /// [`Places::is_place`] holds for, read at once for a list of many
+    /// Notes (obf-1069), as the Dart core's `ids`.
+    pub fn ids(&self) -> Result<HashSet<String>> {
+        let mut ids: HashSet<String> = self
+            .store
+            .current_fields_of_type(keys::TYPE_AREA)?
+            .into_keys()
+            .collect();
+        let topics: Vec<String> = self
+            .store
+            .current_fields_of_type(keys::TYPE_TOPIC)?
+            .into_iter()
+            .filter(|(_, fields)| fields.get(keys::AREA).is_some_and(|a| ids.contains(a)))
+            .map(|(id, _)| id)
+            .collect();
+        ids.extend(topics);
+        Ok(ids)
     }
 }
 

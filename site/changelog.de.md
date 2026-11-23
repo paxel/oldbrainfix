@@ -2,7 +2,25 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.7.1]
+## [0.7.2]
+
+### Geändert
+
+- Mit geteilten Bereichen gehen auf dem Handy und dem Desktop das Verschieben eines Bereichs in den Papierkorb und der Import aus Google Keep schneller. ([obf-1092](https://github.com/paxel/oldbrainfix/issues/405))
+- Auf dem Handy und dem Desktop antwortet die App schneller, wenn du viele Notizen hast. ([obf-1069](https://github.com/paxel/oldbrainfix/issues/382))
+- Auf dem Handy und dem Desktop wartet das Tippen in ein Suchfeld nicht mehr; die Ergebnisse folgen kurz, nachdem du mit dem Tippen aufhörst. ([obf-1068](https://github.com/paxel/oldbrainfix/issues/381))
+- Auf dem Desktop öffnen sich Seiten schneller, während die Alarme im Hintergrund geplant werden. ([obf-1091](https://github.com/paxel/oldbrainfix/issues/404))
+- Auf dem Handy und dem Desktop bleibt die App nach dem Import von Fotos oder Sprachaufnahmen flüssig, während ihr Text gelesen wird. ([obf-1094](https://github.com/paxel/oldbrainfix/issues/407))
+- Auf dem Handy und dem Desktop öffnet sich die App schneller; der Desktop zeigt sein Fenster, während die Agenda noch gelesen wird. ([obf-1090](https://github.com/paxel/oldbrainfix/issues/403))
+
+### Behoben
+
+- Auf dem Handy öffnet „Mehr“ in der Schnellnotiz den Notiz-Editor auch, während ein Tipp zu sehen ist, statt die App abstürzen zu lassen. ([obf-1058](https://github.com/paxel/oldbrainfix/issues/371))
+- Auf dem Handy stürzt die App nach einem Absturz und „App neu starten“ nicht kurz darauf erneut ab. ([obf-1059](https://github.com/paxel/oldbrainfix/issues/372))
+- Auf dem Handy und dem Desktop friert ein Import die App nicht mehr ein: Er läuft daneben und zählt seine Notizen, auch wenn du weggehst. ([obf-1061](https://github.com/paxel/oldbrainfix/issues/374))
+- Auf dem Handy und dem Desktop friert das Verschieben eines Bereichs in den Papierkorb die App nicht mehr ein; seine Zeile zählt die verschobenen Notizen. ([obf-1093](https://github.com/paxel/oldbrainfix/issues/406))
+
+## [0.7.1] - 2026-11-21
 
 ### Geändert
 

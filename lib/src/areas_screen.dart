@@ -7,10 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'announcements.dart';
 import 'app_lock.dart';
+import 'area_deletion.dart';
 import 'area_look.dart';
 import 'browser.dart';
 import 'browser_add.dart';
+import 'failure_dialog.dart';
 import 'file_into_screen.dart';
 import 'frogs_screen.dart';
 import 'hidden_from_ai_view.dart';
@@ -27,6 +30,7 @@ import 'page_bar.dart';
 import 'place_names.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
+import 'run_over.dart';
 import 'share_area_screen.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
@@ -68,8 +72,11 @@ class AreasScreen extends StatefulWidget {
 }
 
 class _AreasScreenState extends State<AreasScreen>
-    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes, SearchesAfterPause {
   late final _query = TextEditingController(text: widget.query);
+
+  /// The text [_hits] were searched for; the field's own may be newer.
+  String _searched = '';
   List<Area> _areas = const [];
 
   /// What this Device may do in each Area, and who shares the shared
@@ -86,9 +93,18 @@ class _AreasScreenState extends State<AreasScreen>
   PersonFilter _filter = PersonFilter.everyone;
   bool _loaded = false;
 
+  /// The Areas being deleted beside the app (obf-1093), whose rows say
+  /// how far they are; none without the app.
+  AreaDeletions? _deletions;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final deletions = AreaDeletionsScope.of(context);
+    if (deletions != _deletions) {
+      _deletions?.removeListener(_deletionsChanged);
+      _deletions = deletions?..addListener(_deletionsChanged);
+    }
     if (_loaded) return;
     _load();
     _loaded = true;
@@ -99,6 +115,10 @@ class _AreasScreenState extends State<AreasScreen>
     super.initState();
     widget.pageShown?.addListener(_pageChanged);
   }
+
+  /// An Area's deletion started, moved on or ended: its row shows it;
+  /// the Area leaves the list as the log says it is gone.
+  void _deletionsChanged() => setState(() {});
 
   @override
   void didUpdateWidget(AreasScreen old) {
@@ -112,6 +132,7 @@ class _AreasScreenState extends State<AreasScreen>
   @override
   void dispose() {
     widget.pageShown?.removeListener(_pageChanged);
+    _deletions?.removeListener(_deletionsChanged);
     _query.dispose();
     super.dispose();
   }
@@ -148,11 +169,12 @@ class _AreasScreenState extends State<AreasScreen>
     };
     // Only a search shows Notes on this level; without one, reading
     // every Note for nothing made each change wait on all of them.
-    _hits = _query.text.trim().isEmpty
+    _searched = _query.text;
+    _hits = _searched.trim().isEmpty
         ? const []
         : _search(
             widget.places,
-            _query.text,
+            _searched,
             lock: LockScope.of(context),
             people: _filter,
           );
@@ -166,16 +188,24 @@ class _AreasScreenState extends State<AreasScreen>
 
   void _reload() => setState(_load);
 
-  /// The search changed; with no hits to show the selection goes too.
-  void _searched(String query) {
+  /// A letter typed: the search runs once typing pauses, an emptied
+  /// field shows the Areas at once.
+  void _typed(String query) {
+    if (query.trim().isEmpty) return _set(query);
+    searchAfterPause(_reload);
+  }
+
+  /// The search set as a whole runs now; with no hits to show the
+  /// selection goes too.
+  void _set(String query) {
     if (query.trim().isEmpty) stopSelecting();
-    _reload();
+    searchNow(_reload);
   }
 
   /// A tag tapped on a hit searches for it here.
   void _searchTag(BuildContext _, String query) {
     _query.text = query;
-    _reload();
+    searchNow(_reload);
   }
 
   @override
@@ -346,7 +376,7 @@ class _AreasScreenState extends State<AreasScreen>
       case _AreaAction.delete:
         final go = await confirmDeleteArea(context, widget.places, area);
         if (!mounted || go == null) return;
-        widget.places.deleteArea(area.id, go);
+        unawaited(_delete(area, go));
       case _AreaAction.share:
         // Nothing Hidden from AI goes to anyone (#267): asked before how.
         final store = widget.places.store;
@@ -384,41 +414,98 @@ class _AreasScreenState extends State<AreasScreen>
     _reload();
   }
 
+  /// Deletes [area], its Notes going where [go] says, beside the app
+  /// (obf-1093): its row shows how far it is meanwhile, and a failure is
+  /// announced at the top in [AppLocalizations] taken before the wait,
+  /// even after this page closed. Without the app, at once.
+  Future<void> _delete(Area area, NotesGo go) async {
+    final deletions = _deletions;
+    if (deletions == null) {
+      widget.places.deleteArea(area.id, go);
+      return;
+    }
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final store = widget.places.store;
+    try {
+      await deletions.run(area.id, go);
+    } on Object catch (e) {
+      // A Restart ended this run of the app meanwhile: its store is
+      // closed, and nobody is left to tell.
+      if (runOver(store)) return;
+      announceFailureWith(
+        announcements,
+        navigator,
+        t.areaDeleteFailed,
+        title: t.areaDeleteFailedTitle,
+        cause: t.areaDeleteFailedCause,
+        fix: t.areaDeleteFailedFix,
+        details: '$e',
+      );
+    }
+  }
+
   List<Widget> _areaRows(AppLocalizations t) {
     if (_areas.isEmpty) return [BrowserEmpty(text: t.noAreasYet)];
     final last = widget.trail.area(widget.places)?.id;
     final lock = LockScope.of(context);
     return [
       for (final (index, area) in _areas.indexed)
-        _PlaceRow(
-          key: ValueKey('area-row-${area.id}'),
-          title: areaName(t, area),
-          subtitle: _people[area.id] == null
-              ? null
-              : [
-                  for (final p in _people[area.id] ?? const <Person>[])
-                    profileDisplayName(t, _names[p.id] ?? ''),
-                ].join(', '),
-          leading: _AreaMark(area: area),
-          locked: lock?.isAreaClosed(area.id) ?? false,
-          shared: _people.containsKey(area.id),
-          hiddenFromAi: _hidden.contains(area.id),
-          highlighted: area.id == last,
-          onTap: () => _open(area),
-          menu: _areaMenu(t, area),
-          // The order is the person's own, so every Area moves, a Shared
-          // one too (#280). A screen reader moves it by the row's own
-          // actions, Move up and Move down, so the handle says nothing.
-          handle: _VerticalDragStart(
-            key: ValueKey('area-move-${area.id}'),
-            index: index,
-            child: const SizedBox(
+        if (_deletions?.of(area.id) case final deleting?)
+          // Being deleted beside the app (obf-1093): how far it is, a
+          // spinner where its menu was, nothing to tap or drag.
+          _PlaceRow(
+            key: ValueKey('area-row-${area.id}'),
+            title: areaName(t, area),
+            subtitle: switch (deleting.of) {
+              final of? => t.areaDeleting(deleting.moved, of),
+              null => t.areaDeletingStarted,
+            },
+            leading: _AreaMark(area: area),
+            handle: const SizedBox(width: 48, height: 48),
+            menu: SizedBox(
+              key: ValueKey('area-deleting-${area.id}'),
               width: 48,
               height: 48,
-              child: Icon(Icons.drag_handle),
+              child: const Center(
+                child: SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+              ),
+            ),
+          )
+        else
+          _PlaceRow(
+            key: ValueKey('area-row-${area.id}'),
+            title: areaName(t, area),
+            subtitle: _people[area.id] == null
+                ? null
+                : [
+                    for (final p in _people[area.id] ?? const <Person>[])
+                      profileDisplayName(t, _names[p.id] ?? ''),
+                  ].join(', '),
+            leading: _AreaMark(area: area),
+            locked: lock?.isAreaClosed(area.id) ?? false,
+            shared: _people.containsKey(area.id),
+            hiddenFromAi: _hidden.contains(area.id),
+            highlighted: area.id == last,
+            onTap: () => _open(area),
+            menu: _areaMenu(t, area),
+            // The order is the person's own, so every Area moves, a Shared
+            // one too (#280). A screen reader moves it by the row's own
+            // actions, Move up and Move down, so the handle says nothing.
+            handle: _VerticalDragStart(
+              key: ValueKey('area-move-${area.id}'),
+              index: index,
+              child: const SizedBox(
+                width: 48,
+                height: 48,
+                child: Icon(Icons.drag_handle),
+              ),
             ),
           ),
-        ),
     ];
   }
 
@@ -473,7 +560,7 @@ class _AreasScreenState extends State<AreasScreen>
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final searching = _query.text.trim().isNotEmpty;
+    final searching = _searched.trim().isNotEmpty;
     // The tags offered leave out the Notes of a closed locked Area, as
     // every list does (#267).
     final lock = LockScope.of(context);
@@ -552,7 +639,8 @@ class _AreasScreenState extends State<AreasScreen>
                       BrowserSearchField(
                         controller: _query,
                         hint: t.searchAllHint,
-                        onChanged: _searched,
+                        onChanged: _typed,
+                        onSet: _set,
                         tags: widget.places.store,
                         closedTags: closed,
                       ),
@@ -659,8 +747,11 @@ class AreaScreen extends StatefulWidget {
 }
 
 class _AreaScreenState extends State<AreaScreen>
-    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes, SearchesAfterPause {
   final _query = TextEditingController();
+
+  /// The text [_diary] was searched for; the field's own may be newer.
+  String _searched = '';
   Area? _area;
   List<Topic> _topics = const [];
   List<PlacedNote> _diary = const [];
@@ -703,9 +794,10 @@ class _AreaScreenState extends State<AreaScreen>
           a,
         ).toLowerCase().compareTo(topicName(t, b).toLowerCase()),
       );
+    _searched = _query.text;
     final found = _search(
       widget.places,
-      _query.text,
+      _searched,
       within: widget.areaId,
       lock: LockScope.of(context),
       order: _order,
@@ -714,7 +806,7 @@ class _AreaScreenState extends State<AreaScreen>
     );
     // A Topic's Notes show inside the Topic; a search still finds them,
     // their cards naming the Topic.
-    _diary = _query.text.trim().isNotEmpty
+    _diary = _searched.trim().isNotEmpty
         ? found
         : [
             for (final placed in found)
@@ -724,6 +816,14 @@ class _AreaScreenState extends State<AreaScreen>
   }
 
   void _reload() => setState(_load);
+
+  /// A letter typed: the search runs once typing pauses, an emptied
+  /// field shows the list at once.
+  void _typed(String query) =>
+      query.trim().isEmpty ? _set(query) : searchAfterPause(_reload);
+
+  /// The search set as a whole runs now.
+  void _set(String _) => searchNow(_reload);
 
   void _filtered(PersonFilter people) => setState(() {
     _filter = people;
@@ -918,7 +1018,7 @@ class _AreaScreenState extends State<AreaScreen>
     final t = context.t;
     final area = _area;
     if (area == null) return Scaffold(appBar: AppBar());
-    final searching = _query.text.trim().isNotEmpty;
+    final searching = _searched.trim().isNotEmpty;
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       child: selectionBack(
@@ -978,7 +1078,8 @@ class _AreaScreenState extends State<AreaScreen>
                       child: BrowserSearchField(
                         controller: _query,
                         hint: t.searchAreaHint,
-                        onChanged: (_) => _reload(),
+                        onChanged: _typed,
+                        onSet: _set,
                       ),
                     ),
                     PersonFilterChips(
@@ -1062,8 +1163,11 @@ class TopicScreen extends StatefulWidget {
 }
 
 class _TopicScreenState extends State<TopicScreen>
-    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes, SearchesAfterPause {
   final _query = TextEditingController();
+
+  /// The text [_diary] was searched for; the field's own may be newer.
+  String _searched = '';
   late Topic? _topic;
   late List<PlacedNote> _diary;
   DiaryOrder _order = DiaryOrder.time;
@@ -1088,9 +1192,10 @@ class _TopicScreenState extends State<TopicScreen>
   void _load() {
     _topic = widget.places.topicById(widget.topicId);
     _writes = widget.places.store.mayWriteIn(widget.topicId);
+    _searched = _query.text;
     _diary = _search(
       widget.places,
-      _query.text,
+      _searched,
       within: widget.topicId,
       lock: LockScope.of(context),
       order: _order,
@@ -1101,6 +1206,14 @@ class _TopicScreenState extends State<TopicScreen>
   }
 
   void _reload() => setState(_load);
+
+  /// A letter typed: the search runs once typing pauses, an emptied
+  /// field shows the list at once.
+  void _typed(String query) =>
+      query.trim().isEmpty ? _set(query) : searchAfterPause(_reload);
+
+  /// The search set as a whole runs now.
+  void _set(String _) => searchNow(_reload);
 
   void _filtered(PersonFilter people) => setState(() {
     _filter = people;
@@ -1176,7 +1289,7 @@ class _TopicScreenState extends State<TopicScreen>
     final t = context.t;
     final topic = _topic;
     if (topic == null) return Scaffold(appBar: AppBar());
-    final searching = _query.text.trim().isNotEmpty;
+    final searching = _searched.trim().isNotEmpty;
     return BrowserSwipes(
       child: selectionBack(
         Scaffold(
@@ -1235,7 +1348,8 @@ class _TopicScreenState extends State<TopicScreen>
                       child: BrowserSearchField(
                         controller: _query,
                         hint: t.searchTopicHint,
-                        onChanged: (_) => _reload(),
+                        onChanged: _typed,
+                        onSet: _set,
                       ),
                     ),
                     PersonFilterChips(
@@ -1333,17 +1447,18 @@ List<PlacedNote> _search(
   DiaryOrder order = DiaryOrder.time,
   bool hideUnimportant = false,
   PersonFilter people = PersonFilter.everyone,
-}) => [
-  for (final note in diary(
+}) => placeNotesShown(
+  places,
+  diary(
     places.store.notesBy(
       Search(places.store).notes(query, within: within),
       people,
     ),
     order: order,
     hideUnimportant: hideUnimportant,
-  ))
-    if (!(lock?.hides(note) ?? false)) placeNote(places, note),
-];
+  ),
+  lock,
+);
 
 /// Every hit of a search on one page, or a line saying there is none.
 List<Widget> _hitCards(

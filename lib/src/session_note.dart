@@ -404,7 +404,16 @@ class CardSession extends StatefulWidget {
   /// How many weeks of history it shows.
   static const weeks = 4;
 
-  const CardSession({super.key, required this.notes, required this.noteId});
+  /// The Note's kind as its list read it (obf-1069); read here when
+  /// null.
+  final NoteKind Function()? kind;
+
+  const CardSession({
+    super.key,
+    required this.notes,
+    required this.noteId,
+    this.kind,
+  });
 
   @override
   State<CardSession> createState() => _CardSessionState();
@@ -436,8 +445,8 @@ class _CardSessionState extends State<CardSession> {
 
   void _load() {
     // An older Session spawned from a Tally stays a Tally (ADR 0039).
-    final setup = _setup =
-        NoteKinds(_store).of(widget.noteId) == NoteKind.session
+    final kind = widget.kind?.call() ?? NoteKinds(_store).of(widget.noteId);
+    final setup = _setup = kind == NoteKind.session
         ? _sessions.setupOf(widget.noteId)
         : null;
     if (setup == null) return;

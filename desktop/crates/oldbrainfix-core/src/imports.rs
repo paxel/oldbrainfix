@@ -105,14 +105,38 @@ impl ImportSummary {
     }
 }
 
+/// How far an Import is (obf-1061): `written` of the `of` Notes it
+/// writes are in, told before the first and after each.
+pub type ImportProgress<'a> = &'a dyn Fn(usize, usize);
+
 /// Imports into one store.
 pub struct Imports<'a> {
     store: &'a Store,
+    progress: Option<ImportProgress<'a>>,
 }
 
 impl<'a> Imports<'a> {
     pub fn new(store: &'a Store) -> Imports<'a> {
-        Imports { store }
+        Imports {
+            store,
+            progress: None,
+        }
+    }
+
+    /// These Imports, `progress` hearing how far the writing is, as the
+    /// Dart core's `progress:`.
+    pub fn reporting(self, progress: ImportProgress<'a>) -> Imports<'a> {
+        Imports {
+            progress: Some(progress),
+            ..self
+        }
+    }
+
+    /// Tells the hook, when there is one, that `written` of `of` are in.
+    fn tell(&self, written: usize, of: usize) {
+        if let Some(progress) = self.progress {
+            progress(written, of);
+        }
     }
 
     /// Makes one Note of each Markdown (`.md`, `.markdown`), text
@@ -184,6 +208,10 @@ impl<'a> Imports<'a> {
     /// than [`MAX_TEXT_BYTES`], and the oldest beyond
     /// [`MAX_TOTAL_BYTES`], are skipped as too large, counted on top of
     /// `not_text` and `too_large`; with nothing left, no Area is made.
+    /// The Area and each Note are a transaction of their own, so another
+    /// connection to the database, such as the window's while the Import
+    /// runs beside it (obf-1061), waits at most for one Note; the hook of
+    /// [`Imports::reporting`] hears how many are in.
     pub fn notes(
         &self,
         area_name: &str,
@@ -261,9 +289,10 @@ impl<'a> Imports<'a> {
             }
             hashes.push(held);
         }
-        let area_id = s.batch(|| {
-            let area = Places::new(s).add_area(&self.unused(name)?)?;
-            for ((note, at), held) in kept.iter().zip(&hashes) {
+        let area_id = s.batch(|| Ok(Places::new(s).add_area(&self.unused(name)?)?.id))?;
+        self.tell(0, kept.len());
+        for (i, ((note, at), held)) in kept.iter().zip(&hashes).enumerate() {
+            s.batch(|| {
                 let id = format!("note:{}", s.new_id()?);
                 let date = Some(*at);
                 s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), date)?;
@@ -271,16 +300,17 @@ impl<'a> Imports<'a> {
                 let boxed = text_boxes::convert(&note.text, &note.format, || s.new_id())?;
                 let text = StoredText::of(&note.format, &boxed, VERSION).encode();
                 s.append(&id, keys::TEXT, Some(&text), date)?;
-                s.append(&id, keys::PLACE, Some(&area.id), date)?;
+                s.append(&id, keys::PLACE, Some(&area_id), date)?;
                 for hash in held {
                     s.append(&id, &keys::photo(hash), Some(keys::ADDED), date)?;
                 }
-                if let Some(lines) = &note.lines {
-                    self.write_lines(&id, lines, *at)?;
+                match &note.lines {
+                    Some(lines) => self.write_lines(&id, lines, *at),
+                    None => Ok(()),
                 }
-            }
-            Ok(area.id)
-        })?;
+            })?;
+            self.tell(i + 1, kept.len());
+        }
         Ok(ImportSummary {
             area_id: Some(area_id),
             notes: kept.len(),

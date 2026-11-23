@@ -765,9 +765,10 @@ fn the_last_card_of_a_list_scrolls_fully_clear() -> TestResult {
     }
     let height = 700.0;
     let mut harness = window_of(&store, Selection::All, height);
-    // The oldest shows last.
+    // The oldest shows last. Scrolled through any card laid out, as one
+    // scrolled far away is not (obf-1069).
     for _ in 0..40 {
-        card(&harness, "Alpha 12").scroll_down();
+        card(&harness, "Alpha ").scroll_down();
         harness.run();
     }
     let last_card = card(&harness, "Alpha 01").rect();

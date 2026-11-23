@@ -143,6 +143,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get whereNotesGo => 'Where should they go?';
 
   @override
+  String get areaDeletingStarted => 'Being deleted…';
+
+  @override
+  String areaDeleting(int moved, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Being deleted: $moved of $count Notes moved',
+      one: 'Being deleted: $moved of 1 Note moved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get areaDeleteFailed => 'The Area could not be deleted.';
+
+  @override
+  String get areaDeleteFailedTitle => 'Area not deleted';
+
+  @override
+  String get areaDeleteFailedCause => 'Not all of its Notes could be moved.';
+
+  @override
+  String get areaDeleteFailedFix =>
+      'The Notes already moved stay where they went. Delete the Area again to move the rest.';
+
+  @override
   String get moveToUnsorted => 'Move to Unsorted';
 
   @override
@@ -5413,6 +5440,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get importKeepFailedFix =>
       'Nothing was imported. Download the export again, copy it onto the phone and import it from there.';
+
+  @override
+  String importWritten(int written, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$written of $count Notes',
+      one: '$written of 1 Note',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importGoesOn =>
+      'You can leave this page. The Import goes on beside the app, and the top of the screen says when it is done.';
 
   @override
   String settingBadgeLabel(String setting, String value) {

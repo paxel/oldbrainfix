@@ -35,6 +35,7 @@ import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/appointments.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/calendar_screen.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
@@ -2050,6 +2051,7 @@ void main() {
             await _tap(tester, find.byTooltip(t.browseTooltip));
             final field = find.widgetWithText(TextField, t.searchAllHint);
             await tester.enterText(field, query);
+            await tester.pump(BrowserSearchField.pause);
             await tester.pumpAndSettle();
           }
 

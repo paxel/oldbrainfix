@@ -838,7 +838,7 @@ class Alarms {
   /// without sound. On a quiet day it waits for the day's end
   /// (obf-1044).
   PlannedNudge? nudge(WallClock wallClock) => nudgePlan(
-    unsorted: Notes(store).unsorted(),
+    unsorted: Notes(store).nudgeAnchors(),
     snooze: nudgeSnooze,
     now: store.clock(),
     wallClock: wallClock,

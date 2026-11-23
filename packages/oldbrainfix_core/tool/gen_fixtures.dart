@@ -4923,7 +4923,7 @@ Map<String, Object?> _alarms(Store store) {
             'nudge': nudge == null
                 ? null
                 : {
-                    'notes': [for (final n in nudge.notes) n.id],
+                    'notes': nudge.noteIds,
                     'at': nudge.at.toUtc().toIso8601String(),
                     'since': nudge.since?.toUtc().toIso8601String(),
                     'firesAfterLater': nudge

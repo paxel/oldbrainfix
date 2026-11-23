@@ -501,6 +501,7 @@ void main() {
 
       await tap(tester, find.byKey(const ValueKey('browse')));
       await tester.enterText(find.byType(TextField), 'plumber');
+      await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
       expect(find.text('Call the plumber\ntomorrow'), findsOneWidget);
       await tap(tester, find.byTooltip('Show compact views'));

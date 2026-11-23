@@ -6,7 +6,6 @@
 library;
 
 import 'alarms.dart';
-import 'notes.dart';
 import 'schedule.dart';
 
 /// A daily window in which Nudges wait and alarms keep quiet (CONTEXT.md,
@@ -77,10 +76,10 @@ typedef NudgeAnchor = ({DateTime due, DateTime captured});
 /// firing in [quiet] waits for its end, and the repeats count from
 /// there.
 class PlannedNudge {
-  /// The Unsorted Notes, oldest first.
-  final List<Note> notes;
+  /// The Unsorted Notes by id, the oldest capture first.
+  final List<String> noteIds;
 
-  /// Their own Nudge times, by capture, the oldest first.
+  /// Their own Nudge times, in the same order.
   final List<NudgeAnchor> anchors;
   final NudgeSnooze? snooze;
   final Duration repeat;
@@ -97,7 +96,7 @@ class PlannedNudge {
   final DateTime at;
 
   const PlannedNudge._({
-    required this.notes,
+    required this.noteIds,
     required this.anchors,
     required this.snooze,
     required this.repeat,
@@ -107,7 +106,7 @@ class PlannedNudge {
   });
 
   /// How many Notes are Unsorted.
-  int get count => notes.length;
+  int get count => anchors.length;
 
   /// When it fires first after [after], on [wallClock]. The platform's
   /// alarm layer follows the same rule.
@@ -192,14 +191,15 @@ DateTime? _nextFiring(
   }
 }
 
-/// The Nudge at [now] over the [unsorted] Notes, null when there are
-/// none. It repeats every [repeat] while ignored and waits out [quiet]
-/// (null when Quiet Hours are off); [snooze] is this Device's latest
-/// (ADR 0008). On a quiet day it waits until [quietUntil], the end of
-/// the quiet stretch [now] lies in (obf-1044): no own time and no snooze
-/// comes before it.
+/// The Nudge at [now] over the Unsorted Notes, null when there are
+/// none: [unsorted] holds each one's id with its own time and capture
+/// (`Notes.nudgeAnchors`). It repeats every [repeat] while ignored and
+/// waits out [quiet] (null when Quiet Hours are off); [snooze] is this
+/// Device's latest (ADR 0008). On a quiet day it waits until
+/// [quietUntil], the end of the quiet stretch [now] lies in (obf-1044):
+/// no own time and no snooze comes before it.
 PlannedNudge? nudgePlan({
-  required List<Note> unsorted,
+  required List<(String, NudgeAnchor)> unsorted,
   required NudgeSnooze? snooze,
   required DateTime now,
   required WallClock wallClock,
@@ -211,14 +211,20 @@ PlannedNudge? nudgePlan({
   if (repeat.inMinutes < 1) {
     throw ArgumentError.value(repeat, 'repeat', 'at least a minute');
   }
+  // By capture, then by own time and id: the same order whatever order
+  // they came in.
   final notes = List.of(unsorted)
-    ..sort((a, b) => a.captured.compareTo(b.captured));
+    ..sort((a, b) {
+      final (x, (due: xDue, captured: xAt)) = a;
+      final (y, (due: yDue, captured: yAt)) = b;
+      return switch ((xAt.compareTo(yAt), xDue.compareTo(yDue))) {
+        (0, 0) => x.compareTo(y),
+        (0, final order) || (final order, _) => order,
+      };
+    });
   final anchors = [
-    for (final note in notes)
-      (
-        due: _waitedOut(note.nudgeAt.toUtc(), quietUntil),
-        captured: note.captured.toUtc(),
-      ),
+    for (final (_, (:due, :captured)) in notes)
+      (due: _waitedOut(due.toUtc(), quietUntil), captured: captured.toUtc()),
   ];
   final snoozed = snooze == null
       ? null
@@ -236,7 +242,7 @@ PlannedNudge? nudgePlan({
     wallClock,
   );
   return PlannedNudge._(
-    notes: notes,
+    noteIds: [for (final (id, _) in notes) id],
     anchors: anchors,
     snooze: snoozed,
     repeat: repeat,

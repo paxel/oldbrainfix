@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
@@ -213,6 +214,7 @@ void main() {
         ),
         'IBUPROFEN',
       );
+      await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
 
       expect(find.byType(NoteCard), findsOneWidget);

@@ -62,15 +62,18 @@ class _TrashScreenState extends State<TrashScreen>
 
   List<_Trashed> _load() {
     final lock = LockScope.of(context);
-    final trashed = <_Trashed>[
+    final notes = placeNotes(widget.places, [
       for (final note in widget.notes.trashed())
-        if (!(lock?.hides(note) ?? false))
-          (
-            at: note.trashed ?? note.captured,
-            note: placeNote(widget.places, note),
-            routine: null,
-            frog: null,
-          ),
+        if (!(lock?.hides(note) ?? false)) note,
+    ]);
+    final trashed = <_Trashed>[
+      for (final placed in notes)
+        (
+          at: placed.note.trashed ?? placed.note.captured,
+          note: placed,
+          routine: null,
+          frog: null,
+        ),
       for (final routine in _routines.trashed())
         if (!(lock?.hidesRoutine(routine) ?? false))
           (

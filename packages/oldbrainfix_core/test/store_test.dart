@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -81,6 +82,118 @@ void main() {
     expect(read.keys, isNot(contains('thing:0')));
     expect(read['thing:1'], {r'$type': 'thing', 'text': 'drafted'});
     expect(read.keys, contains('thing:new'));
+  });
+
+  test('lists the entities of a type in one read as one by one '
+      '(obf-1069)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    // More than one query names at once.
+    for (var i = 0; i < 600; i++) {
+      store.append('thing:$i', r'$type', 'thing');
+      store.append('thing:$i', 'text', 't$i');
+    }
+    store.append('thing:0', r'$type', 'other');
+    store.append('thing:1', r'$type', null);
+    // Dated before it was a thing: it stays one.
+    store.append('thing:2', r'$type', 'other', date: DateTime.utc(2000));
+    store.append('other:a', r'$type', 'other');
+    // Shown pending changes count as they do one by one.
+    final set = store.openPending('ai-task', shown: true);
+    store.draftPending(set, 'thing:new', r'$type', 'thing');
+    store.draftPending(set, 'thing:3', r'$type', 'other');
+    store.draftPending(set, 'other:a', r'$type', 'thing');
+    final before = store.historyReads;
+    final listed = store.entitiesOfType('thing');
+    expect(store.historyReads - before, 1);
+    expect(listed, [
+      for (final id in store.everOfType('thing'))
+        if (store.current(id, r'$type') == 'thing') id,
+    ]);
+    expect(listed, containsAll(['thing:2', 'thing:new', 'other:a']));
+    expect(listed, isNot(contains('thing:0')));
+    expect(listed, isNot(contains('thing:1')));
+    expect(listed, isNot(contains('thing:3')));
+    expect(store.entitiesOfType('none'), isEmpty);
+  });
+
+  test('lists the entities of a type without a \$type the roles ignore '
+      '(obf-1069)', () {
+    final clock = ticking();
+    final ann = Store.inMemory(clock: clock)..applyProfileDefaults(name: 'Ann');
+    addTearDown(ann.close);
+    final ben = Store.inMemory(clock: clock)..applyProfileDefaults(name: 'Ben');
+    addTearDown(ben.close);
+    final house = ann.share(Places(ann).addArea('Household').id);
+    exchange(ben, ann, inviting: Invite(house, role: AreaRole.member));
+    final milk = Notes(ann).capture('Buy milk', place: house).id;
+    exchange(ben, ann);
+    // Not Ben's to do, as a modified app would write it all the same.
+    ben.append(milk, NoteKeys.type, null);
+    exchange(ben, ann);
+    expect(ann.judged.ignored, isNotEmpty);
+    final listed = ann.entitiesOfType(NoteKeys.typeNote);
+    expect(listed, contains(milk));
+    expect(listed, [
+      for (final id in ann.everOfType(NoteKeys.typeNote))
+        if (ann.current(id, NoteKeys.type) == NoteKeys.typeNote) id,
+    ]);
+  });
+
+  test('reads a stored time as DateTime.parse does (obf-1069)', () {
+    void same(String text) {
+      final DateTime expected;
+      try {
+        expected = DateTime.parse(text);
+      } on FormatException {
+        expect(() => parseStoredDate(text), throwsFormatException);
+        return;
+      }
+      final read = parseStoredDate(text);
+      expect(read, expected, reason: text);
+      expect(read.isUtc, expected.isUtc, reason: text);
+    }
+
+    final random = Random(1069);
+    for (var i = 0; i < 2000; i++) {
+      final at = DateTime.fromMicrosecondsSinceEpoch(
+        random.nextInt(1 << 32) * 1000000 + random.nextInt(1000000),
+        isUtc: true,
+      );
+      same(at.toIso8601String());
+      same(DateTime.utc(at.year, at.month, at.day, at.hour).toIso8601String());
+    }
+    for (final text in [
+      '2021-02-30T00:00:00.000Z',
+      '2026-13-01T24:60:61.000Z',
+      '2026-11-22T10:00:00Z',
+      '2026-11-22T10:00:00.000+01:00',
+      '2026-11-22T10:00:00.000',
+      '2026-11-22 10:00:00.000Z',
+      '+012026-11-22T10:00:00.000Z',
+      '2026-1x-22T10:00:00.000Z',
+      '2026-11-22T10:00:00.00xZ',
+    ]) {
+      same(text);
+    }
+  });
+
+  test('a read sees what another connection wrote after it (obf-1069)', () {
+    final dir = Directory.systemTemp.createTempSync('obf');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/log.db';
+    final first = Store.open(path);
+    addTearDown(first.close);
+    final second = Store.open(path);
+    addTearDown(second.close);
+    expect(first.history('note:a'), isEmpty);
+    expect(first.localSetting('seen'), isNull);
+    final seq = first.currentSeq();
+    second.append('note:a', 'text', 'from the other one');
+    second.setLocalSetting('seen', 'yes');
+    expect(first.history('note:a').single.value, 'from the other one');
+    expect(first.localSetting('seen'), 'yes');
+    expect(first.currentSeq(), seq + 1);
   });
 
   test('the latest date wins, not the latest append', () {

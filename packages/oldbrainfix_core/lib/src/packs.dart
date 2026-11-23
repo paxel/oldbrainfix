@@ -1960,9 +1960,28 @@ extension PackImport on Store {
   /// carried; null when it has none, or it was removed. Only what the
   /// user's own Devices wrote counts ([currentByOwn], Q554 (a)): another
   /// person's Device in a Shared Area can neither set nor change it.
-  ({String id, String name})? packFrom(String noteId) {
+  ({String id, String name})? packFrom(String noteId) =>
+      _packFromOf(currentByOwn(noteId, PackKeys.from));
+
+  /// [packFrom] of each of the Notes [noteIds] that has the badge, read
+  /// in one query however many there are (obf-1069): from what the
+  /// user's own Devices wrote alone, as there.
+  Map<String, ({String id, String name})> packFromsOf(
+    Iterable<String> noteIds,
+  ) {
+    final logged = loggedFieldsOf(noteIds, const {PackKeys.from});
+    final own = <String, bool>{};
+    return {
+      for (final MapEntry(key: id, value: entries) in logged.entries)
+        id: ?_packFromOf(latestByOwn(entries, PackKeys.from, own)),
+    };
+  }
+
+  /// The badge the stored value [raw] of a Note's `from` makes, as
+  /// [packFrom] shows it.
+  ({String id, String name})? _packFromOf(String? raw) {
     try {
-      if (jsonDecode(currentByOwn(noteId, PackKeys.from) ?? '') case {
+      if (jsonDecode(raw ?? '') case {
         'id': final String id,
         'name': final String name,
       }) {

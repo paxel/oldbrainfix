@@ -332,6 +332,42 @@ abstract class AppLocalizations {
   /// **'Where should they go?'**
   String get whereNotesGo;
 
+  /// Under an Area's name in the Areas list on the phone while it is deleted beside the app, before its Notes are counted (obf-1093).
+  ///
+  /// In en, this message translates to:
+  /// **'Being deleted…'**
+  String get areaDeletingStarted;
+
+  /// Under an Area's name in the Areas list on the phone while it is deleted beside the app (obf-1093): how many of its Notes went to Unsorted or the trash so far.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Being deleted: {moved} of 1 Note moved} other{Being deleted: {moved} of {count} Notes moved}}'**
+  String areaDeleting(int moved, int count);
+
+  /// Announced at the top on the phone when deleting an Area beside the app failed (obf-1093).
+  ///
+  /// In en, this message translates to:
+  /// **'The Area could not be deleted.'**
+  String get areaDeleteFailed;
+
+  /// Title of the dialog behind 'areaDeleteFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Area not deleted'**
+  String get areaDeleteFailedTitle;
+
+  /// The cause in the dialog behind 'areaDeleteFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Not all of its Notes could be moved.'**
+  String get areaDeleteFailedCause;
+
+  /// The fix in the dialog behind 'areaDeleteFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes already moved stay where they went. Delete the Area again to move the rest.'**
+  String get areaDeleteFailedFix;
+
   /// No description provided for @moveToUnsorted.
   ///
   /// In en, this message translates to:
@@ -8677,6 +8713,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing was imported. Download the export again, copy it onto the phone and import it from there.'**
   String get importKeepFailedFix;
+
+  /// On the phone's page of a running Import (obf-1061): how many of the Notes it makes are in so far.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{written} of 1 Note} other{{written} of {count} Notes}}'**
+  String importWritten(int written, int count);
+
+  /// Under the count on the phone's page of a running Import (obf-1061).
+  ///
+  /// In en, this message translates to:
+  /// **'You can leave this page. The Import goes on beside the app, and the top of the screen says when it is done.'**
+  String get importGoesOn;
 
   /// What a screen reader reads for a badge of a Note's setting in the Note editor (#160): the setting's name and its current value.
   ///

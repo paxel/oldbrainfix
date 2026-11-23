@@ -56,9 +56,14 @@ class _CardOccurrencesState extends State<CardOccurrences> with TicksAtOnce {
     _show(widget.occurrences.read());
   }
 
+  /// Whether the boxes of rows read once tick, kept with them: the rows
+  /// a list read once for all its cards are checked once, however often
+  /// a card shows them anew, as when it switches its view (obf-1069).
+  static final _ticksOf = Expando<List<bool>>('card ticks');
+
   void _show(List<AgendaRow> rows) {
     _rows = rows;
-    _ticks = [for (final row in rows) _checks(row)];
+    _ticks = _ticksOf[rows] ??= [for (final row in rows) _checks(row)];
   }
 
   /// Whether the box of [row] ticks: as on the Agenda, not a Session's,

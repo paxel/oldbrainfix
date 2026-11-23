@@ -10,6 +10,7 @@ import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/import_screen.dart';
 import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
@@ -38,6 +39,10 @@ void main() {
     await tester.pumpWidget(OldBrainFixApp(store: store, alarms: alarms));
     await tester.pumpAndSettle();
   }
+
+  /// [text] in the dialog on top, not on the Import's page under it.
+  Finder inDialog(String text) =>
+      find.descendant(of: find.byType(AlertDialog), matching: find.text(text));
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
     if (finder.evaluate().isEmpty) {
@@ -916,7 +921,7 @@ void main() {
 
       await tapVisible(tester, announcements);
       expect(
-        find.text(
+        inDialog(
           '3 Notes went into the new Area From Notes.\n\n'
           '2 files were skipped:\n'
           'Folder: Notes\nOther files: 1\nToo large: 1',
@@ -934,8 +939,10 @@ void main() {
       expect(find.byType(AreasScreen), findsOneWidget);
     });
 
-    testWidgets('shows that the folder is read and takes no second tap '
-        'meanwhile', (tester) async {
+    testWidgets('shows that the folder is read on a page of its own that '
+        'can be left, and takes no second Import meanwhile (obf-1061)', (
+      tester,
+    ) async {
       folders
         ..put('Dentist.txt', march, utf8.encode('Tuesday 9:00'))
         ..hold = Completer<void>();
@@ -956,16 +963,58 @@ void main() {
         scrollable: find.byType(Scrollable).last,
       );
       await tester.tap(row);
+      // The line under the bar moves and never settles meanwhile.
       await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.byType(ImportScreen), findsOneWidget);
+      expect(find.text('Reading the folder…'), findsOneWidget);
+      expect(find.byKey(const Key('syncLineMoving')), findsOneWidget);
+
+      // Left, the Import goes on; its row says so and opens the page again.
+      await tester.pageBack();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.byType(ImportScreen), findsNothing);
       expect(find.text('Reading the folder…'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(tester.widget<ListTile>(row).enabled, isFalse);
+      expect(tester.widget<ListTile>(row).enabled, isTrue);
+      expect(
+        tester
+            .widget<ListTile>(find.byKey(const ValueKey('importKeep')))
+            .enabled,
+        isFalse,
+      );
+      await tester.tap(row);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.byType(ImportScreen), findsOneWidget);
+      expect(folders.released, isEmpty);
 
       folders.hold!.complete();
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('syncLineMoving')), findsNothing);
+      expect(
+        find.text('1 Note went into the new Area From Notes.'),
+        findsOneWidget,
+      );
+      expect(announcements.visible, 'Import finished.');
+      // The page's Open leads into the new Area.
+      await tester.tap(find.byKey(const ValueKey('importPageOpenArea')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ImportScreen), findsNothing);
+      expect(find.byType(AreaScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(tester.widget<ListTile>(row).enabled, isTrue);
       expect(find.text('Reading the folder…'), findsNothing);
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(announcements.visible, 'Import finished.');
     });
 
     testWidgets('a second Import of the folder makes a second Area, and a '
@@ -981,7 +1030,7 @@ void main() {
       expect(announcements.visible, 'Import finished.');
       await tapVisible(tester, announcements);
       expect(
-        find.text('1 Note went into the new Area From Notes (2).'),
+        inDialog('1 Note went into the new Area From Notes (2).'),
         findsOneWidget,
       );
       await tester.tap(find.text('Close'));
@@ -1158,7 +1207,7 @@ void main() {
 
       await tapVisible(tester, announcements);
       expect(
-        find.text(
+        inDialog(
           '2 Notes went into the new Area From Google Keep.\n'
           '1 of them is a Checklist. Checklists stay off the Agenda until '
           'you switch them on.\n'
@@ -1219,16 +1268,25 @@ void main() {
       await expectImported(tester);
     });
 
-    testWidgets('shows that the export is read and takes no second Import '
-        'meanwhile', (tester) async {
+    testWidgets('shows that the export is read on a page of its own and '
+        'takes no second Import meanwhile (obf-1061)', (tester) async {
       takeout(folders.putZip);
       folders.hold = Completer<void>();
       await importKeep(tester, 'importKeepZip', settle: false);
       await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.byType(ImportScreen), findsOneWidget);
+      expect(find.text('Reading the export…'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
       final keep = find.byKey(const ValueKey('importKeep'));
       expect(find.text('Reading the export…'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(tester.widget<ListTile>(keep).enabled, isFalse);
+      expect(tester.widget<ListTile>(keep).enabled, isTrue);
       expect(
         tester
             .widget<ListTile>(find.byKey(const ValueKey('importFolder')))
@@ -1302,6 +1360,9 @@ void main() {
       expect(folders.unzipped, hasLength(1));
       announcements.dismiss();
       folders.unzipped.clear();
+      // Back from the Import's page to Settings.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       await tap(tester, find.byKey(const ValueKey('importKeep')));
       await tester.tap(find.text('Cancel'));

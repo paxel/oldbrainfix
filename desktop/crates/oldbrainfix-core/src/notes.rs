@@ -7,13 +7,15 @@
 //! clock as often, as the Dart core's, so both logs come out alike.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::{Arc, OnceLock};
 
 use chrono::{DateTime, Duration, Utc};
 
 use crate::boxes::{self, Boxes};
 use crate::entry::{Entry, dart_iso, parse_time};
 use crate::file_text::{self, FileKind};
-use crate::named_places::{Coordinates, NamedPlace, NamedPlaces};
+use crate::named_places::{Coordinates, NamedPlace, NamedPlaces, named_place_at};
+use crate::nudges::NudgeAnchor;
 use crate::places::Places;
 use crate::profile::Profile;
 use crate::store::{Fields, Store};
@@ -567,13 +569,6 @@ fn shown_text(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
         .collect();
     text_boxes::shown(text, &ticks).text
 }
-
-/// A Note's photos or recordings, their texts and those removed.
-type Waiting<'n> = (
-    &'n Vec<String>,
-    &'n BTreeMap<String, String>,
-    &'n Vec<String>,
-);
 
 /// A photo or a voice recording of a Note, by its hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1141,14 +1136,14 @@ impl<'a> Notes<'a> {
     /// those of every Note not in the trash, merged ones included. One
     /// whose Transcript was removed is not among them.
     pub fn untranscribed(&self) -> Result<Vec<Blob>> {
-        self.waiting(|n| (&n.recordings, &n.transcripts, &n.removed_transcripts))
+        self.waiting(keys::AUDIO_PREFIX, keys::transcript)
     }
 
     /// The photos without a Photo Text, newest capture first: those of
     /// every Note not in the trash, merged ones included. One whose Photo
     /// Text was removed is not among them.
     pub fn unread_photos(&self) -> Result<Vec<Blob>> {
-        self.waiting(|n| (&n.photos, &n.photo_texts, &n.removed_photo_texts))
+        self.waiting(keys::PHOTO_PREFIX, keys::ocr)
     }
 
     /// Whether this Device may remove the photo `hash` of the Note
@@ -1331,38 +1326,60 @@ impl<'a> Notes<'a> {
         }
     }
 
-    /// The blobs `of` every Note not in the trash that have no text yet,
-    /// nor one that was removed.
-    fn waiting(&self, of: impl Fn(&Note) -> Waiting<'_>) -> Result<Vec<Blob>> {
-        let waits = |note: &Note, hash: &String| {
-            let (_, texts, removed) = of(note);
-            !texts.contains_key(hash) && !removed.contains(hash)
-        };
+    /// The photos or recordings, fields under `prefix` holding
+    /// [`keys::ADDED`], without a text in their `text` field, nor one
+    /// that was removed, newest capture first: those of every Note not in
+    /// the trash, merged ones included. Told from the fields of the Notes
+    /// holding one, read in one query, without making a Note: made one by
+    /// one, they held the reader up for each photo or recording read after
+    /// an import (obf-1094), as the Dart core's `_waiting`.
+    fn waiting(&self, prefix: &str, text: fn(&str) -> String) -> Result<Vec<Blob>> {
+        let holding: HashSet<String> = self
+            .store
+            .fields_with_prefix(prefix)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        let mut ids = self.store.ever_of_type(keys::TYPE_NOTE)?;
+        ids.retain(|id| holding.contains(id));
+        let mut read = self
+            .store
+            .current_fields_of(ids.iter().map(String::as_str))?;
         let mut notes = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
-            if let Some(note) = self.by_id(&id)?
-                && !note.is_trashed()
+        for id in ids {
+            let Some(fields) = read.remove(&id) else {
+                continue;
+            };
+            if fields.get(keys::TYPE) != Some(keys::TYPE_NOTE)
+                || fields.get(keys::TRASHED).is_some()
             {
-                let (blobs, _, _) = of(&note);
-                if blobs.iter().any(|h| waits(&note, h)) {
-                    notes.push(note);
-                }
+                continue;
+            }
+            let Some(captured) = fields.get(keys::CAPTURED) else {
+                continue;
+            };
+            // Absent means not read yet; empty or null, read or removed.
+            let hashes: Vec<String> = added(&fields, prefix)
+                .into_iter()
+                .filter(|hash| {
+                    let field = text(hash);
+                    !fields.iter().any(|(key, _)| key == field.as_str())
+                })
+                .collect();
+            if !hashes.is_empty() {
+                notes.push((parse_time(captured)?, id, hashes));
             }
         }
-        notes.sort_by_key(|n| std::cmp::Reverse(n.captured));
-        let mut out = Vec::new();
-        for note in &notes {
-            let (blobs, _, _) = of(note);
-            for hash in blobs {
-                if waits(note, hash) {
-                    out.push(Blob {
-                        note_id: note.id.clone(),
-                        hash: hash.clone(),
-                    });
-                }
-            }
-        }
-        Ok(out)
+        notes.sort_by_key(|(captured, _, _)| std::cmp::Reverse(*captured));
+        Ok(notes
+            .into_iter()
+            .flat_map(|(_, note_id, hashes)| {
+                hashes.into_iter().map(move |hash| Blob {
+                    note_id: note_id.clone(),
+                    hash,
+                })
+            })
+            .collect())
     }
 
     /// Files the Note `note_id` into the Area or Topic `place_id`, out of
@@ -1848,12 +1865,44 @@ impl<'a> Notes<'a> {
     /// The Note `id`, trashed or not, or `None` when there is none.
     pub fn by_id(&self, id: &str) -> Result<Option<Note>> {
         let fields = self.store.current_fields(id)?;
-        self.note_of(id, fields)
+        self.note_of(id, &fields, None)
+    }
+
+    /// The Notes of `ids`, trashed or not, by id, each as
+    /// [`Notes::by_id`] reads it; an id that is no Note is left out. Read
+    /// in one pass for all of them, not once per Note (obf-1069), as the
+    /// Dart core's `byIds`.
+    pub fn by_ids<'i>(
+        &self,
+        ids: impl IntoIterator<Item = &'i str>,
+    ) -> Result<HashMap<String, Note>> {
+        self.by_ids_read(ids, &HashMap::new())
+    }
+
+    /// [`Notes::by_ids`], where the current fields of the entities in
+    /// `known` were read already ([`Store::current_fields_of`]) and are
+    /// not read again.
+    pub(crate) fn by_ids_read<'i>(
+        &self,
+        ids: impl IntoIterator<Item = &'i str>,
+        known: &HashMap<String, Fields>,
+    ) -> Result<HashMap<String, Note>> {
+        let pass = Pass::of(self.store, ids, known)?;
+        let mut notes = HashMap::new();
+        for id in &pass.ever {
+            if let Some(held) = pass.notes.get(id)
+                && let Some(note) = self.note_of(id, held, Some(&pass))?
+            {
+                notes.insert(id.clone(), note);
+            }
+        }
+        Ok(notes)
     }
 
     /// The Note `id` made of its current `fields`, as [`Notes::by_id`]
-    /// reads it.
-    fn note_of(&self, id: &str, fields: Fields) -> Result<Option<Note>> {
+    /// reads it; what `pass` read once for a list of many Notes is not
+    /// read again.
+    fn note_of(&self, id: &str, fields: &Fields, pass: Option<&Pass>) -> Result<Option<Note>> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_NOTE) {
             return Ok(None);
         }
@@ -1862,32 +1911,32 @@ impl<'a> Notes<'a> {
         };
         // A place that is gone leaves the Note Unsorted.
         let place = match fields.get(keys::PLACE) {
-            Some(p) if Places::new(self.store).is_place(p)? => Some(p.to_string()),
+            Some(p) if self.is_place(p, pass)? => Some(p.to_string()),
             _ => None,
         };
         let text = StoredText::read(fields.get(keys::TEXT));
-        let transcripts = texts(&fields, keys::TRANSCRIPT_PREFIX);
-        let photo_texts = texts(&fields, keys::OCR_PREFIX);
+        let transcripts = texts(fields, keys::TRANSCRIPT_PREFIX);
+        let photo_texts = texts(fields, keys::OCR_PREFIX);
         let removed = |prefix: &str, texts: &BTreeMap<String, String>| -> Vec<String> {
-            removed(&fields, prefix)
+            removed(fields, prefix)
                 .into_iter()
                 .filter(|hash| has_text(texts.get(hash)))
                 .collect()
         };
-        let photos = added(&fields, keys::PHOTO_PREFIX);
-        let recordings = added(&fields, keys::AUDIO_PREFIX);
+        let photos = added(fields, keys::PHOTO_PREFIX);
+        let recordings = added(fields, keys::AUDIO_PREFIX);
         // Only while the file stays: a text is removed from it, never
         // from a file that is gone.
         let removed_texts = |blobs: &[String], field: fn(&str) -> String| -> Vec<String> {
             blobs
                 .iter()
-                .filter(|hash| removed_text(&fields, &field(hash)))
+                .filter(|hash| removed_text(fields, &field(hash)))
                 .cloned()
                 .collect()
         };
         let removed_transcripts = removed_texts(&recordings, keys::transcript);
         let removed_photo_texts = removed_texts(&photos, keys::ocr);
-        let attachment_texts = texts(&fields, keys::FILE_TEXT_PREFIX);
+        let attachment_texts = texts(fields, keys::FILE_TEXT_PREFIX);
         let attachments: Vec<Attachment> = fields
             .iter()
             .filter_map(|(key, value)| {
@@ -1903,7 +1952,7 @@ impl<'a> Notes<'a> {
         } else {
             self.as_attached(id, &gone)?
         };
-        let boxes = self.boxes(id, &text, &fields)?;
+        let boxes = self.boxes(id, &text, fields)?;
         Ok(Some(Note {
             id: id.to_string(),
             text: text.text,
@@ -1915,11 +1964,11 @@ impl<'a> Notes<'a> {
                 .filter(|l| !l.is_empty())
                 .map(str::to_string),
             captured: parse_time(captured)?,
-            context: self.context(&fields)?,
+            context: self.context(fields, pass)?,
             place,
             importance: Importance::from_name(fields.get(keys::IMPORTANCE)),
             trashed: fields.get(keys::TRASHED).map(parse_time).transpose()?,
-            merged_into: self.merged_into(id)?,
+            merged_into: self.merged_into(id, pass)?,
             spawned: fields.get(keys::SPAWNED).is_some(),
             nudge: fields.get(keys::NUDGE).and_then(|n| parse_time(n).ok()),
             // The fields come in the order they were first written.
@@ -2004,23 +2053,88 @@ impl<'a> Notes<'a> {
 
     /// Every Note neither in the trash nor merged, newest capture first.
     pub fn all(&self) -> Result<Vec<Note>> {
-        // Every Note's fields in one read, not two per Note (#339), in the
-        // order [`Store::entities_of_type`] lists them.
-        let mut fields = self.store.current_fields_of_type(keys::TYPE_NOTE)?;
+        let pass = Pass::read(self.store)?;
         let mut notes = Vec::new();
-        for id in self.store.ever_of_type(keys::TYPE_NOTE)? {
-            let Some(held) = fields.remove(&id) else {
+        for id in &pass.ever {
+            let Some(held) = pass.notes.get(id) else {
                 continue;
             };
-            if let Some(note) = self.note_of(&id, held)?
-                && !note.is_trashed()
-                && !note.is_merged()
+            if self.listed(id, held, &pass)?
+                && let Some(note) = self.note_of(id, held, Some(&pass))?
             {
                 notes.push(note);
             }
         }
         notes.sort_by_key(|n| std::cmp::Reverse(n.captured));
         Ok(notes)
+    }
+
+    /// How many Notes are Unsorted: [`Notes::unsorted`]'s length, worked
+    /// out from the fields alone, without making a Note (obf-1069), as the
+    /// Dart core's `unsortedCount`.
+    pub fn unsorted_count(&self) -> Result<usize> {
+        let pass = Pass::read(self.store)?;
+        Ok(self.unsorted_fields(&pass)?.len())
+    }
+
+    /// Every Unsorted Note's id with its own Nudge time and its capture,
+    /// what the Nudge is planned over ([`Alarms::nudge`]): worked out from
+    /// the fields alone, as [`Notes::unsorted_count`], without making a
+    /// Note (obf-1091), as the Dart core's `nudgeAnchors`. Read as
+    /// [`Note::nudge_at`] and [`Note::captured`] are.
+    ///
+    /// [`Alarms::nudge`]: crate::Alarms::nudge
+    pub fn nudge_anchors(&self) -> Result<Vec<(String, NudgeAnchor)>> {
+        let pass = Pass::read(self.store)?;
+        let mut anchors = Vec::new();
+        for (id, fields) in self.unsorted_fields(&pass)? {
+            let Some(captured) = fields.get(keys::CAPTURED) else {
+                continue;
+            };
+            let captured = parse_time(captured)?;
+            let nudge = fields.get(keys::NUDGE).and_then(|n| parse_time(n).ok());
+            let due = nudge.unwrap_or(captured + Notes::default_nudge());
+            anchors.push((id.clone(), NudgeAnchor { due, captured }));
+        }
+        Ok(anchors)
+    }
+
+    /// The ids and fields of every Unsorted Note `pass` read, in its
+    /// order, told from the fields alone.
+    fn unsorted_fields<'p>(&self, pass: &'p Pass) -> Result<Vec<(&'p String, &'p Fields)>> {
+        let mut unsorted = Vec::new();
+        for id in &pass.ever {
+            let Some(fields) = pass.notes.get(id) else {
+                continue;
+            };
+            let filed = match fields.get(keys::PLACE) {
+                Some(place) => pass.places()?.contains(place),
+                None => false,
+            };
+            if fields.get(keys::CAPTURED).is_some()
+                && fields.get(keys::SPAWNED).is_none()
+                && !filed
+                && self.listed(id, fields, pass)?
+            {
+                unsorted.push((id, fields));
+            }
+        }
+        Ok(unsorted)
+    }
+
+    /// Whether the Note `id` of `fields` is neither in the trash nor
+    /// merged: told before it is made.
+    fn listed(&self, id: &str, fields: &Fields, pass: &Pass) -> Result<bool> {
+        Ok(fields.get(keys::TRASHED).is_none() && self.merged_into(id, Some(pass))?.is_none())
+    }
+
+    /// Whether `id` is an Area or a Topic that exists, as `pass` read
+    /// them when given.
+    fn is_place(&self, id: &str, pass: Option<&Pass>) -> Result<bool> {
+        match pass {
+            Some(pass) => Ok(pass.places()?.contains(id)),
+            None => Places::new(self.store).is_place(id),
+        }
     }
 
     /// Every Unsorted Note, oldest capture first.
@@ -2048,6 +2162,34 @@ impl<'a> Notes<'a> {
             .into_iter()
             .filter(|n| n.place.as_ref().is_some_and(|p| ids.contains(p)))
             .collect())
+    }
+
+    /// How many Notes [`Notes::inside`] lists for `place_id`: worked out
+    /// from the fields alone, without making a Note (obf-1093), as
+    /// [`Notes::unsorted_count`] and the Dart core's `countInside`.
+    pub fn count_inside(&self, place_id: &str) -> Result<usize> {
+        let pass = Pass::read(self.store)?;
+        let mut ids: HashSet<String> = HashSet::from([place_id.to_string()]);
+        ids.extend(
+            Places::new(self.store)
+                .topics(place_id)?
+                .into_iter()
+                .map(|t| t.id),
+        );
+        let mut count = 0;
+        for id in &pass.ever {
+            let Some(fields) = pass.notes.get(id) else {
+                continue;
+            };
+            let filed = match fields.get(keys::PLACE) {
+                Some(place) => ids.contains(place) && pass.places()?.contains(place),
+                None => false,
+            };
+            if fields.get(keys::CAPTURED).is_some() && filed && self.listed(id, fields, &pass)? {
+                count += 1;
+            }
+        }
+        Ok(count)
     }
 
     /// The Notes in the trash that can still be restored, most recently
@@ -2090,7 +2232,7 @@ impl<'a> Notes<'a> {
             .store
             .entities_of_type_among(keys::TYPE_NOTE, &was_merged)?
         {
-            if self.merged_into(&id)?.as_deref() == Some(note_id) && !merged.contains(&id) {
+            if self.merged_into(&id, None)?.as_deref() == Some(note_id) && !merged.contains(&id) {
                 merged.push(id);
             }
         }
@@ -2129,37 +2271,59 @@ impl<'a> Notes<'a> {
     pub fn sections_of(&self, note_ids: &[String]) -> Result<BTreeMap<String, Vec<Section>>> {
         let mut of: BTreeMap<String, Vec<Section>> =
             note_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
+        // Every Note's fields, and the histories of the Sections and of
+        // the Notes merged into them, each read once for all of them
+        // however many there are (obf-1069).
+        let pass = Pass::read(self.store)?;
         // Where each Note merged into one of them shows: its Amends show
         // there as well as under itself.
         let mut into: HashMap<String, String> = HashMap::new();
-        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
-            let Some(end) = self.merged_into(&id)? else {
+        let mut merged: Vec<String> = Vec::new();
+        for id in &pass.ever {
+            if !pass.notes.contains_key(id) {
+                continue;
+            }
+            let Some(end) = self.merged_into(id, Some(&pass))? else {
                 continue;
             };
-            if !of.contains_key(&end) || into.contains_key(&id) {
+            if !of.contains_key(&end) || into.contains_key(id) {
                 continue;
             }
-            let note = self.by_id(&id)?;
-            if let (Some(note), Some(list)) = (note, of.get_mut(&end)) {
-                list.push(self.merged_section(note, &end)?);
-            }
-            into.insert(id, end);
+            merged.push(id.clone());
+            into.insert(id.clone(), end);
         }
-        for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
-            let Some(owner) = self.store.current(&id, keys::NOTE)? else {
+        let sections = self.store.ever_of_type(keys::TYPE_SECTION)?;
+        let histories = self
+            .store
+            .histories_of(merged.iter().chain(sections.iter()).map(String::as_str))?;
+        let history_of = |id: &str| histories.get(id).map(Vec::as_slice).unwrap_or(&[]);
+        for id in &merged {
+            let (Some(end), Some(held)) = (into.get(id), pass.notes.get(id)) else {
                 continue;
             };
-            let under: Vec<&str> = [Some(owner.as_str()), into.get(&owner).map(String::as_str)]
+            let note = self.note_of(id, held, Some(&pass))?;
+            if let (Some(note), Some(list)) = (note, of.get_mut(end)) {
+                list.push(self.merged_section_in(note, end, Some(history_of(id)))?);
+            }
+        }
+        for id in &sections {
+            let history = history_of(id);
+            let fields = Store::latest_fields(history.iter().cloned());
+            // As [`Store::entities_of_type`] lists them.
+            if fields.get(keys::TYPE) != Some(keys::TYPE_SECTION) {
+                continue;
+            }
+            let Some(owner) = fields.get(keys::NOTE) else {
+                continue;
+            };
+            let under: Vec<&str> = [Some(owner), into.get(owner).map(String::as_str)]
                 .into_iter()
                 .flatten()
                 .filter(|note_id| of.contains_key(*note_id))
                 .collect();
-            if under.is_empty() {
-                continue;
-            }
-            let fields = self.store.current_fields(&id)?;
             for note_id in under {
-                if let Some(section) = self.section(&id, note_id, &fields)?
+                if let Some(section) =
+                    self.section_in(id, note_id, &fields, Some(history), Some(&pass))?
                     && let Some(list) = of.get_mut(note_id)
                 {
                     list.push(section);
@@ -2174,7 +2338,18 @@ impl<'a> Notes<'a> {
 
     /// The Note `note`, merged into `note_id`, as a Section of it.
     fn merged_section(&self, note: Note, note_id: &str) -> Result<Section> {
-        let (modified, edited_by) = self.last_edit(&note.id)?;
+        self.merged_section_in(note, note_id, None)
+    }
+
+    /// [`Notes::merged_section`], its edits told by `history` when
+    /// given.
+    fn merged_section_in(
+        &self,
+        note: Note,
+        note_id: &str,
+        history: Option<&[Entry]>,
+    ) -> Result<Section> {
+        let (modified, edited_by) = self.last_edit(&note.id, history)?;
         Ok(Section {
             id: note.id,
             note_id: note_id.to_string(),
@@ -2208,17 +2383,28 @@ impl<'a> Notes<'a> {
     /// one; `None` while there is only the text it was captured with.
     /// Ordered by latest wins, not by the log, so every Device finds the
     /// same.
-    fn last_edit(&self, id: &str) -> Result<(Option<DateTime<Utc>>, Option<Profile>)> {
-        let mut latest: Option<Entry> = None;
+    fn last_edit(
+        &self,
+        id: &str,
+        history: Option<&[Entry]>,
+    ) -> Result<(Option<DateTime<Utc>>, Option<Profile>)> {
+        let read;
+        let history = match history {
+            Some(given) => given,
+            None => {
+                read = self.store.history(id)?;
+                &read
+            }
+        };
+        let mut latest: Option<&Entry> = None;
         let mut texts = 0;
-        for e in self.store.history(id)? {
+        for e in history {
             if e.field != keys::TEXT {
                 continue;
             }
             texts += 1;
             let newer = latest
-                .as_ref()
-                .is_none_or(|held| Store::latest_wins(&e, held) == std::cmp::Ordering::Greater);
+                .is_none_or(|held| Store::latest_wins(e, held) == std::cmp::Ordering::Greater);
             if newer {
                 latest = Some(e);
             }
@@ -2231,6 +2417,19 @@ impl<'a> Notes<'a> {
 
     /// The Section `id` from its `fields`, shown under `note_id`.
     fn section(&self, id: &str, note_id: &str, fields: &Fields) -> Result<Option<Section>> {
+        self.section_in(id, note_id, fields, None, None)
+    }
+
+    /// [`Notes::section`]; its `history`, when given, is not read again,
+    /// nor what `pass` read.
+    fn section_in(
+        &self,
+        id: &str,
+        note_id: &str,
+        fields: &Fields,
+        history: Option<&[Entry]>,
+        pass: Option<&Pass>,
+    ) -> Result<Option<Section>> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_SECTION) {
             return Ok(None);
         }
@@ -2239,7 +2438,7 @@ impl<'a> Notes<'a> {
         };
         let text = StoredText::read(fields.get(keys::TEXT));
         let boxes = self.boxes(id, &text, fields)?;
-        let (modified, edited_by) = self.last_edit(id)?;
+        let (modified, edited_by) = self.last_edit(id, history)?;
         Ok(Some(Section {
             id: id.to_string(),
             note_id: note_id.to_string(),
@@ -2248,7 +2447,7 @@ impl<'a> Notes<'a> {
             text_version: text.version,
             text_editable: text.editable,
             captured: parse_time(captured)?,
-            context: self.context(fields)?,
+            context: self.context(fields, pass)?,
             photos: Vec::new(),
             recordings: Vec::new(),
             transcripts: BTreeMap::new(),
@@ -2268,12 +2467,14 @@ impl<'a> Notes<'a> {
     }
 
     /// The Capture Context in the `fields` of a Note or Section, with the
-    /// Named Place its location lies in.
-    fn context(&self, fields: &Fields) -> Result<CaptureContext> {
+    /// Named Place its location lies in: among those `pass` read, when
+    /// given.
+    fn context(&self, fields: &Fields, pass: Option<&Pass>) -> Result<CaptureContext> {
         let location = Coordinates::decode(fields.get(keys::LOCATION));
-        let named_place = match location {
-            Some(at) => NamedPlaces::new(self.store).at(at)?,
-            None => None,
+        let named_place = match (location, pass) {
+            (Some(at), Some(pass)) => named_place_at(pass.named()?, at).cloned(),
+            (Some(at), None) => NamedPlaces::new(self.store).at(at)?,
+            (None, _) => None,
         };
         let source_app = match fields.get(keys::SOURCE_PACKAGE) {
             Some(package) if !package.is_empty() => Some(SourceApp {
@@ -2294,17 +2495,30 @@ impl<'a> Notes<'a> {
     /// The Note `id` ends up in at the end of its Merge chain, or `None`
     /// when it stands alone. A chain stops before a Note this Device does
     /// not hold. A loop stops at its lowest id, so every Device keeps the
-    /// same Note.
-    fn merged_into(&self, id: &str) -> Result<Option<String>> {
+    /// same Note. With `pass`, the chain is followed in the fields it
+    /// read.
+    fn merged_into(&self, id: &str, pass: Option<&Pass>) -> Result<Option<String>> {
         let mut chain = vec![id.to_string()];
         loop {
             let Some(last) = chain.last() else {
                 return Ok(None);
             };
-            let Some(next) = self.store.current(last, keys::MERGED)? else {
+            let next = match pass {
+                Some(pass) => pass
+                    .notes
+                    .get(last)
+                    .and_then(|f| f.get(keys::MERGED))
+                    .map(str::to_string),
+                None => self.store.current(last, keys::MERGED)?,
+            };
+            let Some(next) = next else {
                 break;
             };
-            if self.store.current(&next, keys::TYPE)?.as_deref() != Some(keys::TYPE_NOTE) {
+            let is_note = match pass {
+                Some(pass) => pass.notes.contains_key(&next),
+                None => self.store.current(&next, keys::TYPE)?.as_deref() == Some(keys::TYPE_NOTE),
+            };
+            if !is_note {
                 break;
             }
             if let Some(start) = chain.iter().position(|c| *c == next) {
@@ -2318,6 +2532,152 @@ impl<'a> Notes<'a> {
             chain.push(next);
         }
         Ok(chain.last().filter(|last| *last != id).cloned())
+    }
+}
+
+/// What a list of many Notes reads once rather than for each Note
+/// (obf-1069), as the Dart core's `_Pass`: every Note's fields, its Merge
+/// chain followed in them; which Areas and Topics exist; the Named
+/// Places, once a Note has a location. The pass over every Note is kept
+/// until the log changes ([`Store::worked_out`]), so the lists of one
+/// read share it.
+struct Pass<'a> {
+    store: &'a Store,
+    read: Arc<PassRead>,
+}
+
+/// What a [`Pass`] read.
+struct PassRead {
+    /// The entities whose `$type` was a Note's at some time, in the order
+    /// [`Store::entities_of_type`] keeps; in a pass over some Notes
+    /// ([`Pass::of`]), those asked for.
+    ever: Vec<String>,
+    /// The fields of every Note, by id: those whose current `$type` is a
+    /// Note's, as [`Store::current_fields_of_type`] reads them; in a pass
+    /// over some Notes, of those and of the Notes their Merge chains lead
+    /// to.
+    notes: HashMap<String, Fields>,
+    places: OnceLock<HashSet<String>>,
+    named: OnceLock<Vec<NamedPlace>>,
+}
+
+impl PassRead {
+    fn new(ever: Vec<String>, notes: HashMap<String, Fields>) -> PassRead {
+        PassRead {
+            ever,
+            notes,
+            places: OnceLock::new(),
+            named: OnceLock::new(),
+        }
+    }
+}
+
+impl std::ops::Deref for Pass<'_> {
+    type Target = PassRead;
+
+    fn deref(&self) -> &PassRead {
+        &self.read
+    }
+}
+
+/// What [`Pass::read`] is kept under.
+const PASS: &str = "notes:pass";
+
+/// What [`Store::current_fields_of`] gives for each of `entities`; those
+/// of the Notes taken from the pass over every Note where one is kept
+/// (obf-1069), not read again.
+pub(crate) fn current_fields_of<'i>(
+    store: &Store,
+    entities: impl IntoIterator<Item = &'i str>,
+) -> Result<HashMap<String, Fields>> {
+    let Some(pass) = store.worked_out_held::<PassRead>(PASS)? else {
+        return store.current_fields_of(entities);
+    };
+    let mut out = HashMap::new();
+    let mut rest = Vec::new();
+    for id in entities {
+        match pass.notes.get(id) {
+            Some(fields) => {
+                out.insert(id.to_string(), fields.clone());
+            }
+            None => rest.push(id),
+        }
+    }
+    out.extend(store.current_fields_of(rest)?);
+    Ok(out)
+}
+
+impl<'a> Pass<'a> {
+    fn read(store: &'a Store) -> Result<Pass<'a>> {
+        let read = store.worked_out(PASS, || {
+            let ever = store.ever_of_type(keys::TYPE_NOTE)?;
+            let mut notes = store.current_fields_of(ever.iter().map(String::as_str))?;
+            notes.retain(|_, fields| fields.get(keys::TYPE) == Some(keys::TYPE_NOTE));
+            Ok(PassRead::new(ever, notes))
+        })?;
+        Ok(Pass { store, read })
+    }
+
+    /// The pass over the Notes of `ids` alone, `ever` in their order: the
+    /// fields of those that are Notes, and of the Notes their Merge
+    /// chains lead to, read a few hundred at a time; those in `known`,
+    /// the current fields of some entities already read, not again.
+    fn of<'i>(
+        store: &'a Store,
+        ids: impl IntoIterator<Item = &'i str>,
+        known: &HashMap<String, Fields>,
+    ) -> Result<Pass<'a>> {
+        let mut ever = Vec::new();
+        let mut seen = HashSet::new();
+        for id in ids {
+            if seen.insert(id.to_string()) {
+                ever.push(id.to_string());
+            }
+        }
+        let mut notes = HashMap::new();
+        let mut reading = ever.clone();
+        while !reading.is_empty() {
+            let unknown = reading.iter().filter(|id| !known.contains_key(*id));
+            let mut read = current_fields_of(store, unknown.map(String::as_str))?;
+            let mut next = Vec::new();
+            for id in reading {
+                let Some(fields) = read.remove(&id).or_else(|| known.get(&id).cloned()) else {
+                    continue;
+                };
+                if fields.get(keys::TYPE) != Some(keys::TYPE_NOTE) {
+                    continue;
+                }
+                if let Some(into) = fields.get(keys::MERGED)
+                    && seen.insert(into.to_string())
+                {
+                    next.push(into.to_string());
+                }
+                notes.insert(id, fields);
+            }
+            reading = next;
+        }
+        Ok(Pass {
+            store,
+            read: Arc::new(PassRead::new(ever, notes)),
+        })
+    }
+
+    /// Every Area and Topic that exists ([`Places::ids`]).
+    fn places(&self) -> Result<&HashSet<String>> {
+        if let Some(held) = self.read.places.get() {
+            return Ok(held);
+        }
+        let read = Places::new(self.store).ids()?;
+        Ok(self.read.places.get_or_init(|| read))
+    }
+
+    /// Every Named Place ([`NamedPlaces::all`]).
+    fn named(&self) -> Result<&[NamedPlace]> {
+        if let Some(held) = self.read.named.get() {
+            return Ok(held);
+        }
+        let read = NamedPlaces::new(self.store).all()?;
+        Ok(self.read.named.get_or_init(|| read))
     }
 }
 

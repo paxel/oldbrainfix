@@ -1061,3 +1061,418 @@ fn a_host_inviting_refuses_a_joiner_without_a_profile() -> TestResult {
     );
     Ok(())
 }
+
+/// A list of many Notes reads their lists, Sections and what may be done
+/// to them in a few queries however many there are (obf-1069), with the
+/// same results as reading each Note on its own, as the Dart core's
+/// `many_lists_test.dart`.
+mod many_lists {
+    use super::*;
+    use crate::text_format::{PLAIN, StoredText, VERSION};
+    use crate::{
+        Checklists, ClockTime, Day, Entry, Routines, Schedule, Search, Section, ShoppingLists,
+    };
+    use chrono::{DateTime, NaiveDateTime, Utc};
+    use std::sync::atomic::Ordering::SeqCst;
+
+    fn wall(t: DateTime<Utc>) -> NaiveDateTime {
+        t.naive_utc()
+    }
+
+    struct World {
+        ann: Store,
+        ben: Store,
+        area: String,
+        kitchen: String,
+        cids: String,
+    }
+
+    /// Ann's Household shared with Ben as a Member, a Topic in it, a Note
+    /// Cid sent Ann, and one Checklist on a Routine.
+    fn world() -> Boxed<World> {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        let kitchen = Places::new(&ann).add_topic(&area, "Kitchen")?.id;
+        sync(&ben, &ann)?;
+        let cids = accepted(&ann, &sent_from(&cid)?)?;
+        let daily = Notes::new(&ann)
+            .capture("Daily\nStretch\nWalk", None, None)?
+            .id;
+        Checklists::new(&ann).make(&daily)?;
+        let schedule = Schedule::new(
+            Day::parse("2026-03-01").ok_or("day")?,
+            &[ClockTime::new(8, 0).ok_or("time")?],
+            None,
+        )
+        .ok_or("schedule")?;
+        Routines::new(&ann).spawn(&daily, &schedule)?;
+        Ok(World {
+            ann,
+            ben,
+            area,
+            kitchen,
+            cids,
+        })
+    }
+
+    /// Adds `rounds` times one Note of every kind the lists tell apart, on
+    /// Ann's Device and on Ben's in the Shared Area, then syncs them.
+    fn seed(w: &World, rounds: usize) -> TestResult {
+        let (ann, ben) = (&w.ann, &w.ben);
+        let notes = Notes::new(ann);
+        let lists = Checklists::new(ann);
+        let shopping = ShoppingLists::new(ann);
+        for i in 0..rounds {
+            let text = format!("Pack {i}\nSocks\nShirt");
+            let check = notes.capture(&text, Some(&w.area), None)?.id;
+            lists.make(&check)?;
+            let made = lists.by_note(&check)?.ok_or("a Checklist")?;
+            lists.delete(&made.lines.last().ok_or("a Line")?.id)?;
+            lists.check(&made.lines.first().ok_or("a Line")?.id)?;
+            let text = format!("Shop {i}\nMilk\nBread");
+            let shop = notes.capture(&text, Some(&w.kitchen), None)?.id;
+            shopping.make(&shop)?;
+            let made = shopping.by_note(&shop, &wall)?.ok_or("a list")?;
+            shopping.check(&made.lines.first().ok_or("a Line")?.id, &wall)?;
+            let plain = notes.capture(&format!("Plain {i}"), None, None)?.id;
+            let amend = notes.amend(&plain, &format!("Amend {i}"))?;
+            let fixed = StoredText::of(PLAIN, &format!("Amend {i}, fixed"), VERSION).encode();
+            ann.append(&amend.id, "text", Some(&fixed), None)?;
+            let merged = notes
+                .capture(&format!("Merged {i}"), Some(&w.area), None)?
+                .id;
+            notes.amend(&merged, &format!("Amend of merged {i}"))?;
+            notes.merge(&merged, &plain)?;
+            notes.trash(&notes.capture(&format!("Trashed {i}"), None, None)?.id)?;
+            // A list made back into a Note keeps its Lines out of sight.
+            let undone = notes.capture(&format!("Undone {i}\nA\nB"), None, None)?.id;
+            lists.make(&undone)?;
+            ann.append(&undone, "kind", None, None)?;
+            // Ben's own Notes in the Area, one of them marked as Ann's by
+            // a `received` link his Device wrote, and a change to Ann's
+            // Note no role of his allows.
+            let bens = Notes::new(ben).capture(&format!("Ben {i}\nTea"), Some(&w.area), None)?;
+            Checklists::new(ben).make(&bens.id)?;
+            let forged = Notes::new(ben).capture(&format!("Forged {i}"), Some(&w.area), None)?;
+            let link = link(&key_of(ann)?, &own_id(ann)?);
+            ben.append(&forged.id, "received", Some(&link), None)?;
+            Notes::new(ben).amend(&forged.id, &format!("Ben amends {i}"))?;
+            sync(ben, ann)?;
+            ben.append(&check, "text", Some(&format!("Ben was here {i}")), None)?;
+            sync(ben, ann)?;
+        }
+        Ok(())
+    }
+
+    fn note_ids(store: &Store) -> Boxed<Vec<String>> {
+        let mut ids = store.entities_of_type("note")?;
+        ids.push("note:none".into());
+        Ok(ids)
+    }
+
+    fn reads_of(store: &Store, read: impl FnOnce() -> TestResult) -> Boxed<usize> {
+        let count = || store.history_reads.load(SeqCst) + store.logged_reads.load(SeqCst);
+        let before = count();
+        read()?;
+        Ok(count() - before)
+    }
+
+    fn section_shown(s: &Section) -> String {
+        format!(
+            "{} | {} | {} | {} | {:?} | {:?} | {}",
+            s.id,
+            s.note_id,
+            s.text,
+            s.captured,
+            s.modified,
+            s.edited_by.as_ref().map(|p| &p.id),
+            s.boxes.len()
+        )
+    }
+
+    #[test]
+    fn many_notes_histories_read_as_one_by_one() -> TestResult {
+        let w = world()?;
+        seed(&w, 2)?;
+        let mut ids = note_ids(&w.ann)?;
+        ids.extend(w.ann.entities_of_type("section")?);
+        let histories = w.ann.histories_of(ids.iter().map(String::as_str))?;
+        let logged = w.ann.logged_histories_of(ids.iter().map(String::as_str))?;
+        let of = |held: Option<&Vec<Entry>>| -> Vec<String> {
+            held.map(|h| h.iter().map(Entry::id).collect())
+                .unwrap_or_default()
+        };
+        for id in &ids {
+            let one: Vec<String> = w.ann.history(id)?.iter().map(Entry::id).collect();
+            assert_eq!(of(histories.get(id)), one, "{id}");
+            let one: Vec<String> = w.ann.logged_history(id)?.iter().map(Entry::id).collect();
+            assert_eq!(of(logged.get(id)), one, "{id}");
+        }
+        // Ben's change to Ann's Checklist is left out of both.
+        assert!(!w.ann.judged()?.ignored.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn many_notes_lists_read_as_one_by_one() -> TestResult {
+        let w = world()?;
+        seed(&w, 2)?;
+        let ann = &w.ann;
+        let ids = note_ids(ann)?;
+        let lists = Checklists::new(ann);
+        let many = lists.of_notes(&ids)?;
+        let mut expected = Vec::new();
+        for id in &ids {
+            if lists.is_checklist(id)? {
+                expected.push(id.clone());
+            }
+            let one = lists.by_note(id)?;
+            assert_eq!(many.get(id), one.as_ref(), "{id}");
+            // The Lines that count, read one by one from the log.
+            if let Some(one) = one {
+                let mut counted = Vec::new();
+                for line in ann.entities_of_type("line")? {
+                    let f = ann.current_fields(&line)?;
+                    if f.get("note") == Some(id.as_str())
+                        && f.get("made") == Some(one.making.as_str())
+                        && f.get("trashed").is_none()
+                    {
+                        counted.push(line);
+                    }
+                }
+                let mut shown: Vec<String> = one.lines.iter().map(|l| l.id.clone()).collect();
+                shown.sort();
+                counted.sort();
+                assert_eq!(shown, counted);
+            }
+        }
+        let mut keys: Vec<String> = many.keys().cloned().collect();
+        keys.sort();
+        expected.sort();
+        assert_eq!(keys, expected);
+        assert!(many.len() > 4);
+        let now = lists.of_notes_now(&ids, &wall)?;
+        for id in &ids {
+            assert_eq!(now.get(id), lists.shown_now(id, &wall)?.as_ref(), "{id}");
+        }
+        assert_eq!(now.values().filter(|l| l.on.is_some()).count(), 1);
+        let shopping = ShoppingLists::new(ann);
+        let many = shopping.of_notes(&ids, &wall)?;
+        for id in &ids {
+            assert_eq!(many.contains_key(id), shopping.is_shopping_list(id)?);
+            assert_eq!(many.get(id), shopping.by_note(id, &wall)?.as_ref(), "{id}");
+        }
+        // The checked Lines, one of each list.
+        let checked: usize = many
+            .values()
+            .map(|l| l.struck().len() + l.gone().len())
+            .sum();
+        assert_eq!(checked, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn many_notes_sections_read_as_one_by_one() -> TestResult {
+        let w = world()?;
+        seed(&w, 2)?;
+        let notes = Notes::new(&w.ann);
+        let ids = note_ids(&w.ann)?;
+        let many = notes.sections_of(&ids)?;
+        assert_eq!(many.len(), ids.len());
+        let mut shown = Vec::new();
+        for id in &ids {
+            let batch: Vec<String> = many
+                .get(id)
+                .ok_or("a key")?
+                .iter()
+                .map(section_shown)
+                .collect();
+            let one: Vec<String> = notes.sections(id)?.iter().map(section_shown).collect();
+            assert_eq!(batch, one, "{id}");
+            shown.extend(many.get(id).ok_or("a key")?.iter());
+        }
+        assert!(shown.iter().any(|s| s.modified.is_some()));
+        assert_eq!(
+            shown.iter().filter(|s| s.id.starts_with("note:")).count(),
+            2
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn many_notes_access_reads_as_one_by_one() -> TestResult {
+        let w = world()?;
+        seed(&w, 2)?;
+        for store in [&w.ann, &w.ben] {
+            let ids = note_ids(store)?;
+            assert_eq!(store.access_of(&ids)?.len(), ids.len());
+            access_as_one_by_one(store)?;
+        }
+        let mut by_text = HashMap::new();
+        for note in Notes::new(&w.ann).all()? {
+            by_text.insert(note.text.clone(), note.id.clone());
+        }
+        let id = |text: &str| -> Boxed<String> { Ok(by_text.get(text).ok_or("a Note")?.clone()) };
+        let ids: Vec<String> = by_text.values().cloned().chain([w.cids.clone()]).collect();
+        let on_ann = w.ann.access_of(&ids)?;
+        let on_ben = w.ben.access_of(&ids)?;
+        let access = |on: &HashMap<String, NoteAccess>, text: &str| -> Boxed<NoteAccess> {
+            Ok(on.get(&id(text)?).ok_or("a key")?.clone())
+        };
+        // A Member changes only their own Notes and adds to every one.
+        assert!(access(&on_ben, "Ben 0")?.changes);
+        let packed = access(&on_ben, "Pack 0")?;
+        assert!(!packed.changes);
+        assert!(packed.amends);
+        assert!(!packed.schedules);
+        assert_eq!(packed.author.map(|p| p.id), Some(own_id(&w.ann)?));
+        assert_eq!(access(&on_ann, "Pack 0")?.area, Some(w.area.clone()));
+        assert_eq!(access(&on_ann, "Shop 0")?.area, Some(w.area.clone()));
+        assert_eq!(access(&on_ann, "Plain 0")?.area, None);
+        // A `received` link counts only when one's own Device wrote it.
+        let forged = access(&on_ann, "Forged 0")?;
+        assert_eq!(forged.author.map(|p| p.id), Some(own_id(&w.ben)?));
+        let cids = on_ann.get(&w.cids).ok_or("a key")?;
+        assert_eq!(cids.author.as_ref().map(|p| p.name.as_str()), Some("Cid"));
+        assert_eq!(access(&on_ann, "Plain 0")?.author, None);
+        Ok(())
+    }
+
+    /// [`Store::access_of`] on `store` as each Note's own reads tell it.
+    fn access_as_one_by_one(store: &Store) -> TestResult {
+        let ids = note_ids(store)?;
+        let many = store.access_of(&ids)?;
+        for id in &ids {
+            let access = many.get(id).ok_or("a key")?;
+            let area = store.area_of(id)?;
+            assert_eq!(access.changes, store.may_change(id)?, "{id}");
+            assert_eq!(access.schedules, store.may_manage(area.as_deref())?, "{id}");
+            assert_eq!(access.amends, store.may_write_in(id)?, "{id}");
+            assert_eq!(access.author, store.author_of(id)?, "{id}");
+            assert_eq!(access.area, area, "{id}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn many_notes_with_a_pending_change_shown_read_as_one_by_one() -> TestResult {
+        let w = world()?;
+        seed(&w, 2)?;
+        let (ann, ben) = (&w.ann, &w.ben);
+        let mut by_text = HashMap::new();
+        for note in Notes::new(ann).all()? {
+            by_text.insert(note.text.clone(), note.id.clone());
+        }
+        let id = |text: &str| -> Boxed<String> { Ok(by_text.get(text).ok_or("a Note")?.clone()) };
+        // Shown, but trusted for nothing (ADR 0022): it moves no Note into
+        // an Area and marks none as somebody else's.
+        let pending = ann.open_pending("ai-task", true, None)?;
+        let (plain, packed, shop) = (id("Plain 0")?, id("Pack 0")?, id("Shop 1")?);
+        ann.draft_pending(&pending, &plain, "place", Some(&w.area), None)?;
+        let forged = link(&key_of(ben)?, &own_id(ben)?);
+        ann.draft_pending(&pending, &packed, "received", Some(&forged), None)?;
+        ann.draft_pending(&pending, &shop, "text", Some("Shop now"), None)?;
+        let shown = Notes::new(ann).by_id(&plain)?.ok_or("a Note")?;
+        assert_eq!(shown.place, Some(w.area.clone()));
+        let mut ids = note_ids(ann)?;
+        ids.extend(ann.entities_of_type("section")?);
+        let histories = ann.histories_of(ids.iter().map(String::as_str))?;
+        let logged = ann.logged_histories_of(ids.iter().map(String::as_str))?;
+        let of = |held: Option<&Vec<Entry>>| -> Vec<String> {
+            held.map(|h| h.iter().map(Entry::id).collect())
+                .unwrap_or_default()
+        };
+        for id in &ids {
+            let one: Vec<String> = ann.history(id)?.iter().map(Entry::id).collect();
+            assert_eq!(of(histories.get(id)), one, "{id}");
+            let one: Vec<String> = ann.logged_history(id)?.iter().map(Entry::id).collect();
+            assert_eq!(of(logged.get(id)), one, "{id}");
+        }
+        let fields = ann.current_fields_of(ids.iter().map(String::as_str))?;
+        let text = fields.get(&shop).and_then(|f| f.get("text"));
+        assert_eq!(text, Some("Shop now"));
+        let wanted = [plain.clone(), packed.clone()];
+        let on_ann = ann.access_of(&wanted)?;
+        assert_eq!(on_ann.get(&plain).ok_or("a key")?.area, None);
+        assert_eq!(on_ann.get(&packed).ok_or("a key")?.author, None);
+        // A Member who left the Area may write nothing in it any more.
+        ben.leave_area(&w.area)?;
+        access_as_one_by_one(ann)?;
+        access_as_one_by_one(ben)?;
+        let on_ben = ben.access_of(&[packed.clone(), id("Ben 0")?])?;
+        assert!(!on_ben.get(&packed).ok_or("a key")?.amends);
+        assert!(!on_ben.get(&id("Ben 0")?).ok_or("a key")?.changes);
+        Ok(())
+    }
+
+    #[test]
+    fn many_notes_searched_by_one_or_two_letters() -> TestResult {
+        let w = world()?;
+        seed(&w, 2)?;
+        let ids = |notes: Vec<Note>| -> Vec<String> { notes.into_iter().map(|n| n.id).collect() };
+        for query in ["so", "br", "t", "a"] {
+            assert_eq!(
+                ids(Search::new(&w.ann).notes(query, None)?),
+                ids(Search::scanning(&w.ann).notes(query, None)?),
+                "{query}"
+            );
+        }
+        let texts = |query: &str| -> Boxed<Vec<String>> {
+            Ok(Search::new(&w.ann)
+                .notes(query, None)?
+                .into_iter()
+                .map(|n| n.text)
+                .collect())
+        };
+        // The Line "Socks", but not "Shirt" deleted nor those of a Note
+        // that is no list any more.
+        assert!(texts("so")?.iter().any(|t| t.starts_with("Pack 0")));
+        assert!(texts("shirt")?.is_empty());
+        assert!(texts("br")?.contains(&"Shop 0".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn many_notes_read_no_more_than_a_few() -> TestResult {
+        // The one Routine stays one: the Routines are read one by one yet.
+        let w = world()?;
+        seed(&w, 1)?;
+        let reads = |w: &World| -> Boxed<Vec<usize>> {
+            let (ann, ben) = (&w.ann, &w.ben);
+            let ids = note_ids(ann)?;
+            let bens = note_ids(ben)?;
+            Ok(vec![
+                reads_of(ann, || {
+                    Checklists::new(ann).of_notes(&ids)?;
+                    Ok(())
+                })?,
+                reads_of(ann, || {
+                    Checklists::new(ann).of_notes_now(&ids, &wall)?;
+                    Ok(())
+                })?,
+                reads_of(ann, || {
+                    ShoppingLists::new(ann).of_notes(&ids, &wall)?;
+                    Ok(())
+                })?,
+                reads_of(ann, || {
+                    Notes::new(ann).sections_of(&ids)?;
+                    Ok(())
+                })?,
+                reads_of(ann, || {
+                    ann.access_of(&ids)?;
+                    Ok(())
+                })?,
+                reads_of(ben, || {
+                    ben.access_of(&bens)?;
+                    Ok(())
+                })?,
+            ])
+        };
+        let few = reads(&w)?;
+        seed(&w, 4)?;
+        assert_eq!(reads(&w)?, few);
+        Ok(())
+    }
+}

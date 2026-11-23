@@ -144,6 +144,34 @@ class AppLocalizationsDe extends AppLocalizations {
   String get whereNotesGo => 'Wohin sollen sie verschoben werden?';
 
   @override
+  String get areaDeletingStarted => 'Wird gelöscht …';
+
+  @override
+  String areaDeleting(int moved, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wird gelöscht: $moved von $count Notizen verschoben',
+      one: 'Wird gelöscht: $moved von 1 Notiz verschoben',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get areaDeleteFailed => 'Der Bereich konnte nicht gelöscht werden.';
+
+  @override
+  String get areaDeleteFailedTitle => 'Bereich nicht gelöscht';
+
+  @override
+  String get areaDeleteFailedCause =>
+      'Nicht alle seine Notizen ließen sich verschieben.';
+
+  @override
+  String get areaDeleteFailedFix =>
+      'Die schon verschobenen Notizen bleiben, wo sie hingekommen sind. Lösche den Bereich noch einmal, um die übrigen zu verschieben.';
+
+  @override
   String get moveToUnsorted => 'Nach Unsortiert verschieben';
 
   @override
@@ -5478,6 +5506,21 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get importKeepFailedFix =>
       'Es wurde nichts importiert. Lade den Export noch einmal herunter, kopiere ihn auf das Telefon und importiere ihn von dort.';
+
+  @override
+  String importWritten(int written, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$written von $count Notizen',
+      one: '$written von 1 Notiz',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importGoesOn =>
+      'Du kannst diese Seite verlassen. Der Import läuft neben der App weiter, und oben auf dem Bildschirm steht, wenn er fertig ist.';
 
   @override
   String settingBadgeLabel(String setting, String value) {

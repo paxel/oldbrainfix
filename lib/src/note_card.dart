@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'app_links.dart' show LinkedFrom;
+import 'app_lock.dart';
 import 'area_look.dart';
 import 'attachment_views.dart';
 import 'calendar_platform.dart';
@@ -54,10 +55,76 @@ typedef PlacedNote = ({
 /// whose it is.
 PlacedNote placeNote(Places places, Note note) {
   final store = places.store;
-  final changes = store.mayChange(note.id);
-  final schedules = store.mayManage(store.areaOf(note.id));
-  final amends = store.mayWriteIn(note.id);
-  final author = store.authorOf(note.id);
+  return _placed(
+    places,
+    note,
+    changes: store.mayChange(note.id),
+    schedules: store.mayManage(store.areaOf(note.id)),
+    amends: store.mayWriteIn(note.id),
+    author: store.authorOf(note.id),
+  );
+}
+
+/// [placeNote] for each of [notes], in their order, for a list: what
+/// this Device may do to them and whose they are read for all of them
+/// at once, and each Area and Topic once (obf-1069).
+List<PlacedNote> placeNotes(Places places, Iterable<Note> notes) {
+  final list = notes.toList();
+  final access = places.store.accessOf([for (final note in list) note.id]);
+  final topics = <String, Topic?>{};
+  final areas = <String, Area?>{};
+  return [
+    for (final note in list)
+      if (access[note.id] case final a?)
+        _placed(
+          places,
+          note,
+          changes: a.changes,
+          schedules: a.schedules,
+          amends: a.amends,
+          author: a.author,
+          topics: topics,
+          areas: areas,
+        ),
+  ];
+}
+
+/// [placeNotes] of [notes] without those [lock] hides, filed into a
+/// locked Area closed now: each Area's lock is read once for the list,
+/// from where the Notes are placed, not once per Note (obf-1068).
+List<PlacedNote> placeNotesShown(
+  Places places,
+  Iterable<Note> notes,
+  AppLock? lock,
+) {
+  final placed = placeNotes(places, notes);
+  if (lock == null) return placed;
+  final closed = <String, bool>{};
+  bool hides(PlacedNote p) {
+    // The Area as the lock finds it: a Topic's, or the place itself.
+    final area = p.topic?.areaId ?? p.area?.id;
+    return area != null && (closed[area] ??= lock.isAreaClosed(area));
+  }
+
+  return [
+    for (final p in placed)
+      if (!hides(p)) p,
+  ];
+}
+
+/// [note] with what this Device may do to it and whose it is, and where
+/// it is filed, its Topic and Area looked up in [topics] and [areas]
+/// first when given.
+PlacedNote _placed(
+  Places places,
+  Note note, {
+  required bool changes,
+  required bool schedules,
+  required bool amends,
+  required Profile? author,
+  Map<String, Topic?>? topics,
+  Map<String, Area?>? areas,
+}) {
   final place = note.place;
   if (place == null) {
     return (
@@ -70,8 +137,18 @@ PlacedNote placeNote(Places places, Note note) {
       author: author,
     );
   }
-  final topic = places.topicById(place);
-  final area = places.areaById(topic?.areaId ?? place);
+  Topic? topicById(String id) => switch (topics) {
+    null => places.topicById(id),
+    final held when held.containsKey(id) => held[id],
+    final held => held[id] = places.topicById(id),
+  };
+  Area? areaById(String id) => switch (areas) {
+    null => places.areaById(id),
+    final held when held.containsKey(id) => held[id],
+    final held => held[id] = places.areaById(id),
+  };
+  final topic = topicById(place);
+  final area = areaById(topic?.areaId ?? place);
   return (
     note: note,
     area: area,
@@ -510,7 +587,8 @@ class NoteCard extends StatelessWidget {
                   full: full,
                 ),
               if (tally != null) CardTally(notes: tally, noteId: note.id),
-              if (session != null) CardSession(notes: session, noteId: note.id),
+              if (session != null)
+                CardSession(notes: session, noteId: note.id, kind: kind),
             ],
           );
     final acts =

@@ -24,8 +24,12 @@ permissions:
 jobs:
   build-test:
     name: iOS build and XCTest
-    # Xcode 26 with the iOS 26 SDK, the oldest iOS the app runs on.
-    runs-on: macos-26
+    # Xcode 27.2 with the iOS 27 SDK, which App Store Connect requires from
+    # 2027 (#392); the app still runs on iOS 26 and newer. Pinned, not the
+    # image's default Xcode, so a new Xcode on the image changes nothing.
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
       # whisper.cpp is the submodule third_party/whisper.cpp (#247).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0

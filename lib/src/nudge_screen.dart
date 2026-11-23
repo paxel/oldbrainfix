@@ -40,10 +40,8 @@ class _NudgeScreenState extends State<NudgeScreen>
   /// The cards shown, the oldest of [_unsorted].
   late List<PlacedNote> _shown = _place();
 
-  List<PlacedNote> _place() => [
-    for (final note in _unsorted.take(nudgeCards))
-      placeNote(widget.places, note),
-  ];
+  List<PlacedNote> _place() =>
+      placeNotes(widget.places, _unsorted.take(nudgeCards));
 
   @override
   Store get log => widget.notes.store;
@@ -176,9 +174,7 @@ class _UnsortedScreenState extends State<UnsortedScreen>
   void reloadLog() => _reload();
 
   /// The Unsorted Notes of the people the filter keeps (#53).
-  List<PlacedNote> _load() => [
-    for (final note in _kept()) placeNote(widget.places, note),
-  ];
+  List<PlacedNote> _load() => placeNotes(widget.places, _kept());
 
   /// Those Notes themselves, as the filter keeps them now; the editor opened
   /// from here moves on through them (#313).

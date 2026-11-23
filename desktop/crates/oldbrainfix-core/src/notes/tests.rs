@@ -2272,3 +2272,414 @@ fn a_members_machine_gives_anothers_file_its_text_and_only_the_owner_removes_it(
     }
     Ok(())
 }
+
+/// The Notes [`Notes::all`] lists, each made on its own by
+/// [`Notes::by_id`] from the entities whose current `$type` is a Note's,
+/// as before obf-1069.
+fn one_by_one(store: &Store) -> Result<Vec<Note>> {
+    let notes = Notes::new(store);
+    let mut listed = Vec::new();
+    for id in store.ever_of_type(keys::TYPE_NOTE)? {
+        if store.current(&id, keys::TYPE)?.as_deref() != Some(keys::TYPE_NOTE) {
+            continue;
+        }
+        if let Some(note) = notes.by_id(&id)?
+            && !note.is_trashed()
+            && !note.is_merged()
+        {
+            listed.push(note);
+        }
+    }
+    listed.sort_by_key(|n| std::cmp::Reverse(n.captured));
+    Ok(listed)
+}
+
+/// A store with Areas and Topics, some gone, two Named Places and a
+/// Note with a ticked box, as the Dart core's `many_notes_test`: (store,
+/// home, gone, desk, orphan).
+fn many_notes() -> Result<(Store, [String; 4])> {
+    use crate::named_places::keys as named_keys;
+    use crate::places::keys as place_keys;
+    let store = crate::store::tests::store();
+    let places = Places::new(&store);
+    let home = places.add_area("Home")?.id;
+    let gone = places.add_area("Gone")?.id;
+    let work = places.add_area("Work")?.id;
+    let desk = places.add_topic(&work, "Desk")?.id;
+    let old = places.add_area("Old")?.id;
+    let orphan = places.add_topic(&old, "Orphan")?.id;
+    // An Area that is gone leaves its Notes and its Topics' Notes
+    // Unsorted.
+    store.append(&gone, place_keys::TYPE, None, None)?;
+    store.append(&old, place_keys::TYPE, None, None)?;
+    for (id, name, radius) in [
+        ("namedplace:home", "Home", "500.0"),
+        ("namedplace:kitchen", "Kitchen", "50.0"),
+    ] {
+        put(
+            &store,
+            id,
+            &[
+                (named_keys::TYPE, Some(named_keys::TYPE_NAMED_PLACE)),
+                (named_keys::NAME, Some(name)),
+                (named_keys::CENTRE, Some("52.5,13.4")),
+                (named_keys::RADIUS, Some(radius)),
+            ],
+        )?;
+    }
+    let boxed = Notes::new(&store).capture("☐ milk", None, None)?;
+    Boxes::new(&store).tick(
+        &boxed.id,
+        &boxed.boxes[0].id,
+        crate::text_boxes::BoxState::Done,
+    )?;
+    Ok((store, [home, gone, desk, orphan]))
+}
+
+/// Adds `rounds` times one Note of every kind a list tells apart.
+fn seed_many(store: &Store, places: &[String; 4], rounds: usize) -> Result<()> {
+    let [home, gone, desk, orphan] = places;
+    let notes = Notes::new(store);
+    let plain = |text: &str| -> Result<String> { Ok(notes.capture(text, None, None)?.id) };
+    for i in 0..rounds {
+        plain(&format!("plain {i}"))?;
+        notes.capture(&format!("home {i}"), Some(home), None)?;
+        notes.capture(&format!("desk {i}"), Some(desk), None)?;
+        store.append(&plain(&format!("gone {i}"))?, keys::PLACE, Some(gone), None)?;
+        store.append(
+            &plain(&format!("orphan {i}"))?,
+            keys::PLACE,
+            Some(orphan),
+            None,
+        )?;
+        let located = plain(&format!("located {i}"))?;
+        store.append(&located, keys::LOCATION, Some("52.5,13.4001"), None)?;
+        let far = plain(&format!("far {i}"))?;
+        store.append(&far, keys::LOCATION, Some("48.1,11.6"), None)?;
+        store.append(
+            &plain(&format!("spawned {i}"))?,
+            keys::SPAWNED,
+            Some("x"),
+            None,
+        )?;
+        notes.trash(&plain(&format!("trashed {i}"))?)?;
+        let a = plain(&format!("a {i}"))?;
+        let b = plain(&format!("b {i}"))?;
+        let c = plain(&format!("c {i}"))?;
+        notes.merge(&a, &b)?;
+        notes.merge(&b, &c)?;
+        // Merged both ways on two Devices before they synced.
+        let x = plain(&format!("x {i}"))?;
+        let y = plain(&format!("y {i}"))?;
+        store.append(&x, keys::MERGED, Some(&y), None)?;
+        store.append(&y, keys::MERGED, Some(&x), None)?;
+        // Merged into a Note this Device does not hold, and a Merge undone.
+        let away = format!("note:away{i}");
+        store.append(&plain(&format!("z {i}"))?, keys::MERGED, Some(&away), None)?;
+        let undone = plain(&format!("undone {i}"))?;
+        store.append(&undone, keys::MERGED, Some(&c), None)?;
+        store.append(&undone, keys::MERGED, None, None)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn many_notes_are_listed_as_made_one_by_one() -> Result<()> {
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let listed = Notes::new(&store).all()?;
+    assert_eq!(listed, one_by_one(&store)?);
+    // The smaller of the two Named Places holding it.
+    for note in &listed {
+        let name = note.context.named_place.as_ref().map(|p| p.name.as_str());
+        let located = note.text.starts_with("located");
+        assert_eq!(name, located.then_some("Kitchen"), "{}", note.text);
+    }
+    assert!(listed.iter().any(|n| n.place.is_some()));
+    assert!(listed.iter().any(|n| !n.boxes.is_empty()));
+    Ok(())
+}
+
+#[test]
+fn many_notes_are_read_by_their_ids_as_made_one_by_one() -> Result<()> {
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let notes = Notes::new(&store);
+    let mut ids = store.ever_of_type(keys::TYPE_NOTE)?;
+    ids.extend([places[0].clone(), places[2].clone(), "note:none".into()]);
+    let mut one_by_one = HashMap::new();
+    for id in &ids {
+        if let Some(note) = notes.by_id(id)? {
+            one_by_one.insert(id.clone(), note);
+        }
+    }
+    let listed = notes.all()?;
+    assert!(listed.iter().all(|n| one_by_one.get(&n.id) == Some(n)));
+    assert!(one_by_one.len() > listed.len());
+    let asked = || ids.iter().map(String::as_str);
+    // Read anew, with some of their fields read already, and from the
+    // pass over every Note a list keeps.
+    store.changed_elsewhere();
+    assert_eq!(notes.by_ids(asked())?, one_by_one);
+    store.changed_elsewhere();
+    let known = store.current_fields_of(asked().take(9))?;
+    assert_eq!(notes.by_ids_read(asked(), &known)?, one_by_one);
+    notes.all()?;
+    assert_eq!(notes.by_ids(asked())?, one_by_one);
+    Ok(())
+}
+
+#[test]
+fn the_unsorted_notes_are_counted_as_they_are_listed() -> Result<()> {
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let notes = Notes::new(&store);
+    assert_eq!(notes.unsorted_count()?, notes.unsorted()?.len());
+    assert!(notes.unsorted_count()? > 0);
+    Ok(())
+}
+
+#[test]
+fn the_nudge_is_planned_over_the_unsorted_notes_as_they_are_listed() -> TestResult {
+    use crate::Alarms;
+    use crate::nudges::NudgeAnchor;
+    let (store, places) = many_notes()?;
+    seed_many(&store, &places, 3)?;
+    let notes = Notes::new(&store);
+    notes.capture("soon", None, Some(Duration::minutes(10)))?;
+    let unreadable = notes.capture("unreadable", None, None)?.id;
+    store.append(&unreadable, keys::NUDGE, Some("not a time"), None)?;
+    let key = |(id, a): &(String, NudgeAnchor)| (id.clone(), a.captured, a.due);
+    let mut listed: Vec<_> = notes
+        .unsorted()?
+        .iter()
+        .map(|n| (n.id.clone(), n.captured, n.nudge_at()))
+        .collect();
+    let mut anchors: Vec<_> = notes.nudge_anchors()?.iter().map(key).collect();
+    listed.sort();
+    anchors.sort();
+    assert_eq!(anchors, listed);
+    // The Nudge counts what Unsorted lists, without making a Note
+    // (obf-1091).
+    let wall = |at: DateTime<Utc>| at.naive_utc();
+    let nudge = Alarms::new(&store).nudge(&wall)?.ok_or("a Nudge")?;
+    assert_eq!(nudge.count(), notes.unsorted()?.len());
+    assert_eq!(nudge.count(), notes.unsorted_count()?);
+    Ok(())
+}
+
+#[test]
+fn many_notes_take_no_more_reads_than_a_few() -> Result<()> {
+    let (store, places) = many_notes()?;
+    let notes = Notes::new(&store);
+    let reads_of = |read: &dyn Fn() -> Result<()>| -> Result<usize> {
+        let before = store.history_reads.load(Ordering::SeqCst);
+        read()?;
+        Ok(store.history_reads.load(Ordering::SeqCst) - before)
+    };
+    let all = || notes.all().map(drop);
+    let count = || notes.unsorted_count().map(drop);
+    seed_many(&store, &places, 1)?;
+    let few = reads_of(&all)?;
+    let few_count = reads_of(&count)?;
+    seed_many(&store, &places, 4)?;
+    assert_eq!(reads_of(&all)?, few);
+    assert_eq!(reads_of(&count)?, few_count);
+    Ok(())
+}
+
+#[test]
+fn a_type_the_roles_ignore_does_not_count_when_a_type_is_listed() -> TestResult {
+    let devices = Devices::new();
+    let ann = devices.device(1, "Ann")?;
+    let ben = devices.device(2, "Ben")?;
+    let (area, _) = household(&ann, &ben)?;
+    let milk = Notes::new(&ann).capture("Buy milk", Some(&area), None)?.id;
+    exchange(&ben, &ann, None)?;
+    // Not Ben's to do, as a modified app would write it all the same.
+    ben.append(&milk, keys::TYPE, None, None)?;
+    exchange(&ben, &ann, None)?;
+    assert!(!ann.judged()?.ignored.is_empty());
+    let listed = ann.entities_of_type(keys::TYPE_NOTE)?;
+    assert!(listed.contains(&milk));
+    let mut by_one = Vec::new();
+    for id in ann.ever_of_type(keys::TYPE_NOTE)? {
+        if ann.current(&id, keys::TYPE)?.as_deref() == Some(keys::TYPE_NOTE) {
+            by_one.push(id);
+        }
+    }
+    assert_eq!(listed, by_one);
+    assert_eq!(Notes::new(&ann).all()?, one_by_one(&ann)?);
+    Ok(())
+}
+
+// ------------------------------- the photos and recordings waiting (obf-1094)
+
+/// What [`Notes::unread_photos`], or [`Notes::untranscribed`] when
+/// `photos` is false, listed before obf-1094: each Note made on its own
+/// by [`Notes::by_id`].
+fn waiting_one_by_one(store: &Store, photos: bool) -> Result<Vec<Blob>> {
+    let notes = Notes::new(store);
+    let blobs = |note: &Note| -> Vec<String> {
+        if photos {
+            note.photos.clone()
+        } else {
+            note.recordings.clone()
+        }
+    };
+    let waits = |note: &Note, hash: &String| {
+        if photos {
+            !note.photo_texts.contains_key(hash) && !note.removed_photo_texts.contains(hash)
+        } else {
+            !note.transcripts.contains_key(hash) && !note.removed_transcripts.contains(hash)
+        }
+    };
+    let mut listed = Vec::new();
+    for id in store.entities_of_type(keys::TYPE_NOTE)? {
+        if let Some(note) = notes.by_id(&id)?
+            && !note.is_trashed()
+            && blobs(&note).iter().any(|h| waits(&note, h))
+        {
+            listed.push(note);
+        }
+    }
+    listed.sort_by_key(|n| std::cmp::Reverse(n.captured));
+    let mut out = Vec::new();
+    for note in &listed {
+        for hash in blobs(note) {
+            if waits(note, &hash) {
+                out.push(Blob {
+                    note_id: note.id.clone(),
+                    hash,
+                });
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Notes of every kind the readers tell apart, their photos and
+/// recordings made from `n` up to `n` + 10, as the Dart core's
+/// `unread_media_test`; the photos left waiting.
+fn seed_media(store: &Store, n: u8) -> Result<Vec<String>> {
+    let notes = Notes::new(store);
+    notes.capture(&format!("plain {n}"), None, None)?;
+    let several = notes.capture_with(
+        "several",
+        None,
+        None,
+        &[photo(n), photo(n + 1), photo(n + 2)],
+        &[voice(n), voice(n + 1)],
+    )?;
+    notes.set_photo_text(&several.id, &several.photos[1], "Read")?;
+    notes.set_photo_text(&several.id, &several.photos[2], "")?;
+    notes.set_transcript(&several.id, &several.recordings[0], "Heard")?;
+    for (i, kind) in (0u8..).zip(["read", "removed text", "removed"]) {
+        let note =
+            notes.capture_with(kind, None, None, &[photo(n + 3 + i)], &[voice(n + 2 + i)])?;
+        let (p, r) = (&note.photos[0], &note.recordings[0]);
+        notes.set_photo_text(&note.id, p, "Text")?;
+        notes.set_transcript(&note.id, r, "Words")?;
+        if kind == "removed text" {
+            notes.remove_photo_text(&note.id, p)?;
+            notes.remove_transcript(&note.id, r)?;
+        } else if kind == "removed" {
+            notes.remove_photo(&note.id, p)?;
+            notes.remove_recording(&note.id, r)?;
+        }
+    }
+    let trashed = notes.capture_with("trashed", None, None, &[photo(n + 6)], &[voice(n + 5)])?;
+    notes.trash(&trashed.id)?;
+    let restored = notes.capture_with("restored", None, None, &[photo(n + 7)], &[voice(n + 6)])?;
+    notes.trash(&restored.id)?;
+    notes.restore(&restored.id)?;
+    let merged = notes.capture_with("merged", None, None, &[photo(n + 8)], &[voice(n + 7)])?;
+    let target = notes.capture("target", None, None)?;
+    notes.merge(&merged.id, &target.id)?;
+    let discarded =
+        notes.capture_with("discarded", None, None, &[photo(n + 9)], &[voice(n + 8)])?;
+    notes.discard(&discarded.id)?;
+    let twin = notes.capture_with("twin", None, None, &[photo(n + 10)], &[voice(n + 9)])?;
+    let captured = store.current(&several.id, keys::CAPTURED)?;
+    store.append(&twin.id, keys::CAPTURED, captured.as_deref(), None)?;
+    Ok(vec![
+        several.photos[0].clone(),
+        restored.photos[0].clone(),
+        merged.photos[0].clone(),
+        twin.photos[0].clone(),
+    ])
+}
+
+#[test]
+fn the_photos_and_recordings_waiting_are_those_each_note_made_on_its_own_leaves() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let mut waiting = seed_media(&ann, 0)?;
+    waiting.extend(seed_media(&ann, 20)?);
+    let photos = notes.unread_photos()?;
+    assert_eq!(photos, waiting_one_by_one(&ann, true)?);
+    assert_eq!(notes.untranscribed()?, waiting_one_by_one(&ann, false)?);
+    let mut hashes: Vec<String> = photos.into_iter().map(|b| b.hash).collect();
+    hashes.sort();
+    waiting.sort();
+    assert_eq!(hashes, waiting);
+    assert_eq!(notes.untranscribed()?.len(), 8);
+    Ok(())
+}
+
+#[test]
+fn the_reads_for_the_media_waiting_do_not_grow_with_the_notes() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let reads = |read: &dyn Fn() -> Result<Vec<Blob>>| -> Result<usize> {
+        // What the store works out once per change is not counted.
+        read()?;
+        let count =
+            || ann.history_reads.load(Ordering::SeqCst) + ann.logged_reads.load(Ordering::SeqCst);
+        let before = count();
+        read()?;
+        Ok(count() - before)
+    };
+    let photos = || notes.unread_photos();
+    let recordings = || notes.untranscribed();
+    seed_media(&ann, 0)?;
+    let few_photos = reads(&photos)?;
+    let few_recordings = reads(&recordings)?;
+    for i in 1..6 {
+        seed_media(&ann, 20 * i)?;
+    }
+    for i in 0..40 {
+        notes.capture(&format!("plain {i}"), None, None)?;
+    }
+    assert_eq!(reads(&photos)?, few_photos);
+    assert_eq!(reads(&recordings)?, few_recordings);
+    assert!(few_photos <= 2, "{few_photos}");
+    Ok(())
+}
+
+#[test]
+fn a_text_removal_written_by_one_who_may_not_leaves_the_media_waiting() -> TestResult {
+    let devices = Devices::new();
+    let ann = devices.device(1, "Ann")?;
+    let ben = devices.device(2, "Ben")?;
+    let (area, _) = household(&ann, &ben)?;
+    let note =
+        Notes::new(&ann).capture_with("Shed", Some(&area), None, &[photo(1)], &[voice(1)])?;
+    let (p, r) = (note.photos[0].clone(), note.recordings[0].clone());
+    exchange(&ben, &ann, None)?;
+    // As a modified app would write it: a Member removes a text only on
+    // their own Note.
+    ben.append(&note.id, &keys::ocr(&p), None, None)?;
+    ben.append(&note.id, &keys::transcript(&r), None, None)?;
+    exchange(&ben, &ann, None)?;
+    for store in [&ann, &ben] {
+        let notes = Notes::new(store);
+        let blob = |hash: &str| Blob {
+            note_id: note.id.clone(),
+            hash: hash.to_string(),
+        };
+        assert_eq!(notes.unread_photos()?, vec![blob(&p)]);
+        assert_eq!(notes.untranscribed()?, vec![blob(&r)]);
+    }
+    Ok(())
+}

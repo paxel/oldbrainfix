@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
@@ -102,6 +103,7 @@ void main() {
     await tap(tester, mergeOn('more sauce', unsorted: true));
     expect(cards(), ['pasta', 'sauce']);
     await tester.enterText(find.byType(TextField), 'sau');
+    await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
     expect(cards(), ['sauce']);
     await tap(tester, find.text('sauce'));

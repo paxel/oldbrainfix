@@ -128,6 +128,10 @@ const starterSet = <({String slug, String name, List<StarterPlace> topics})>[
   ),
 ];
 
+/// How far deleting an Area is: [moved] of the [of] Notes inside it have
+/// gone where they go (obf-1093), told before the first and after each.
+typedef MoveProgress = void Function(int moved, int of);
+
 /// Where a deleted place's Notes go.
 enum NotesGo {
   /// Back to Unsorted.
@@ -231,16 +235,31 @@ class Places {
 
   /// The Topics of the Area [areaId], by stored name.
   List<Topic> topics(String areaId) {
+    // None while the Area is gone ([topicById]); every Topic's fields
+    // read at once, not one by one (obf-1069), in the order
+    // [Store.entitiesOfType] lists them.
+    if (areaById(areaId) == null) return [];
+    final ever = store.everOfType(PlaceKeys.typeTopic);
+    final fields = store.currentFieldsOf(ever);
     final topics = [
-      for (final id in store.entitiesOfType(PlaceKeys.typeTopic))
-        if (store.current(id, PlaceKeys.area) == areaId) ?topicById(id),
+      for (final id in ever)
+        if (fields[id] case final held?
+            when held[PlaceKeys.type] == PlaceKeys.typeTopic &&
+                held[PlaceKeys.area] == areaId)
+          Topic(
+            id: id,
+            areaId: areaId,
+            name: held[PlaceKeys.name] ?? '',
+            starter: held[PlaceKeys.starter],
+          ),
     ];
     topics.sort((a, b) => a.name.compareTo(b.name));
     return topics;
   }
 
   /// How many Notes sit in [id]; for an Area, its Topics' Notes count too.
-  int notesInside(String id) => _notesInside(id).length;
+  /// Told from their fields, without making a Note (obf-1093).
+  int notesInside(String id) => Notes(store).countInside(id);
 
   /// Deletes the Topic [topicId]; its Notes go where [notesGo] says.
   void deleteTopic(String topicId, NotesGo notesGo) {
@@ -255,14 +274,18 @@ class Places {
   }
 
   /// Deletes the Area [areaId] with its Topics; their Notes go where
-  /// [notesGo] says: back to Unsorted or into the trash.
-  void deleteArea(String areaId, NotesGo notesGo) {
+  /// [notesGo] says: back to Unsorted or into the trash. Each Note goes
+  /// in a transaction of its own, then the Area with its Topics in one
+  /// more (obf-1093), so another connection to the database, such as the
+  /// app's while this runs beside it, waits at most for one Note;
+  /// [progress] hears how many have gone.
+  void deleteArea(String areaId, NotesGo notesGo, {MoveProgress? progress}) {
     _requireArea(areaId);
     if (notesGo == NotesGo.area) {
       throw ArgumentError.value(notesGo, 'notesGo', 'an Area has no Area');
     }
+    _moveNotes(areaId, notesGo, null, progress);
     store.batch(() {
-      _moveNotes(areaId, notesGo, null);
       for (final topic in topics(areaId)) {
         store.append(topic.id, PlaceKeys.type, null);
       }
@@ -318,24 +341,48 @@ class Places {
   /// Whether [id] is an Area or a Topic that exists.
   bool isPlace(String id) => areaById(id) != null || topicById(id) != null;
 
+  /// Every Area and Topic that exists, by id: those [isPlace] holds for,
+  /// read at once for a list of many Notes (obf-1069).
+  Set<String> ids() {
+    final areas = store.currentFieldsOfType(PlaceKeys.typeArea).keys.toSet();
+    return {
+      ...areas,
+      for (final MapEntry(key: id, value: fields)
+          in store.currentFieldsOfType(PlaceKeys.typeTopic).entries)
+        if (areas.contains(fields[PlaceKeys.area])) id,
+    };
+  }
+
   List<Note> _notesInside(String id) => Notes(store).inside(id);
 
-  /// Sends the Notes inside [id] where [notesGo] says; [areaId] is where
-  /// [NotesGo.area] leads.
-  void _moveNotes(String id, NotesGo notesGo, String? areaId) {
-    final routines = Routines(store);
-    for (final note in _notesInside(id)) {
-      switch (notesGo) {
-        case NotesGo.unsorted:
-          // Back to Unsorted, even when it spawned a Routine (CONTEXT.md).
-          store.append(note.id, NoteKeys.place, null);
-          if (note.spawned) store.append(note.id, NoteKeys.spawned, null);
-        case NotesGo.area:
+  /// Sends the Notes inside [id] where [notesGo] says, each Note in a
+  /// transaction of its own unless a batch holds them all; [areaId] is
+  /// where [NotesGo.area] leads. [progress] hears how many have gone.
+  void _moveNotes(
+    String id,
+    NotesGo notesGo,
+    String? areaId, [
+    MoveProgress? progress,
+  ]) {
+    final notes = _notesInside(id);
+    if (notesGo == NotesGo.trash) {
+      // With their Routines and Reminders, as every deletion (#262), those
+      // read once for all of them (obf-1093).
+      Routines(store).trashNotes(notes, progress: progress);
+      return;
+    }
+    progress?.call(0, notes.length);
+    for (final (i, note) in notes.indexed) {
+      store.batch(() {
+        if (notesGo == NotesGo.area) {
           store.append(note.id, NoteKeys.place, areaId);
-        case NotesGo.trash:
-          // With its Routines and Reminders, as every deletion (#262).
-          routines.trashNote(note.id);
-      }
+          return;
+        }
+        // Back to Unsorted, even when it spawned a Routine (CONTEXT.md).
+        store.append(note.id, NoteKeys.place, null);
+        if (note.spawned) store.append(note.id, NoteKeys.spawned, null);
+      });
+      progress?.call(i + 1, notes.length);
     }
   }
 

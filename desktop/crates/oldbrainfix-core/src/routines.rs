@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use chrono::{DateTime, Duration, Utc};
 
 use crate::checklists::{LineChecks, keys as checklist_keys};
-use crate::entry::{dart_iso, parse_time};
+use crate::entry::{Entry, dart_iso, parse_time};
 use crate::note_kinds::NoteKind;
 use crate::notes::{Note, Notes, keys as note_keys};
 use crate::person_settings::PersonSettings;
@@ -575,6 +575,41 @@ impl<'a> Routines<'a> {
         })
     }
 
+    /// Moves the listed `notes` to the trash, in their order, each as
+    /// [`Routines::trash_note`] moves it and with what it takes along: the
+    /// Routines and Reminders are read once for all of them, not once per
+    /// Note, and a Note's trash moment is the one just written, not read
+    /// back (obf-1093). Each Note is a transaction of its own, so another
+    /// connection to the database, such as the window's while this runs
+    /// beside it, waits at most for one Note; `progress` hears how many
+    /// are in, before the first and after each, as the Dart core's
+    /// `trashNotes`.
+    pub fn trash_notes(&self, notes: &[Note], progress: &dyn Fn(usize, usize)) -> Result<()> {
+        let mut by_note: HashMap<String, Vec<Routine>> = HashMap::new();
+        for routine in self.all()? {
+            if let Some(note) = self.note(&routine)? {
+                by_note.entry(note.id).or_default().push(routine);
+            }
+        }
+        progress(0, notes.len());
+        for (i, note) in notes.iter().enumerate() {
+            self.store.batch(|| {
+                let at = dart_iso(self.store.now());
+                self.store
+                    .append(&note.id, note_keys::TRASHED, Some(&at), None)?;
+                for routine in by_note.get(&note.id).into_iter().flatten() {
+                    self.store
+                        .append(&routine.id, keys::TRASHED, Some(&at), None)?;
+                    self.store
+                        .append(&routine.id, keys::TRASHED_WITH, Some(&note.id), None)?;
+                }
+                Ok(())
+            })?;
+            progress(i + 1, notes.len());
+        }
+        Ok(())
+    }
+
     /// Brings the Note `note_id` back from the trash, with the Routines
     /// and Reminders that went there with it.
     pub fn restore_note(&self, note_id: &str) -> Result<()> {
@@ -777,7 +812,22 @@ impl<'a> Routines<'a> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_ROUTINE) {
             return Ok(None);
         }
-        let (Some(note_id), Some(schedule)) = (fields.get(keys::NOTE), Self::schedule_of(&fields))
+        let history = self.store.history(id)?;
+        self.made(id, &fields, &history, &mut None)
+    }
+
+    /// The Routine `id` of its `fields` and its `history`, as
+    /// [`Routines::by_id`] makes it; every Line's fields, against which
+    /// its checks count, read into `every_line` when they are needed and
+    /// not read yet, and kept there for the next (obf-1090).
+    fn made(
+        &self,
+        id: &str,
+        fields: &Fields,
+        history: &[Entry],
+        every_line: &mut Option<HashMap<String, Fields>>,
+    ) -> Result<Option<Routine>> {
+        let (Some(note_id), Some(schedule)) = (fields.get(keys::NOTE), Self::schedule_of(fields))
         else {
             return Ok(None);
         };
@@ -810,8 +860,7 @@ impl<'a> Routines<'a> {
             }
         }
         let mut scheduled_at: Option<DateTime<Utc>> = None;
-        let history = self.store.history(id)?;
-        for entry in &history {
+        for entry in history {
             // Leaving the trash bounds what was asked for like a new
             // schedule.
             if !keys::SCHEDULE_FIELDS.contains(&entry.field.as_str())
@@ -848,7 +897,17 @@ impl<'a> Routines<'a> {
             {
                 notes.push(into);
             }
-            done.extend(LineChecks::read(self.store, id, &history)?.done(self.store, &notes)?);
+            let checks = LineChecks::read(self.store, id, history)?;
+            if !checks.by_occurrence.is_empty() {
+                let lines = match every_line {
+                    Some(lines) => lines,
+                    None => every_line.insert(
+                        self.store
+                            .current_fields_of_type(checklist_keys::TYPE_LINE)?,
+                    ),
+                };
+                done.extend(checks.done_among(self.store, &notes, lines)?);
+            }
         }
         for (key, value) in fields.iter() {
             if let (Some(occurrence), Some(value)) = (key.strip_prefix(keys::DONE_PREFIX), value) {
@@ -971,9 +1030,21 @@ impl<'a> Routines<'a> {
 
     /// Every Routine and Reminder not in the trash.
     pub fn all(&self) -> Result<Vec<Routine>> {
+        let ids = self.store.entities_of_type(keys::TYPE_ROUTINE)?;
+        // Their entries and every Line read once for all of them, not
+        // for each (obf-1090).
+        let histories = self.store.histories_of(ids.iter().map(String::as_str))?;
+        let mut every_line = None;
         let mut out = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_ROUTINE)? {
-            if let Some(routine) = self.by_id(&id)?
+        for id in &ids {
+            let Some(history) = histories.get(id) else {
+                continue;
+            };
+            let fields = Store::latest_fields(history.iter().cloned());
+            if fields.get(keys::TYPE) != Some(keys::TYPE_ROUTINE) {
+                continue;
+            }
+            if let Some(routine) = self.made(id, &fields, history, &mut every_line)?
                 && !routine.is_trashed()
             {
                 out.push(routine);

@@ -1,6 +1,8 @@
 //! The Agenda read on a thread of its own with a connection of its own
 //! (#207): the window draws on while it reads, the last rows showing,
-//! and a read the log has changed since is dropped and read again.
+//! and a read the log has changed since is dropped and read again. As
+//! the window opens, its first frame comes before the first read is in
+//! (obf-1090).
 //! Driven headless by egui_kittest over a store on disk.
 
 use std::path::Path;
@@ -79,15 +81,21 @@ impl Gate {
     /// Hands the Agenda's thread its connection, each read once it is
     /// let go.
     fn hand(&self, app: &mut App) {
+        app.set_agenda_store(self.opener());
+    }
+
+    /// What hands the Agenda's thread its connection, each read once it
+    /// is let go.
+    fn opener(&self) -> impl Fn() -> Arc<Store> + Send + Sync + 'static {
         let (own, gate, taken) = (self.own.clone(), self.gate.clone(), self.taken.clone());
-        app.set_agenda_store(move || {
+        move || {
             if let Ok(gate) = gate.lock() {
                 let _ = gate.recv();
             }
             let store = own.clone();
             taken.store(true, Ordering::SeqCst);
             store
-        });
+        }
     }
 
     /// Lets one read go and waits until it is done with the connection.
@@ -245,5 +253,71 @@ fn the_window_draws_on_while_its_thread_reads_a_long_agenda() -> TestResult {
         longest < read / 3,
         "no frame waits for it: {longest:?} of {read:?}"
     );
+    Ok(())
+}
+
+/// Where the stretch of the line under the menu bar starts, as drawn
+/// last: the only rectangle as thin as the line.
+fn stretch(harness: &Harness<'_, App>) -> Result<f32, Box<dyn std::error::Error>> {
+    harness
+        .output()
+        .shapes
+        .iter()
+        .find_map(|clipped| match &clipped.shape {
+            egui::Shape::Rect(r)
+                if (r.rect.height() - oldbrainfix_gui::sync_line::HEIGHT).abs() < 0.01 =>
+            {
+                Some(r.rect.left())
+            }
+            _ => None,
+        })
+        .ok_or_else(|| "no line drawn".into())
+}
+
+#[test]
+fn the_window_shows_before_its_first_agenda_read_is_in_the_line_moving_meanwhile() -> TestResult {
+    let db = tempfile::tempdir()?;
+    let path = db.path().join("oldbrainfix.db");
+    let shown = Arc::new(open(&path)?);
+    let gate = Gate::new(open(&path)?);
+    Routines::new(&shown).create("pills", &daily(3)?)?;
+    Notes::new(&shown).capture("nees mor sauce", None, None)?;
+    // As the app opens it: nothing read the Agenda yet.
+    let app = App::opening(shown.clone(), "en", gate.opener());
+    assert_eq!(app.agenda_read(), (false, true));
+    let mut harness = window(app);
+    // The first frame, its read held at the gate: the menu bar and the
+    // Agenda's heading, no row yet, the line moving under the bar.
+    assert!(shows(&harness, "File"));
+    assert!(shows(&harness, "All Routines and Reminders"));
+    assert!(!shows(&harness, "pills"));
+    let line = harness.get_by_label("Reading the Agenda…").rect();
+    assert!(line.top() >= harness.get_by_label("File").rect().bottom());
+    assert!((line.height() - oldbrainfix_gui::sync_line::HEIGHT).abs() < 0.01);
+    let mut places = vec![stretch(&harness)?];
+    for _ in 0..3 {
+        harness.step();
+        assert!(!shows(&harness, "pills"));
+        places.push(stretch(&harness)?);
+    }
+    places.dedup();
+    assert!(places.len() > 1, "the line moves: {places:?}");
+    // One read for the start, whatever the window was set up with: once
+    // it is in, the rows show, the line goes and nothing reads again.
+    gate.let_go()?;
+    until_shown(&mut harness, "pills")?;
+    harness.step();
+    assert_eq!(harness.state().agenda_read(), (true, false));
+    assert!(harness.query_by_label("Reading the Agenda…").is_none());
+    // What it shows is what a read on the window's thread shows.
+    let here = window(App::new(shown.clone(), "en"));
+    let labels = |harness: &Harness<'_, App>| -> Vec<String> {
+        harness
+            .query_all_by(|_| true)
+            .filter_map(|n| n.accesskit_node().label())
+            .collect()
+    };
+    assert!(shows(&harness, "1 Unsorted"));
+    assert_eq!(labels(&harness), labels(&here));
     Ok(())
 }

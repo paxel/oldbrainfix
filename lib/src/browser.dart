@@ -689,11 +689,18 @@ class _SwipeDrag extends HorizontalDragGestureRecognizer {
 /// [tags], typing `#` shows the tags of the tag tree that start with what
 /// is typed as chips under it (#267, Q639), whose tap fills one in; the
 /// Notes of the Areas of [closedTags], the locked Areas closed now, are
-/// left out of them.
+/// left out of them. Each letter typed shows at once, ✕ with it, and
+/// runs [onChanged]; a text set as a whole, cleared, a tag picked or
+/// Search on the keyboard, runs [onSet], or [onChanged] without it.
 class BrowserSearchField extends StatelessWidget {
+  /// How long typing pauses before a search over the Notes runs
+  /// (obf-1068, C11): a search per letter made each letter wait on it.
+  static const pause = Duration(milliseconds: 300);
+
   final TextEditingController controller;
   final String hint;
   final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSet;
   final Store? tags;
   final Set<String> closedTags;
 
@@ -702,13 +709,16 @@ class BrowserSearchField extends StatelessWidget {
     required this.controller,
     required this.hint,
     required this.onChanged,
+    this.onSet,
     this.tags,
     this.closedTags = const {},
   });
 
+  ValueChanged<String> get _set => onSet ?? onChanged;
+
   void _clear() {
     controller.clear();
-    onChanged('');
+    _set('');
   }
 
   void _pick(String tag) {
@@ -716,28 +726,33 @@ class BrowserSearchField extends StatelessWidget {
       text: tag,
       selection: TextSelection.collapsed(offset: tag.length),
     );
-    onChanged(tag);
+    _set(tag);
   }
 
   @override
   Widget build(BuildContext context) {
     final field = Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: hint,
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: controller.text.isEmpty
-              ? null
-              : IconButton(
-                  tooltip: context.t.clearSearch,
-                  onPressed: _clear,
-                  icon: const Icon(Icons.close),
-                ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      // ✕ follows the text itself, not the page's next search.
+      child: ListenableBuilder(
+        listenable: controller,
+        builder: (context, _) => TextField(
+          controller: controller,
+          onChanged: onChanged,
+          onSubmitted: _set,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: controller.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: context.t.clearSearch,
+                    onPressed: _clear,
+                    icon: const Icon(Icons.close),
+                  ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+          ),
         ),
       ),
     );
@@ -756,6 +771,38 @@ class BrowserSearchField extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// A page whose search over the Notes runs [BrowserSearchField.pause]
+/// after the last letter typed (obf-1068, C11): each letter shows at
+/// once, and a letter typed before the pause is over puts the search
+/// off again, so no result of an older query replaces a newer one. A
+/// search runs on the field's text as it is then.
+mixin SearchesAfterPause<T extends StatefulWidget> on State<T> {
+  Timer? _searchTimer;
+
+  /// Runs [search] once typing pauses, in place of any still waiting.
+  void searchAfterPause(VoidCallback search) {
+    _searchTimer?.cancel();
+    _searchTimer = Timer(BrowserSearchField.pause, () {
+      _searchTimer = null;
+      if (mounted) search();
+    });
+  }
+
+  /// Runs [search] now, in place of any still waiting: for a text set as
+  /// a whole.
+  void searchNow(VoidCallback search) {
+    _searchTimer?.cancel();
+    _searchTimer = null;
+    search();
+  }
+
+  @override
+  void dispose() {
+    _searchTimer?.cancel();
+    super.dispose();
   }
 }
 
@@ -981,52 +1028,52 @@ List<Widget> diaryCards(
   Set<String>? selected,
   void Function(Note note, bool on)? onSelect,
 }) {
-  final when = DateFormat.yMd(Localizations.localeOf(context).toString())
-      .add_Hm();
+  final locale = Localizations.localeOf(context).toString();
+  final when = DateFormat.yMd(locale).add_Hm();
+  // What the cards read, kept with the list as loaded (obf-1069): a tap
+  // that switches a card or ticks its box reads none of it again; a list
+  // read anew, after any change to the log, reads it anew, as does a new
+  // day or language.
+  final reads = _ListReads.of(
+    shown,
+    day: Day.today(notes.store.clock(), deviceWallClock),
+    locale: locale,
+  );
+  List<String> ids() => [for (final placed in shown) placed.note.id];
   // The Sections of every listed Note, read in one pass when the first
   // full card reads its own, not while building and not once per card.
-  Map<String, List<Section>>? read;
   List<Section> sectionsOf(Note note) =>
-      (read ??= notes.sectionsOf([
-        for (final placed in shown) placed.note.id,
-      ]))[note.id] ??
-      const [];
-  // Their Checklists alike, read anew with every list built, as a check
-  // changes no Note; each as it shows now, for its Occurrence (#121).
+      (reads.sections ??= notes.sectionsOf(ids()))[note.id] ?? const [];
+  // Their Checklists alike, each as it shows now, for its Occurrence
+  // (#121).
   final lists = Checklists(notes.store);
-  Map<String, Checklist>? listed;
-  Checklist? checklistOf(Note note) => (listed ??= lists.ofNotesNow([
-    for (final placed in shown) placed.note.id,
-  ], deviceWallClock))[note.id];
+  Checklist? checklistOf(Note note) =>
+      (reads.checklists ??= lists.ofNotesNow(ids(), deviceWallClock))[note.id];
   // And their Shopping Lists, as they show today (#122).
   final shopping = ShoppingLists(notes.store);
-  Map<String, ShoppingList>? shopped;
-  ShoppingList? shoppingOf(Note note) => (shopped ??= shopping.ofNotes([
-    for (final placed in shown) placed.note.id,
-  ], deviceWallClock))[note.id];
+  ShoppingList? shoppingOf(Note note) =>
+      (reads.shopping ??= shopping.ofNotes(ids(), deviceWallClock))[note.id];
   // What their compact cards say of a Tally or a Session (#189), read
   // when the first compact card asks.
   final glances = CardGlances.inContext(context, notes.store);
   // Today's Occurrences of their Routines and Reminders (#215), read in
   // one pass when the first card asks.
   final routines = Routines(notes.store);
-  Map<String, List<AgendaRow>>? today;
   List<AgendaRow> todayOf(Note note) =>
-      (today ??= routines.todayByNote(deviceWallClock))[note.id] ?? const [];
+      (reads.today ??= routines.todayByNote(deviceWallClock))[note.id] ??
+      const [];
   // The Notes Hidden from AI (#267), read once for the list and kept by
   // the core until the log changes; without a mark no card walks up from
   // its Note.
-  final hidden = notes.store.hiddenFromAiAmong([
-    for (final placed in shown) placed.note.id,
-  ]);
+  bool hiddenFromAi(Note note) =>
+      (reads.hidden ??= notes.store.hiddenFromAiAmong(ids())).contains(note.id);
   // The Notes linking to each full card's Note (obf-1035), from what the
   // core keeps until the log changes; a closed locked Area's left out.
   final backlinks = Backlinks(notes.store);
   final lock = LockScope.of(context);
-  Set<String>? closed;
-  List<Note> linkedFrom(Note note) => backlinks.to(
+  List<Note> linkedFrom(Note note) => reads.linked[note.id] ??= backlinks.to(
     note.id,
-    closed: closed ??= lock?.closedAreas ?? const <String>{},
+    closed: reads.closed ??= lock?.closedAreas ?? const <String>{},
   );
   bool full(Note note) => compact == switched.contains(note.id);
   return [
@@ -1040,47 +1087,93 @@ List<Widget> diaryCards(
         amends: _,
         :final author,
       ))
-        NoteCard(
-          note: note,
-          when: when,
-          area: area,
-          topic: topic,
-          author: author,
-          showPlace: showPlace(placed),
-          // What a Member may not do to it is not offered (ADR 0013).
-          onFile: changes ? () => onFile(note) : null,
-          onMerge: changes ? () => onMerge(note) : null,
-          onSchedule: onSchedule == null || !schedules
-              ? null
-              : (spawn) => onSchedule(note, spawn),
-          actions: noteActions(
-            context,
-            notes,
-            placed,
-            onChanged,
+        // Built as it scrolls into sight: a card out of sight reads
+        // nothing.
+        Builder(
+          builder: (_) => NoteCard(
+            note: note,
+            when: when,
+            area: area,
+            topic: topic,
+            author: author,
+            showPlace: showPlace(placed),
+            // What a Member may not do to it is not offered (ADR 0013).
+            onFile: changes ? () => onFile(note) : null,
+            onMerge: changes ? () => onMerge(note) : null,
+            onSchedule: onSchedule == null || !schedules
+                ? null
+                : (spawn) => onSchedule(note, spawn),
+            actions: noteActions(
+              context,
+              notes,
+              placed,
+              onChanged,
+              onEdit: () => onOpen(note),
+              // Read once for the list, not for every card (obf-1069),
+              // the Pack badges of all its Notes in one query (obf-1068).
+              advanced: reads.advanced ??= notes.store.advanced,
+              packFrom: () =>
+                  (reads.packFrom ??= notes.store.packFromsOf(ids()))[note.id],
+            ),
+            full: full(note),
+            sections: () => sectionsOf(note),
+            linkedFrom: full(note) ? linkedFrom(note) : const [],
+            checklist: (read: () => checklistOf(note), lists: lists),
+            shopping: (read: () => shoppingOf(note), lists: shopping),
+            tally: notes,
+            session: notes,
+            kind: () =>
+                reads.kinds[note.id] ??= NoteKinds(notes.store).of(note.id),
+            glance: () => reads.glances[note.id] ??= glances.of(note.id),
+            boxes: boxTicks(notes, placed, onChanged),
+            onTable: tableEdit(notes, placed, onChanged),
+            occurrences: (read: () => todayOf(note), routines: routines),
+            onTap: onSwitch == null ? null : () => onSwitch(note),
             onEdit: () => onOpen(note),
+            hiddenFromAi: hiddenFromAi(note),
+            onSelect: selected == null || onSelect == null || !changes
+                ? null
+                : (on) => onSelect(note, on),
+            selected: selected?.contains(note.id) ?? false,
           ),
-          full: full(note),
-          sections: () => sectionsOf(note),
-          linkedFrom: full(note) ? linkedFrom(note) : const [],
-          checklist: (read: () => checklistOf(note), lists: lists),
-          shopping: (read: () => shoppingOf(note), lists: shopping),
-          tally: notes,
-          session: notes,
-          kind: () => NoteKinds(notes.store).of(note.id),
-          glance: () => glances.of(note.id),
-          boxes: boxTicks(notes, placed, onChanged),
-          onTable: tableEdit(notes, placed, onChanged),
-          occurrences: (read: () => todayOf(note), routines: routines),
-          onTap: onSwitch == null ? null : () => onSwitch(note),
-          onEdit: () => onOpen(note),
-          hiddenFromAi: hidden.contains(note.id),
-          onSelect: selected == null || onSelect == null || !changes
-              ? null
-              : (on) => onSelect(note, on),
-          selected: selected?.contains(note.id) ?? false,
         ),
   ];
+}
+
+/// What the cards of one list read from the store, kept with the list
+/// as it was loaded (obf-1069) for its day and language: a list loaded
+/// anew starts with nothing read.
+class _ListReads {
+  final Day day;
+  final String locale;
+
+  _ListReads(this.day, this.locale);
+
+  static final _kept = Expando<_ListReads>('diary reads');
+
+  /// The reads kept for [shown], or none read yet when it is another
+  /// day or language than they were read for.
+  static _ListReads of(
+    List<PlacedNote> shown, {
+    required Day day,
+    required String locale,
+  }) {
+    final kept = _kept[shown];
+    if (kept != null && kept.day == day && kept.locale == locale) return kept;
+    return _kept[shown] = _ListReads(day, locale);
+  }
+
+  Map<String, List<Section>>? sections;
+  Map<String, Checklist>? checklists;
+  Map<String, ShoppingList>? shopping;
+  Map<String, List<AgendaRow>>? today;
+  Set<String>? hidden;
+  Set<String>? closed;
+  bool? advanced;
+  final linked = <String, List<Note>>{};
+  final kinds = <String, NoteKind>{};
+  final glances = <String, List<String>>{};
+  Map<String, ({String id, String name})>? packFrom;
 }
 
 /// The app bar buttons of a diary: order by time or by Importance, and

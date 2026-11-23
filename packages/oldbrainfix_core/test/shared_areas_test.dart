@@ -882,4 +882,156 @@ void main() {
       }
     });
   });
+
+  group('judging inside a batch (obf-1092)', () {
+    /// Fails unless what [store] holds as judged is what the whole log
+    /// judges now.
+    void expectJudgedAsAll(Store store) {
+      final held = store.judged;
+      final entries = store.allEntries();
+      final all = judgeLog(entries);
+      expect(held.ignored, all.ignored);
+      expect(held.areas.keys.toSet(), all.areas.keys.toSet());
+      for (final MapEntry(key: id, value: grants) in all.areas.entries) {
+        final kept = held.areas[id]!;
+        expect(kept.first.id, grants.first.id);
+        expect(kept.devices, grants.devices);
+        for (final device in grants.devices) {
+          expect(kept.grantOf(device)?.role, grants.grantOf(device)?.role);
+          expect(kept.personOf(device), grants.personOf(device));
+          for (final e in entries) {
+            expect(kept.accessAt(device, e), grants.accessAt(device, e));
+          }
+        }
+      }
+    }
+
+    test('the first grant written inside a batch counts at once', () {
+      final house = Places(ann).addArea('Household');
+      ann.batch(() {
+        // What was judged before the batch goes with its first entry.
+        Places(ann).rename(house.id, 'Home');
+        expect(ann.isShared(house.id), isFalse);
+        ann.share(house.id);
+        expect(ann.isShared(house.id), isTrue);
+        expect(ann.accessIn(house.id), AreaAccess.manager);
+        expectJudgedAsAll(ann);
+      });
+    });
+
+    test('a batch of writes with reads between them judges the log once', () {
+      final h = household(AreaRole.member);
+      final old = Places(ann).addArea('Old');
+      for (var i = 0; i < 4; i++) {
+        final note = Notes(ann).capture('Old $i', place: old.id);
+        Routines(ann).spawn(note.id, Schedule(start: Day(2026, 3, 1)));
+      }
+      var before = ann.judgedBuilds;
+      Places(ann).deleteArea(old.id, NotesGo.trash);
+      expect(ann.judgedBuilds - before, lessThanOrEqualTo(1));
+      // As an import writes: new Notes, each read back.
+      before = ann.judgedBuilds;
+      ann.batch(() {
+        for (var i = 0; i < 4; i++) {
+          final id = 'note:imported$i';
+          ann.append(id, NoteKeys.type, NoteKeys.typeNote);
+          ann.append(id, NoteKeys.place, h.topic);
+          ann.append(id, NoteKeys.text, 'Imported $i');
+          expect(ann.current(id, NoteKeys.place), h.topic);
+          expectJudgedAsAll(ann);
+        }
+      });
+      expect(ann.judgedBuilds - before, 1);
+    });
+
+    test('what a Manager\'s batch judges again is what the whole log '
+        'judges', () {
+      final h = household(AreaRole.member);
+      final health = Places(ann)
+          .areas()
+          .firstWhere((a) => a.name == 'Health')
+          .id;
+      final mid = clock();
+      // Not Ben's to do, written all the same: ignored.
+      Routines(ben).reschedule(
+        h.routine,
+        Schedule(start: Day(2026, 3, 1), times: [ClockTime(6, 0)]),
+      );
+      Notes(ben).edit(h.note, 'Buy beer');
+      final own = Notes(ben).capture('Ben buys bread', place: h.topic);
+      Notes(ben).amend(own.id, 'Rye');
+      exchange(ben, ann);
+      expect(Routines(ann).byId(h.routine)!.schedule.times, [ClockTime(8, 0)]);
+      final before = ann.judgedBuilds;
+      ann.batch(() {
+        expectJudgedAsAll(ann);
+        // Filed in Health before Ben wrote: what he wrote on the Note and
+        // its Routine lies in no Shared Area then, and counts.
+        ann.append(h.note, NoteKeys.place, health, date: mid);
+        expectJudgedAsAll(ann);
+        expect(Routines(ann).byId(h.routine)!.schedule.times, [
+          ClockTime(6, 0),
+        ]);
+        ann.append(
+          h.note,
+          NoteKeys.place,
+          h.topic,
+          date: mid.add(const Duration(milliseconds: 1)),
+        );
+        expectJudgedAsAll(ann);
+        expect(Routines(ann).byId(h.routine)!.schedule.times, [
+          ClockTime(8, 0),
+        ]);
+        // A first `$type` dated before Ben's.
+        ann.append(
+          own.id,
+          NoteKeys.type,
+          NoteKeys.typeNote,
+          date: DateTime.utc(2026),
+        );
+        expectJudgedAsAll(ann);
+        ann.append(h.topic, PlaceKeys.area, health, date: mid);
+        expectJudgedAsAll(ann);
+        ann.share(health);
+        expectJudgedAsAll(ann);
+        ann.append(h.area, ShareKeys.role(ben.deviceId), null);
+        expectJudgedAsAll(ann);
+        Places(ann).rename(h.area, 'Home');
+        Notes(ann).trash(h.note);
+        expectJudgedAsAll(ann);
+      });
+      expect(ann.judgedBuilds - before, 1);
+      expectJudgedAsAll(ann);
+    });
+
+    test('what a Member\'s batch judges again is what the whole log '
+        'judges', () {
+      final h = household(AreaRole.member);
+      final before = ben.judgedBuilds;
+      ben.batch(() {
+        expectJudgedAsAll(ben);
+        Notes(ben).edit(h.note, 'Buy beer');
+        // Ignored at once, inside the batch too.
+        expect(Notes(ben).byId(h.note)!.text, 'Buy milk');
+        expectJudgedAsAll(ben);
+        final own = Notes(ben).capture('Ben buys bread', place: h.topic);
+        Notes(ben).amend(h.note, 'Oat milk please');
+        expectJudgedAsAll(ben);
+        // As a modified app would write them.
+        ben.append('routine:ben', RoutineKeys.type, RoutineKeys.typeRoutine);
+        ben.append('routine:ben', RoutineKeys.note, own.id);
+        ben.append('topic:garage', PlaceKeys.area, h.area);
+        expectJudgedAsAll(ben);
+        ben.append(
+          h.area,
+          ShareKeys.role(ben.deviceId),
+          Grant(AreaRole.manager, 'ben').encode(),
+        );
+        expectJudgedAsAll(ben);
+        ben.append(own.id, NoteKeys.place, null);
+        expectJudgedAsAll(ben);
+      });
+      expect(ben.judgedBuilds - before, 1);
+    });
+  });
 }

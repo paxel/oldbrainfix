@@ -16,6 +16,7 @@ import 'attachment_reader.dart';
 import 'attachment_views.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
+import 'area_deletion.dart';
 import 'areas_screen.dart';
 import 'auto_sync.dart';
 import 'browser.dart';
@@ -37,6 +38,7 @@ import 'help_notes.dart';
 import 'home_shortcuts.dart';
 import 'home_pages.dart';
 import 'host_screen.dart';
+import 'import_run.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'lock_platform.dart';
@@ -58,6 +60,7 @@ import 'restore_screen.dart';
 import 'ring_screen.dart';
 import 'session_view.dart';
 import 'routine_editor_screen.dart';
+import 'run_over.dart';
 import 'sent_item_screen.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
@@ -72,8 +75,28 @@ import 'tally_entry_screen.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
+/// Stops what a run of the app does on its own, apart from its screens:
+/// the automatic sync, the alarms' and the calendar mirror's timers, the
+/// readers in the background and the App Lock. The crash guard's Restart
+/// stops the run that crashed before it closes the store, as the screens
+/// of that run may never be taken down (obf-1059).
+class RunStop {
+  VoidCallback? _stop;
+
+  /// Stops the run that started last, once; nothing without one.
+  void stop() {
+    final stop = _stop;
+    _stop = null;
+    stop?.call();
+  }
+}
+
 class OldBrainFixApp extends StatefulWidget {
   final Store store;
+
+  /// Where the crash guard's Restart stops this run; none in tests that
+  /// do not restart.
+  final RunStop? runStop;
 
   /// What the app has to say; the app keeps its own when none is given.
   final Announcements? announcements;
@@ -163,6 +186,11 @@ class OldBrainFixApp extends StatefulWidget {
   /// an isolate of their own (#207); without one, on [store] at once.
   final AgendaReader agendaReader;
 
+  /// Where an Import and deleting an Area run: the app hands in an
+  /// isolate of its own (obf-1061, obf-1093); without one, on [store]
+  /// with [folders].
+  final JobRunner? jobRunner;
+
   /// Starts this Device's paired host for automatic sync; while none is
   /// given, this Device only joins.
   final StartPairedHost? pairedHost;
@@ -199,6 +227,7 @@ class OldBrainFixApp extends StatefulWidget {
   const OldBrainFixApp({
     super.key,
     required this.store,
+    this.runStop,
     this.announcements,
     this.navigatorKey,
     this.drafts,
@@ -223,6 +252,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.autoJoin = quickPairedSync,
     this.syncRunner,
     this.agendaReader = const InlineAgendaReader(),
+    this.jobRunner,
     this.pairedHost,
     this.join = lanSync,
     this.hosting = startPairingHost,
@@ -291,13 +321,17 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     store: widget.store,
     platform: widget.profile,
   );
+  late final _jobs = widget.jobRunner ?? InlineJobRunner(widget.folders);
+  late final _imports = ImportJobs(store: widget.store, runner: _jobs);
+  late final _deletions = AreaDeletions(store: widget.store, runner: _jobs);
 
   @override
   void initState() {
     super.initState();
-    // What has been in the trash for 30 days goes for good.
-    _notes.purgeTrash();
-    Routines(widget.store).purgeTrash();
+    widget.runStop?._stop = _restarted;
+    // What has been in the trash for 30 days goes for good, once the
+    // first frame shows: it builds every Note in the trash (obf-1090).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _purgeTrash());
     _alarms = AlarmSync(
       store: widget.store,
       platform: widget.alarms,
@@ -330,21 +364,63 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     }
   }
 
+  /// Purges what has been in the trash for 30 days, after the first frame
+  /// (obf-1090); not once the app is gone.
+  void _purgeTrash() {
+    if (!mounted) return;
+    _notes.purgeTrash();
+    Routines(widget.store).purgeTrash();
+  }
+
+  /// Restart stops this run: its screens, should they stay, read nothing
+  /// more either.
+  void _restarted() {
+    endRun(widget.store);
+    _stopWork();
+  }
+
+  /// Whether what this run does on its own was stopped, by [dispose] or
+  /// by a Restart before it.
+  var _stopped = false;
+
+  /// Stops what this run does on its own, once: each part even when one
+  /// before it fails, which is then thrown.
+  void _stopWork() {
+    if (_stopped) return;
+    _stopped = true;
+    (Object, StackTrace)? failed;
+    for (final stop in <VoidCallback>[
+      _alarms.dispose,
+      _autoSync.dispose,
+      _mirror.dispose,
+      _playback.dispose,
+      _transcriber.dispose,
+      _speechModel.dispose,
+      _photoReader.dispose,
+      _attachmentReader.dispose,
+      _lock.dispose,
+      _profile.dispose,
+      _frameTimes.dispose,
+      _imports.dispose,
+      _deletions.dispose,
+    ]) {
+      try {
+        stop();
+      } on Object catch (e, stack) {
+        failed ??= (e, stack);
+      }
+    }
+    if (failed case (final e, final stack)) {
+      Error.throwWithStackTrace(e, stack);
+    }
+  }
+
   @override
   void dispose() {
-    _alarms.dispose();
-    _autoSync.dispose();
-    _mirror.dispose();
-    _playback.dispose();
-    _transcriber.dispose();
-    _speechModel.dispose();
-    _photoReader.dispose();
-    _attachmentReader.dispose();
-    _lock.dispose();
-    _profile.dispose();
+    if (widget.runStop?._stop == _restarted) widget.runStop?._stop = null;
+    _stopWork();
     _pager.dispose();
     _scroll.dispose();
-    _frameTimes.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
   }
@@ -471,9 +547,17 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                               child: HomeShortcutsScope(
                                                                 shortcuts: widget
                                                                     .shortcuts,
-                                                                child: _spotlit(
-                                                                  child ??
-                                                                      const SizedBox.shrink(),
+                                                                child: ImportJobsScope(
+                                                                  jobs:
+                                                                      _imports,
+                                                                  child: AreaDeletionsScope(
+                                                                    deletions:
+                                                                        _deletions,
+                                                                    child: _spotlit(
+                                                                      child ??
+                                                                          const SizedBox.shrink(),
+                                                                    ),
+                                                                  ),
                                                                 ),
                                                               ),
                                                             ),

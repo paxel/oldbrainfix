@@ -228,3 +228,229 @@ fn a_device_whose_grant_is_newer_grants_nothing_and_writes_nothing_that_counts()
     assert_eq!(ann.extend_roles_to("peer")?, 0);
     Ok(())
 }
+
+/// Fails unless what `store` holds as judged is what the whole log
+/// judges now (obf-1092).
+fn assert_judged_as_all(store: &Store) -> Result<()> {
+    let held = store.judged()?;
+    let entries = store.all_entries()?;
+    let all = judge_log(&entries);
+    assert_eq!(held.ignored, all.ignored);
+    assert_eq!(
+        held.areas.keys().collect::<Vec<_>>(),
+        all.areas.keys().collect::<Vec<_>>()
+    );
+    for (id, grants) in &all.areas {
+        let kept = held
+            .areas
+            .get(id)
+            .ok_or_else(|| Error::Invalid(format!("{id} is not judged")))?;
+        assert_eq!(kept.first.id(), grants.first.id());
+        assert_eq!(kept.devices(), grants.devices());
+        for device in grants.devices() {
+            assert_eq!(
+                kept.grant_of(&device).map(|g| g.role),
+                grants.grant_of(&device).map(|g| g.role)
+            );
+            assert_eq!(kept.person_of(&device), grants.person_of(&device));
+            for e in &entries {
+                assert_eq!(kept.access_at(&device, e), grants.access_at(&device, e));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn no_times() -> crate::Schedule {
+    crate::Schedule {
+        start: crate::Day::new(2026, 3, 1),
+        times: Vec::new(),
+        rule: None,
+    }
+}
+
+#[test]
+fn the_first_grant_written_inside_a_batch_counts_at_once() -> TestResult {
+    let ann = device(1)?;
+    let house = Places::new(&ann).add_area("Household")?;
+    ann.batch(|| {
+        // What was judged before the batch goes with its first entry.
+        Places::new(&ann).rename(&house.id, "Home")?;
+        assert!(!ann.is_shared(&house.id)?);
+        ann.share(&house.id)?;
+        assert!(ann.is_shared(&house.id)?);
+        assert_eq!(ann.access_in(&house.id, None)?, AreaAccess::Manager);
+        assert_judged_as_all(&ann)
+    })?;
+    Ok(())
+}
+
+#[test]
+fn a_batch_of_writes_with_reads_between_them_judges_the_log_once() -> TestResult {
+    use std::sync::atomic::Ordering::SeqCst;
+    let ann = device(1)?;
+    let house = Places::new(&ann).add_area("Household")?;
+    let area = ann.share(&house.id)?;
+    let old = Places::new(&ann).add_area("Old")?;
+    for i in 0..4 {
+        let note = Notes::new(&ann).capture(&format!("Old {i}"), Some(&old.id), None)?;
+        Routines::new(&ann).spawn(&note.id, &no_times())?;
+    }
+    let before = ann.judged_builds.load(SeqCst);
+    Places::new(&ann).delete_area(&old.id, crate::NotesGo::Trash)?;
+    assert!(ann.judged_builds.load(SeqCst) - before <= 1);
+    // As an import writes: new Notes, each read back.
+    let before = ann.judged_builds.load(SeqCst);
+    ann.batch(|| {
+        for i in 0..4 {
+            let id = format!("note:imported{i}");
+            ann.append(&id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), None)?;
+            ann.append(&id, note_keys::PLACE, Some(&area), None)?;
+            ann.append(&id, note_keys::TEXT, Some(&format!("Imported {i}")), None)?;
+            assert_eq!(ann.current(&id, note_keys::PLACE)?, Some(area.clone()));
+            assert_judged_as_all(&ann)?;
+        }
+        Ok(())
+    })?;
+    assert_eq!(ann.judged_builds.load(SeqCst) - before, 1);
+    Ok(())
+}
+
+/// Ann's household with a Topic, a Note in it and its Routine, shared
+/// with Ben as a Member, and her private Health beside it.
+struct Household {
+    area: String,
+    kitchen: String,
+    milk: String,
+    bins: String,
+    health: String,
+}
+
+fn household(
+    ann: &Store,
+    ben: &Store,
+) -> std::result::Result<Household, Box<dyn std::error::Error>> {
+    let places = Places::new(ann);
+    let house = places.add_area("Household")?;
+    let kitchen = places.add_topic(&house.id, "Kitchen")?;
+    let milk = Notes::new(ann).capture("Buy milk", Some(&kitchen.id), None)?;
+    let bins = Routines::new(ann).spawn(&milk.id, &no_times())?;
+    let health = places.add_area("Health")?;
+    let area = ann.share(&house.id)?;
+    crate::checklists::tests::invite(ann, ben, &area)?;
+    Ok(Household {
+        area,
+        kitchen: kitchen.id,
+        milk: milk.id,
+        bins: bins.id,
+        health: health.id,
+    })
+}
+
+#[test]
+fn what_a_managers_batch_judges_again_is_what_the_whole_log_judges() -> TestResult {
+    use chrono::TimeZone;
+    use std::sync::atomic::Ordering::SeqCst;
+    let ann = device(1)?;
+    let ben = device(2)?;
+    let h = household(&ann, &ben)?;
+    let may = chrono::Utc
+        .with_ymd_and_hms(2026, 5, 1, 0, 0, 0)
+        .single()
+        .ok_or("a date")?;
+    let june = may + chrono::Duration::days(31);
+    // Not Ben's to do, written all the same after everything else:
+    // ignored.
+    ben.append(&h.bins, routine_keys::START, Some("2026-03-05"), Some(june))?;
+    let beer = ben.append(&h.milk, note_keys::TEXT, Some("Buy beer"), Some(june))?;
+    let own = Notes::new(&ben).capture("Ben buys bread", Some(&h.kitchen), None)?;
+    Notes::new(&ben).amend(&own.id, "Rye")?;
+    crate::checklists::tests::exchange(&ben, &ann)?;
+    assert!(ann.judged()?.ignored.contains(&beer.id()));
+    let before = ann.judged_builds.load(SeqCst);
+    ann.batch(|| {
+        assert_judged_as_all(&ann)?;
+        // Filed in Health before Ben wrote: what he wrote on the Note and
+        // its Routine lies in no Shared Area then, and counts.
+        ann.append(&h.milk, note_keys::PLACE, Some(&h.health), Some(may))?;
+        assert_judged_as_all(&ann)?;
+        assert!(!ann.judged()?.ignored.contains(&beer.id()));
+        ann.append(
+            &h.milk,
+            note_keys::PLACE,
+            Some(&h.kitchen),
+            Some(may + chrono::Duration::milliseconds(1)),
+        )?;
+        assert_judged_as_all(&ann)?;
+        assert!(ann.judged()?.ignored.contains(&beer.id()));
+        // A first `$type` dated before Ben's.
+        let early = chrono::Utc
+            .with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
+            .single()
+            .ok_or_else(|| Error::Invalid("a date".into()))?;
+        ann.append(
+            &own.id,
+            note_keys::TYPE,
+            Some(note_keys::TYPE_NOTE),
+            Some(early),
+        )?;
+        assert_judged_as_all(&ann)?;
+        ann.append(&h.kitchen, place_keys::AREA, Some(&h.health), Some(may))?;
+        assert_judged_as_all(&ann)?;
+        ann.share(&h.health)?;
+        assert_judged_as_all(&ann)?;
+        ann.append(&h.area, &role_field(&ben.device_id()?), None, None)?;
+        assert_judged_as_all(&ann)?;
+        Places::new(&ann).rename(&h.area, "Home")?;
+        Notes::new(&ann).trash(&h.milk)?;
+        assert_judged_as_all(&ann)?;
+        Ok(())
+    })?;
+    assert_eq!(ann.judged_builds.load(SeqCst) - before, 1);
+    assert_judged_as_all(&ann)?;
+    Ok(())
+}
+
+#[test]
+fn what_a_members_batch_judges_again_is_what_the_whole_log_judges() -> TestResult {
+    use std::sync::atomic::Ordering::SeqCst;
+    let ann = device(1)?;
+    let ben = device(2)?;
+    let h = household(&ann, &ben)?;
+    let before = ben.judged_builds.load(SeqCst);
+    ben.batch(|| {
+        assert_judged_as_all(&ben)?;
+        Notes::new(&ben).edit(&h.milk, "Buy beer")?;
+        // Ignored at once, inside the batch too.
+        assert_eq!(
+            Notes::new(&ben).by_id(&h.milk)?.map(|n| n.text),
+            Some("Buy milk".into())
+        );
+        assert_judged_as_all(&ben)?;
+        let own = Notes::new(&ben).capture("Ben buys bread", Some(&h.kitchen), None)?;
+        Notes::new(&ben).amend(&h.milk, "Oat milk please")?;
+        assert_judged_as_all(&ben)?;
+        // As a modified app would write them.
+        ben.append(
+            "routine:ben",
+            routine_keys::TYPE,
+            Some(routine_keys::TYPE_ROUTINE),
+            None,
+        )?;
+        ben.append("routine:ben", routine_keys::NOTE, Some(&own.id), None)?;
+        ben.append("topic:garage", place_keys::AREA, Some(&h.area), None)?;
+        assert_judged_as_all(&ben)?;
+        ben.append(
+            &h.area,
+            &role_field(&ben.device_id()?),
+            Some(&encode_grant(AreaRole::Manager, "ben")),
+            None,
+        )?;
+        assert_judged_as_all(&ben)?;
+        ben.append(&own.id, note_keys::PLACE, None, None)?;
+        assert_judged_as_all(&ben)?;
+        Ok(())
+    })?;
+    assert_eq!(ben.judged_builds.load(SeqCst) - before, 1);
+    Ok(())
+}

@@ -27,6 +27,7 @@ import 'src/file_platform.dart';
 import 'src/folder_platform.dart';
 import 'src/help_notes.dart';
 import 'src/home_shortcuts.dart';
+import 'src/import_run.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
@@ -45,6 +46,10 @@ import 'src/voice_platform.dart';
 /// again.
 Store? _store;
 
+/// Stops what the running app does on its own before Restart closes its
+/// store (obf-1059).
+final _runStop = RunStop();
+
 /// What the app has to say; one for the whole run, across Restarts.
 final _announcements = Announcements();
 
@@ -62,6 +67,11 @@ Future<void> main() async {
     await initCrashGuard(
       dir,
       restart: () {
+        // The app that crashed first: its timers would read the closed
+        // store, as its screens may never be taken down.
+        try {
+          _runStop.stop();
+        } catch (_) {}
         try {
           _store?.close();
         } catch (_) {}
@@ -112,6 +122,7 @@ Future<void> _openAndRun(Directory dir) async {
   runApp(
     OldBrainFixApp(
       store: store,
+      runStop: _runStop,
       announcements: _announcements,
       navigatorKey: _navigator,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
@@ -148,6 +159,13 @@ Future<void> _openAndRun(Directory dir) async {
       // The Agenda's reads and the alarms' plan there too, so the app
       // draws on while they read (#207).
       agendaReader: IsolateAgendaReader(path),
+      // An Import there too, and deleting an Area, so the app stays
+      // usable while they write (obf-1061, obf-1093).
+      jobRunner: IsolateJobRunner(
+        path: path,
+        folders: const AndroidFolders(),
+        token: RootIsolateToken.instance,
+      ),
       bundles: AndroidBundles(),
       profile: AndroidProfile(),
       workDir: work.path,

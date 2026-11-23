@@ -9,7 +9,7 @@
 //! Occurrence, so every new one starts with no Line checked.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
@@ -570,20 +570,39 @@ impl LineChecks {
         store: &Store,
         note_ids: &[String],
     ) -> Result<BTreeMap<String, DateTime<Utc>>> {
+        if self.by_occurrence.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        self.done_among(
+            store,
+            note_ids,
+            &store.current_fields_of_type(keys::TYPE_LINE)?,
+        )
+    }
+
+    /// [`LineChecks::done`] with every Line's fields in `every_line`, by
+    /// id, as [`Store::current_fields_of_type`] reads them: read once for
+    /// all the Routines of a read (obf-1090).
+    pub(crate) fn done_among(
+        &self,
+        store: &Store,
+        note_ids: &[String],
+        every_line: &HashMap<String, Fields>,
+    ) -> Result<BTreeMap<String, DateTime<Utc>>> {
         let mut done = BTreeMap::new();
         if self.by_occurrence.is_empty() {
             return Ok(done);
         }
-        let mut lines: BTreeMap<String, Fields> = BTreeMap::new();
-        for id in store.entities_of_type(keys::TYPE_LINE)? {
-            let fields = store.current_fields(&id)?;
-            if fields
-                .get(keys::NOTE)
-                .is_some_and(|note| note_ids.iter().any(|n| n == note))
-            {
-                lines.insert(id, fields);
-            }
-        }
+        let lines: BTreeMap<&String, &Fields> = every_line
+            .iter()
+            .filter(|(_, fields)| {
+                fields
+                    .get(keys::NOTE)
+                    .is_some_and(|note| note_ids.iter().any(|n| n == note))
+            })
+            .collect();
+        // Whether a Note was ever a Checklist of a making, read once each.
+        let mut of_lists: HashMap<(&str, &str), bool> = HashMap::new();
         let mut added: HashMap<String, Option<DateTime<Utc>>> = HashMap::new();
         for (key, checks) in &self.by_occurrence {
             let mut last: Option<(&String, &Entry)> = None;
@@ -604,11 +623,19 @@ impl LineChecks {
             let (Some(note), Some(made)) = (of.get(keys::NOTE), of.get(keys::MADE)) else {
                 continue;
             };
-            if !of_checklist(store, note, made)? {
+            let of_list = match of_lists.get(&(note, made)) {
+                Some(held) => *held,
+                None => {
+                    let read = of_checklist(store, note, made)?;
+                    of_lists.insert((note, made), read);
+                    read
+                }
+            };
+            if !of_list {
                 continue;
             }
             let mut raw = Vec::new();
-            for (id, fields) in &lines {
+            for (&id, &fields) in &lines {
                 if fields.get(keys::NOTE) != Some(note)
                     || fields.get(keys::MADE) != Some(made)
                     || fields.get(keys::TRASHED).is_some()
@@ -744,21 +771,27 @@ impl<'a> Checklists<'a> {
     }
 
     /// The Checklists of the Notes `note_ids` that are one, read in one
-    /// pass over the Lines, by Note.
+    /// pass over the Lines, by Note. The Notes and the Lines are read in
+    /// a few queries however many there are (obf-1069).
     pub fn of_notes(&self, note_ids: &[String]) -> Result<BTreeMap<String, Checklist>> {
-        let mut makings: HashMap<String, String> = HashMap::new();
-        for id in note_ids {
-            if let Some(making) = self.making(id)? {
-                makings.insert(id.clone(), making);
-            }
-        }
+        let makings = self.makings_of(note_ids)?;
         let mut out = BTreeMap::new();
         if makings.is_empty() {
             return Ok(out);
         }
         let mut raw: HashMap<String, Vec<Raw>> = HashMap::new();
-        for id in self.store.entities_of_type(keys::TYPE_LINE)? {
-            let fields = self.store.current_fields(&id)?;
+        let ever = self.store.ever_of_type(keys::TYPE_LINE)?;
+        let read = self
+            .store
+            .current_fields_of(ever.iter().map(String::as_str))?;
+        for id in ever {
+            // As [`Store::entities_of_type`] lists them.
+            let Some(fields) = read.get(&id) else {
+                continue;
+            };
+            if fields.get(keys::TYPE) != Some(keys::TYPE_LINE) {
+                continue;
+            }
             let Some(note) = fields.get(keys::NOTE) else {
                 continue;
             };
@@ -772,7 +805,7 @@ impl<'a> Checklists<'a> {
                 continue;
             }
             let note = note.to_string();
-            raw.entry(note).or_default().push(Raw::new(id, &fields));
+            raw.entry(note).or_default().push(Raw::new(id, fields));
         }
         for (note, making) in makings {
             let lines = shown(&note, raw.remove(&note).unwrap_or_default());
@@ -806,6 +839,52 @@ impl<'a> Checklists<'a> {
         };
         let checks = LineChecks::of(self.store, &on.routine_id)?;
         Ok(Some(checked_for(list, on, &checks)))
+    }
+
+    /// [`Checklists::for_occurrence`] for each of `on`, given the id of
+    /// the Note its Routine links back to ([`Routines::note`]): the Lines
+    /// and the Routines' checks read for all of them at once (obf-1090).
+    /// By Routine id and Occurrence key; those whose Note is no
+    /// Checklist are left out.
+    pub fn for_occurrences(
+        &self,
+        on: &[(RoutineOccurrence, String)],
+    ) -> Result<HashMap<(String, String), Checklist>> {
+        let mut out = HashMap::new();
+        let notes: Vec<String> = on
+            .iter()
+            .map(|(_, note)| note.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        if notes.is_empty() {
+            return Ok(out);
+        }
+        let lists = self.of_notes(&notes)?;
+        let listed: Vec<&(RoutineOccurrence, String)> = on
+            .iter()
+            .filter(|(_, note)| lists.contains_key(note))
+            .collect();
+        let histories = self
+            .store
+            .histories_of(listed.iter().map(|(o, _)| o.routine_id.as_str()))?;
+        let mut checks: HashMap<&str, LineChecks> = HashMap::new();
+        for (on, note) in listed {
+            let Some(list) = lists.get(note) else {
+                continue;
+            };
+            let id = on.routine_id.as_str();
+            let held = match checks.entry(id) {
+                std::collections::hash_map::Entry::Occupied(held) => held.into_mut(),
+                std::collections::hash_map::Entry::Vacant(free) => {
+                    let history = histories.get(id).map(Vec::as_slice).unwrap_or(&[]);
+                    free.insert(LineChecks::read(self.store, id, history)?)
+                }
+            };
+            let key = (id.to_string(), on.occurrence.key());
+            out.insert(key, checked_for(list.clone(), on, held));
+        }
+        Ok(out)
     }
 
     /// The Occurrence the Checklist of `note_id` is checked for now, with
@@ -852,14 +931,26 @@ impl<'a> Checklists<'a> {
             }
         }
         let today = Day::today(self.store.now(), wall);
+        let on: HashMap<String, RoutineOccurrence> = lists
+            .keys()
+            .filter_map(|id| {
+                let routines = spawned.get(id).map(Vec::as_slice).unwrap_or(&[]);
+                now_of(routines, today).map(|on| (id.clone(), on))
+            })
+            .collect();
+        // The checks of every Routine they are on, read in one go.
+        let checks = self
+            .store
+            .histories_of(on.values().map(|o| o.routine_id.as_str()))?;
         let mut out = BTreeMap::new();
         for (id, list) in lists {
-            let on = now_of(spawned.get(&id).map(Vec::as_slice).unwrap_or(&[]), today);
-            let shown = match on {
+            let shown = match on.get(&id) {
                 None => list,
                 Some(on) => {
-                    let checks = LineChecks::of(self.store, &on.routine_id)?;
-                    checked_for(list, &on, &checks)
+                    let history = checks.get(&on.routine_id).map(Vec::as_slice);
+                    let checks =
+                        LineChecks::read(self.store, &on.routine_id, history.unwrap_or(&[]))?;
+                    checked_for(list, on, &checks)
                 }
             };
             out.insert(id, shown);
@@ -1476,6 +1567,30 @@ impl<'a> Checklists<'a> {
     /// when it is no Checklist: no Note, another list, or a Tally.
     fn making(&self, note_id: &str) -> Result<Option<String>> {
         let fields = self.store.current_fields(note_id)?;
+        self.making_of(note_id, &fields)
+    }
+
+    /// The making of each of `note_ids` that is a Checklist now, as
+    /// [`Checklists::is_checklist`] tells it, by Note: their fields read
+    /// in one query rather than one per Note (obf-1069), as the Dart
+    /// core's `makingsOf`.
+    pub fn makings_of(&self, note_ids: &[String]) -> Result<HashMap<String, String>> {
+        // What a list of the Notes read already is not read again.
+        let read =
+            crate::notes::current_fields_of(self.store, note_ids.iter().map(String::as_str))?;
+        let none = Fields::default();
+        let mut makings = HashMap::new();
+        for id in note_ids {
+            if let Some(making) = self.making_of(id, read.get(id).unwrap_or(&none))? {
+                makings.insert(id.clone(), making);
+            }
+        }
+        Ok(makings)
+    }
+
+    /// The making of the Checklist the Note `note_id` of the current
+    /// `fields` is ([`Checklists::making`]).
+    fn making_of(&self, note_id: &str, fields: &Fields) -> Result<Option<String>> {
         if fields.get(note_keys::TYPE) != Some(note_keys::TYPE_NOTE) {
             return Ok(None);
         }

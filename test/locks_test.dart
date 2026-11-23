@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
@@ -487,6 +488,7 @@ void main() {
       await tap(tester, find.byTooltip(en.browseTooltip));
 
       await tester.enterText(find.byType(TextField), 'Pill');
+      await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
       expect(find.text('Pills for the cat'), findsOneWidget);
       expect(find.text('Pills'), findsNothing);

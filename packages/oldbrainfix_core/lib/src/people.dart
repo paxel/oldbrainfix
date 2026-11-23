@@ -118,6 +118,20 @@ class PersonFilter {
   int get hashCode => Object.hash(me, Object.hashAllUnordered(people));
 }
 
+/// What this Device may do to a Note or Section in a Shared Area (ADR
+/// 0013) and whose it is ([People.accessOf]): the Area it lies in, null
+/// for none; whether it may change it ([SharedAreas.mayChange]), give it
+/// Routines and Reminders ([SharedAreas.mayManage]) and add to it
+/// ([SharedAreas.mayWriteIn]); the Profile of the other person who wrote
+/// it ([People.authorOf]), null for the user's own.
+typedef NoteAccess = ({
+  String? area,
+  bool changes,
+  bool schedules,
+  bool amends,
+  Profile? author,
+});
+
 /// The own Profile's ids and keys, with what they were read from.
 typedef _OwnKeys = ({String stamp, Set<String> ids, Set<String> bound});
 
@@ -683,8 +697,62 @@ extension People on Store {
 
   /// Who wrote the Note or Section [entity]: the user, another person
   /// as their Profile shows without the Override, or nobody known.
-  _Writer _writerOf(String entity) {
-    if (_receivedFrom(entity) case (:final key, :final person)) {
+  _Writer _writerOf(String entity) => _writerFrom(
+    _receivedFrom(entity),
+    () => history(entity),
+    (device) => _deviceWriter(device, entity),
+  );
+
+  /// What this Device may do to each Note or Section of [ids] and whose
+  /// it is, as [mayChange], [mayManage] of its [areaOf], [mayWriteIn] and
+  /// [authorOf] tell it one by one: read for all of them in a few
+  /// queries however many there are (obf-1069), for a list of many cards.
+  Map<String, NoteAccess> accessOf(Iterable<String> ids) {
+    final list = ids.toSet();
+    final scopes = scopesOf(list);
+    // Of each, only what tells whose it is: its `$type` entries for the
+    // Device that made it, the link it keeps from a Sent Item.
+    final histories = historiesFieldsOf(list, const {r'$type'});
+    final logged = loggedFieldsOf(list, const {'received'});
+    final own = <String, bool>{};
+    final writers = <(String, String?), _Writer>{};
+    final overrides = <String, PersonOverride?>{};
+    NoteAccess one(String id) {
+      final scope = scopes[id] ?? personalScope;
+      final area = scope == personalScope ? null : scope;
+      final history = histories[id] ?? const <Entry>[];
+      final writer = _writerFrom(
+        _receivedLink(latestByOwn(logged[id] ?? const [], 'received', own)),
+        () => history,
+        (device) => writers.putIfAbsent((
+          device,
+          area,
+        ), () => _deviceWriterIn(device, () => area)),
+      );
+      return (
+        area: area,
+        changes: mayChangeIn(area, () => history),
+        schedules: mayManage(area),
+        amends: mayWriteInArea(area),
+        author: switch (writer) {
+          _Theirs(:final author) => _withOverride(author, overrides),
+          _ => null,
+        },
+      );
+    }
+
+    return {for (final id in list) id: one(id)};
+  }
+
+  /// Who wrote a Note or Section: [received] the link it keeps from a
+  /// Sent Item, else the Device of the first `$type` in its [history],
+  /// told by [byDevice].
+  _Writer _writerFrom(
+    ({String key, String person})? received,
+    List<Entry> Function() history,
+    _Writer Function(String device) byDevice,
+  ) {
+    if (received case (:final key, :final person)) {
       if (_own.bound.contains(key)) return const _Own();
       // The id counts only when a Profile kept under it binds the key:
       // a Sent Item carrying one's own id, or a third person's, is shown
@@ -696,26 +764,33 @@ extension People on Store {
       return _theirs(_shownFor(key, kept ? person : null));
     }
     String? device;
-    for (final e in history(entity)) {
+    for (final e in history()) {
       if (e.field == r'$type') {
         device = e.device;
         break;
       }
     }
     if (device == null) return const _Unknown();
-    return _deviceWriter(device, entity);
+    return byDevice(device);
   }
 
   /// Who the Device [device] writes for in the place of [entity]: the
   /// user, another person as their Profile shows without the Override,
   /// or nobody known.
-  _Writer _deviceWriter(String device, String entity) {
+  _Writer _deviceWriter(String device, String entity) =>
+      _deviceWriterIn(device, () => areaOf(entity));
+
+  /// [_deviceWriter] for an entity whose Area [area] gives, read only
+  /// when the Device is not the user's own.
+  _Writer _deviceWriterIn(String device, String? Function() area) {
     if (device == deviceId || isOwnDevice(device)) return const _Own();
     final keyBytes = pinnedKey(device)?.record.publicKey;
     final key = keyBytes == null ? null : base64.encode(keyBytes);
     if (key != null && _own.bound.contains(key)) return const _Own();
-    final area = areaOf(entity);
-    final named = area == null ? null : grantsOf(area)?.personOf(device);
+    final named = switch (area()) {
+      final area? => grantsOf(area)?.personOf(device),
+      null => null,
+    };
     if (named != null && isOwnPerson(named)) return const _Own();
     return _theirs(_shownFor(key, named));
   }
@@ -727,8 +802,11 @@ extension People on Store {
   /// Sent Item it was accepted from; null for any other. Only a link one
   /// of the user's own Devices wrote counts: another person's Device in
   /// a Shared Area could write any.
-  ({String key, String person})? _receivedFrom(String entity) {
-    final raw = currentByOwn(entity, 'received');
+  ({String key, String person})? _receivedFrom(String entity) =>
+      _receivedLink(currentByOwn(entity, 'received'));
+
+  /// The sender's key and Profile id in the `received` link [raw].
+  static ({String key, String person})? _receivedLink(String? raw) {
     if (raw == null) return null;
     try {
       if (jsonDecode(raw) case {

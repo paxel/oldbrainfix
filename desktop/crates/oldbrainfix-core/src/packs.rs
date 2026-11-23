@@ -2448,7 +2448,34 @@ impl Store {
         let Some(raw) = self.own_current(note_id, keys::FROM, &mut HashMap::new())? else {
             return Ok(None);
         };
-        let Ok(Value::Object(json)) = serde_json::from_str::<Value>(&raw) else {
+        self.pack_from_of(&raw)
+    }
+
+    /// [`Store::pack_from`] of each of the Notes `note_ids` that has the
+    /// badge, read in one query however many there are (obf-1069), as
+    /// the Dart core's `packFromsOf`: from what the user's own Devices
+    /// wrote alone, as there.
+    pub fn pack_froms_of(&self, note_ids: &[String]) -> Result<HashMap<String, PackFrom>> {
+        let logged = self.logged_fields_of(note_ids.iter().map(String::as_str), &[keys::FROM])?;
+        let mut own = HashMap::new();
+        let mut out = HashMap::new();
+        for id in note_ids {
+            let Some(kept) = logged.get(id) else {
+                continue;
+            };
+            if let Some(raw) = self.latest_by_own(kept, keys::FROM, &mut own)?
+                && let Some(from) = self.pack_from_of(&raw)?
+            {
+                out.insert(id.clone(), from);
+            }
+        }
+        Ok(out)
+    }
+
+    /// The badge the stored value `raw` of a Note's `from` makes, as
+    /// [`Store::pack_from`] shows it.
+    fn pack_from_of(&self, raw: &str) -> Result<Option<PackFrom>> {
+        let Ok(Value::Object(json)) = serde_json::from_str::<Value>(raw) else {
             return Ok(None);
         };
         let (Some(id), Some(name)) = (

@@ -337,6 +337,11 @@ jobs:
           flutter pub get
           flutter analyze --fatal-infos
           flutter test
+      # The phone's share of the time budget on 5000 Notes (obf-1069,
+      # C12): what its lists read of the core, alone on the runner.
+      - name: The phone's lists read a large store within the time budget
+        if: env.TESTED_BEFORE_MERGE != 'true'
+        run: flutter test test/budget_test.dart --run-skipped --concurrency=1
       # The app, the core and the tools, after both pub gets: the
       # package config sets the language version, and with it the style.
       - name: Dart format
@@ -473,6 +478,13 @@ jobs:
           cargo fmt --check
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
+      # The time budget on 5000 Notes (obf-1069, C12), timed as the app
+      # ships: in a release build, the debug one being far slower, and one
+      # test at a time, each alone on the runner.
+      - name: All Notes, a card and the search keep the time budget on a large store
+        if: env.TESTED_BEFORE_MERGE != 'true'
+        working-directory: desktop
+        run: cargo test -p oldbrainfix-gui --test budget --release --locked -- --ignored --nocapture --test-threads=1
       - name: The guide's desktop frames match their screens
         if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: desktop
@@ -845,7 +857,10 @@ jobs:
   testflight:
     name: iOS to TestFlight
     needs: [ios, sonar-gate]
-    runs-on: macos-26
+    # The same image and Xcode as ios.yml: the iOS 27 SDK (#392).
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
       - name: Apple secrets present
         id: secrets

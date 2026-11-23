@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
@@ -48,8 +49,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Types [query] and waits the pause after which the search runs.
   Future<void> search(WidgetTester tester, String query) async {
     await tester.enterText(find.byType(TextField), query);
+    await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
   }
 

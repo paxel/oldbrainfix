@@ -55,6 +55,10 @@ class ImportedNote {
   });
 }
 
+/// How far an Import is: [written] of the [of] Notes it writes are in
+/// (obf-1061), told before the first and after each.
+typedef ImportProgress = void Function(int written, int of);
+
 /// What an Import made, for the apps to announce.
 class ImportSummary {
   /// The new Area the Notes landed in; null when there was nothing to
@@ -133,8 +137,12 @@ class Imports {
   /// its Markdown as written; a text file's is plain; the others' are
   /// formatted, read into the Markdown subset ([ImportFormats]). A Note
   /// is dated by its file's modification time, and by now when that is
-  /// unknown or later.
-  ImportSummary folder(String areaName, List<ImportFile> files) {
+  /// unknown or later. [progress] hears how far the writing is.
+  ImportSummary folder(
+    String areaName,
+    List<ImportFile> files, {
+    ImportProgress? progress,
+  }) {
     final name = _areaName(areaName);
     final now = store.clock().toUtc();
     final made = <ImportedNote>[];
@@ -177,7 +185,13 @@ class Imports {
         ImportedNote(name: base, text: text, format: format, captured: at),
       );
     }
-    return notes(name, made, notText: notText, tooLarge: tooLarge);
+    return notes(
+      name,
+      made,
+      notText: notText,
+      tooLarge: tooLarge,
+      progress: progress,
+    );
   }
 
   /// Writes [notes] into a new Area named [areaName], oldest first,
@@ -187,16 +201,21 @@ class Imports {
   /// new one beside it, named with a number after it. A text larger
   /// than [maxTextBytes], and the oldest beyond [maxTotalBytes], are
   /// skipped as too large, counted on top of [notText] and [tooLarge];
-  /// with nothing left, no Area is made.
+  /// with nothing left, no Area is made. The Area and each Note are a
+  /// transaction of their own, so another connection to the database,
+  /// such as the app's while the Import runs beside it (obf-1061), waits
+  /// at most for one Note; [progress] hears how many are in.
   ImportSummary notes(
     String areaName,
     List<ImportedNote> notes, {
     int notText = 0,
     int tooLarge = 0,
+    ImportProgress? progress,
   }) => _write(
     areaName,
     notes,
     ImportSummary(areaId: null, notes: 0, notText: notText, tooLarge: tooLarge),
+    progress,
   );
 
   /// [notes] with the files and notes [skipped] before them counted.
@@ -204,6 +223,7 @@ class Imports {
     String areaName,
     List<ImportedNote> notes,
     ImportSummary skipped,
+    ImportProgress? progress,
   ) {
     final name = _areaName(areaName);
     for (final note in notes) {
@@ -259,9 +279,10 @@ class Imports {
       for (final (:note, at: _) in writing)
         {for (final bytes in note.photos) store.putPhoto(bytes)}.toList(),
     ];
-    final areaId = store.batch(() {
-      final area = Places(store).addArea(_unused(name));
-      for (final (i, (:note, :at)) in writing.indexed) {
+    final areaId = Places(store).addArea(_unused(name)).id;
+    progress?.call(0, writing.length);
+    for (final (i, (:note, :at)) in writing.indexed) {
+      store.batch(() {
         final id = 'note:${Store.newId()}';
         store.append(id, NoteKeys.type, NoteKeys.typeNote, date: at);
         store.append(id, NoteKeys.captured, at.toIso8601String(), date: at);
@@ -276,14 +297,14 @@ class Imports {
           StoredText.of(note.format, boxed).encode(),
           date: at,
         );
-        store.append(id, NoteKeys.place, area.id, date: at);
+        store.append(id, NoteKeys.place, areaId, date: at);
         for (final hash in hashes[i]) {
           store.append(id, NoteKeys.photo(hash), NoteKeys.photoAdded, date: at);
         }
         if (note.lines case final lines?) _writeLines(id, lines, at);
-      }
-      return area.id;
-    });
+      });
+      progress?.call(i + 1, writing.length);
+    }
     return summary(
       areaId: areaId,
       notes: kept.length,
@@ -352,7 +373,12 @@ class Imports {
   /// tags in a last line, a list is a Checklist with its Lines checked as
   /// in Keep, its photos are its photos. It is captured when Keep says it
   /// was made, and its checks are dated when it was last changed.
-  ImportSummary keep(String areaName, List<ImportFile> entries) {
+  /// [progress] hears how far the writing is.
+  ImportSummary keep(
+    String areaName,
+    List<ImportFile> entries, {
+    ImportProgress? progress,
+  }) {
     final name = _areaName(areaName);
     final now = store.clock().toUtc();
     final inKeep = entries.any((e) => _inKeep(e.name));
@@ -455,6 +481,7 @@ class Imports {
         missing: missing,
         notPhoto: notPhoto,
       ),
+      progress,
     );
   }
 

@@ -5,7 +5,7 @@
 use std::f64::consts::PI;
 
 use crate::Result;
-use crate::store::{Store, utf16_cmp};
+use crate::store::{Fields, Store, utf16_cmp};
 use crate::transcript_prompts::{dart_trim, lower};
 
 /// Field keys of a Named Place.
@@ -142,28 +142,38 @@ impl<'a> NamedPlaces<'a> {
     /// The Named Place `id`, or `None` when there is none or its centre
     /// or radius cannot be read.
     pub fn by_id(&self, id: &str) -> Result<Option<NamedPlace>> {
-        let fields = self.store.current_fields(id)?;
+        Ok(Self::of(id, &self.store.current_fields(id)?))
+    }
+
+    /// The Named Place `id` made of its current `fields`, as
+    /// [`NamedPlaces::by_id`] reads it.
+    fn of(id: &str, fields: &Fields) -> Option<NamedPlace> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_NAMED_PLACE) {
-            return Ok(None);
+            return None;
         }
         let centre = Coordinates::decode(fields.get(keys::CENTRE));
         let radius = dart_double(fields.get(keys::RADIUS).unwrap_or(""));
         let (Some(centre), Some(radius)) = (centre, radius) else {
-            return Ok(None);
+            return None;
         };
-        Ok(Some(NamedPlace {
+        Some(NamedPlace {
             id: id.to_string(),
             name: fields.get(keys::NAME).unwrap_or("").to_string(),
             centre,
             radius,
-        }))
+        })
     }
 
     /// Every Named Place, by name, ignoring case.
     pub fn all(&self) -> Result<Vec<NamedPlace>> {
+        // Their fields in one read, not one per Named Place (obf-1069), in
+        // the order [`Store::entities_of_type`] lists them.
+        let fields = self.store.current_fields_of_type(keys::TYPE_NAMED_PLACE)?;
         let mut places = Vec::new();
-        for id in self.store.entities_of_type(keys::TYPE_NAMED_PLACE)? {
-            places.extend(self.by_id(&id)?);
+        for id in self.store.ever_of_type(keys::TYPE_NAMED_PLACE)? {
+            if let Some(held) = fields.get(&id) {
+                places.extend(Self::of(&id, held));
+            }
         }
         places.sort_by(|a, b| utf16_cmp(&lower(&a.name), &lower(&b.name)));
         Ok(places)

@@ -574,8 +574,11 @@ void main() {
         ..insert(cy.append(own, PackKeys.from, from('Cy')));
       expect(ben.packFrom(badged), badge);
       expect(ben.packFrom(own), isNull);
+      // Read for many Notes at once, the same (obf-1069).
+      expect(ben.packFromsOf([badged, own]), {badged: badge});
       ben.insert(cy.append(badged, PackKeys.from, null));
       expect(ben.packFrom(badged), badge);
+      expect(ben.packFromsOf([badged, own]), {badged: badge});
       ben.removePackFrom(badged);
       expect(ben.packFrom(badged), isNull);
       ben.removePackFrom(own);
@@ -584,6 +587,7 @@ void main() {
       // one gets none.
       ben.restorePackFrom(badged);
       expect(ben.packFrom(badged), badge);
+      expect(ben.packFromsOf([badged, own]), {badged: badge});
       final before = ben.allEntries().length;
       ben.restorePackFrom(own);
       expect(ben.packFrom(own), isNull);

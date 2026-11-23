@@ -804,3 +804,78 @@ fn an_import_reads_no_file_an_include_names() -> Result<()> {
     assert_eq!(secret, ["Secret\nthe secret"]);
     Ok(())
 }
+
+/// Beside the window (obf-1061): the Import tells how far it is, and
+/// another connection writes between its Notes.
+mod beside {
+    use super::*;
+    use std::cell::RefCell;
+
+    #[test]
+    fn it_tells_how_far_it_is_before_the_first_note_and_after_each() -> Result<()> {
+        let store = store();
+        let told = RefCell::new(Vec::new());
+        let tell = |written, of| told.borrow_mut().push((written, of));
+        let summary = Imports::new(&store).reporting(&tell).folder(
+            "From Notes",
+            &[
+                file("a.txt", "a", Some(march())),
+                file("b.txt", "b", Some(may())),
+                file("photo.png", "not text", Some(march())),
+            ],
+        )?;
+        assert_eq!(summary.notes, 2);
+        assert_eq!(told.take(), [(0, 2), (1, 2), (2, 2)]);
+        assert_eq!(inside(&store, &summary)?.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn it_tells_nothing_when_nothing_is_written() -> Result<()> {
+        let store = store();
+        let told = RefCell::new(Vec::new());
+        let tell = |written, of| told.borrow_mut().push((written, of));
+        Imports::new(&store)
+            .reporting(&tell)
+            .folder("From Notes", &[file("photo.png", "x", None)])?;
+        assert!(told.take().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn another_connection_writes_between_its_notes() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("log.db");
+        let open = || Store::open(&path, Box::new(now), || Ok(SigningKey::from_seed([1; 32])));
+        let (importing, window) = (open()?, open()?);
+        let captured = RefCell::new(Vec::new());
+        // A write here waits for no lock the Import holds.
+        let tell = |written: usize, _| {
+            let made = Notes::new(&window).capture(&format!("Meanwhile {written}"), None, None);
+            captured.borrow_mut().push(made.map(|n| n.id));
+        };
+        let line = |text: &str| serde_json::json!({"text": text, "isChecked": false});
+        let entries: Vec<ImportFile> = ["One", "Two", "Three"]
+            .iter()
+            .map(|name| {
+                let json = serde_json::json!({
+                    "createdTimestampUsec": march().timestamp_micros(),
+                    "title": name,
+                    "listContent": [line("Line")],
+                });
+                file(&format!("Keep/{name}.json"), &json.to_string(), None)
+            })
+            .collect();
+        let started = std::time::Instant::now();
+        let summary = Imports::new(&importing)
+            .reporting(&tell)
+            .keep("From Google Keep", &entries)?;
+        assert!(started.elapsed() < std::time::Duration::from_secs(4));
+        assert_eq!(summary.notes, 3);
+        let captured = captured.take();
+        assert_eq!(captured.len(), 4);
+        assert!(captured.iter().all(std::result::Result::is_ok));
+        assert_eq!(inside(&importing, &summary)?.len(), 3);
+        Ok(())
+    }
+}

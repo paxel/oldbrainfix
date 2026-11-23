@@ -72,8 +72,12 @@ class MergeIntoScreen extends StatefulWidget {
   State<MergeIntoScreen> createState() => _MergeIntoScreenState();
 }
 
-class _MergeIntoScreenState extends State<MergeIntoScreen> {
+class _MergeIntoScreenState extends State<MergeIntoScreen>
+    with SearchesAfterPause {
   final _query = TextEditingController();
+
+  /// The text [_shown] was searched for; the field's own may be newer.
+  String _searched = '';
   late List<PlacedNote> _shown = _load();
 
   /// With [MergeIntoScreen.adding], the Notes added to last that are
@@ -97,20 +101,22 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
   List<PlacedNote> _load() {
     final lock = LockScope.of(context);
     final store = widget.notes.store;
-    bool offered(Note note) {
+    bool offered(PlacedNote placed) {
       if (!widget.adding) return true;
-      if (!store.mayWriteIn(note.id)) return false;
+      if (!placed.amends) return false;
       if (!widget.hidden) return true;
-      final area = store.areaOf(note.id);
+      final area = store.areaOf(placed.note.id);
       return area == null || !store.isShared(area);
     }
 
+    _searched = _query.text;
+    // Placed for all of them at once, not once per Note (obf-1068).
     return [
-      for (final note in Search(store).notes(_query.text))
-        if (note.id != widget.noteId &&
-            !(lock?.hides(note) ?? false) &&
-            offered(note))
-          placeNote(widget.places, note),
+      for (final placed in placeNotesShown(widget.places, [
+        for (final note in Search(store).notes(_searched))
+          if (note.id != widget.noteId) note,
+      ], lock))
+        if (offered(placed)) placed,
     ];
   }
 
@@ -120,7 +126,15 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
     Navigator.of(context).pop(id);
   }
 
-  void _search(String _) => setState(() => _shown = _load());
+  void _search() => setState(() => _shown = _load());
+
+  /// A letter typed: the search runs once typing pauses, an emptied
+  /// field shows every Note at once.
+  void _typed(String query) =>
+      query.trim().isEmpty ? _set(query) : searchAfterPause(_search);
+
+  /// The search set as a whole runs now.
+  void _set(String _) => searchNow(_search);
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +151,8 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
           BrowserSearchField(
             controller: _query,
             hint: t.searchAllHint,
-            onChanged: _search,
+            onChanged: _typed,
+            onSet: _set,
           ),
           Expanded(
             child: ListView(
@@ -148,7 +163,7 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
               children: _shown.isEmpty
                   ? [
                       BrowserEmpty(
-                        text: _query.text.trim().isNotEmpty
+                        text: _searched.trim().isNotEmpty
                             ? t.nothingFound
                             : widget.adding
                             ? t.noNoteToAddTo
@@ -156,7 +171,7 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
                       ),
                     ]
                   : [
-                      if (_recent.isNotEmpty && _query.text.trim().isEmpty) ...[
+                      if (_recent.isNotEmpty && _searched.trim().isEmpty) ...[
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                           child: Text(

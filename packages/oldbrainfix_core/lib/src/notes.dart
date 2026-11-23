@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import 'boxes.dart';
 import 'checklists.dart';
 import 'entry.dart';
 import 'file_text.dart';
 import 'hidden_from_ai.dart';
 import 'named_places.dart';
+import 'nudges.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'shared_areas.dart';
@@ -1055,18 +1058,11 @@ class Notes {
   /// The voice recordings without a Transcript, newest capture first:
   /// those of every Note not in the trash, merged ones included. One
   /// whose Transcript was removed is not among them.
-  List<({String noteId, String hash})> untranscribed() {
-    final notes = [
-      for (final note in _holding(NoteKeys.audioPrefix))
-        if (note.recordings.any((h) => _untranscribed(note, h))) note,
-    ];
-    notes.sort((a, b) => b.captured.compareTo(a.captured));
-    return [
-      for (final note in notes)
-        for (final hash in note.recordings)
-          if (_untranscribed(note, hash)) (noteId: note.id, hash: hash),
-    ];
-  }
+  List<({String noteId, String hash})> untranscribed() => _waiting(
+    NoteKeys.audioPrefix,
+    NoteKeys.audioAdded,
+    NoteKeys.transcriptPrefix,
+  );
 
   /// Keeps [text] as the Photo Text of the photo [hash] of the Note
   /// [noteId], a merged one included, next to the photo; the photo stays
@@ -1083,16 +1079,48 @@ class Notes {
   /// The photos without a Photo Text, newest capture first: those of
   /// every Note not in the trash, merged ones included. One whose Photo
   /// Text was removed is not among them.
-  List<({String noteId, String hash})> unreadPhotos() {
-    final notes = [
-      for (final note in _holding(NoteKeys.photoPrefix))
-        if (note.photos.any((h) => _unread(note, h))) note,
+  List<({String noteId, String hash})> unreadPhotos() =>
+      _waiting(NoteKeys.photoPrefix, NoteKeys.photoAdded, NoteKeys.ocrPrefix);
+
+  /// The photos or recordings, fields under [prefix] holding [added],
+  /// without a text under [textPrefix], nor one that was removed, newest
+  /// capture first: those of every Note not in the trash, merged ones
+  /// included. Told from the fields of the Notes holding one, read in one
+  /// query, without making a Note: made one by one, they held the phone
+  /// up for each photo or recording read after an import (obf-1094).
+  List<({String noteId, String hash})> _waiting(
+    String prefix,
+    String added,
+    String textPrefix,
+  ) {
+    final holding = {for (final (id, _) in store.fieldsWithPrefix(prefix)) id};
+    final ids = [
+      for (final id in store.everOfType(NoteKeys.typeNote))
+        if (holding.contains(id)) id,
     ];
+    final read = store.currentFieldsOf(ids);
+    final notes = <({String id, DateTime captured, List<String> hashes})>[];
+    for (final id in ids) {
+      final fields = read[id];
+      if (fields == null ||
+          fields[NoteKeys.type] != NoteKeys.typeNote ||
+          fields[NoteKeys.trashed] != null) {
+        continue;
+      }
+      final captured = fields[NoteKeys.captured];
+      if (captured == null) continue;
+      // Absent means not read yet; empty or null, read or removed.
+      final hashes = [
+        for (final hash in _blobs(fields, prefix, added))
+          if (!fields.containsKey('$textPrefix$hash')) hash,
+      ];
+      if (hashes.isEmpty) continue;
+      notes.add((id: id, captured: DateTime.parse(captured), hashes: hashes));
+    }
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
       for (final note in notes)
-        for (final hash in note.photos)
-          if (_unread(note, hash)) (noteId: note.id, hash: hash),
+        for (final hash in note.hashes) (noteId: note.id, hash: hash),
     ];
   }
 
@@ -1109,14 +1137,6 @@ class Notes {
           if (byId(id) case final note? when !note.isTrashed) note,
     ];
   }
-
-  static bool _untranscribed(Note note, String hash) =>
-      !note.transcripts.containsKey(hash) &&
-      !note.removedTranscripts.contains(hash);
-
-  static bool _unread(Note note, String hash) =>
-      !note.photoTexts.containsKey(hash) &&
-      !note.removedPhotoTexts.contains(hash);
 
   /// Whether this Device may remove the photo [hash] of the Note
   /// [noteId], a merged one included, and keep its Photo Text: the photo
@@ -1592,24 +1612,50 @@ class Notes {
   /// that is not a Note with the Sections that name it, if any.
   Map<String, List<Section>> sectionsOf(Iterable<String> noteIds) {
     final of = {for (final id in noteIds) id: <Section>[]};
+    // Every Note's fields, and the histories of the Sections and of the
+    // Notes merged into them, each read once for all of them however
+    // many there are (obf-1069).
+    final pass = _Pass(store);
     // Where each Note merged into one of them shows: its Amends show
     // there as well as under itself.
     final into = <String, String>{};
-    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-      final end = _mergedInto(id);
-      if (end == null) continue;
-      if (of[end] case final list?) {
-        into[id] = end;
-        if (byId(id) case final note?) list.add(_merged(note, end));
+    final merged = <(String, Map<String, String?>)>[];
+    for (final id in pass.ever) {
+      final held = pass.notes[id];
+      if (held == null) continue;
+      final end = _mergedInto(id, pass);
+      if (end == null || !of.containsKey(end)) continue;
+      into[id] = end;
+      merged.add((id, held));
+    }
+    final sections = store.everOfType(SectionKeys.typeSection);
+    final histories = store.historiesOf([...into.keys, ...sections]);
+    for (final (id, held) in merged) {
+      final end = into[id];
+      final list = of[end];
+      if (end == null || list == null) continue;
+      if (_note(id, held, pass) case final note?) {
+        list.add(_merged(note, end, histories[id] ?? const []));
       }
     }
-    for (final id in store.entitiesOfType(SectionKeys.typeSection)) {
-      final owner = store.current(id, SectionKeys.note);
+    for (final id in sections) {
+      final history = histories[id] ?? const <Entry>[];
+      final fields = Store.latestFields(history);
+      // As [Store.entitiesOfType] lists them.
+      if (fields[SectionKeys.type] != SectionKeys.typeSection) continue;
+      final owner = fields[SectionKeys.note];
       if (owner == null) continue;
       for (final noteId in [owner, ?into[owner]]) {
         final list = of[noteId];
         if (list == null) continue;
-        if (_section(id, noteId: noteId) case final section?) {
+        if (_section(
+              id,
+              noteId: noteId,
+              fields: fields,
+              history: history,
+              pass: pass,
+            )
+            case final section?) {
           list.add(section);
         }
       }
@@ -1620,9 +1666,10 @@ class Notes {
     return of;
   }
 
-  /// The Note [note], merged into [noteId], as a Section of it.
-  Section _merged(Note note, String noteId) {
-    final edit = _lastEdit(note.id);
+  /// The Note [note], merged into [noteId], as a Section of it; its
+  /// edits told by [history] when given.
+  Section _merged(Note note, String noteId, [List<Entry>? history]) {
+    final edit = _lastEdit(note.id, history);
     return Section(
       id: note.id,
       noteId: noteId,
@@ -1654,10 +1701,10 @@ class Notes {
   /// count, once there is more than one; null while there is only the
   /// text it was captured with. Ordered by latest wins, not by the log,
   /// so every Device finds the same.
-  ({DateTime at, Profile? by})? _lastEdit(String id) {
+  ({DateTime at, Profile? by})? _lastEdit(String id, [List<Entry>? history]) {
     Entry? latest;
     var texts = 0;
-    for (final e in store.history(id)) {
+    for (final e in history ?? store.history(id)) {
       if (e.field != SectionKeys.text) continue;
       texts++;
       if (latest == null || Store.latestWins(e, latest) > 0) latest = e;
@@ -1835,8 +1882,44 @@ class Notes {
   /// The Note [id], trashed or not, or null when there is none.
   Note? byId(String id) => _note(id, store.currentFields(id));
 
-  /// The Note [id] made of its current [fields], as [byId] reads it.
-  Note? _note(String id, Map<String, String?> fields) {
+  /// The Notes of [ids], trashed or not, by id, each as [byId] reads it;
+  /// an id that is no Note is left out. Read in one pass for all of
+  /// them, not once per Note (obf-1069); the current fields of the
+  /// entities in [read], as [Store.currentFieldsOf] gives them, are not
+  /// read again.
+  Map<String, Note> byIds(
+    Iterable<String> ids, {
+    Map<String, Map<String, String?>> read = const {},
+  }) {
+    final pass = _Pass.of(store, ids, read);
+    return {
+      for (final id in pass.ever)
+        if (pass.notes[id] case final held?) id: ?_note(id, held, pass),
+    };
+  }
+
+  /// What [Store.currentFieldsOf] gives for each of [entities]; those of
+  /// the Notes taken from the pass over every Note where one is kept
+  /// (obf-1069), not read again.
+  @internal
+  Map<String, Map<String, String?>> currentFieldsOf(Iterable<String> entities) {
+    final pass = store.workedOutHeld<_Pass>(_Pass);
+    if (pass == null) return store.currentFieldsOf(entities);
+    final rest = <String>[];
+    final out = <String, Map<String, String?>>{};
+    for (final id in entities) {
+      if (pass.notes[id] case final fields?) {
+        out[id] = fields;
+      } else {
+        rest.add(id);
+      }
+    }
+    return out..addAll(store.currentFieldsOf(rest));
+  }
+
+  /// The Note [id] made of its current [fields], as [byId] reads it;
+  /// what [pass] read once for a list of many Notes is not read again.
+  Note? _note(String id, Map<String, String?> fields, [_Pass? pass]) {
     if (fields[NoteKeys.type] != NoteKeys.typeNote) return null;
     final captured = fields[NoteKeys.captured];
     if (captured == null) return null;
@@ -1872,13 +1955,13 @@ class Notes {
         final l? when l.isNotEmpty => l,
         _ => null,
       },
-      context: _context(captured, fields),
-      place: place != null && Places(store).isPlace(place) ? place : null,
+      context: _context(captured, fields, pass),
+      place: place != null && _isPlace(place, pass) ? place : null,
       importance:
           Importance.values.asNameMap()[fields[NoteKeys.importance]] ??
           Importance.normal,
       trashed: trashed == null ? null : DateTime.parse(trashed),
-      mergedInto: _mergedInto(id),
+      mergedInto: _mergedInto(id, pass),
       spawned: fields[NoteKeys.spawned] != null,
       nudge: DateTime.tryParse(fields[NoteKeys.nudge] ?? '')?.toUtc(),
       // The fields come in the order they were first written.
@@ -1977,19 +2060,67 @@ class Notes {
 
   /// Every Note neither in the trash nor merged, newest capture first.
   List<Note> all() {
-    // Every Note's fields in one read, not two per Note (#339), in the
-    // order [Store.entitiesOfType] lists them.
-    final fields = store.currentFieldsOfType(NoteKeys.typeNote);
+    final pass = _Pass(store);
     final notes = [
-      for (final id in store.everOfType(NoteKeys.typeNote))
-        if (fields[id] case final held?)
-          if (_note(id, held) case final note?
-              when !note.isTrashed && !note.isMerged)
-            note,
+      for (final id in pass.ever)
+        if (pass.notes[id] case final held? when _listed(id, held, pass))
+          ?_note(id, held, pass),
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return notes;
   }
+
+  /// How many Notes are Unsorted: [unsorted]'s length, worked out from
+  /// the fields alone, without making a Note (obf-1069).
+  int unsortedCount() => _unsortedFields(_Pass(store)).length;
+
+  /// Every Unsorted Note's id with its own Nudge time and its capture,
+  /// what the Nudge is planned over ([Alarms.nudge]): worked out from the
+  /// fields alone, as [unsortedCount], without making a Note (obf-1091).
+  /// Read as [Note.nudgeAt] and [Note.captured] are.
+  List<(String, NudgeAnchor)> nudgeAnchors() => [
+    for (final (id, fields) in _unsortedFields(_Pass(store)))
+      if (fields[NoteKeys.captured] case final captured?)
+        (
+          id,
+          _anchor(
+            DateTime.parse(captured),
+            DateTime.tryParse(fields[NoteKeys.nudge] ?? '')?.toUtc(),
+          ),
+        ),
+  ];
+
+  static NudgeAnchor _anchor(DateTime captured, DateTime? nudge) => (
+    due: (nudge ?? captured.add(defaultNudge)).toUtc(),
+    captured: captured.toUtc(),
+  );
+
+  /// The ids and fields of every Unsorted Note [pass] read, in its order,
+  /// told from the fields alone.
+  List<(String, Map<String, String?>)> _unsortedFields(_Pass pass) => [
+    for (final id in pass.ever)
+      if (pass.notes[id] case final fields?)
+        if (fields[NoteKeys.captured] != null &&
+            fields[NoteKeys.spawned] == null &&
+            !_filed(fields[NoteKeys.place], pass) &&
+            _listed(id, fields, pass))
+          (id, fields),
+  ];
+
+  /// Whether [place] is an Area or a Topic that exists, as [pass] read
+  /// them.
+  bool _filed(String? place, _Pass pass) =>
+      place != null && pass.places.contains(place);
+
+  /// Whether the Note [id] of [fields] is neither in the trash nor
+  /// merged: told before it is made.
+  bool _listed(String id, Map<String, String?> fields, _Pass pass) =>
+      fields[NoteKeys.trashed] == null && _mergedInto(id, pass) == null;
+
+  /// Whether [id] is an Area or a Topic that exists, as [pass] read them
+  /// when given.
+  bool _isPlace(String id, _Pass? pass) =>
+      pass?.places.contains(id) ?? Places(store).isPlace(id);
 
   /// Every Unsorted Note, oldest capture first.
   List<Note> unsorted() => [
@@ -2010,16 +2141,41 @@ class Notes {
     ];
   }
 
+  /// How many Notes [inside] lists for [placeId]: worked out from the
+  /// fields alone, without making a Note (obf-1093), as [unsortedCount].
+  int countInside(String placeId) {
+    final pass = _Pass(store);
+    final ids = {
+      placeId,
+      for (final topic in Places(store).topics(placeId)) topic.id,
+    };
+    var count = 0;
+    for (final id in pass.ever) {
+      if (pass.notes[id] case final fields?
+          when fields[NoteKeys.captured] != null &&
+              ids.contains(fields[NoteKeys.place]) &&
+              _filed(fields[NoteKeys.place], pass) &&
+              _listed(id, fields, pass)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   /// The Note [id] ends up in at the end of its Merge chain, or null when
   /// it stands alone. A chain stops before a Note this Device does not
   /// hold. A loop, from Devices merging both ways before they synced,
-  /// stops at its lowest id, so every Device keeps the same Note.
-  String? _mergedInto(String id) {
+  /// stops at its lowest id, so every Device keeps the same Note. With
+  /// [pass], the chain is followed in the fields it read.
+  String? _mergedInto(String id, [_Pass? pass]) {
     final chain = [id];
     while (true) {
-      final next = store.current(chain.last, NoteKeys.merged);
+      final next = pass == null
+          ? store.current(chain.last, NoteKeys.merged)
+          : pass.notes[chain.last]?[NoteKeys.merged];
       if (next == null ||
-          store.current(next, NoteKeys.type) != NoteKeys.typeNote) {
+          !(pass?.notes.containsKey(next) ??
+              store.current(next, NoteKeys.type) == NoteKeys.typeNote)) {
         break;
       }
       final loop = chain.indexOf(next);
@@ -2035,15 +2191,22 @@ class Notes {
   }
 
   /// The Section [id]; shown under [noteId] when given, for the Amends of
-  /// a merged Note.
-  Section? _section(String id, {String? noteId}) {
-    final fields = store.currentFields(id);
+  /// a merged Note. Its current [fields] and its [history], when given,
+  /// are not read again, nor what [pass] read.
+  Section? _section(
+    String id, {
+    String? noteId,
+    Map<String, String?>? fields,
+    List<Entry>? history,
+    _Pass? pass,
+  }) {
+    fields ??= store.currentFields(id);
     if (fields[SectionKeys.type] != SectionKeys.typeSection) return null;
     final owner = fields[SectionKeys.note];
     final captured = fields[SectionKeys.captured];
     if (owner == null || captured == null) return null;
     final text = StoredText.read(fields[SectionKeys.text]);
-    final edit = _lastEdit(id);
+    final edit = _lastEdit(id, history);
     return Section(
       id: id,
       noteId: noteId ?? owner,
@@ -2051,7 +2214,7 @@ class Notes {
       textFormat: text.format,
       textVersion: text.version,
       textEditable: text.editable,
-      context: _context(captured, fields),
+      context: _context(captured, fields, pass),
       boxes: _boxes(id, text, fields),
       modified: edit?.at,
       editedBy: edit?.by,
@@ -2068,15 +2231,24 @@ class Notes {
   }
 
   /// The Capture Context from the stored capture time and the [fields]
-  /// of a Note or Section, with the Named Place its location lies in.
-  CaptureContext _context(String captured, Map<String, String?> fields) {
+  /// of a Note or Section, with the Named Place its location lies in:
+  /// among those [pass] read, when given.
+  CaptureContext _context(
+    String captured,
+    Map<String, String?> fields, [
+    _Pass? pass,
+  ]) {
     // Notes and Sections keep their Capture Context under the same keys.
     final at = Coordinates.decode(fields[NoteKeys.location]);
     final package = fields[NoteKeys.sourcePackage];
     return CaptureContext(
       captured: DateTime.parse(captured),
       location: at,
-      namedPlace: at == null ? null : NamedPlaces(store).at(at),
+      namedPlace: at == null
+          ? null
+          : pass == null
+          ? NamedPlaces(store).at(at)
+          : namedPlaceAt(pass.named, at),
       sourceApp: package == null || package.isEmpty
           ? null
           : SourceApp(package, label: fields[NoteKeys.sourceLabel]),
@@ -2118,4 +2290,72 @@ class Notes {
     }
     return trimmed;
   }
+}
+
+/// What a list of many Notes reads once rather than for each Note
+/// (obf-1069): every Note's fields, its Merge chain followed in them;
+/// which Areas and Topics exist; the Named Places, once a Note has a
+/// location. The pass over every Note is kept until the log changes
+/// ([Store.workedOut]), so the lists of one read share it.
+class _Pass {
+  final Store store;
+
+  /// The entities whose `$type` was a Note's at some time, in the order
+  /// [Store.entitiesOfType] keeps; in a pass over some Notes
+  /// ([_Pass.of]), those asked for.
+  final Set<String> ever;
+
+  /// The fields of every Note, by id: those whose current `$type` is a
+  /// Note's, as [Store.currentFieldsOfType] reads them; in a pass over
+  /// some Notes, of those and of the Notes their Merge chains lead to.
+  final Map<String, Map<String, String?>> notes;
+
+  /// Every Area and Topic that exists ([Places.ids]).
+  late final places = Places(store).ids();
+
+  /// Every Named Place ([NamedPlaces.all]).
+  late final named = NamedPlaces(store).all();
+
+  factory _Pass(Store store) => store.workedOut(_Pass, () {
+    final ever = store.everOfType(NoteKeys.typeNote);
+    return _Pass._(store, ever, {
+      for (final MapEntry(key: id, value: fields)
+          in store.currentFieldsOf(ever).entries)
+        if (fields[NoteKeys.type] == NoteKeys.typeNote) id: fields,
+    });
+  });
+
+  /// The pass over the Notes of [ids] alone, [ever] in their order: the
+  /// fields of those that are Notes, and of the Notes their Merge chains
+  /// lead to, read a few hundred at a time; those in [known], the current
+  /// fields of some entities already read, not again.
+  factory _Pass.of(
+    Store store,
+    Iterable<String> ids,
+    Map<String, Map<String, String?>> known,
+  ) {
+    final asked = ids.toSet();
+    final notes = <String, Map<String, String?>>{};
+    final seen = <String>{};
+    var reading = asked;
+    while (reading.isNotEmpty) {
+      seen.addAll(reading);
+      final read = Notes(store)
+          .currentFieldsOf(reading.where((id) => !known.containsKey(id)));
+      for (final id in reading) {
+        final fields = read[id] ?? known[id];
+        if (fields != null && fields[NoteKeys.type] == NoteKeys.typeNote) {
+          notes[id] = fields;
+        }
+      }
+      reading = {
+        for (final id in reading)
+          if (notes[id]?[NoteKeys.merged] case final next?)
+            if (!seen.contains(next)) next,
+      };
+    }
+    return _Pass._(store, asked, notes);
+  }
+
+  _Pass._(this.store, this.ever, this.notes);
 }

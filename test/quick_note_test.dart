@@ -5,6 +5,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/spotlight.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
@@ -217,6 +218,34 @@ void main() {
       expect(find.byType(CaptureScreen), findsNothing);
       expect(find.byIcon(Icons.add), findsOneWidget);
       expect(notes.all(), hasLength(1));
+    });
+
+    testWidgets('under a tip that came up meanwhile opens the editor in '
+        'its own place, and the tip gets no answer (#371)', (tester) async {
+      await start(tester);
+      await openTextCapture(tester);
+      await tester.enterText(find.byType(TextField), 'descale the kettle');
+      await tester.pump();
+      // A tip shows over the quick note while More is saving.
+      final pressed = tester.widget<TextButton>(more).onPressed!;
+      final tip = showDialog<SpotlightAnswer>(
+        context: tester.element(more),
+        builder: (_) => const SizedBox(),
+      );
+      await tester.pumpAndSettle();
+      pressed();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(await tip, isNull);
+      expect(find.byType(CaptureScreen), findsNothing);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(notes.all().single.text, 'descale the kettle');
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(find.byIcon(Icons.add), findsOneWidget);
     });
 
     testWidgets('is not offered behind the App Lock', (tester) async {

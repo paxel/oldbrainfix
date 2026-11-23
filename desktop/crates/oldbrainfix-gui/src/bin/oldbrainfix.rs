@@ -305,6 +305,9 @@ struct Shell {
     /// The Agenda's own connection, which reads it beside the window
     /// (#207).
     agenda_store: Arc<Store>,
+    /// Where the database lies: each Import opens a connection of its
+    /// own to it, to write beside the window (obf-1061).
+    dir: std::path::PathBuf,
     locale: &'static str,
     changes: Arc<AtomicU64>,
     events: Sender<Event>,
@@ -419,15 +422,20 @@ impl Shell {
     /// Opens the window, at once hidden into the tray when `hidden`, and
     /// runs it until it closes; whether the app is to quit.
     fn window(&self, hidden: bool) -> Result<bool, String> {
-        let mut app = App::new(self.store.clone(), self.locale);
+        // The Agenda read on its thread from the start (obf-1090): the
+        // window shows at once.
+        let agenda = self.agenda_store.clone();
+        let mut app = App::opening(self.store.clone(), self.locale, move || agenda.clone());
+        // Each Import on a connection of its own (obf-1061), and each Area
+        // being deleted (obf-1093).
+        let (dir, shared) = (self.dir.clone(), self.store.clone());
+        app.set_import_store(move || own_store(&dir, &shared));
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         let window = self.window.clone();
         app.set_redraw(Arc::new(move || wake(&window)));
         app.set_folder_wanted(self.folder_wanted.clone());
         app.set_syncing(self.syncing.clone());
-        let agenda = self.agenda_store.clone();
-        app.set_agenda_store(move || agenda.clone());
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_occurrence_wanted(self.occurrence_wanted.clone());
@@ -610,8 +618,9 @@ fn open_store(dir: &Path) -> Result<Store, Error> {
 }
 
 /// A store of its own on the database in `dir`, for a sync thread
-/// (#225): its merge never holds the window's connection. The window's
-/// `shared` one when it does not open.
+/// (#225), the alarms (obf-1091), an Import (obf-1061) or deleting an
+/// Area (obf-1093): its work never holds the window's connection. The
+/// window's `shared` one when it does not open.
 fn own_store(dir: &Path, shared: &Arc<Store>) -> Arc<Store> {
     match open_store(dir) {
         Ok(store) => Arc::new(store),
@@ -787,14 +796,18 @@ fn run() -> Result<i32, String> {
     let (command_tx, command_rx) = std::sync::mpsc::channel::<Command>();
     let commands = Arc::new(Mutex::new(command_rx));
 
-    // The alarm layer, on its own thread for as long as the app runs.
+    // The alarm layer, on its own thread for as long as the app runs, on
+    // a connection of its own (obf-1091): its plan and Nudge never hold
+    // the window's. A tap's Done or snooze is written there, so the
+    // window forgets what it worked out before it reads again.
     let (events_tx, events_rx) = std::sync::mpsc::channel::<Event>();
     let changes = Arc::new(AtomicU64::new(0));
     let unsorted_wanted = Arc::new(AtomicBool::new(false));
     let changes_wanted = Arc::new(AtomicBool::new(false));
     let occurrence_wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
     {
-        let store = store.clone();
+        let (shown, tapped) = (store.clone(), changes.clone());
+        let store = own_store(&dir, &store);
         let notifier = DesktopNotifier::new(events_tx.clone());
         let mut alerts = Alerts::new(Box::new(notifier), t, changes.clone());
         alerts.set_unsorted_wanted(unsorted_wanted.clone());
@@ -814,6 +827,8 @@ fn run() -> Result<i32, String> {
                         let _ = open.send(Command::Open);
                     }
                     // The window reads a Done or a snooze at once.
+                    shown.changed_elsewhere();
+                    tapped.fetch_add(1, Ordering::SeqCst);
                     wake_window();
                 },
             );
@@ -1045,6 +1060,7 @@ fn run() -> Result<i32, String> {
     let system_theme = SystemTheme::follow(waker(&window));
     let shell = Shell {
         agenda_store: own_store(&dir, &store),
+        dir: dir.clone(),
         store,
         locale,
         changes,

@@ -160,8 +160,11 @@ class NamedPlaces {
   }
 
   /// The Named Place [id], or null when there is none.
-  NamedPlace? byId(String id) {
-    final fields = store.currentFields(id);
+  NamedPlace? byId(String id) => _of(id, store.currentFields(id));
+
+  /// The Named Place [id] made of its current [fields], as [byId] reads
+  /// it.
+  static NamedPlace? _of(String id, Map<String, String?> fields) {
     if (fields[NamedPlaceKeys.type] != NamedPlaceKeys.typeNamedPlace) {
       return null;
     }
@@ -178,9 +181,12 @@ class NamedPlaces {
 
   /// Every Named Place, by name, ignoring case.
   List<NamedPlace> all() {
+    // Their fields in one read, not one per Named Place (obf-1069), in
+    // the order [Store.entitiesOfType] lists them.
+    final fields = store.currentFieldsOfType(NamedPlaceKeys.typeNamedPlace);
     final places = [
-      for (final id in store.entitiesOfType(NamedPlaceKeys.typeNamedPlace))
-        ?byId(id),
+      for (final id in store.everOfType(NamedPlaceKeys.typeNamedPlace))
+        if (fields[id] case final held?) ?_of(id, held),
     ];
     places.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return places;

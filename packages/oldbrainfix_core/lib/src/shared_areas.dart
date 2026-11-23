@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:meta/meta.dart';
+
 import 'area_keys.dart';
 import 'boxes.dart';
 import 'checklists.dart';
@@ -422,6 +424,20 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
   return JudgedLog(ignored, areas);
 }
 
+/// The entity [e] links its own to as [judgeLog] judges them: the Area,
+/// Topic or Note its value names; null for none. Judging an entity looks
+/// at nothing but its own entries and those of the entities they link
+/// to, linked on in turn, so the store judges again only those an entry
+/// can change ([Store.judged]). A rule that looks further widens this.
+String? judgedLink(Entry e) => switch (e.value) {
+  final value?
+      when value.startsWith('area:') ||
+          value.startsWith('topic:') ||
+          value.startsWith('note:') =>
+    value,
+  _ => null,
+};
+
 /// The Area of the filing that counts at [e]: the last one before it,
 /// else the first one.
 String? areaAt(List<(Entry, String?)> filings, Entry e) {
@@ -463,23 +479,31 @@ extension SharedAreas on Store {
 
   /// Whether this Device may change the Note or Section [id]: in no Area
   /// or one it manages, or as a Member when it is theirs.
-  bool mayChange(String id) {
-    final area = areaOf(id);
+  bool mayChange(String id) => mayChangeIn(areaOf(id), () => history(id));
+
+  /// [mayChange] for a Note or Section that lies in [area], [history]
+  /// giving its entries, read only for a Member: what a list of many
+  /// reads once for all of them (obf-1069).
+  @internal
+  bool mayChangeIn(String? area, List<Entry> Function() history) {
     if (mayManage(area)) return true;
     if (area == null || accessIn(area) != AreaAccess.member) return false;
     final grants = grantsOf(area);
     if (grants == null) return false;
     final mine = grants.personOf(deviceId);
-    return mine != null && _creatorPerson(id, grants) == mine;
+    return mine != null && _creatorPerson(history(), grants) == mine;
   }
 
   /// Whether this Device may write anything at all in the Area [entity]
   /// lies in (an Area, Topic, Note or Section): in none, or holding a
   /// role there. A Device removed from a Shared Area may not.
-  bool mayWriteIn(String entity) {
-    final area = entity.startsWith('area:') ? entity : areaOf(entity);
-    return area == null || accessIn(area) != AreaAccess.none;
-  }
+  bool mayWriteIn(String entity) =>
+      mayWriteInArea(entity.startsWith('area:') ? entity : areaOf(entity));
+
+  /// [mayWriteIn] for what lies in [area].
+  @internal
+  bool mayWriteInArea(String? area) =>
+      area == null || accessIn(area) != AreaAccess.none;
 
   /// Whether this Device may pick a version of a Conflict on [entity] of
   /// [type] (`$type`): the pick is an edit like any other.
@@ -504,8 +528,10 @@ extension SharedAreas on Store {
     return area == null || accessIn(area) != AreaAccess.none;
   }
 
-  String? _creatorPerson(String id, AreaGrants grants) {
-    for (final e in history(id)) {
+  /// Whose the entity of [history] is: the person [grants] name for the
+  /// Device that wrote its first `$type`.
+  String? _creatorPerson(List<Entry> history, AreaGrants grants) {
+    for (final e in history) {
       if (e.field == r'$type') return grants.personOf(e.device);
     }
     return null;

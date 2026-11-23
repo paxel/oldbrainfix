@@ -298,16 +298,22 @@ class Checklists {
   bool isChecklist(String noteId) => _making(noteId) != null;
 
   /// The Checklists of the Notes [noteIds] that are one, read in one
-  /// pass over the Lines: for a list that shows many Notes in full.
+  /// pass over the Lines: for a list that shows many Notes in full. The
+  /// Notes and the Lines are read in a few queries however many there
+  /// are (obf-1069).
   Map<String, Checklist> ofNotes(Iterable<String> noteIds) {
-    final makings = <String, String>{};
-    for (final id in noteIds) {
-      if (_making(id) case final making?) makings[id] = making;
-    }
+    final makings = makingsOf(noteIds);
     if (makings.isEmpty) return const {};
     final raw = <String, List<_Raw>>{};
-    for (final id in store.entitiesOfType(ChecklistKeys.typeLine)) {
-      final fields = store.currentFields(id);
+    final ever = store.everOfType(ChecklistKeys.typeLine);
+    final read = store.currentFieldsOf(ever);
+    for (final id in ever) {
+      // As [Store.entitiesOfType] lists them.
+      final fields = read[id];
+      if (fields == null ||
+          fields[ChecklistKeys.type] != ChecklistKeys.typeLine) {
+        continue;
+      }
       final note = fields[ChecklistKeys.note];
       if (note == null || fields[ChecklistKeys.trashed] != null) continue;
       final making = makings[note];
@@ -364,14 +370,23 @@ class Checklists {
       }
     }
     final today = Day.today(store.clock(), wallClock);
+    final on = {
+      for (final id in lists.keys) id: ?_now(spawned[id] ?? const [], today),
+    };
+    // The checks of every Routine they are on, read in one go.
+    final checks = store.historiesOf([for (final o in on.values) o.routineId]);
     return {
       for (final MapEntry(key: id, value: list) in lists.entries)
-        id: switch (_now(spawned[id] ?? const [], today)) {
+        id: switch (on[id]) {
           null => list,
           final on => _checkedFor(
             list,
             on,
-            LineChecks.read(store, on.routineId),
+            LineChecks.read(
+              store,
+              on.routineId,
+              checks[on.routineId] ?? const [],
+            ),
           ),
         },
     };
@@ -898,8 +913,27 @@ class Checklists {
 
   /// The making of the Checklist the Note [noteId] is now, or null when
   /// it is no Checklist: no Note, another list, or a Tally.
-  String? _making(String noteId) {
-    final fields = store.currentFields(noteId);
+  String? _making(String noteId) =>
+      _makingOf(noteId, store.currentFields(noteId));
+
+  /// The making of each of [noteIds] that is a Checklist now, as
+  /// [isChecklist] tells it, in their order: their fields read in one
+  /// query rather than one per Note (obf-1069).
+  Map<String, String> makingsOf(Iterable<String> noteIds) {
+    // What a list of the Notes read already is not read again.
+    final read = Notes(store).currentFieldsOf(noteIds);
+    final makings = <String, String>{};
+    for (final id in noteIds) {
+      if (_makingOf(id, read[id] ?? const {}) case final making?) {
+        makings[id] = making;
+      }
+    }
+    return makings;
+  }
+
+  /// The making of the Checklist the Note [noteId] of the current
+  /// [fields] is ([_making]).
+  String? _makingOf(String noteId, Map<String, String?> fields) {
     if (fields[NoteKeys.type] != NoteKeys.typeNote) return null;
     final kind = parseListKind(fields[ChecklistKeys.kind]);
     if (kind == null || kind.list != ChecklistKeys.checklist) return null;
