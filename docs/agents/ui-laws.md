@@ -993,8 +993,8 @@ replace a law of Both apps where they say so. A desktop law marked
   quarter of its width moving back and forth (Knight Rider), taking no
   room, so nothing else on the screen moves. It shows only while a
   folder round or a join of this Device runs, on the desktop also while
-  its paired host answers, or an Import runs (obf-1061), or on the phone
-  an Area is being deleted (obf-1093), and the app is in view; every sync shows it, also the one each minute. The sync runs beside the app (an isolate on
+  its paired host answers, or an Import runs (obf-1061), or an Area is
+  being deleted (obf-1093), and the app is in view; every sync shows it, also the one each minute. The sync runs beside the app (an isolate on
   the phone, a thread with its own connection on the desktop): the app
   stays usable and draws on. With the system's "remove animations" the
   phone's line stands still across the whole width; the desktop reads
@@ -1002,11 +1002,15 @@ replace a law of Both apps where they say so. A desktop law marked
   reader hears "Syncing…" once each time the app comes into view, not
   with every sync; on the desktop the line is a progress indicator named
   "Syncing…".
-- **Deleting an Area runs beside the app** (obf-1093), on the phone: once the dialog
-  is answered, the Area's row says how many of its Notes have gone
-  ("Being deleted: 120 of 340 Notes moved"), a spinner in place of its
-  menu, and takes no tap or drag until the Area is gone; a failure is
-  announced at the top.
+- **Deleting an Area runs beside the app** (obf-1093), in both apps:
+  once the dialog is answered, the Area's row says how many of its Notes
+  have gone ("Being deleted: 120 of 340 Notes moved"), a spinner in
+  place of its menu (on the desktop, of its chevron), and takes no tap,
+  click or drag until the Area is gone; a failure is announced at the
+  top, success is not. On the desktop it runs on a thread with its own
+  connection, one Note per transaction, its Topics hidden under the
+  row; the line is named "Deleting an Area…", and the Area menu's Delete
+  asks nothing for it meanwhile.
 - On the desktop the same line moves while the Agenda is read for the
   first time after the window opened (obf-1090), named "Reading the
   Agenda…": the window shows at once, the Agenda read on its thread.

@@ -111,6 +111,7 @@ use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::{Event, OccurrenceWanted};
 use crate::all_routines_view::{self, AllRoutinesAction};
 use crate::app_links;
+use crate::area_deletion::AreaDeletions;
 use crate::ask_view::{self, AskAsked, AskFields, AskPanel, AskSetting};
 use crate::attachment_view::{self, HeldFile};
 use crate::auto_sync::Syncing;
@@ -2304,8 +2305,11 @@ pub struct App {
     import_zip_picker: FolderPicker,
     import: FolderImport,
     /// Hands an Import its connection to the window's database
-    /// (obf-1061); without it, the Import runs on the window's.
+    /// (obf-1061), and deleting an Area (obf-1093); without it, the
+    /// Import runs on the window's, and an Area is deleted at once.
     import_open: Option<StoreOpener>,
+    /// The Areas being deleted beside the window (obf-1093).
+    deletions: AreaDeletions,
     /// Asks the system's dialog for the folder a vault goes into, or is
     /// rebuilt from (#267).
     vault_picker: FolderPicker,
@@ -2875,6 +2879,7 @@ impl App {
             import_zip_picker: Box::new(|title| zip_dialog(title).pick_file()),
             import: FolderImport::default(),
             import_open: None,
+            deletions: AreaDeletions::default(),
             vault_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             vault: VaultJob::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
@@ -3174,9 +3179,15 @@ impl App {
         self.import.running()
     }
 
+    /// Whether an Area is being deleted beside the window (obf-1093).
+    pub fn deleting_area(&self) -> bool {
+        self.deletions.running()
+    }
+
     /// Runs each Import beside the window on the store `open` hands its
-    /// thread (obf-1061): a connection of its own to the window's
-    /// database, so the window reads and writes on meanwhile.
+    /// thread (obf-1061), and each Area being deleted (obf-1093): a
+    /// connection of its own to the window's database, so the window
+    /// reads and writes on meanwhile.
     pub fn set_import_store(&mut self, open: impl Fn() -> Arc<Store> + Send + Sync + 'static) {
         self.import_open = Some(Arc::new(open));
     }
@@ -5397,7 +5408,8 @@ impl App {
         }
         // An Import writes a Note after another meanwhile (obf-1061): the
         // read shows as it is, and its end reads again.
-        let importing = self.import.running();
+        // So does deleting an Area (obf-1093), a Note after another.
+        let importing = self.import.running() || self.deletions.running();
         let Some(reads) = &mut self.agenda_reads else {
             return;
         };
@@ -8133,6 +8145,8 @@ impl App {
                 });
             }
             Action::Look(area) => self.dialog = Some(Dialog::Look { area }),
+            // Not asked again for an Area being deleted (obf-1093).
+            Action::Delete(id) if self.deletions.of(&id).is_some() => {}
             Action::Delete(id) => self.dialog = Some(Dialog::Delete(self.deleting(&id)?)),
             Action::StartMerge => {
                 let merging = vec![selected.clone()];
@@ -8177,7 +8191,12 @@ impl App {
             Action::Icon(area, icon) => places.set_icon(&area, icon.as_deref())?,
             Action::DeletePlace(go) => {
                 if let Some(Dialog::Delete(deleting)) = &self.dialog {
-                    if deleting.area.is_none() {
+                    if deleting.area.is_none() && self.import_open.is_some() {
+                        // Beside the window (obf-1093): its row says how
+                        // far it is; a second start of it is not made.
+                        let open = self.import_store();
+                        self.deletions.start(open, &deleting.id, go);
+                    } else if deleting.area.is_none() {
                         places.delete_area(&deleting.id, go)?;
                     } else {
                         places.delete_topic(&deleting.id, go)?;
@@ -11306,6 +11325,38 @@ impl App {
                     .request_repaint_after(std::time::Duration::from_millis(100)),
             }
         }
+        // An Area being deleted beside the window (obf-1093): a failure is
+        // announced at the top when it comes; the Area leaves the list.
+        if self.deletions.running() {
+            let finished = self.deletions.finished();
+            if finished.is_empty() {
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(100));
+            } else {
+                // Written on a connection of its own, a Note after
+                // another, also when it failed on the way: this one reads
+                // the log anew.
+                self.store.changed_elsewhere();
+                let t = self.t;
+                for (_, deleted) in finished {
+                    if let Err(details) = deleted {
+                        self.announce_failure(
+                            t.area_delete_failed(),
+                            t.area_delete_failed_title(),
+                            (t.area_delete_failed_cause(), t.area_delete_failed_fix()),
+                            details,
+                        );
+                    }
+                }
+                self.refresh();
+                // Routines went to the trash with their Notes: the alarms
+                // plan anew.
+                if let Some(wake) = &self.wake {
+                    drop(wake.send(Event::Wake));
+                }
+                ui.ctx().request_repaint();
+            }
+        }
         // A vault being written or rebuilt, also after its dialog closed:
         // its answer is announced when it comes, how far it is meanwhile.
         if self.vault.running() {
@@ -11571,6 +11622,14 @@ impl App {
             } else if drawn && self.import.running() {
                 // And while an Import runs beside the window (obf-1061).
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.import_running());
+            } else if drawn && self.deletions.running() {
+                // And while an Area is being deleted beside it (obf-1093).
+                sync_line::show(
+                    ui,
+                    bar.response.rect,
+                    tones.accent,
+                    self.t.area_deleting_line(),
+                );
             } else if drawn && self.agenda_waiting() {
                 // And while the Agenda is read for the first time
                 // (obf-1090).
@@ -12284,6 +12343,33 @@ impl App {
                     let icon = icons::area_icon(area.icon.as_deref()).map(|i| (i, colour));
                     let on = self.selection == Selection::Place(area.id.clone());
                     let name = area_name(&t, area);
+                    // Being deleted beside the window (obf-1093): how far
+                    // it is under its name, a spinner where its chevron
+                    // was, nothing to click, drag, drop on or open a menu
+                    // of; its Topics go with it.
+                    if let Some(moved) = self.deletions.of(&area.id) {
+                        let resp = row(ui, tones, on, 0.0, icon, &name, false);
+                        let spinner = egui::Rect::from_center_size(
+                            egui::pos2(resp.rect.right() - 18.0, resp.rect.center().y),
+                            egui::vec2(16.0, 16.0),
+                        );
+                        egui::Spinner::new().size(16.0).paint_at(ui, spinner);
+                        let said = match moved {
+                            Some((done, of)) => t.area_deleting(done as i64, of as i64),
+                            None => t.area_deleting_started().to_string(),
+                        };
+                        ui.horizontal(|ui| {
+                            ui.add_space(32.0);
+                            let weak = ui.visuals().weak_text_color();
+                            ui.label(RichText::new(said).small().color(weak));
+                        });
+                        blocks.push(AreaRows {
+                            id: area.id.clone(),
+                            row: resp.rect,
+                            bottom: ui.min_rect().bottom(),
+                        });
+                        continue;
+                    }
                     // Dragged by its row into the person's own order
                     // (#280); a card dropped on it files.
                     let resp = row(ui, tones, on, 0.0, icon, &name, true)

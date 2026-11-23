@@ -2164,6 +2164,34 @@ impl<'a> Notes<'a> {
             .collect())
     }
 
+    /// How many Notes [`Notes::inside`] lists for `place_id`: worked out
+    /// from the fields alone, without making a Note (obf-1093), as
+    /// [`Notes::unsorted_count`] and the Dart core's `countInside`.
+    pub fn count_inside(&self, place_id: &str) -> Result<usize> {
+        let pass = Pass::read(self.store)?;
+        let mut ids: HashSet<String> = HashSet::from([place_id.to_string()]);
+        ids.extend(
+            Places::new(self.store)
+                .topics(place_id)?
+                .into_iter()
+                .map(|t| t.id),
+        );
+        let mut count = 0;
+        for id in &pass.ever {
+            let Some(fields) = pass.notes.get(id) else {
+                continue;
+            };
+            let filed = match fields.get(keys::PLACE) {
+                Some(place) => ids.contains(place) && pass.places()?.contains(place),
+                None => false,
+            };
+            if fields.get(keys::CAPTURED).is_some() && filed && self.listed(id, fields, &pass)? {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
     /// The Notes in the trash that can still be restored, most recently
     /// deleted first.
     pub fn trashed(&self) -> Result<Vec<Note>> {

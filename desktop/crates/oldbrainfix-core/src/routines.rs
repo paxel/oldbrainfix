@@ -575,6 +575,41 @@ impl<'a> Routines<'a> {
         })
     }
 
+    /// Moves the listed `notes` to the trash, in their order, each as
+    /// [`Routines::trash_note`] moves it and with what it takes along: the
+    /// Routines and Reminders are read once for all of them, not once per
+    /// Note, and a Note's trash moment is the one just written, not read
+    /// back (obf-1093). Each Note is a transaction of its own, so another
+    /// connection to the database, such as the window's while this runs
+    /// beside it, waits at most for one Note; `progress` hears how many
+    /// are in, before the first and after each, as the Dart core's
+    /// `trashNotes`.
+    pub fn trash_notes(&self, notes: &[Note], progress: &dyn Fn(usize, usize)) -> Result<()> {
+        let mut by_note: HashMap<String, Vec<Routine>> = HashMap::new();
+        for routine in self.all()? {
+            if let Some(note) = self.note(&routine)? {
+                by_note.entry(note.id).or_default().push(routine);
+            }
+        }
+        progress(0, notes.len());
+        for (i, note) in notes.iter().enumerate() {
+            self.store.batch(|| {
+                let at = dart_iso(self.store.now());
+                self.store
+                    .append(&note.id, note_keys::TRASHED, Some(&at), None)?;
+                for routine in by_note.get(&note.id).into_iter().flatten() {
+                    self.store
+                        .append(&routine.id, keys::TRASHED, Some(&at), None)?;
+                    self.store
+                        .append(&routine.id, keys::TRASHED_WITH, Some(&note.id), None)?;
+                }
+                Ok(())
+            })?;
+            progress(i + 1, notes.len());
+        }
+        Ok(())
+    }
+
     /// Brings the Note `note_id` back from the trash, with the Routines
     /// and Reminders that went there with it.
     pub fn restore_note(&self, note_id: &str) -> Result<()> {

@@ -43,6 +43,22 @@ pub type ImportStore = Box<dyn FnOnce() -> Arc<Store> + Send>;
 /// many Notes are in.
 type Progress = Arc<Mutex<Option<(usize, usize)>>>;
 
+/// `tell` hearing how many of how many Notes are done, at low priority
+/// (obf-1061): after each Note the thread rests as long as the Note
+/// took, so the window's reads and writes, which wait for its
+/// transaction, get the database between two Notes. Deleting an Area
+/// beside the window rests the same way (obf-1093).
+pub(crate) fn low_priority(tell: impl Fn(usize, usize)) -> impl Fn(usize, usize) {
+    let since = std::cell::Cell::new(std::time::Instant::now());
+    move |done, of| {
+        tell(done, of);
+        if done > 0 {
+            std::thread::sleep(since.get().elapsed());
+        }
+        since.set(std::time::Instant::now());
+    }
+}
+
 /// The Import running off the window's thread, until it answers, with
 /// how far it is.
 #[derive(Default)]
@@ -101,17 +117,7 @@ impl FolderImport {
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let store = open();
-            // At low priority: after each Note it rests as long as the
-            // Note took, so the window's reads and writes, which wait
-            // for its transaction, get the database between two Notes.
-            let since = std::cell::Cell::new(std::time::Instant::now());
-            let tell = |written: usize, of: usize| {
-                *shared.lock() = Some((written, of));
-                if written > 0 {
-                    std::thread::sleep(since.get().elapsed());
-                }
-                since.set(std::time::Instant::now());
-            };
+            let tell = low_priority(|written, of| *shared.lock() = Some((written, of)));
             // A window gone meanwhile is nobody's problem.
             drop(tx.send(job(&store, &tell)));
         });

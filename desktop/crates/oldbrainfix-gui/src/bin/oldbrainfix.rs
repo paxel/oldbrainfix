@@ -426,7 +426,8 @@ impl Shell {
         // window shows at once.
         let agenda = self.agenda_store.clone();
         let mut app = App::opening(self.store.clone(), self.locale, move || agenda.clone());
-        // Each Import on a connection of its own (obf-1061).
+        // Each Import on a connection of its own (obf-1061), and each Area
+        // being deleted (obf-1093).
         let (dir, shared) = (self.dir.clone(), self.store.clone());
         app.set_import_store(move || own_store(&dir, &shared));
         app.watch_changes(self.changes.clone());
@@ -617,9 +618,9 @@ fn open_store(dir: &Path) -> Result<Store, Error> {
 }
 
 /// A store of its own on the database in `dir`, for a sync thread
-/// (#225), the alarms (obf-1091) or an Import (obf-1061): its work never
-/// holds the window's connection. The window's `shared` one when it does
-/// not open.
+/// (#225), the alarms (obf-1091), an Import (obf-1061) or deleting an
+/// Area (obf-1093): its work never holds the window's connection. The
+/// window's `shared` one when it does not open.
 fn own_store(dir: &Path, shared: &Arc<Store>) -> Arc<Store> {
     match open_store(dir) {
         Ok(store) => Arc::new(store),
