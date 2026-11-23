@@ -18,7 +18,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy öffnet „Mehr“ in der Schnellnotiz den Notiz-Editor auch, während ein Tipp zu sehen ist, statt die App abstürzen zu lassen. ([obf-1058](https://github.com/paxel/oldbrainfix/issues/371))
 - Auf dem Handy stürzt die App nach einem Absturz und „App neu starten“ nicht kurz darauf erneut ab. ([obf-1059](https://github.com/paxel/oldbrainfix/issues/372))
 - Auf dem Handy und dem Desktop friert ein Import die App nicht mehr ein: Er läuft daneben und zählt seine Notizen, auch wenn du weggehst. ([obf-1061](https://github.com/paxel/oldbrainfix/issues/374))
-- Auf dem Handy und dem Desktop friert das Verschieben eines Bereichs in den Papierkorb die App nicht mehr ein: Seine Zeile zählt die verschobenen Notizen, die App bleibt bedienbar. ([obf-1093](https://github.com/paxel/oldbrainfix/issues/406))
+- Auf dem Handy und dem Desktop friert das Verschieben eines Bereichs in den Papierkorb die App nicht mehr ein; seine Zeile zählt die verschobenen Notizen. ([obf-1093](https://github.com/paxel/oldbrainfix/issues/406))
 
 ## [0.7.1] - 2026-11-21
 
