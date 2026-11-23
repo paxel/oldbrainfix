@@ -1010,6 +1010,11 @@ replace a law of Both apps where they say so. A desktop law marked
 - On the desktop the same line moves while the Agenda is read for the
   first time after the window opened (obf-1090), named "Reading the
   Agenda…": the window shows at once, the Agenda read on its thread.
+- On the desktop it also moves while an Import runs (obf-1061), named
+  "Importing…": the Import writes on a thread with its own connection,
+  one Note per transaction, and the Import dialog counts its Notes
+  ("120 of 340 Notes"); it may be closed and File ▸ Import… shows it
+  again, at the end with what went where and Open the Area.
 
 ### Alarms and notifications
 

@@ -6,10 +6,16 @@
 //! over unread, so the core counts it as skipped. A file that cannot be
 //! read fails the Import, and then nothing is written. The import from
 //! Google Keep (`keep_import`) runs the same way, one Import at a time.
+//! It runs beside the window on a connection of its own (obf-1061), each
+//! Note written in a transaction of its own and a rest after it, so the
+//! window reads and writes on meanwhile; how many of its Notes are in
+//! shows as it goes.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError};
+
+use parking_lot::Mutex;
 
 use chrono::{DateTime, Utc};
 use oldbrainfix_core::Store;
@@ -29,35 +35,47 @@ pub enum Importing {
     Keep,
 }
 
-/// The Import running off the window's thread, until it answers.
+/// Hands the Import's thread its store: a connection of its own to the
+/// window's database, or the window's own.
+pub type ImportStore = Box<dyn FnOnce() -> Arc<Store> + Send>;
+
+/// How far an Import is: `None` while it reads, then how many of how
+/// many Notes are in.
+type Progress = Arc<Mutex<Option<(usize, usize)>>>;
+
+/// The Import running off the window's thread, until it answers, with
+/// how far it is.
 #[derive(Default)]
 pub struct FolderImport {
-    running: Option<(Importing, Receiver<Imported>)>,
+    running: Option<(Importing, Receiver<Imported>, Progress)>,
 }
 
 impl FolderImport {
-    /// Imports the `folder` into `store` on a thread of its own, its
-    /// Notes into a new Area named `area_name`; `name` is the folder's
-    /// name for people. Nothing while one runs.
-    pub fn start(&mut self, store: Arc<Store>, folder: PathBuf, name: String, area_name: String) {
-        self.run(Importing::Folder(name), move || {
+    /// Imports the `folder` on a thread of its own into the store `open`
+    /// hands it there, its Notes into a new Area named `area_name`;
+    /// `name` is the folder's name for people. Nothing while one runs.
+    pub fn start(&mut self, open: ImportStore, folder: PathBuf, name: String, area_name: String) {
+        self.run(Importing::Folder(name), open, move |store, tell| {
             read_folder(&folder)
                 .map_err(|e| format!("{}: {e}", folder.display()))
                 .and_then(|files| {
-                    Imports::new(&store)
+                    Imports::new(store)
+                        .reporting(tell)
                         .folder(&area_name, &files)
                         .map_err(|e| e.to_string())
                 })
         });
     }
 
-    /// Imports the Google Keep notes of the Takeout export `source` into
-    /// `store` on a thread of its own, into a new Area named `area_name`
-    /// (ADR 0036, Google Keep). Nothing while an Import runs.
-    pub fn start_keep(&mut self, store: Arc<Store>, source: KeepSource, area_name: String) {
-        self.run(Importing::Keep, move || {
+    /// Imports the Google Keep notes of the Takeout export `source` on a
+    /// thread of its own into the store `open` hands it there, into a
+    /// new Area named `area_name` (ADR 0036, Google Keep). Nothing while
+    /// an Import runs.
+    pub fn start_keep(&mut self, open: ImportStore, source: KeepSource, area_name: String) {
+        self.run(Importing::Keep, open, move |store, tell| {
             keep_import::read(&source).and_then(|(files, refused)| {
-                let mut summary = Imports::new(&store)
+                let mut summary = Imports::new(store)
+                    .reporting(tell)
                     .keep(&area_name, &files)
                     .map_err(|e| e.to_string())?;
                 summary.not_text += refused;
@@ -66,18 +84,46 @@ impl FolderImport {
         });
     }
 
-    /// Runs `job` on a thread of its own as the Import `kind`, unless
-    /// one runs.
-    fn run(&mut self, kind: Importing, job: impl FnOnce() -> Imported + Send + 'static) {
+    /// Runs `job` on a thread of its own as the Import `kind`, on the
+    /// store `open` hands it there, telling it how far it is, unless one
+    /// runs.
+    fn run(
+        &mut self,
+        kind: Importing,
+        open: ImportStore,
+        job: impl FnOnce(&Store, &dyn Fn(usize, usize)) -> Imported + Send + 'static,
+    ) {
         if self.running.is_some() {
             return;
         }
+        let progress = Progress::default();
+        let shared = progress.clone();
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
+            let store = open();
+            // At low priority: after each Note it rests as long as the
+            // Note took, so the window's reads and writes, which wait
+            // for its transaction, get the database between two Notes.
+            let since = std::cell::Cell::new(std::time::Instant::now());
+            let tell = |written: usize, of: usize| {
+                *shared.lock() = Some((written, of));
+                if written > 0 {
+                    std::thread::sleep(since.get().elapsed());
+                }
+                since.set(std::time::Instant::now());
+            };
             // A window gone meanwhile is nobody's problem.
-            drop(tx.send(job()));
+            drop(tx.send(job(&store, &tell)));
         });
-        self.running = Some((kind, rx));
+        self.running = Some((kind, rx, progress));
+    }
+
+    /// How many of how many Notes the Import running has written; `None`
+    /// while it reads, or while none runs.
+    pub fn progress(&self) -> Option<(usize, usize)> {
+        self.running
+            .as_ref()
+            .and_then(|(_, _, progress)| *progress.lock())
     }
 
     /// Whether an Import is reading its folder or zip.
@@ -87,20 +133,20 @@ impl FolderImport {
 
     /// Which Import runs, `None` while none does.
     pub fn kind(&self) -> Option<&Importing> {
-        self.running.as_ref().map(|(kind, _)| kind)
+        self.running.as_ref().map(|(kind, ..)| kind)
     }
 
     /// Takes in the Import's answer once there, with which Import it
     /// was: `None` while it runs.
     pub fn finished(&mut self) -> Option<(Importing, Imported)> {
-        let (_, rx) = self.running.as_ref()?;
+        let (_, rx, _) = self.running.as_ref()?;
         let answer = match rx.try_recv() {
             Ok(answer) => answer,
             Err(TryRecvError::Empty) => return None,
             // The thread broke off without an answer.
             Err(TryRecvError::Disconnected) => Err("the import broke off".to_string()),
         };
-        let (kind, _) = self.running.take()?;
+        let (kind, ..) = self.running.take()?;
         Some((kind, answer))
     }
 }

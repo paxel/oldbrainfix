@@ -2303,6 +2303,9 @@ pub struct App {
     /// Asks the system's dialog for the zip of a Google Takeout export.
     import_zip_picker: FolderPicker,
     import: FolderImport,
+    /// Hands an Import its connection to the window's database
+    /// (obf-1061); without it, the Import runs on the window's.
+    import_open: Option<StoreOpener>,
     /// Asks the system's dialog for the folder a vault goes into, or is
     /// rebuilt from (#267).
     vault_picker: FolderPicker,
@@ -2871,6 +2874,7 @@ impl App {
             import_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             import_zip_picker: Box::new(|title| zip_dialog(title).pick_file()),
             import: FolderImport::default(),
+            import_open: None,
             vault_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             vault: VaultJob::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
@@ -3168,6 +3172,28 @@ impl App {
     /// Whether an Import is reading its folder or zip.
     pub fn importing(&self) -> bool {
         self.import.running()
+    }
+
+    /// Runs each Import beside the window on the store `open` hands its
+    /// thread (obf-1061): a connection of its own to the window's
+    /// database, so the window reads and writes on meanwhile.
+    pub fn set_import_store(&mut self, open: impl Fn() -> Arc<Store> + Send + Sync + 'static) {
+        self.import_open = Some(Arc::new(open));
+    }
+
+    /// What hands the next Import's thread its store: the opener's
+    /// connection, or the window's own without one.
+    fn import_store(&self) -> crate::folder_import::ImportStore {
+        match &self.import_open {
+            Some(open) => {
+                let open = open.clone();
+                Box::new(move || open())
+            }
+            None => {
+                let store = self.store.clone();
+                Box::new(move || store)
+            }
+        }
     }
 
     /// Asks `picker` for the folder a vault goes into, or is rebuilt
@@ -5369,6 +5395,9 @@ impl App {
         {
             self.read_agenda_aside();
         }
+        // An Import writes a Note after another meanwhile (obf-1061): the
+        // read shows as it is, and its end reads again.
+        let importing = self.import.running();
         let Some(reads) = &mut self.agenda_reads else {
             return;
         };
@@ -5393,7 +5422,7 @@ impl App {
             self.store.changed_elsewhere();
         }
         match read {
-            Ok((view, seq)) if self.store.current_seq().ok() == Some(seq) => {
+            Ok((view, seq)) if importing || self.store.current_seq().ok() == Some(seq) => {
                 if self.selection == Selection::Agenda {
                     self.view.agenda = Some(view.clone());
                 }
@@ -8517,7 +8546,8 @@ impl App {
                 {
                     let name = folder_name(&folder);
                     let area = self.t.import_area_name(&name);
-                    self.import.start(self.store.clone(), folder, name, area);
+                    let open = self.import_store();
+                    self.import.start(open, folder, name, area);
                 }
             }
             Action::ExportVault => {
@@ -8547,7 +8577,8 @@ impl App {
                     };
                     if let Some(source) = source {
                         let area = t.import_keep_area_name().to_string();
-                        self.import.start_keep(self.store.clone(), source, area);
+                        let open = self.import_store();
+                        self.import.start_keep(open, source, area);
                         // The Import dialog says it reads meanwhile.
                         self.dialog = Some(Dialog::Import);
                     }
@@ -11244,26 +11275,29 @@ impl App {
                     .request_repaint_after(std::time::Duration::from_millis(100)),
             }
         }
-        // An Import reading its folder, also after its dialog closed:
-        // its answer is announced when it comes.
+        // An Import running beside the window (obf-1061), also after its
+        // dialog closed: its answer is announced when it comes.
         if self.import.running() {
             match self.import.finished() {
                 Some((kind, imported)) => {
-                    // What it made is announced at the top, clickable once
-                    // the Import dialog is gone.
-                    if self.dialog == Some(Dialog::Import) {
-                        self.dialog = None;
-                    }
                     let made = imported.as_ref().is_ok_and(|s| s.area_id.is_some());
+                    // Written on a connection of its own, a Note after
+                    // another, also when it failed on the way: this one
+                    // reads the log anew, the new Area too.
+                    self.store.changed_elsewhere();
                     match kind {
                         Importing::Folder(name) => self.announce_folder_imported(&name, imported),
                         Importing::Keep => self.announce_keep_imported(imported),
                     }
-                    if made {
-                        self.refresh();
-                        if let Some(wake) = &self.wake {
-                            drop(wake.send(Event::Wake));
-                        }
+                    // What it made is announced at the top; the Import
+                    // dialog, when it shows, says the same in its place,
+                    // with the way into the new Area.
+                    if self.dialog == Some(Dialog::Import) {
+                        self.dialog = self.dialog_behind_notice().cloned();
+                    }
+                    self.refresh();
+                    if made && let Some(wake) = &self.wake {
+                        drop(wake.send(Event::Wake));
                     }
                     ui.ctx().request_repaint();
                 }
@@ -11534,6 +11568,9 @@ impl App {
             } else if drawn && self.pack_opening() {
                 // And while a Pack opens off the window's thread.
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.pack_opening());
+            } else if drawn && self.import.running() {
+                // And while an Import runs beside the window (obf-1061).
+                sync_line::show(ui, bar.response.rect, tones.accent, self.t.import_running());
             } else if drawn && self.agenda_waiting() {
                 // And while the Agenda is read for the first time
                 // (obf-1090).
@@ -15806,6 +15843,7 @@ impl App {
         let pictures = &mut self.pictures;
         let person_square = &mut self.person_square;
         let importing = self.import.kind();
+        let import_progress = self.import.progress();
         let vault = self.vault.running().then(|| self.vault.progress());
         let frame = Frame::NONE
             .fill(tones.card)
@@ -16261,8 +16299,9 @@ impl App {
                         title(ui, t.settings_import());
                         let text = ui.visuals().text_color();
                         let weak = ui.visuals().weak_text_color();
-                        // Each with what it does, or that it reads; both
-                        // greyed while either runs.
+                        // Each with what it does, or while it runs that it
+                        // reads, then how many of its Notes are in
+                        // (obf-1061); both greyed while either runs.
                         let imports = [
                             (
                                 matches!(importing, Some(Importing::Folder(_))),
@@ -16288,8 +16327,18 @@ impl App {
                             {
                                 actions.push(asked);
                             }
-                            let said = if running { reading } else { detail };
+                            let said = match (running, import_progress) {
+                                (true, Some((written, of))) => {
+                                    t.import_written(written as i64, of as i64)
+                                }
+                                (true, None) => reading.to_string(),
+                                (false, _) => detail.to_string(),
+                            };
                             ui.label(RichText::new(said).small().color(weak));
+                        }
+                        // It may be left: the Import goes on (obf-1061).
+                        if importing.is_some() {
+                            ui.label(RichText::new(t.import_goes_on_desktop()).color(text));
                         }
                         if ui.button(RichText::new(t.close()).color(text)).clicked() {
                             actions.push(Action::CloseDialog);

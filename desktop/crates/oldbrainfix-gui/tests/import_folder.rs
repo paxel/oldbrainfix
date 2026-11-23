@@ -98,7 +98,18 @@ fn import(harness: &mut Harness<'_, App>) -> TestResult {
     harness.step();
     step_until(harness, |app| app.notice().is_some())?;
     harness.step();
+    close_end(harness);
     Ok(())
+}
+
+/// Closes what the Import dialog says in its place once the Import ended
+/// (obf-1061); the top still says that it did.
+fn close_end(harness: &mut Harness<'_, App>) {
+    if let Some(close) = harness.get_all_by_label("Close").last() {
+        close.click_accesskit();
+    }
+    harness.step();
+    harness.step();
 }
 
 #[test]

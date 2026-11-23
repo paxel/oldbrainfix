@@ -305,6 +305,9 @@ struct Shell {
     /// The Agenda's own connection, which reads it beside the window
     /// (#207).
     agenda_store: Arc<Store>,
+    /// Where the database lies: each Import opens a connection of its
+    /// own to it, to write beside the window (obf-1061).
+    dir: std::path::PathBuf,
     locale: &'static str,
     changes: Arc<AtomicU64>,
     events: Sender<Event>,
@@ -423,6 +426,9 @@ impl Shell {
         // window shows at once.
         let agenda = self.agenda_store.clone();
         let mut app = App::opening(self.store.clone(), self.locale, move || agenda.clone());
+        // Each Import on a connection of its own (obf-1061).
+        let (dir, shared) = (self.dir.clone(), self.store.clone());
+        app.set_import_store(move || own_store(&dir, &shared));
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         let window = self.window.clone();
@@ -611,8 +617,9 @@ fn open_store(dir: &Path) -> Result<Store, Error> {
 }
 
 /// A store of its own on the database in `dir`, for a sync thread
-/// (#225) or the alarms (obf-1091): its work never holds the window's
-/// connection. The window's `shared` one when it does not open.
+/// (#225), the alarms (obf-1091) or an Import (obf-1061): its work never
+/// holds the window's connection. The window's `shared` one when it does
+/// not open.
 fn own_store(dir: &Path, shared: &Arc<Store>) -> Arc<Store> {
     match open_store(dir) {
         Ok(store) => Arc::new(store),
@@ -1052,6 +1059,7 @@ fn run() -> Result<i32, String> {
     let system_theme = SystemTheme::follow(waker(&window));
     let shell = Shell {
         agenda_store: own_store(&dir, &store),
+        dir: dir.clone(),
         store,
         locale,
         changes,
