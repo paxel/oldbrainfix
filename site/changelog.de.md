@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.8.0]
 
+### Geändert
+
+- Auf dem Handy und dem Desktop behält eine Tabelle die Textgröße, bricht lange Zellen um und scrollt seitwärts; eine Karte zeigt ihre ersten 10 Zeilen. ([obf-1048](https://github.com/paxel/oldbrainfix/issues/359))
+
 ## [0.7.2] - 2026-11-23
 
 ### Geändert

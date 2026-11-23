@@ -591,7 +591,7 @@ class _TableScreenState extends State<TableScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_most > 0)
-              _SidewaysBar(
+              TableSidewaysBar(
                 key: const ValueKey('table-sideways'),
                 offset: _offset,
                 most: _most,
@@ -648,7 +648,7 @@ class _TableScreenState extends State<TableScreen> {
           if (table.headingColumn)
             SizedBox(width: _widths[0], child: letter(0)),
           Expanded(
-            child: _Shifted(
+            child: TableShifted(
               offset: _offset,
               most: _most,
               child: Row(
@@ -697,7 +697,7 @@ class _TableScreenState extends State<TableScreen> {
           if (table.headingColumn)
             SizedBox(width: _widths[0], child: _cellAt(context, table, r, 0)),
           Expanded(
-            child: _Shifted(
+            child: TableShifted(
               offset: _offset,
               most: _most,
               child: Row(
@@ -841,13 +841,14 @@ class _Heading extends StatelessWidget {
 }
 
 /// [child] moved sideways by [offset], up to [most], cut to the room it
-/// has.
-class _Shifted extends StatelessWidget {
+/// has; full screen and where a table is read in a text (obf-1048).
+class TableShifted extends StatelessWidget {
   final ValueListenable<double> offset;
   final double most;
   final Widget child;
 
-  const _Shifted({
+  const TableShifted({
+    super.key,
     required this.offset,
     required this.most,
     required this.child,
@@ -874,15 +875,16 @@ class _Shifted extends StatelessWidget {
 /// The bar that moves the table sideways: its thumb shows the part of
 /// the [whole] width that is in the [room] there is, and is dragged; a
 /// tap beside it moves the table by a screen. A screen reader scrolls it
-/// left and right.
-class _SidewaysBar extends StatelessWidget {
+/// left and right. Full screen and where a table is read in a text
+/// (obf-1048).
+class TableSidewaysBar extends StatelessWidget {
   final ValueNotifier<double> offset;
   final double most;
   final double room;
   final double whole;
   final String label;
 
-  const _SidewaysBar({
+  const TableSidewaysBar({
     super.key,
     required this.offset,
     required this.most,

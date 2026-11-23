@@ -5145,6 +5145,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tableSideways => 'Tabelle seitlich verschieben';
 
   @override
+  String tableShowAll(int count) {
+    return 'Alle $count zeigen';
+  }
+
+  @override
   String tableRow(int number) {
     return 'Zeile $number';
   }

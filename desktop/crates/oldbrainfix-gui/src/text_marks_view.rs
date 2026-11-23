@@ -33,11 +33,15 @@
 //! code, a code block or a link ([`markdown::autolinks`]); a tag or a box
 //! inside one is none. Nothing about it is stored.
 //!
-//! A table of a formatted text (#128, ADR 0033) is drawn as a grid,
-//! scaled down to the width there is: its header row bold on grey, its
-//! first column bold while it holds headings, each cell one line of the
-//! formats above with its boxes and tags taking clicks. A click
-//! elsewhere on it opens it in the full-screen table view.
+//! A table of a formatted text (#128, ADR 0033) is drawn as a grid at
+//! the text's own size (obf-1048): its header row bold on grey, its
+//! first column bold while it holds headings, each cell the formats
+//! above with its boxes and tags taking clicks, a long one wrapped once
+//! the table is wider than its room. Still wider, it moves sideways
+//! inside its room, its first column staying while it holds headings;
+//! its header row stays in view while its rows scroll. On a card it
+//! shows its first rows until "Show all" unfolds the rest in place. A
+//! click elsewhere on it opens it in the full-screen table view.
 //!
 //! Code is coloured by its language (obf-1036, ADR 0054): a Code text by
 //! the language its Note keeps, a fenced code block by the one its fence
@@ -199,11 +203,66 @@ pub struct LinkSpot {
 }
 
 /// A table of a formatted text as it is drawn: where it begins in the
-/// whole text, in bytes, and where it lies on the screen.
+/// whole text, in bytes, where it lies on the screen, where what is kept
+/// of it between frames is ([`TableState`]), where its "Show all" goes
+/// with how many rows it has under its header while it is folded on a
+/// card, and where the bar under it lies while it moves sideways, with
+/// how far its cells move per point the bar is dragged and how far they
+/// move at most (obf-1048).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TableSpot {
     pub at: usize,
     pub rect: Rect,
+    pub key: Id,
+    pub more: Option<(Rect, usize)>,
+    pub bar: Option<(Rect, f32, f32)>,
+}
+
+/// How many rows under its header a table shows on a card until "Show
+/// all" unfolds the rest in place (obf-1048).
+pub const CARD_ROWS: usize = 10;
+
+/// Where the tables of a text are drawn (obf-1048): on the card of the
+/// Note or Section whose clicks [`table_clicks`] takes as `card`, each
+/// folded to its first [`CARD_ROWS`] rows under its header; elsewhere
+/// whole. `wide` is the room across a table may take beyond the text's
+/// column, centred on it, as the reading view gives the window's width;
+/// without it a table takes the column's.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct TableRoom {
+    pub card: Option<Id>,
+    pub wide: Option<egui::Rangef>,
+}
+
+/// What is kept of a table drawn between frames, under its
+/// [`TableSpot::key`]: whether "Show all" unfolded it, how far its cells
+/// moved sideways, and the row to bring into view once it is drawn.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+struct TableState {
+    unfolded: bool,
+    offset: f32,
+    reveal: Option<usize>,
+}
+
+/// Where what is kept of the table beginning at the byte `at` of the text
+/// whose tables are drawn under `of` lies.
+fn table_key(of: Id, at: usize) -> Id {
+    of.with(("table rows", at))
+}
+
+/// Unfolds the table beginning at the byte `at` of the text whose card
+/// takes its clicks as `of` (its [`TableRoom::card`]) and brings its row
+/// `row` into view once it is drawn, the header row counted as 0: for a
+/// search hit further down it (obf-1047). The card must be drawn to
+/// show it; bringing the card into view is the list's.
+pub fn unfold_table(ctx: &egui::Context, of: Id, at: usize, row: usize) {
+    let key = table_key(of, at);
+    ctx.data_mut(|d| {
+        let state: &mut TableState = d.get_temp_mut_or_default(key);
+        state.unfolded = true;
+        state.reveal = Some(row);
+    });
+    ctx.request_repaint();
 }
 
 /// A cell of a table of a formatted text as it is drawn: the table's
@@ -402,11 +461,33 @@ pub fn formatted_label(
 /// of the grammar its Note keeps (obf-1036).
 pub fn note_label(
     ui: &mut Ui,
+    text: (&str, &str, &BoxLook),
+    language: Option<&str>,
+    shown: (usize, usize),
+    look: (Option<f32>, Color32),
+    truncate: bool,
+) -> Spots {
+    room_label(
+        ui,
+        text,
+        language,
+        shown,
+        look,
+        truncate,
+        TableRoom::default(),
+    )
+}
+
+/// As [`note_label`], its tables drawn in `room` (obf-1048): folded on a
+/// card, as wide as the reading view's window.
+pub fn room_label(
+    ui: &mut Ui,
     (text, format, boxes): (&str, &str, &BoxLook),
     language: Option<&str>,
     shown: (usize, usize),
     look: (Option<f32>, Color32),
     truncate: bool,
+    tables: TableRoom,
 ) -> Spots {
     if format == text_format::CODE {
         code_text_label(ui, (text, language), shown, look, (truncate, false));
@@ -469,7 +550,7 @@ pub fn note_label(
                 Some(table) if !truncate => {
                     if block.line == table.first_line.max(first) {
                         room(ui, BlockKind::Table, &mut blank);
-                        spots.extend(table_label(ui, text, table, (&found, &look)));
+                        spots.extend(table_label(ui, (text, table), (&found, &look), tables));
                     }
                 }
                 // A blank line reads as room, not as a line.
@@ -632,13 +713,6 @@ impl Look {
     /// Its font, at the size it shows.
     pub(crate) fn font(&self) -> FontId {
         self.font.clone()
-    }
-
-    /// The same, `scale` times as large.
-    fn scaled(&self, scale: f32) -> Look {
-        let mut look = self.clone();
-        look.font.size *= scale;
-        look
     }
 }
 
@@ -1452,8 +1526,20 @@ impl LaidCell {
 pub(crate) fn lay_cell(
     ui: &Ui,
     (text, cell): (&str, &Cell),
+    ctx: (&Found, &Look),
+    bold: bool,
+) -> LaidCell {
+    lay_wrapped(ui, (text, cell), ctx, bold, f32::INFINITY)
+}
+
+/// Lays out `cell` of `text`, bold while `bold`, its lines wrapped at
+/// `width` (obf-1048).
+fn lay_wrapped(
+    ui: &Ui,
+    (text, cell): (&str, &Cell),
     (found, look): (&Found, &Look),
     bold: bool,
+    width: f32,
 ) -> LaidCell {
     let mut line = Line::default();
     let style = Style {
@@ -1461,10 +1547,12 @@ pub(crate) fn lay_cell(
         ..Style::default()
     };
     add_spans(&mut line, text, &cell.spans, style, (found, look));
-    let job = std::mem::take(&mut line.job);
+    let mut job = std::mem::take(&mut line.job);
+    job.wrap.max_width = width;
     let galley = ui.fonts_mut(|f| f.layout_job(job));
     let ghost = line.bold.then(|| {
-        let ghost = std::mem::take(&mut line.ghost);
+        let mut ghost = std::mem::take(&mut line.ghost);
+        ghost.wrap.max_width = width;
         ui.fonts_mut(|f| f.layout_job(ghost))
     });
     LaidCell {
@@ -1543,71 +1631,341 @@ pub(crate) fn table_tones(colour: Color32) -> (Stroke, Color32) {
     )
 }
 
-/// The room around a cell's words in a table, at full size.
+/// The room around a cell's words in a table.
 const CELL_PAD: Vec2 = egui::vec2(6.0, 3.0);
 
-/// Draws `table` of `text` as a grid, scaled down to the width there is,
-/// and gives where its marks, tags and links lie and where it does.
-fn table_label(ui: &mut Ui, text: &str, table: &Table, (found, look): (&Found, &Look)) -> Spots {
-    let room = ui.available_width().max(1.0);
-    let mut scale = 1.0f32;
-    let mut scaled = look.clone();
-    let mut laid = lay_table(ui, (text, table), (found, &scaled));
-    let (mut widths, mut heights) = grid(ui, &laid, &scaled, CELL_PAD);
-    // Smaller till it fits; a font does not shrink quite in proportion.
-    for _ in 0..3 {
-        let wide: f32 = widths.iter().sum();
-        if wide <= room {
+/// The widest a column is drawn while its table is wider than its room,
+/// in parts of the text's size: longer words wrap (obf-1048).
+const COLUMN_EMS: f32 = 20.0;
+
+/// How high the bar under a table that moves sideways is, the room above
+/// it, and the room above "Show all" (obf-1048).
+const BAR: f32 = 6.0;
+const BAR_GAP: f32 = 3.0;
+const MORE_GAP: f32 = 4.0;
+
+/// How wide each column of a table is in `room` across, as wide as its
+/// widest words with their room, `natural`, while the whole table fits;
+/// else none wider than `cap`, the room left shared among the columns cut,
+/// none past its words (obf-1048).
+fn column_widths(natural: &[f32], room: f32, cap: f32) -> Vec<f32> {
+    if natural.iter().sum::<f32>() <= room {
+        return natural.to_vec();
+    }
+    let mut widths: Vec<f32> = natural.iter().map(|w| w.min(cap)).collect();
+    let mut left = room - widths.iter().sum::<f32>();
+    // Each round either uses up the room left or fills a column.
+    for _ in 0..natural.len() {
+        let cut = widths.iter().zip(natural).filter(|(w, n)| w < n).count();
+        if left <= 0.5 || cut == 0 {
             break;
         }
-        scale = (scale * room / wide).max(0.2);
-        scaled = look.scaled(scale);
-        laid = lay_table(ui, (text, table), (found, &scaled));
-        (widths, heights) = grid(ui, &laid, &scaled, CELL_PAD * scale);
+        let share = left / cut as f32;
+        for (width, wide) in widths.iter_mut().zip(natural) {
+            if *width < *wide {
+                let add = share.min(*wide - *width);
+                *width += add;
+                left -= add;
+            }
+        }
     }
-    let pad = CELL_PAD * scale;
-    let size = egui::vec2(widths.iter().sum(), heights.iter().sum());
-    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
-    // The cells' labels in a part of their own, which moves nothing after
-    // the table.
-    let mut cells = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(rect)
-            .id_salt(("table", table.start)),
-    );
-    let (stroke, header) = table_tones(look.colour);
+    widths
+}
+
+/// Where each of `sizes` begins, one after another from 0, and where the
+/// last ends.
+fn running(sizes: &[f32]) -> (Vec<f32>, f32) {
+    let mut at = 0.0;
+    let starts = sizes
+        .iter()
+        .map(|size| {
+            let start = at;
+            at += size;
+            start
+        })
+        .collect();
+    (starts, at)
+}
+
+/// `spots` but those outside `clip`, each cut to it (obf-1048): what of a
+/// table moved under its parts that stay, or past its edge, takes no
+/// click.
+fn spots_in(spots: Spots, clip: Rect) -> Spots {
+    let cut = |rect: Rect| Some(rect.intersect(clip)).filter(Rect::is_positive);
+    Spots {
+        boxes: spots
+            .boxes
+            .into_iter()
+            .filter_map(|mut spot| {
+                spot.rect = cut(spot.rect)?;
+                Some(spot)
+            })
+            .collect(),
+        tags: spots
+            .tags
+            .into_iter()
+            .filter_map(|mut spot| {
+                spot.rect = cut(spot.rect)?;
+                Some(spot)
+            })
+            .collect(),
+        links: spots
+            .links
+            .into_iter()
+            .filter_map(|mut spot| {
+                spot.rects = spot.rects.into_iter().filter_map(cut).collect();
+                (!spot.rects.is_empty()).then_some(spot)
+            })
+            .collect(),
+        tables: spots.tables,
+        cells: spots.cells,
+    }
+}
+
+/// Draws `table` of `text` as a grid at the text's own size in `room`
+/// (obf-1048), and gives where its marks, tags, links and cells lie and
+/// where it does. Wider than its room, its long cells wrap, no column
+/// wider than [`COLUMN_EMS`]; still wider, it moves sideways inside its
+/// room, by the bar under it or the wheel sideways, its first column
+/// staying while it holds headings. Its header row stays in view while
+/// its rows scroll under it. On a card it shows its first [`CARD_ROWS`]
+/// rows under its header until "Show all" ([`table_clicks`]) unfolds the
+/// rest; only the rows shown are laid out.
+fn table_label(
+    ui: &mut Ui,
+    (text, table): (&str, &Table),
+    (found, look): (&Found, &Look),
+    room: TableRoom,
+) -> Spots {
+    let key = table_key(room.card.unwrap_or_else(|| ui.id()), table.start);
+    let mut state: TableState = ui.data(|d| d.get_temp(key)).unwrap_or_default();
+    let under = table.rows.len().saturating_sub(1);
+    let folded = room.card.is_some() && !state.unfolded && under > CARD_ROWS;
+    let rows = if folded {
+        table.rows.get(..=CARD_ROWS).unwrap_or(&table.rows)
+    } else {
+        &table.rows
+    };
+    let column = ui.available_width().max(1.0);
+    let space = room.wide.map_or(column, |r| r.span().max(column));
+    let pad = CELL_PAD;
+    // Each cell on one line first, for how wide its words are.
+    let bold = |r: usize, c: usize| r == 0 || (table.heading_column && c == 0);
+    let mut laid: Vec<Vec<LaidCell>> = rows
+        .iter()
+        .enumerate()
+        .map(|(r, row)| {
+            row.cells
+                .iter()
+                .enumerate()
+                .map(|(c, cell)| lay_cell(ui, (text, cell), (found, look), bold(r, c)))
+                .collect()
+        })
+        .collect();
+    let columns = laid.first().map_or(0, Vec::len);
+    let mut natural = vec![0.0f32; columns];
+    for row in &laid {
+        for (width, cell) in natural.iter_mut().zip(row) {
+            *width = width.max(cell.size(ui, look).x + pad.x * 2.0);
+        }
+    }
+    let mut widths = column_widths(&natural, space, look.font.size * COLUMN_EMS);
+    // A first column of headings that stays while the rest moves takes at
+    // most half the room, its words wrapped.
+    if table.heading_column
+        && widths.iter().sum::<f32>() > space + 0.5
+        && let Some(first) = widths.first_mut()
+    {
+        *first = first.min(space / 2.0);
+    }
+    // The cells wider than their column laid out again, wrapped.
+    for (r, (row, cells)) in rows.iter().zip(&mut laid).enumerate() {
+        for (c, ((cell, slot), width)) in row.cells.iter().zip(cells).zip(&widths).enumerate() {
+            if slot.size(ui, look).x + pad.x * 2.0 > *width + 0.5 {
+                let wrap = (*width - pad.x * 2.0 - 1.0).max(1.0);
+                *slot = lay_wrapped(ui, (text, cell), (found, look), bold(r, c), wrap);
+            }
+        }
+    }
+    let heights: Vec<f32> = laid
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|cell| cell.size(ui, look).y + pad.y * 2.0)
+                .fold(0.0, f32::max)
+        })
+        .collect();
+    let (xs, wide) = running(&widths);
+    let (ys, high) = running(&heights);
+    let shown = wide.min(space);
+    let sideways = wide > space + 0.5;
+    let most = (wide - shown).max(0.0);
+    state.offset = state.offset.clamp(0.0, most);
+    // The text's column takes the table's height, the bar's and
+    // "Show all"'s; the table itself lies across the room it has.
+    let bar_room = if sideways { BAR_GAP + BAR } else { 0.0 };
+    let more_height = ui.spacing().interact_size.y;
+    let more_room = if folded { MORE_GAP + more_height } else { 0.0 };
+    let size = egui::vec2(column, high + bar_room + more_room);
+    let (taken, _) = ui.allocate_exact_size(size, Sense::hover());
+    let left = match room.wide {
+        Some(range) if shown > column => {
+            (taken.center().x - shown / 2.0).clamp(range.min, (range.max - shown).max(range.min))
+        }
+        _ => taken.left(),
+    };
+    let rect = Rect::from_min_size(egui::pos2(left, taken.top()), egui::vec2(shown, high));
+    // The wheel sideways, or with Shift, moves it while it is pointed at.
+    if sideways && ui.rect_contains_pointer(rect) {
+        let dx = ui.input(|i| i.smooth_scroll_delta.x);
+        let to = (state.offset - dx).clamp(0.0, most);
+        if (to - state.offset).abs() > f32::EPSILON {
+            state.offset = to;
+            ui.input_mut(|i| i.smooth_scroll_delta.x = 0.0);
+        }
+    }
+    // The bar under it, its thumb as wide as the part shown; a drag on it
+    // moves the cells along. Over a card, [`table_clicks`] takes it again.
+    let bar = sideways.then(|| {
+        let bar = Rect::from_min_size(
+            egui::pos2(rect.left(), rect.bottom() + BAR_GAP),
+            egui::vec2(shown, BAR),
+        );
+        let thumb = (shown * shown / wide.max(1.0)).clamp(BAR * 4.0, shown);
+        let per_point = most / (shown - thumb).max(1.0);
+        (bar, thumb, per_point)
+    });
+    if let Some((bar, _, per_point)) = bar {
+        let drag = ui.interact(bar, key.with("bar"), Sense::drag());
+        let dx = drag.drag_delta().x;
+        state.offset = (state.offset + dx * per_point).clamp(0.0, most);
+    }
+    // The header row stays at the top of what shows while the rows scroll
+    // under it, within the table.
+    let clip = ui.clip_rect();
+    let head = heights.first().copied().unwrap_or_default();
+    let header_top = rect.top().max(clip.top()).min(rect.bottom() - head);
+    let pinned = if table.heading_column && sideways {
+        widths.first().copied().unwrap_or_default()
+    } else {
+        0.0
+    };
+    let split = (rect.left() + pinned, header_top + head);
+    // Four parts, each clipped to its own: the body, the first column, the
+    // header row and the corner of the two, the cells' labels in parts of
+    // their own, which move nothing after the table.
+    let mut parts: Vec<(Rect, Ui)> = [(false, false), (false, true), (true, false), (true, true)]
+        .into_iter()
+        .map(|(header, first)| {
+            let x = if first {
+                egui::Rangef::new(rect.left(), split.0)
+            } else {
+                egui::Rangef::new(split.0, rect.right())
+            };
+            let y = if header {
+                egui::Rangef::new(header_top, split.1)
+            } else {
+                egui::Rangef::new(split.1, rect.bottom())
+            };
+            let part = Rect::from_x_y_ranges(x, y).intersect(clip);
+            let mut cells = ui.new_child(egui::UiBuilder::new().max_rect(rect).id_salt((
+                "table",
+                table.start,
+                header,
+                first,
+            )));
+            cells.set_clip_rect(part);
+            (part, cells)
+        })
+        .collect();
+    let (stroke, fill) = table_tones(look.colour);
     let mut spots = Spots::default();
-    let mut y = rect.top();
     for (r, row) in laid.iter().enumerate() {
         let height = heights.get(r).copied().unwrap_or_default();
-        let mut x = rect.left();
+        let y = if r == 0 {
+            header_top
+        } else {
+            rect.top() + ys.get(r).copied().unwrap_or(high)
+        };
         for (c, cell) in row.iter().enumerate() {
+            let first = c == 0 && pinned > 0.0;
             let width = widths.get(c).copied().unwrap_or_default();
+            let x = if first {
+                rect.left()
+            } else {
+                rect.left() + xs.get(c).copied().unwrap_or(wide) - state.offset
+            };
+            let Some((part, cells)) = parts.get_mut(usize::from(r == 0) * 2 + usize::from(first))
+            else {
+                continue;
+            };
+            let part = *part;
             let at = Rect::from_min_size(egui::pos2(x, y), egui::vec2(width, height));
-            if r == 0 && ui.is_rect_visible(at) {
-                ui.painter().rect_filled(at, 0.0, header);
+            let seen = at.intersect(part);
+            let painter = ui.painter().with_clip_rect(part);
+            if r == 0 && seen.is_positive() {
+                painter.rect_filled(at, 0.0, fill);
             }
             let align = table.aligns.get(c).copied().unwrap_or(Align::None);
-            let words = cell.size(ui, &scaled);
-            let left = aligned(align, width, words.x, pad.x);
-            let pos = egui::pos2(x + left, y + pad.y);
-            spots.extend(cell.paint(&mut cells, pos, scaled.colour, true));
-            spots.cells.push(CellSpot {
-                at: table.start,
-                cell: (r, c),
-                rect: at,
-            });
-            if ui.is_rect_visible(at) {
-                ui.painter()
-                    .rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
+            let words = cell.size(ui, look);
+            let inset = aligned(align, width, words.x, pad.x);
+            let pos = egui::pos2(x + inset, y + pad.y);
+            spots.extend(spots_in(cell.paint(cells, pos, look.colour, true), part));
+            if seen.is_positive() {
+                spots.cells.push(CellSpot {
+                    at: table.start,
+                    cell: (r, c),
+                    rect: seen,
+                });
+                painter.rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
             }
-            x += width;
         }
-        y += height;
     }
+    if let Some((bar, thumb, _)) = bar
+        && ui.is_rect_visible(bar)
+    {
+        let painter = ui.painter();
+        painter.rect_filled(bar, BAR / 2.0, look.colour.gamma_multiply(0.12));
+        let along = if most > 0.0 {
+            state.offset / most * (shown - thumb)
+        } else {
+            0.0
+        };
+        let knob = Rect::from_min_size(
+            egui::pos2(bar.left() + along, bar.top()),
+            egui::vec2(thumb, BAR),
+        );
+        painter.rect_filled(knob, BAR / 2.0, look.colour.gamma_multiply(0.45));
+    }
+    // A row asked for, as by a search hit in it, comes into view once.
+    if let Some(row) = state.reveal.take()
+        && let (Some(y), Some(height)) = (ys.get(row), heights.get(row))
+    {
+        let target = Rect::from_min_size(
+            egui::pos2(rect.left(), rect.top() + y),
+            egui::vec2(shown, *height),
+        );
+        ui.scroll_to_rect_animation(
+            target,
+            Some(egui::Align::Center),
+            egui::style::ScrollAnimation::none(),
+        );
+    }
+    ui.data_mut(|d| d.insert_temp(key, state));
+    let more = folded.then(|| {
+        let top = rect.bottom() + bar_room + MORE_GAP;
+        let at = Rect::from_min_size(
+            egui::pos2(taken.left(), top),
+            egui::vec2(column, more_height),
+        );
+        (at, under)
+    });
     spots.tables.push(TableSpot {
         at: table.start,
         rect,
+        key,
+        more,
+        bar: bar.map(|(bar, _, per_point)| (bar, per_point, most)),
     });
     spots
 }
@@ -1615,7 +1973,10 @@ fn table_label(ui: &mut Ui, text: &str, table: &Table, (found, look): (&Found, &
 /// Takes the tables `spots` of the text `of`, by id, as buttons over
 /// what was drawn of them, read as "Open the table". Gives where the
 /// table clicked begins in the text. Taken before the marks, tags and
-/// links in them, those keep their clicks.
+/// links in them, those keep their clicks. Over the table's own click and
+/// whatever else lies over it, as a card does, the bar under a table
+/// moves it sideways and "Show all" unfolds a table folded on a card
+/// (obf-1048).
 pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Option<usize> {
     let mut picked = None;
     for spot in spots {
@@ -1627,6 +1988,31 @@ pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Optio
             .clicked()
         {
             picked = Some(spot.at);
+        }
+        if let Some((bar, per_point, most)) = spot.bar {
+            let drag = ui.interact(bar, of.with(("table bar", spot.at)), Sense::drag());
+            let dx = drag.drag_delta().x;
+            if dx != 0.0 {
+                ui.data_mut(|d| {
+                    let state: &mut TableState = d.get_temp_mut_or_default(spot.key);
+                    state.offset = (state.offset + dx * per_point).clamp(0.0, most);
+                });
+                ui.ctx().request_repaint();
+            }
+        }
+        if let Some((rect, count)) = spot.more {
+            let builder = egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center));
+            let said = t.table_show_all(count as i64);
+            let shown = ui.scope_builder(builder, |ui| ui.button(said).clicked());
+            if shown.inner {
+                ui.data_mut(|d| {
+                    let state: &mut TableState = d.get_temp_mut_or_default(spot.key);
+                    state.unfolded = true;
+                });
+                ui.ctx().request_repaint();
+            }
         }
     }
     picked

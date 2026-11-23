@@ -2082,6 +2082,7 @@ class _Whole extends StatelessWidget {
             ticking: ticking,
             tableEdit: onTable,
             language: language,
+            rows: MarkedText.cardRows,
           );
     final parts = <Widget>[
       if (list == null)
@@ -2263,6 +2264,7 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
           source: widget.source,
           ticking: widget.ticking,
           tableEdit: widget.onTable,
+          rows: MarkedText.cardRows,
         );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

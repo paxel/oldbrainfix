@@ -6,7 +6,10 @@
 //! text as it was; a table of a Note in the trash opens to read only;
 //! Copy puts the table on the clipboard as an HTML table beside its
 //! Markdown (#324). The editor edits a table as a grid in place (#257,
-//! tests/table_grid.rs).
+//! tests/table_grid.rs). On a card a table keeps the text's size, wider
+//! than the card it moves sideways, its first column staying while it
+//! holds headings, and it shows its first 10 rows until "Show all"
+//! unfolds the rest in place (obf-1048).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -431,5 +434,217 @@ fn a_copied_table_pasted_into_a_new_note_is_the_same_table() -> TestResult {
     let before = shape(text).ok_or("the table")?;
     assert!(before.2);
     assert_eq!(shape(&pasted.text), Some(before));
+    Ok(())
+}
+
+/// A table of `rows` rows under its header, "row 1" and so on.
+fn long_table(rows: usize) -> String {
+    let mut text = String::from("| Day | Reading |\n| --- | --- |");
+    for n in 1..=rows {
+        text.push_str(&format!("\n| row {n} | {} |", n * 3));
+    }
+    text
+}
+
+/// A table of eight columns, far wider than a card, its first column as
+/// headings, under a line of text.
+fn wide_table() -> String {
+    let header: Vec<String> = (1..=8).map(|c| format!("Meter number {c}")).collect();
+    let body: Vec<String> = (1..=8)
+        .map(|c| format!("reading {c} of the year"))
+        .collect();
+    format!(
+        "Before\n\n<!-- first column headings -->\n| {} |\n|{}\n| {} |",
+        header.join(" | "),
+        " --- |".repeat(8),
+        body.join(" | ")
+    )
+}
+
+/// Where the label reading `value`, a table's cell, lies.
+fn cell(harness: &Harness<'_, App>, value: &str) -> Result<egui::Rect, String> {
+    harness
+        .query_all_by_value(value)
+        .next()
+        .map(|n| n.rect())
+        .ok_or(format!("{value:?}"))
+}
+
+/// Whether the words `words` are drawn, each time wholly inside what
+/// they are clipped to: what accesskit gives is where a cell lies, not
+/// what of it shows.
+fn drawn_whole(harness: &Harness<'_, App>, words: &str) -> bool {
+    fn each(shape: &egui::Shape, clip: egui::Rect, words: &str, out: &mut Vec<bool>) {
+        match shape {
+            egui::Shape::Text(text) if text.galley.text() == words => {
+                out.push(clip.expand(1.0).contains_rect(text.visual_bounding_rect()));
+            }
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| each(s, clip, words, out)),
+            _ => {}
+        }
+    }
+    let mut drawn = Vec::new();
+    for clipped in &harness.output().shapes {
+        each(&clipped.shape, clipped.clip_rect, words, &mut drawn);
+    }
+    !drawn.is_empty() && drawn.iter().all(|&whole| whole)
+}
+
+#[test]
+fn a_card_shows_ten_rows_of_a_long_table_until_show_all() -> TestResult {
+    let (store, _) = with_note(&long_table(200), MARKDOWN)?;
+    let mut harness = cards(&store);
+    cell(&harness, "row 10")?;
+    // The rows not shown are not laid out (the speed budget, obf-1069).
+    assert!(cell(&harness, "row 11").is_err());
+    assert_eq!(buttons(&harness, "Show all 200"), 1);
+    // The pointer's click, over the card's own.
+    click(&mut harness, "Show all 200")?;
+    cell(&harness, "row 200")?;
+    assert_eq!(buttons(&harness, "Show all 200"), 0);
+    assert_eq!(harness.state().shown_table(), None);
+    assert_eq!(buttons(&harness, "Open the table"), 1);
+    Ok(())
+}
+
+#[test]
+fn a_table_of_ten_rows_shows_them_all_without_show_all() -> TestResult {
+    let (store, _) = with_note(&long_table(10), MARKDOWN)?;
+    let harness = cards(&store);
+    cell(&harness, "row 10")?;
+    let more = harness.query_all_by(|n| n.label().is_some_and(|l| l.starts_with("Show all")));
+    assert_eq!(more.count(), 0);
+    Ok(())
+}
+
+#[test]
+fn a_wide_table_keeps_the_texts_size_and_moves_sideways_by_the_wheel() -> TestResult {
+    let (store, _) = with_note(&wide_table(), MARKDOWN)?;
+    let mut harness = cards(&store);
+    // As high as the line of text above it: not made smaller.
+    let before = harness
+        .query_all_by_value("Before")
+        .next()
+        .ok_or("the line before")?
+        .rect();
+    let body = cell(&harness, "reading 5 of the year")?;
+    assert!(
+        (body.height() - before.height()).abs() < 1.5,
+        "{body:?} {before:?}"
+    );
+    // Its last column lies past the card's edge.
+    let table = harness
+        .query_all_by_role_and_label(Role::Button, "Open the table")
+        .next()
+        .ok_or("the table")?
+        .rect();
+    let last = cell(&harness, "reading 8 of the year")?;
+    assert!(last.right() > table.right() + 50.0, "{last:?} {table:?}");
+    assert!(!drawn_whole(&harness, "reading 8 of the year"));
+    assert!(drawn_whole(&harness, "reading 1 of the year"));
+    let first = cell(&harness, "reading 1 of the year")?;
+    harness.hover_at(table.center());
+    harness.run();
+    harness.event(egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(-300.0, 0.0),
+        phase: egui::TouchPhase::Move,
+        modifiers: Modifiers::NONE,
+    });
+    // The wheel's step is spread over a few frames.
+    harness.run_steps(30);
+    let moved = cell(&harness, "reading 8 of the year")?;
+    assert!(moved.left() < last.left() - 100.0, "{moved:?} {last:?}");
+    // The first column holds headings: it stays.
+    let stayed = cell(&harness, "reading 1 of the year")?;
+    assert!(
+        (stayed.left() - first.left()).abs() < 0.5,
+        "{stayed:?} {first:?}"
+    );
+    // The list did not scroll.
+    let still = harness
+        .query_all_by_value("Before")
+        .next()
+        .ok_or("the line before")?
+        .rect();
+    assert!((still.top() - before.top()).abs() < 0.5);
+    Ok(())
+}
+
+#[test]
+fn a_long_cell_wraps_within_the_card() -> TestResult {
+    let long = "Pay the gas bill before the end of the month and keep the receipt \
+                in the blue folder in the hall, next to the one for the water, \
+                then call the office to say it was paid, and ask about the meter";
+    let text = format!("| Task | When |\n| --- | --- |\n| {long} | Friday |");
+    let (store, _) = with_note(&text, MARKDOWN)?;
+    let harness = cards(&store);
+    let table = harness
+        .query_all_by_role_and_label(Role::Button, "Open the table")
+        .next()
+        .ok_or("the table")?
+        .rect();
+    let words = cell(&harness, long)?;
+    let short = cell(&harness, "Friday")?;
+    assert!(words.right() <= table.right(), "{words:?} {table:?}");
+    // On several lines, each at the text's size.
+    assert!(words.height() > short.height() * 1.5, "{words:?} {short:?}");
+    // It fits: no bar under it.
+    assert!(cell(&harness, "Friday")?.right() <= table.right());
+    Ok(())
+}
+
+#[test]
+fn the_bar_under_a_wide_table_on_a_card_moves_it_sideways() -> TestResult {
+    let (store, _) = with_note(&wide_table(), MARKDOWN)?;
+    let mut harness = cards(&store);
+    let table = harness
+        .query_all_by_role_and_label(Role::Button, "Open the table")
+        .next()
+        .ok_or("the table")?
+        .rect();
+    let last = cell(&harness, "reading 8 of the year")?;
+    // The bar lies right under the table; its thumb at its start.
+    let grab = egui::pos2(table.left() + 20.0, table.bottom() + 6.0);
+    harness.drag_at(grab);
+    harness.run();
+    harness.hover_at(grab + egui::vec2(200.0, 0.0));
+    harness.run();
+    harness.drop_at(grab + egui::vec2(200.0, 0.0));
+    harness.run();
+    let moved = cell(&harness, "reading 8 of the year")?;
+    assert!(moved.left() < last.left() - 100.0, "{moved:?} {last:?}");
+    // The card was not moved or opened.
+    assert_eq!(harness.state().shown_table(), None);
+    Ok(())
+}
+
+#[test]
+fn a_table_that_fits_draws_its_heading_column_whole() -> TestResult {
+    let text = "<!-- first column headings -->\n| Meter and what it counts in the house | Jan |\n\
+                | --- | --- |\n| Water in cubic metres for the whole house | 312 |";
+    let (store, _) = with_note(text, MARKDOWN)?;
+    let harness = cards(&store);
+    assert!(drawn_whole(
+        &harness,
+        "Water in cubic metres for the whole house"
+    ));
+    assert!(drawn_whole(&harness, "312"));
+    Ok(())
+}
+
+#[test]
+fn a_search_hit_can_unfold_a_cards_table_to_its_row() -> TestResult {
+    // The hook for obf-1047: unfolded under the card's id, the row
+    // brought into view.
+    let (store, note) = with_note(&long_table(200), MARKDOWN)?;
+    let mut harness = cards(&store);
+    assert!(cell(&harness, "row 150").is_err());
+    let of = egui::Id::new(("card", note.as_str()));
+    oldbrainfix_gui::text_marks_view::unfold_table(&harness.ctx, of, 0, 150);
+    harness.run();
+    let row = cell(&harness, "row 150")?;
+    assert!(row.top() >= 0.0 && row.bottom() <= 1000.0, "{row:?}");
+    assert_eq!(buttons(&harness, "Show all 200"), 0);
     Ok(())
 }

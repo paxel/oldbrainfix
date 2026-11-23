@@ -5,7 +5,9 @@
 //! the Note's content (its text, Lines, Sections and photos), boxes and
 //! Lines ticking, in a column of at most [`note_window::measure`] in the
 //! middle; what was typed is kept as it opens; the keys of a page scroll
-//! it; the window is maximized as the system's are.
+//! it; the window is maximized as the system's are. A table shows all
+//! its rows and may take the window's width beyond the column
+//! (obf-1048).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -420,4 +422,100 @@ fn the_page_keys_scroll_also_while_a_widget_has_the_keyboard() -> TestResult {
         "{end:?}"
     );
     Ok(())
+}
+
+#[test]
+fn a_table_shows_all_its_rows_as_wide_as_the_window_allows() -> TestResult {
+    let store = store()?;
+    let mut long = String::from("| Day | Reading |\n| --- | --- |");
+    for n in 1..=200 {
+        long.push_str(&format!("\n| row {n} | {} |", n * 3));
+    }
+    let note = recipe(&store, &long, None)?;
+    let mut harness = normal(&store, &note);
+    harness.key_press(Key::F9);
+    harness.run();
+    assert!(reading(&harness));
+    // All its rows, none folded.
+    assert!(harness.query_all_by_value("row 200").next().is_some());
+    let more = harness.query_all_by(|n| n.label().is_some_and(|l| l.starts_with("Show all")));
+    assert_eq!(more.count(), 0);
+    // Eight wide columns go past the column, within the window.
+    let header: Vec<String> = (1..=8).map(|c| format!("Meter number {c}")).collect();
+    let wide = format!("| {} |\n|{}", header.join(" | "), " --- |".repeat(8));
+    let note = recipe(&store, &wide, None)?;
+    let width = 2400.0;
+    let mut harness = alone(&store, &note, egui::vec2(width, 900.0));
+    harness.key_press(Key::F9);
+    harness.run();
+    let table = harness
+        .query_all_by_role_and_label(Role::Button, "Open the table")
+        .next()
+        .ok_or("the table")?
+        .rect();
+    let measure = note_window::measure(18.0);
+    assert!(table.width() > measure + 100.0, "{table:?}");
+    assert!(table.left() >= 0.0 && table.right() <= width, "{table:?}");
+    let last = harness
+        .query_all_by_value("Meter number 8")
+        .next()
+        .ok_or("the last column")?
+        .rect();
+    assert!(last.right() <= table.right(), "{last:?} {table:?}");
+    assert!(drawn_whole(&harness, "Meter number 8"));
+    Ok(())
+}
+
+#[test]
+fn a_tables_header_row_stays_in_view_while_its_rows_scroll() -> TestResult {
+    let store = store()?;
+    let mut long = String::from("| Day | Reading |\n| --- | --- |");
+    for n in 1..=200 {
+        long.push_str(&format!("\n| row {n} | {} |", n * 3));
+    }
+    let note = recipe(&store, &long, None)?;
+    let mut harness = alone(&store, &note, egui::vec2(800.0, 600.0));
+    harness.key_press(Key::F9);
+    harness.run();
+    let top = |h: &Harness<'_, App>, value: &str| {
+        h.query_all_by_value(value)
+            .next()
+            .map(|n| n.rect().top())
+            .unwrap_or_default()
+    };
+    let header = top(&harness, "Day");
+    harness.key_press(Key::PageDown);
+    harness.run();
+    harness.key_press(Key::PageDown);
+    harness.run();
+    // The first rows went up out of view; the header row stays at the top.
+    let first = top(&harness, "row 1");
+    let stayed = top(&harness, "Day");
+    assert!(first < 0.0, "{first}");
+    assert!(
+        stayed >= 0.0 && stayed < header + 600.0,
+        "{stayed} {header}"
+    );
+    assert!(stayed > first, "{stayed} {first}");
+    Ok(())
+}
+
+/// Whether the words `words` are drawn, each time wholly inside what
+/// they are clipped to: what accesskit gives is where a cell lies, not
+/// what of it shows.
+fn drawn_whole(harness: &Harness<'_, App>, words: &str) -> bool {
+    fn each(shape: &egui::Shape, clip: egui::Rect, words: &str, out: &mut Vec<bool>) {
+        match shape {
+            egui::Shape::Text(text) if text.galley.text() == words => {
+                out.push(clip.expand(1.0).contains_rect(text.visual_bounding_rect()));
+            }
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| each(s, clip, words, out)),
+            _ => {}
+        }
+    }
+    let mut drawn = Vec::new();
+    for clipped in &harness.output().shapes {
+        each(&clipped.shape, clipped.clip_rect, words, &mut drawn);
+    }
+    !drawn.is_empty() && drawn.iter().all(|&whole| whole)
 }

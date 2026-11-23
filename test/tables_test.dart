@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/table_grid.dart';
@@ -14,11 +15,13 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
 
-/// Tables in formatted text (#128, ADR 0033): drawn smaller to fit in
-/// the text, opened full screen with the header row, and the first
-/// column when it holds headings, kept on screen; their cells edited in
-/// place, their rows and columns changed from their headings' menus; and
-/// a new one put in from the bar of formats.
+/// Tables in formatted text (#128, ADR 0033): drawn at the text's size
+/// in the text, long cells wrapping, moving sideways when wider than
+/// their room, a card's folded to its first rows (obf-1048); opened full
+/// screen with the header row, and the first column when it holds
+/// headings, kept on screen; their cells edited in place, their rows and
+/// columns changed from their headings' menus; and a new one put in from
+/// the bar of formats.
 void main() {
   Finder key(String value) => find.byKey(ValueKey(value));
 
@@ -78,38 +81,195 @@ void main() {
       );
     }
 
-    testWidgets('is a grid made smaller to fit, its header row bold', (
-      tester,
-    ) async {
-      await pump(tester, '${wide()}\nafter');
-      final table = find.byType(Table);
-      expect(table, findsOneWidget);
-      expect(tester.widget<Table>(table).border, isNotNull);
-      // Drawn smaller: its own width is more than the room it shows in.
-      expect(tester.getSize(key('table-0')).width, lessThanOrEqualTo(300));
-      expect(
-        tester.renderObject<RenderBox>(table).size.width,
-        greaterThan(300),
-      );
-      final scaled = tester.getRect(table);
-      expect(scaled.width, lessThanOrEqualTo(300));
+    /// The words of row [r] of the table at its first line [line], cell by
+    /// cell.
+    Finder cells(int r, {int line = 0}) => find.descendant(
+      of: key('table-$line-row-$r'),
+      matching: find.byType(RichText),
+    );
 
-      final name = tester
-          .widgetList<RichText>(
-            find.descendant(of: table, matching: find.byType(RichText)),
-          )
-          .first;
+    testWidgets('keeps the text size, its header row bold, and moves '
+        'sideways inside the room, the heading column staying', (tester) async {
+      await pump(tester, '${wide(headings: true)}\nafter');
+      final table = key('table-0');
+      expect(table, findsOneWidget);
+      expect(
+        find.descendant(of: table, matching: find.byType(FittedBox)),
+        findsNothing,
+      );
+      expect(tester.getSize(table).width, lessThanOrEqualTo(300));
+
+      final name = tester.widget<RichText>(cells(0).first);
       expect(name.text.toPlainText(), 'Name');
-      var bold = false;
-      name.text.visitChildren((span) {
-        bold = bold || span.style?.fontWeight == FontWeight.bold;
-        return true;
-      });
-      expect(bold, isTrue);
+      expect(name.text.style?.fontSize, 16);
+      expect(name.text.style?.fontWeight, FontWeight.bold);
+      // At the text's size: a line of a cell is as high as one of the text.
+      final after = tester.getSize(find.text('after')).height;
+      expect(
+        tester.getSize(cells(1).at(1)).height,
+        moreOrLessEquals(after, epsilon: 1),
+      );
       // The pipes and the delimiter row show nowhere.
       expect(find.textContaining('|'), findsNothing);
       expect(find.textContaining('---'), findsNothing);
-      expect(find.text('after'), findsOneWidget);
+
+      expect(key('table-sideways-0'), findsOneWidget);
+      final heading = tester.getTopLeft(cells(1).first);
+      final column = tester.getTopLeft(cells(1).at(1));
+      final header = tester.getTopLeft(cells(0).at(1));
+      await tester.dragFrom(
+        tester.getCenter(cells(2).at(1)),
+        const Offset(-100, 0),
+      );
+      await tester.pump();
+      expect(tester.getTopLeft(cells(1).first), heading);
+      expect(tester.getTopLeft(cells(1).at(1)).dx, lessThan(column.dx));
+      // The header row moves with its columns.
+      expect(
+        tester.getTopLeft(cells(0).at(1)).dx - header.dx,
+        tester.getTopLeft(cells(1).at(1)).dx - column.dx,
+      );
+    });
+
+    testWidgets('a long cell wraps in a column no wider than the bound', (
+      tester,
+    ) async {
+      final long = List.filled(12, 'words').join(' ');
+      await pump(tester, '| A | B |\n| --- | --- |\n| $long | x |');
+      final cell = tester.getSize(cells(1).first);
+      expect(cell.width, lessThanOrEqualTo(TableScreen.widest));
+      // Higher than the header row's one line.
+      final line = tester.getSize(cells(0).first).height;
+      expect(cell.height, greaterThan(line * 1.5));
+    });
+
+    testWidgets('a drag on a table wider than its room moves it, not the '
+        'page; on one that fits it swipes the page', (tester) async {
+      var forward = 0;
+      Future<void> swipe(String text) async {
+        await tester.pumpWidget(
+          app(
+            Scaffold(
+              body: BrowserSwipes(
+                onForward: () => forward++,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: 300,
+                    child: MarkedText(
+                      text,
+                      key: ValueKey(text),
+                      format: TextFormats.markdown,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.flingFrom(
+          tester.getCenter(cells(1).first),
+          const Offset(-250, 0),
+          1000,
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await swipe(wide());
+      expect(forward, 0);
+      expect(tester.getTopLeft(cells(1).first).dx, lessThan(0));
+      await swipe(shop.substring(shop.indexOf('|')));
+      expect(key('table-sideways-0'), findsNothing);
+      expect(forward, 1);
+    });
+
+    testWidgets('folded shows its first rows only, "Show all" unfolds the '
+        'rest in place', (tester) async {
+      final text = wide(rows: 200);
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: ListView(
+              children: [
+                MarkedText(
+                  text,
+                  format: TextFormats.markdown,
+                  rows: MarkedText.cardRows,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      // The header row and ten under it, no other row built.
+      expect(key('table-0-row-10'), findsOneWidget);
+      expect(key('table-0-row-11'), findsNothing);
+      expect(find.byType(IntrinsicHeight), findsNWidgets(11));
+      expect(find.text('Show all 200'), findsOneWidget);
+
+      await tester.tap(find.text('Show all 200'));
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('table-0-row-200'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(find.text('Show all 200', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('unfolds the table holding unfoldAt, also when it comes '
+        'later', (tester) async {
+      final text = wide(rows: 30);
+      final at = text.indexOf('row25');
+      Future<void> show(int? unfoldAt) => tester.pumpWidget(
+        app(
+          Scaffold(
+            body: ListView(
+              children: [
+                MarkedText(
+                  text,
+                  format: TextFormats.markdown,
+                  rows: MarkedText.cardRows,
+                  unfoldAt: unfoldAt,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      final row = find.byKey(
+        const ValueKey('table-0-row-25'),
+        skipOffstage: false,
+      );
+      await show(null);
+      expect(row, findsNothing);
+      await show(at);
+      expect(row, findsOneWidget);
+
+      await show(at);
+      expect(row, findsOneWidget);
+    });
+
+    testWidgets('without rows a table shows all of them', (tester) async {
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: ListView(
+              children: [
+                MarkedText(wide(rows: 30), format: TextFormats.markdown),
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(
+        find.byKey(const ValueKey('table-0-row-30'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Show all', skipOffstage: false),
+        findsNothing,
+      );
     });
 
     testWidgets('a cell\'s box is a button that ticks it beside the text', (
@@ -137,10 +297,7 @@ void main() {
       // Bold and a tag inside a cell.
       final spans = <TextSpan>[];
       for (final paragraph in tester.widgetList<RichText>(
-        find.descendant(
-          of: find.byType(Table),
-          matching: find.byType(RichText),
-        ),
+        find.descendant(of: key('table-2'), matching: find.byType(RichText)),
       )) {
         paragraph.text.visitChildren((span) {
           if (span is TextSpan) spans.add(span);
@@ -169,7 +326,7 @@ void main() {
       final text = wide(headings: true);
       final (start, end) = NoteCard.firstLine(text);
       await pump(tester, text, start: start, end: end, maxLines: 1);
-      expect(find.byType(Table), findsNothing);
+      expect(key('table-0'), findsNothing);
       final shown = tester
           .widget<RichText>(
             find.descendant(of: key('text'), matching: find.byType(RichText)),
@@ -898,7 +1055,7 @@ void main() {
       );
       expect(controller.text, '# Shop\n\n\nBread');
       expect(controller.selection.baseOffset, table.start);
-      expect(find.byType(Table), findsNothing);
+      expect(key('table-0'), findsNothing);
     });
 
     testWidgets('an empty table goes without asking', (tester) async {
@@ -945,7 +1102,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('All Notes'));
       await tester.pumpAndSettle();
-      await tester.tap(key('table-2'));
+      // On a cell of the header row: a tag in a cell searches.
+      await tester.tap(find.text('Item', findRichText: true));
       await tester.pumpAndSettle();
       expect(find.byType(TableScreen), findsOneWidget);
       await tester.tap(key('cell-2-0'));
@@ -1096,6 +1254,30 @@ void main() {
       expect(note.shownText, contains('| Second |  |'));
     });
 
+    testWidgets('a card shows the first ten rows of a long table and lays '
+        'out no more until "Show all" unfolds them', (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      notes.capture(wide(rows: 200), format: TextFormats.markdown);
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('All Notes'));
+      await tester.pumpAndSettle();
+      expect(key('table-0-row-10'), findsOneWidget);
+      expect(key('table-0-row-11'), findsNothing);
+      await tester.tap(find.text('Show all 200'));
+      await tester.pumpAndSettle();
+      // In place: the full screen stays closed.
+      expect(find.byType(TableScreen), findsNothing);
+      expect(
+        find.byKey(const ValueKey('table-0-row-200'), skipOffstage: false),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('a box ticked on the card keeps its tick when a cell is '
         'written; one typed into a cell becomes a box', (tester) async {
       tester.view.physicalSize = const Size(800, 2400);
@@ -1114,7 +1296,7 @@ void main() {
       await tester.tap(key('box-done'));
       await tester.pumpAndSettle();
 
-      await tester.tap(key('table-2'));
+      await tester.tap(find.text('Item', findRichText: true));
       await tester.pumpAndSettle();
       expect(find.text('✅'), findsOneWidget);
       await tester.tap(key('cell-2-0'));

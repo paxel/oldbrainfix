@@ -5079,6 +5079,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tableSideways => 'Move the table sideways';
 
   @override
+  String tableShowAll(int count) {
+    return 'Show all $count';
+  }
+
+  @override
   String tableRow(int number) {
     return 'Row $number';
   }

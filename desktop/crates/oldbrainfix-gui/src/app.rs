@@ -189,7 +189,7 @@ use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
 };
-use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
+use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots, TableRoom};
 use crate::text_menu::{self, Clip, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::tick_saves;
@@ -12192,6 +12192,9 @@ impl App {
         let output = scroll.show(ui, |ui| {
             let room = ui.available_width();
             let width = room.min(column);
+            // A table may take the window's width beyond the column, all
+            // its rows shown (obf-1048).
+            let wide = ui.max_rect().x_range().shrink(READ_EDGE);
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
                 ui.add_space(((room - width) / 2.0).max(0.0));
@@ -12224,16 +12227,17 @@ impl App {
                             }
                             None => {
                                 let shown = ((0, named), heading);
+                                let shown = (shown, wide);
                                 read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
                             }
                         }
                         let rest = (named, note.text.len());
                         if !note_kinds::description(&note.text).trim().is_empty() {
-                            let shown = (rest, READ_SIZE);
+                            let shown = ((rest, READ_SIZE), wide);
                             read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
                         }
                     } else if !note.text.trim().is_empty() {
-                        let shown = (all, READ_SIZE);
+                        let shown = ((all, READ_SIZE), wide);
                         read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
                     }
                     if let Some(shown) = checklist {
@@ -12283,7 +12287,7 @@ impl App {
                             None,
                         );
                         if !section.text.trim().is_empty() {
-                            let shown = ((0, section.text.len()), READ_SIZE);
+                            let shown = (((0, section.text.len()), READ_SIZE), wide);
                             read_part(ui, &t, part, shown, (looks(&section.id), ticks), actions);
                         }
                         let (of, photos) = (&section.id, &section.photos);
@@ -23296,16 +23300,20 @@ type ReadPart<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 /// them, with which have been ticked.
 type PartBoxes<'a> = (&'a BoxLook, (bool, &'a dyn Fn(&str) -> bool));
 
+/// How far from the window's edges a table in the reading view stays.
+const READ_EDGE: f32 = 12.0;
+
 /// Draws the bytes `range` of a Note's or Section's text in the reading
 /// view (#322) at `size` points, as a text only read reads in the Note
 /// dialog: selectable to be copied, its boxes ticking where this Device
 /// may, its tags opening their search, its links their pages and its
-/// tables full screen to read; a Code text as code.
+/// tables full screen to read, each with all its rows and as wide as
+/// `wide`, the window's width, allows (obf-1048); a Code text as code.
 fn read_part(
     ui: &mut Ui,
     t: &L10n,
     (of, text, format, language): ReadPart<'_>,
-    (range, size): ((usize, usize), f32),
+    ((range, size), wide): (((usize, usize), f32), egui::Rangef),
     (boxes, ticks): PartBoxes<'_>,
     actions: &mut Vec<Action>,
 ) {
@@ -23318,8 +23326,13 @@ fn read_part(
             });
             return;
         }
+        let tables = TableRoom {
+            card: None,
+            wide: Some(wide),
+        };
         let spots = read_text::shown(ui, |ui| {
-            text_marks_view::formatted_label(ui, (text, format, boxes), range, look, false)
+            let text = (text, format, boxes);
+            text_marks_view::room_label(ui, text, None, range, look, false, tables)
         });
         let id = Id::new(("reading", of));
         if let Some(at) = text_marks_view::table_clicks(ui, t, id, &spots.tables) {
@@ -23434,7 +23447,12 @@ fn whole(
     (cache, store, transcribing): ShownMedia,
     (look, marks): (&BoxLook, &mut Spots),
 ) -> Vec<(String, egui::Rect)> {
-    card_text(ui, (part.text, part.format, look), part.language, marks);
+    card_text(
+        ui,
+        (part.id, part.text, part.format, look),
+        part.language,
+        marks,
+    );
     media_view::whole_media(
         ui,
         t,
@@ -23445,38 +23463,50 @@ fn whole(
     )
 }
 
-/// The whole text `text` of a Note or Section in `format` on a full
-/// card, its boxes as `look` says, where its boxes (ADR 0035), tags
+/// The whole text `text` of the Note or Section `id` in `format` on a
+/// full card, its boxes as `look` says, where its boxes (ADR 0035), tags
 /// (#126) and links (#127) lie added to `marks`; a Code text coloured by
-/// `language` (obf-1036).
+/// `language` (obf-1036); its tables folded to their first rows
+/// (obf-1048).
 fn card_text(
     ui: &mut Ui,
-    (text, format, look): (&str, &str, &BoxLook),
+    (id, text, format, look): (&str, &str, &str, &BoxLook),
     language: Option<&str>,
     marks: &mut Spots,
 ) {
     if !text.is_empty() {
         let colour = ui.visuals().text_color();
         let shown = (0, text.len());
-        marks.extend(text_marks_view::note_label(
+        marks.extend(text_marks_view::room_label(
             ui,
             (text, format, look),
             language,
             shown,
             (Some(16.0), colour),
             false,
+            card_tables(id),
         ));
     }
 }
 
-/// The text `text` of a Note of a kind in `format` on its full card
-/// (#188): its name as the card's title, its description under it,
-/// small, folded to its first line with words unless `unfolded`; where
-/// its boxes, tags and links lie added to `marks`, and where the
-/// description shows.
+/// How the tables of the Note or Section `id` show on its card
+/// (obf-1048): folded to their first rows, under the id its card takes
+/// their clicks with.
+fn card_tables(id: &str) -> TableRoom {
+    TableRoom {
+        card: Some(Id::new(("card", id))),
+        wide: None,
+    }
+}
+
+/// The text `text` of the Note `id` of a kind in `format` on its full
+/// card (#188): its name as the card's title, its description under it,
+/// small, folded to its first line with words unless `unfolded`, its
+/// tables to their first rows (obf-1048); where its boxes, tags and
+/// links lie added to `marks`, and where the description shows.
 fn card_kinded_text(
     ui: &mut Ui,
-    (text, format, look): (&str, &str, &BoxLook),
+    (id, text, format, look): (&str, &str, &str, &BoxLook),
     (unfolded, untitled): (bool, Option<String>),
     marks: &mut Spots,
 ) -> Option<egui::Rect> {
@@ -23506,7 +23536,9 @@ fn card_kinded_text(
     };
     let small = (Some(13.0), weak);
     let drawn = folded_row(ui, unfolded, |ui| {
-        text_marks_view::formatted_label(ui, (text, format, look), range, small, !unfolded)
+        let text = (text, format, look);
+        let tables = card_tables(id);
+        text_marks_view::room_label(ui, text, None, range, small, !unfolded, tables)
     });
     marks.extend(drawn.inner);
     Some(drawn.response.rect)
@@ -23681,7 +23713,8 @@ fn note_card(
                             if lines.is_some() || look.tally || look.session {
                                 // Its name as its title, its description folded
                                 // under it (#188), its Lines right under them.
-                                let text = (part.text, part.format, look.boxes.look(part.id));
+                                let text =
+                                    (part.id, part.text, part.format, look.boxes.look(part.id));
                                 let untitled = l10n::untitled_list(t, note);
                                 description_rect =
                                     card_kinded_text(ui, text, (unfolded, untitled), &mut marks);

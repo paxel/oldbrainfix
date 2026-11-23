@@ -1200,12 +1200,21 @@ int storedOffset(List<ShownBox> boxes, int shown) {
 /// link, and a web address in code, a code block or a link, which is
 /// none ([Markdown.autolinks]).
 ///
-/// A table is drawn as a grid, made smaller to fit the width, its header
-/// row in bold, its boxes as in a line. A tap on it opens it full screen
-/// ([openTable]) in the text as stored ([source]), where [tableEdit]
-/// changes it; it is only read there without one. A compact line
-/// ([maxLines]) of a table shows the words of its row.
+/// A table is drawn as a grid at the text's size, its header row in bold,
+/// its boxes as in a line, each column as wide as its words up to a
+/// bound, a longer cell wrapping (obf-1048). A table wider than its room
+/// moves sideways with a drag on it or by its bar, its first column
+/// staying while it holds headings. With [rows] a table shows its header
+/// and that many rows under it, and "Show all" unfolds the rest in
+/// place; a table holding [unfoldAt] shows all of them. A tap on it opens
+/// it full screen ([openTable]) in the text as stored ([source]), where
+/// [tableEdit] changes it; it is only read there without one. A compact
+/// line ([maxLines]) of a table shows the words of its row.
 class MarkedText extends StatefulWidget {
+  /// How many rows under its header a table on a card shows before
+  /// "Show all" (obf-1048).
+  static const cardRows = 10;
+
   final String text;
   final String format;
   final int? start;
@@ -1218,6 +1227,14 @@ class MarkedText extends StatefulWidget {
   final BoxTicking? ticking;
   final TableEditing? tableEdit;
   final String? language;
+
+  /// How many rows under its header each table shows folded; all when
+  /// null.
+  final int? rows;
+
+  /// An offset in [text], such as a search hit's (obf-1047): the table
+  /// holding it shows all its rows.
+  final int? unfoldAt;
 
   const MarkedText(
     this.text, {
@@ -1233,6 +1250,8 @@ class MarkedText extends StatefulWidget {
     this.ticking,
     this.tableEdit,
     this.language,
+    this.rows,
+    this.unfoldAt,
   }) : assert(
          boxes == null || source != null || tableEdit == null,
          'a table is changed in the text as stored, its ids in it',
@@ -1671,8 +1690,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     );
   }
 
-  /// [table] as a grid, made smaller when it is wider than the room it
-  /// has; a tap opens it full screen.
+  /// [table] as a grid at the text's size; a tap opens it full screen.
   Widget _table(
     BuildContext context,
     MarkdownTable table,
@@ -1680,75 +1698,33 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     List<DrawnBox> boxes,
     List<FoundTag> tags,
   ) {
-    final scheme = Theme.of(context).colorScheme;
-    final bold = base.copyWith(fontWeight: FontWeight.bold);
-    final grid = Table(
-      defaultColumnWidth: const IntrinsicColumnWidth(),
-      border: TableBorder.all(color: scheme.outline),
-      children: [
-        for (final (r, row) in table.rows.indexed)
-          TableRow(
-            decoration: r == 0
-                ? BoxDecoration(color: scheme.surfaceContainerHighest)
-                : null,
-            children: [
-              for (final (c, cell) in row.cells.indexed)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        for (final span in cell.spans)
-                          ..._inlineOf(
-                            context,
-                            span,
-                            r == 0 || (c == 0 && table.headingColumn)
-                                ? bold
-                                : base,
-                            boxes,
-                            tags,
-                          ),
-                      ],
-                    ),
-                    textAlign: cellAlign(table.aligns[c]),
-                    softWrap: false,
-                  ),
-                ),
-            ],
-          ),
-      ],
-    );
     final found = _foundIn;
     final edit = widget.tableEdit;
     final ticking = widget.ticking;
-    return Semantics(
-      container: true,
-      onTapHint: context.t.tableOpen,
-      child: GestureDetector(
-        key: ValueKey('table-${table.firstLine}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: () => unawaited(
-          openTable(
-            context,
-            text: found.stored(widget.source),
-            at: found.storedAt(table.start),
-            edit: edit,
-            ticking: ticking,
-          ),
+    final at = widget.unfoldAt;
+    return _ReadTable(
+      key: ValueKey('table-${table.firstLine}'),
+      table: table,
+      base: base,
+      rows: widget.rows,
+      unfold: at != null && at >= table.start && at <= table.end,
+      cell: (context, r, c, style) => Text.rich(
+        TextSpan(
+          children: [
+            for (final span in table.rows[r].cells[c].spans)
+              ..._inlineOf(context, span, style, boxes, tags),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: AlignmentDirectional.centerStart,
-              child: grid,
-            ),
-          ),
+        style: style,
+        textAlign: cellAlign(table.aligns[c]),
+      ),
+      onOpen: () => unawaited(
+        openTable(
+          context,
+          text: found.stored(widget.source),
+          at: found.storedAt(table.start),
+          edit: edit,
+          ticking: ticking,
         ),
       ),
     );
@@ -1794,6 +1770,255 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       ],
     ),
   );
+}
+
+/// A table of a formatted text being read (obf-1048): each column as
+/// wide as its widest shown cell's words, no wider than
+/// [TableScreen.widest] or the room, a longer cell wrapping; wider than
+/// its room it moves sideways with a drag on its cells or by its bar,
+/// the first column staying while it holds headings. With [rows] it shows
+/// its header and that many rows under it, and "Show all" under it
+/// unfolds the rest in place; [unfold] shows all of them. Only the rows
+/// shown are measured and built. A tap opens it ([onOpen]).
+class _ReadTable extends StatefulWidget {
+  final MarkdownTable table;
+  final TextStyle base;
+  final int? rows;
+  final bool unfold;
+
+  /// The words of the cell in row [r] and column [c] in [style].
+  final Widget Function(BuildContext context, int r, int c, TextStyle style)
+  cell;
+  final VoidCallback onOpen;
+
+  const _ReadTable({
+    super.key,
+    required this.table,
+    required this.base,
+    required this.rows,
+    required this.unfold,
+    required this.cell,
+    required this.onOpen,
+  });
+
+  @override
+  State<_ReadTable> createState() => _ReadTableState();
+}
+
+class _ReadTableState extends State<_ReadTable> {
+  /// The room around a cell's words, sideways and up and down.
+  static const _across = 8.0;
+  static const _down = 4.0;
+
+  final _offset = ValueNotifier<double>(0);
+  late bool _unfolded = widget.unfold;
+  List<double> _widths = const [];
+
+  /// How many rows show, the header row included.
+  int get _shown {
+    final rows = widget.table.rows.length;
+    final folded = widget.rows;
+    if (_unfolded || folded == null) return rows;
+    return math.min(rows, folded + 1);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _measure();
+  }
+
+  @override
+  void didUpdateWidget(_ReadTable old) {
+    super.didUpdateWidget(old);
+    if (widget.unfold && !old.unfold) _unfolded = true;
+    if (!identical(old.table, widget.table) ||
+        old.base != widget.base ||
+        old.rows != widget.rows ||
+        widget.unfold != old.unfold) {
+      _measure();
+    }
+  }
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
+  /// Each column as wide as its widest shown cell's words in bold, within
+  /// bounds.
+  void _measure() {
+    final table = widget.table;
+    final bold = widget.base.copyWith(fontWeight: FontWeight.bold);
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    double width(String words) {
+      final painter = TextPainter(
+        text: TextSpan(text: words, style: bold),
+        textDirection: direction,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    final shown = _shown;
+    _widths = [
+      for (var c = 0; c < table.columns; c++)
+        [for (var r = 0; r < shown; r++) width(table.rows[r].cells[c].visible)]
+                .fold(0.0, math.max)
+                .clamp(
+                  TableScreen.narrowest - 2 * _across,
+                  TableScreen.widest - 2 * _across,
+                ) +
+            2 * _across,
+    ];
+  }
+
+  void _unfoldAll() => setState(() {
+    _unfolded = true;
+    _measure();
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final table = widget.table;
+    final hidden = table.rows.length - _shown;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: LayoutBuilder(builder: _grid),
+        ),
+        if (hidden > 0)
+          TextButton(
+            key: ValueKey('table-show-all-${table.firstLine}'),
+            onPressed: _unfoldAll,
+            child: Text(t.tableShowAll(table.rows.length - 1)),
+          ),
+      ],
+    );
+  }
+
+  Widget _grid(BuildContext context, BoxConstraints constraints) {
+    final t = context.t;
+    final table = widget.table;
+    final room = constraints.maxWidth;
+    final first = table.headingColumn ? 1 : 0;
+    // A column is never wider than the room, the one that stays no wider
+    // than half of it: the others need room to move past it.
+    final widths = [
+      for (final (c, w) in _widths.indexed)
+        math.min(w, c < first ? room / 2 : room),
+    ];
+    final fixed = first == 1 ? widths[0] : 0.0;
+    var moving = 0.0;
+    for (var c = first; c < table.columns; c++) {
+      moving += widths[c];
+    }
+    final rest = math.max(0.0, room - fixed);
+    final most = math.max(0.0, moving - rest);
+    final rows = [
+      for (var r = 0; r < _shown; r++) _row(context, r, widths, first, most),
+    ];
+    return Semantics(
+      container: true,
+      onTapHint: t.tableOpen,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onOpen,
+        // A drag on the cells moves a table wider than its room under the
+        // finger; one that fits leaves the swipe to the page.
+        onHorizontalDragUpdate: most > 0
+            ? (d) => _offset.value = (_offset.value - d.delta.dx).clamp(0, most)
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (most > 0)
+              TableSidewaysBar(
+                key: ValueKey('table-sideways-${table.firstLine}'),
+                offset: _offset,
+                most: most,
+                room: rest,
+                whole: moving,
+                label: t.tableSideways,
+              ),
+            ...rows,
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The row [r]: its first column stays when it holds headings ([first]
+  /// is 1), the others move by the offset up to [most].
+  Widget _row(
+    BuildContext context,
+    int r,
+    List<double> widths,
+    int first,
+    double most,
+  ) {
+    final table = widget.table;
+    final cells = [
+      for (var c = first; c < table.columns; c++)
+        SizedBox(width: widths[c], child: _cellAt(context, r, c)),
+    ];
+    return IntrinsicHeight(
+      key: ValueKey('table-${table.firstLine}-row-$r'),
+      child: Row(
+        mainAxisSize: most > 0 ? MainAxisSize.max : MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (first == 1)
+            SizedBox(width: widths[0], child: _cellAt(context, r, 0)),
+          if (most > 0)
+            Expanded(
+              child: TableShifted(
+                offset: _offset,
+                most: most,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: cells,
+                ),
+              ),
+            )
+          else
+            ...cells,
+        ],
+      ),
+    );
+  }
+
+  Widget _cellAt(BuildContext context, int r, int c) {
+    final scheme = Theme.of(context).colorScheme;
+    final table = widget.table;
+    final heading = r == 0 || (c == 0 && table.headingColumn);
+    final base = widget.base;
+    final style = heading ? base.copyWith(fontWeight: FontWeight.bold) : base;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: heading ? scheme.surfaceContainerHighest : null,
+        border: Border.all(color: scheme.outline, width: 0.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: _across,
+          vertical: _down,
+        ),
+        child: widget.cell(context, r, c, style),
+      ),
+    );
+  }
 }
 
 /// How a cell of a column that lines up as [align] sets its words.

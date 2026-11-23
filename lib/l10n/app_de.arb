@@ -1352,6 +1352,7 @@
   "tableCopy": "Kopieren",
   "tableOpen": "Tabelle öffnen",
   "tableSideways": "Tabelle seitlich verschieben",
+  "tableShowAll": "Alle {count} zeigen",
   "tableRow": "Zeile {number}",
   "tableColumn": "Spalte {letter}",
   "tableAddRow": "Zeile hinzufügen",

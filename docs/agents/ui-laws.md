@@ -722,8 +722,11 @@ replace a law of Both apps where they say so. A desktop law marked
   stays the source. **Show as lines** on the grid shows that table's
   lines as text until the cursor leaves them, the field loses focus or
   Show as table is pressed. Column widths are the view's only, never
-  stored. Cards and texts that are only read show the grid and open the
-  table full screen. **Copy in the bar of the table full screen**
+  stored. Cards and texts that are only read show the grid at the text
+  size, long cells wrapping and a table wider than its room moving
+  sideways inside it, the header row and a heading first column in view;
+  a card shows the first 10 rows and "Show all N" (obf-1048). A click
+  opens the table full screen. **Copy in the bar of the table full screen**
   (#324) puts the table on the clipboard as an HTML table and, as the
   plain text, as Markdown, each box in the state it shows, the cell
   being edited written first; on the phone the HTML goes through the
@@ -1175,7 +1178,9 @@ replace a law of Both apps where they say so. A desktop law marked
   changes data or swipes a row or card away. The exceptions are the
   full-screen table, where a one-finger drag on its cells moves it
   sideways, as its bar does, a table wider than the editor's field
-  (#257), which a drag on it moves sideways, and a Code text in the Note editor (#213),
+  (#257), which a drag on it moves sideways, a table wider than its room
+  on a card or in a text being read (obf-1048), which a drag on its
+  cells moves sideways, as its bar does, and a Code text in the Note editor (#213),
   which a one-finger drag moves sideways; on a card a Code text is cut
   off at the edge instead.
 - **On the iPhone a pushed page goes back with the edge swipe** (#243,

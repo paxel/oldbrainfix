@@ -8150,11 +8150,17 @@ abstract class AppLocalizations {
   /// **'Open the table'**
   String get tableOpen;
 
-  /// Screen reader label of the bar above a table shown full screen that moves the table left and right.
+  /// Screen reader label of the bar above a table, full screen or read in a text, that moves the table left and right.
   ///
   /// In en, this message translates to:
   /// **'Move the table sideways'**
   String get tableSideways;
+
+  /// Button under a table on a card that shows only its first 10 rows (obf-1048): unfolds all of its rows in place. count is how many rows it has under its header.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count}'**
+  String tableShowAll(int count);
 
   /// Screen reader label of a row's number beside a table: a tap or long press opens the row's menu.
   ///
