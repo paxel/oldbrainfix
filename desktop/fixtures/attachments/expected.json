@@ -481,6 +481,7 @@
     "dentist": [],
     "x-ray": [],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [
@@ -500,6 +501,57 @@
       "note:00000000000000000000000000000004",
       "note:00000000000000000000000000000002"
     ]
+  },
+  "findings": {
+    "MULLER": {},
+    "dentist": {},
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {
+      "note:00000000000000000000000000000002": [
+        {
+          "cell": null,
+          "context": "Lease",
+          "contextEnd": 5,
+          "contextStart": 0,
+          "end": 5,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        },
+        {
+          "cell": null,
+          "context": "Lease.pdf",
+          "contextEnd": 5,
+          "contextStart": 0,
+          "end": 5,
+          "key": "eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e",
+          "line": 0,
+          "part": "fileName",
+          "section": null,
+          "start": 0
+        }
+      ]
+    },
+    "rent due": {
+      "note:00000000000000000000000000000002": [
+        {
+          "cell": null,
+          "context": "Rent due",
+          "contextEnd": 8,
+          "contextStart": 0,
+          "end": 8,
+          "key": "eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e",
+          "line": 0,
+          "part": "attachmentText",
+          "section": null,
+          "start": 0
+        }
+      ]
+    }
   },
   "conflicts": []
 }

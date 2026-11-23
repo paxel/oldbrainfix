@@ -89,7 +89,7 @@ const SCENARIOS: [&str; 35] = [
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
-const QUERIES: [&str; 15] = [
+const QUERIES: [&str; 16] = [
     "",
     "sauce",
     "MILK",
@@ -97,6 +97,8 @@ const QUERIES: [&str; 15] = [
     "dentist",
     "x-ray",
     "müller",
+    // Folded (obf-1047): without the umlaut, in upper case.
+    "MULLER",
     "called",
     "loop",
     " e ",
@@ -472,6 +474,15 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
     for query in QUERIES {
         searched.insert(query.to_string(), found(query, None)?);
     }
+    let mut findings = serde_json::Map::new();
+    for query in FINDING_QUERIES {
+        let mut of = serde_json::Map::new();
+        for note in Search::new(store).notes(query, None)? {
+            let sections = notes.sections(&note.id)?;
+            of.insert(note.id.clone(), findings_json(&note, &sections, query));
+        }
+        findings.insert(query.to_string(), Value::Object(of));
+    }
     Ok(json!({
         "now": dart_iso(store.now()),
         "device": store.device_id()?,
@@ -488,8 +499,69 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         "shares": shares,
         "search": searched,
         "searchWithin": within,
+        "findings": findings,
         "conflicts": conflicts_json(&store.conflicts()?),
     }))
+}
+
+/// The queries whose places in each Note found are read (obf-1047), the
+/// generator's.
+const FINDING_QUERIES: [&str; 7] = [
+    "MULLER", "dentist", "receipt", "called", "loop", "lease", "rent due",
+];
+
+/// The places of `query` in `note` and its `sections` in the shape of
+/// the generator's `_findingsOf`, offsets in code points.
+fn findings_json(note: &Note, sections: &[oldbrainfix_core::notes::Section], query: &str) -> Value {
+    use oldbrainfix_core::findings::{FindingPart, of_note};
+    let points = |of: &str, at: usize| of.get(..at).map(|t| t.chars().count());
+    let found: Vec<Value> = of_note(note, query, sections)
+        .iter()
+        .map(|f| {
+            let section = sections.iter().find(|s| Some(&s.id) == f.section.as_ref());
+            let pick =
+                |own: &std::collections::BTreeMap<String, String>,
+                 of_section: Option<&std::collections::BTreeMap<String, String>>| {
+                    of_section
+                        .unwrap_or(own)
+                        .get(&f.key)
+                        .cloned()
+                        .unwrap_or_default()
+                };
+            let text = match f.part {
+                FindingPart::Text => section.map_or_else(|| note.shown_text(), |s| s.shown_text()),
+                FindingPart::Transcript => pick(&note.transcripts, section.map(|s| &s.transcripts)),
+                FindingPart::PhotoText => pick(&note.photo_texts, section.map(|s| &s.photo_texts)),
+                FindingPart::AttachmentText => {
+                    pick(&note.attachment_texts, section.map(|s| &s.attachment_texts))
+                }
+                FindingPart::FileName => section
+                    .map_or(&note.attachments, |s| &s.attachments)
+                    .iter()
+                    .find(|a| a.hash == f.key)
+                    .map(|a| a.name.clone())
+                    .unwrap_or_default(),
+            };
+            json!({
+                "cell": f.cell.map(|cell| json!({
+                    "column": cell.column,
+                    "row": cell.row,
+                    "table": cell.table,
+                    "tableStart": points(&text, cell.table_start),
+                })),
+                "context": f.context,
+                "contextEnd": points(&f.context, f.context_end),
+                "contextStart": points(&f.context, f.context_start),
+                "end": points(&text, f.end),
+                "key": f.key,
+                "line": f.line,
+                "part": f.part.name(),
+                "section": f.section,
+                "start": points(&text, f.start),
+            })
+        })
+        .collect();
+    Value::Array(found)
 }
 
 /// Conflicts in the shape of the generator's `_conflicts`.
@@ -9148,6 +9220,70 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             looks.as_bool(),
             "{text:?}"
         );
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------ Findings
+
+#[test]
+fn texts_fold_and_places_are_found_as_the_dart_core_finds_them() -> TestResult {
+    use oldbrainfix_core::findings::{fold, in_text};
+    let fixture = read_json(&fixtures().join("findings.json"))?;
+    // Every character: those listed fold as listed, the others to
+    // themselves.
+    let folding = fixture["folding"].as_object().ok_or("folding")?;
+    assert!(folding.len() > 1000);
+    for c in (0..=0x10FFFF).filter_map(char::from_u32) {
+        let own = c.to_string();
+        let expected = match folding.get(&format!("{:04X}", u32::from(c))) {
+            Some(listed) => listed.as_str().ok_or("folded")?,
+            None => &own,
+        };
+        assert_eq!(fold(&own), expected, "U+{:04X}", u32::from(c));
+    }
+    for word in fixture["words"].as_array().ok_or("words")? {
+        let text = word["text"].as_str().ok_or("text")?;
+        assert_eq!(
+            Some(fold(text).as_str()),
+            word["folded"].as_str(),
+            "{text:?}"
+        );
+    }
+    let cases = fixture["cases"].as_array().ok_or("cases")?;
+    assert!(cases.len() >= 20);
+    for case in cases {
+        let text = case["text"].as_str().ok_or("text")?;
+        let format = case["format"].as_str().ok_or("format")?;
+        let query = case["query"].as_str().ok_or("query")?;
+        // Offsets as the generator counts them: in code points.
+        let points = |of: &str, at: usize| of.get(..at).map(|t| t.chars().count());
+        let findings: Vec<Value> = in_text(text, format, query)
+            .iter()
+            .map(|f| {
+                json!({
+                    "cell": f.cell.map(|cell| json!({
+                        "column": cell.column,
+                        "row": cell.row,
+                        "table": cell.table,
+                        "tableStart": points(text, cell.table_start),
+                    })),
+                    "context": f.context,
+                    "contextEnd": points(&f.context, f.context_end),
+                    "contextStart": points(&f.context, f.context_start),
+                    "end": points(text, f.end),
+                    "line": f.line,
+                    "start": points(text, f.start),
+                })
+            })
+            .collect();
+        let ours = json!({
+            "findings": findings,
+            "format": format,
+            "query": query,
+            "text": text,
+        });
+        assert_eq!(&ours, case, "{text:?} {query:?}");
     }
     Ok(())
 }

@@ -5,7 +5,9 @@
 //! merged Notes), the text lines of the entries of a Tally and the Lines
 //! of a Checklist or a Shopping List, but those gone. A formatted text
 //! counts as it reads without its marks (ADR 0033), a text in a format
-//! not known here as its source text.
+//! not known here as its source text. A text and a query are matched
+//! folded ([`crate::findings::fold`], obf-1047): in lower case, without
+//! accents and umlauts, "ß" as "ss".
 //!
 //! The full-text index (ADR 0048, [`crate::search_index`]) names the
 //! entities that may hold a query, and only those are read; without it,
@@ -16,6 +18,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::Result;
 use crate::checklists::{Checklists, keys as checklist_keys};
+use crate::findings::fold;
 use crate::notes::{Note, Notes, keys};
 use crate::places::Places;
 use crate::search_index;
@@ -59,13 +62,19 @@ impl<'a> Search<'a> {
     /// Attachment Texts, or those of one
     /// of their Sections, or the text line of an entry of their Tally, or
     /// a Line of their Checklist or Shopping List, hold `query`, ignoring
-    /// case, newest capture first. The query counts as typed, inner spaces included; only its
-    /// ends are trimmed, and a blank one finds everything. With `within`,
+    /// case, accents and umlauts, newest capture first. The query counts
+    /// as typed, inner spaces included; only its ends are trimmed, and a
+    /// blank one finds everything, one that folds to nothing, such as an
+    /// accent alone, nothing. With `within`,
     /// only the Notes inside that Area or Topic count (an Area's Topics
     /// included).
     pub fn notes(&self, query: &str, within: Option<&str>) -> Result<Vec<Note>> {
         let notes = Notes::new(self.store);
-        let wanted = lower_case(query.trim());
+        let typed = query.trim();
+        let wanted = fold(typed);
+        if !typed.is_empty() && wanted.is_empty() {
+            return Ok(Vec::new());
+        }
         let mut read = Read::new();
         let found = if wanted.is_empty() {
             None
@@ -143,9 +152,13 @@ impl<'a> Search<'a> {
     /// them, in the order given: for a list the search does not read
     /// itself, such as the trash (#274). A blank query keeps them all.
     pub fn among(&self, query: &str, scope: Vec<Note>) -> Result<Vec<Note>> {
-        let wanted = lower_case(query.trim());
-        if wanted.is_empty() {
+        let typed = query.trim();
+        if typed.is_empty() {
             return Ok(scope);
+        }
+        let wanted = fold(typed);
+        if wanted.is_empty() {
+            return Ok(Vec::new());
         }
         match self.indexed(&wanted, &mut Read::new())? {
             Some(found) => Ok(scope
@@ -156,7 +169,7 @@ impl<'a> Search<'a> {
         }
     }
 
-    /// The ids of the Notes `wanted`, in lower case and not blank, is
+    /// The ids of the Notes `wanted`, folded and not empty, is
     /// found in, as [`Search::scanned`] finds them in a scope holding
     /// every Note: those of the candidates the index names, read as they
     /// are now. Each Note read is kept in `read`. `None` when the index
@@ -169,7 +182,7 @@ impl<'a> Search<'a> {
             return Ok(None);
         };
         let notes = Notes::new(self.store);
-        let holds = |text: &str| lower_case(text).contains(wanted);
+        let holds = |text: &str| fold(text).contains(wanted);
         // Read in one query per few hundred rather than one each (#204),
         // the Notes' from a list of them read already (obf-1069).
         let fields_of =
@@ -280,12 +293,12 @@ impl<'a> Search<'a> {
             .collect())
     }
 
-    /// Those of `scope` `wanted`, in lower case and not blank, is found
+    /// Those of `scope` `wanted`, folded and not empty, is found
     /// in, each Note read in full: the search without the index.
     fn scanned(&self, wanted: &str, scope: Vec<Note>) -> Result<Vec<Note>> {
         let notes = Notes::new(self.store);
         let sections = self.section_texts(&notes)?;
-        let holds = |text: &str| lower_case(text).contains(wanted);
+        let holds = |text: &str| fold(text).contains(wanted);
         Ok(scope
             .into_iter()
             .filter(|note| {

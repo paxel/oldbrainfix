@@ -20,6 +20,7 @@
     "dentist": [],
     "x-ray": [],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [],
@@ -30,5 +31,14 @@
     "4711": []
   },
   "searchWithin": {},
+  "findings": {
+    "MULLER": {},
+    "dentist": {},
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
+  },
   "conflicts": []
 }

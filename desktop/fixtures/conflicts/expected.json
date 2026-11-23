@@ -330,6 +330,7 @@
       "dentist": [],
       "x-ray": [],
       "müller": [],
+      "MULLER": [],
       "called": [],
       "loop": [],
       " e ": [
@@ -344,6 +345,15 @@
     "searchWithin": {
       "area:00000000000000000000000000000003": [],
       "topic:00000000000000000000000000000004": []
+    },
+    "findings": {
+      "MULLER": {},
+      "dentist": {},
+      "receipt": {},
+      "called": {},
+      "loop": {},
+      "lease": {},
+      "rent due": {}
     },
     "conflicts": []
   },

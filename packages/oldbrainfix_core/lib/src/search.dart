@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
 
 import 'checklists.dart';
+import 'findings.dart';
 import 'notes.dart';
 import 'places.dart';
 import 'search_index.dart';
@@ -17,6 +18,8 @@ import 'text_format.dart';
 /// but those gone. Capture Context joins later.
 /// A formatted text counts as it reads without its marks (ADR 0033), a
 /// text in a format not known here as its source text.
+/// A text and a query are matched folded ([Findings.fold], obf-1047):
+/// in lower case, without accents and umlauts, "ß" as "ss".
 ///
 /// The full-text index (ADR 0048) names the entities that may hold a
 /// query, and only those are read; without it, or for a query holding a
@@ -39,13 +42,16 @@ class Search {
   /// Attachment Texts, or those of one of
   /// their Sections, or the text line of an entry of their Tally, or a
   /// Line of their Checklist or Shopping List, hold
-  /// [query], ignoring case, newest capture first.
+  /// [query], ignoring case, accents and umlauts, newest capture first.
   /// The query counts as typed, inner spaces included; only its ends are
-  /// trimmed, and a blank one finds everything. With [within], only the
+  /// trimmed, and a blank one finds everything, one that folds to
+  /// nothing, such as an accent alone, nothing. With [within], only the
   /// Notes inside that Area or Topic count (an Area's Topics included).
   List<Note> notes(String query, {String? within}) {
     final notes = Notes(store);
-    final wanted = query.trim().toLowerCase();
+    final typed = query.trim();
+    final wanted = Findings.fold(typed);
+    if (typed.isNotEmpty && wanted.isEmpty) return [];
     final read = <String, Note?>{};
     final found = wanted.isEmpty ? null : _indexed(wanted, read);
     if (found == null) {
@@ -87,8 +93,10 @@ class Search {
   /// order given: for a list the search does not read itself, such as the
   /// trash (#274). A blank query keeps them all.
   List<Note> among(String query, List<Note> scope) {
-    final wanted = query.trim().toLowerCase();
-    if (wanted.isEmpty) return scope;
+    final typed = query.trim();
+    if (typed.isEmpty) return scope;
+    final wanted = Findings.fold(typed);
+    if (wanted.isEmpty) return [];
     final found = _indexed(wanted, {});
     if (found == null) return _scanned(wanted, scope);
     return [
@@ -101,7 +109,7 @@ class Search {
   /// than the one it was written with (ADR 0035).
   static const _boxGlyphs = ['\u2610', '\u2705', '\u274C'];
 
-  /// The ids of the Notes [wanted], in lower case and not blank, is found
+  /// The ids of the Notes [wanted], folded and not empty, is found
   /// in, as [_scanned] finds them in a scope holding every Note: those of
   /// the candidates the index names, read as they are now. Each Note read
   /// is kept in [read]. Null when the index cannot answer.
@@ -110,7 +118,7 @@ class Search {
     final candidates = SearchIndex.candidates(store, wanted);
     if (candidates == null) return null;
     final notes = Notes(store);
-    bool holds(String text) => text.toLowerCase().contains(wanted);
+    bool holds(String text) => Findings.fold(text).contains(wanted);
     Note? note(String id) => read.putIfAbsent(id, () => notes.byId(id));
     String shownUnder(String owner) => note(owner)?.mergedInto ?? owner;
     final found = <String>{};
@@ -233,11 +241,11 @@ class Search {
     shopping: true,
   );
 
-  /// Those of [scope] [wanted], in lower case and not blank, is found
+  /// Those of [scope] [wanted], folded and not empty, is found
   /// in, each Note read in full: the search without the index.
   List<Note> _scanned(String wanted, List<Note> scope) {
     final sections = _sectionTexts(Notes(store));
-    bool holds(String text) => text.toLowerCase().contains(wanted);
+    bool holds(String text) => Findings.fold(text).contains(wanted);
     return [
       for (final note in scope)
         if (_holdsOwn(note, holds) ||

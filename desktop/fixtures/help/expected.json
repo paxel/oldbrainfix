@@ -154,6 +154,7 @@
     "dentist": [],
     "x-ray": [],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [
@@ -169,6 +170,15 @@
     "area:help-00000000000000000000000000000001": [
       "note:help-00000000000000000000000000000001-whats-new-0.5.0"
     ]
+  },
+  "findings": {
+    "MULLER": {},
+    "dentist": {},
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
   },
   "conflicts": []
 }

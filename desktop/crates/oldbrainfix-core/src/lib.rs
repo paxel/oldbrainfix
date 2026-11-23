@@ -31,6 +31,7 @@ pub mod discovery;
 pub mod entry;
 pub mod error;
 pub mod file_text;
+pub mod findings;
 pub mod folder;
 pub mod frogs;
 pub mod help_notes;

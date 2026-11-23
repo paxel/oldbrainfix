@@ -384,6 +384,7 @@
     "dentist": [],
     "x-ray": [],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [
@@ -422,6 +423,15 @@
     "area:starter-work": [],
     "topic:starter-meetings": [],
     "topic:starter-to-sort-out": []
+  },
+  "findings": {
+    "MULLER": {},
+    "dentist": {},
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
   },
   "conflicts": []
 }

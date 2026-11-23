@@ -4027,6 +4027,8 @@ const _queries = [
   'dentist',
   'x-ray',
   'müller',
+  // Folded (obf-1047): without the umlaut, in upper case.
+  'MULLER',
   'called',
   'loop',
   ' e ',
@@ -4335,7 +4337,80 @@ Map<String, Object?> _expected(Store store) {
       for (final id in placeIds)
         id: [for (final n in Search(store).notes('e', within: id)) n.id],
     },
+    'findings': {
+      for (final query in _findingQueries)
+        query: {
+          for (final n in Search(store).notes(query))
+            n.id: _findingsOf(n, notes.sections(n.id), query),
+        },
+    },
     'conflicts': _conflicts(store.conflicts()),
+  };
+}
+
+/// The queries whose places in each Note found are read (obf-1047).
+const _findingQueries = [
+  'MULLER',
+  'dentist',
+  'receipt',
+  'called',
+  'loop',
+  'lease',
+  'rent due',
+];
+
+/// The places of [query] in [note] and its [sections] (obf-1047), each
+/// with the text it lies in, offsets counted in code points.
+List<Map<String, Object?>> _findingsOf(
+  Note note,
+  List<Section> sections,
+  String query,
+) {
+  int points(String text, int at) => text.substring(0, at).runes.length;
+  return [
+    for (final f in Findings.ofNote(note, query, sections: sections))
+      if (_findingText(note, sections, f) case final text)
+        {
+          'cell': switch (f.cell) {
+            null => null,
+            final cell => {
+              'column': cell.column,
+              'row': cell.row,
+              'table': cell.table,
+              'tableStart': points(text, cell.tableStart),
+            },
+          },
+          'context': f.context,
+          'contextEnd': points(f.context, f.contextEnd),
+          'contextStart': points(f.context, f.contextStart),
+          'end': points(text, f.end),
+          'key': f.key,
+          'line': f.line,
+          'part': f.part.name,
+          'section': f.section,
+          'start': points(text, f.start),
+        },
+  ];
+}
+
+/// The text [finding] lies in.
+String _findingText(Note note, List<Section> sections, Finding finding) {
+  final section = sections.where((s) => s.id == finding.section).firstOrNull;
+  final key = finding.key;
+  return switch (finding.part) {
+    FindingPart.text => section?.shownText ?? note.shownText,
+    FindingPart.transcript =>
+      (section?.transcripts ?? note.transcripts)[key] ?? '',
+    FindingPart.photoText =>
+      (section?.photoTexts ?? note.photoTexts)[key] ?? '',
+    FindingPart.attachmentText =>
+      (section?.attachmentTexts ?? note.attachmentTexts)[key] ?? '',
+    FindingPart.fileName =>
+      (section?.attachments ?? note.attachments)
+              .where((a) => a.hash == key)
+              .firstOrNull
+              ?.name ??
+          '',
   };
 }
 
@@ -4353,6 +4428,7 @@ Map<String, Object?> _attachmentsOf(Store store, Pack pack) {
         'rent due',
         'LEASE.PDF',
         'grüße',
+        'GRUSSE',
         'keys: 2',
         'boxes.csv',
         'plan.ods',
@@ -9913,6 +9989,171 @@ Map<String, Object?> _textTags() {
   };
 }
 
+/// Folding and the places of a query (obf-1047): what every character
+/// that does not fold to itself folds to, by its code point, and some
+/// words; then for texts in each format and queries the places found,
+/// counted in code points, so that the cores' UTF-16 and UTF-8 offsets
+/// compare.
+Map<String, Object?> _findings() {
+  const words = [
+    'Müller',
+    'MÜLLER',
+    'Müller',
+    'Straße',
+    'STRASSE',
+    'ẞ',
+    'Ærø Œuvre',
+    'İzmir',
+    'ΟΔΟΣ Ελλάδα',
+    'Łódź Đorđe',
+    'ﬃ K',
+    'Ǆemal',
+    '🧠 日記 𝔸',
+    'é̂',
+    '́',
+  ];
+  final long = [for (var i = 0; i < 40; i++) 'word$i'].join(' ');
+  final word = 'x' * 100;
+  final cases = [
+    (
+      'Call Herr Müller\nthen muller again, MULLER',
+      TextFormats.plain,
+      ' muller ',
+    ),
+    ('Straße strasse STRASSE', TextFormats.plain, 'strasse'),
+    ('Straße', TextFormats.plain, 's'),
+    ('Müller und Müller', TextFormats.plain, 'mu'),
+    ('🧠 Grüße 𝔸 grusse\r\nGRÜSSE\rgrüsse', TextFormats.plain, 'grusse'),
+    ('', TextFormats.plain, 'a'),
+    ('abc', TextFormats.plain, '   '),
+    ('é', TextFormats.plain, '́'),
+    (long, TextFormats.plain, 'word20'),
+    (long, TextFormats.plain, 'word1'),
+    ('  $long  ', TextFormats.plain, 'word39'),
+    ('a $word b', TextFormats.plain, 'x' * 90),
+    ('#Müll und #mull', TextFormats.plain, '#mull'),
+    ('fn main() {\n  let straße = 1;\n}', TextFormats.code, 'strasse'),
+    ('**Müller**', 'later', 'muller'),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      'muller',
+    ),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      '*star*',
+    ),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      'co de',
+    ),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      '#',
+    ),
+    (
+      '- Müller\n> Müller\n## Müller\n1. Müller\n  - *Mü*_ller_',
+      TextFormats.markdown,
+      'muller',
+    ),
+    (
+      '[Müller](https://example.org/muller) and `` `Müller` ``',
+      TextFormats.markdown,
+      'muller',
+    ),
+    ('```\nMüller\n```\nMüller', TextFormats.markdown, 'muller'),
+    ('☐ Müller ✅ done', TextFormats.markdown, '☐ m'),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'koln',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'ann kö',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'graz |',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      '---',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'a',
+    ),
+    (
+      '${MarkdownTables.headingColumnLine}\n| a | b |\n|---|---|\n'
+          '| Müller | x |',
+      TextFormats.markdown,
+      'muller',
+    ),
+    (
+      '| a |  | c |\n|---|---|---|\n| x |  | Müller |',
+      TextFormats.markdown,
+      'x muller',
+    ),
+    ('| a\\|b |\n|---|\n| c |', TextFormats.markdown, 'a|b'),
+    ('Straße\r\n**STRASSE**\rstraße', TextFormats.markdown, 'strasse'),
+  ];
+  int points(String text, int at) => text.substring(0, at).runes.length;
+  return {
+    'folding': {
+      for (var c = 0; c <= 0x10FFFF; c++)
+        if ((c < 0xD800 || c >= 0xE000) &&
+            Findings.fold(String.fromCharCode(c)) != String.fromCharCode(c))
+          c.toRadixString(16).toUpperCase().padLeft(4, '0'): Findings.fold(
+            String.fromCharCode(c),
+          ),
+    },
+    'words': [
+      for (final w in words) {'folded': Findings.fold(w), 'text': w},
+    ],
+    'cases': [
+      for (final (text, format, query) in cases)
+        {
+          'findings': [
+            for (final f in Findings.inText(text, format, query))
+              {
+                'cell': switch (f.cell) {
+                  null => null,
+                  final cell => {
+                    'column': cell.column,
+                    'row': cell.row,
+                    'table': cell.table,
+                    'tableStart': points(text, cell.tableStart),
+                  },
+                },
+                'context': f.context,
+                'contextEnd': points(f.context, f.contextEnd),
+                'contextStart': points(f.context, f.contextStart),
+                'end': points(text, f.end),
+                'line': f.line,
+                'start': points(text, f.start),
+              },
+          ],
+          'format': format,
+          'query': query,
+          'text': text,
+        },
+    ],
+  };
+}
+
 /// The tag tree (#267): the Areas made, the Notes captured, each with its
 /// format, the Area it is filed into by its index, its Amends, the one it
 /// is merged into and whether it is trashed, then the tree read from them
@@ -12255,6 +12496,14 @@ Future<void> main(List<String> args) async {
     'too long lines); which fence names and pasted first lines name '
     'which grammar; and which grammars and regular expressions are '
     'refused. Offsets are counted in code points.\n'
+    '- `findings.json`: the folding search and the find bar match by '
+    '(obf-1047): what every character that does not fold to itself folds '
+    'to, by its code point, and words in several scripts, decomposed '
+    'accents among them; then for texts in each format and queries the '
+    'places found, each with its line, its table cell and its context: '
+    'a letter folded to two, accents dropped, line breaks of every kind, '
+    'a long line cut, marks inside a place, escapes, code, links, lists, '
+    'code blocks and tables. Offsets are counted in code points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -12498,6 +12747,7 @@ Future<void> main(List<String> args) async {
     File('${root.path}/highlight.json'),
     '${_json.convert(_highlight())}\n',
   );
+  _write(File('${root.path}/findings.json'), '${_json.convert(_findings())}\n');
   _write(
     File('${root.path}/schedule_sentences.json'),
     '${_json.convert(_scheduleSentences())}\n',

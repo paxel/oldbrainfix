@@ -426,6 +426,9 @@
     "müller": [
       "note:00000000000000000000000000000003"
     ],
+    "MULLER": [
+      "note:00000000000000000000000000000003"
+    ],
     "called": [],
     "loop": [],
     " e ": [
@@ -460,6 +463,71 @@
     "area:0000000000000000000000000000000c": [
       "note:0000000000000000000000000000000d"
     ]
+  },
+  "findings": {
+    "MULLER": {
+      "note:00000000000000000000000000000003": [
+        {
+          "cell": null,
+          "context": "Müller",
+          "contextEnd": 6,
+          "contextStart": 0,
+          "end": 6,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        },
+        {
+          "cell": null,
+          "context": "Herr Müller € 12,50",
+          "contextEnd": 11,
+          "contextStart": 5,
+          "end": 18,
+          "key": "",
+          "line": 1,
+          "part": "text",
+          "section": null,
+          "start": 12
+        }
+      ]
+    },
+    "dentist": {
+      "note:00000000000000000000000000000004": [
+        {
+          "cell": null,
+          "context": "dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ],
+      "note:0000000000000000000000000000000d": [
+        {
+          "cell": null,
+          "context": "dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ]
+    },
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
   },
   "conflicts": []
 }

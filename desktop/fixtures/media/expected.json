@@ -607,6 +607,9 @@
     "müller": [
       "note:00000000000000000000000000000004"
     ],
+    "MULLER": [
+      "note:00000000000000000000000000000004"
+    ],
     "called": [],
     "loop": [],
     " e ": [
@@ -623,5 +626,59 @@
     "4711": []
   },
   "searchWithin": {},
+  "findings": {
+    "MULLER": {
+      "note:00000000000000000000000000000004": [
+        {
+          "cell": null,
+          "context": "Dr. Müller, Tuesday 9:00",
+          "contextEnd": 10,
+          "contextStart": 4,
+          "end": 10,
+          "key": "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66",
+          "line": 0,
+          "part": "photoText",
+          "section": "note:00000000000000000000000000000005",
+          "start": 4
+        }
+      ]
+    },
+    "dentist": {
+      "note:00000000000000000000000000000004": [
+        {
+          "cell": null,
+          "context": "Dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ]
+    },
+    "receipt": {
+      "note:00000000000000000000000000000001": [
+        {
+          "cell": null,
+          "context": "RECEIPT",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb",
+          "line": 0,
+          "part": "photoText",
+          "section": null,
+          "start": 0
+        }
+      ]
+    },
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
+  },
   "conflicts": []
 }

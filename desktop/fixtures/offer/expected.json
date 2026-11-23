@@ -186,6 +186,7 @@
       "dentist": [],
       "x-ray": [],
       "müller": [],
+      "MULLER": [],
       "called": [],
       "loop": [],
       " e ": [
@@ -199,6 +200,15 @@
     },
     "searchWithin": {
       "area:00000000000000000000000000000003": []
+    },
+    "findings": {
+      "MULLER": {},
+      "dentist": {},
+      "receipt": {},
+      "called": {},
+      "loop": {},
+      "lease": {},
+      "rent due": {}
     },
     "conflicts": []
   },
