@@ -34,6 +34,7 @@ use oldbrainfix_core::{Alarms, AreaRole, Notes, OwnProfile, Places, SigningKey, 
 use oldbrainfix_gui::app::FileSaver;
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::sync_view::offer_refusal;
+use oldbrainfix_gui::theme::{self, ButtonKind};
 use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -111,6 +112,38 @@ fn app(store: Store, selection: Selection, locale: &str) -> App {
     app
 }
 
+/// Whether the last button labelled `label`, a dialog's, is drawn on the
+/// idle fill of `kind` (obf-1101).
+fn wears(harness: &Harness<'_, App>, label: &str, kind: ButtonKind) -> bool {
+    let Some(node) = harness
+        .query_all_by(|n| n.role() == Role::Button && n.label().as_deref() == Some(label))
+        .last()
+    else {
+        return false;
+    };
+    let scale = harness.ctx.pixels_per_point();
+    let rect = node.rect();
+    let at = egui::Rect::from_min_max(
+        (rect.min.to_vec2() / scale).to_pos2(),
+        (rect.max.to_vec2() / scale).to_pos2(),
+    );
+    let fill = theme::button_tones(harness.ctx.global_style().visuals.dark_mode, kind).idle;
+    fn flat(shape: &egui::Shape, into: &mut Vec<egui::epaint::RectShape>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            egui::Shape::Rect(r) => into.push(r.clone()),
+            _ => {}
+        }
+    }
+    let mut rects = Vec::new();
+    for egui::epaint::ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut rects);
+    }
+    rects
+        .iter()
+        .any(|r| r.fill == fill && r.rect.contains_rect(at.shrink(1.0)))
+}
+
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
 }
@@ -172,6 +205,8 @@ fn sharing_by_files_saves_an_offer_the_other_window_accepts() -> TestResult {
     click(&mut harness, "Ben");
     assert!(shows(&harness, "How do changes travel with Ben?"));
     click(&mut harness, "Files through a messenger");
+    // Each dialog's main action, filled on the accent (obf-1101).
+    assert!(wears(&harness, "Share", ButtonKind::Primary));
     click(&mut harness, "Share");
     assert_eq!(
         harness.state().notice(),
@@ -200,6 +235,7 @@ fn sharing_by_files_saves_an_offer_the_other_window_accepts() -> TestResult {
         &harness,
         "Nothing of the Area is kept until you accept."
     ));
+    assert!(wears(&harness, "Accept", ButtonKind::Primary));
     click(&mut harness, "Accept");
     assert_eq!(harness.state().notice(), Some("Shared Area accepted."));
     assert!(!harness.state().previewing());
@@ -272,6 +308,7 @@ fn sharing_through_a_folder_picks_it_and_asks_how_only_once() -> TestResult {
     ));
     click(&mut harness, "Accept");
     assert!(shows(&harness, "Choose the shared folder?"));
+    assert!(wears(&harness, "Choose folder", ButtonKind::Primary));
     click(&mut harness, "Choose folder");
     assert_eq!(
         harness.state().store().sync_folder()?,

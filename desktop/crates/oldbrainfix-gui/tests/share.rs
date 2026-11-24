@@ -22,6 +22,7 @@ use oldbrainfix_core::{
     AreaAccess, AreaRole, Invite, Notes, OwnProfile, PairedDevice, PersonSettings, Places,
     SigningKey, Store,
 };
+use oldbrainfix_gui::theme::{self, ButtonKind};
 use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -90,6 +91,38 @@ fn harness(store: Store, selection: Selection) -> Harness<'static, App> {
         );
     harness.run();
     harness
+}
+
+/// Whether the last button labelled `label`, a dialog's, is drawn on the
+/// idle fill of `kind` (obf-1101).
+fn wears(harness: &Harness<'_, App>, label: &str, kind: ButtonKind) -> bool {
+    let Some(node) = harness
+        .query_all_by(|n| n.role() == Role::Button && n.label().as_deref() == Some(label))
+        .last()
+    else {
+        return false;
+    };
+    let scale = harness.ctx.pixels_per_point();
+    let rect = node.rect();
+    let at = egui::Rect::from_min_max(
+        (rect.min.to_vec2() / scale).to_pos2(),
+        (rect.max.to_vec2() / scale).to_pos2(),
+    );
+    let fill = theme::button_tones(harness.ctx.global_style().visuals.dark_mode, kind).idle;
+    fn flat(shape: &egui::Shape, into: &mut Vec<egui::epaint::RectShape>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            egui::Shape::Rect(r) => into.push(r.clone()),
+            _ => {}
+        }
+    }
+    let mut rects = Vec::new();
+    for egui::epaint::ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut rects);
+    }
+    rects
+        .iter()
+        .any(|r| r.fill == fill && r.rect.contains_rect(at.shrink(1.0)))
 }
 
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
@@ -300,6 +333,9 @@ fn sharing_an_area_hosts_its_invite() -> TestResult {
     assert!(!shows(&harness, "Their name"));
     harness.get_by_label("Manager").click();
     harness.run();
+    // The dialog's main action, filled on the accent (obf-1101).
+    assert!(wears(&harness, "Show the code", ButtonKind::Primary));
+    assert!(!wears(&harness, "Cancel", ButtonKind::Primary));
     harness.get_by_label("Show the code").click();
     harness.step();
     harness.step();

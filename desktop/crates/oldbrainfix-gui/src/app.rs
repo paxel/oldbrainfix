@@ -18817,10 +18817,7 @@ impl App {
                             {
                                 actions.push(Action::CloseDialog);
                             }
-                            if ui
-                                .button(RichText::new(t.folder_pick()).strong().color(text))
-                                .clicked()
-                            {
+                            if theme::main_action(ui, true, t.folder_pick()) {
                                 actions.push(Action::OfferFolder);
                             }
                         });
@@ -21997,10 +21994,7 @@ fn share_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if ui
-            .button(RichText::new(t.share_show_code()).color(text))
-            .clicked()
-        {
+        if theme::main_action(ui, true, t.share_show_code()) {
             actions.push(Action::StartInvite);
         }
     });
@@ -22092,10 +22086,7 @@ fn transport_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if ui
-            .button(RichText::new(t.invite_confirm_share()).strong().color(text))
-            .clicked()
-        {
+        if theme::main_action(ui, true, t.invite_confirm_share()) {
             actions.push(Action::ShareAfarNow);
         }
     });
@@ -22224,10 +22215,7 @@ fn area_offer_form(
             .color(weak),
     );
     ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.sent_item_accept()).strong().color(text))
-            .clicked()
-        {
+        if theme::main_action(ui, true, t.sent_item_accept()) {
             actions.push(Action::AcceptOffer);
         }
         if ui
@@ -22447,11 +22435,14 @@ fn sent_item_form(
         SentItemState::UpToDate | SentItemState::NothingToCancel => None,
     };
     ui.horizontal(|ui| {
-        if let Some(accept) = accept
-            && ui
-                .button(RichText::new(accept).strong().color(text))
-                .clicked()
-        {
+        // Accepting a cancel moves the Note to the trash: the error
+        // colour, and no Ctrl+Enter (Q665).
+        let accepted = match accept {
+            Some(label) if opened.state == SentItemState::Cancel => destructive(ui, label),
+            Some(label) => theme::main_action(ui, true, label),
+            None => false,
+        };
+        if accepted {
             actions.push(Action::AcceptSent);
         }
         let decline = if accept.is_some() {
