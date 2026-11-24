@@ -14,6 +14,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop sortiert ein Tippen auf die Kopfreihe eine Tabelle beim Lesen; der Editor sortiert ihre Zeilen nach Spalte. ([obf-1052](https://github.com/paxel/oldbrainfix/issues/363))
 - Auf dem Handy und dem Desktop wählt langes Drücken oder Ziehen auf einer Tabellenzelle ein Rechteck aus Zellen, das sich als Tabelle kopieren lässt. ([obf-1054](https://github.com/paxel/oldbrainfix/issues/365))
 - Auf dem Handy und dem Desktop kann eine Vorwarnung eine eigene Länge haben: Minuten, Stunden, Tage oder Wochen. ([obf-1087](https://github.com/paxel/oldbrainfix/issues/400))
+- Auf dem Handy und dem Desktop schalten „Tipps zeigen“ in den Einstellungen und „Keine Tipps mehr“ auf jedem Tipp die Tipps ab. ([obf-1060](https://github.com/paxel/oldbrainfix/issues/373))
 
 ### Geändert
 

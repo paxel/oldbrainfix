@@ -2065,6 +2065,8 @@ enum Setting {
     QuickNoteNudgeButtons(bool),
     /// The main switch "AI (experimental)" (#334).
     AiOn(bool),
+    /// Whether the screens show their tips, "Show tips" (obf-1060).
+    Tips(bool),
 }
 
 /// Opens an address in the browser; tests hand in one that keeps it.
@@ -3677,6 +3679,9 @@ impl App {
         self.spotlights.set_on(on);
         if on {
             spotlight::seed(&self.store, self.welcoming())?;
+            // Whether this Device shows them at all (obf-1060).
+            self.spotlights
+                .set_tips(DeviceSettings::new(&self.store).tips_on()?);
         }
         Ok(())
     }
@@ -8849,6 +8854,7 @@ impl App {
             }
             Action::ShowTipsAgain => {
                 spotlight::show_again(&self.store)?;
+                self.spotlights.set_tips(true);
                 self.notice = Some(self.t.settings_show_tips_done().to_string());
             }
             Action::Sync(SyncAction::Trust(trust)) => {
@@ -11094,6 +11100,10 @@ impl App {
                 self.store.set_ai_on(on)?;
                 // Read anew once it shows again.
                 self.ask_fields = None;
+            }
+            Setting::Tips(on) => {
+                settings.set_tips_on(on)?;
+                self.spotlights.set_tips(on);
             }
         }
         Ok(())
@@ -18723,6 +18733,7 @@ impl App {
         let alerts = settings.alerts_on().unwrap_or(true);
         let autostart = settings.autostart_on().unwrap_or(true);
         let bigger = settings.fat_fingers().unwrap_or(false);
+        let tips = settings.tips_on().unwrap_or(true);
         let renag = settings
             .renag_interval()
             .map(|d| d.num_minutes())
@@ -18852,7 +18863,6 @@ impl App {
                         t.text_size_larger(),
                         t.text_size_largest(),
                     ],
-                    &[t.settings_show_tips()],
                 ],
             );
             if shows.contains(&true) {
@@ -18917,9 +18927,40 @@ impl App {
                                 .color(weak),
                         );
                     }
-                    // The tips of every screen back on this computer
-                    // (obf-1043).
-                    if shows[4] {
+                });
+            }
+            // Whether the screens show their tips (obf-1060), and the
+            // tips of every screen back on this computer (obf-1043).
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_tips()),
+                [
+                    &[t.settings_tips_switch(), t.settings_tips_switch_detail()],
+                    &[t.settings_show_tips()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    heading(ui, t.settings_tips(), "tips");
+                    if shows[0] {
+                        let mut on = tips;
+                        let switch = theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.settings_tips_switch()).color(text),
+                        );
+                        spotlight::anchor(ui, "settings-tips-switch", switch.rect);
+                        if switch.changed() {
+                            actions.push(Action::Setting(Setting::Tips(on)));
+                        }
+                        ui.label(
+                            RichText::new(t.settings_tips_switch_detail())
+                                .small()
+                                .color(weak),
+                        );
+                    }
+                    if shows[1] {
                         let again = ui.button(RichText::new(t.settings_show_tips()).color(text));
                         spotlight::anchor(ui, "settings-show-tips", again.rect);
                         if again.clicked() {

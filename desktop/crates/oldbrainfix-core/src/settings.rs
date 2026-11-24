@@ -31,6 +31,7 @@ const STREAKS_OFF: &str = "streaksOff";
 const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
 const TEXT_SIZE: &str = "textSize";
+const TIPS_OFF: &str = "tipsOff";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
@@ -388,6 +389,21 @@ impl<'a> DeviceSettings<'a> {
 
     pub fn set_fat_fingers(&self, on: bool) -> Result<()> {
         self.store.set_local_setting(FAT_FINGERS, &on.to_string())
+    }
+
+    /// Whether this Device shows its Spotlights (obf-1060): "Show tips"
+    /// in the Settings, on until switched off; off is kept as "true",
+    /// as the phone keeps it under the same key.
+    pub fn tips_on(&self) -> Result<bool> {
+        Ok(self.store.local_setting(TIPS_OFF)?.as_deref() != Some("true"))
+    }
+
+    pub fn set_tips_on(&self, on: bool) -> Result<()> {
+        if on {
+            self.store.remove_local_setting(TIPS_OFF)
+        } else {
+            self.store.set_local_setting(TIPS_OFF, "true")
+        }
     }
 
     /// The step of this Device's text (#326, obf-1019); normal unless

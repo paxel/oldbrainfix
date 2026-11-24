@@ -168,7 +168,7 @@ A Note the app makes to explain itself (#180, ADR 0042): one "What's new in X.Y.
 _Avoid_: tutorial, onboarding, tip (that is a Spotlight), changelog Note
 
 **Spotlight**:
-A tip that explains one thing on a screen (obf-1043, ADR 0055): the page dims around it and a card beside it says in one sentence what it does. A screen shows its Spotlights one after another on a person's first visit, Next the next one, Skip or a tap outside ending them; from then on only a new thing on the screen gets its Spotlight, once. Each Device keeps which ones it showed, a Device updated from an earlier version counting those of what it already had as shown, and "Show tips again" in the Settings brings them back on that Device. German: Tipp.
+A tip that explains one thing on a screen (obf-1043, ADR 0055): the page dims around it and a card beside it says in one sentence what it does. A screen shows its Spotlights one after another on a person's first visit, Next the next one, Skip or a tap outside ending them; from then on only a new thing on the screen gets its Spotlight, once. Each Device keeps which ones it showed, a Device updated from an earlier version counting those of what it already had as shown, and "Show tips again" in the Settings brings them back on that Device. The switch "Show tips" in the Settings, on by default and kept on each Device, stops them: off, no screen shows one, a new one neither; "No more tips" on every tip's card turns it off at once, and "Show tips again" on (obf-1060). German: Tipp.
 _Avoid_: tutorial, coach mark, hint, Help Note
 
 ### Routines and Reminders

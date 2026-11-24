@@ -5,7 +5,9 @@
 //! shows, Next chaining, Skip, Esc and a click beside the card ending the
 //! tour and counting the rest as shown, a tip whose element is not on the
 //! screen staying due, Show tips again bringing them back, the card's
-//! place, and the guide's frames marking every tip.
+//! place, and the guide's frames marking every tip; "Show tips" off
+//! showing none and marking none, and No more tips switching it off at
+//! once (obf-1060).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -21,8 +23,9 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use egui::accesskit::Role;
 use egui::{Key, Pos2, Rect, Vec2};
 use egui_kittest::Harness;
+use egui_kittest::kittest::NodeT;
 use egui_kittest::kittest::Queryable;
-use oldbrainfix_core::{Places, SigningKey, Store, parse_time};
+use oldbrainfix_core::{DeviceSettings, Places, SigningKey, Store, parse_time};
 use oldbrainfix_gui::spotlight::{self, BEFORE_070, MANIFEST};
 use oldbrainfix_gui::{App, Page, Selection};
 
@@ -60,6 +63,11 @@ fn window(
     app.select(selection);
     app.set_spotlights(true)?;
     spotlight::show_again(store)?;
+    Ok(shown(app))
+}
+
+/// `app` in a window of 1280 by 800, drawn.
+fn shown(app: App) -> Harness<'static, App> {
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui_state(
@@ -70,7 +78,16 @@ fn window(
             app,
         );
     harness.run();
-    Ok(harness)
+    harness
+}
+
+/// Whether the Settings' switch "Show tips" shows ticked.
+fn switch_on(harness: &Harness<'_, App>) -> Result<bool, Box<dyn std::error::Error>> {
+    let switch = harness
+        .query_all_by_role_and_label(Role::CheckBox, "Show tips")
+        .next()
+        .ok_or("no Show tips")?;
+    Ok(switch.accesskit_node().toggled() == Some(egui::accesskit::Toggled::True))
 }
 
 /// Whether a Label says `text` (egui gives a Label its text as the
@@ -146,7 +163,11 @@ fn an_updated_device_counts_what_it_had_as_shown_and_keeps_the_new_tips() -> Tes
     );
     assert_eq!(
         due(&store, spotlight::SETTINGS)?,
-        ["settings-show-tips", "settings-grammar"]
+        [
+            "settings-show-tips",
+            "settings-grammar",
+            "settings-tips-switch"
+        ]
     );
     // obf-1065's ⋮ of an Area or a Topic came after.
     assert_eq!(due(&store, spotlight::LIST)?, ["list-place-more"]);
@@ -394,4 +415,158 @@ fn switched_on_a_first_start_gets_every_tip_and_an_updated_device_the_new_ones()
     app.set_spotlights(true)?;
     assert_eq!(due(&updated, spotlight::AGENDA)?, ["agenda-quiet"]);
     Ok(())
+}
+
+#[test]
+fn show_tips_off_shows_no_tip_and_counts_none_as_shown() -> TestResult {
+    let store = store()?;
+    let mut app = App::new(store.clone(), "en");
+    app.set_wall_clock(Arc::new(utc));
+    app.select(Selection::Agenda);
+    app.set_spotlights(true)?;
+    spotlight::show_again(&store)?;
+    DeviceSettings::new(&store).set_tips_on(false)?;
+    // As the binary reads it at its start.
+    app.set_spotlights(true)?;
+    let mut harness = shown(app);
+    harness.run_steps(4);
+    assert_eq!(harness.state().spotlight_showing(), None);
+    assert!(store.local_setting(spotlight::STARTED)?.is_some());
+    for screen in MANIFEST {
+        assert_eq!(due(&store, screen.id)?.len(), screen.tips.len());
+    }
+    // Nor in the Settings, where the switch shows off.
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    assert_eq!(harness.state().spotlight_showing(), None);
+    assert!(!switch_on(&harness)?);
+    // Switched on: not on this visit, on the next screen's.
+    harness
+        .get_all_by_role_and_label(Role::CheckBox, "Show tips")
+        .next()
+        .ok_or("no Show tips")?
+        .click();
+    harness.run();
+    assert!(switch_on(&harness)?);
+    assert_eq!(store.local_setting("tipsOff")?, None);
+    harness.run_steps(4);
+    assert_eq!(harness.state().spotlight_showing(), None);
+    harness.state_mut().close_page();
+    harness.run();
+    assert_eq!(harness.state().spotlight_showing(), Some("agenda-add"));
+    Ok(())
+}
+
+#[test]
+fn no_more_tips_switches_them_off_at_once_and_show_tips_again_on() -> TestResult {
+    let store = store()?;
+    let mut harness = window(&store, Selection::Agenda)?;
+    assert_eq!(harness.state().spotlight_showing(), Some("agenda-add"));
+    click(&mut harness, "No more tips")?;
+    assert_eq!(harness.state().spotlight_showing(), None);
+    assert_eq!(store.local_setting("tipsOff")?.as_deref(), Some("true"));
+    assert!(!DeviceSettings::new(&store).tips_on()?);
+    // The rest stays due for when they are on again.
+    assert!(due(&store, spotlight::AGENDA)?.contains(&"agenda-places"));
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    harness.run_steps(4);
+    assert_eq!(harness.state().spotlight_showing(), None);
+    assert!(!switch_on(&harness)?);
+    click(&mut harness, "Show tips again")?;
+    assert!(switch_on(&harness)?);
+    assert!(DeviceSettings::new(&store).tips_on()?);
+    harness.state_mut().close_page();
+    harness.run();
+    assert_eq!(harness.state().spotlight_showing(), Some("agenda-add"));
+    Ok(())
+}
+
+#[test]
+fn the_settings_tour_points_at_the_switch_once() -> TestResult {
+    let store = store()?;
+    let mut harness = window(&store, Selection::Agenda)?;
+    click(&mut harness, "Skip")?;
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    for _ in 0..10 {
+        if harness.state().spotlight_showing() == Some("settings-tips-switch") {
+            break;
+        }
+        // The switch lies below the fold: the Settings scroll to it.
+        harness
+            .get_all_by_role_and_label(Role::Button, "Next")
+            .last()
+            .ok_or("no Next")?
+            .click();
+        harness.run_steps(8);
+    }
+    assert_eq!(
+        harness.state().spotlight_showing(),
+        Some("settings-tips-switch")
+    );
+    assert!(says(
+        &harness,
+        "Switched off, no screen shows a tip; No more tips does the same."
+    ));
+    assert!(!due(&store, spotlight::SETTINGS)?.contains(&"settings-tips-switch"));
+    Ok(())
+}
+
+/// Whether the card's No more tips, Skip and `next` sit side by side,
+/// in that order, under its sentence and inside its width.
+fn the_row_fits(harness: &Harness<'_, App>, next: &str) -> TestResult {
+    let t = harness.state().t();
+    let tip = harness.state().spotlight_showing().ok_or("no tip")?;
+    let text = MANIFEST
+        .iter()
+        .flat_map(|screen| screen.tips)
+        .find(|candidate| candidate.id == tip)
+        .map(|candidate| (candidate.text)(t))
+        .ok_or("no such tip")?;
+    let sentence = harness
+        .query_all_by_value(text)
+        .next()
+        .ok_or("no sentence")?
+        .rect();
+    let button = |label: &str| -> Result<Rect, Box<dyn std::error::Error>> {
+        Ok(harness
+            .query_all_by_role_and_label(Role::Button, label)
+            .last()
+            .ok_or(format!("no {label}"))?
+            .rect())
+    };
+    let off = button(t.spot_no_more_tips())?;
+    let skip = button(t.spot_skip())?;
+    let next = button(next)?;
+    assert!(off.max.x <= skip.min.x && skip.max.x <= next.min.x);
+    assert!(off.min.x >= sentence.min.x - 1.0, "{off:?} {sentence:?}");
+    assert!(next.max.x <= sentence.min.x + spotlight::CARD_WIDTH);
+    assert!(off.min.y > sentence.max.y);
+    Ok(())
+}
+
+#[test]
+fn the_cards_three_buttons_sit_side_by_side_under_its_sentence_in_german() -> TestResult {
+    let store = store()?;
+    let mut app = App::new(store.clone(), "de");
+    app.set_wall_clock(Arc::new(utc));
+    app.select(Selection::Agenda);
+    app.set_spotlights(true)?;
+    spotlight::show_again(&store)?;
+    let mut harness = shown(app);
+    assert_eq!(harness.state().spotlight_showing(), Some("agenda-add"));
+    the_row_fits(&harness, "Weiter")?;
+    // The last tip's Verstanden, wider than Weiter.
+    for _ in 0..10 {
+        if harness
+            .query_all_by_role_and_label(Role::Button, "Verstanden")
+            .next()
+            .is_some()
+        {
+            break;
+        }
+        click(&mut harness, "Weiter")?;
+    }
+    the_row_fits(&harness, "Verstanden")
 }

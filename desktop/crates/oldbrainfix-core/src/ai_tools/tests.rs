@@ -486,6 +486,8 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     // The text's own step (#326, obf-1019), read only as every setting.
     assert_eq!(read.pointer("/textSize"), Some(&json!("larger")));
     assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
+    // Show tips (obf-1060), on until switched off, read only.
+    assert_eq!(read.pointer("/tipsOn"), Some(&json!(true)));
     assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
     // Today's quiet day (obf-1044), read only.
     assert_eq!(read.pointer("/quietDayUntil"), Some(&Value::Null));
@@ -504,7 +506,9 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     PersonSettings::new(&store).set_advanced(false)?;
     store.set_ai_on(true)?;
     store.set_ask_thinks(true)?;
+    DeviceSettings::new(&store).set_tips_on(false)?;
     let settings = call(&store, &task, "read_settings", &json!({}))?;
+    assert_eq!(json_of(&settings)?.pointer("/tipsOn"), Some(&json!(false)));
     assert_eq!(
         json_of(&settings)?.pointer("/features"),
         Some(&json!("simple"))

@@ -1,16 +1,19 @@
 //! Spotlights (obf-1043): each screen explains itself on a first visit,
 //! one tip after another. The window dims around one element, a card
 //! beside it says in one sentence what it does, Next shows the next tip
-//! and Skip, a click beside the card, Esc and back end the screen's tour.
-//! A tour never traps input: the card always has Skip, and every way out
-//! of a dialog ends the tour first.
+//! and Skip, a click beside the card, Esc and back end the screen's tour;
+//! No more tips, like "Show tips" off in the Settings (obf-1060), ends
+//! every tour to come. A tour never traps input: the card always has
+//! Skip, and every way out of a dialog ends the tour first.
 //!
 //! Which tips this Device showed are settings of the Device (ADR 0008),
 //! never synced: `spot:<screen>` holds the ids of the screen's tips shown,
 //! comma-separated, and [`STARTED`] says this Device ran with Spotlights
 //! once. A Device updated from 0.6.1 counts the tips of what it already
 //! had as shown ([`BEFORE_070`], [`seed`]); Show tips again in the
-//! Settings ([`show_again`]) brings every tip back.
+//! Settings ([`show_again`]) brings every tip back and switches "Show
+//! tips" on, which `tipsOff` keeps off as the phone does
+//! ([`DeviceSettings::tips_on`]).
 //!
 //! Each element a tip points at says where it is drawn, frame by frame,
 //! with [`anchor`]; [`Spotlights`] runs the tour over what the window
@@ -24,6 +27,7 @@ use egui::{
     Align, Color32, Context, Frame, Id, Key, LayerId, Margin, Modifiers, Order, PointerButton,
     Pos2, Rect, RichText, Sense, Ui, UiBuilder, Vec2,
 };
+use oldbrainfix_core::settings::DeviceSettings;
 use oldbrainfix_core::{Result, Store};
 
 use crate::l10n::L10n;
@@ -277,6 +281,12 @@ pub const MANIFEST: &[Screen] = &[
                 anchor: "settings-features",
                 text: L10n::spot_desk_settings_features,
             },
+            // obf-1060: on the switch Show tips.
+            Tip {
+                id: "settings-tips-switch",
+                anchor: "settings-tips-switch",
+                text: L10n::spot_settings_tips_switch,
+            },
         ],
     },
 ];
@@ -373,9 +383,11 @@ pub fn mark_all_seen(store: &Store) -> Result<()> {
     Ok(())
 }
 
-/// Show tips again: every screen shows its tips again on its next visit.
-/// [`STARTED`] stays, so they are not counted as shown once more.
+/// Show tips again: every screen shows its tips again on its next visit,
+/// "Show tips" on. [`STARTED`] stays, so they are not counted as shown
+/// once more.
 pub fn show_again(store: &Store) -> Result<()> {
+    DeviceSettings::new(store).set_tips_on(true)?;
     for screen in MANIFEST {
         store.remove_local_setting(&seen_key(screen.id))?;
     }
@@ -529,12 +541,17 @@ struct Visit {
 enum Answer {
     Next,
     End,
+    /// No more tips (obf-1060): "Show tips" goes off.
+    Off,
 }
 
 /// The tours of one window: off until switched on.
 #[derive(Default)]
 pub struct Spotlights {
     on: bool,
+    /// "Show tips" off (obf-1060), as this Device keeps it: no tour
+    /// starts and nothing is marked, what is due stays due.
+    tips_off: bool,
     tour: Option<Tour>,
     visit: Option<Visit>,
     /// When a key or text last came in, in the input's seconds.
@@ -553,6 +570,15 @@ impl Spotlights {
 
     pub fn on(&self) -> bool {
         self.on
+    }
+
+    /// Follows "Show tips" (obf-1060); off ends the tour showing, its
+    /// rest still due.
+    pub fn set_tips(&mut self, on: bool) {
+        self.tips_off = !on;
+        if !on {
+            self.tour = None;
+        }
     }
 
     /// Whether a tip shows.
@@ -636,6 +662,13 @@ impl Spotlights {
         let Some(visit) = &mut self.visit else {
             return;
         };
+        // Show tips off: the visit is looked at all the same, so that
+        // switching them on shows nothing before the next one.
+        if self.tips_off {
+            visit.looked = true;
+            visit.known.extend(drawn.keys().copied());
+            return;
+        }
         visit.frames += 1;
         if visit.frames < SETTLE {
             ctx.request_repaint();
@@ -814,6 +847,12 @@ impl Spotlights {
                                     {
                                         answer = Some(Answer::End);
                                     }
+                                    if ui
+                                        .button(RichText::new(t.spot_no_more_tips()).color(text))
+                                        .clicked()
+                                    {
+                                        answer = Some(Answer::Off);
+                                    }
                                 },
                             );
                         });
@@ -835,6 +874,15 @@ impl Spotlights {
                 self.arrive_at(ctx, store, drawn, from);
             }
             Some(Answer::End) => self.end(ctx, store, true),
+            Some(Answer::Off) => {
+                // At once, the rest of the tour still due should they be
+                // switched on again.
+                self.end(ctx, store, false);
+                if let Err(e) = DeviceSettings::new(store).set_tips_on(false) {
+                    eprintln!("tips: {e}");
+                }
+                self.set_tips(false);
+            }
             None => {}
         }
     }
