@@ -90,10 +90,10 @@ and F-Droid both take them. `docs/screenshots/play` links to
 | # | File            | What is on it                                                                            |
 |---|-----------------|------------------------------------------------------------------------------------------|
 | 1 | `1-agenda.png`  | Agenda: today's Routines, two Frogs, the Unsorted banner                                 |
-| 2 | `2-capture.png` | The quick note with its text, the Nudge buttons and More |
+| 2 | `2-capture.png` | The quick note with its text, the Nudge buttons and Open in the editor                   |
 | 3 | `3-diary.png`   | An Area's diary of Note cards in full                                                    |
-| 4 | `4-editor.png`  | Note editor with its badges and dated parts                                              |
-| 5 | `5-fan.png`     | The "+" fanned out: Text, Voice, Photo, Gallery, Paste                                   |
+| 4 | `4-editor.png`  | Note editor: Undo, Redo and Find in the bar, dated parts, the groups This Note, Add, Share |
+| 5 | `5-fan.png`     | The "+" fanned out: Text, Voice, Photo, Gallery, Paste, File                             |
 | 6 | `6-alarm.png`   | Alarm ring screen with Done and Snooze                                                   |
 | 7 | `7-history.png` | Routine history with Streak and Adherence                                                |
 | 8 | `8-dark.png`    | Agenda in the dark theme, scrolled to the rest of the week                               |
