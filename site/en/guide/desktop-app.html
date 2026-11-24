@@ -315,7 +315,7 @@
 </box-tab>
 <box-more>
 <ul>
-  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Attach a file…</strong> picks files of any kind: with the Note dialog open they go onto its Note, else they wait in the quick note for a new Note, as files dropped onto the window do. <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown, text, AsciiDoc, Org, reStructuredText or HTML files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Open Pack…</strong> opens a Pack someone sent you (see <a href="sharing-and-sync.html">Sharing and sync</a>). <strong>Open a Backup…</strong> opens a Backup to take Notes back from it, as on the Backups dialog (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Export as vault…</strong> writes every Note as Markdown files for another app (see <a href="#take-your-notes-to-another-app">Take your Notes to another app</a>). <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
+  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Attach a file…</strong> picks files of any kind: with the Note dialog open they go onto its Note, else they wait in the quick note for a new Note, as files dropped onto the window do. <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown, text, AsciiDoc, Org, reStructuredText or HTML files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Open Markdown file…</strong> shows a Markdown file in a viewer of its own, to read or import (see <a href="#capture-from-the-command-line">Capture from the command line</a>). <strong>Open Pack…</strong> opens a Pack someone sent you (see <a href="sharing-and-sync.html">Sharing and sync</a>). <strong>Open a Backup…</strong> opens a Backup to take Notes back from it, as on the Backups dialog (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Export as vault…</strong> writes every Note as Markdown files for another app (see <a href="#take-your-notes-to-another-app">Take your Notes to another app</a>). <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
   <li><strong>Edit</strong>: <strong>Undo</strong> (Ctrl+Z) takes back the last delete, check-off, filing or Merge, of all the cards selected at once where they went together; it is greyed while there is nothing to undo. <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Find</strong> (Ctrl+F) puts the cursor into the search field of the list shown, All Notes' where the list has none, such as the Agenda, and over the Settings into theirs; with a Note open in the Note dialog it opens the Note's find bar instead. <strong>Settings…</strong> (Ctrl+,) opens the Settings, whose search field at the top shows only the settings that hold the words typed. In the Settings, <strong>AI…</strong> opens the AI settings; the search finds it by the words of every AI setting, such as "API key".</li>
   <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Theme</strong> and <strong>Text size</strong>, with <strong>Larger text</strong> (Ctrl+Plus) and <strong>Smaller text</strong> (Ctrl+Minus) (see <a href="#change-the-theme-and-the-size">Change the theme and the size</a>).</li>
   <li><strong>Area</strong>, for the Area or Topic the list shows: <strong>Rename</strong> (F2), <strong>Colour and icon</strong>, <strong>Share…</strong>, <strong>People</strong>, <strong>Export as Pack…</strong>, <strong>Hidden from AI</strong>, <strong>Move up</strong> (Alt+Up), <strong>Move down</strong> (Alt+Down) and <strong>Delete</strong>, as its right-click in the sidebar offers them. Each is greyed where that menu leaves it out, such as Colour and icon, Share…, People, Hidden from AI, Move up and Move down for a Topic, Hidden from AI for a Shared Area, Move up for the first Area and Move down for the last, and all of them while no Area or Topic shows or a dialog, the Note dialog too, lies over the list.</li>
@@ -497,6 +497,7 @@
   <li><code>oldbrainfix capture -</code> keeps what comes in on standard input.</li>
   <li><code>oldbrainfix import FILE</code> imports a sync bundle and prints what came in.</li>
   <li><code>oldbrainfix open FILE</code> shows a Sent Item in the window, to accept or decline; a Profile card file adds the person and opens their Profile.</li>
+  <li><code>oldbrainfix notes.md more.md</code> shows each Markdown file (<code>.md</code>, <code>.markdown</code>) in a viewer window of its own, in the running app when one runs. On Linux, "Open with" offers Old Brain Fix for Markdown files without making it their default program, and <strong>File</strong> ▸ <strong>Open Markdown file…</strong> picks one.</li>
   <li><code>oldbrainfix --version</code> or <code>-V</code> prints the version, such as "Old Brain Fix 0.6.0", without starting the app.</li>
   <li><code>oldbrainfix --help</code> prints the usage.</li>
 </ul>
@@ -506,6 +507,25 @@
   worked prints nothing. The exit code is 0 when it worked, 1 when the Note could not be kept or the
   bundle imported, and 2 for wrong arguments or nothing to capture. Launchers, key-binding tools and
   macro pads can run these commands, also where the desktop offers no hotkey.
+</p>
+<p>
+  The Markdown viewer shows the file as the reading view of a Note's own window shows a Note: all
+  of Markdown with its tables, task lists, footnotes and six heading levels, its front matter as a
+  small table of properties at the top, and Obsidian's callouts and <code>==highlights==</code>.
+  Nothing of it goes into the app or syncs, and it shows the file again whenever the file changes.
+  A link such as <code>[[Garden]]</code>, <code>[[Garden|the garden]]</code> or
+  <code>[[Garden#Roses]]</code> opens Garden.md in the same window, at its heading; a name not
+  found is dimmed. Files are found in the nearest folder above holding <code>.obsidian</code>, else
+  in the file's own folder, and their folders; nothing outside it is read. <code>![[picture.png]]</code>
+  shows the picture. The arrows at the top, Alt+Left and Alt+Right and the mouse's back and forward
+  buttons go back and forward through the files shown. Ctrl+F finds in the file, a right-click on a
+  selection copies it, and Ctrl+Plus and Ctrl+Minus change the text size. <strong>Import as
+  Note…</strong> imports the file as the Import does, into a new Area named after it, dated when
+  the file was last changed; when it links to other files, it asks "Also import the files it links
+  to?" first. Imported together, their links become links between their Notes, and the pictures
+  they show become photos. ⋮ ▸ <strong>Open in the default app</strong> opens the file in the
+  program the system has for it. In the Flatpak only the file opened is shared with the app, so the
+  files its links name show as not found.
 </p>
 </box-more>
 </guide-box>

@@ -2307,7 +2307,7 @@ fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
 
 /// Where the characters `start..end` of `galley` lie, a rectangle on each
 /// row they are on.
-fn row_rects(galley: &Galley, (start, end): (usize, usize)) -> Vec<Rect> {
+pub(crate) fn row_rects(galley: &Galley, (start, end): (usize, usize)) -> Vec<Rect> {
     let mut out = Vec::new();
     let mut at = 0;
     for row in &galley.rows {

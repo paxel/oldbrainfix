@@ -8,6 +8,8 @@
 //! - `oldbrainfix import FILE` imports the sync bundle FILE,
 //! - `oldbrainfix open FILE` shows the Sent Item FILE in the window, to
 //!   accept or decline,
+//! - `oldbrainfix notes.md more.md` shows each Markdown file (`.md`,
+//!   `.markdown`) in a viewer of its own (obf-1056), as "Open with" does,
 //! - `oldbrainfix --version` prints the version.
 //!
 //! A capture without a window prints nothing when it worked; an import
@@ -51,6 +53,9 @@ pub enum Launch {
     Import(String),
     /// Shows the Sent Item at this path in the window.
     Open(String),
+    /// Shows the Markdown files at these paths, each in a viewer of its
+    /// own (obf-1056).
+    Markdown(Vec<String>),
     /// Prints the usage.
     Help,
     /// Prints the version.
@@ -85,8 +90,15 @@ pub fn parse(args: &[String]) -> Result<Launch, Usage> {
             [path] if !path.is_empty() => Ok(Launch::Open(path.clone())),
             _ => Err(Usage),
         },
+        _ if args.iter().all(|a| is_markdown(a)) => Ok(Launch::Markdown(args.to_vec())),
         _ => Err(Usage),
     }
+}
+
+/// Whether `arg` is the path of a Markdown file, by its ending, and no
+/// option.
+fn is_markdown(arg: &str) -> bool {
+    !arg.starts_with('-') && oldbrainfix_core::obsidian::is_markdown(arg)
 }
 
 fn words(text: &[String]) -> Result<Launch, Usage> {

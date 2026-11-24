@@ -84,3 +84,21 @@ fn blank_text_is_nothing_to_capture() {
     );
     assert_eq!(note_text(" \n\t"), None);
 }
+
+#[test]
+fn markdown_files_open_in_viewers_several_at_once() {
+    assert_eq!(
+        parse_of(&["notes.md"]),
+        Ok(Launch::Markdown(vec!["notes.md".into()]))
+    );
+    assert_eq!(
+        parse_of(&["a.md", "/home/me/B.MARKDOWN"]),
+        Ok(Launch::Markdown(vec![
+            "a.md".into(),
+            "/home/me/B.MARKDOWN".into()
+        ]))
+    );
+    assert_eq!(parse_of(&["a.md", "b.txt"]), Err(Usage));
+    assert_eq!(parse_of(&["-x.md"]), Err(Usage));
+    assert_eq!(parse_of(&["notes"]), Err(Usage));
+}

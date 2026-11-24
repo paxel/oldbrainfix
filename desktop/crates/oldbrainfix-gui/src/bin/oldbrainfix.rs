@@ -566,7 +566,7 @@ fn older_stays(locale: &'static str, launch: &Launch) -> Result<i32, String> {
     );
     if !matches!(
         launch,
-        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_)
+        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_) | Launch::Markdown(_)
     ) {
         return Ok(cli::FAILED);
     }
@@ -753,6 +753,21 @@ fn run() -> Result<i32, String> {
             }
             if let Ok(mut held) = handed.lock() {
                 held.push(path);
+            }
+            Some(Command::Open)
+        }
+        Launch::Markdown(files) => {
+            // Each in a viewer of the running app, one connection each
+            // (obf-1056); without one, this start shows them.
+            let paths: Vec<std::path::PathBuf> = files
+                .iter()
+                .map(|f| std::path::absolute(f).unwrap_or_else(|_| f.into()))
+                .collect();
+            if paths.iter().all(|p| instance::hand_over_file(&socket, p)) {
+                return Ok(cli::OK);
+            }
+            if let Ok(mut held) = handed.lock() {
+                held.extend(paths);
             }
             Some(Command::Open)
         }

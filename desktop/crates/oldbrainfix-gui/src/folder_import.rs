@@ -33,6 +33,9 @@ pub type Imported = Result<ImportSummary, String>;
 pub enum Importing {
     Folder(String),
     Keep,
+    /// Of a Markdown file shown in its viewer (obf-1056), by its name for
+    /// people.
+    Markdown(String),
 }
 
 /// Hands the Import's thread its store: a connection of its own to the
@@ -80,6 +83,29 @@ impl FolderImport {
                         .folder(&area_name, &files)
                         .map_err(|e| e.to_string())
                 })
+        });
+    }
+
+    /// Imports the Markdown file `file` and the files `linked` it links
+    /// to in the folder `root` its links are found in on a thread of its
+    /// own (obf-1056), into the store `open` hands it there, into a new
+    /// Area named `area_name`, with the pictures they show as photos
+    /// ([`Imports::linked`]); `name` is the file's name for people.
+    /// Nothing while an Import runs.
+    pub fn start_linked(
+        &mut self,
+        open: ImportStore,
+        (file, root, linked): (PathBuf, PathBuf, Vec<PathBuf>),
+        name: String,
+        area_name: String,
+    ) {
+        self.run(Importing::Markdown(name), open, move |store, tell| {
+            read_linked(&root, &file, &linked).and_then(|(files, pictures)| {
+                Imports::new(store)
+                    .reporting(tell)
+                    .linked(&area_name, &files, &pictures)
+                    .map_err(|e| e.to_string())
+            })
         });
     }
 
@@ -218,6 +244,73 @@ fn read_into(dir: &Path, prefix: &str, files: &mut Vec<ImportFile>) -> std::io::
         });
     }
     Ok(())
+}
+
+/// The Markdown file `file` and the files `linked` of the folder `root`,
+/// by their paths in it, and the pictures they show there (obf-1056);
+/// what fails to be read fails the Import. A file or picture larger than
+/// the core takes is handed over as that many bytes and one more,
+/// unread, to be counted as too large. Nothing outside `root` is read.
+pub fn read_linked(
+    root: &Path,
+    file: &Path,
+    linked: &[PathBuf],
+) -> Result<(Vec<ImportFile>, Vec<ImportFile>), String> {
+    use oldbrainfix_core::imports::MAX_PHOTO_BYTES;
+    use oldbrainfix_core::obsidian;
+    let read = |path: &Path, most: usize| -> Result<(Option<DateTime<Utc>>, Vec<u8>), String> {
+        let failed = |e: std::io::Error| format!("{}: {e}", path.display());
+        let metadata = std::fs::metadata(path).map_err(failed)?;
+        let modified = metadata.modified().ok().map(DateTime::<Utc>::from);
+        if metadata.len() > most as u64 {
+            return Ok((modified, vec![0; most + 1]));
+        }
+        Ok((modified, std::fs::read(path).map_err(failed)?))
+    };
+    let index = crate::md_source::index(root);
+    let mut files = Vec::new();
+    let mut wanted: Vec<String> = Vec::new();
+    for path in std::iter::once(file).chain(linked.iter().map(PathBuf::as_path)) {
+        let Some(name) = crate::md_source::path_in(root, path) else {
+            continue;
+        };
+        let (modified, bytes) = read(path, MAX_FILE_BYTES)?;
+        let text = crate::md_source::text_of(&bytes);
+        for link in obsidian::wiki_links(&text).into_iter().filter(|l| l.embed) {
+            if let Some(found) = obsidian::file_target(&link.target, &name, &index)
+                .and_then(|i| index.get(i))
+                .filter(|p| !wanted.contains(p))
+            {
+                wanted.push(found.clone());
+            }
+        }
+        for picture in obsidian::pictures(&text) {
+            if let Some(found) = obsidian::picture_target(&picture.path, &name, &index)
+                .and_then(|i| index.get(i))
+                .filter(|p| !wanted.contains(p))
+            {
+                wanted.push(found.clone());
+            }
+        }
+        files.push(ImportFile {
+            name,
+            modified,
+            bytes,
+        });
+    }
+    let mut pictures = Vec::new();
+    for path in wanted {
+        let Some(full) = crate::md_source::inside(root, &path) else {
+            continue;
+        };
+        let (modified, bytes) = read(&full, MAX_PHOTO_BYTES)?;
+        pictures.push(ImportFile {
+            name: path,
+            modified,
+            bytes,
+        });
+    }
+    Ok((files, pictures))
 }
 
 /// Whether the file `name` may become a Note, as the core takes it: a

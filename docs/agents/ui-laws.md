@@ -1688,6 +1688,31 @@ replace a law of Both apps where they say so. A desktop law marked
   over it. It opens off in every new window and stays as switched while
   the window is open; nothing is stored, so the AI port has nothing to
   read or set.
+- **A Markdown file opens in a viewer of its own** (obf-1056, Q1–Q7):
+  from the command line (`oldbrainfix notes.md more.md`, several at
+  once, into the running app, no second app), from "Open with" for `.md`
+  and `.markdown` files on Linux, Windows and macOS, offered but never
+  made their default, and from File ▸ Open Markdown file…. It is a
+  window beside the main one, one per file, drawn as the reading view
+  draws a Note: all of CommonMark with GitHub's tables (as obf-1048 draws
+  them), task lists, strike-through and footnotes, six heading levels,
+  the front matter as a small table of properties at the top, Obsidian's
+  callouts and highlights. Nothing goes into the store or syncs, so the
+  AI port has nothing to read or set; it shows the file again as it
+  changes on disk. `[[Name]]`, `[[Name|label]]` and `[[Name#Heading]]`
+  open Name.md in the same window at that heading, found in the nearest
+  folder above holding `.obsidian`, else the file's own, and their
+  folders; a name not found is dimmed, and nothing outside that folder is
+  read. Back and forward (the arrows at the top, Alt+Left and Alt+Right,
+  the mouse's back and forward buttons) go through the files it showed.
+  It has the find bar (Ctrl+F), selection with the right-click's Copy and
+  Search, Ctrl+Plus and Ctrl+Minus for the text size, and in ⋮ Find,
+  Open in the default app and Import as Note…, which also stands in its
+  bar: it imports by the Import rules and, when the file links to others,
+  asks first "Also import the N files it links to?"; imported together,
+  their links become App links to each other's Notes, their pictures
+  photos. While an Import runs, the bar says so in its place. What the
+  Import made is announced at the top of the main window.
 - **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
   7", #279), as the one list that asks to be emptied; no other place
   shows a count, and an empty Unsorted shows none. **An Area with Topics

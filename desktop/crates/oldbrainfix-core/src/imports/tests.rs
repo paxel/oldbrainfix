@@ -879,3 +879,131 @@ mod beside {
         Ok(())
     }
 }
+
+/// The Import of a Markdown file opened in the desktop's viewer and the
+/// files it links to (obf-1056).
+mod linked {
+    use super::*;
+    use crate::app_link::{self, AppLink};
+
+    const PNG: [u8; 10] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 3, 4];
+
+    /// The ids of the Notes the app links in `text` open.
+    fn linked_ids(text: &str) -> Vec<String> {
+        crate::markdown::parse(text)
+            .iter()
+            .flat_map(|b| b.spans.clone())
+            .filter(|s| s.kind == crate::markdown::SpanKind::Link)
+            .filter_map(|s| match app_link::parse(&s.url) {
+                Some(AppLink::Note(id)) => Some(id),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn links_between_the_files_become_app_links_to_each_others_notes() -> Result<()> {
+        let store = store();
+        let summary = Imports::new(&store).linked(
+            "From Garden",
+            &[
+                file(
+                    "Garden.md",
+                    "Plant [[Roses|the roses]] and [[sub/Tulips#Bulbs]], not [[Lost]].",
+                    Some(march()),
+                ),
+                file("sub/Roses.md", "Back to [[garden]].", Some(may())),
+                file("sub/Tulips.md", "Bulbs in autumn.", Some(may())),
+            ],
+            &[],
+        )?;
+        assert_eq!(summary.notes, 3);
+        let notes = inside(&store, &summary)?;
+        let by_name = |name: &str| {
+            notes
+                .iter()
+                .find(|n| n.text.starts_with(&format!("# {name}")))
+        };
+        let garden = by_name("Garden").ok_or(Error::Invalid("Garden".into()))?;
+        let roses = by_name("Roses").ok_or(Error::Invalid("Roses".into()))?;
+        let tulips = by_name("Tulips").ok_or(Error::Invalid("Tulips".into()))?;
+        assert_eq!(garden.text_format, MARKDOWN);
+        assert!(garden.text.contains("[the roses](oldbrainfix://note/"));
+        assert!(
+            garden
+                .text
+                .contains("[sub/Tulips > Bulbs](oldbrainfix://note/")
+        );
+        assert!(garden.text.contains("not [[Lost]]."));
+        assert_eq!(
+            linked_ids(&garden.text),
+            [roses.id.clone(), tulips.id.clone()]
+        );
+        assert_eq!(linked_ids(&roses.text), std::slice::from_ref(&garden.id));
+        // Dated by their files, none of them Unsorted.
+        assert_eq!(garden.captured, march());
+        assert!(notes.iter().all(|n| n.place.is_some()));
+        Ok(())
+    }
+
+    #[test]
+    fn embedded_pictures_become_photos_and_leave_the_text() -> Result<()> {
+        let store = store();
+        let summary = Imports::new(&store).linked(
+            "From Garden",
+            &[file(
+                "notes/Garden.md",
+                "Roses ![[rose.png]] and ![a tulip](../pics/tulip%201.png) ![[gone.png]]\n![big](big.png)",
+                Some(march()),
+            )],
+            &[
+                raw("pics/rose.png", PNG.to_vec(), None),
+                raw("pics/tulip 1.png", vec![0xff, 0xd8, 0xff, 0xd9], None),
+                raw("notes/big.png", vec![0; MAX_PHOTO_BYTES + 1], None),
+            ],
+        )?;
+        assert_eq!(
+            (summary.notes, summary.photos, summary.too_large),
+            (1, 2, 1)
+        );
+        let notes = inside(&store, &summary)?;
+        let garden = notes.first().ok_or(Error::Invalid("Garden".into()))?;
+        assert_eq!(
+            garden.text,
+            "# Garden\nRoses  and  ![[gone.png]]\n![big](big.png)"
+        );
+        assert_eq!(store.photo(&garden.photos[0]), Some(PNG.to_vec()));
+        Ok(())
+    }
+
+    #[test]
+    fn a_link_to_a_file_skipped_stays_as_written() -> Result<()> {
+        let store = store();
+        let large = format!("{}\n", "x".repeat(MAX_TEXT_BYTES));
+        let summary = Imports::new(&store).linked(
+            "From Garden",
+            &[
+                file("Garden.md", "See [[Huge]] and [[Shed]].", Some(march())),
+                file("Huge.md", &large, Some(march())),
+                file("Shed.md", "Tools.", Some(march())),
+                file("picture.png", "no text", None),
+            ],
+            &[],
+        )?;
+        assert_eq!(
+            (summary.notes, summary.too_large, summary.not_text),
+            (2, 1, 1)
+        );
+        let notes = inside(&store, &summary)?;
+        let garden = notes
+            .iter()
+            .find(|n| n.text.starts_with("# Garden"))
+            .ok_or(Error::Invalid("Garden".into()))?;
+        assert!(
+            garden
+                .text
+                .contains("See [[Huge]] and [Shed](oldbrainfix://note/")
+        );
+        Ok(())
+    }
+}

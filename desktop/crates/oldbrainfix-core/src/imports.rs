@@ -16,6 +16,7 @@ use crate::entry::dart_iso;
 use crate::error::{Error, Result};
 use crate::import_formats::{self, ImportFormat};
 use crate::notes::keys;
+use crate::obsidian;
 use crate::places::Places;
 use crate::search::lower_case;
 use crate::shopping_lists::ListOnAgenda;
@@ -200,6 +201,92 @@ impl<'a> Imports<'a> {
         self.notes(name, &made, not_text, too_large)
     }
 
+    /// Makes one Note of each Markdown file of `files` in a new Area
+    /// named `area_name`, as [`Imports::folder`] makes it (obf-1056): the
+    /// file opened in the desktop's viewer and the files it links to, by
+    /// their paths in the folder their links are found in
+    /// ([`crate::obsidian`]). A wiki link to another of them becomes an
+    /// app link to its Note, `[[Name|label]]` showing its label; one to
+    /// a file not among them, or skipped, stays as written. A picture it
+    /// embeds, `![[picture.png]]` or `![alt](picture.png)`, that is among
+    /// `pictures`, by its path there, becomes a photo of the Note, the
+    /// embed left out of its text; one larger than [`MAX_PHOTO_BYTES`] is
+    /// counted as too large and stays as written. Any other file of
+    /// `files` is skipped and counted.
+    pub fn linked(
+        &self,
+        area_name: &str,
+        files: &[ImportFile],
+        pictures: &[ImportFile],
+    ) -> Result<ImportSummary> {
+        let name = area(area_name)?;
+        let now = self.store.now();
+        let mut skipped = ImportSummary::default();
+        let picture_paths: Vec<String> = pictures.iter().map(|p| slashed(&p.name)).collect();
+        let mut read: Vec<LinkedRead> = Vec::new();
+        for file in files {
+            let path = slashed(&file.name);
+            let base = base(&path);
+            let Some((stem, MARKDOWN)) = format_of(base) else {
+                skipped.not_text += 1;
+                continue;
+            };
+            if file.bytes.len() > MAX_FILE_BYTES {
+                skipped.too_large += 1;
+                continue;
+            }
+            let Some(text) = decode(&file.bytes) else {
+                skipped.not_text += 1;
+                continue;
+            };
+            let (text, photos, large) = taken_pictures(&text, &path, pictures, &picture_paths);
+            skipped.too_large += large;
+            let at = match file.modified.map(|at| at.trunc_subsecs(6)) {
+                Some(at) if at > DateTime::UNIX_EPOCH && at <= now => at,
+                _ => now,
+            };
+            read.push((path.clone(), stem.to_string(), text, at, photos));
+        }
+        let paths: Vec<String> = read.iter().map(|r| r.0.clone()).collect();
+        let ids = read
+            .iter()
+            .map(|_| Ok(format!("note:{}", self.store.new_id()?)))
+            .collect::<Result<Vec<String>>>()?;
+        // Links only to the Notes kept: those dropped as too large are
+        // left as written, and the rest is linked anew without them.
+        let mut linkable = vec![true; read.len()];
+        loop {
+            let notes: Vec<ImportedNote> = read
+                .iter()
+                .map(|(path, stem, text, at, photos)| {
+                    let linked = with_links(text, (&paths, &linkable, &ids));
+                    let text = titled(stem, &linked, MARKDOWN);
+                    ImportedNote {
+                        name: base(path).to_string(),
+                        text,
+                        format: MARKDOWN.to_string(),
+                        captured: *at,
+                        lines: None,
+                        photos: photos.clone(),
+                    }
+                })
+                .collect();
+            let (kept, _) = kept(&notes);
+            // Only ever fewer, so this ends: once every Note linked to is
+            // kept, the texts are written as they are.
+            let now_linkable: Vec<bool> = linkable
+                .iter()
+                .enumerate()
+                .map(|(i, &l)| l && kept.iter().any(|(k, _)| *k == i))
+                .collect();
+            // Every file has a name, so no Note is empty.
+            if now_linkable == linkable {
+                return self.write_as(name, &notes, &skipped, &ids);
+            }
+            linkable = now_linkable;
+        }
+    }
+
     /// Writes `notes` into a new Area named `area_name`, oldest first,
     /// filed there so none of them is Unsorted or Nudged, each captured
     /// and dated when it says, with its photos and, for a Checklist, its
@@ -234,6 +321,18 @@ impl<'a> Imports<'a> {
         notes: &[ImportedNote],
         skipped: &ImportSummary,
     ) -> Result<ImportSummary> {
+        self.write_as(area_name, notes, skipped, &[])
+    }
+
+    /// As [`Imports::write`], each note getting the id `ids` holds at its
+    /// place, a new one where it holds none (obf-1056).
+    fn write_as(
+        &self,
+        area_name: &str,
+        notes: &[ImportedNote],
+        skipped: &ImportSummary,
+        ids: &[String],
+    ) -> Result<ImportSummary> {
         let name = area(area_name)?;
         if let Some(note) = notes.iter().find(|n| !KNOWN.contains(&n.format.as_str())) {
             return Err(Error::Invalid(format!(
@@ -241,33 +340,11 @@ impl<'a> Imports<'a> {
                 note.format
             )));
         }
-        let mut order: Vec<(usize, &ImportedNote, DateTime<Utc>)> = notes
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (i, n, n.captured.trunc_subsecs(6)))
-            .collect();
-        order.sort_by(|a, b| (a.2, &a.1.name, a.0).cmp(&(b.2, &b.1.name, b.0)));
-        let mut kept = Vec::new();
-        let mut large = skipped.too_large;
-        let mut total = 0;
-        for (_, note, at) in order.iter().rev() {
-            let mut size = StoredText::of(&note.format, &note.text, VERSION)
-                .encode()
-                .len();
-            for line in note.lines.iter().flatten() {
-                size += StoredText::plain(&line.text).encode().len();
-            }
-            if size > MAX_TEXT_BYTES || total + size > MAX_TOTAL_BYTES {
-                large += 1;
-                continue;
-            }
-            total += size;
-            kept.push((*note, *at));
-        }
+        let (kept, large) = kept(notes);
         let summary = ImportSummary {
             area_id: None,
             notes: 0,
-            too_large: large,
+            too_large: skipped.too_large + large,
             checklists: 0,
             photos: 0,
             ..skipped.clone()
@@ -275,11 +352,14 @@ impl<'a> Imports<'a> {
         if kept.is_empty() {
             return Ok(summary);
         }
-        kept.reverse();
+        let kept: Vec<(&ImportedNote, DateTime<Utc>, Option<&String>)> = kept
+            .into_iter()
+            .filter_map(|(i, at)| Some((notes.get(i)?, at, ids.get(i))))
+            .collect();
         let s = self.store;
         // The bytes are kept before the log names them, each photo once.
         let mut hashes = Vec::new();
-        for (note, _) in &kept {
+        for (note, _, _) in &kept {
             let mut held: Vec<String> = Vec::new();
             for bytes in &note.photos {
                 let hash = s.put_photo(bytes)?;
@@ -291,9 +371,12 @@ impl<'a> Imports<'a> {
         }
         let area_id = s.batch(|| Ok(Places::new(s).add_area(&self.unused(name)?)?.id))?;
         self.tell(0, kept.len());
-        for (i, ((note, at), held)) in kept.iter().zip(&hashes).enumerate() {
+        for (i, ((note, at, given), held)) in kept.iter().zip(&hashes).enumerate() {
             s.batch(|| {
-                let id = format!("note:{}", s.new_id()?);
+                let id = match given {
+                    Some(id) => (*id).clone(),
+                    None => format!("note:{}", s.new_id()?),
+                };
                 let date = Some(*at);
                 s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), date)?;
                 s.append(&id, keys::CAPTURED, Some(&dart_iso(*at)), date)?;
@@ -314,7 +397,7 @@ impl<'a> Imports<'a> {
         Ok(ImportSummary {
             area_id: Some(area_id),
             notes: kept.len(),
-            checklists: kept.iter().filter(|(n, _)| n.lines.is_some()).count(),
+            checklists: kept.iter().filter(|(n, _, _)| n.lines.is_some()).count(),
             photos: hashes.iter().map(Vec::len).sum(),
             ..summary
         })
@@ -607,6 +690,134 @@ fn keep_tags(labels: Option<&Value>, body: &str) -> String {
         }
     }
     tags.join(" ")
+}
+
+/// A Markdown file read for [`Imports::linked`]: its path, its name
+/// without the ending, its text without the pictures taken, when it is
+/// dated and its photos.
+type LinkedRead = (String, String, String, DateTime<Utc>, Vec<Vec<u8>>);
+
+/// `path` with its folders separated by `/`.
+fn slashed(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
+/// `text`, of the file at `path`, without the pictures it embeds that are
+/// among `pictures` (by their `paths`), with their bytes, each once; and
+/// how many of them were too large to take, which stay as written.
+fn taken_pictures(
+    text: &str,
+    path: &str,
+    pictures: &[ImportFile],
+    paths: &[String],
+) -> (String, Vec<Vec<u8>>, usize) {
+    let mut cuts: Vec<(usize, usize, usize)> = Vec::new();
+    for link in obsidian::wiki_links(text).into_iter().filter(|l| l.embed) {
+        if let Some(found) = obsidian::file_target(&link.target, path, paths) {
+            cuts.push((link.start, link.end, found));
+        }
+    }
+    for picture in obsidian::pictures(text) {
+        if let Some(found) = obsidian::picture_target(&picture.path, path, paths) {
+            cuts.push((picture.start, picture.end, found));
+        }
+    }
+    cuts.sort_unstable();
+    let mut out = String::with_capacity(text.len());
+    let mut photos: Vec<Vec<u8>> = Vec::new();
+    let mut taken: Vec<usize> = Vec::new();
+    let mut large = 0;
+    let mut at = 0;
+    for (start, end, found) in cuts {
+        let Some(picture) = pictures.get(found) else {
+            continue;
+        };
+        if start < at {
+            continue;
+        }
+        if picture.bytes.len() > MAX_PHOTO_BYTES {
+            large += 1;
+            continue;
+        }
+        out.push_str(text.get(at..start).unwrap_or_default());
+        at = end;
+        if !taken.contains(&found) {
+            taken.push(found);
+            photos.push(picture.bytes.clone());
+        }
+    }
+    out.push_str(text.get(at..).unwrap_or_default());
+    (out, photos, large)
+}
+
+/// `text` with each wiki link to one of the files at `paths` that is
+/// `linkable` as a link to its Note, by its id in `ids`: `[shown](app
+/// link)`. Embeds and links to any other file stay as written.
+fn with_links(text: &str, (paths, linkable, ids): (&[String], &[bool], &[String])) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    for link in obsidian::wiki_links(text) {
+        if link.embed || link.target.is_empty() {
+            continue;
+        }
+        let Some(found) = obsidian::note_target(&link.target, paths) else {
+            continue;
+        };
+        let (Some(true), Some(id)) = (linkable.get(found).copied(), ids.get(found)) else {
+            continue;
+        };
+        out.push_str(text.get(at..link.start).unwrap_or_default());
+        let url = crate::app_link::AppLink::Note(id.clone()).url();
+        out.push_str(&format!("[{}]({url})", label_escaped(&link.shown())));
+        at = link.end;
+    }
+    out.push_str(text.get(at..).unwrap_or_default());
+    out
+}
+
+/// `label` as a link's words that read as written: a `\\` before each
+/// mark that could end the link or start a format in it.
+fn label_escaped(label: &str) -> String {
+    let mut out = String::with_capacity(label.len());
+    for c in label.chars() {
+        if matches!(c, '\\' | '[' | ']' | '*' | '_' | '~' | '`') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Which of `notes` an Import keeps, oldest first, by their places in
+/// `notes`, each with when it was captured; and how many it skips as too
+/// large: a text larger than [`MAX_TEXT_BYTES`], and the oldest beyond
+/// [`MAX_TOTAL_BYTES`].
+fn kept(notes: &[ImportedNote]) -> (Vec<(usize, DateTime<Utc>)>, usize) {
+    let mut order: Vec<(usize, &ImportedNote, DateTime<Utc>)> = notes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (i, n, n.captured.trunc_subsecs(6)))
+        .collect();
+    order.sort_by(|a, b| (a.2, &a.1.name, a.0).cmp(&(b.2, &b.1.name, b.0)));
+    let mut kept = Vec::new();
+    let mut large = 0;
+    let mut total = 0;
+    for (i, note, at) in order.iter().rev() {
+        let mut size = StoredText::of(&note.format, &note.text, VERSION)
+            .encode()
+            .len();
+        for line in note.lines.iter().flatten() {
+            size += StoredText::plain(&line.text).encode().len();
+        }
+        if size > MAX_TEXT_BYTES || total + size > MAX_TOTAL_BYTES {
+            large += 1;
+            continue;
+        }
+        total += size;
+        kept.push((*i, *at));
+    }
+    kept.reverse();
+    (kept, large)
 }
 
 fn area(name: &str) -> Result<&str> {

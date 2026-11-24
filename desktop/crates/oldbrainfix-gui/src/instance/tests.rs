@@ -264,3 +264,36 @@ fn a_file_to_open_goes_to_the_running_window() -> std::io::Result<()> {
     assert_eq!(opened, [file]);
     Ok(())
 }
+
+#[test]
+fn several_markdown_files_go_to_the_running_app_one_after_another() -> std::io::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let socket = dir.path().join("instance.sock");
+    let files = [dir.path().join("Garden.md"), dir.path().join("Roses.md")];
+    let opened = Arc::new(Mutex::new(Vec::new()));
+    let into = opened.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    listen(
+        &socket,
+        tx,
+        Box::new(|| {}),
+        (
+            Box::new(|_| Ok(())),
+            Box::new(|_| Ok(String::new())),
+            Box::new(move |path| {
+                if let Ok(mut held) = into.lock() {
+                    held.push(path.to_path_buf());
+                }
+            }),
+        ),
+    )?;
+    for file in &files {
+        assert!(hand_over_file(&socket, file));
+    }
+    let wait = std::time::Duration::from_secs(5);
+    assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
+    assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
+    let opened = opened.lock().map(|o| o.clone()).unwrap_or_default();
+    assert_eq!(opened, files);
+    Ok(())
+}

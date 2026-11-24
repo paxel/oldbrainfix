@@ -20,7 +20,9 @@
 //! or the line `import`, then the path to the end of the stream,
 //! answered by `ok` and what came in, or by `error` and what went wrong;
 //! or the line `file`, then the path to the end of the stream, and
-//! nothing back: the window opens with it.
+//! nothing back: the window opens with it. Markdown files given at the
+//! command line (obf-1056) go one per connection, each into a viewer of
+//! its own.
 
 use std::path::Path;
 use std::sync::mpsc::Sender;

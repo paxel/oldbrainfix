@@ -51,6 +51,7 @@ pub mod note_history;
 pub mod note_kinds;
 pub mod notes;
 pub mod nudges;
+pub mod obsidian;
 pub mod offers;
 pub mod overrides;
 pub mod packs;

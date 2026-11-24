@@ -61,6 +61,11 @@ rfd = "0.17"
 zip = { version = "=9.1.2", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # Whether the app running already is older than this start (#290).
 semver = "1"
+# A Markdown file opened from outside drawn in full (obf-1056): all of
+# CommonMark with GitHub's tables, task lists, strike-through and
+# footnotes, front matter and Obsidian's wiki links; pure Rust, MIT,
+# without its HTML writer.
+pulldown-cmark = { version = "0.13", default-features = false }
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]

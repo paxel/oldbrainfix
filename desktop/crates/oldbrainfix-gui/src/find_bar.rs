@@ -171,6 +171,14 @@ impl FindBar {
     /// Search all Notes and ✕. Enter in its field goes to the next place, Shift+Enter back,
     /// the field keeping the keyboard. What was asked comes back.
     pub fn show(&mut self, ui: &mut Ui, t: &L10n) -> Option<Asked> {
+        self.show_with(ui, t, (t.desk_find_hint(), t.desk_find_none()))
+    }
+
+    /// As [`FindBar::show`], its field's hint and what it says while its
+    /// words are nowhere `said`: a viewer of a file names the file there
+    /// (obf-1056).
+    pub fn show_with(&mut self, ui: &mut Ui, t: &L10n, said: (&str, &str)) -> Option<Asked> {
+        let (hint, nowhere) = said;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let mut asked = None;
@@ -214,7 +222,7 @@ impl FindBar {
                 let said = if findings::fold(self.query.trim()).is_empty() {
                     String::new()
                 } else if count == 0 {
-                    t.desk_find_none().to_string()
+                    nowhere.to_string()
                 } else {
                     t.desk_find_count(self.at as i64 + 1, count as i64)
                 };
@@ -225,11 +233,11 @@ impl FindBar {
                     let field = ui.add(
                         TextEdit::singleline(&mut self.query)
                             .id(id)
-                            .hint_text(t.desk_find_hint())
+                            .hint_text(hint)
                             .text_color(text)
                             .desired_width(ui.available_width()),
                     );
-                    name_field(ui, &field, t.desk_find_hint());
+                    name_field(ui, &field, hint);
                     crate::text_menu::show(ui, t, &field, &self.query);
                     // Not in a dialog's first, sizing pass, which drops a
                     // focus.

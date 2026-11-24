@@ -147,6 +147,7 @@ use crate::l10n::{self, L10n};
 use crate::leave_saves::{self, Leaving};
 use crate::line_editing::{Listed, TypedLines};
 use crate::login;
+use crate::md_view;
 use crate::media::{
     Clipboard, FromFile, Player, Recorder, SOUND_EXTENSIONS, from_file, photo_extension,
     photo_from_file,
@@ -1507,6 +1508,9 @@ enum Action {
     SelectAllCards,
     /// File ▸ Import…: asks which Import.
     AskImport,
+    /// File ▸ Open Markdown file… (obf-1056): asks for the file, then
+    /// shows it in a viewer of its own.
+    OpenMarkdown,
     /// File ▸ Export as vault… (#267): asks for the folder, then writes
     /// the vault off the window's thread.
     ExportVault,
@@ -2484,6 +2488,13 @@ pub struct App {
     /// What a Note window was asked that the main window does (#287):
     /// showing a place or a dialog, opening another Note.
     for_main: Vec<Action>,
+    /// The Markdown files shown in viewers of their own beside this
+    /// window (obf-1056), and how many were opened, each having its own
+    /// viewport.
+    viewers: Vec<md_view::Viewer>,
+    viewers_opened: u64,
+    /// Asks for the Markdown file File ▸ Open Markdown file… shows.
+    markdown_picker: FolderPicker,
 }
 
 /// A question asked off the window's thread (#267): the provider's
@@ -2620,6 +2631,13 @@ fn pack_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
         .add_filter(oldbrainfix_core::APP_NAME, &[packs::EXTENSION])
+}
+
+/// The open dialog's filter for a Markdown file (obf-1056).
+fn markdown_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter("Markdown", &["md", "markdown"])
 }
 
 /// The open dialog's filter for the zip of a Google Takeout export.
@@ -2993,6 +3011,9 @@ impl App {
             windows_opened: 0,
             lines_base: 0,
             for_main: Vec::new(),
+            viewers: Vec::new(),
+            viewers_opened: 0,
+            markdown_picker: Box::new(|title| markdown_dialog(title).pick_file()),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -3181,6 +3202,13 @@ impl App {
     pub fn set_bundle_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
         self.bundle_saver = saver;
         self.bundle_opener = opener;
+    }
+
+    /// Asks `picker` for the Markdown file File ▸ Open Markdown file…
+    /// shows (obf-1056) instead of the system's dialog; tests hand in a
+    /// path.
+    pub fn set_markdown_picker(&mut self, picker: FolderPicker) {
+        self.markdown_picker = picker;
     }
 
     /// Asks `picker` for the folder to import instead of the system's
@@ -4137,6 +4165,11 @@ impl App {
     /// than a Sent Item or a card file can be read off the window's
     /// thread, and every Pack opened there.
     fn open_file(&mut self, path: &std::path::Path) {
+        // A Markdown file shows in a viewer of its own (obf-1056).
+        if oldbrainfix_core::obsidian::is_markdown(&path.to_string_lossy()) {
+            self.open_viewer(path.to_path_buf());
+            return;
+        }
         let most = sent::MAX_BYTES.max(cards::MAX_FILE_BYTES) as u64;
         match pack_file(path, most) {
             PackFile::Bytes(bytes) => {
@@ -5295,6 +5328,64 @@ impl App {
         ));
     }
 
+    /// Announces how the Import of the Markdown file `name` from its viewer
+    /// ended (obf-1056), as [`App::announce_folder_imported`] does for a
+    /// folder: that it finished, what went where behind the click with a
+    /// way into the new Area; that the file was too large to take; or
+    /// that it failed.
+    fn announce_markdown_imported(&mut self, name: &str, imported: Imported) {
+        let t = self.t;
+        let summary = match imported {
+            Ok(summary) => summary,
+            Err(details) => {
+                self.announce_failure(
+                    t.desk_markdown_import_failed(),
+                    t.import_failed_title(),
+                    (
+                        t.desk_markdown_import_failed_cause(),
+                        t.desk_markdown_import_failed_fix(),
+                    ),
+                    details,
+                );
+                return;
+            }
+        };
+        let skipped =
+            t.desk_markdown_import_skipped(name, summary.not_text as i64, summary.too_large as i64);
+        let Some(area) = summary.area_id.clone() else {
+            self.announce_failure(
+                t.desk_markdown_import_nothing(),
+                t.import_nothing_title(),
+                (
+                    t.desk_markdown_import_nothing_cause(),
+                    t.desk_markdown_import_nothing_fix(),
+                ),
+                skipped,
+            );
+            return;
+        };
+        let shown = match Places::new(&self.store).area_by_id(&area) {
+            Ok(Some(made)) => area_name(&t, &made),
+            _ => t.import_area_name(name),
+        };
+        let mut details = t.import_finished_notes(summary.notes as i64, &shown);
+        if summary.photos > 0 {
+            details.push('\n');
+            details.push_str(&t.import_keep_photos(summary.photos as i64));
+        }
+        if summary.skipped() > 0 {
+            details.push_str("\n\n");
+            details.push_str(&t.import_finished_skipped(summary.skipped() as i64));
+            details.push('\n');
+            details.push_str(&skipped);
+        }
+        self.notice = Some(t.import_finished().to_string());
+        self.notice_dialog = Some((
+            t.import_finished().to_string(),
+            Dialog::Imported { details, area },
+        ));
+    }
+
     /// Announces how the import from Google Keep ended, as
     /// [`App::announce_folder_imported`] does: what went where behind the
     /// click, the Checklists and photos among it and what was skipped
@@ -6364,8 +6455,10 @@ impl App {
     /// quick note's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the open Note's edited text.
     pub fn flush(&mut self) {
-        // The Note windows go with the window (#287).
+        // The Note windows go with the window (#287), the Markdown files'
+        // too (obf-1056).
         self.close_note_windows();
+        self.viewers.clear();
         if !self.capture.trim().is_empty() || self.recording() || self.holds_media() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
@@ -7681,6 +7774,11 @@ impl App {
             }
             Action::SelectAllCards => self.cards.select_all(&self.shown_cards()),
             Action::AskImport => self.dialog = Some(Dialog::Import),
+            Action::OpenMarkdown => {
+                if let Some(file) = (self.markdown_picker)(self.t.desk_markdown_open_title()) {
+                    self.open_viewer(file);
+                }
+            }
             Action::SelectNote(id) => {
                 // One dialog at a time: the quick note is kept and closed.
                 if self.quick_open {
@@ -11401,6 +11499,15 @@ impl App {
                     match kind {
                         Importing::Folder(name) => self.announce_folder_imported(&name, imported),
                         Importing::Keep => self.announce_keep_imported(imported),
+                        Importing::Markdown(name) => {
+                            self.announce_markdown_imported(&name, imported);
+                            // Asked in a viewer, it is said here: this
+                            // window comes forward to say it.
+                            ui.ctx().send_viewport_cmd_to(
+                                egui::ViewportId::ROOT,
+                                egui::ViewportCommand::Focus,
+                            );
+                        }
                     }
                     // What it made is announced at the top; the Import
                     // dialog, when it shows, says the same in its place,
@@ -11835,8 +11942,10 @@ impl App {
                 self.apply(action);
             }
         }
-        // The Notes in windows of their own, beside this one (#287).
+        // The Notes in windows of their own, beside this one (#287), and
+        // the Markdown files (obf-1056).
         self.show_note_windows(ui.ctx());
+        self.show_viewers(ui.ctx());
         // Once the Settings no longer show Record keys, recording stops
         // (#283).
         if !std::mem::take(&mut self.hotkey_recording.drawn) {
@@ -11914,6 +12023,82 @@ impl App {
         }
         for action in asked {
             self.apply(action);
+        }
+    }
+
+    /// Shows the Markdown file `file` in a viewer of its own (obf-1056),
+    /// or brings forward the one that shows it already.
+    fn open_viewer(&mut self, file: std::path::PathBuf) {
+        if let Some(viewer) = self.viewers.iter_mut().find(|v| v.shows(&file)) {
+            viewer.forward = true;
+            return;
+        }
+        self.viewers_opened += 1;
+        let size = window_sizes::note_window_size(&self.store);
+        let wake = self.redraw.clone();
+        let viewer = md_view::Viewer::open(file, self.viewers_opened, size, wake);
+        self.viewers.push(viewer);
+    }
+
+    /// The Markdown viewers open (obf-1056), for tests.
+    pub fn markdown_viewers(&self) -> &[md_view::Viewer] {
+        &self.viewers
+    }
+
+    /// Draws each Markdown viewer (obf-1056) as a viewport of this
+    /// window's, and does what each asked of this window.
+    fn show_viewers(&mut self, ctx: &egui::Context) {
+        if self.viewers.is_empty() {
+            return;
+        }
+        let t = self.t;
+        let importing = self.import.running();
+        let mut asked = Vec::new();
+        self.viewers.retain_mut(|viewer| {
+            if std::mem::take(&mut viewer.forward) {
+                ctx.send_viewport_cmd_to(viewer.viewport, egui::ViewportCommand::Focus);
+            }
+            let title = viewer.title(t.app_title());
+            let builder = note_window::viewport(&title, viewer.size, false);
+            let (open, mut wanted) =
+                ctx.show_viewport_immediate(viewer.viewport, builder, |ui, class| {
+                    viewer.frame(
+                        ui,
+                        &t,
+                        importing,
+                        class != egui::ViewportClass::EmbeddedWindow,
+                    )
+                });
+            asked.append(&mut wanted);
+            open
+        });
+        for ask in asked {
+            match ask {
+                md_view::Asked::TextStep(larger) => self.apply(Action::TextStep(larger)),
+                md_view::Asked::SearchAll(words) => self.apply(Action::SearchFor(words)),
+                md_view::Asked::OpenElsewhere(file) => {
+                    let opened = match &self.linked_file_opener {
+                        Some(open) => open(&file),
+                        None => app_links::open_file(&file),
+                    };
+                    if !opened {
+                        self.notice = Some(self.t.link_not_available().to_string());
+                    }
+                }
+                md_view::Asked::Import { file, root, linked } => {
+                    if !self.import.running() {
+                        // Named after the file, without its ending.
+                        let name = file
+                            .file_stem()
+                            .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+                        let area = self.t.import_area_name(&name);
+                        let open = self.import_store();
+                        self.import
+                            .start_linked(open, (file, root, linked), name, area);
+                    }
+                }
+            }
+            ctx.request_repaint();
         }
     }
 
@@ -13452,6 +13637,7 @@ impl App {
                     (t.attach_file_menu(), None, true, Action::AttachFiles),
                     (t.settings_quick_note(), None, true, Action::QuickNote),
                     (t.menu_import(), None, true, Action::AskImport),
+                    (t.desk_markdown_open(), None, true, Action::OpenMarkdown),
                     (t.menu_open_pack(), None, true, Action::OpenPack),
                     (
                         t.backup_open(),
@@ -23627,7 +23813,7 @@ fn finding_text(
 
 /// The size of a Note's text as the Note dialog and the reading view show
 /// it, before the Device's text size (#326).
-const READ_SIZE: f32 = 18.0;
+pub(crate) const READ_SIZE: f32 = 18.0;
 
 /// What [`read_part`] draws, the text of a Note or Section: its id, its
 /// text, its format and the scope of the grammar a Code text is coloured
@@ -23639,7 +23825,7 @@ type ReadPart<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 type PartBoxes<'a> = (&'a BoxLook, (bool, &'a dyn Fn(&str) -> bool));
 
 /// How far from the window's edges a table in the reading view stays.
-const READ_EDGE: f32 = 12.0;
+pub(crate) const READ_EDGE: f32 = 12.0;
 
 /// Draws the bytes `range` of a Note's or Section's text in the reading
 /// view (#322) at `size` points, as a text only read reads in the Note
