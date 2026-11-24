@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a long press or drag on a table cell selects a rectangle of cells, which copies as a table. ([obf-1054](https://github.com/paxel/oldbrainfix/issues/365))
 - On the phone and the desktop, a Heads-up can have a custom length: a number of minutes, hours, days or weeks. ([obf-1087](https://github.com/paxel/oldbrainfix/issues/400))
 - On the phone and the desktop, a Show tips switch in the Settings and No more tips on every tip turn the tips off. ([obf-1060](https://github.com/paxel/oldbrainfix/issues/373))
+- On the phone and the desktop, a voice recording can end on its own after a pause of 2, 3, 5 or 10 seconds. ([obf-1053](https://github.com/paxel/oldbrainfix/issues/364))
 
 ### Changed
 

@@ -265,3 +265,92 @@ fn a_kept_photo_has_no_metadata_left_to_strip() {
     let kept = photo_from_file(&png(8, 8, [1, 2, 3, 255])).unwrap_or_default();
     assert_eq!(oldbrainfix_core::photos::strip_jpeg_metadata(&kept), kept);
 }
+
+#[test]
+fn the_level_is_the_loudest_sample_since_it_was_last_asked() {
+    let mut peak = Peak::default();
+    assert_eq!(peak.take(), None, "nothing heard yet");
+    peak.hear(&[0.01, -0.3, 0.2]);
+    peak.hear(&[0.05]);
+    assert_eq!(peak.take(), Some(0.3));
+    assert_eq!(peak.take(), None, "nothing heard since");
+    peak.hear(&[0.0; 800]);
+    assert_eq!(peak.take(), Some(0.0), "silence is a level");
+    // A sample that is no number makes it unreadable, never quiet.
+    peak.hear(&[0.001, f32::NAN, 0.001]);
+    assert_eq!(peak.take(), None);
+    peak.hear(&[f32::INFINITY]);
+    assert_eq!(peak.take(), None);
+    peak.hear(&[0.001]);
+    assert_eq!(peak.take(), Some(0.001));
+}
+
+/// Feeds `watch` the `levels`, one every [`PauseWatch::EVERY`] from
+/// `start`; the time of the one it ended on.
+fn ends_at(watch: &mut PauseWatch, start: f64, levels: &[Option<f32>]) -> Option<f64> {
+    levels.iter().enumerate().find_map(|(i, level)| {
+        let now = start + i as f64 * PauseWatch::EVERY;
+        assert!(watch.due(now));
+        watch.hear(*level, now).then_some(now)
+    })
+}
+
+#[test]
+fn a_pause_after_speech_ends_a_recording_once_it_lasted_the_seconds_set() {
+    let quiet = Some(QUIET_BELOW / 2.0);
+    let loud = Some(0.4);
+    let mut watch = PauseWatch::new(2);
+    // Ten asks of 0.2 s quiet after speech make 2 s.
+    let mut levels = vec![loud];
+    levels.extend([quiet; 10]);
+    let ended = ends_at(&mut watch, 0.0, &levels);
+    assert!(ended.is_some_and(|at| (at - 2.0).abs() < 1e-9), "{ended:?}");
+    // Nine are not enough.
+    let mut watch = PauseWatch::new(2);
+    let mut levels = vec![loud];
+    levels.extend([quiet; 9]);
+    assert_eq!(ends_at(&mut watch, 0.0, &levels), None);
+}
+
+#[test]
+fn a_recording_nothing_was_said_into_goes_on() {
+    let mut watch = PauseWatch::new(2);
+    let levels = [Some(0.0); 100];
+    assert_eq!(ends_at(&mut watch, 0.0, &levels), None);
+    // Just under the line is quiet, on it is heard.
+    let mut watch = PauseWatch::new(2);
+    let mut levels = vec![Some(QUIET_BELOW - 0.001); 50];
+    levels.push(Some(QUIET_BELOW));
+    levels.extend([Some(0.0); 10]);
+    assert!(ends_at(&mut watch, 0.0, &levels).is_some());
+}
+
+#[test]
+fn speech_or_an_unreadable_level_starts_the_quiet_anew() {
+    let quiet = Some(0.0);
+    for breaks in [Some(0.5), None] {
+        let mut watch = PauseWatch::new(3);
+        let mut levels = vec![Some(0.5)];
+        levels.extend([quiet; 14]);
+        levels.push(breaks);
+        levels.extend([quiet; 14]);
+        assert_eq!(ends_at(&mut watch, 0.0, &levels), None, "{breaks:?}");
+        // The fifteenth quiet ask after it ends it.
+        assert!(watch.hear(quiet, 30.0 * PauseWatch::EVERY));
+    }
+    // An unreadable level before anything was heard does not count as
+    // heard.
+    let mut watch = PauseWatch::new(2);
+    let mut levels = vec![None];
+    levels.extend([quiet; 20]);
+    assert_eq!(ends_at(&mut watch, 0.0, &levels), None);
+}
+
+#[test]
+fn the_level_is_asked_every_fifth_of_a_second() {
+    let mut watch = PauseWatch::new(2);
+    assert!(watch.due(0.0), "at once");
+    watch.hear(Some(0.5), 1.0);
+    assert!(!watch.due(1.1));
+    assert!(watch.due(1.2));
+}

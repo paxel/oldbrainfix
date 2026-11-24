@@ -52,6 +52,110 @@ pub trait Recorder {
 
     /// How long the running recording has run.
     fn elapsed(&self) -> Duration;
+
+    /// The loudest the running recording was since this was last asked,
+    /// from 0 to 1 of full scale (obf-1053); `None` when that cannot be
+    /// told: nothing heard since, a sample that is no number, or no
+    /// recording running. A microphone that tells nothing never ends a
+    /// recording on a pause.
+    fn level(&mut self) -> Option<f32> {
+        None
+    }
+}
+
+/// The level below which the microphone counts as quiet (obf-1053), as on
+/// the phone: 0.02 of full scale at its peak, about −34 dBFS, under
+/// speech and above a quiet room.
+pub const QUIET_BELOW: f32 = 0.02;
+
+/// The loudest of the samples heard since it was last taken (obf-1053).
+#[derive(Debug, Default)]
+pub struct Peak {
+    loudest: f32,
+    heard: bool,
+    /// Whether a sample was no number, so the level cannot be told.
+    unreadable: bool,
+}
+
+impl Peak {
+    /// Takes `samples`, from -1 to 1.
+    pub fn hear(&mut self, samples: &[f32]) {
+        for sample in samples {
+            if sample.is_finite() {
+                self.loudest = self.loudest.max(sample.abs());
+            } else {
+                self.unreadable = true;
+            }
+        }
+        self.heard |= !samples.is_empty();
+    }
+
+    /// The loudest sample heard since last taken, from then on counting
+    /// anew; `None` when none was heard or one was no number.
+    pub fn take(&mut self) -> Option<f32> {
+        let taken = std::mem::take(self);
+        (taken.heard && !taken.unreadable).then_some(taken.loudest)
+    }
+}
+
+/// Watches a recording's level for a pause (obf-1053), as the phone does:
+/// once something louder than [`QUIET_BELOW`] was heard, a quiet as long
+/// as the pause set ends it. A level that cannot be told counts as no
+/// quiet, so a failing microphone never ends a recording early; one not
+/// spoken into yet goes on.
+#[derive(Debug)]
+pub struct PauseWatch {
+    /// The pause, in seconds.
+    pause: f64,
+    heard: bool,
+    /// When the quiet going on was first asked, in seconds.
+    quiet_from: Option<f64>,
+    /// When the level was last asked, in seconds.
+    asked: Option<f64>,
+}
+
+/// What a sum of seconds may miss by being a float.
+const SLACK: f64 = 1e-6;
+
+impl PauseWatch {
+    /// How often the level is asked, in seconds, as on the phone.
+    pub const EVERY: f64 = 0.2;
+
+    /// Watches for a pause of `seconds`.
+    pub fn new(seconds: u32) -> PauseWatch {
+        PauseWatch {
+            pause: f64::from(seconds),
+            heard: false,
+            quiet_from: None,
+            asked: None,
+        }
+    }
+
+    /// Whether the level is to be asked at `now`, in seconds.
+    pub fn due(&self, now: f64) -> bool {
+        self.asked
+            .is_none_or(|asked| now - asked + SLACK >= Self::EVERY)
+    }
+
+    /// Takes the `level` asked at `now`, in seconds; whether the pause is
+    /// reached. The level asked tells the loudest since the ask before,
+    /// so a quiet counts from one ask before it was first heard.
+    pub fn hear(&mut self, level: Option<f32>, now: f64) -> bool {
+        self.asked = Some(now);
+        match level {
+            None => self.quiet_from = None,
+            Some(level) if level >= QUIET_BELOW => {
+                self.heard = true;
+                self.quiet_from = None;
+            }
+            Some(_) if self.heard => {
+                let from = *self.quiet_from.get_or_insert(now);
+                return now - from + Self::EVERY + SLACK >= self.pause;
+            }
+            Some(_) => {}
+        }
+        false
+    }
 }
 
 /// The speakers.
@@ -137,6 +241,8 @@ struct Heard {
     samples: Vec<f32>,
     channels: usize,
     rate: u32,
+    /// The loudest since the level was last asked (obf-1053).
+    peak: Peak,
 }
 
 /// The system's default microphone, through rodio. Device-only.
@@ -162,6 +268,7 @@ impl Recorder for MicRecorder {
             samples: Vec::new(),
             channels: 1,
             rate: SAMPLE_RATE,
+            peak: Peak::default(),
         }));
         let (opened, open) = std::sync::mpsc::channel();
         let thread = {
@@ -179,23 +286,33 @@ impl Recorder for MicRecorder {
                     opened.send(false).ok();
                     return;
                 };
+                let channels = usize::from(mic.channels().get());
+                let rate = mic.sample_rate().get();
                 {
                     let mut heard = heard.lock();
-                    heard.channels = usize::from(mic.channels().get());
-                    heard.rate = mic.sample_rate().get();
+                    heard.channels = channels;
+                    heard.rate = rate;
                 }
                 opened.send(true).ok();
-                let mut chunk = Vec::with_capacity(4096);
+                // Handed over every 50 ms, so each ask of the level, every
+                // 200 ms, finds something new (obf-1053).
+                let every = (rate as usize * channels / 20).max(1);
+                let mut chunk = Vec::with_capacity(every);
+                let hand_over = |chunk: &mut Vec<f32>| {
+                    let mut heard = heard.lock();
+                    heard.peak.hear(chunk);
+                    heard.samples.append(chunk);
+                };
                 while !stop.load(Ordering::Relaxed) {
                     match mic.next() {
                         Some(sample) => chunk.push(sample),
                         None => break,
                     }
-                    if chunk.len() == chunk.capacity() {
-                        heard.lock().samples.append(&mut chunk);
+                    if chunk.len() >= every {
+                        hand_over(&mut chunk);
                     }
                 }
-                heard.lock().samples.append(&mut chunk);
+                hand_over(&mut chunk);
             })
         };
         if open.recv().unwrap_or(false) {
@@ -222,6 +339,7 @@ impl Recorder for MicRecorder {
                 samples: Vec::new(),
                 channels: 1,
                 rate: SAMPLE_RATE,
+                peak: Peak::default(),
             },
         );
         let samples = oldbrainfix_whisper::to_whisper(&heard.samples, heard.channels, heard.rate);
@@ -236,6 +354,10 @@ impl Recorder for MicRecorder {
         self.running
             .as_ref()
             .map_or(Duration::ZERO, |r| r.since.elapsed())
+    }
+
+    fn level(&mut self) -> Option<f32> {
+        self.running.as_ref()?.heard.lock().peak.take()
     }
 }
 

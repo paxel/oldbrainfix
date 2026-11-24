@@ -32,11 +32,16 @@ const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
 const TEXT_SIZE: &str = "textSize";
 const TIPS_OFF: &str = "tipsOff";
+const RECORDING_PAUSE_SECONDS: &str = "recordingPauseSeconds";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
 const RECENTLY_FILED_INTO: &str = "recentlyFiledInto";
 const RECENTLY_ADDED_TO: &str = "recentlyAddedTo";
+
+/// The pauses, in seconds, after which a recording may end on its own
+/// (obf-1053), besides Off; the phone offers the same.
+pub const RECORDING_PAUSE_CHOICES: [u32; 4] = [2, 3, 5, 10];
 
 /// How many places filed into File into… shows at its top (#272), and
 /// how many Notes added to Add to Note… shows at its top (#308).
@@ -403,6 +408,31 @@ impl<'a> DeviceSettings<'a> {
             self.store.remove_local_setting(TIPS_OFF)
         } else {
             self.store.set_local_setting(TIPS_OFF, "true")
+        }
+    }
+
+    /// After how many seconds of a pause a voice recording on this Device
+    /// ends on its own (obf-1053): "End a recording after a pause", one
+    /// of [`RECORDING_PAUSE_CHOICES`]; `None` while it is Off, as by
+    /// default, also for anything else kept, and pauses are ignored. Kept
+    /// under the phone's key, absent while Off.
+    pub fn recording_pause_seconds(&self) -> Result<Option<u32>> {
+        Ok(self
+            .store
+            .local_setting(RECORDING_PAUSE_SECONDS)?
+            .and_then(|text| text.parse::<u32>().ok())
+            .filter(|seconds| RECORDING_PAUSE_CHOICES.contains(seconds)))
+    }
+
+    /// Keeps `seconds`, one of [`RECORDING_PAUSE_CHOICES`], as the pause;
+    /// `None` turns it Off.
+    pub fn set_recording_pause_seconds(&self, seconds: Option<u32>) -> Result<()> {
+        match seconds {
+            None => self.store.remove_local_setting(RECORDING_PAUSE_SECONDS),
+            Some(seconds) if RECORDING_PAUSE_CHOICES.contains(&seconds) => self
+                .store
+                .set_local_setting(RECORDING_PAUSE_SECONDS, &seconds.to_string()),
+            Some(seconds) => Err(Error::Invalid(format!("no pause of {seconds} s offered"))),
         }
     }
 

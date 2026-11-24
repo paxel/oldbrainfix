@@ -102,7 +102,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Capture never asks anything and never needs unlocking.** The App
   Lock and Area Locks guard browsing, not Capture.
 - Voice recording starts at once and **ends by tapping one big stop
-  button**. No hold-to-talk, no stop on silence. After Stop, and after
+  button**. No hold-to-talk; a pause ends it only where "End a
+  recording after a pause" in Settings ▸ Capture is set on that Device
+  (obf-1053), as Stop ends it. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
   with the recording or photo on it and room to type. Leaving saves.
 - **The quick note is the text, three Nudge buttons and Open in the
@@ -2330,6 +2332,16 @@ replace a law of Both apps where they say so. A desktop law marked
   and announced; the others are. Leaving the dialog by its cross, Esc,
   Alt+Left, the mouse's back button or a click beside it keeps what is
   typed, nudged in 1 h.
+- **A pause ends a recording only where the computer says so**
+  (obf-1053): desktop Settings ▸ Capture, a card of its own with "End a
+  recording after a pause", kept on this computer only under the
+  phone's key, offers Off, the default, which ignores pauses, and 2, 3,
+  5 or 10 s as pills. Set as Record voice starts, the recording ends
+  once the microphone stayed under 2 % of full scale at its peak that
+  long after it heard something louder, and is kept on the Note as Stop
+  keeps it, the Note dialog staying open; one nothing was said into yet
+  goes on, and a level that cannot be told counts as no quiet. The card
+  shows only where the computer records.
 
 ### Text editor and Lines
 

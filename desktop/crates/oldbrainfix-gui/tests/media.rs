@@ -19,10 +19,10 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration as StdDuration, Instant};
 
 use egui::Key;
-use egui::accesskit::Role;
+use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
-use oldbrainfix_core::{Notes, SigningKey, Store, WireEntry, parse_time};
+use egui_kittest::kittest::{NodeT, Queryable};
+use oldbrainfix_core::{DeviceSettings, Notes, SigningKey, Store, WireEntry, parse_time};
 use oldbrainfix_gui::enrich::{Engine, Enricher, Kind};
 use oldbrainfix_gui::media::{self, Clipboard, Player, Recorder};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
@@ -72,6 +72,10 @@ struct Devices {
     speeds: Vec<f64>,
     /// The clipboard's photo, if any.
     clipboard: Option<Vec<u8>>,
+    /// The level the microphone tells while it records (obf-1053).
+    level: Option<f32>,
+    /// How often the level was asked.
+    asked: u32,
 }
 
 type Shared = Rc<RefCell<Devices>>;
@@ -102,6 +106,12 @@ impl Recorder for FakeMic {
 
     fn elapsed(&self) -> StdDuration {
         StdDuration::from_secs(75)
+    }
+
+    fn level(&mut self) -> Option<f32> {
+        let mut d = self.0.borrow_mut();
+        d.asked += 1;
+        d.level.filter(|_| d.recording)
     }
 }
 
@@ -1215,5 +1225,225 @@ fn transcribing_again_without_a_text_is_announced_at_the_top() -> TestResult {
         section.transcripts.values().next().map(String::as_str),
         Some("Lock code 1234")
     );
+    Ok(())
+}
+
+/// Speaking, as the fake microphone hears it (obf-1053).
+const LOUD: Option<f32> = Some(0.4);
+
+/// A quiet room: under 0.02 of full scale (obf-1053).
+const QUIET: Option<f32> = Some(0.005);
+
+/// The window over a Note "Garage" open in the Note dialog, recording
+/// into it with "End a recording after a pause" at `pause` (obf-1053);
+/// its id. Each step of the window is a quarter second.
+fn recording_garage(
+    store: &Arc<Store>,
+    devices: &Shared,
+    pause: Option<u32>,
+) -> Result<(Harness<'static, App>, String), Box<dyn std::error::Error>> {
+    DeviceSettings::new(store).set_recording_pause_seconds(pause)?;
+    devices.borrow_mut().mic = true;
+    let mut harness = window(store.clone(), devices);
+    let garage = open_garage(&mut harness);
+    harness.get_by_label("Record voice").click();
+    // With a pause set, the window looks five times a second.
+    harness.run_steps(1);
+    assert!(harness.state().recording());
+    Ok((harness, garage))
+}
+
+/// How many recordings the Note `id` has.
+fn recordings(store: &Store, id: &str) -> Result<usize, Box<dyn std::error::Error>> {
+    Ok(Notes::new(store)
+        .by_id(id)?
+        .ok_or("the Note")?
+        .recordings
+        .len())
+}
+
+#[test]
+fn with_a_pause_set_a_recording_ends_once_it_was_quiet_that_long_and_is_kept() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let (mut harness, garage) = recording_garage(&store, &devices, Some(2))?;
+    devices.borrow_mut().level = LOUD;
+    harness.run_steps(4);
+    devices.borrow_mut().level = QUIET;
+    // 2 s are eight steps from the first quiet one on.
+    harness.run_steps(8);
+    assert!(harness.state().recording(), "not yet 2 s");
+    harness.run_steps(2);
+    assert!(!harness.state().recording());
+    // Kept as Stop keeps it: on the Note, which stays open.
+    assert_eq!(recordings(&store, &garage)?, 1);
+    assert_eq!(harness.state().selected_note(), Some(garage.as_str()));
+    assert!(shows(&harness, "Record voice"));
+    assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn off_as_by_default_a_pause_is_ignored() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let (mut harness, garage) = recording_garage(&store, &devices, None)?;
+    devices.borrow_mut().level = LOUD;
+    harness.run_steps(2);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(60);
+    assert!(harness.state().recording());
+    assert_eq!(devices.borrow().asked, 0, "the level is not even asked");
+    harness.get_by_label("Stop").click();
+    harness.run();
+    assert_eq!(recordings(&store, &garage)?, 1);
+    Ok(())
+}
+
+#[test]
+fn a_recording_nothing_was_said_into_goes_on_however_quiet() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = QUIET;
+    let (mut harness, _) = recording_garage(&store, &devices, Some(2))?;
+    harness.run_steps(60);
+    assert!(harness.state().recording());
+    assert!(devices.borrow().asked > 40, "asked every step");
+    Ok(())
+}
+
+#[test]
+fn speech_or_a_level_that_cannot_be_told_counts_the_pause_anew() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = LOUD;
+    let (mut harness, garage) = recording_garage(&store, &devices, Some(2))?;
+    harness.run_steps(2);
+    for breaks in [LOUD, None] {
+        devices.borrow_mut().level = QUIET;
+        harness.run_steps(6);
+        devices.borrow_mut().level = breaks;
+        harness.run_steps(1);
+    }
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(8);
+    assert!(harness.state().recording(), "1.75 s since the last break");
+    harness.run_steps(2);
+    assert!(!harness.state().recording());
+    assert_eq!(recordings(&store, &garage)?, 1);
+    Ok(())
+}
+
+#[test]
+fn the_pause_is_read_as_each_recording_starts() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = LOUD;
+    let (mut harness, garage) = recording_garage(&store, &devices, None)?;
+    DeviceSettings::new(&store).set_recording_pause_seconds(Some(2))?;
+    harness.run_steps(2);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(20);
+    assert!(harness.state().recording(), "it started with Off");
+    harness.get_by_label("Stop").click();
+    harness.run();
+    devices.borrow_mut().level = LOUD;
+    harness.get_by_label("Record voice").click();
+    harness.run_steps(3);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(12);
+    assert!(!harness.state().recording(), "the next one ends on 2 s");
+    assert_eq!(devices.borrow().starts, 2);
+    // The fake hears the same both times, kept once.
+    assert_eq!(recordings(&store, &garage)?, 1);
+    Ok(())
+}
+
+/// The pill `label` of the choice "End a recording after a pause".
+fn pause_pill<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> egui_kittest::Node<'a> {
+    let title = harness.get_by_label("End a recording after a pause").rect();
+    harness
+        .query_all_by(|n| n.role() == Role::RadioButton && n.label().as_deref() == Some(label))
+        .filter(|n| n.rect().min.y > title.min.y)
+        .min_by(|a, b| a.rect().min.y.total_cmp(&b.rect().min.y))
+        .unwrap_or_else(|| panic!("no {label:?}"))
+}
+
+#[test]
+fn settings_capture_sets_the_pause_on_this_computer_only() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let mut app = App::new(store.clone(), "en");
+    app.set_recorder(Box::new(FakeMic(devices.clone())));
+    app.open(Page::Settings);
+    let mut harness = settings(app);
+    harness.run();
+    assert!(shows(&harness, "Capture"));
+    assert!(shows(
+        &harness,
+        "Ends a voice recording on its own once you have said nothing this long, and keeps it as Stop does. Off: pauses are ignored."
+    ));
+    assert!(pause_pill(&harness, "Off").accesskit_node().toggled() == Some(Toggled::True));
+    pause_pill(&harness, "3 s").click();
+    harness.run();
+    let settings = DeviceSettings::new(&store);
+    assert_eq!(settings.recording_pause_seconds()?, Some(3));
+    assert_eq!(
+        store.local_setting("recordingPauseSeconds")?.as_deref(),
+        Some("3")
+    );
+    assert!(store.all_entries()?.is_empty(), "never synced");
+    pause_pill(&harness, "Off").click();
+    harness.run();
+    assert_eq!(settings.recording_pause_seconds()?, None);
+    assert_eq!(store.local_setting("recordingPauseSeconds")?, None);
+    // Found by its detail line, under the card's heading.
+    type_into(&mut harness, "Search Settings", "pauses ignored");
+    assert!(shows(&harness, "End a recording after a pause"));
+    assert!(shows(&harness, "Capture"));
+    assert!(!shows(&harness, "This computer"));
+    Ok(())
+}
+
+#[test]
+fn without_a_microphone_the_settings_offer_no_pause() -> TestResult {
+    let store = empty_store()?;
+    let mut app = App::new(store, "en");
+    app.open(Page::Settings);
+    let mut harness = settings(app);
+    harness.run();
+    assert!(!shows(&harness, "End a recording after a pause"));
+    Ok(())
+}
+
+#[test]
+fn a_pause_ending_the_recording_keeps_what_is_being_typed_and_the_cursor() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = LOUD;
+    let (mut harness, garage) = recording_garage(&store, &devices, Some(2))?;
+    harness
+        .get_by(|n| {
+            matches!(n.role(), Role::TextInput | Role::MultilineTextInput)
+                && n.value().as_deref() == Some("Garage")
+        })
+        .click();
+    harness.run_steps(1);
+    harness.get_by(|n| n.is_focused()).type_text(" in the loft");
+    harness.run_steps(1);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(12);
+    assert!(!harness.state().recording());
+    let focused = harness.get_by(|n| n.is_focused());
+    let typed = focused.value().unwrap_or_default();
+    assert!(typed.contains("in the loft"), "{typed:?}");
+    // Typing on, then leaving, keeps both.
+    focused.type_text(" too");
+    harness.run();
+    harness.key_press(Key::Escape);
+    harness.run();
+    let note = Notes::new(&store).by_id(&garage)?.ok_or("Garage")?;
+    assert!(note.text.contains("in the loft too"), "{:?}", note.text);
+    assert_eq!(note.recordings.len(), 1);
     Ok(())
 }

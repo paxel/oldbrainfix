@@ -488,6 +488,8 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
     // Show tips (obf-1060), on until switched off, read only.
     assert_eq!(read.pointer("/tipsOn"), Some(&json!(true)));
+    // End a recording after a pause (obf-1053), Off by default, read only.
+    assert_eq!(read.pointer("/recordingPauseSeconds"), Some(&Value::Null));
     assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
     // Today's quiet day (obf-1044), read only.
     assert_eq!(read.pointer("/quietDayUntil"), Some(&Value::Null));
@@ -507,8 +509,13 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     store.set_ai_on(true)?;
     store.set_ask_thinks(true)?;
     DeviceSettings::new(&store).set_tips_on(false)?;
+    DeviceSettings::new(&store).set_recording_pause_seconds(Some(5))?;
     let settings = call(&store, &task, "read_settings", &json!({}))?;
     assert_eq!(json_of(&settings)?.pointer("/tipsOn"), Some(&json!(false)));
+    assert_eq!(
+        json_of(&settings)?.pointer("/recordingPauseSeconds"),
+        Some(&json!(5))
+    );
     assert_eq!(
         json_of(&settings)?.pointer("/features"),
         Some(&json!("simple"))

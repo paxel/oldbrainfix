@@ -91,6 +91,7 @@ use oldbrainfix_core::routines::{HeadsUpUnit, heads_up_keys, routines_by_name};
 use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
+use oldbrainfix_core::settings::RECORDING_PAUSE_CHOICES;
 use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
@@ -148,8 +149,8 @@ use crate::line_editing::{Listed, TypedLines};
 use crate::login;
 use crate::md_view;
 use crate::media::{
-    Clipboard, FromFile, Player, Recorder, SOUND_EXTENSIONS, from_file, photo_extension,
-    photo_from_file,
+    Clipboard, FromFile, PauseWatch, Player, Recorder, SOUND_EXTENSIONS, from_file,
+    photo_extension, photo_from_file,
 };
 use crate::media_view::{
     self, Generated, Made, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer, Voice,
@@ -2067,6 +2068,9 @@ enum Setting {
     AiOn(bool),
     /// Whether the screens show their tips, "Show tips" (obf-1060).
     Tips(bool),
+    /// After how many seconds of a pause a recording ends on its own;
+    /// `None` ignores pauses (obf-1053).
+    RecordingPause(Option<u32>),
 }
 
 /// Opens an address in the browser; tests hand in one that keeps it.
@@ -2326,6 +2330,10 @@ pub struct App {
     /// (#352), which it goes onto as it ends; `None` for one held on the
     /// capture field.
     recording_into: Option<String>,
+    /// What watches the recording running for a pause that ends it,
+    /// while "End a recording after a pause" was on as it started
+    /// (obf-1053).
+    pause_watch: Option<PauseWatch>,
     /// Whether the Note dialog's last Paste found nothing, said in grey
     /// under its button until the Note dialog closes (#352).
     note_paste_empty: bool,
@@ -2969,6 +2977,7 @@ impl App {
             speed,
             recorded: Vec::new(),
             recording_into: None,
+            pause_watch: None,
             note_paste_empty: false,
             held_photos: Vec::new(),
             held_files: Vec::new(),
@@ -7990,6 +7999,13 @@ impl App {
                     return Ok(());
                 }
                 self.recording_into = Some(into);
+                // The setting as this recording starts (obf-1053); one
+                // that cannot be read ignores pauses.
+                self.pause_watch = DeviceSettings::new(&self.store)
+                    .recording_pause_seconds()
+                    .ok()
+                    .flatten()
+                    .map(PauseWatch::new);
             }
             Action::PasteOntoNote => self.paste_onto_note()?,
             Action::PourIntoShopping(list) => self.pour_into_shopping(&list)?,
@@ -10335,6 +10351,7 @@ impl App {
     /// failure is told.
     fn end_recording(&mut self) -> oldbrainfix_core::Result<()> {
         let into = self.recording_into.take();
+        self.pause_watch = None;
         let Some(bytes) = self
             .recorder
             .as_mut()
@@ -10357,6 +10374,24 @@ impl App {
                 Err(e)
             }
         }
+    }
+
+    /// Ends the recording running as Stop does once the microphone was
+    /// quiet for the pause set after it heard something (obf-1053),
+    /// asking its level every [`PauseWatch::EVERY`] while one is watched.
+    fn watch_pause(&mut self, ctx: &egui::Context, actions: &mut Vec<Action>) {
+        let (Some(watch), Some(recorder)) = (&mut self.pause_watch, &mut self.recorder) else {
+            return;
+        };
+        if !recorder.recording() {
+            return;
+        }
+        let now = ctx.input(|i| i.time);
+        if watch.due(now) && watch.hear(recorder.level(), now) {
+            actions.push(Action::StopRecording);
+            return;
+        }
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(PauseWatch::EVERY));
     }
 
     /// Ends a recording into a Note no longer open in the Note dialog
@@ -11105,6 +11140,7 @@ impl App {
                 settings.set_tips_on(on)?;
                 self.spotlights.set_tips(on);
             }
+            Setting::RecordingPause(seconds) => settings.set_recording_pause_seconds(seconds)?,
         }
         Ok(())
     }
@@ -12635,6 +12671,8 @@ impl App {
         let screen = self.spotlight_screen(ui.ctx());
         self.spotlights
             .show(ui.ctx(), (&self.store, &self.t, tones), screen);
+        // A pause that ends the recording (obf-1053).
+        self.watch_pause(ui.ctx(), &mut actions);
         for action in actions {
             if let Some(action) = self.tick_later(ui.ctx(), action) {
                 self.apply(action);
@@ -18734,6 +18772,9 @@ impl App {
         let autostart = settings.autostart_on().unwrap_or(true);
         let bigger = settings.fat_fingers().unwrap_or(false);
         let tips = settings.tips_on().unwrap_or(true);
+        // Where this computer records (obf-1053).
+        let records = self.recorder.is_some();
+        let pause = settings.recording_pause_seconds().ok().flatten();
         let renag = settings
             .renag_interval()
             .map(|d| d.num_minutes())
@@ -19029,6 +19070,36 @@ impl App {
                 found = true;
                 embossed(ui, tones, false, None, |ui| {
                     quick_note_card(ui, &t, (&quick, &shows), actions);
+                });
+            }
+            // A pause that ends a recording (obf-1053), where this
+            // computer records.
+            let [paused] = settings_search::rows(
+                q,
+                Some(t.settings_capture()),
+                [&[t.recording_pause(), t.recording_pause_detail()]],
+            );
+            if records && paused {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    heading(ui, t.settings_capture(), "capture");
+                    ui.label(RichText::new(t.recording_pause()).color(text));
+                    let mut chosen = pause;
+                    let options = std::iter::once((None, t.recording_pause_off().to_string()))
+                        .chain(RECORDING_PAUSE_CHOICES.iter().map(|seconds| {
+                            (
+                                Some(*seconds),
+                                t.recording_pause_seconds(i64::from(*seconds)),
+                            )
+                        }));
+                    if chip_row(ui, &mut chosen, options) && chosen != pause {
+                        actions.push(Action::Setting(Setting::RecordingPause(chosen)));
+                    }
+                    ui.label(
+                        RichText::new(t.recording_pause_detail())
+                            .small()
+                            .color(weak),
+                    );
                 });
             }
             if let Some(speech) = speech {
