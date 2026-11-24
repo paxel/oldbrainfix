@@ -2864,24 +2864,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         );
 
   /// A compact button of a group (obf-1073), its icon and its words;
-  /// [warns] draws it in the error colour, as Delete.
+  /// [warns] fills it on the error colour, as Delete (obf-1099).
   Widget _groupButton({
     required Key key,
     required String label,
     required VoidCallback onPressed,
     required IconData icon,
     bool warns = false,
-  }) => OutlinedButton.icon(
-    key: key,
-    style: warns
-        ? OutlinedButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          )
-        : null,
-    onPressed: onPressed,
-    icon: Icon(icon, size: 18),
-    label: Text(label),
-  );
+  }) => warns
+      ? DestructiveButton(
+          key: key,
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          child: Text(label),
+        )
+      : OutlinedButton.icon(
+          key: key,
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          label: Text(label),
+        );
 
   /// The text format badge [badge], with the tip of the code language
   /// (obf-1043) while its format dialog offers one: a Code text this
@@ -4057,12 +4059,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onAnswer: (answer) => _answer(open, answer),
               ),
               if (changes && open.routine.isReminder && _routines.length == 1)
-                OutlinedButton(
+                // It moves to the trash: filled on the error colour, as
+                // Delete (obf-1099).
+                DestructiveButton(
                   key: const ValueKey('open-done-trash'),
-                  // It moves to the trash: the error colour, as Delete.
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
                   onPressed: () => _checkOff(open, trash: true),
                   child: Text(t.doneAndTrash),
                 ),

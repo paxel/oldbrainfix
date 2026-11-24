@@ -1553,7 +1553,7 @@ There are three kinds, and an action takes the first that fits.
   ("+", Voice, Photo, Gallery, Paste, Attach a file…, Add a part),
   **Share** (Send to a person, Share to an app, Export as Pack…) and
   **Tidy** (Merge into…, Add to a Shopping List, Move to trash, the
-  last in the error colour). Each group is a small heading, read as a
+  last filled on the error colour, obf-1099). Each group is a small heading, read as a
   heading, over its compact buttons side by side, wrapping; a group
   with nothing this Device may do shows nothing. The top bar keeps
   Undo, Redo and Find first, then the calendar, History and Revert all

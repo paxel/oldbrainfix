@@ -72,6 +72,17 @@ void main() {
       expect(find.byType(NoteEditorScreen), findsOneWidget);
       expect(find.text('Due 08:00'), findsOneWidget);
       expect(doneAndTrash, findsOneWidget);
+      // It moves to the trash: filled on the error colour (obf-1099).
+      expect(
+        tester
+            .widget<Material>(
+              find
+                  .descendant(of: doneAndTrash, matching: find.byType(Material))
+                  .first,
+            )
+            .color,
+        Theme.of(tester.element(doneAndTrash)).colorScheme.error,
+      );
       await tap(tester, done);
       expect(
         routines.byId(reminder.id)?.doneAt(Occurrence(today, at(8))),

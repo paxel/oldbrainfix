@@ -171,6 +171,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Move to trash is filled on the error colour, the others '
+      'outlined (obf-1099)', (tester) async {
+    final id = notes.capture('oil the hinge').id;
+    await edit(tester, id);
+    await revealInEditor(tester, key('editor-trash'));
+    final scheme = Theme.of(tester.element(key('editor-trash'))).colorScheme;
+    Material ground(String name) => tester.widget<Material>(
+      find.descendant(of: key(name), matching: find.byType(Material)).first,
+    );
+    expect(ground('editor-trash').color, scheme.error);
+    expect(
+      find.descendant(
+        of: key('editor-trash'),
+        matching: find.byWidgetPredicate((w) => w is FilledButton),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.widget(key('editor-merge')), isA<OutlinedButton>());
+    expect(ground('editor-merge').color, isNot(scheme.error));
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+  });
+
   testWidgets('a screen reader reads each heading on its own', (tester) async {
     final semantics = tester.ensureSemantics();
     final id = notes.capture('oil the hinge').id;

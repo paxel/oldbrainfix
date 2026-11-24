@@ -420,29 +420,37 @@ class Embossed extends StatelessWidget {
 }
 
 /// The button of an action that deletes or removes, in a dialog's action
-/// row (Delete, Remove, Move to trash): filled on the error colour, with
-/// its words in the colour on it (UI laws, "Design system", obf-1081).
+/// row or a page's group (Delete, Remove, Move to trash): filled on the
+/// error colour, with its words in the colour on it (UI laws, "Design
+/// system", obf-1081), its [icon] before them where one is given.
 class DestructiveButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final Widget child;
+  final Widget? icon;
 
   const DestructiveButton({
     super.key,
     required this.onPressed,
     required this.child,
+    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return FilledButton(
-      style: FilledButton.styleFrom(
-        backgroundColor: scheme.error,
-        foregroundColor: scheme.onError,
-      ),
-      onPressed: onPressed,
-      child: child,
+    final style = FilledButton.styleFrom(
+      backgroundColor: scheme.error,
+      foregroundColor: scheme.onError,
     );
+    final icon = this.icon;
+    return icon == null
+        ? FilledButton(style: style, onPressed: onPressed, child: child)
+        : FilledButton.icon(
+            style: style,
+            onPressed: onPressed,
+            icon: icon,
+            label: child,
+          );
   }
 }
 
