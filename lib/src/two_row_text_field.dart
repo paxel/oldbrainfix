@@ -9,6 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_links.dart';
 import 'box_ids.dart';
+import 'edit_history.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'selection_toolbar.dart';
@@ -694,11 +695,17 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       ),
     );
     final editable = _editable();
-    if (editable == null) {
-      controller.value = next;
-    } else {
-      editable.userUpdateTextEditingValue(next, SelectionChangedCause.toolbar);
-    }
+    // A format is a step of its own for Undo (obf-1051).
+    EditHistory.wholeStep(context, () {
+      if (editable == null) {
+        controller.value = next;
+      } else {
+        editable.userUpdateTextEditingValue(
+          next,
+          SelectionChangedCause.toolbar,
+        );
+      }
+    });
     if (change.text != text && !controller.markdown) {
       _becomeFormatted(controller);
     }

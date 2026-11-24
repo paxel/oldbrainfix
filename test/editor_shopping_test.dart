@@ -61,6 +61,12 @@ void main() {
   ];
 
   Future<void> start(WidgetTester tester) async {
+    // Wide, so every action of the editor's bar shows on it, none in ⋮
+    // (obf-1051).
+    tester.view
+      ..physicalSize = const Size(1280, 1600)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       OldBrainFixApp(
         store: store,

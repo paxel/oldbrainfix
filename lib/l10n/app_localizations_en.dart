@@ -6882,4 +6882,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get spotSettingsGrammar =>
       'Add grammar… colours code in one more language, on all your Devices.';
+
+  @override
+  String get editorUndo => 'Undo';
+
+  @override
+  String get editorRedo => 'Redo';
+
+  @override
+  String get revertAllChanges => 'Revert all changes';
+
+  @override
+  String get revertAllQuestion => 'Revert all changes?';
+
+  @override
+  String get revertAllBody =>
+      'The Note goes back to how it was when it was opened. Redo brings the changes back one by one.';
+
+  @override
+  String get revertAllConfirm => 'Revert';
 }

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
+import 'edit_history.dart';
 import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -361,7 +362,8 @@ class TableGridState extends State<TableGrid> {
   /// gives.
   void _apply(MarkdownChange change) {
     if (change.text == _text) return;
-    _write(change);
+    // A row or column changed is a step of its own for Undo (obf-1051).
+    EditHistory.wholeStep(context, () => _write(change));
     setState(_measure);
   }
 

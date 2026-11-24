@@ -1530,6 +1530,27 @@ replace a law of Both apps where they say so. A desktop law marked
   where there is no room, not at the finger. Other selectable texts,
   such as an error report or a code to read out, and Capture keep the
   system's menu; a card selects no text.
+- **Undo and Redo lead the Note editor's bar** (obf-1051, C3a): first in
+  its order, so they stay on the bar of a phone 360 wide, with Fat
+  fingers too, greyed while there is nothing to undo or redo. They go
+  step by step through everything changed since the editor opened: the
+  text and the Sections' texts, a text History brought back or a
+  Transcript or Photo Text taken over, a table's cells, the Lines (typed,
+  added, deleted, checked, moved, in and out, a Shopping List's reappear
+  time) and the badges (kind between Plain Note, Checklist and Shopping
+  List, Importance, Area and Topic, text format, code language, Show on
+  the Agenda, Show ticks, Hidden from AI). Typing is one step until a
+  pause of a second, a new word after a space or a line break, or a turn
+  from typing to deleting; a format of the bar and a table's row or
+  column changed are a step each; a Line's words are one step, stored
+  first when Undo is tapped while they are typed. A step goes back through the same
+  calls that made it, the earlier value written as a new edit; what can
+  no longer go back, such as a Line a sync took away, stays as it is.
+  **"Revert all changes"** in ⋮ asks once, "Revert all changes?" with
+  Cancel and Revert, then takes every step back to the Note as it was
+  opened; Redo brings them back one by one. A formatted text does not go
+  back to plain, and a Tally or a Session not back to a Plain Note, so
+  those changes are no step. The history ends with the editor.
 - **The find bar's "Search all Notes"** (obf-1055), between ↓ and ✕,
   opens the search over every Note for its words on top, as a tap on a
   tag does, greyed while it holds none; back returns to the Note with
@@ -1671,7 +1692,8 @@ replace a law of Both apps where they say so. A desktop law marked
   window per Note: opening it again brings its window forward, and the
   Note dialog does not open a Note that has one. What is typed there is
   kept as in the dialog; its cross saves as closing the dialog does, and
-  the Undo slot is the main window's. A Note going to the trash, deleted
+  the Undo slot is the main window's, while its bar has the dialog's
+  Undo, Redo and ⋮ for its own Note's steps (obf-1051). A Note going to the trash, deleted
   or merged, here or on another Device, closes its window. The Note
   windows close, saved, as the main window closes or hides into the
   tray. **Each has "Keep on top" above the Note**, off as it opens and
@@ -1883,7 +1905,10 @@ replace a law of Both apps where they say so. A desktop law marked
   nothing waits; Ctrl+Z works over the list and the Note dialog but not
   in a text field, where it undoes the typing. Only the last one waits;
   cards selected and moved to the trash or merged together come back
-  with one (#273).
+  with one (#273). Over the Note dialog and in a Note's own window they
+  take back the Note's last step instead (obf-1051), unless the window's
+  undo came after it, and Ctrl+Shift+Z and Ctrl+Y outside a text field
+  are its Redo.
 - **The keys work the card lists** (#274, Q657): over a Note list's
   cards, with no dialog, menu or Note dialog on top and no field or
   other widget holding the keyboard, Up and Down select the next card
@@ -2128,6 +2153,29 @@ replace a law of Both apps where they say so. A desktop law marked
   and the handle move one among the open Lines as they show; a struck
   Line has no handle nor Move up and Move down, the keys do nothing in
   it, and no open Line goes among the struck ones.
+- **The Note dialog's bar has Undo, Redo and ⋮** (obf-1051), before
+  "Open in its own window" and the cross, and so has a Note's own window
+  before "Reading view", which shows none. They go step by step through
+  everything changed since the Note opened: its text, its tables' cells,
+  its Sections' texts, its Lines (their checks too, as on the phone), its
+  Area and Topic and its badges, each greyed while it has
+  nothing to do. Typing is one step until it rests for a second, a new
+  word begins, its field is left or saved, or anything else is done; a
+  table's menu (insert, move, delete, align, and what ⋮ of a table adds)
+  is a step of its own after the cell typed before it. A step is written
+  back as an edit writes it, nothing deleted. In ⋮, **Revert all
+  changes**, greyed while nothing changed, asks once ("Revert all
+  changes?", Cancel and Revert) and brings the Note back to how it
+  opened; Redo then makes the changes again one by one. In a text field
+  Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y stay the field's own, for its typing;
+  once Undo, Redo or Revert wrote a field, its own history is forgotten.
+  A formatted text stays formatted (ADR 0033), and a Tally or Session made
+  or unmade, or a change written elsewhere meanwhile, starts the steps
+  again from there. A box ticked in a text is a check-off with its own
+  history (ADR 0035), no step; a captured detail removed after its
+  question has no way back. A step that also waits for Ctrl+Z, as a Line
+  deleted, goes from there once the bar's Undo takes it back. Nothing is
+  stored: the steps go as the Note closes.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,

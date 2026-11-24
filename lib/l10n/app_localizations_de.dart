@@ -6966,4 +6966,23 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get spotSettingsGrammar =>
       '„Grammatik hinzufügen …“ färbt Code in einer weiteren Sprache ein, auf all deinen Geräten.';
+
+  @override
+  String get editorUndo => 'Rückgängig';
+
+  @override
+  String get editorRedo => 'Wiederholen';
+
+  @override
+  String get revertAllChanges => 'Alle Änderungen zurücknehmen';
+
+  @override
+  String get revertAllQuestion => 'Alle Änderungen zurücknehmen?';
+
+  @override
+  String get revertAllBody =>
+      'Die Notiz wird wieder so, wie sie beim Öffnen war. „Wiederholen“ holt die Änderungen einzeln zurück.';
+
+  @override
+  String get revertAllConfirm => 'Zurücknehmen';
 }

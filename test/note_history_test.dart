@@ -71,6 +71,8 @@ void main() {
     notes.setImportance(note.id, Importance.important);
     await openEditor(tester, 'Dentist on Wednesday');
 
+    // In ⋮, after Undo and Redo first on the bar (obf-1051).
+    await tap(tester, find.byKey(const ValueKey('bar-more')));
     await tap(tester, find.byKey(const ValueKey('note-history')));
     expect(find.byType(NoteHistoryScreen), findsOneWidget);
     expect(find.text('History'), findsOneWidget);

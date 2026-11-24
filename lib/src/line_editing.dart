@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'checklist_view.dart';
+import 'edit_history.dart';
 import 'two_row_text_field.dart';
 
 /// What the Note editor tells the list in it (#141): [keep] stores what
@@ -189,6 +190,14 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
 
   /// Whether the Line [id] has a group under it.
   bool hasGroup(String id) => false;
+
+  /// Takes a change of the Lines into the Undo and Redo of the Note
+  /// editor the list is in (obf-1051): [undo] takes it back, [redo] makes
+  /// it again, each doing nothing where nothing is left to change.
+  void recordLines({required VoidCallback undo, required VoidCallback redo}) {
+    if (!mounted) return;
+    EditHistoryScope.of(context)?.record(undo: undo, redo: redo);
+  }
 
   @override
   void dispose() {
@@ -473,6 +482,10 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
     final value = row.text.value;
     final before = row.last;
     row.last = value;
+    // Undo stores it and takes it back (obf-1051).
+    if (value.text != before.text && mounted) {
+      EditHistoryScope.of(context)?.typedElsewhere();
+    }
     final text = value.text;
     if (!text.startsWith(lineStart)) {
       final selection = before.selection;

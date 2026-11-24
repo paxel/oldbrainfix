@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a search lists where each Note matches, and a find bar highlights every match inside a Note. ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
 - On the phone a toolbar with Copy, Paste and Search floats above a selection; on the desktop the right-click menu gains Search. ([obf-1055](https://github.com/paxel/oldbrainfix/issues/366))
 - On the desktop, a Markdown file opens in a viewer with Obsidian links, and can be imported with the files it links to. ([obf-1056](https://github.com/paxel/oldbrainfix/issues/367))
+- On the phone and the desktop, the Note editor has Undo and Redo, step by step, and Revert all changes in its ⋮. ([obf-1051](https://github.com/paxel/oldbrainfix/issues/362))
 
 ### Changed
 

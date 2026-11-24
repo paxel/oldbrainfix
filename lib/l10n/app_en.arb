@@ -3713,5 +3713,17 @@
   "spotSettingsFeatures": "Simple or Advanced: Advanced also makes Tallies, Sessions, Frogs and Topics.",
   "@spotSettingsFeatures": {"description": "A Spotlight (obf-1043) on Simple and Advanced in the Settings: one sentence of what it does."},
   "spotSettingsGrammar": "Add grammar… colours code in one more language, on all your Devices.",
-  "@spotSettingsGrammar": {"description": "A Spotlight (obf-1043) on Add grammar… in the Settings (new in 0.7.0): one sentence of what it does."}
+  "@spotSettingsGrammar": {"description": "A Spotlight (obf-1043) on Add grammar… in the Settings (new in 0.7.0): one sentence of what it does."},
+  "editorUndo": "Undo",
+  "@editorUndo": {"description": "In the Note editor's top bar (obf-1051): takes back the last change made since it opened."},
+  "editorRedo": "Redo",
+  "@editorRedo": {"description": "In the Note editor's top bar (obf-1051): makes the last change taken back again."},
+  "revertAllChanges": "Revert all changes",
+  "@revertAllChanges": {"description": "In the Note editor's ⋮ (obf-1051): asks once, then takes back every change made since it opened."},
+  "revertAllQuestion": "Revert all changes?",
+  "@revertAllQuestion": {"description": "Title of the question behind 'revertAllChanges'."},
+  "revertAllBody": "The Note goes back to how it was when it was opened. Redo brings the changes back one by one.",
+  "@revertAllBody": {"description": "Body of the question behind 'revertAllChanges'; two sentences at most."},
+  "revertAllConfirm": "Revert",
+  "@revertAllConfirm": {"description": "Confirm button of the question behind 'revertAllChanges'."}
 }

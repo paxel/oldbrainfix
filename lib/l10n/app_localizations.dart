@@ -11082,6 +11082,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add grammar… colours code in one more language, on all your Devices.'**
   String get spotSettingsGrammar;
+
+  /// In the Note editor's top bar (obf-1051): takes back the last change made since it opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get editorUndo;
+
+  /// In the Note editor's top bar (obf-1051): makes the last change taken back again.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get editorRedo;
+
+  /// In the Note editor's ⋮ (obf-1051): asks once, then takes back every change made since it opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert all changes'**
+  String get revertAllChanges;
+
+  /// Title of the question behind 'revertAllChanges'.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert all changes?'**
+  String get revertAllQuestion;
+
+  /// Body of the question behind 'revertAllChanges'; two sentences at most.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note goes back to how it was when it was opened. Redo brings the changes back one by one.'**
+  String get revertAllBody;
+
+  /// Confirm button of the question behind 'revertAllChanges'.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert'**
+  String get revertAllConfirm;
 }
 
 class _AppLocalizationsDelegate

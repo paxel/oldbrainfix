@@ -9,6 +9,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop zeigt eine Suche, wo jede Notiz passt, und eine Suchleiste hebt jeden Treffer in einer Notiz hervor. ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
 - Auf dem Handy schwebt über einer Auswahl eine Leiste mit Kopieren, Einfügen und Suchen; auf dem Desktop bekommt das Rechtsklickmenü Suchen. ([obf-1055](https://github.com/paxel/oldbrainfix/issues/366))
 - Auf dem Desktop öffnet sich eine Markdown-Datei in einer Ansicht mit Obsidian-Links und lässt sich samt verlinkter Dateien importieren. ([obf-1056](https://github.com/paxel/oldbrainfix/issues/367))
+- Auf dem Handy und dem Desktop hat der Notiz-Editor Rückgängig und Wiederholen, Schritt für Schritt, und „Alle Änderungen zurücknehmen“ in seinem ⋮. ([obf-1051](https://github.com/paxel/oldbrainfix/issues/362))
 
 ### Geändert
 

@@ -553,15 +553,84 @@ class _ShoppingSectionState extends State<ShoppingSection>
   /// Where it was typed among the open Lines; a name it has already
   /// brings that Line back.
   @override
-  String addLine(String text, {required int at, required bool inGroup}) =>
-      _lists.add(widget.noteId, text, deviceWallClock, at: at);
+  String addLine(String text, {required int at, required bool inGroup}) {
+    final shown = _lists.byNote(widget.noteId, deviceWallClock);
+    final id = _lists.add(widget.noteId, text, deviceWallClock, at: at);
+    switch (shown?.line(id)) {
+      // A gone one back, checked on an earlier day: struck again.
+      case null when _wasChecked(id):
+        recordLines(
+          undo: () => _checkAgain(id, true),
+          redo: () => _checkAgain(id, false),
+        );
+      // A new Line.
+      case null:
+        recordLines(
+          undo: () => _deleteAgain(id),
+          redo: () => _restoreAgain(id),
+        );
+      // A struck one back on the list.
+      case final line when line.struck:
+        recordLines(
+          undo: () => _checkAgain(id, true),
+          redo: () => _checkAgain(id, false),
+        );
+      // An open one of that name: nothing changed.
+      case _:
+    }
+    return id;
+  }
 
   @override
-  void renameLine(String id, String text) => _lists.rename(id, text);
+  void renameLine(String id, String text) {
+    final before = _lists.byNote(widget.noteId, deviceWallClock)?.line(id);
+    _lists.rename(id, text);
+    if (before == null || before.text == text) return;
+    final was = before.text;
+    recordLines(
+      undo: () => _renameAgain(id, was),
+      redo: () => _renameAgain(id, text),
+    );
+  }
 
   /// Into the trash, as a Checklist's Line goes (ADR 0030).
   @override
-  void deleteLine(String id) => _lists.delete(id);
+  void deleteLine(String id) {
+    _lists.delete(id);
+    recordLines(undo: () => _restoreAgain(id), redo: () => _deleteAgain(id));
+  }
+
+  /// Whether the Line [id] was ever checked: a Line gone from the list,
+  /// not a new one.
+  bool _wasChecked(String id) => widget.notes.store
+      .history(id)
+      .any((e) => e.field == ChecklistKeys.checked && e.value != null);
+
+  /// Whether the Line [id] shows on the list and this Device may change
+  /// it: what Undo and Redo change (obf-1051).
+  bool _changeable(String id) =>
+      linesWritable && showsLine(id) && _lists.mayEdit(id);
+
+  void _deleteAgain(String id) {
+    if (_changeable(id)) _lists.delete(id);
+  }
+
+  void _restoreAgain(String id) {
+    if (!linesWritable || !_lists.mayEdit(id)) return;
+    if (!_lists.deletedLines(widget.noteId).any((l) => l.id == id)) return;
+    _lists.restore(id);
+  }
+
+  void _renameAgain(String id, String text) {
+    if (_changeable(id)) _lists.rename(id, text);
+  }
+
+  void _checkAgain(String id, bool checked) {
+    if (!linesWritable || !showsLine(id)) return;
+    checked
+        ? _lists.check(id, deviceWallClock)
+        : _lists.uncheck(id, deviceWallClock);
+  }
 
   /// Ticks the Line [id] at once and saves it after the frame (#338).
   void _check(String id, bool checked) {
@@ -572,6 +641,10 @@ class _ShoppingSectionState extends State<ShoppingSection>
       checked
           ? _lists.check(line, deviceWallClock)
           : _lists.uncheck(line, deviceWallClock);
+      recordLines(
+        undo: () => _checkAgain(line, !checked),
+        redo: () => _checkAgain(line, checked),
+      );
       // Read once with the log's change, not twice (#339).
       if (mounted) reloadSoon();
     });
@@ -596,6 +669,15 @@ class _ShoppingSectionState extends State<ShoppingSection>
           if (!mounted || !linesWritable || !showsLine(id)) return;
           if (picked == current) return;
           _lists.setReappear(id, picked);
+          final was = current;
+          recordLines(
+            undo: () {
+              if (_changeable(id)) _lists.setReappear(id, was);
+            },
+            redo: () {
+              if (_changeable(id)) _lists.setReappear(id, picked);
+            },
+          );
           current = picked;
         },
       ),
@@ -656,9 +738,15 @@ class _ShoppingSectionState extends State<ShoppingSection>
     if (!linesWritable || !showsLine(id)) return;
     switch (picked) {
       case _ShopStep.up || _ShopStep.down:
-        _move(id, up: picked == _ShopStep.up);
+        final up = picked == _ShopStep.up;
+        if (_move(id, up: up)) {
+          recordLines(
+            undo: () => _moveAgain(id, up: !up),
+            redo: () => _moveAgain(id, up: up),
+          );
+        }
       case _ShopStep.delete:
-        _lists.delete(id);
+        deleteLine(id);
         offerLineUndo(
           context,
           _lists.deletedLines,
@@ -689,14 +777,15 @@ class _ShoppingSectionState extends State<ShoppingSection>
   /// Moves the open Line [id] one place up, or with [up] false down, and
   /// its row with it, as rows stay where they are while the editor is
   /// open (#283).
-  void _move(String id, {required bool up}) {
+  /// Whether it moved.
+  bool _move(String id, {required bool up}) {
     final (moves, before) = _moveTo(id, up: up);
-    if (!moves || !_lists.mayEdit(id)) return;
+    if (!moves || !_lists.mayEdit(id)) return false;
     // A sync while the menu was open may have struck either.
     final list = _lists.byNote(widget.noteId, deviceWallClock);
     bool open(String? line) =>
         line == null || list?.line(line)?.struck == false;
-    if (!open(id) || !open(before)) return;
+    if (!open(id) || !open(before)) return false;
     _lists.move(id, deviceWallClock, before: before);
     final row = rows.firstWhere((r) => r.id == id);
     final rest = [...rows]..remove(row);
@@ -704,6 +793,15 @@ class _ShoppingSectionState extends State<ShoppingSection>
         ? rest.lastIndexWhere(placesAmong) + 1
         : rest.indexWhere((r) => r.id == before);
     rows = rest..insert(at < 0 ? rows.indexOf(row) : at, row);
+    return true;
+  }
+
+  /// Moves the Line [id] back, or again, for Undo and Redo.
+  void _moveAgain(String id, {required bool up}) {
+    if (!_changeable(id) || !mounted) return;
+    setState(() {
+      _move(id, up: up);
+    });
   }
 
   /// Brings the deleted Line [id] back from "Removed Lines".
@@ -711,6 +809,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
     if (!linesWritable || !_lists.mayEdit(id)) return;
     if (!_lists.deletedLines(widget.noteId).any((l) => l.id == id)) return;
     _lists.restore(id);
+    recordLines(undo: () => _deleteAgain(id), redo: () => _restoreAgain(id));
     setState(_load);
   }
 

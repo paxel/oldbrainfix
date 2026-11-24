@@ -1837,5 +1837,11 @@
   "spotSettingsSearch": "Die Suche findet jede Einstellung über ein Wort darin.",
   "spotSettingsShowTips": "„Tipps wieder zeigen“ holt auf diesem Gerät alle Tipps zurück.",
   "spotSettingsFeatures": "Einfach oder Erweitert: Erweitert legt auch Strichlisten, Einheiten, Frösche und Themen an.",
-  "spotSettingsGrammar": "„Grammatik hinzufügen …“ färbt Code in einer weiteren Sprache ein, auf all deinen Geräten."
+  "spotSettingsGrammar": "„Grammatik hinzufügen …“ färbt Code in einer weiteren Sprache ein, auf all deinen Geräten.",
+  "editorUndo": "Rückgängig",
+  "editorRedo": "Wiederholen",
+  "revertAllChanges": "Alle Änderungen zurücknehmen",
+  "revertAllQuestion": "Alle Änderungen zurücknehmen?",
+  "revertAllBody": "Die Notiz wird wieder so, wie sie beim Öffnen war. „Wiederholen“ holt die Änderungen einzeln zurück.",
+  "revertAllConfirm": "Zurücknehmen"
 }
