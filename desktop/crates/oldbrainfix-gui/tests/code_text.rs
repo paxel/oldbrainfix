@@ -169,13 +169,14 @@ fn its_field_is_unwrapped_sideways_and_has_no_format_bar() -> TestResult {
     harness.run_steps(30);
     let after = field_rect(&harness, SCRIPT).ok_or("the field")?.left();
     assert!(after < before - 50.0, "{before} {after}");
-    // Only Add to Note's format bar: the text's has none.
+    // No format bar: the text's has none, and Add to Note's waits for
+    // "Add a part" (obf-1072).
     let bars = |harness: &Harness<'_, App>| {
         harness
             .query_all_by_role_and_label(Role::Button, "Bold")
             .count()
     };
-    assert_eq!(bars(&harness), 1);
+    assert_eq!(bars(&harness), 0);
     // Its badges right under it, no room left between.
     let badge = harness.get_by_label("Text format: Code").rect();
     let field = field_rect(&harness, SCRIPT).ok_or("the field")?;
@@ -185,7 +186,7 @@ fn its_field_is_unwrapped_sideways_and_has_no_format_bar() -> TestResult {
     let harness = window(&store, Selection::Unsorted, Some(&note));
     let width = field_width(&harness, SCRIPT).ok_or("the plain field")?;
     assert!(width < 1280.0, "{width}");
-    assert_eq!(bars(&harness), 2);
+    assert_eq!(bars(&harness), 1);
     Ok(())
 }
 

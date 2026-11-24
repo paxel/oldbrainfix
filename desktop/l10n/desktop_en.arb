@@ -980,5 +980,7 @@
   "deskTopicMore": "More for this Topic",
   "@deskTopicMore": {"description": "The ⋮ at the end of the second row of a Topic's list band on the desktop (obf-1065), for screen readers and its tooltip: Rename, Export as Pack… and Delete."},
   "spotDeskListPlaceMore": "Renames, shares, exports or deletes this place.",
-  "@spotDeskListPlaceMore": {"description": "A Spotlight's sentence (obf-1043) on the desktop, beside the ⋮ of an Area's or Topic's list band (obf-1065)."}
+  "@spotDeskListPlaceMore": {"description": "A Spotlight's sentence (obf-1043) on the desktop, beside the ⋮ of an Area's or Topic's list band (obf-1065)."},
+  "deskAddPart": "Add a part",
+  "@deskAddPart": {"description": "A button among the actions of the desktop's Note dialog and a Note's own window (obf-1072): opens the box that adds a Section, with “What's new?” and “Add to Note”, which shows only then."}
 }

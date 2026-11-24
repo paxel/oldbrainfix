@@ -509,6 +509,8 @@ fn a_text_in_an_unknown_format_shows_as_it_is_and_is_never_overwritten() -> Test
     harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
     harness.run();
     // Amend adds a Section and leaves the text as it is.
+    harness.get_by_label("Add a part").click();
+    harness.run();
     field(&harness, "What's new?").click();
     harness.run();
     typing(&harness).type_text("Oat milk too");
@@ -639,6 +641,8 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     harness.run();
     assert_eq!(note(&harness, &kettle)?.importance, Importance::Important);
 
+    harness.get_by_label("Add a part").click();
+    harness.run();
     field(&harness, "What's new?").click();
     harness.run();
     typing(&harness).type_text("Vinegar works");
@@ -985,7 +989,7 @@ fn the_editor_speaks_german() -> TestResult {
         "Bereich und Thema: Unsortiert",
         "Zusammenführen mit …",
         "In den Papierkorb",
-        "Zur Notiz hinzufügen",
+        "Teil hinzufügen",
     ] {
         assert!(shows(&harness, label), "{label}");
     }

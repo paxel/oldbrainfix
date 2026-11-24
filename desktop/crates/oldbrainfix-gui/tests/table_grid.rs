@@ -541,6 +541,7 @@ fn the_text_around_still_edits_and_leaving_the_field_keeps_it() -> TestResult {
     assert!(text.contains("| milk | 20 |"), "{text:?}");
     assert!(text.ends_with("the very end"), "{text:?}");
     // Into another field, the Note's is left: kept, and read again.
+    press(&mut harness, "Add a part")?;
     harness
         .get_by(|n| n.placeholder() == Some("What's new?"))
         .click();
@@ -593,7 +594,8 @@ fn a_sections_table_is_edited_in_its_grid_too() -> TestResult {
 fn a_table_of_add_to_note_is_edited_in_its_grid() -> TestResult {
     let (store, note) = with_note("Shop", "plain")?;
     let mut harness = editor(&store, &note);
-    // The Amend field's bar, the second.
+    // Its box shows once asked (obf-1072); its bar is the second.
+    press(&mut harness, "Add a part")?;
     harness
         .query_all_by_role_and_label(Role::Button, "Table")
         .nth(1)

@@ -2181,6 +2181,13 @@ pub struct App {
     amend: String,
     amend_focus: bool,
     amend_select: Option<(usize, usize)>,
+    /// Whether the Amend box shows: only once "Add a part" opened it,
+    /// until the Section is added or the Note left (obf-1072).
+    amend_open: bool,
+    /// The Note the dialog shows since it was made there, by "+" or the
+    /// quick note's "Open in the editor": no "Add a part" until it is
+    /// opened again (obf-1072).
+    made_open: Option<String>,
     dialog: Option<Dialog>,
     /// Whether the dialog's text field is to take the keyboard, once, as
     /// it opens.
@@ -2899,6 +2906,8 @@ impl App {
             amend: String::new(),
             amend_focus: false,
             amend_select: None,
+            amend_open: false,
+            made_open: None,
             dialog: None,
             focus: false,
             editor: None,
@@ -6743,6 +6752,11 @@ impl App {
             self.amend.clear();
             self.amend_focus = false;
             self.amend_select = None;
+            self.amend_open = false;
+            // Made and opened here, it stays so only while it shows.
+            if self.made_open.as_ref() != self.text_of.as_ref() {
+                self.made_open = None;
+            }
             self.section_texts.clear();
         } else if kinded != self.text_kinded {
             // Its kind changed while it shows: what is typed stays, now
@@ -7946,6 +7960,7 @@ impl App {
                     self.quick_open = false;
                     self.capture_focus = false;
                     self.selected_note = Some(id.clone());
+                    self.made_open = Some(id.clone());
                     self.edit_wanted = Some(id);
                 }
             }
@@ -8356,6 +8371,8 @@ impl App {
                 };
                 notes.amend_as(&selected, &self.amend, format)?;
                 self.amend.clear();
+                // Added, the box goes until asked again (obf-1072).
+                self.amend_open = false;
             }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
             Action::File { notes: ids, place } => {
@@ -10551,6 +10568,8 @@ impl App {
         if !self.amend.trim().is_empty() && self.view.may.amends {
             self.act(Action::Amend)?;
         }
+        self.amend_open = false;
+        self.made_open = None;
         self.lines.leave(&self.store, &*self.wall)?;
         self.selected_note = None;
         self.badge = None;
@@ -10762,7 +10781,8 @@ impl App {
         })?;
         self.say_if_filter_hides(&made)?;
         if matches!(kind, NewKind::Checklist | NewKind::Shopping) {
-            self.act(Action::SelectNote(made))?;
+            self.act(Action::SelectNote(made.clone()))?;
+            self.made_open = Some(made);
             self.start_lines = true;
         }
         Ok(())
@@ -16417,6 +16437,8 @@ impl App {
         let amend = &mut self.amend;
         let amend_focus = &mut self.amend_focus;
         let amend_select = &mut self.amend_select;
+        let amend_open = &mut self.amend_open;
+        let just_made = self.made_open.as_deref() == Some(placed.note.id.as_str());
         let cache = &mut self.photos;
         let store = &self.store;
         let playing = self.playing.as_deref();
@@ -16904,152 +16926,175 @@ impl App {
                 if !may.amends {
                     return;
                 }
-                embossed(ui, tones, false, None, |ui| {
-                    // The format bar goes with the field (UI laws), as on
-                    // the phone's "Add to Note": without ☐, which the
-                    // Note's text puts in.
-                    let id = Id::new(("amend", &note.id));
-                    let focused = ui.memory(|m| m.has_focus(id));
-                    // Its tables as grids, as in the Note's text (#257).
-                    let unticked = BoxLook::default();
-                    let body = egui::TextStyle::Body.resolve(ui.style());
-                    // Typed at the Device's text size (#326, obf-1019).
-                    let mut typed_font = body.clone();
-                    typed_font.size = theme::content(ui, body.size);
-                    let grids = markdown::uses(amend).then(|| {
-                        let look = GridLook {
-                            size: body.size,
-                            colour: text,
-                            boxes: &unticked,
-                        };
-                        Grids::prepare(ui, (id, "amend"), amend, look)
-                    });
-                    let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
-                    let selected = format_bar::selection(ui, id, amend);
-                    let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
-                        Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
-                        None => format_bar::At::of(amend, selected, markdown::uses(amend)),
-                    };
-                    let formats = &Format::ALL[1..];
-                    // Only in Advanced (#197).
-                    let mut picked = match self.view.advanced {
-                        true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
-                        false => None,
-                    };
-                    if focused || in_cell {
-                        ui.input_mut(|i| {
-                            if i.consume_key(Modifiers::COMMAND, Key::B) {
-                                picked = Some(Format::Bold);
-                            } else if i.consume_key(Modifiers::COMMAND, Key::I) {
-                                picked = Some(Format::Italic);
-                            }
+                // Only when asked by "Add a part" (obf-1072); what is
+                // typed keeps it open.
+                let asked = *amend_open || !amend.trim().is_empty();
+                if asked {
+                    embossed(ui, tones, false, None, |ui| {
+                        // The format bar goes with the field (UI laws), as on
+                        // the phone's "Add to Note": without ☐, which the
+                        // Note's text puts in.
+                        let id = Id::new(("amend", &note.id));
+                        let focused = ui.memory(|m| m.has_focus(id));
+                        // Its tables as grids, as in the Note's text (#257).
+                        let unticked = BoxLook::default();
+                        let body = egui::TextStyle::Body.resolve(ui.style());
+                        // Typed at the Device's text size (#326, obf-1019).
+                        let mut typed_font = body.clone();
+                        typed_font.size = theme::content(ui, body.size);
+                        let grids = markdown::uses(amend).then(|| {
+                            let look = GridLook {
+                                size: body.size,
+                                colour: text,
+                                boxes: &unticked,
+                            };
+                            Grids::prepare(ui, (id, "amend"), amend, look)
                         });
-                    }
-                    if std::mem::take(amend_focus) {
-                        match amend_select.take() {
-                            Some(range) => format_bar::select(ui, id, amend, range),
-                            None => ui.memory_mut(|m| m.request_focus(id)),
+                        let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
+                        let selected = format_bar::selection(ui, id, amend);
+                        let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
+                            Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
+                            None => format_bar::At::of(amend, selected, markdown::uses(amend)),
+                        };
+                        let formats = &Format::ALL[1..];
+                        // Only in Advanced (#197).
+                        let mut picked = match self.view.advanced {
+                            true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
+                            false => None,
+                        };
+                        if focused || in_cell {
+                            ui.input_mut(|i| {
+                                if i.consume_key(Modifiers::COMMAND, Key::B) {
+                                    picked = Some(Format::Bold);
+                                } else if i.consume_key(Modifiers::COMMAND, Key::I) {
+                                    picked = Some(Format::Italic);
+                                }
+                            });
                         }
-                    }
-                    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
-                        let typed = typed.as_str();
-                        let format = egui::TextFormat::simple(typed_font.clone(), text);
-                        let mut job =
-                            egui::text::LayoutJob::single_section(typed.to_string(), format);
-                        if let Some(grids) = &grids {
-                            job = grids.hide(typed, job);
+                        if std::mem::take(amend_focus) {
+                            match amend_select.take() {
+                                Some(range) => format_bar::select(ui, id, amend, range),
+                                None => ui.memory_mut(|m| m.request_focus(id)),
+                            }
                         }
-                        job.wrap.max_width = width;
-                        ui.fonts_mut(|f| f.layout_job(job))
-                    };
-                    let output = TextEdit::multiline(amend)
-                        .id(id)
-                        .hint_text(t.amend_hint())
-                        .text_color(text)
-                        .layouter(&mut layouter)
-                        .desired_rows(1)
-                        .desired_width(f32::INFINITY)
-                        .frame(Frame::NONE)
-                        .show(ui);
-                    let field = output.response.response.clone();
-                    if let Some(grids) = grids {
-                        let shown = (&output, &mut *amend);
-                        let ticks: table_grid::Ticks<'_> = (false, &|_| false);
-                        let grid = grids.show(ui, (&t, tones), shown, (picked, &unticked, ticks));
-                        if grid.took {
-                            picked = None;
+                        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+                            let typed = typed.as_str();
+                            let format = egui::TextFormat::simple(typed_font.clone(), text);
+                            let mut job =
+                                egui::text::LayoutJob::single_section(typed.to_string(), format);
+                            if let Some(grids) = &grids {
+                                job = grids.hide(typed, job);
+                            }
+                            job.wrap.max_width = width;
+                            ui.fonts_mut(|f| f.layout_job(job))
+                        };
+                        let output = TextEdit::multiline(amend)
+                            .id(id)
+                            .hint_text(t.amend_hint())
+                            .text_color(text)
+                            .layouter(&mut layouter)
+                            .desired_rows(1)
+                            .desired_width(f32::INFINITY)
+                            .frame(Frame::NONE)
+                            .show(ui);
+                        let field = output.response.response.clone();
+                        if let Some(grids) = grids {
+                            let shown = (&output, &mut *amend);
+                            let ticks: table_grid::Ticks<'_> = (false, &|_| false);
+                            let grid =
+                                grids.show(ui, (&t, tones), shown, (picked, &unticked, ticks));
+                            if grid.took {
+                                picked = None;
+                            }
+                            actions.extend(grid.copy.map(Action::CopyTable));
+                            if let Some((start, end, url)) = grid.link {
+                                actions.push(Action::AskLink {
+                                    start,
+                                    end,
+                                    url,
+                                    amend: true,
+                                    section: None,
+                                    pick: false,
+                                });
+                            }
                         }
-                        actions.extend(grid.copy.map(Action::CopyTable));
-                        if let Some((start, end, url)) = grid.link {
-                            actions.push(Action::AskLink {
-                                start,
-                                end,
-                                url,
+                        // Its right-click menu, with the bar's formats while
+                        // the bar shows (#253).
+                        let offered: &[Format] = if self.view.advanced { formats } else { &[] };
+                        match text_menu::menu(ui, &t, &field, amend, offered) {
+                            Some(MenuPick::Format(format)) => picked = Some(format),
+                            Some(pick) => text_menu::apply(ui, id, amend, pick),
+                            None => {}
+                        }
+                        match picked {
+                            // As in the Note's text (#257).
+                            Some(Format::Table) => match markdown::table::at(amend, selected.0) {
+                                Some(table) => {
+                                    let cell = table_grid::cell_at(amend, &table, selected.0);
+                                    table_grid::edit(ui, (id, "amend"), amend, table.start, cell);
+                                }
+                                None => {
+                                    let change = markdown::table::insert(amend, selected.0);
+                                    *amend = change.text;
+                                    table_grid::edit(
+                                        ui,
+                                        (id, "amend"),
+                                        amend,
+                                        change.start,
+                                        (0, 0),
+                                    );
+                                }
+                            },
+                            Some(Format::Link) => actions.push(Action::AskLink {
+                                start: selected.0,
+                                end: selected.1,
+                                url: at.url.clone(),
                                 amend: true,
                                 section: None,
                                 pick: false,
-                            });
+                            }),
+                            Some(Format::LinkTo) => actions.push(Action::AskLink {
+                                start: selected.0,
+                                end: selected.1,
+                                url: None,
+                                amend: true,
+                                section: None,
+                                pick: true,
+                            }),
+                            Some(format) => match format_bar::change(format, amend, selected) {
+                                Some(changed) => {
+                                    *amend = changed.text;
+                                    let range = (changed.start, changed.end);
+                                    format_bar::select(ui, id, amend, range);
+                                }
+                                None => ui.memory_mut(|m| m.request_focus(id)),
+                            },
+                            None => {}
                         }
-                    }
-                    // Its right-click menu, with the bar's formats while
-                    // the bar shows (#253).
-                    let offered: &[Format] = if self.view.advanced { formats } else { &[] };
-                    match text_menu::menu(ui, &t, &field, amend, offered) {
-                        Some(MenuPick::Format(format)) => picked = Some(format),
-                        Some(pick) => text_menu::apply(ui, id, amend, pick),
-                        None => {}
-                    }
-                    match picked {
-                        // As in the Note's text (#257).
-                        Some(Format::Table) => match markdown::table::at(amend, selected.0) {
-                            Some(table) => {
-                                let cell = table_grid::cell_at(amend, &table, selected.0);
-                                table_grid::edit(ui, (id, "amend"), amend, table.start, cell);
+                        let ready = !amend.trim().is_empty();
+                        ui.horizontal_wrapped(|ui| {
+                            let add = ui.add_enabled(
+                                ready,
+                                egui::Button::new(RichText::new(t.amend()).color(text)),
+                            );
+                            if add.clicked() {
+                                actions.push(Action::Amend);
                             }
-                            None => {
-                                let change = markdown::table::insert(amend, selected.0);
-                                *amend = change.text;
-                                table_grid::edit(ui, (id, "amend"), amend, change.start, (0, 0));
-                            }
-                        },
-                        Some(Format::Link) => actions.push(Action::AskLink {
-                            start: selected.0,
-                            end: selected.1,
-                            url: at.url.clone(),
-                            amend: true,
-                            section: None,
-                            pick: false,
-                        }),
-                        Some(Format::LinkTo) => actions.push(Action::AskLink {
-                            start: selected.0,
-                            end: selected.1,
-                            url: None,
-                            amend: true,
-                            section: None,
-                            pick: true,
-                        }),
-                        Some(format) => match format_bar::change(format, amend, selected) {
-                            Some(changed) => {
-                                *amend = changed.text;
-                                let range = (changed.start, changed.end);
-                                format_bar::select(ui, id, amend, range);
-                            }
-                            None => ui.memory_mut(|m| m.request_focus(id)),
-                        },
-                        None => {}
-                    }
-                    let ready = !amend.trim().is_empty();
-                    ui.horizontal_wrapped(|ui| {
-                        let add = ui.add_enabled(
-                            ready,
-                            egui::Button::new(RichText::new(t.amend()).color(text)),
-                        );
-                        if add.clicked() {
-                            actions.push(Action::Amend);
-                        }
+                        });
                     });
-                });
+                }
                 ui.horizontal_wrapped(|ui| {
+                    // Opens the Amend box, the field taking the keyboard.
+                    if !asked
+                        && !just_made
+                        && ui
+                            .button(RichText::new(t.desk_add_part()).color(text))
+                            .clicked()
+                    {
+                        *amend_open = true;
+                        *amend_focus = true;
+                        ui.ctx().request_repaint();
+                    }
                     if ui
                         .button(RichText::new(t.send_button()).color(text))
                         .on_hover_text(t.send_to_person())

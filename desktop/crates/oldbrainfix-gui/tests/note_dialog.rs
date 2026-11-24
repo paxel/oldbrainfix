@@ -12,7 +12,8 @@
 //! detail of the Note, in its Captured badge, or of a Section, in the
 //! dialog its line under it opens (#170),
 //! goes with its Remove after one question while the time stays, and
-//! where this Device may change the Note only (#162).
+//! where this Device may change the Note only (#162). The Amend box
+//! shows only once "Add a part" opened it (obf-1072).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -782,6 +783,132 @@ fn the_last_card_of_a_list_scrolls_fully_clear() -> TestResult {
         "{last_card:?} in {height}"
     );
     assert!(add.bottom() < last_card.top(), "{add:?} {last_card:?}");
+    Ok(())
+}
+
+/// Whether the Amend box shows: its field, by its hint.
+fn amend_box(harness: &Harness<'_, App>) -> bool {
+    harness
+        .query_by(|n| n.placeholder() == Some("What's new?"))
+        .is_some()
+}
+
+/// Whether the dialog's Undo can be clicked.
+fn undoes(harness: &Harness<'_, App>) -> bool {
+    !last(harness, "Undo").accesskit_node().is_disabled()
+}
+
+#[test]
+fn the_amend_box_shows_only_once_add_a_part_opens_it() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    // Neither its field nor "Add to Note", only the button.
+    assert!(!amend_box(&harness));
+    assert!(!shows(&harness, "Add to Note"));
+    assert!(shows(&harness, "Add a part"));
+    // Over the find bar too, which stays; opening it is no step.
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::F);
+    harness.run();
+    assert!(shows(&harness, "Close the find bar"));
+    click(&mut harness, "Add a part");
+    harness.run();
+    assert!(amend_box(&harness));
+    assert!(!shows(&harness, "Add a part"));
+    assert!(shows(&harness, "Close the find bar"));
+    assert!(!undoes(&harness));
+    // Its field has the keyboard.
+    let focused = harness.get_by(|n| n.is_focused());
+    assert_eq!(focused.accesskit_node().placeholder(), Some("What's new?"));
+    typed(&mut harness, "Washer bought");
+    click(&mut harness, "Add to Note");
+    let sections = Notes::new(&store).sections(&tap)?;
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].text, "Washer bought");
+    // Added, it goes until asked again.
+    assert!(!amend_box(&harness));
+    assert!(shows(&harness, "Add a part"));
+    Ok(())
+}
+
+#[test]
+fn a_part_typed_and_left_is_kept_and_the_box_shows_no_more() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    click(&mut harness, "Add a part");
+    harness.run();
+    typed(&mut harness, "Plumber called");
+    harness.key_press(Key::Escape);
+    harness.run();
+    assert!(!harness.state().note_open());
+    let sections = Notes::new(&store).sections(&tap)?;
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].text, "Plumber called");
+    // Opened again, the box waits to be asked.
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert!(!amend_box(&harness));
+    assert!(shows(&harness, "Add a part"));
+    Ok(())
+}
+
+#[test]
+fn a_checklist_just_made_opens_without_the_amend_box() -> TestResult {
+    let (store, household) = store()?;
+    let mut harness = window(&store, Selection::Place(household));
+    harness.get_by_label("Add here").click();
+    harness.run();
+    click(&mut harness, "Checklist");
+    typed(&mut harness, "Packing");
+    click(&mut harness, "Create");
+    harness.run();
+    assert!(harness.state().note_open());
+    assert!(!amend_box(&harness));
+    assert!(!shows(&harness, "Add to Note"));
+    assert!(!shows(&harness, "Add a part"));
+    // Opened again, it has the button.
+    let packing = harness.state().selected_note().ok_or("the Checklist")?;
+    let packing = packing.to_string();
+    harness.state_mut().close_note();
+    harness.run();
+    harness.state_mut().select_note(&packing);
+    harness.run();
+    assert!(shows(&harness, "Add a part"));
+    Ok(())
+}
+
+#[test]
+fn a_note_from_the_quick_notes_open_in_the_editor_has_no_add_a_part() -> TestResult {
+    let (store, _) = store()?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().new_note();
+    harness.run();
+    harness
+        .get_by(|n| n.placeholder() == Some("What's on your mind?"))
+        .click();
+    harness.run();
+    typed(&mut harness, "Buy bread");
+    click(&mut harness, "Open in the editor");
+    harness.run();
+    assert!(harness.state().note_open());
+    assert!(!amend_box(&harness));
+    assert!(!shows(&harness, "Add a part"));
+    // Opened again, it has the button.
+    let bread = harness
+        .state()
+        .selected_note()
+        .ok_or("the Note")?
+        .to_string();
+    harness.state_mut().close_note();
+    harness.run();
+    harness.state_mut().select_note(&bread);
+    harness.run();
+    assert!(shows(&harness, "Add a part"));
     Ok(())
 }
 

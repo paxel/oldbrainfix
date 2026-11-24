@@ -2308,6 +2308,17 @@ replace a law of Both apps where they say so. A desktop law marked
   question has no way back. A step that also waits for Ctrl+Z, as a Line
   deleted, goes from there once the bar's Undo takes it back. Nothing is
   stored: the steps go as the Note closes.
+- **The Amend box shows only when asked** (obf-1072, C15): the Note
+  dialog and a Note's own window show no format bar, "What's new?" nor
+  "Add to Note" on their own. A Note just made and opened there, a
+  Checklist or Shopping List by "+" or a Note by the quick note's "Open
+  in the editor", has no "Add a part" while that dialog stays open;
+  opened again later, it has it. Where this Device may amend the Note,
+  **"Add a part"** stands first in the row of Send…, Copy as text, Save as Markdown… and
+  Export as Pack…; a click opens the box in its place, above that row,
+  its field taking the keyboard, and opening it is no step of Undo.
+  The box stays while it holds text and goes once "Add to Note" added
+  the Section or the Note is left, which adds what was typed, as ever.
 - **A table's ⋮ sits beside its top right corner** (obf-1050) wherever
   a table is drawn on the desktop: on a card, in a Section, in the Note
   dialog's text as it reads and on its grid while edited, in the reading

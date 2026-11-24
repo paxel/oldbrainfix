@@ -117,7 +117,7 @@ fn a_member_sees_who_shares_and_only_adds_to_someone_elses_note() -> TestResult 
     assert!(shows(&harness, "Shared · Ben, Ann"));
     harness.state_mut().select_note(&milk);
     harness.run();
-    assert!(shows(&harness, "Add to Note"));
+    assert!(shows(&harness, "Add a part"));
     // No "+" badge for Routines and the rest; where it is filed and its
     // Importance only show (#160).
     for hidden in [
