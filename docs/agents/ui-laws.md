@@ -1956,9 +1956,11 @@ There are three kinds, and an action takes the first that fits.
 - **An action goes into ⋮ only when the bar is full.** A page lists its
   actions in a fixed order; the bar shows as many as fit at the width it
   has, the rest overflow into ⋮, and ⋮ exists only when it holds
-  something. ⋮ is last. The one exception is the Areas list's ⋮ with
-  Rearrange (obf-1089), which stands whenever it offers Rearrange and
-  gives way to Done meanwhile, Running after Rearrange in it; and the
+  something. ⋮ is last. The one exception is the Areas list's ⋮
+  (obf-1089, obf-1096), which stands whenever nothing is searched, also
+  with fewer than two Areas, and gives way to Done while rearranging:
+  Rearrange with two Areas or more, Import… where a folder can be
+  picked, Running last; and the
   Agenda's ⋮, which always holds Running last (obf-1078,
   `BarAction.inMenu`) and so always stands, on a wide screen too.
   Nothing adapts to use. Settings, Backups and
@@ -1999,6 +2001,12 @@ There are three kinds, and an action takes the first that fits.
   Off, no screen shows a Spotlight, a new one neither, and none is
   counted as shown; "No more tips" on every tip's card turns it off at
   once. "Show tips again" brings every tip back and turns the switch on.
+- **The phone's Imports are actions, not settings** (obf-1096): a
+  folder and Google Keep sit on the page Import… in the Areas list's ⋮
+  opens, each a row that shows its running Import and opens its page
+  again. Settings has no Import section; a search there for the Imports
+  shows the line "Import… is in the Areas list's ⋮", which opens the
+  Areas list. The desktop keeps File ▸ Import….
 - **A search field sits at the top of Settings** (#282), under the bar,
   staying there while the page scrolls, on the band of the list pages'
   search bar (obf-1088); nothing focuses it on opening.

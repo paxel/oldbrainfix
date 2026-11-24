@@ -21,3 +21,14 @@ Future<void> openDeviceSettings(WidgetTester tester) async {
   await tester.tap(entry);
   await tester.pumpAndSettle();
 }
+
+/// Opens the page of the Imports as the user does (obf-1096): the Areas
+/// list from the Agenda, then ⋮ ▸ Import… in its top bar.
+Future<void> openImports(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('browse')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('areas-more')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('areas-import')));
+  await tester.pumpAndSettle();
+}

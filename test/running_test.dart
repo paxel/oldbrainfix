@@ -194,14 +194,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await openDeviceSettings(tester);
-      final row = find.byKey(const ValueKey('importFolder'));
-      await tester.scrollUntilVisible(
-        row,
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(row);
+      await openImports(tester);
+      await tester.tap(find.byKey(const ValueKey('importFolder')));
       await frames(tester);
 
       // The line under the Import page's bar.

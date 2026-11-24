@@ -5501,6 +5501,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsImport => 'Import';
 
   @override
+  String get areasImport => 'Importieren …';
+
+  @override
+  String get settingsImportMoved =>
+      'Importieren … steht im ⋮ der Bereichsliste';
+
+  @override
   String get importFolder => 'Ordner importieren';
 
   @override

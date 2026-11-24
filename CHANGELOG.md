@@ -47,6 +47,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, the most used tags sit as chips under the search, ending in All tags… for the whole tree. ([obf-1074](https://github.com/paxel/oldbrainfix/issues/387))
 - On the phone and the desktop, buttons, chips and header bands follow one design: outlined buttons are tonal, deleting is red, chips are pills. ([obf-1081](https://github.com/paxel/oldbrainfix/issues/394))
 - Actions have one name in both apps; the menus of a card, an Area, a table column, File and View are grouped into short submenus. ([obf-1014](https://github.com/paxel/oldbrainfix/issues/321))
+- On the phone, the Imports moved from the Settings to Import… in the Areas list's ⋮. ([obf-1096](https://github.com/paxel/oldbrainfix/issues/409))
 
 ### Fixed
 

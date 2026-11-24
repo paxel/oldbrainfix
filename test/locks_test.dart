@@ -483,17 +483,19 @@ void main() {
     testWidgets('asks for the PIN before its menu does anything', (
       tester,
     ) async {
-      lockedDoctor();
+      final (:doctor, note: _, routine: _) = lockedDoctor();
       await start(tester);
       await tap(tester, find.byTooltip(en.browseTooltip));
+      // The Area's own ⋮, not the list's in the top bar (obf-1096).
+      final menu = find.byKey(ValueKey('area-menu-${doctor.id}'));
 
-      await tap(tester, find.byIcon(Icons.more_vert));
+      await tap(tester, menu);
       await tap(tester, find.text(en.rename));
       expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
       await tap(tester, find.widgetWithText(TextButton, en.cancel));
       expect(find.text(en.rename), findsNothing, reason: 'no name asked');
 
-      await tap(tester, find.byIcon(Icons.more_vert));
+      await tap(tester, menu);
       await tap(tester, find.text(en.rename));
       await enterPin(tester, pin);
       expect(find.byKey(const ValueKey('pinField')), findsNothing);

@@ -146,14 +146,8 @@ void main() {
     testWidgets('counts its Notes on a page of its own, leaves the app '
         'usable meanwhile, and opens the new Area at the end', (tester) async {
       await pumpApp(tester);
-      await openDeviceSettings(tester);
-      final row = find.byKey(const ValueKey('importFolder'));
-      await tester.scrollUntilVisible(
-        row,
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(row);
+      await openImports(tester);
+      await tester.tap(find.byKey(const ValueKey('importFolder')));
       await frames(tester);
       expect(find.byType(ImportScreen), findsOneWidget);
       expect(find.text('Reading the folder…'), findsOneWidget);
@@ -212,14 +206,8 @@ void main() {
       folders.fails = true;
       await pumpApp(tester);
       runner.gate.complete();
-      await openDeviceSettings(tester);
-      final row = find.byKey(const ValueKey('importFolder'));
-      await tester.scrollUntilVisible(
-        row,
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(row);
+      await openImports(tester);
+      await tester.tap(find.byKey(const ValueKey('importFolder')));
       await tester.pumpAndSettle();
       expect(
         find.text(

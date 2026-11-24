@@ -1503,8 +1503,8 @@ void main() {
             expect(find.byKey(const ValueKey('restore-offer')), findsOneWidget);
           });
 
-          /// The phone's Settings searched for its Import rows (#282), a
-          /// folder pickable.
+          /// The phone's Import rows, opened by Import… in the Areas
+          /// list's ⋮ (obf-1096), a folder pickable.
           Future<void> importRows(WidgetTester tester) async {
             final dir = Directory('build/guide-import')
               ..createSync(recursive: true);
@@ -1516,20 +1516,9 @@ void main() {
               _guideDpr,
               folders: DirFolders(dir.path),
             );
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            final settings = find.byKey(const ValueKey('deviceSettings'));
-            await tester.ensureVisible(settings);
-            await _tap(tester, settings);
-            await tester.enterText(
-              find.descendant(
-                of: find.byKey(const ValueKey('settingsSearch')),
-                matching: find.byType(TextField),
-              ),
-              t.settingsImport,
-            );
-            // The rows found, without the cursor blinking in the field.
-            FocusManager.instance.primaryFocus?.unfocus();
-            await tester.pumpAndSettle();
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(const ValueKey('areas-more')));
+            await _tap(tester, find.byKey(const ValueKey('areas-import')));
             expect(find.byKey(const ValueKey('importKeep')), findsOneWidget);
           }
 

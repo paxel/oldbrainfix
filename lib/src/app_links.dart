@@ -266,7 +266,6 @@ List<(String, String)> settingsSections(BuildContext context) {
     ('privacy', t.settingsPrivacy),
     ('typing', t.settingsTyping),
     ('history', t.settingsHistory),
-    ('import', t.settingsImport),
     ('features', t.features),
   ];
 }

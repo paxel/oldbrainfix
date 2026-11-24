@@ -1452,6 +1452,8 @@
   "photoShareNoAppFix": "Installiere einen Messenger oder eine Galerie-App und teile es dann noch einmal.",
   "photoNotWrittenCause": "Die Datei des Fotos konnte auf diesem Telefon nicht geschrieben werden.",
   "settingsImport": "Import",
+  "areasImport": "Importieren …",
+  "settingsImportMoved": "Importieren … steht im ⋮ der Bereichsliste",
   "importFolder": "Ordner importieren",
   "importFolderDetail": "Jede Markdown-, Text-, AsciiDoc-, Org-, reStructuredText- oder HTML-Datei darin wird eine Notiz in einem neuen Bereich, datiert auf die letzte Änderung der Datei.",
   "importReading": "Der Ordner wird gelesen …",

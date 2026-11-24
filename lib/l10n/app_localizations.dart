@@ -8750,13 +8750,25 @@ abstract class AppLocalizations {
   /// **'The photo\'s file could not be written on this phone.'**
   String get photoNotWrittenCause;
 
-  /// Section title in Settings for the Import of a folder (CONTEXT.md: Import).
+  /// Title of the phone's page of the Imports, opened by 'areasImport' (obf-1096; CONTEXT.md: Import).
   ///
   /// In en, this message translates to:
   /// **'Import'**
   String get settingsImport;
 
-  /// Settings row that opens the system's folder picker for an Import.
+  /// In ⋮ of the Areas list's top bar, between Rearrange and Running (obf-1096): opens the page with the Import of a folder and of Google Keep.
+  ///
+  /// In en, this message translates to:
+  /// **'Import…'**
+  String get areasImport;
+
+  /// A line Settings shows only while its search finds the Imports (obf-1096); its tap opens the Areas list, whose top bar's ⋮ holds Import….
+  ///
+  /// In en, this message translates to:
+  /// **'Import… is in the Areas list\'s ⋮'**
+  String get settingsImportMoved;
+
+  /// Row of the Imports page (obf-1096) that opens the system's folder picker for an Import.
   ///
   /// In en, this message translates to:
   /// **'Import a folder'**
@@ -8858,7 +8870,7 @@ abstract class AppLocalizations {
   /// **'Nothing was imported. Copy the folder onto the phone and import it from there.'**
   String get importFailedFix;
 
-  /// Settings row under 'importFolder' that imports a Google Takeout export of Google Keep (ADR 0036); also the title of the dialog behind it. Shared with the desktop.
+  /// Row of the Imports page under 'importFolder' that imports a Google Takeout export of Google Keep (ADR 0036); also the title of the dialog behind it. Shared with the desktop.
   ///
   /// In en, this message translates to:
   /// **'Import from Google Keep'**

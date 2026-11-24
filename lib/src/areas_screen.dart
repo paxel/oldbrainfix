@@ -17,6 +17,7 @@ import 'file_into_screen.dart';
 import 'frogs_screen.dart';
 import 'hidden_from_ai_view.dart';
 import 'home_pages.dart';
+import 'imports_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
@@ -657,20 +658,28 @@ class _AreasScreenState extends State<AreasScreen>
     );
   }
 
-  /// ⋮ of the Areas list, with two Areas or more: Rearrange shows the
-  /// Areas' handles (obf-1089), Running opens the page of what runs in
-  /// the background (obf-1078).
+  /// ⋮ of the Areas list: Rearrange, with two Areas or more, shows the
+  /// Areas' handles (obf-1089), Import… opens the page of the Imports
+  /// (obf-1096), Running the page of what runs in the background
+  /// (obf-1078).
   Widget _areasMenu(AppLocalizations t) => PopupMenuButton<VoidCallback>(
     key: const ValueKey('areas-more'),
     tooltip: t.more,
     icon: const Icon(Icons.more_vert),
     onSelected: (run) => run(),
     itemBuilder: (_) => [
-      PopupMenuItem(
-        key: const ValueKey('areas-rearrange'),
-        value: () => setState(() => _rearranging = true),
-        child: Text(t.rearrangeAreas),
-      ),
+      if (_areas.length > 1)
+        PopupMenuItem(
+          key: const ValueKey('areas-rearrange'),
+          value: () => setState(() => _rearranging = true),
+          child: Text(t.rearrangeAreas),
+        ),
+      if (ImportsScreen.offered(context))
+        PopupMenuItem(
+          key: const ValueKey('areas-import'),
+          value: _openImports,
+          child: Text(t.areasImport),
+        ),
       if (RunningScope.of(context) != null)
         PopupMenuItem(
           key: const ValueKey('areas-running'),
@@ -678,6 +687,23 @@ class _AreasScreenState extends State<AreasScreen>
           child: Text(t.jobsTitle),
         ),
     ],
+  );
+
+  /// Whether ⋮ holds anything: it stands also with fewer than two Areas
+  /// (obf-1096).
+  bool get _hasMenu =>
+      _areas.length > 1 ||
+      ImportsScreen.offered(context) ||
+      RunningScope.of(context) != null;
+
+  /// The page of the Imports on top (obf-1096).
+  void _openImports() => unawaited(
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ImportsScreen(store: widget.places.store, trail: widget.trail),
+      ),
+    ),
   );
 
   @override
@@ -757,7 +783,7 @@ class _AreasScreenState extends State<AreasScreen>
                           onPressed: _stopRearranging,
                           child: Text(t.rearrangeDone),
                         )
-                      else if (!searching && _areas.length > 1)
+                      else if (!searching && _hasMenu)
                         _areasMenu(t),
                     ],
             ),

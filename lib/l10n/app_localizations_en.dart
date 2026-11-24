@@ -5434,6 +5434,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsImport => 'Import';
 
   @override
+  String get areasImport => 'Import…';
+
+  @override
+  String get settingsImportMoved => 'Import… is in the Areas list\'s ⋮';
+
+  @override
   String get importFolder => 'Import a folder';
 
   @override

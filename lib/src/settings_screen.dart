@@ -13,25 +13,18 @@ import 'browser.dart';
 import 'calendar_screen.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
-import 'failure_dialog.dart';
 import 'features_choice.dart';
 import 'feedback_screen.dart';
 import 'file_platform.dart';
-import 'folder_import.dart';
-import 'folder_platform.dart';
-import 'import_run.dart';
-import 'import_screen.dart';
-import 'keep_import.dart';
+import 'imports_screen.dart';
 import 'l10n.dart';
 import 'lock_settings.dart';
 import 'look.dart';
 import 'named_places_screen.dart';
 import 'page_bar.dart';
-import 'place_names.dart';
 import 'print_platform.dart';
 import 'recording_pause.dart';
 import 'routine_editor_screen.dart';
-import 'run_over.dart';
 import 'schedule_text.dart';
 import 'settings_search.dart';
 import 'setup_screen.dart';
@@ -52,8 +45,9 @@ enum _UnitChoice { region, metric, imperial }
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model, End a recording after a pause (obf-1053) and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
-/// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; in Advanced, Ask (#333); Show tips (obf-1060)
+/// the Area Locks; whether Streaks show; while searching for the Imports,
+/// a line that leads to the Areas list, whose ⋮ holds them (obf-1096); in
+/// Advanced, Ask (#333); Show tips (obf-1060)
 /// and Show tips again (obf-1043); the person's own Code languages (obf-1037); and Send
 /// feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
@@ -65,8 +59,8 @@ class SettingsScreen extends StatefulWidget {
   /// to show it at once.
   final VoidCallback? onThemeChanged;
 
-  /// The notes browser's way back in, which the Area an Import made
-  /// opens as the last selected one.
+  /// The notes browser's way back in, for the Areas list the line about
+  /// the Imports opens (obf-1096).
   final BrowserTrail? trail;
 
   /// The section an app link opens the page at (#261), by its link's
@@ -274,359 +268,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _twoRows = on);
   }
 
-  /// Picks a folder with the system's picker and makes Notes of its
-  /// Markdown and text files in a new Area (ADR 0036), announced as
-  /// [_runImport] does.
-  Future<void> _import(ImportJobs jobs) async {
-    if (jobs.running.value != null) return;
-    final t = context.t;
-    final folders = FolderScope.of(context);
-    final announcements = AnnouncementsScope.of(context);
-    final navigator = Navigator.of(context, rootNavigator: true);
+  /// The Areas list on top, whose ⋮ holds Import… (obf-1096).
+  void _openAreas() {
     final store = widget.store;
-    final folder = await folders.pick();
-    if (folder == null || jobs.running.value != null) return;
-    final name = await folders.displayName(folder);
-    if (jobs.running.value != null) return;
-    await _runImport(
-      ImportKind.folder,
-      t,
-      announcements,
-      navigator,
-      jobs,
-      name: name,
-      work: folderImport(folder, t.importAreaName(name)),
-      finished: (summary, area) => [
-        t.importFinishedNotes(summary.notes, area),
-        if (summary.skipped > 0) ...[
-          '',
-          t.importFinishedSkipped(summary.skipped),
-          t.importSkippedDetails(name, summary.notText, summary.tooLarge),
-        ],
-      ].join('\n'),
-      nothing: (summary) => (
-        announced: t.importNothing,
-        cause: t.importNothingCause,
-        fix: t.importNothingFix,
-        details: t.importSkippedDetails(
-          name,
-          summary.notText,
-          summary.tooLarge,
-        ),
-      ),
-      failed: (
-        announced: t.importFailed,
-        cause: t.importFailedCause,
-        fix: t.importFailedFix,
-      ),
-      // The folder was picked for this Import alone: its lasting access
-      // goes, unless the app syncs or backs up through it.
-      release: () =>
-          folders.release(folder, [?store.syncFolder, ?store.backupFolder]),
-    );
-  }
-
-  /// Asks whether the Google Takeout export is still a zip or an unpacked
-  /// folder, picks it with the system's picker and makes Notes of its
-  /// Google Keep notes in the new Area "From Google Keep" (ADR 0036),
-  /// announced as [_runImport] does.
-  Future<void> _importKeep(ImportJobs jobs) async {
-    if (jobs.running.value != null) return;
-    final t = context.t;
-    final folders = FolderScope.of(context);
-    final announcements = AnnouncementsScope.of(context);
-    final navigator = Navigator.of(context, rootNavigator: true);
-    final store = widget.store;
-    final zip = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.t.importKeep),
-        // The two answers stacked full width, Cancel below (UI laws).
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(context.t.importKeepAsk),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                key: const ValueKey('importKeepZip'),
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(context.t.importKeepZip),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                key: const ValueKey('importKeepFolder'),
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(context.t.importKeepFolder),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.t.cancel),
-          ),
-        ],
-      ),
-    );
-    if (zip == null || !mounted || jobs.running.value != null) return;
-    final source = zip ? await folders.pickZip() : await folders.pick();
-    if (source == null || jobs.running.value != null) return;
-    await _runImport(
-      ImportKind.keep,
-      t,
-      announcements,
-      navigator,
-      jobs,
-      work: keepImport(source, t.importKeepAreaName, zip: zip),
-      finished: (summary, area) => [
-        t.importFinishedNotes(summary.notes, area),
-        if (summary.checklists > 0) t.importKeepChecklists(summary.checklists),
-        if (summary.photos > 0) t.importKeepPhotos(summary.photos),
-        if (summary.skipped > 0) ...[
-          '',
-          t.importKeepSkipped(summary.skipped),
-          _keepSkipped(t, summary),
-        ],
-      ].join('\n'),
-      nothing: (summary) => (
-        announced: t.importKeepNothing,
-        cause: t.importKeepNothingCause,
-        fix: t.importKeepNothingFix,
-        details: _keepSkipped(t, summary),
-      ),
-      failed: (
-        announced: t.importKeepFailed,
-        cause: t.importKeepFailedCause,
-        fix: t.importKeepFailedFix,
-      ),
-      // A zip leaves no lasting access behind, only the copies of its
-      // files; a folder's goes as for any Import.
-      release: () => zip
-          ? Future<void>.value()
-          : folders.release(source, [?store.syncFolder, ?store.backupFolder]),
-    );
-  }
-
-  static String _keepSkipped(AppLocalizations t, ImportSummary summary) =>
-      t.importKeepSkippedDetails(
-        summary.trashed,
-        summary.missing,
-        summary.notPhoto,
-        summary.tooLarge,
-        summary.notText,
-      );
-
-  /// Runs the Import [kind] as [work] beside the app in [jobs]
-  /// (obf-1061), on a page of its own that counts its Notes and that the
-  /// user may leave, and announces at the top in [t], taken before any
-  /// await, once done, even after this page closed, without values (UI
-  /// laws): its tap shows what went where, [finished] says it of the new
-  /// Area, with a way into the Area; or, with nothing to import, why
-  /// ([nothing]); or that it [failed]. Stopped by Abort on the page
-  /// Running (obf-1078), it announces "Import stopped.", its tap showing
-  /// how many of how many Notes came in and, with any, what went where.
-  /// The page says the same. Then gives up what was picked for it
-  /// ([release]). [name] is the folder's, for the page Running.
-  Future<void> _runImport(
-    ImportKind kind,
-    AppLocalizations t,
-    Announcements? announcements,
-    NavigatorState navigator,
-    ImportJobs jobs, {
-    String? name,
-    required ImportWork work,
-    required String Function(ImportSummary summary, String area) finished,
-    required ({String announced, String cause, String fix, String details})
-    Function(ImportSummary summary)
-    nothing,
-    required ({String announced, String cause, String fix}) failed,
-    required Future<void> Function() release,
-  }) async {
-    final store = widget.store;
-    final trail = widget.trail ?? BrowserTrail();
-    final job = ImportJob(kind, name: name);
-    _showImport(navigator, store, trail, job);
-    // Says at the top that it ended as [title], its tap showing
-    // [details], with a way into the new [area] when there is one.
-    void announceEnd(String title, String details, Area? area) =>
-        announcements?.announce(
-          title,
-          onTap: () => unawaited(
-            showDialog<void>(
-              context: navigator.context,
-              builder: (context) => AlertDialog(
-                title: Text(title),
-                content: SingleChildScrollView(child: Text(details)),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(context.t.close),
-                  ),
-                  if (area != null)
-                    TextButton(
-                      key: const ValueKey('importOpenArea'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _openImported(navigator, store, trail, area);
-                      },
-                      child: Text(context.t.importOpenArea),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        );
-    try {
-      final summary = await jobs.run(job, work);
-      // A Restart ended this run of the app meanwhile: its store is
-      // closed, and nobody is left to tell.
-      if (runOver(store)) return;
-      final area = switch (summary.areaId) {
-        final id? => Places(store).areaById(id),
-        null => null,
-      };
-      // Stopped by Abort, before its first Note or later (obf-1078).
-      if (summary.stopped case final of?) {
-        final said = t.jobsImportStopped(summary.notes, of);
-        final details = area == null
-            ? said
-            : '$said\n\n${finished(summary, areaName(t, area))}';
-        job.ended(ImportEnd(details, area: area));
-        announceEnd(t.jobsImportEnded, details, area);
-        return;
-      }
-      if (area == null) {
-        final why = nothing(summary);
-        job.ended(ImportEnd('${why.announced}\n\n${why.cause} ${why.fix}'));
-        announceFailureWith(
-          announcements,
-          navigator,
-          why.announced,
-          title: t.importNothingTitle,
-          cause: why.cause,
-          fix: why.fix,
-          details: why.details,
-        );
-        return;
-      }
-      final details = finished(summary, areaName(t, area));
-      job.ended(ImportEnd(details, area: area));
-      announceEnd(t.importFinished, details, area);
-    } on Exception catch (e) {
-      if (runOver(store)) return;
-      job.ended(
-        ImportEnd('${failed.announced}\n\n${failed.cause} ${failed.fix}'),
-      );
-      announceFailureWith(
-        announcements,
-        navigator,
-        failed.announced,
-        title: t.importFailedTitle,
-        cause: failed.cause,
-        fix: failed.fix,
-        details: '$e',
-      );
-    } finally {
-      // Not on a store a Restart closed meanwhile, which [release] reads.
-      if (!runOver(store)) unawaited(release());
-    }
-  }
-
-  /// The notes browser on top, the Areas list and in it the imported
-  /// [area], chosen as the last selected one; the Areas list alone while
-  /// [area] was locked and is closed meanwhile.
-  static void _openImported(
-    NavigatorState navigator,
-    Store store,
-    BrowserTrail trail,
-    Area area,
-  ) {
-    final notes = Notes(store);
-    final places = Places(store);
-    trail.choseArea(area);
     unawaited(
-      navigator.push(
+      Navigator.of(context).push(
         BrowserRoute<void>(
-          builder: (_) =>
-              AreasScreen(notes: notes, places: places, trail: trail),
-        ),
-      ),
-    );
-    final closed =
-        LockScope.of(navigator.context)?.isAreaClosed(area.id) ?? false;
-    if (closed) return;
-    unawaited(
-      navigator.push(
-        BrowserRoute<void>(
-          builder: (_) => AreaScreen(
-            notes: notes,
-            places: places,
-            trail: trail,
-            areaId: area.id,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// The row of the Import [kind] in [jobs]: [title] over [detail], or
-  /// over [reading] with a spinner while it runs, its tap then opening
-  /// its page again (obf-1061); the other row takes no tap meanwhile.
-  Widget _importRow(
-    ImportJobs jobs,
-    ImportKind kind, {
-    required Key key,
-    required IconData icon,
-    required String title,
-    required String detail,
-    required String reading,
-    required VoidCallback onTap,
-  }) => ValueListenableBuilder<ImportJob?>(
-    valueListenable: jobs.running,
-    builder: (context, job, _) {
-      final running = job != null && job.kind == kind;
-      return ListTile(
-        key: key,
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(running ? reading : detail),
-        trailing: running
-            ? const SizedBox.square(
-                dimension: 24,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              )
-            : null,
-        enabled: job == null || running,
-        onTap: running
-            ? () => _showImport(
-                Navigator.of(context, rootNavigator: true),
-                widget.store,
-                widget.trail ?? BrowserTrail(),
-                job,
-              )
-            : onTap,
-      );
-    },
-  );
-
-  /// The page of the Import [job] on top, its Open opening the new Area
-  /// as [_openImported] does; once left, the running Import's row opens
-  /// it again.
-  static void _showImport(
-    NavigatorState navigator,
-    Store store,
-    BrowserTrail trail,
-    ImportJob job,
-  ) {
-    unawaited(
-      navigator.push(
-        MaterialPageRoute<void>(
-          builder: (_) => ImportScreen(
-            job: job,
-            onOpen: (area) => _openImported(navigator, store, trail, area),
+          builder: (_) => AreasScreen(
+            notes: Notes(store),
+            places: Places(store),
+            trail: widget.trail ?? BrowserTrail(),
           ),
         ),
       ),
@@ -651,7 +302,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     final soundDetail = _sound == null ? t.alarmSoundOwn : t.alarmSoundChosen;
     final typed = _search.text.trim();
-    final imports = ImportJobsScope.of(context);
     return Scaffold(
       appBar: pageBar(
         context,
@@ -1174,37 +824,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    if (FolderScope.of(context).available && imports != null)
+                    // The Imports are in the Areas list's ⋮ (obf-1096);
+                    // a search for them says so, and its tap leads there.
+                    if (_query.isNotEmpty && ImportsScreen.offered(context))
                       SettingsGroup(
-                        heading: t.settingsImport,
-                        headingKey: _heading('import'),
                         children: [
                           SettingsSection(
                             children: [
                               SettingsRow(
-                                words: [t.importFolder, t.importFolderDetail],
-                                child: _importRow(
-                                  imports,
-                                  ImportKind.folder,
-                                  key: const ValueKey('importFolder'),
-                                  icon: Icons.drive_folder_upload_outlined,
-                                  title: t.importFolder,
-                                  detail: t.importFolderDetail,
-                                  reading: t.importReading,
-                                  onTap: () => unawaited(_import(imports)),
-                                ),
-                              ),
-                              SettingsRow(
-                                words: [t.importKeep, t.importKeepDetail],
-                                child: _importRow(
-                                  imports,
-                                  ImportKind.keep,
-                                  key: const ValueKey('importKeep'),
-                                  icon: Icons.sticky_note_2_outlined,
-                                  title: t.importKeep,
-                                  detail: t.importKeepDetail,
-                                  reading: t.importKeepReading,
-                                  onTap: () => unawaited(_importKeep(imports)),
+                                // Found by the Imports' words, not
+                                // by the Areas list's.
+                                words: [
+                                  t.settingsImport,
+                                  t.importFolder,
+                                  t.importKeep,
+                                ],
+                                child: ListTile(
+                                  key: const ValueKey('settingsImportMoved'),
+                                  leading: const Icon(
+                                    Icons.drive_folder_upload_outlined,
+                                  ),
+                                  title: Text(t.settingsImportMoved),
+                                  onTap: _openAreas,
                                 ),
                               ),
                             ],
