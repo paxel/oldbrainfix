@@ -35,6 +35,7 @@ pub mod card_selection;
 pub mod cell_pick;
 pub mod checklist_view;
 pub mod cli;
+pub mod click_trace;
 pub mod design;
 pub mod enrich;
 pub mod feedback_view;

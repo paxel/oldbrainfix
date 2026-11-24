@@ -12,17 +12,19 @@
 //! and Not today with Skip and Tomorrow, as the phone's Android
 //! notification does (Q650), as Windows toasts and some Linux desktops
 //! show only a few buttons. What is tapped comes back as [`Tap`]s and is
-//! applied to the log; a click on an Occurrence's notification opens
-//! the window with its Note (#270), a click on the Nudge the
-//! window on Unsorted, as the phone's Nudge screen, and a click on the
-//! Changes Nudge asks the window to send each person waiting their
-//! bundle (#109). Quiet
+//! applied to the log. A click on a notification closes it and brings
+//! the window forward (obf-1039): on the Agenda with the Occurrence
+//! marked for an Occurrence's, on the Agenda for the Catch-up
+//! Notification's, on Unsorted for the Nudge's, as the phone's Nudge
+//! screen, and a click on the Changes Nudge asks the window to send each
+//! person waiting their bundle (#109). Every tap goes into the
+//! [`ClickTrace`], with where it went. Quiet
 //! Hours hold back the Nudge and the Changes Nudge, and an Occurrence
 //! firing in them shows silent with no alarm sound rung, but for one
 //! that escalates (obf-1045); with alerts off on this Device nothing
 //! shows (ADR 0008). A Heads-up shows once in its Occurrence's
 //! notification, which the ring then takes over: the Note's title with
-//! how long until it starts, a click opening the Note, nothing to check
+//! how long until it starts, a click opening the Agenda, nothing to check
 //! off, without sound in the Quiet Hours (obf-1046).
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -38,6 +40,7 @@ use oldbrainfix_core::{
     Routines, Store, WallClock, Wordless,
 };
 
+use crate::click_trace::ClickTrace;
 use crate::l10n::{L10n, names_text, wordless};
 use crate::profile_view::display_name;
 use crate::ring::{Ringer, alarm_sound};
@@ -170,9 +173,20 @@ pub fn occurrence_key(routine_id: &str, occurrence: &Occurrence) -> String {
     oldbrainfix_core::alarms::snooze_key(routine_id, occurrence)
 }
 
-/// The Routine whose Occurrence's notification was clicked, held until
-/// the window opens its Note (#270).
-pub type OccurrenceWanted = Arc<Mutex<Option<String>>>;
+/// What a click on a notification asks the window to show on the
+/// Agenda (obf-1039).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgendaWanted {
+    /// The Occurrence of the Routine by its id, marked where the Agenda
+    /// lists it.
+    Occurrence(String, Occurrence),
+    /// The Agenda alone: the Catch-up Notification's.
+    Agenda,
+}
+
+/// What a click on a notification asks the window to show on the
+/// Agenda, held until the window shows it.
+pub type OccurrenceWanted = Arc<Mutex<Option<AgendaWanted>>>;
 
 /// The Routine and Occurrence a notification's key names.
 fn split_key(key: &str) -> Option<(&str, &str)> {
@@ -301,14 +315,16 @@ pub struct Alerts {
     changed: Arc<AtomicU64>,
     /// Asked for by a click on a notification: the window is to open.
     pub open_requested: bool,
-    /// Given the Routine by a click on an Occurrence's notification: the
-    /// window is to open its Note.
+    /// Given the Occurrence by a click on its notification, the Agenda by
+    /// one on the Catch-up Notification: the window is to show them.
     occurrence_wanted: OccurrenceWanted,
     /// Raised by a click on the Nudge: the window is to show Unsorted.
     unsorted_wanted: Arc<AtomicBool>,
     /// Raised by a click on the Changes Nudge: the window is to send each
     /// person waiting their bundle.
     changes_wanted: Arc<AtomicBool>,
+    /// Every tap as it came, and where the answers went.
+    trace: ClickTrace,
     /// Plays the alarm sound of an Occurrence that rings; without one
     /// nothing plays.
     ringer: Option<Box<dyn Ringer>>,
@@ -331,6 +347,7 @@ impl Alerts {
             occurrence_wanted: Arc::new(Mutex::new(None)),
             unsorted_wanted: Arc::new(AtomicBool::new(false)),
             changes_wanted: Arc::new(AtomicBool::new(false)),
+            trace: ClickTrace::default(),
             ringer: None,
             heads_ups_fired: BTreeMap::new(),
             mark: None,
@@ -349,9 +366,9 @@ impl Alerts {
         self.unsorted_wanted = wanted;
     }
 
-    /// Puts the Routine into `wanted` when an Occurrence's notification
-    /// is clicked, for the window to open its Note
-    /// ([`crate::App::set_occurrence_wanted`]).
+    /// Puts the Occurrence into `wanted` when its notification is
+    /// clicked, and the Agenda alone when the Catch-up Notification is,
+    /// for the window to show them ([`crate::App::set_occurrence_wanted`]).
     pub fn set_occurrence_wanted(&mut self, wanted: OccurrenceWanted) {
         self.occurrence_wanted = wanted;
     }
@@ -362,29 +379,47 @@ impl Alerts {
         self.changes_wanted = wanted;
     }
 
+    /// Notes every tap in `trace`, which the window shares
+    /// ([`crate::App::set_click_trace`]).
+    pub fn set_trace(&mut self, trace: ClickTrace) {
+        self.trace = trace;
+    }
+
     /// Applies one tap to the log and this Device's snoozes, `wall`
     /// telling which day it is; Snooze and Not today show their choices
-    /// in place, quietly.
+    /// in place, quietly. A click on a notification closes it and asks
+    /// the window to show what it is about; the window notes in the
+    /// trace where that went, the answers are noted here.
     pub fn apply(
         &mut self,
         store: &Store,
         wall: &WallClock,
         tap: &Tap,
     ) -> oldbrainfix_core::Result<()> {
+        self.trace.arrived(tap);
         if tap.action == OPEN {
-            // The Changes Nudge stays until the bundles went: a save
-            // dialog cancelled keeps it for that person.
+            // Gone once clicked, on every system alike (obf-1039). The
+            // Changes Nudge is held until the bundles went, to be closed
+            // then: a save dialog cancelled keeps it for that person.
+            if tap.key != CHANGES_KEY {
+                self.notifier.close(&tap.key);
+                self.shown.remove(&tap.key);
+            }
             if tap.key == CHANGES_KEY {
                 self.changes_wanted.store(true, Ordering::SeqCst);
             }
             if tap.key == NUDGE_KEY {
                 self.unsorted_wanted.store(true, Ordering::SeqCst);
             }
-            if let Some((routine, occurrence)) = split_key(&tap.key)
-                && Occurrence::parse(occurrence).is_some()
+            let agenda = match split_key(&tap.key) {
+                Some((routine, occurrence)) => Occurrence::parse(occurrence)
+                    .map(|o| AgendaWanted::Occurrence(routine.to_string(), o)),
+                None => (tap.key == CATCH_UP_KEY).then_some(AgendaWanted::Agenda),
+            };
+            if let Some(agenda) = agenda
                 && let Ok(mut wanted) = self.occurrence_wanted.lock()
             {
-                *wanted = Some(routine.to_string());
+                *wanted = Some(agenda);
             }
             self.open_requested = true;
             return Ok(());
@@ -395,6 +430,7 @@ impl Alerts {
                 alarms.apply_nudge_snooze(tap.at, tap.at + wait)?;
                 self.notifier.close(NUDGE_KEY);
                 self.shown.remove(NUDGE_KEY);
+                self.trace.went(&tap.key, "snoozed");
             }
             return Ok(());
         }
@@ -415,17 +451,34 @@ impl Alerts {
             };
             self.notifier.show(&notice);
             self.shown.insert(tap.key.clone(), notice);
+            self.trace.went(&tap.key, "its choices shown");
             return Ok(());
         }
-        match tap.action.as_str() {
-            DONE => drop(alarms.apply_done(routine, occurrence, tap.at)?),
-            SKIP => drop(alarms.apply_skip(routine, occurrence, tap.at)?),
-            TOMORROW => drop(alarms.apply_tomorrow(routine, occurrence, tap.at)?),
+        let went = match tap.action.as_str() {
+            DONE => {
+                alarms.apply_done(routine, occurrence, tap.at)?;
+                "done"
+            }
+            SKIP => {
+                alarms.apply_skip(routine, occurrence, tap.at)?;
+                "skipped"
+            }
+            TOMORROW => {
+                alarms.apply_tomorrow(routine, occurrence, tap.at)?;
+                "tomorrow"
+            }
             action => match snooze_of(action) {
-                Some(wait) => alarms.apply_snooze(routine, occurrence, tap.at + wait)?,
-                None => return Ok(()),
+                Some(wait) => {
+                    alarms.apply_snooze(routine, occurrence, tap.at + wait)?;
+                    "snoozed"
+                }
+                None => {
+                    self.trace.went(&tap.key, "nothing, no longer shown");
+                    return Ok(());
+                }
             },
-        }
+        };
+        self.trace.went(&tap.key, went);
         self.notifier.close(&tap.key);
         self.shown.remove(&tap.key);
         self.changed.fetch_add(1, Ordering::SeqCst);
@@ -605,7 +658,7 @@ impl Alerts {
 
     /// Shows `heads_up` in its Occurrence's notification (obf-1046): the
     /// Note's title with how long until it starts, nothing but a click to
-    /// open the Note, with the notification's own sound but in the Quiet
+    /// open the Agenda on it, with the notification's own sound but in the Quiet
     /// Hours; the app rings no alarm sound for it.
     fn show_heads_up(&mut self, heads_up: &PlannedHeadsUp, wall: &WallClock) {
         let t = self.t;

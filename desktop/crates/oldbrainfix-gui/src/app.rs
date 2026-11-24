@@ -108,7 +108,7 @@ use oldbrainfix_core::{
 use crate::about_view;
 use crate::add_to_note::{self, NoteAsk, NotePicker};
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
-use crate::alerts::{Event, OccurrenceWanted};
+use crate::alerts::{AgendaWanted, CATCH_UP_KEY, CHANGES_KEY, Event, NUDGE_KEY, OccurrenceWanted};
 use crate::all_routines_view::{self, AllRoutinesAction};
 use crate::app_links;
 use crate::area_deletion::AreaDeletions;
@@ -129,6 +129,7 @@ use crate::cell_pick;
 use crate::checklist_view::{
     self, CardMenu, ChecklistAction, ChecklistShown, LineStep, RemovedAsk, ShownLine,
 };
+use crate::click_trace::ClickTrace;
 use crate::design;
 use crate::enrich::{self, Enricher};
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
@@ -483,6 +484,71 @@ struct AgendaView {
     quiet: bool,
 }
 
+/// The Occurrence a click on its notification asked for (obf-1039),
+/// until the Agenda is left or another is asked for.
+#[derive(Debug, Clone)]
+struct Notified {
+    routine: String,
+    occurrence: Occurrence,
+    /// The log's mark as it was clicked: an Agenda read at it or later
+    /// tells where it is listed.
+    seq: Option<i64>,
+    /// Where the Agenda lists it, once read; then it is marked.
+    place: Option<AgendaPlace>,
+    /// Whether the list is still to scroll it into view, once.
+    scroll: bool,
+}
+
+/// Where the Agenda lists an Occurrence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AgendaPlace {
+    Today,
+    Tomorrow,
+    Later(Day),
+    Missed,
+}
+
+impl AgendaPlace {
+    /// Where it went, for the trace of notification clicks.
+    fn traced(self) -> String {
+        match self {
+            AgendaPlace::Today => "Agenda today".into(),
+            AgendaPlace::Tomorrow => "Agenda tomorrow".into(),
+            AgendaPlace::Later(day) => format!("Agenda {day}"),
+            AgendaPlace::Missed => "Agenda Missed".into(),
+        }
+    }
+}
+
+/// Where `agenda` lists the Occurrence `occurrence` of the Routine
+/// `routine`: today, tomorrow, a later day, else the Missed Summary;
+/// `None` where it lists it nowhere.
+fn agenda_place(
+    agenda: &AgendaView,
+    routine: &str,
+    occurrence: &Occurrence,
+) -> Option<AgendaPlace> {
+    let listed = |rows: &[Row]| {
+        rows.iter()
+            .any(|r| r.row.routine.id == routine && r.row.occurrence == *occurrence)
+    };
+    if listed(&agenda.today) {
+        return Some(AgendaPlace::Today);
+    }
+    if listed(&agenda.tomorrow) {
+        return Some(AgendaPlace::Tomorrow);
+    }
+    if let Some((day, _)) = agenda.later.iter().find(|(_, rows)| listed(rows)) {
+        return Some(AgendaPlace::Later(*day));
+    }
+    agenda
+        .missed
+        .routines
+        .iter()
+        .any(|m| m.routine.id == routine && m.missed.iter().any(|o| o.occurrence == *occurrence))
+        .then_some(AgendaPlace::Missed)
+}
+
 /// Hands a thread its connection to the window's database.
 type StoreOpener = Arc<dyn Fn() -> Arc<Store> + Send + Sync>;
 
@@ -494,6 +560,8 @@ struct AgendaReads {
     open: StoreOpener,
     /// The rows read last, shown until the next read is in.
     shown: Option<AgendaView>,
+    /// The log's mark they were read at.
+    shown_seq: Option<i64>,
     /// The read running, with whether it wrote today's picks.
     running: Option<std::sync::mpsc::Receiver<AgendaRead>>,
     /// A change asked for one more read meanwhile.
@@ -1820,9 +1888,10 @@ enum Action {
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
-    /// A click on the notification of an Occurrence of this Routine
-    /// (#270): its Note opens in the Note dialog, while it is there.
-    OpenNotified(String),
+    /// A click on the notification of this Occurrence of the Routine
+    /// (obf-1039): the Agenda shows, the Occurrence marked where it lists
+    /// it.
+    OpenNotified(String, Occurrence),
     /// Saves one calendar file of every Routine and Reminder, in the
     /// order their page lists them (#115).
     ExportRoutines,
@@ -2443,9 +2512,15 @@ pub struct App {
     /// Raised by a click on the Changes Nudge: the bundles of the people
     /// waiting are to be saved (#109).
     changes_wanted: Option<Arc<AtomicBool>>,
-    /// Holds the Routine whose Occurrence's notification was clicked:
-    /// its Note is to open (#270).
+    /// Holds what a click on a notification asks the Agenda to show: an
+    /// Occurrence, marked, or the Agenda alone (obf-1039).
     occurrence_wanted: Option<OccurrenceWanted>,
+    /// The Occurrence a click on its notification asked for, marked on
+    /// the Agenda once read.
+    notified: Option<Notified>,
+    /// Every click on a notification, as it came and where it went, for
+    /// Send feedback (obf-1039).
+    click_trace: ClickTrace,
     /// Ask the system's dialogs where to save a bundle and which one to
     /// import.
     bundle_saver: FileSaver,
@@ -3062,6 +3137,13 @@ impl App {
             unsorted_wanted: None,
             changes_wanted: None,
             occurrence_wanted: None,
+            notified: None,
+            // Shown, as the window is at first.
+            click_trace: {
+                let trace = ClickTrace::default();
+                trace.set_shown(true);
+                trace
+            },
             bundle_saver: Box::new(|title, name| {
                 bundle_dialog(title).set_file_name(name).save_file()
             }),
@@ -6000,6 +6082,7 @@ impl App {
         self.agenda_reads = Some(AgendaReads {
             open: Arc::new(open),
             shown: self.view.agenda.clone(),
+            shown_seq: None,
             running: None,
             again: false,
             held: false,
@@ -6158,6 +6241,7 @@ impl App {
                     self.view.agenda = Some(view.clone());
                 }
                 reads.shown = Some(view);
+                reads.shown_seq = Some(seq);
             }
             Ok(_) => reads.again = true,
             Err(e) => self.error = Some(e.to_string()),
@@ -6167,6 +6251,79 @@ impl App {
             self.read_agenda_aside();
         }
         ctx.request_repaint();
+    }
+
+    /// Places the Occurrence a click on its notification asked for
+    /// (obf-1039) once the Agenda is read at the click's mark or later:
+    /// marked, and scrolled into view once, where the Agenda lists it;
+    /// where it lists it nowhere, as one Done or skipped meanwhile, the
+    /// top says so. One still open that no day of the Agenda shows, as a
+    /// weekly one of yesterday, not Missed until its next, opens its Note
+    /// dialog over the Agenda, whose Due line answers it. Each goes into
+    /// the trace of the clicks; the mark goes once the Agenda is left.
+    fn place_notified(&mut self) {
+        let Some(notified) = &mut self.notified else {
+            return;
+        };
+        if self.selection != Selection::Agenda {
+            self.notified = None;
+            return;
+        }
+        if notified.place.is_some() {
+            return;
+        }
+        let Some(agenda) = &self.view.agenda else {
+            return;
+        };
+        // On its thread the Agenda shows the rows read last a while.
+        let read = self.agenda_reads.as_ref().is_none_or(|reads| {
+            reads
+                .shown_seq
+                .is_some_and(|seq| notified.seq.is_none_or(|at| seq >= at))
+        });
+        if !read {
+            return;
+        }
+        let key = crate::alerts::occurrence_key(&notified.routine, &notified.occurrence);
+        if let Some(place) = agenda_place(agenda, &notified.routine, &notified.occurrence) {
+            notified.place = Some(place);
+            notified.scroll = true;
+            self.click_trace.went(&key, &place.traced());
+            return;
+        }
+        let occurrence = notified.occurrence;
+        let routines = Routines::new(&self.store);
+        let routine = routines.by_id(&notified.routine).ok().flatten();
+        let note = routine
+            .as_ref()
+            .filter(|r| !r.is_trashed())
+            .and_then(|r| routines.note(r).ok().flatten())
+            .filter(|n| !n.is_trashed());
+        self.notified = None;
+        let t = self.t;
+        let (said, went) = match (routine, note) {
+            (Some(r), _) if r.done_at(&occurrence).is_some() => {
+                (Some(t.notification_already_done()), "Agenda, already done")
+            }
+            (Some(r), _) if r.skipped_at(&occurrence).is_some() => {
+                (Some(t.occurrence_skipped()), "Agenda, skipped")
+            }
+            (Some(_), Some(note)) => {
+                // A Routine editor or Tally form open keeps its draft, over
+                // the Note dialog.
+                let (editor, tally_form) = (self.editor.take(), self.tally_form.take());
+                self.apply(Action::SelectNote(note.id));
+                self.editor = editor;
+                self.tally_form = tally_form;
+                (None, "Note dialog, not on the Agenda")
+            }
+            (Some(_), None) => (None, "Agenda, not listed"),
+            (None, _) => (None, "Agenda, Routine gone"),
+        };
+        if let Some(said) = said {
+            self.notice = Some(said.to_string());
+        }
+        self.click_trace.went(&key, went);
     }
 
     /// The searches typed into (obf-1068): each runs on a thread of its
@@ -6307,10 +6464,25 @@ impl App {
         self.changes_wanted = Some(wanted);
     }
 
-    /// Opens the Note dialog of the Note of the Routine a click on an
-    /// Occurrence's notification put into `wanted` (#270).
+    /// Shows the Agenda whenever a click on a notification put into
+    /// `wanted` what it is about (obf-1039): an Occurrence scrolled into
+    /// view and marked where the Agenda lists it, else the Agenda with
+    /// "Already done" or "Skipped" at the top; the Agenda alone for the
+    /// Catch-up Notification.
     pub fn set_occurrence_wanted(&mut self, wanted: OccurrenceWanted) {
         self.occurrence_wanted = Some(wanted);
+    }
+
+    /// Notes where each click on a notification went in `trace`, which
+    /// the alerts share, and offers it to Send feedback (obf-1039).
+    pub fn set_click_trace(&mut self, trace: ClickTrace) {
+        trace.set_shown(self.shown);
+        self.click_trace = trace;
+    }
+
+    /// The trace of the clicks on notifications.
+    pub fn click_trace(&self) -> &ClickTrace {
+        &self.click_trace
     }
 
     /// Syncs through the shared folder now: on the folder thread, or here
@@ -6774,6 +6946,7 @@ impl App {
     /// into the tray and brings it back.
     pub fn set_shown(&mut self, shown: bool) {
         self.shown = shown;
+        self.click_trace.set_shown(shown);
         // Hidden, it hears no keys to record (#283).
         if !shown {
             self.record_hotkey(false);
@@ -8310,6 +8483,7 @@ impl App {
             Action::PageInto(page) => {
                 if page == Page::Feedback {
                     self.feedback = FeedbackForm::default();
+                    self.feedback.click_lines = self.click_trace.lines();
                 }
                 self.pages.push(page);
             }
@@ -9197,22 +9371,19 @@ impl App {
                     self.tally_form = None;
                 }
             }
-            Action::OpenNotified(id) => {
-                let routines = Routines::new(&self.store);
-                let Some(routine) = routines.by_id(&id)?.filter(|r| !r.is_trashed()) else {
-                    return Ok(());
-                };
-                // Gone or in the trash, it opens just the window.
-                let Some(note) = routines.note(&routine)?.filter(|n| !n.is_trashed()) else {
-                    return Ok(());
-                };
-                // A Routine editor or Tally form open keeps its draft, over
-                // the Note dialog.
-                let (editor, tally_form) = (self.editor.take(), self.tally_form.take());
-                let opened = self.act(Action::SelectNote(note.id));
-                self.editor = editor;
-                self.tally_form = tally_form;
-                opened?;
+            Action::OpenNotified(routine, occurrence) => {
+                // As a click on the Agenda in the sidebar: the Note open is
+                // kept and closed, a Routine editor or Tally form stays
+                // over it with its draft.
+                self.leave_note()?;
+                self.go(Selection::Agenda);
+                self.notified = Some(Notified {
+                    routine,
+                    occurrence,
+                    seq: self.store.current_seq().ok(),
+                    place: None,
+                    scroll: false,
+                });
             }
             Action::NewRoutine { note, reminder } => {
                 self.save_text()?;
@@ -12720,6 +12891,7 @@ impl App {
     pub fn show(&mut self, ui: &mut Ui) {
         self.save_ticks(ui.ctx());
         self.agenda_arrived(ui.ctx());
+        self.place_notified();
         self.search_arrived(ui.ctx());
         self.tags_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
@@ -12991,6 +13163,7 @@ impl App {
             .is_some_and(|wanted| wanted.swap(false, Ordering::SeqCst))
         {
             actions.push(Action::Select(Selection::Unsorted));
+            self.click_trace.went(NUDGE_KEY, "Unsorted");
             ui.ctx().request_repaint();
         }
         if self
@@ -12999,14 +13172,23 @@ impl App {
             .is_some_and(|wanted| wanted.swap(false, Ordering::SeqCst))
         {
             actions.push(Action::SendWaitingChanges);
+            self.click_trace.went(CHANGES_KEY, "send changes");
             ui.ctx().request_repaint();
         }
-        if let Some(routine) = self
+        if let Some(wanted) = self
             .occurrence_wanted
             .as_ref()
             .and_then(|wanted| wanted.lock().ok().and_then(|mut held| held.take()))
         {
-            actions.push(Action::OpenNotified(routine));
+            actions.push(match wanted {
+                AgendaWanted::Occurrence(routine, occurrence) => {
+                    Action::OpenNotified(routine, occurrence)
+                }
+                AgendaWanted::Agenda => {
+                    self.click_trace.went(CATCH_UP_KEY, "Agenda");
+                    Action::Select(Selection::Agenda)
+                }
+            });
             ui.ctx().request_repaint();
         }
         if !files.is_empty() {
@@ -18818,6 +19000,32 @@ impl App {
         let Some(agenda) = self.view.agenda.clone() else {
             return;
         };
+        // The Occurrence a click on its notification asked for, marked
+        // where it is listed and scrolled into view once (obf-1039).
+        let mark = self.notified.as_ref().and_then(|n| {
+            n.place
+                .map(|place| (n.routine.clone(), n.occurrence, place))
+        });
+        let scroll = std::cell::Cell::new(
+            self.notified
+                .as_mut()
+                .is_some_and(|n| std::mem::take(&mut n.scroll)),
+        );
+        let marks = |row: &Row| {
+            mark.as_ref()
+                .is_some_and(|(r, o, _)| row.row.routine.id == *r && row.row.occurrence == *o)
+        };
+        let row_at = |ui: &mut Ui, row: &Row, actions: &mut Vec<Action>| {
+            let marked = marks(row);
+            let rect = agenda_row(ui, &t, tones, (row, agenda.hides_checked, marked), actions);
+            if marked && scroll.take() {
+                ui.scroll_to_rect(rect, Some(egui::Align::Center));
+            }
+        };
+        let missed_mark = mark
+            .as_ref()
+            .filter(|(_, _, place)| *place == AgendaPlace::Missed)
+            .map(|(r, o, _)| (r.as_str(), *o));
         let output = list_scroll(ui, "agenda", |ui| {
             // Tighter than 0.3.1's 12 (#208).
             ui.spacing_mut().item_spacing.y = 6.0;
@@ -18827,7 +19035,12 @@ impl App {
                 quiet_day_line(ui, &t, tones, actions);
             }
             if !agenda.missed.is_empty() {
-                missed_card(ui, &t, tones, &agenda.missed, actions);
+                let shown = (&agenda.missed, missed_mark);
+                if let Some(rect) = missed_card(ui, &t, tones, shown, actions)
+                    && scroll.take()
+                {
+                    ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                }
             }
             if agenda.unsorted > 0 {
                 let said = t.unsorted_banner(agenda.unsorted as i64);
@@ -18869,7 +19082,7 @@ impl App {
                 .unwrap_or(agenda.today.len());
             let (all_day, timed) = agenda.today.split_at(timed);
             for row in all_day {
-                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                row_at(ui, row, actions);
             }
             for row in &agenda.shopping {
                 shopping_row(ui, tones, row, actions);
@@ -18878,7 +19091,7 @@ impl App {
                 checklist_row(ui, tones, row, actions);
             }
             for row in timed {
-                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                row_at(ui, row, actions);
             }
             // Under what is due, never above it (#101); gone once today's
             // Frog is eaten where this Device hides what is checked (#217).
@@ -18913,7 +19126,7 @@ impl App {
                     );
                 }
                 for row in &agenda.tomorrow {
-                    agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                    row_at(ui, row, actions);
                 }
             });
             // The days after, each under its weekday and date; one
@@ -18935,7 +19148,7 @@ impl App {
                         );
                     }
                     for row in rows {
-                        agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                        row_at(ui, row, actions);
                     }
                 });
             }
@@ -23193,14 +23406,16 @@ fn occurrence_opens(row: &AgendaRow) -> Action {
 /// every Line is checked, its box stays checked too (#121), a Line's
 /// words opening what the heading opens. Where
 /// `hides_checked` (#217), the checked Lines and the picks with an entry
-/// are left out.
+/// are left out. The one a click on its notification asked for is
+/// `marked` with an outline in the accent colour, and says so to a screen
+/// reader (obf-1039); where the card lies.
 fn agenda_row(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    (row, hides_checked): (&Row, bool),
+    (row, hides_checked, marked): (&Row, bool, bool),
     actions: &mut Vec<Action>,
-) {
+) -> egui::Rect {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let routine = &row.row.routine;
@@ -23218,7 +23433,7 @@ fn agenda_row(
         .and_then(|a| area_colour(a.colour.as_deref()));
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
-    agenda_card(ui, tones, colour, |ui| {
+    let card = agenda_card(ui, tones, colour, |ui| {
         // Done from the entries of every pick, or from every Line
         // checked, stays checked.
         let complete = matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
@@ -23269,19 +23484,26 @@ fn agenda_row(
                 .response
                 .interact(Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
-            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &title));
+            open.widget_info(|| WidgetInfo {
+                selected: marked.then_some(true),
+                ..WidgetInfo::labeled(WidgetType::Button, true, &title)
+            });
             if open.clicked() {
                 actions.push(occurrence_opens(&row.row));
             }
-            // The same menu from a right-click and from ⋮.
+            // The same menu from a right-click and from ⋮; Done there as
+            // the box checks it (obf-1039), not on a Session's, which its
+            // picks make Done.
             let history = !routine.is_reminder();
             let answers = row.answers;
+            let offers_done = answers.not_today && !done && !complete && row.session.is_none();
+            let menu = (history, offers_done, answers);
             let mut picked = None;
-            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
+            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, menu)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let more = icon_button(ui, icons::MORE_VERT, &t.occurrence_menu(&title), weak);
                 egui::Popup::menu(&more)
-                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
+                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, menu)));
                 if let Some(icon) = row
                     .area
                     .as_ref()
@@ -23294,6 +23516,9 @@ fn agenda_row(
                 }
             });
             match picked {
+                Some(OccurrencePick::Done) => {
+                    actions.push(Action::Toggle(routine.id.clone(), occurrence));
+                }
                 Some(OccurrencePick::Schedule) => {
                     actions.push(Action::OpenRoutine(routine.id.clone()));
                 }
@@ -23330,6 +23555,15 @@ fn agenda_row(
             }
         }
     });
+    if marked {
+        ui.painter().rect_stroke(
+            card.rect,
+            theme::CARD_RADIUS,
+            egui::Stroke::new(3.0, tones.accent),
+            egui::StrokeKind::Inside,
+        );
+    }
+    card.rect
 }
 
 /// Today's picks of a Session under its heading (#208), in the order
@@ -23515,25 +23749,37 @@ fn answered_under(t: &L10n, row: &AgendaRow) -> Option<&'static str> {
 /// What was picked in an Occurrence's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OccurrencePick {
+    Done,
     Schedule,
     History,
     Answer(Answer),
 }
 
-/// An Occurrence's menu, from a right-click on it or its ⋮, as the
-/// phone's: Snooze and Not today as far as `answers` allows (#269), each
+/// An Occurrence's menu, from a right-click on it or its ⋮: Done where
+/// it is offered (`done`, obf-1039), as its box checks it, then as the
+/// phone's Snooze and Not today as far as `answers` allows (#269), each
 /// under its heading, then Edit schedule, which opens its Routine or
 /// Reminder editor (#270), and History for a Routine (`history`); no
 /// calendar file (obf-1014). What was picked.
 fn occurrence_menu(
     ui: &mut Ui,
     t: &L10n,
-    history: bool,
-    answers: Answers,
+    (history, done, answers): (bool, bool, Answers),
 ) -> Option<OccurrencePick> {
     let text = ui.visuals().text_color();
-    let mut picked = occurrence_answers::entries(ui, t, answers).map(OccurrencePick::Answer);
-    if answers.any() {
+    let mut picked = None;
+    if done
+        && ui
+            .button(RichText::new(t.mark_done()).color(text))
+            .clicked()
+    {
+        picked = Some(OccurrencePick::Done);
+    }
+    if done && answers.any() {
+        ui.separator();
+    }
+    picked = picked.or(occurrence_answers::entries(ui, t, answers).map(OccurrencePick::Answer));
+    if done || answers.any() {
         ui.separator();
     }
     if ui
@@ -23562,14 +23808,18 @@ const MISSED_SHOWN: usize = 3;
 
 /// The Missed Summary: each Routine that Missed something since "Seen",
 /// how often, and its latest Missed Occurrences to check off late. It
-/// stays until "Seen".
+/// stays until "Seen". The Routine of the Occurrence a click on its
+/// notification asked for (`mark`, obf-1039) is outlined in the accent
+/// colour, its Occurrence's line in bold where it shows; where the
+/// outline lies.
 fn missed_card(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    missed: &MissedSummary,
+    (missed, mark): (&MissedSummary, Option<(&str, Occurrence)>),
     actions: &mut Vec<Action>,
-) {
+) -> Option<egui::Rect> {
+    let mut marked_at = None;
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let error = ui.visuals().error_fg_color;
@@ -23591,40 +23841,58 @@ fn missed_card(
             }
         });
         for routine in &missed.routines {
-            let what = row_title(t, routine.note.as_ref());
-            let first = what.lines().next().unwrap_or_default();
-            ui.label(
-                RichText::new(format!(
-                    "{first} · {}",
-                    t.missed_times(routine.count() as i64)
-                ))
-                .color(text),
-            );
-            for m in routine.missed.iter().take(MISSED_SHOWN) {
-                ui.horizontal(|ui| {
-                    let when = format!(
-                        "{}  {}",
-                        day_text(t, m.occurrence.day),
-                        occurrence_time(t, &m.occurrence)
-                    );
-                    let label = format!("{}: {when} {first}", t.mark_done());
-                    let key = tick_saves::occurrence_key(&routine.routine.id, &m.occurrence);
-                    let done = tick_saves::done(ui.ctx(), &key, false);
-                    if check(ui, tones, done, &label).clicked() && !done {
-                        actions.push(Action::CheckMissed(
-                            routine.routine.id.clone(),
-                            m.occurrence,
-                        ));
-                    }
-                    ui.label(RichText::new(when).color(text));
-                });
-            }
-            if routine.count() > MISSED_SHOWN {
-                let more = t.missed_more((routine.count() - MISSED_SHOWN) as i64);
-                ui.label(RichText::new(more).small().color(weak));
+            let marked = mark.filter(|(id, _)| *id == routine.routine.id);
+            let block = ui.scope(|ui| {
+                let what = row_title(t, routine.note.as_ref());
+                let first = what.lines().next().unwrap_or_default();
+                ui.label(
+                    RichText::new(format!(
+                        "{first} · {}",
+                        t.missed_times(routine.count() as i64)
+                    ))
+                    .color(text),
+                );
+                for m in routine.missed.iter().take(MISSED_SHOWN) {
+                    ui.horizontal(|ui| {
+                        let when = format!(
+                            "{}  {}",
+                            day_text(t, m.occurrence.day),
+                            occurrence_time(t, &m.occurrence)
+                        );
+                        let label = format!("{}: {when} {first}", t.mark_done());
+                        let key = tick_saves::occurrence_key(&routine.routine.id, &m.occurrence);
+                        let done = tick_saves::done(ui.ctx(), &key, false);
+                        if check(ui, tones, done, &label).clicked() && !done {
+                            actions.push(Action::CheckMissed(
+                                routine.routine.id.clone(),
+                                m.occurrence,
+                            ));
+                        }
+                        let mut when = RichText::new(when).color(text);
+                        if marked.is_some_and(|(_, o)| o == m.occurrence) {
+                            when = when.strong();
+                        }
+                        ui.label(when);
+                    });
+                }
+                if routine.count() > MISSED_SHOWN {
+                    let more = t.missed_more((routine.count() - MISSED_SHOWN) as i64);
+                    ui.label(RichText::new(more).small().color(weak));
+                }
+            });
+            if marked.is_some() {
+                let rect = block.response.rect.expand(4.0);
+                ui.painter().rect_stroke(
+                    rect,
+                    8.0,
+                    egui::Stroke::new(3.0, tones.accent),
+                    egui::StrokeKind::Outside,
+                );
+                marked_at = Some(rect);
             }
         }
     });
+    marked_at
 }
 
 /// An Area's stored colour (`RRGGBB`), or `None` when it has none or it

@@ -555,5 +555,8 @@
   "runningAreaStopped": "{count, plural, =1{Angehalten: {moved} von 1 Notiz verschoben} other{Angehalten: {moved} von {count} Notizen verschoben}}",
   "runningPackAbort": "Das Paket wird nicht gezeigt, und nichts daraus wird hinzugefügt.",
   "runningPackStopped": "Angehalten: Das Paket wurde nicht geöffnet.",
-  "importStopped": "Import angehalten."
+  "importStopped": "Import angehalten.",
+  "notificationAlreadyDone": "Schon erledigt",
+  "feedbackNotificationClicks": "Klicks auf Benachrichtigungen",
+  "feedbackNotificationClicksValue": "{count, plural, =1{Der letzte: wann, welche Benachrichtigung, wohin er führte; kein Text einer Notiz} other{Die letzten {count}: wann, welche Benachrichtigung, wohin jeder führte; kein Text einer Notiz}}"
 }

@@ -1064,5 +1064,11 @@
   "runningPackStopped": "Stopped: the Pack was not opened.",
   "@runningPackStopped": {"description": "On the page Running for opening a Pack Abort stopped (obf-1078)."},
   "importStopped": "Import stopped.",
-  "@importStopped": {"description": "Announced at the top once an Import Abort stopped on the page Running has ended (obf-1078); its click shows what it made."}
+  "@importStopped": {"description": "Announced at the top once an Import Abort stopped on the page Running has ended (obf-1078); its click shows what it made."},
+  "notificationAlreadyDone": "Already done",
+  "@notificationAlreadyDone": {"description": "At the top of the Agenda after a click on an Occurrence's notification, when it was Done meanwhile and the Agenda no longer lists it (obf-1039)."},
+  "feedbackNotificationClicks": "Notification clicks",
+  "@feedbackNotificationClicks": {"description": "Tick on the desktop's Send feedback page (obf-1039): the trace of the last clicks on the app's notifications goes along, its value under it."},
+  "feedbackNotificationClicksValue": "{count, plural, =1{The last one: when, which notification, where it went; no Note text} other{The last {count}: when, which notification, where each went; no Note text}}",
+  "@feedbackNotificationClicksValue": {"description": "Under the tick 'Notification clicks' on the desktop's Send feedback page: how many clicks go along and what they hold.", "placeholders": {"count": {"type": "int"}}}
 }

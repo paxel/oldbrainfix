@@ -6,7 +6,8 @@
 //! shown above the buttons, and Mail, a mail link to the developer, and
 //! "Save as file…". A mail link cannot carry the Pack: it is saved with
 //! "Save the Pack…" to be attached. The desktop keeps no crash report,
-//! so it offers none.
+//! so it offers none; it offers the trace of the last clicks on its
+//! notifications (obf-1039), ticked at first, while it holds any.
 
 use std::path::Path;
 
@@ -183,6 +184,10 @@ pub struct FeedbackForm {
     /// Whether the text still waits for the keyboard it takes as the
     /// page opens (#277).
     pub focus: bool,
+    /// Whether the trace of the notification clicks goes along.
+    pub clicks: bool,
+    /// The trace as the page opened, a line per click ([`crate::click_trace`]).
+    pub click_lines: Vec<String>,
 }
 
 impl Default for FeedbackForm {
@@ -198,19 +203,30 @@ impl Default for FeedbackForm {
             worked: pack_view::Worked::default(),
             busy: false,
             focus: true,
+            clicks: true,
+            click_lines: Vec::new(),
         }
     }
 }
 
 impl FeedbackForm {
-    /// The text sent with `facts` as ticked.
+    /// The text sent with `facts` as ticked, then the notification
+    /// clicks under their heading while ticked.
     pub fn body(&self, facts: &FeedbackFacts) -> String {
-        feedback_body(
+        let mut body = feedback_body(
             &self.text,
             self.version.then_some(facts.version.as_str()),
             self.system.then_some(facts.system.as_str()),
             self.install.then_some(facts.install.as_str()),
-        )
+        );
+        if self.clicks && !self.click_lines.is_empty() {
+            if !body.is_empty() {
+                body.push_str("\n\n");
+            }
+            body.push_str("Notification clicks:\n");
+            body.push_str(&self.click_lines.join("\n"));
+        }
+        body
     }
 
     /// The Pack going along: Notes ticked, at least one picked.
@@ -269,6 +285,16 @@ pub fn form(
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 2.0;
                     theme::checkbox(ui, on, RichText::new(label).color(text));
+                    ui.label(RichText::new(value).small().color(weak));
+                });
+            }
+            if !form.click_lines.is_empty() {
+                let count = form.click_lines.len() as i64;
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    let label = RichText::new(t.feedback_notification_clicks()).color(text);
+                    theme::checkbox(ui, &mut form.clicks, label);
+                    let value = t.feedback_notification_clicks_value(count);
                     ui.label(RichText::new(value).small().color(weak));
                 });
             }

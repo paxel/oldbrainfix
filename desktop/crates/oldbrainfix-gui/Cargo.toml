@@ -100,6 +100,10 @@ zbus = { version = "5", default-features = false, features = ["async-io", "block
 # notify-rust already brings.
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6"
+# The app brought before the others as its window comes forward
+# (obf-1039), at the versions eframe and tray-icon bring already.
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder"] }
 
 [build-dependencies]
 oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.8.0" }

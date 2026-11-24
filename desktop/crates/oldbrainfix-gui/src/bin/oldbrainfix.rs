@@ -48,6 +48,7 @@ use oldbrainfix_gui::auto_sync::{self, Syncing};
 use oldbrainfix_gui::autostart::{Autostart, TRAY_ARG};
 use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
+use oldbrainfix_gui::click_trace::ClickTrace;
 use oldbrainfix_gui::enrich::{
     Enricher, Kind, OcrEngine, PromptsNow, WhisperEngine, transcript_prompts,
 };
@@ -297,7 +298,26 @@ fn focus(ctx: &egui::Context) {
     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
     ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+    come_forward();
 }
+
+/// Brings the app before the others on macOS (obf-1039). As winit 0.30
+/// reads, shown again the window is ordered front as the app's key
+/// window, and egui's Focus asks winit to activate the app only for a
+/// window not key, so the window may stay behind the app in front, as
+/// reported after a click on a notification. Activated here in any case.
+/// Called on the main thread, as the window's frames run.
+#[cfg(target_os = "macos")]
+fn come_forward() {
+    if let Some(main) = objc2::MainThreadMarker::new() {
+        #[allow(deprecated)]
+        objc2_app_kit::NSApplication::sharedApplication(main).activateIgnoringOtherApps(true);
+    }
+}
+
+/// Elsewhere Focus brings the window forward.
+#[cfg(not(target_os = "macos"))]
+fn come_forward() {}
 
 /// Everything the windows share while the app runs.
 struct Shell {
@@ -330,9 +350,11 @@ struct Shell {
     /// Raised by a click on the Changes Nudge, for the window to save the
     /// bundles.
     changes_wanted: Arc<AtomicBool>,
-    /// Given the Routine by a click on an Occurrence's notification, for
-    /// the window to open its Note.
+    /// Given the Occurrence by a click on its notification, the Agenda by
+    /// one on the Catch-up Notification, for the window to show them.
     occurrence_wanted: OccurrenceWanted,
+    /// Every click on a notification, for Send feedback (obf-1039).
+    click_trace: ClickTrace,
     /// Files for the window to open.
     handed: Arc<Mutex<Vec<std::path::PathBuf>>>,
     tray: TrayHeld,
@@ -439,6 +461,7 @@ impl Shell {
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_occurrence_wanted(self.occurrence_wanted.clone());
+        app.set_click_trace(self.click_trace.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
@@ -497,7 +520,10 @@ impl Shell {
             store: self.store.clone(),
             place: kept,
         };
-        self.run(viewport, placed, Box::new(native))?;
+        let ran = self.run(viewport, placed, Box::new(native));
+        // A click from now on comes while it waits in the tray.
+        self.click_trace.set_shown(false);
+        ran?;
         // Where the tray lives in the window's event loop, its end is the
         // app's: nothing hears the tray or the hotkey after it.
         Ok(quit.load(Ordering::SeqCst) || self.tray.borrow().is_none() || tray::IN_EVENT_LOOP)
@@ -820,6 +846,7 @@ fn run() -> Result<i32, String> {
     let unsorted_wanted = Arc::new(AtomicBool::new(false));
     let changes_wanted = Arc::new(AtomicBool::new(false));
     let occurrence_wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
+    let click_trace = ClickTrace::default();
     {
         let (shown, tapped) = (store.clone(), changes.clone());
         let store = own_store(&dir, &store);
@@ -828,6 +855,7 @@ fn run() -> Result<i32, String> {
         alerts.set_unsorted_wanted(unsorted_wanted.clone());
         alerts.set_changes_wanted(changes_wanted.clone());
         alerts.set_occurrence_wanted(occurrence_wanted.clone());
+        alerts.set_trace(click_trace.clone());
         alerts.set_ringer(Box::new(SpeakerRinger::new()));
         let open = command_tx.clone();
         let wake_window = waker(&window);
@@ -1096,6 +1124,7 @@ fn run() -> Result<i32, String> {
         unsorted_wanted,
         changes_wanted,
         occurrence_wanted,
+        click_trace,
         handed,
         tray: tray.clone(),
         tray_wanted: RefCell::new(tray_wanted),
