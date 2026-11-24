@@ -3183,7 +3183,7 @@ impl App {
     /// The window this App's Note shows in, opened as large as `size`.
     fn note_window_builder(&self, size: egui::Vec2) -> egui::ViewportBuilder {
         let note = self.view.detail.as_ref().map(|(p, _)| &p.note);
-        let text = note.map(|n| n.visible_text()).unwrap_or_default();
+        let text = note.map(Note::shown_name).unwrap_or_default();
         let title = note_window::title(&text, self.t.app_title());
         note_window::viewport(&title, size, self.kept_on_top().unwrap_or(false))
     }
@@ -3940,13 +3940,14 @@ impl App {
     }
 
     /// Saves `list` as one calendar file where the user says, made at the
-    /// store's now, each titled with its Note's text: every one for
+    /// store's now, each titled with the first line of what its Note's
+    /// calendar entry reads and described by the whole (obf-1049): every one for
     /// Export, or one Routine as its whole series or one Reminder for
     /// Share. The desktop has no share sheet; the file is what a calendar
     /// app imports. Backing out of the dialog writes nothing.
     fn save_calendar_file(&mut self, list: &[Routine]) -> oldbrainfix_core::Result<()> {
         let t = self.t;
-        let names = all_routines_view::names(&t, &Routines::new(&self.store), list)?;
+        let names = all_routines_view::calendar_texts(&t, &Routines::new(&self.store), list)?;
         let ics = routines_ics(
             list,
             |r| names.get(&r.id).cloned().unwrap_or_default(),
@@ -21994,12 +21995,16 @@ fn frogs_shown(
     Ok(out)
 }
 
-/// What an Occurrence of a Routine shows as: its Note's text, what the
-/// Note holds when it has no words, or that the Note is gone.
+/// What an Occurrence of a Routine shows as: its Note's text, else the
+/// first line of its Transcript or Photo Text ([`Note::shown_name`],
+/// obf-1049), what the Note holds when it has none of them, or that the
+/// Note is gone.
 pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
-    match note {
-        Some(note) if !note.text.trim().is_empty() => note.visible_text().trim().to_string(),
-        Some(note) => l10n::wordless(t, note.wordless(), &note.wordless_name()),
+    match note.map(|n| (n, n.shown_name())) {
+        Some((note, name)) if name.trim().is_empty() => {
+            l10n::wordless(t, note.wordless(), &note.wordless_name())
+        }
+        Some((_, name)) => name.trim().to_string(),
         None => t.note_gone().to_string(),
     }
 }
@@ -25112,6 +25117,19 @@ fn card_text(
     }
 }
 
+/// Whether `note`, without words, goes by a Photo Text of a photo it
+/// still shows (obf-1049), which its compact card shows nowhere else; the
+/// Texts of its recordings and of its removed photos show on it already.
+/// The phone's `_namedByPhoto`.
+fn named_by_photo(note: &Note) -> bool {
+    let words = |text: Option<&String>| text.is_some_and(|t| !t.trim().is_empty());
+    let heard = |hashes: &[String]| hashes.iter().any(|h| words(note.transcripts.get(h)));
+    note.visible_text().trim().is_empty()
+        && !heard(&note.recordings)
+        && !heard(&note.removed_recordings)
+        && note.photos.iter().any(|h| words(note.photo_texts.get(h)))
+}
+
 /// How the tables of the Note or Section `id` show on its card
 /// (obf-1048): folded to their first rows, under the id its card takes
 /// their clicks with.
@@ -25612,7 +25630,13 @@ fn note_card(
                         return;
                     }
                     card_glance_lines(ui, look.glance);
-                    // Without words it shows what it holds instead.
+                    // Without words it shows what it holds instead, named by
+                    // the first line of a photo's text when it has one
+                    // (obf-1049).
+                    if named_by_photo(note) {
+                        let name = RichText::new(note.shown_name()).size(16.0).color(text);
+                        ui.add(egui::Label::new(name).truncate());
+                    }
                     if !note.photos.is_empty() {
                         media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
                     }
@@ -25729,7 +25753,7 @@ fn note_card(
         }
         None => ui.interact(rect, Id::new(("card", &note.id)), sense),
     };
-    let label = note.visible_text();
+    let label = note.shown_name();
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, chosen, &label));
     // The author's picture and Edit lie over the card: registered after
     // it, so they take the click.

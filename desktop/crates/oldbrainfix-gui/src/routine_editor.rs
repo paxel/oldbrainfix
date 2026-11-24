@@ -38,6 +38,7 @@ use oldbrainfix_core::{
     Routine, Routines, Schedule, SimpleRepeat, Store,
 };
 
+use crate::all_routines_view::routine_name;
 use crate::app::{chip_row, embossed, icon_button, pill};
 use crate::capture_choices::{ScheduleChoice, SessionChoice};
 use crate::icons;
@@ -976,7 +977,7 @@ impl RoutineEditor {
                     match &self.note {
                         None => drop(ui.label(RichText::new(t.note_deleted()).color(weak))),
                         Some(note) if note.is_trashed() => {
-                            ui.label(RichText::new(note.visible_text()).color(text));
+                            ui.label(RichText::new(routine_name(t, Some(note))).color(text));
                             ui.label(RichText::new(t.note_in_trash()).color(weak));
                         }
                         Some(note) => {
@@ -984,7 +985,7 @@ impl RoutineEditor {
                                 icons::show(ui, icons::NOTE, 18.0, text);
                                 ui.add(
                                     egui::Label::new(
-                                        RichText::new(note.visible_text()).color(text),
+                                        RichText::new(routine_name(t, Some(note))).color(text),
                                     )
                                     .sense(egui::Sense::click()),
                                 )

@@ -393,9 +393,10 @@ fn formatted(store: &Store, note: &Note) -> oldbrainfix_core::Result<()> {
 }
 
 /// What a Shopping List is called where it is picked: the first line of
-/// its text, "Shopping List" while that is blank.
+/// its text, else of its Transcript or Photo Text ([`Note::shown_name`],
+/// obf-1049), "Shopping List" while that is blank.
 pub fn shopping_title(t: &L10n, note: &Note) -> String {
-    match note.visible_text().trim().split('\n').next().map(str::trim) {
+    match note.shown_name().trim().split('\n').next().map(str::trim) {
         Some(title) if !title.is_empty() => title.to_string(),
         _ => t.shopping_heading().to_string(),
     }

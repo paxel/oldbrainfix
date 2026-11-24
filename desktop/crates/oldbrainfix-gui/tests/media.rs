@@ -430,13 +430,13 @@ fn search_finds_transcripts_photo_texts_and_sections() -> TestResult {
     );
     harness.get_by_label("Clear search").click();
     harness.run();
-    assert_eq!(harness.state().shown_notes().len(), 6);
+    assert_eq!(harness.state().shown_notes().len(), 10);
     // Another level starts with a search of its own.
     harness.state_mut().set_query("receipt");
     harness.state_mut().select(Selection::Unsorted);
     harness.state_mut().select(Selection::All);
     harness.run();
-    assert_eq!(harness.state().shown_notes().len(), 6);
+    assert_eq!(harness.state().shown_notes().len(), 10);
     Ok(())
 }
 

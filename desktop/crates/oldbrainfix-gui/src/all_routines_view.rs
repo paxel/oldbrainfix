@@ -50,15 +50,32 @@ pub struct NewerRow {
     pub area: Option<Area>,
 }
 
-/// The name a Routine goes by, on the page, in its order and in the
-/// calendar file: its Note's text, a Note without words by what it holds,
-/// or that the Note is gone; the phone's `noteText` and `noteGone`.
+/// The name a Routine goes by, on the page and in its order: its Note's
+/// text, else the first line of its Transcript or Photo Text
+/// ([`Note::shown_name`], obf-1049), a Note without any of them by what
+/// it holds, or that the Note is gone; the phone's `noteText` and
+/// `noteGone`.
 pub fn routine_name(t: &L10n, note: Option<&Note>) -> String {
-    match note {
-        Some(note) if note.text.trim().is_empty() => {
+    match note.map(|n| (n, n.shown_name())) {
+        Some((note, name)) if name.trim().is_empty() => {
             l10n::wordless(t, note.wordless(), &note.wordless_name())
         }
-        Some(note) => note.visible_text(),
+        Some((_, name)) => name,
+        None => t.note_gone().to_string(),
+    }
+}
+
+/// What the calendar file's entry of a Routine reads, its first line the
+/// title and the whole the description: its Note's text, else its whole
+/// Transcript or Photo Text ([`Note::calendar_text`], obf-1049), a Note
+/// without any of them by what it holds, or that the Note is gone; the
+/// phone's `noteCalendarText` and `noteGone`.
+pub fn calendar_text(t: &L10n, note: Option<&Note>) -> String {
+    match note.map(|n| (n, n.calendar_text())) {
+        Some((note, text)) if text.trim().is_empty() => {
+            l10n::wordless(t, note.wordless(), &note.wordless_name())
+        }
+        Some((_, text)) => text,
         None => t.note_gone().to_string(),
     }
 }
@@ -75,6 +92,21 @@ pub fn names(
         names.insert(routine.id.clone(), name);
     }
     Ok(names)
+}
+
+/// What the calendar file's entry of each of `list` reads by its id, as
+/// [`calendar_text`] gives it.
+pub fn calendar_texts(
+    t: &L10n,
+    routines: &Routines,
+    list: &[Routine],
+) -> oldbrainfix_core::Result<HashMap<String, String>> {
+    let mut texts = HashMap::new();
+    for routine in list {
+        let text = calendar_text(t, routines.note(routine)?.as_ref());
+        texts.insert(routine.id.clone(), text);
+    }
+    Ok(texts)
 }
 
 /// The page: its heading with New Session and Export, and each of `rows`, a Routine with
