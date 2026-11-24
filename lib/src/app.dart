@@ -301,7 +301,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     speed: widget.store.playbackSpeed,
     onSpeed: (speed) => widget.store.playbackSpeed = speed,
   );
-  late final _speechModel = SpeechModel(widget.speech);
+  late final _speechModel = SpeechModel(widget.speech, store: widget.store);
   late final _lock = AppLock(store: widget.store, platform: widget.lock);
   final _routes = RouteStack();
   late final _autoSync = AutoSync(
@@ -760,6 +760,14 @@ class _HomeState extends State<_Home> {
   /// Set, a restore or a Device added on the first start, and never again, as Settings
   /// offers it as well.
   var _speechOfferDue = false;
+
+  /// The speech model a restored Backup names (obf-1098), offered in its
+  /// place while it is not in use here.
+  SpeechModelChoice? _restoredModel;
+
+  /// Whether a restored Backup's speech model, not taken up on an
+  /// earlier start, is still to be announced once the check is done.
+  var _restoredModelDue = false;
   late bool _alarmSetupDone =
       widget.store.alarmSetupDone || !widget.alarms.platform.available;
   late final AppLifecycleListener _lifecycle;
@@ -804,6 +812,8 @@ class _HomeState extends State<_Home> {
   @override
   void initState() {
     super.initState();
+    _restoredModelDue =
+        _starterSetOffered && widget.store.speechModelOffer != null;
     _bundlesOpened = widget.bundles.opened.listen(
       (_) => unawaited(_importOpened()),
     );
@@ -836,6 +846,7 @@ class _HomeState extends State<_Home> {
       // Past the first start already: what this version's help Notes
       // still owe (#180), an update's What's new.
       if (_starterSetOffered) _helpDue(fresh: false);
+      _speechChanged();
     });
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
@@ -1331,24 +1342,100 @@ class _HomeState extends State<_Home> {
   }
 
   /// Whether the speech model is worth offering: there is a speech layer,
-  /// Whisper may run here, and no model is in place.
-  bool get _speechWanted =>
-      widget.speech.platform.available &&
-      widget.speech.status != ModelStatus.ready &&
-      widget.speech.status != ModelStatus.unsupported;
+  /// Whisper may run here, and no model is in place, or not the one a
+  /// restored Backup names.
+  bool get _speechWanted {
+    final speech = widget.speech;
+    if (!speech.platform.available) return false;
+    return switch (speech.status) {
+      ModelStatus.unsupported => false,
+      ModelStatus.ready =>
+        _restoredModel != null && speech.current?.name != _restoredModel?.name,
+      _ => true,
+    };
+  }
 
   /// The offer goes once the check finds a model in place or that Whisper
-  /// does not run here.
+  /// does not run here; a restored Backup's model goes with it, dropped
+  /// once in use ([SpeechModel]). One not taken up on an earlier start is
+  /// announced at the top once the check is done, once.
   void _speechChanged() {
-    if (!mounted || !_speechOfferDue || _speechWanted) return;
+    if (!mounted) return;
+    final speech = widget.speech;
+    if (speech.status == ModelStatus.checking) return;
+    if (_restoredModelDue) {
+      _restoredModelDue = false;
+      _announceRestoredModel();
+    }
+    if (!_speechOfferDue || _speechWanted) return;
+    if (!speech.platform.available ||
+        speech.status == ModelStatus.unsupported) {
+      widget.store.dropSpeechModelOffer();
+    }
+    setState(() {
+      _speechOfferDue = false;
+      _restoredModel = null;
+    });
+  }
+
+  /// A restored Backup's speech model still offered on a later start:
+  /// at the top, once, a tap downloading it or picking its file again.
+  /// Settings offers it after that.
+  void _announceRestoredModel() {
+    final store = widget.store;
+    final offer = store.speechModelOffer;
+    if (offer == null) return;
+    store.dropSpeechModelOffer();
+    final speech = widget.speech;
+    if (!speech.platform.available ||
+        speech.status == ModelStatus.unsupported ||
+        speech.current?.name == offer.name) {
+      return;
+    }
+    final model = WhisperModel.values.asNameMap()[offer.name];
+    if (model == null) return;
+    final t = context.t;
+    final fromFile = offer.source == SpeechModelSource.file;
+    AnnouncementsScope.of(context)?.announce(
+      fromFile ? t.speechRestoredPick : t.speechRestoredDownload,
+      onTap: () {
+        if (!mounted) return;
+        unawaited(
+          fetchSpeechModel(
+            context,
+            fromFile ? speech.pick : () => speech.download(model),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Starts the speech model's download in the background, the one a
+  /// restored Backup names or else the base one, announced at the top
+  /// should it fail, and goes on with the setup at once.
+  void _downloadSpeech() {
+    final model =
+        WhisperModel.values.asNameMap()[_restoredModel?.name] ??
+        WhisperModel.base;
+    unawaited(fetchSpeechModel(context, () => widget.speech.download(model)));
     setState(() => _speechOfferDue = false);
   }
 
-  /// Starts the speech model's download in the background, announced
-  /// at the top should it fail, and goes on with the setup at once.
-  void _downloadSpeech() {
-    unawaited(fetchSpeechModel(context, widget.speech.download));
+  /// Takes a restored Backup's model from the file the user picks again,
+  /// as [_downloadSpeech] does.
+  void _pickSpeech() {
+    unawaited(fetchSpeechModel(context, widget.speech.pick));
     setState(() => _speechOfferDue = false);
+  }
+
+  /// Not now: a restored Backup's model is not offered again here;
+  /// Settings offers every model.
+  void _skipSpeech() {
+    if (_restoredModel != null) widget.store.dropSpeechModelOffer();
+    setState(() {
+      _speechOfferDue = false;
+      _restoredModel = null;
+    });
   }
 
   /// The platform's backup is told the opt-in this Device keeps, and on
@@ -1389,8 +1476,12 @@ class _HomeState extends State<_Home> {
       _found = null;
     }
     widget.store.starterSetOffered = true;
-    // The playback speed came with it.
-    VoiceScope.playbackOf(context)?.speed.value = widget.store.playbackSpeed;
+    // The playback speed came with it, and the Device's other settings
+    // (obf-1098): the look and the tips show them at once.
+    final store = widget.store;
+    VoiceScope.playbackOf(context)?.speed.value = store.playbackSpeed;
+    widget.onThemeChanged();
+    TipsSwitch.of(store).value = store.localSetting(tipsOffKey) != 'true';
     _setUpAfterwards();
   }
 
@@ -1417,10 +1508,18 @@ class _HomeState extends State<_Home> {
   /// After a restore or a Device added: what came with it is in place;
   /// the Profile is there already, the defaults only fill a gap.
   void _setUpAfterwards() {
+    final offer = widget.store.speechModelOffer;
     setState(() {
       _starterSetOffered = true;
+      _restoredModel = offer;
       _speechOfferDue = _speechWanted;
+      if (!_speechOfferDue) _restoredModel = null;
     });
+    // The model a restored Backup names, in use already or not to be run
+    // here, is not offered.
+    if (offer != null && !_speechOfferDue) {
+      widget.store.dropSpeechModelOffer();
+    }
     unawaited(widget.profile.applyDefaults());
     _helpDue(fresh: true);
     unawaited(widget.alarms.refresh());
@@ -1476,8 +1575,10 @@ class _HomeState extends State<_Home> {
     if (_speechOfferDue) {
       return SpeechOfferScreen(
         model: widget.speech,
+        restored: _restoredModel,
         onDownload: _downloadSpeech,
-        onSkip: () => setState(() => _speechOfferDue = false),
+        onPick: _pickSpeech,
+        onSkip: _skipSpeech,
       );
     }
     if (!_alarmSetupDone) {

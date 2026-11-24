@@ -15,6 +15,9 @@ import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/restore_screen.dart';
+import 'package:oldbrainfix/src/speech_offer_screen.dart';
+import 'package:oldbrainfix/src/speech_platform.dart';
+import 'package:oldbrainfix/src/spotlight.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -22,6 +25,7 @@ import 'announced.dart';
 import 'bundle_test.dart' show FakeBundles;
 import 'fake_photos.dart';
 import 'fake_profile.dart';
+import 'fake_speech.dart';
 
 /// A stand-in for Argon2id, quick in a widget test: the real one is the
 /// core's to test.
@@ -143,13 +147,15 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  /// A Backup of a Device with a Note in an Area, and its recovery key.
-  Future<(String, String)> backup() async {
+  /// A Backup of a Device with a Note in an Area, and its recovery key;
+  /// [settings] sets that Device's settings first.
+  Future<(String, String)> backup({void Function(Store old)? settings}) async {
     final old = Store.inMemory(clock: () => now)
       ..applyProfileDefaults(name: 'Pixel')
       ..renameOwnProfile('Ada')
       ..playbackSpeed = 1.5;
     addTearDown(old.close);
+    settings?.call(old);
     final area = Places(old).addArea('Doctor');
     Notes(old).capture('Pills at eight', place: area.id);
     final code = await setUpBackups(old, 'correct horse', derive: quickKey);
@@ -560,7 +566,7 @@ void main() {
         tester,
         announcements,
         'Backup restored.',
-        'Set alarms and locks again',
+        'Set the App Lock, the Area Locks and the alarm sound again',
       );
       expect(find.text('Welcome to Old Brain Fix'), findsNothing);
       expect(find.text('Pick your Areas'), findsNothing);
@@ -632,6 +638,178 @@ void main() {
       expect(Places(store).areas().single.name, 'Doctor');
       expect(File(found).existsSync(), isFalse);
       expect(store.autoBackupOn, isFalse);
+    });
+
+    group("the Device's settings (obf-1098)", () {
+      /// Restores a Backup of a Device with [settings] on a first start
+      /// with [speech]; the restore announcement is closed.
+      Future<Store> restore(
+        WidgetTester tester, {
+        required void Function(Store old) settings,
+        required FakeSpeech speech,
+      }) async {
+        final (path, code) = await backup(settings: settings);
+        final store = Store.inMemory(clock: () => now);
+        addTearDown(store.close);
+        // The tips switch is there before, as the Spotlights make it.
+        expect(TipsSwitch.of(store).value, isTrue);
+        bundles.picks = copy(path);
+        tester.view.physicalSize = const Size(800, 2400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          OldBrainFixApp(
+            store: store,
+            announcements: announcements,
+            bundles: bundles,
+            speech: speech,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('restore-offer')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('restore-pick')));
+        await tester.pumpAndSettle();
+        // The recovery key: no Argon2id here, the app's runs in an
+        // isolate.
+        await tester.enterText(
+          find.byKey(const ValueKey('restore-code')),
+          code,
+        );
+        await tester.tap(find.byKey(const ValueKey('restore')));
+        await tester.pumpAndSettle();
+        expect(announcements.visible, 'Backup restored.');
+        announcements.dismiss();
+        await tester.pumpAndSettle();
+        return store;
+      }
+
+      testWidgets('come back at once, and one tap downloads the speech model '
+          'the Backup names', (tester) async {
+        final speech = FakeSpeech();
+        final store = await restore(
+          tester,
+          settings: (old) => old
+            ..themeChoice = ThemeChoice.dark
+            ..setLocalSetting('tipsOff', 'true')
+            ..speechModelChoice = (
+              name: 'small',
+              source: SpeechModelSource.download,
+            ),
+          speech: speech,
+        );
+        // The look and the tips show them without a restart.
+        expect(
+          tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+          ThemeMode.dark,
+        );
+        expect(TipsSwitch.of(store).value, isFalse);
+
+        // The offer names the small model, as the Backup's Device used.
+        expect(find.byType(SpeechOfferScreen), findsOneWidget);
+        expect(find.textContaining('Small, 488 MB'), findsOneWidget);
+        await tester.tap(find.text('Download (488 MB)'));
+        await tester.pump();
+        await tester.pump();
+        expect(speech.downloads, [WhisperModel.small.url]);
+        expect(find.byType(SpeechOfferScreen), findsNothing);
+        // Kept until it is in use, then dropped and noted as downloaded.
+        expect(store.speechModelOffer?.name, 'small');
+        speech.bring(WhisperModel.small.sha256);
+        await tester.pumpAndSettle();
+        expect(store.speechModelOffer, isNull);
+        expect(store.speechModelChoice, (
+          name: 'small',
+          source: SpeechModelSource.download,
+        ));
+      });
+
+      testWidgets('a model taken from a file asks for the file again; Not now '
+          'drops the offer', (tester) async {
+        final speech = FakeSpeech();
+        final store = await restore(
+          tester,
+          settings: (old) => old.speechModelChoice = (
+            name: 'base',
+            source: SpeechModelSource.file,
+          ),
+          speech: speech,
+        );
+        expect(find.byType(SpeechOfferScreen), findsOneWidget);
+        expect(find.textContaining('pick that file again'), findsOneWidget);
+        expect(find.byKey(const ValueKey('speech-offer-pick')), findsOneWidget);
+        expect(find.text('Download (148 MB)'), findsNothing);
+
+        await tester.tap(find.text('Not now'));
+        await tester.pumpAndSettle();
+        expect(find.byType(SpeechOfferScreen), findsNothing);
+        expect(store.speechModelOffer, isNull);
+        expect(speech.picks, 0);
+      });
+
+      testWidgets('Pick the file again takes the model from a file', (
+        tester,
+      ) async {
+        final speech = FakeSpeech();
+        final store = await restore(
+          tester,
+          settings: (old) => old.speechModelChoice = (
+            name: 'base',
+            source: SpeechModelSource.file,
+          ),
+          speech: speech,
+        );
+        await tester.tap(find.byKey(const ValueKey('speech-offer-pick')));
+        await tester.pump();
+        await tester.pump();
+        expect(speech.picks, 1);
+        speech.bring(WhisperModel.base.sha256);
+        await tester.pumpAndSettle();
+        expect(store.speechModelOffer, isNull);
+        expect(store.speechModelChoice, (
+          name: 'base',
+          source: SpeechModelSource.file,
+        ));
+      });
+
+      testWidgets('another model in use here: the one the Backup names is '
+          'offered to take its place', (tester) async {
+        final speech = FakeSpeech(installed: WhisperModel.base.sha256);
+        final store = await restore(
+          tester,
+          settings: (old) => old.speechModelChoice = (
+            name: 'small',
+            source: SpeechModelSource.download,
+          ),
+          speech: speech,
+        );
+        expect(find.byType(SpeechOfferScreen), findsOneWidget);
+        await tester.tap(find.text('Download (488 MB)'));
+        await tester.pump();
+        await tester.pump();
+        expect(speech.downloads, [WhisperModel.small.url]);
+        speech.bring(WhisperModel.small.sha256);
+        await tester.pumpAndSettle();
+        expect(store.speechModelOffer, isNull);
+        expect(store.speechModelChoice?.name, 'small');
+      });
+
+      testWidgets('the model in use here already is not offered', (
+        tester,
+      ) async {
+        final speech = FakeSpeech(installed: WhisperModel.base.sha256);
+        final store = await restore(
+          tester,
+          settings: (old) => old.speechModelChoice = (
+            name: 'base',
+            source: SpeechModelSource.download,
+          ),
+          speech: speech,
+        );
+        expect(find.byType(SpeechOfferScreen), findsNothing);
+        expect(store.speechModelOffer, isNull);
+        expect(speech.downloads, isEmpty);
+      });
     });
 
     testWidgets('is not offered once the log holds anything', (tester) async {

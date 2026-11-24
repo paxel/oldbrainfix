@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/browser.dart';
@@ -562,6 +563,138 @@ void main() {
       await firstStart(tester, platform: const NoSpeech());
       expect(find.byType(SpeechOfferScreen), findsNothing);
       expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+  });
+
+  group('the model a Backup carries (obf-1098)', () {
+    const downloaded = (name: 'base', source: SpeechModelSource.download);
+    const fromFile = (name: 'base', source: SpeechModelSource.file);
+
+    testWidgets('a download is noted as downloaded, a picked file as taken '
+        'from a file', (tester) async {
+      await start(tester);
+      expect(store.speechModelChoice, isNull);
+      await openModel(tester);
+      await choose(tester, small);
+      speech.bring(WhisperModel.small.sha256);
+      await tester.pumpAndSettle();
+      expect(store.speechModelChoice, (
+        name: 'small',
+        source: SpeechModelSource.download,
+      ));
+
+      await choose(tester, pick);
+      speech.bring(WhisperModel.base.sha256);
+      await tester.pumpAndSettle();
+      expect(store.speechModelChoice, fromFile);
+    });
+
+    testWidgets('a fetch that is not kept leaves the choice as it was', (
+      tester,
+    ) async {
+      speech.installed = WhisperModel.base.sha256;
+      await start(tester);
+      expect(store.speechModelChoice, downloaded);
+      await openModel(tester);
+      await choose(tester, small);
+      speech.bring(null);
+      await tester.pumpAndSettle();
+      await choose(tester, pick);
+      speech.bring(wrongHash);
+      await tester.pumpAndSettle();
+      expect(store.speechModelChoice, downloaded);
+    });
+
+    testWidgets('a model in place from before is noted as downloaded; a '
+        'noted file stays one', (tester) async {
+      speech.installed = WhisperModel.base.sha256;
+      await start(tester);
+      expect(store.speechModelChoice, downloaded);
+
+      // The next start: the app anew.
+      store.speechModelChoice = fromFile;
+      await tester.pumpWidget(const SizedBox());
+      await start(tester, platform: FakeSpeech(installed: speech.installed));
+      expect(store.speechModelChoice, fromFile);
+    });
+
+    testWidgets('a model that is dropped or gone is noted as none', (
+      tester,
+    ) async {
+      store.speechModelChoice = downloaded;
+      speech.installed = wrongHash;
+      await start(tester);
+      expect(speech.removes, 1);
+      expect(store.speechModelChoice, isNull);
+    });
+
+    group('offered on a later start', () {
+      late Announcements announcements;
+      setUp(() => announcements = Announcements());
+      tearDown(() => announcements.dispose());
+
+      Future<void> later(WidgetTester tester, String offer) async {
+        store.setLocalSetting('speechModelOffer', offer);
+        await tester.pumpWidget(
+          OldBrainFixApp(
+            store: store,
+            voice: voice,
+            speech: speech,
+            announcements: announcements,
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('at the top, once; the tap downloads that model', (
+        tester,
+      ) async {
+        await later(tester, 'small:download');
+        expect(
+          announcements.visible,
+          'The speech model from the Backup is not on this phone yet. '
+          'Download',
+        );
+        expect(store.speechModelOffer, isNull);
+        await tester.tap(find.text(announcements.visible!));
+        await tester.pump();
+        await tester.pump();
+        expect(speech.downloads, [WhisperModel.small.url]);
+      });
+
+      testWidgets('one taken from a file: the tap picks the file again', (
+        tester,
+      ) async {
+        await later(tester, 'base:file');
+        expect(
+          announcements.visible,
+          'The speech model from the Backup is not on this phone yet. '
+          'Pick its file',
+        );
+        await tester.tap(find.text(announcements.visible!));
+        await tester.pump();
+        await tester.pump();
+        expect(speech.picks, 1);
+        expect(speech.downloads, isEmpty);
+      });
+
+      testWidgets('not said, and dropped, where that model is in use', (
+        tester,
+      ) async {
+        speech.installed = WhisperModel.small.sha256;
+        await later(tester, 'small:download');
+        expect(announcements.visible, isNull);
+        expect(store.speechModelOffer, isNull);
+      });
+
+      testWidgets('not said, and dropped, where Whisper does not run', (
+        tester,
+      ) async {
+        speech.runs = false;
+        await later(tester, 'small:download');
+        expect(announcements.visible, isNull);
+        expect(store.speechModelOffer, isNull);
+      });
     });
   });
 

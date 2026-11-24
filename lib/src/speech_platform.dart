@@ -277,9 +277,14 @@ enum ModelOutcome {
 /// once per start before anything is transcribed, fetched on request,
 /// and kept only when it is one of the [WhisperModel]s. A model fetched
 /// takes the place of the one in use only once it is checked, so the
-/// one before is gone then and not earlier.
+/// one before is gone then and not earlier. With a [store] it keeps the
+/// model in use there and how it came, which a Backup carries
+/// (obf-1098), and drops a restored Backup's offer of that model.
 class SpeechModel extends ChangeNotifier {
   final SpeechPlatform platform;
+
+  /// Where the model in use is noted; none in tests that need no Backup.
+  final Store? store;
 
   late final StreamSubscription<ModelProgress> _progressing;
   var _status = ModelStatus.checking;
@@ -290,7 +295,7 @@ class SpeechModel extends ChangeNotifier {
   var _cancelling = false;
   var _disposed = false;
 
-  SpeechModel(this.platform) {
+  SpeechModel(this.platform, {this.store}) {
     _progressing = platform.progress.listen((progress) {
       _progress = progress;
       _changed();
@@ -314,7 +319,8 @@ class SpeechModel extends ChangeNotifier {
 
   /// Looks whether a model is here and whether it is one of the pinned
   /// ones; a model that is not is dropped, and so is a fetch cut off
-  /// when the app was last closed.
+  /// when the app was last closed. A model in place from before the
+  /// choice was noted counts as downloaded.
   Future<void> check() async {
     _current = null;
     _set(ModelStatus.checking);
@@ -322,9 +328,35 @@ class SpeechModel extends ChangeNotifier {
     await platform.discard();
     final hash = await platform.modelHash();
     _current = WhisperModel.byHash(hash);
-    if (_current != null) return _set(ModelStatus.ready);
+    if (_current != null) {
+      _note(_current, SpeechModelSource.download, kept: true);
+      return _set(ModelStatus.ready);
+    }
     if (hash != null) await platform.remove();
+    _note(null, SpeechModelSource.download);
     _set(ModelStatus.missing);
+  }
+
+  /// Notes [model] as the one in use, come by [source], or that there
+  /// is none (null); with [kept], a source noted for it already stays.
+  /// An offer of the model in use is dropped.
+  void _note(
+    WhisperModel? model,
+    SpeechModelSource source, {
+    bool kept = false,
+  }) {
+    final store = this.store;
+    if (store == null || _disposed) return;
+    final noted = store.speechModelChoice;
+    final choice = model == null
+        ? null
+        : kept && noted?.name == model.name
+        ? noted
+        : (name: model.name, source: source);
+    if (noted != choice) store.speechModelChoice = choice;
+    if (model != null && store.speechModelOffer?.name == model.name) {
+      store.dropSpeechModelOffer();
+    }
   }
 
   /// Downloads [model] from its release asset and, once it is checked,
@@ -378,6 +410,10 @@ class SpeechModel extends ChangeNotifier {
         : ModelOutcome.mismatch;
     if (outcome == ModelOutcome.installed) {
       _current = fetched;
+      _note(
+        fetched,
+        target == null ? SpeechModelSource.file : SpeechModelSource.download,
+      );
     } else {
       await platform.discard();
     }

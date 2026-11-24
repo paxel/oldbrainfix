@@ -2378,6 +2378,36 @@ abstract class AppLocalizations {
   /// **'You are on mobile data. The download uses {megabytes} MB of it.'**
   String speechOfferMobileData(int megabytes);
 
+  /// No description provided for @speechOfferRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup names the speech model used before: {model}. Download it once. It downloads in the background while you go on, and Settings offers it any time later.'**
+  String speechOfferRestored(String model);
+
+  /// No description provided for @speechOfferRestoredFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup names the speech model used before: {model}. It came from a file of your own: pick that file again. Settings offers it any time later.'**
+  String speechOfferRestoredFile(String model);
+
+  /// No description provided for @speechOfferPickAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the file again'**
+  String get speechOfferPickAgain;
+
+  /// No description provided for @speechRestoredDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech model from the Backup is not on this phone yet. Download'**
+  String get speechRestoredDownload;
+
+  /// No description provided for @speechRestoredPick.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech model from the Backup is not on this phone yet. Pick its file'**
+  String get speechRestoredPick;
+
   /// No description provided for @transcribing.
   ///
   /// In en, this message translates to:
@@ -4397,7 +4427,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupsIntro.
   ///
   /// In en, this message translates to:
-  /// **'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out, except the playback speed. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.'**
+  /// **'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. It also holds this Device\'s settings and which speech model it uses, not the model itself. The App Lock, the Area Locks, the alarm sound, the paired Devices, the shared folder and the Backup folder stay out: set them again after a restore. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.'**
   String get backupsIntro;
 
   /// No description provided for @backupPassphrase.
@@ -4667,7 +4697,7 @@ abstract class AppLocalizations {
   /// No description provided for @restoreDone.
   ///
   /// In en, this message translates to:
-  /// **'Restored: {count, plural, =1{1 change} other{{count} changes}}. Set alarms and locks again, choose the Backup folder again, and pair your other Devices again.'**
+  /// **'Restored: {count, plural, =1{1 change} other{{count} changes}}. Set the App Lock, the Area Locks and the alarm sound again, choose the Backup folder again, and pair your other Devices again.'**
   String restoreDone(int count);
 
   /// No description provided for @recoverySheetPdfTitle.

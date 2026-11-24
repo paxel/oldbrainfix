@@ -1520,6 +1520,27 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String speechOfferRestored(String model) {
+    return 'Die Sicherung nennt das zuvor verwendete Sprachmodell: $model. Lade es einmal herunter. Es lädt im Hintergrund, während du weitermachst, und die Einstellungen bieten es jederzeit später an.';
+  }
+
+  @override
+  String speechOfferRestoredFile(String model) {
+    return 'Die Sicherung nennt das zuvor verwendete Sprachmodell: $model. Es kam aus einer eigenen Datei: Wähle diese Datei noch einmal. Die Einstellungen bieten es jederzeit später an.';
+  }
+
+  @override
+  String get speechOfferPickAgain => 'Datei noch einmal wählen';
+
+  @override
+  String get speechRestoredDownload =>
+      'Das Sprachmodell aus der Sicherung ist noch nicht auf diesem Telefon. Herunterladen';
+
+  @override
+  String get speechRestoredPick =>
+      'Das Sprachmodell aus der Sicherung ist noch nicht auf diesem Telefon. Datei wählen';
+
+  @override
   String get transcribing => 'Wird transkribiert …';
 
   @override
@@ -2796,7 +2817,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get backupsIntro =>
-      'Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Geräts bleiben draußen, außer der Wiedergabegeschwindigkeit. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.';
+      'Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Sie enthält auch die Einstellungen dieses Geräts und welches Sprachmodell es verwendet, nicht das Modell selbst. Draußen bleiben die App-Sperre, die Bereichssperren, der Alarmton, die gekoppelten Geräte, der gemeinsame Ordner und der Ordner für Sicherungen: Stell sie nach einer Wiederherstellung neu ein. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.';
 
   @override
   String get backupPassphrase => 'Passphrase';
@@ -2965,7 +2986,7 @@ class AppLocalizationsDe extends AppLocalizations {
       other: '$count Änderungen',
       one: '1 Änderung',
     );
-    return 'Wiederhergestellt: $_temp0. Stell Alarme und Sperren neu ein, wähl den Ordner für Sicherungen noch einmal und kopple deine anderen Geräte noch einmal.';
+    return 'Wiederhergestellt: $_temp0. Stell die App-Sperre, die Bereichssperren und den Alarmton neu ein, wähl den Ordner für Sicherungen noch einmal und kopple deine anderen Geräte noch einmal.';
   }
 
   @override

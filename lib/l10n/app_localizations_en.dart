@@ -1511,6 +1511,27 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String speechOfferRestored(String model) {
+    return 'The Backup names the speech model used before: $model. Download it once. It downloads in the background while you go on, and Settings offers it any time later.';
+  }
+
+  @override
+  String speechOfferRestoredFile(String model) {
+    return 'The Backup names the speech model used before: $model. It came from a file of your own: pick that file again. Settings offers it any time later.';
+  }
+
+  @override
+  String get speechOfferPickAgain => 'Pick the file again';
+
+  @override
+  String get speechRestoredDownload =>
+      'The speech model from the Backup is not on this phone yet. Download';
+
+  @override
+  String get speechRestoredPick =>
+      'The speech model from the Backup is not on this phone yet. Pick its file';
+
+  @override
   String get transcribing => 'Transcribing…';
 
   @override
@@ -2772,7 +2793,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupsIntro =>
-      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out, except the playback speed. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.';
+      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. It also holds this Device\'s settings and which speech model it uses, not the model itself. The App Lock, the Area Locks, the alarm sound, the paired Devices, the shared folder and the Backup folder stay out: set them again after a restore. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.';
 
   @override
   String get backupPassphrase => 'Passphrase';
@@ -2936,7 +2957,7 @@ class AppLocalizationsEn extends AppLocalizations {
       other: '$count changes',
       one: '1 change',
     );
-    return 'Restored: $_temp0. Set alarms and locks again, choose the Backup folder again, and pair your other Devices again.';
+    return 'Restored: $_temp0. Set the App Lock, the Area Locks and the alarm sound again, choose the Backup folder again, and pair your other Devices again.';
   }
 
   @override

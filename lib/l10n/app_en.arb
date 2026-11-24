@@ -998,6 +998,25 @@
       }
     }
   },
+  "speechOfferRestored": "The Backup names the speech model used before: {model}. Download it once. It downloads in the background while you go on, and Settings offers it any time later.",
+  "@speechOfferRestored": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "speechOfferRestoredFile": "The Backup names the speech model used before: {model}. It came from a file of your own: pick that file again. Settings offers it any time later.",
+  "@speechOfferRestoredFile": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "speechOfferPickAgain": "Pick the file again",
+  "speechRestoredDownload": "The speech model from the Backup is not on this phone yet. Download",
+  "speechRestoredPick": "The speech model from the Backup is not on this phone yet. Pick its file",
   "transcribing": "Transcribing…",
   "noWordsHeard": "No words heard.",
   "historyTitle": "History",
@@ -1702,7 +1721,7 @@
   "backupsTitle": "Backups",
   "backupsSettingsEntry": "Back up this Device",
   "backupsSettingsDetail": "Encrypted files of everything on this Device, in a folder you choose.",
-  "backupsIntro": "A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device's settings stay out, except the playback speed. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.",
+  "backupsIntro": "A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. It also holds this Device's settings and which speech model it uses, not the model itself. The App Lock, the Area Locks, the alarm sound, the paired Devices, the shared folder and the Backup folder stay out: set them again after a restore. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.",
   "backupPassphrase": "Passphrase",
   "backupPassphraseAgain": "Passphrase again",
   "backupPassphraseHint": "At least 8 characters. A short sentence is easy to remember.",
@@ -1775,7 +1794,7 @@
   "restoreDamaged": "The Backup is damaged or incomplete. Nothing was restored; try an older one.",
   "restoreNotEmpty": "This Device holds Notes already, so nothing was restored.",
   "restoreFailed": "The Backup could not be restored. Nothing was changed.",
-  "restoreDone": "Restored: {count, plural, =1{1 change} other{{count} changes}}. Set alarms and locks again, choose the Backup folder again, and pair your other Devices again.",
+  "restoreDone": "Restored: {count, plural, =1{1 change} other{{count} changes}}. Set the App Lock, the Area Locks and the alarm sound again, choose the Backup folder again, and pair your other Devices again.",
   "@restoreDone": {
     "placeholders": {
       "count": {

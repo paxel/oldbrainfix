@@ -1244,6 +1244,16 @@ replace a law of Both apps where they say so. A desktop law marked
   before what waits, takes the place of the offer before, a screen
   reader hears "Show" as the tap's hint, and left alone it goes by
   itself after 10 seconds. With "Me" in the filter nothing is said.
+- **A restored Backup's speech model is offered** (obf-1098): right
+  after the restore, "Transcribe voice Notes on the phone?" offers the
+  model the Backup names, with **Download** and its size, or **Pick the
+  file again** for a model taken from a file, and **Not now**, which
+  drops the offer. A model fetched drops it once it is in use. A model
+  in use here already, or a phone where Whisper does not run, gets no
+  offer. Still not in place on the next start, the top says "The
+  speech model from the Backup is not on this phone yet", ending with
+  "Download" or "Pick its file", once; its tap fetches it, and Settings
+  offers it after that.
 
 ### Capture
 
@@ -1970,6 +1980,15 @@ replace a law of Both apps where they say so. A desktop law marked
   showed, or once the list shows another place or its filter changes.
   With "Me" in the filter nothing is said, nor for a Note the quick
   note's choices filed elsewhere, which this list would not show.
+- **A restored Backup's speech model is offered at the top** (obf-1098):
+  once "Backup restored." is clicked away, in the main window, the top
+  says the speech model used before is not on this computer yet, with
+  **Download**, or **Use a file of my own** for a model taken from a
+  file, and **Not now**. A click on the words or the first button
+  fetches it; the line hides while the model is fetched and goes once
+  that model is in use, so a failed download offers it again. The file
+  dialog left without a file keeps it; Not now drops it for good. A
+  model the Backup names that is in use here already is not offered.
 - **The Agenda's bar on the desktop holds All Routines and Reminders and
   New Routine or Reminder** (draft, #196): no Calendar and no Profile
   picture; the menu bar leads to the rest.
