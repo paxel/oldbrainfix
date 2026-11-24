@@ -221,6 +221,17 @@ void main() {
 
       final button = find.byKey(ValueKey('remove:$spoken'));
       await reveal(tester, button);
+      // It removes: filled on the error colour (obf-1107).
+      expect(
+        tester
+            .widget<Material>(
+              find
+                  .descendant(of: button, matching: find.byType(Material))
+                  .first,
+            )
+            .color,
+        Theme.of(tester.element(button)).colorScheme.error,
+      );
       expect(
         find.byKey(ValueKey('remove:$silent'), skipOffstage: false),
         findsNothing,

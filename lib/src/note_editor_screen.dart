@@ -2868,7 +2868,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Widget _groupButton({
     required Key key,
     required String label,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required IconData icon,
     bool warns = false,
   }) => warns
@@ -3153,21 +3153,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (!_removable.contains((id, hash))) return const [];
     final t = context.t;
     return [
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          key: ValueKey('remove:$hash'),
-          onPressed: () => _removeMedia(id, hash, photo),
-          icon: Icon(
-            photo ? Icons.hide_image_outlined : Icons.mic_off_outlined,
-          ),
-          label: Text(
-            photo ? t.removePhotoKeepText : t.removeRecordingKeepText,
-          ),
-        ),
+      _groupButton(
+        key: ValueKey('remove:$hash'),
+        label: photo ? t.removePhotoKeepText : t.removeRecordingKeepText,
+        onPressed: () => _removeMedia(id, hash, photo),
+        icon: photo ? Icons.hide_image_outlined : Icons.mic_off_outlined,
+        warns: true,
       ),
     ];
   }
+
+  /// The actions under a generated text, its photo, recording or file
+  /// (obf-1107): side by side where they fit, wrapping, as a group's
+  /// buttons; none without [buttons].
+  List<Widget> _actionRow(List<Widget> buttons) => buttons.isEmpty
+      ? const []
+      : [
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+          ),
+        ];
 
   /// Makes the Transcript or Photo Text [generated] the text of the Note
   /// or Section [id], or adds it on a line of its own after the text
@@ -3278,15 +3284,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       String hash,
       IconData icon,
       String label,
-      VoidCallback? run,
-    ) => Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        key: ValueKey('$key:$hash'),
-        onPressed: run,
-        icon: Icon(icon),
-        label: Text(label),
-      ),
+      VoidCallback? run, {
+      bool warns = false,
+    }) => _groupButton(
+      key: ValueKey('$key:$hash'),
+      label: label,
+      onPressed: run,
+      icon: icon,
+      warns: warns,
     );
     List<Widget> takeOver(String hash, String? text) => [
       if (text != null &&
@@ -3318,47 +3323,56 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           text: texts[file.hash],
         ),
         AttachmentText(file: file, text: texts[file.hash]),
-        ...takeOver(file.hash, texts[file.hash]),
-        if (_fileTextRemovable.contains((id, file.hash)))
-          button(
-            'remove-text',
-            file.hash,
-            Icons.backspace_outlined,
-            t.removeGeneratedText,
-            () {
-              _saveText();
-              if (removeAttachmentText(context, widget.notes, id, file.hash)) {
-                _reload();
-              }
-            },
-          ),
-        if (_fileReadable.contains((id, file.hash)))
-          button(
-            'again',
-            file.hash,
-            Icons.refresh,
-            t.readTextAgain,
-            _remaking.contains((id, file.hash))
-                ? null
-                : () => _readFileAgain(id, file.hash),
-          ),
-        if (_fileRemovable.contains((id, file.hash)))
-          button(
-            'remove',
-            file.hash,
-            Icons.link_off,
-            t.removeFileKeepText,
-            () async {
-              _saveText();
-              final gone = await removeAttachment(
-                context,
-                widget.notes,
-                id,
-                file.hash,
-              );
-              if (mounted && gone) _reload();
-            },
-          ),
+        ..._actionRow([
+          ...takeOver(file.hash, texts[file.hash]),
+          if (_fileTextRemovable.contains((id, file.hash)))
+            button(
+              'remove-text',
+              file.hash,
+              Icons.backspace_outlined,
+              t.removeGeneratedText,
+              () {
+                _saveText();
+                if (removeAttachmentText(
+                  context,
+                  widget.notes,
+                  id,
+                  file.hash,
+                )) {
+                  _reload();
+                }
+              },
+              warns: true,
+            ),
+          if (_fileReadable.contains((id, file.hash)))
+            button(
+              'again',
+              file.hash,
+              Icons.refresh,
+              t.readTextAgain,
+              _remaking.contains((id, file.hash))
+                  ? null
+                  : () => _readFileAgain(id, file.hash),
+            ),
+          if (_fileRemovable.contains((id, file.hash)))
+            button(
+              'remove',
+              file.hash,
+              Icons.link_off,
+              t.removeFileKeepText,
+              () async {
+                _saveText();
+                final gone = await removeAttachment(
+                  context,
+                  widget.notes,
+                  id,
+                  file.hash,
+                );
+                if (mounted && gone) _reload();
+              },
+              warns: true,
+            ),
+        ]),
       ],
       // Removed, the file shows no more; its text stays.
       for (final file in removed) ...[
@@ -3368,7 +3382,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           label: file.name.isEmpty ? t.attachmentTextLabel : file.name,
           child: AttachmentText(file: file, text: texts[file.hash]),
         ),
-        ...takeOver(file.hash, texts[file.hash]),
+        ..._actionRow(takeOver(file.hash, texts[file.hash])),
       ],
     ];
   }
@@ -3584,7 +3598,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// The buttons under the Photo Text ([photo]) or Transcript [text] of
-  /// [hash] of the Note or Section [id], one per line: Replace and Append
+  /// [hash] of the Note or Section [id], for [_actionRow]: Replace and Append
   /// for a text that says something, Remove for one this Device may
   /// remove, and again while the file is here and an engine runs. Only
   /// "again" shows for a removed text.
@@ -3603,16 +3617,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           }
         : SpeechScope.of(context)?.model.current != null;
     final remaking = _remaking.contains((id, hash));
-    Widget button(String key, IconData icon, String label, VoidCallback? run) =>
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('$key:$hash'),
-            onPressed: run,
-            icon: Icon(icon),
-            label: Text(label),
-          ),
-        );
+    Widget button(
+      String key,
+      IconData icon,
+      String label,
+      VoidCallback? run, {
+      bool warns = false,
+    }) => _groupButton(
+      key: ValueKey('$key:$hash'),
+      label: label,
+      onPressed: run,
+      icon: icon,
+      warns: warns,
+    );
     return [
       if (text != null &&
           text.trim().isNotEmpty &&
@@ -3636,21 +3653,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           Icons.backspace_outlined,
           t.removeGeneratedText,
           () => _removeGenerated(id, hash, photo),
+          warns: true,
         ),
       if (engine && _remakeable.contains((id, hash)))
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('again:$hash'),
-            onPressed: remaking ? null : () => _makeAgain(id, hash, photo),
-            icon: remaking
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
-            label: Text(photo ? t.readTextAgain : t.transcribeAgain),
-          ),
+        OutlinedButton.icon(
+          key: ValueKey('again:$hash'),
+          onPressed: remaking ? null : () => _makeAgain(id, hash, photo),
+          icon: remaking
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh, size: 18),
+          label: Text(photo ? t.readTextAgain : t.transcribeAgain),
         ),
     ];
   }
@@ -3756,13 +3771,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           hash: hash,
           photoText: section.photoTexts[hash],
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.photoTexts[hash],
-          photo: true,
-        ),
-        ..._removeButton(section.id, hash, photo: true),
+        ..._actionRow([
+          ..._generatedButtons(
+            section.id,
+            hash,
+            section.photoTexts[hash],
+            photo: true,
+          ),
+          ..._removeButton(section.id, hash, photo: true),
+        ]),
       ],
       for (final hash in section.removedPhotos) ...[
         PhotoText(
@@ -3771,11 +3788,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           hash: hash,
           photoText: section.photoTexts[hash],
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.photoTexts[hash],
-          photo: true,
+        ..._actionRow(
+          _generatedButtons(
+            section.id,
+            hash,
+            section.photoTexts[hash],
+            photo: true,
+          ),
         ),
       ],
       for (final hash in section.recordings) ...[
@@ -3788,13 +3807,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           transcript: section.transcripts[hash],
           compact: false,
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.transcripts[hash],
-          photo: false,
-        ),
-        ..._removeButton(section.id, hash, photo: false),
+        ..._actionRow([
+          ..._generatedButtons(
+            section.id,
+            hash,
+            section.transcripts[hash],
+            photo: false,
+          ),
+          ..._removeButton(section.id, hash, photo: false),
+        ]),
       ],
       for (final hash in section.removedRecordings) ...[
         TranscriptText(
@@ -3804,11 +3825,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           transcript: section.transcripts[hash],
           compact: false,
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.transcripts[hash],
-          photo: false,
+        ..._actionRow(
+          _generatedButtons(
+            section.id,
+            hash,
+            section.transcripts[hash],
+            photo: false,
+          ),
         ),
       ],
       // A merged Note's files travel with it (ADR 0047).
@@ -4339,13 +4362,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             hash: hash,
             photoText: note.photoTexts[hash],
           ),
-          ..._generatedButtons(
-            note.id,
-            hash,
-            note.photoTexts[hash],
-            photo: true,
-          ),
-          ..._removeButton(note.id, hash, photo: true),
+          ..._actionRow([
+            ..._generatedButtons(
+              note.id,
+              hash,
+              note.photoTexts[hash],
+              photo: true,
+            ),
+            ..._removeButton(note.id, hash, photo: true),
+          ]),
         ],
         // Removed, the file shows no more; its text stays.
         for (final hash in note.removedPhotos) ...[
@@ -4355,11 +4380,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             hash: hash,
             photoText: note.photoTexts[hash],
           ),
-          ..._generatedButtons(
-            note.id,
-            hash,
-            note.photoTexts[hash],
-            photo: true,
+          ..._actionRow(
+            _generatedButtons(
+              note.id,
+              hash,
+              note.photoTexts[hash],
+              photo: true,
+            ),
           ),
         ],
         for (final hash in note.recordings) ...[
@@ -4379,13 +4406,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             transcript: note.transcripts[hash],
             compact: false,
           ),
-          ..._generatedButtons(
-            note.id,
-            hash,
-            note.transcripts[hash],
-            photo: false,
-          ),
-          ..._removeButton(note.id, hash, photo: false),
+          ..._actionRow([
+            ..._generatedButtons(
+              note.id,
+              hash,
+              note.transcripts[hash],
+              photo: false,
+            ),
+            ..._removeButton(note.id, hash, photo: false),
+          ]),
         ],
         for (final hash in note.removedRecordings) ...[
           TranscriptText(
@@ -4395,11 +4424,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             transcript: note.transcripts[hash],
             compact: false,
           ),
-          ..._generatedButtons(
-            note.id,
-            hash,
-            note.transcripts[hash],
-            photo: false,
+          ..._actionRow(
+            _generatedButtons(
+              note.id,
+              hash,
+              note.transcripts[hash],
+              photo: false,
+            ),
           ),
         ],
         ..._fileParts(

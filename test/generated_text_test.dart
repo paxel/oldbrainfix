@@ -105,6 +105,43 @@ void main() {
   }
 
   group('in the Note editor', () {
+    testWidgets('the actions stand side by side as outlined buttons, '
+        'Remove filled on the error colour (obf-1107)', (tester) async {
+      final note = mixed();
+      final spoken = note.recordings.first;
+      await start(tester);
+      await edit(tester, note.id);
+      await seek(tester, key('remove-text', spoken));
+      for (final name in ['replace-text', 'append-text', 'again']) {
+        expect(
+          tester.widget(key(name, spoken)),
+          isA<OutlinedButton>(),
+          reason: name,
+        );
+      }
+      final remove = key('remove-text', spoken);
+      expect(
+        tester
+            .widget<Material>(
+              find
+                  .descendant(of: remove, matching: find.byType(Material))
+                  .first,
+            )
+            .color,
+        Theme.of(tester.element(remove)).colorScheme.error,
+      );
+      // Side by side where they fit, wrapping: one Wrap holds them all.
+      final row = find.ancestor(of: remove, matching: find.byType(Wrap));
+      expect(row, findsOneWidget);
+      for (final name in ['replace-text', 'append-text', 'again']) {
+        expect(
+          find.descendant(of: row, matching: key(name, spoken)),
+          findsOneWidget,
+          reason: name,
+        );
+      }
+    });
+
     testWidgets('Replace makes the Transcript the Note text', (tester) async {
       final note = mixed();
       await start(tester);
@@ -294,7 +331,10 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text('Transcribing…'), findsOneWidget);
-      expect(tester.widget<TextButton>(key('again', spoken)).onPressed, isNull);
+      expect(
+        tester.widget<OutlinedButton>(key('again', spoken)).onPressed,
+        isNull,
+      );
 
       speech.transcribeGate!.complete();
       await tester.pumpAndSettle();
