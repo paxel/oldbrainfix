@@ -101,8 +101,8 @@ use oldbrainfix_core::{
     ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
     OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuietHours, Routine,
     RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
-    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, TextSize, ThemeChoice,
-    Topic, UnitSystem, bundle, markdown, text_format,
+    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, SpeechModelChoice, SpeechModelSource,
+    Store, Tallies, TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -179,7 +179,7 @@ use crate::setting_badges::{
 use crate::settings_search;
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
-use crate::speech::SpeechModel;
+use crate::speech::{self, SpeechModel, Status as SpeechStatus};
 use crate::spotlight::{self, Spotlights};
 use crate::starter_set_view;
 use crate::sync_line;
@@ -1682,6 +1682,9 @@ enum Action {
     /// Shows only the Notes of these people (#53).
     FilterPeople(PersonFilter),
     Speech(Speech),
+    /// Takes the offer of a restored Backup's speech model, or, false,
+    /// turns it down (obf-1098).
+    SpeechOffer(bool),
     /// Keeps the selected Note's edited text.
     SaveText,
     /// Keeps it as a formatted text, its first format just applied
@@ -2362,6 +2365,12 @@ pub struct App {
     /// when last looked at.
     speech: Option<SpeechModel>,
     speech_ready: bool,
+    /// The choice of speech model this Device keeps (obf-1098), as read
+    /// or last written; `None` until read.
+    speech_kept: Option<Option<SpeechModelChoice>>,
+    /// The speech model a restored Backup's Device used, offered at the
+    /// top until it is in use here or turned down (obf-1098).
+    speech_offer: Option<SpeechModelChoice>,
     /// A speech model file as typed into the Settings.
     /// Asks for a speech model file of the user's own.
     model_picker: FolderPicker,
@@ -2871,6 +2880,11 @@ impl App {
         let theme = DeviceSettings::new(&store).theme().unwrap_or_default();
         // Normal when it cannot be read.
         let text_size = DeviceSettings::new(&store).text_size().unwrap_or_default();
+        // None when it cannot be read.
+        let speech_offer = DeviceSettings::new(&store)
+            .speech_model_offer()
+            .ok()
+            .flatten();
         // As they were left on this computer (#278).
         let sidebar = window_sizes::sidebar_width(&store).unwrap_or(window_sizes::DEFAULT_SIDEBAR);
         let note_kept = window_sizes::note_dialog_size(&store);
@@ -2990,6 +3004,8 @@ impl App {
             files_reader: None,
             speech: None,
             speech_ready: false,
+            speech_kept: None,
+            speech_offer,
             model_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_file()),
             photos: PhotoCache::default(),
             pictures: profile_view::Pictures::default(),
@@ -3583,14 +3599,7 @@ impl App {
                             t.restore_done_short(),
                             t.restore_done(restored.entries as i64),
                         );
-                        // The playback speed came with it; one that cannot
-                        // be read leaves the speed as it was.
-                        if let Ok(speed) = DeviceSettings::new(&self.store).playback_speed() {
-                            self.speed = speed;
-                            if let Some(player) = &mut self.player {
-                                player.set_speed(speed);
-                            }
-                        }
+                        self.restored_settings();
                     }
                     Err(e) => {
                         let (cause, fix) = backup_view::restore_failure(&t, &e);
@@ -3601,6 +3610,123 @@ impl App {
                             format!("restore: {e}"),
                         );
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Shows the Device settings a Backup brought (obf-1098) where the
+    /// window keeps them: the playback speed, the theme, the text size,
+    /// Fat fingers, Show tips and the speech model to offer. The others
+    /// are read where they are used. One that cannot be read stays as
+    /// it was.
+    fn restored_settings(&mut self) {
+        let settings = DeviceSettings::new(&self.store);
+        if let Ok(speed) = settings.playback_speed() {
+            self.speed = speed;
+            if let Some(player) = &mut self.player {
+                player.set_speed(speed);
+            }
+        }
+        if let Ok(theme) = settings.theme() {
+            self.theme = theme;
+            self.theme_shown = false;
+        }
+        if let Ok(size) = settings.text_size() {
+            self.text_size = size;
+        }
+        self.zoom_shown = false;
+        if self.spotlights.on()
+            && let Ok(on) = settings.tips_on()
+        {
+            self.spotlights.set_tips(on);
+        }
+        if let Ok(offer) = settings.speech_model_offer() {
+            self.speech_offer = offer;
+        }
+    }
+
+    /// Keeps the choice of speech model as the model came to (obf-1098),
+    /// once it is checked or fetched: the one downloaded or taken from a
+    /// file, none once there is none. The offer of a restored Backup's
+    /// model goes once that model is in use. Not in a Note window, which
+    /// only borrows the model.
+    fn keep_speech_choice(&mut self) {
+        let Some(model) = &self.speech else {
+            return;
+        };
+        if self.alone.is_some() {
+            return;
+        }
+        let settings = DeviceSettings::new(&self.store);
+        let kept = match self.speech_kept.take() {
+            Some(kept) => kept,
+            None => match settings.speech_model() {
+                Ok(kept) => kept,
+                Err(e) => {
+                    eprintln!("speech model: {e}");
+                    None
+                }
+            },
+        };
+        let Some(now) = model.choice(kept.as_ref()) else {
+            self.speech_kept = Some(kept);
+            return;
+        };
+        if now != kept
+            && let Err(e) = settings.set_speech_model(now.as_ref())
+        {
+            // Not tried again each frame; the next start does.
+            eprintln!("speech model: {e}");
+        }
+        if let (Some(offer), Some(used)) = (&self.speech_offer, &now)
+            && offer.name == used.name
+        {
+            if let Err(e) = settings.drop_speech_model_offer() {
+                eprintln!("speech model offer: {e}");
+            }
+            self.speech_offer = None;
+        }
+        self.speech_kept = Some(now);
+    }
+
+    /// The speech model offered at the top (obf-1098): once the first
+    /// start's view is answered, in the main window, while the model is
+    /// neither checked nor fetched, so a download that failed offers it
+    /// again.
+    fn speech_offer_shows(&self) -> Option<SpeechModelSource> {
+        let offer = self.speech_offer.as_ref()?;
+        let model = self.speech.as_ref()?;
+        let idle = matches!(model.status(), SpeechStatus::Missing | SpeechStatus::Ready);
+        (idle && self.welcome.is_none() && self.alone.is_none()).then_some(offer.source)
+    }
+
+    /// Does what the speech model's offer at the top asked (obf-1098):
+    /// downloads the model, or takes its file again, from the dialog the
+    /// Settings' "Use a file of my own" opens; the offer stays until the
+    /// model is in use, also when the dialog is left. Not now turns it
+    /// down for good: the Settings still fetch any model.
+    fn speech_offer_action(&mut self, take: bool) -> oldbrainfix_core::Result<()> {
+        let Some(offer) = self.speech_offer.clone() else {
+            return Ok(());
+        };
+        if !take {
+            self.speech_offer = None;
+            return DeviceSettings::new(&self.store).drop_speech_model_offer();
+        }
+        let Some(model) = &self.speech else {
+            return Ok(());
+        };
+        match offer.source {
+            SpeechModelSource::Download => {
+                if let Some(chosen) = speech::named(&offer.name) {
+                    model.download(chosen);
+                }
+            }
+            SpeechModelSource::File => {
+                if let Some(path) = (self.model_picker)(self.t.speech_model_pick()) {
+                    model.take_file(&path);
                 }
             }
         }
@@ -6287,6 +6413,7 @@ impl App {
         self.reader = reader;
         self.speech = speech;
         self.speech_ready = false;
+        self.speech_kept = None;
         self.kick();
     }
 
@@ -6823,6 +6950,11 @@ impl App {
     /// The theme this Device chose (#147).
     pub fn theme(&self) -> ThemeChoice {
         self.theme
+    }
+
+    /// The text size this Device chose (#326).
+    pub fn text_size(&self) -> TextSize {
+        self.text_size
     }
 
     /// Whether the Note list shown shows its Notes compact (#114).
@@ -8252,6 +8384,7 @@ impl App {
                     }
                 }
             }
+            Action::SpeechOffer(take) => self.speech_offer_action(take)?,
             Action::SaveText => self.save_text()?,
             Action::FormatText(None) => self.save_formatted()?,
             Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
@@ -12311,6 +12444,7 @@ impl App {
             };
             self.announce_failure(t.sync_not_done(), t.sync_not_done_title(), why, details);
         }
+        self.keep_speech_choice();
         // A speech model came: what waited is transcribed now.
         let ready = self.speech.as_ref().is_none_or(|s| s.current().is_some());
         if ready != self.speech_ready {
@@ -13692,6 +13826,37 @@ impl App {
                     if ui.add(label).clicked() {
                         actions.push(Action::OpenPage(Page::Sync));
                     }
+                });
+        } else if let Some(source) = self.speech_offer_shows() {
+            // The speech model a restored Backup's Device used (obf-1098),
+            // after "Backup restored." and below what goes by a click, as
+            // it waits for an answer; the click on the words or the
+            // button fetches it, Not now turns it down.
+            let t = self.t;
+            let (said, offered) = match source {
+                SpeechModelSource::Download => {
+                    (t.speech_model_offer(), t.speech_model_offer_download())
+                }
+                SpeechModelSource::File => (t.speech_model_offer_file(), t.speech_model_pick()),
+            };
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    ui.horizontal_wrapped(|ui| {
+                        let text = RichText::new(said).color(colour);
+                        let words = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+                        let take = ui.button(RichText::new(offered).strong().color(colour));
+                        if words.clicked() || take.clicked() {
+                            actions.push(Action::SpeechOffer(true));
+                        }
+                        if ui
+                            .button(RichText::new(t.not_now()).color(colour))
+                            .clicked()
+                        {
+                            actions.push(Action::SpeechOffer(false));
+                        }
+                    });
                 });
         } else if self.ai_port.is_some() || self.view.ai_task.is_some() {
             // The AI port open, or its AI Task waiting for its review,

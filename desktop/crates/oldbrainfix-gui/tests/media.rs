@@ -671,6 +671,84 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     Ok(())
 }
 
+/// The choice of speech model this Device keeps, as text.
+fn kept(store: &Store) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    Ok(DeviceSettings::new(store)
+        .speech_model()?
+        .map(|c| format!("{}:{:?}", c.name, c.source)))
+}
+
+#[test]
+fn the_speech_model_in_use_is_kept_as_the_choice_with_how_it_came() -> TestResult {
+    let store = media_store()?;
+    let tmp = tempfile::tempdir()?;
+    let whisper = tmp.path().join("whisper");
+    let pinned = || ModelDir::pinned_to(&whisper, &sha(b"base"), &sha(b"small"));
+    let mirror: Download = Arc::new(|dir, model, stop, _| {
+        let bytes: &[u8] = match model {
+            WhisperModel::Base => b"base",
+            WhisperModel::Small => b"small",
+        };
+        dir.take_in(bytes, None, Some(model), stop, |_, _| {})
+    });
+    let start = |store: &Arc<Store>| {
+        let speech = SpeechModel::with_download(pinned(), mirror.clone(), Arc::new(|| {}));
+        assert!(eventually(|| matches!(
+            speech.status(),
+            Status::Missing | Status::Ready
+        )));
+        let mut app = App::new(store.clone(), "en");
+        app.set_enrichers(None, None, Some(speech.clone()));
+        let mut harness = settings(app);
+        harness.run();
+        (harness, speech)
+    };
+    // No model, none kept.
+    let (mut harness, speech) = start(&store);
+    assert_eq!(kept(&store)?, None);
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    harness.get_by_label("Small, 488 MB").click_accesskit();
+    harness.run_steps(4);
+    assert!(eventually(
+        || speech.status() == Status::Ready && speech.current() == Some(WhisperModel::Small)
+    ));
+    harness.run_steps(4);
+    assert_eq!(kept(&store)?.as_deref(), Some("small:Download"));
+    // Taken from a file, it says so.
+    let file = tmp.path().join("mine.bin");
+    std::fs::write(&file, b"base")?;
+    let picked = file.clone();
+    harness
+        .state_mut()
+        .set_model_picker(Box::new(move |_| Some(picked.clone())));
+    harness
+        .get_by_label("Use a file of my own")
+        .click_accesskit();
+    harness.run_steps(4);
+    assert!(eventually(
+        || speech.status() == Status::Ready && speech.current() == Some(WhisperModel::Base)
+    ));
+    harness.run_steps(4);
+    assert_eq!(kept(&store)?.as_deref(), Some("base:File"));
+    drop(harness);
+    // The next start finds it and keeps how it came.
+    let (harness, _) = start(&store);
+    assert_eq!(kept(&store)?.as_deref(), Some("base:File"));
+    drop(harness);
+    // A model there from before anything was kept counts as downloaded.
+    DeviceSettings::new(&store).set_speech_model(None)?;
+    let (harness, _) = start(&store);
+    assert_eq!(kept(&store)?.as_deref(), Some("base:Download"));
+    drop(harness);
+    // Gone from the folder, none is kept.
+    std::fs::remove_dir_all(&whisper)?;
+    let (_harness, speech) = start(&store);
+    assert_eq!(speech.status(), Status::Missing);
+    assert_eq!(kept(&store)?, None);
+    Ok(())
+}
+
 #[test]
 fn the_merge_dialog_finds_notes_by_their_transcripts_too() -> TestResult {
     let store = media_store()?;

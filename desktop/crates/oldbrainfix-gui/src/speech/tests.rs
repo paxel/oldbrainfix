@@ -138,3 +138,53 @@ fn a_new_model_replaces_the_one_in_use_and_a_failed_one_keeps_it() {
     assert_eq!(settled(&again), Status::Ready);
     assert_eq!(again.current(), Some(WhisperModel::Base));
 }
+
+#[test]
+fn the_choice_kept_says_which_model_is_in_use_and_how_it_came() {
+    let tmp = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
+    let dir = ModelDir::pinned_to(tmp.path().join("whisper"), &sha(b"base"), &sha(b"small"));
+    let fake: Download = Arc::new(|dir, model, stop, _| {
+        let bytes: &[u8] = match model {
+            WhisperModel::Base => b"base",
+            WhisperModel::Small => b"small",
+        };
+        dir.take_in(bytes, None, Some(model), stop, |_, _| {})
+    });
+    let choice = |name: &str, source| SpeechModelChoice {
+        name: name.to_owned(),
+        source,
+    };
+    let model = SpeechModel::with_download(dir.clone(), fake.clone(), quiet());
+    assert_eq!(settled(&model), Status::Missing);
+    // None in use: none kept, also where one was.
+    let small_file = choice("small", SpeechModelSource::File);
+    assert_eq!(model.choice(Some(&small_file)), Some(None));
+    model.download(WhisperModel::Small);
+    assert_eq!(settled(&model), Status::Ready);
+    let small_download = choice("small", SpeechModelSource::Download);
+    assert_eq!(model.choice(None), Some(Some(small_download.clone())));
+    assert_eq!(
+        model.choice(Some(&small_file)),
+        Some(Some(small_download.clone())),
+        "a fetch says how it came"
+    );
+    let file = tmp.path().join("mine.bin");
+    assert!(std::fs::write(&file, b"base").is_ok());
+    model.take_file(&file);
+    assert_eq!(settled(&model), Status::Ready);
+    let base_file = choice("base", SpeechModelSource::File);
+    assert_eq!(model.choice(None), Some(Some(base_file.clone())));
+    // The next start finds it: it came as kept, or, with nothing kept or
+    // another model kept, by download.
+    let again = SpeechModel::with_download(dir, fake, quiet());
+    assert_eq!(settled(&again), Status::Ready);
+    assert_eq!(again.choice(Some(&base_file)), Some(Some(base_file)));
+    let base_download = choice("base", SpeechModelSource::Download);
+    assert_eq!(again.choice(None), Some(Some(base_download.clone())));
+    assert_eq!(again.choice(Some(&small_file)), Some(Some(base_download)));
+    assert_eq!(
+        named(model_name(WhisperModel::Small)),
+        Some(WhisperModel::Small)
+    );
+    assert_eq!(named("large"), None);
+}

@@ -519,5 +519,10 @@
   "spotDeskListPlaceMore": "Benennt diesen Ort um, teilt, exportiert oder löscht ihn.",
   "deskAddPart": "Teil hinzufügen",
   "deskAddDescription": "Beschreibung hinzufügen",
-  "deskAddLine": "Zeile hinzufügen"
+  "deskAddLine": "Zeile hinzufügen",
+  "backupsIntro": "Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Computers kommen mit, außer den gekoppelten Geräten, dem Alarmton und den Ordnern. Das Sprachmodell selbst ist nicht darin: Nach dem Wiederherstellen wird es wieder zum Herunterladen angeboten. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.",
+  "restoreDone": "Wiederhergestellt: {count, plural, =1{1 Änderung} other{{count} Änderungen}}. Die Einstellungen kamen mit. Stell den Alarmton neu ein, wähl den Ordner für Sicherungen noch einmal und kopple deine anderen Geräte noch einmal.",
+  "speechModelOffer": "Das zuvor verwendete Sprachmodell ist noch nicht auf diesem Computer.",
+  "speechModelOfferFile": "Das zuvor verwendete Sprachmodell kam aus einer eigenen Datei und ist noch nicht auf diesem Computer.",
+  "speechModelOfferDownload": "Herunterladen"
 }

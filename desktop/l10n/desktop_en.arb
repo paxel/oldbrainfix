@@ -992,5 +992,15 @@
   "deskAddDescription": "Add a description",
   "@deskAddDescription": {"description": "Small text button under the name of a Checklist, Shopping List or Tally without a description in the desktop's Note dialog and a Note's own window (obf-1071): opens the description's field."},
   "deskAddLine": "Add a Line",
-  "@deskAddLine": {"description": "Under the Lines of a Checklist or Shopping List in the desktop's Note dialog and a Note's own window (obf-1071): a click puts the cursor into a new empty Line at the end, on a Shopping List before the struck ones."}
+  "@deskAddLine": {"description": "Under the Lines of a Checklist or Shopping List in the desktop's Note dialog and a Note's own window (obf-1071): a click puts the cursor into a new empty Line at the end, on a Shopping List before the struck ones."},
+  "backupsIntro": "A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This computer's settings come with it, except the paired Devices, the alarm sound and the folders. The speech model itself is not in it: after a restore, it is offered for download again. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.",
+  "@backupsIntro": {"description": "Desktop wording of the phone's text (obf-1098): what a Backup holds and which settings stay out."},
+  "restoreDone": "Restored: {count, plural, =1{1 change} other{{count} changes}}. The settings came with it. Set the alarm sound again, choose the Backup folder again, and pair your other Devices again.",
+  "@restoreDone": {"description": "Desktop wording of the phone's text (obf-1098), behind the click on Backup restored.", "placeholders": {"count": {"type": "int"}}},
+  "speechModelOffer": "The speech model used before is not on this computer yet.",
+  "@speechModelOffer": {"description": "At the top of the desktop window after a Backup was restored whose Device had downloaded a speech model (obf-1098), beside Download and Not now."},
+  "speechModelOfferFile": "The speech model used before came from a file of your own and is not on this computer yet.",
+  "@speechModelOfferFile": {"description": "As speechModelOffer, for a model taken from a file (obf-1098), beside Use a file of my own and Not now."},
+  "speechModelOfferDownload": "Download",
+  "@speechModelOfferDownload": {"description": "Button beside speechModelOffer: downloads that speech model (obf-1098)."}
 }
