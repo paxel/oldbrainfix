@@ -393,6 +393,27 @@ fn heads_ups_are_kept_leniently_and_written_canonically() -> Result<()> {
 }
 
 #[test]
+fn a_custom_heads_up_off_the_list_is_kept_and_planned() -> Result<()> {
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let routines = Routines::new(&store);
+    let id = reminder(&store, "dentist", Day::new(2026, 10, 26), Some(time(10, 0)))?;
+    let day = reminder(&store, "birthday", Day::new(2026, 10, 30), None)?;
+    routines.set_heads_ups(&id, &[45, 10 * 1440])?;
+    routines.set_heads_ups(&day, &[90, 3 * 1440])?;
+    assert_eq!(routines.heads_ups(&id)?, [45, 14400]);
+    assert_eq!(routines.heads_ups(&day)?, [90, 4320]);
+    // An all-day one plans its whole days only; the 90 minutes stay kept
+    // for a timed schedule again.
+    let mut planned: Vec<String> = heads_ups(&store)?
+        .iter()
+        .map(|h| h.split(' ').take(2).collect::<Vec<_>>().join(" "))
+        .collect();
+    planned.sort();
+    assert_eq!(planned, ["4320 2026-10-30", "45 2026-10-26T10:00"]);
+    Ok(())
+}
+
+#[test]
 fn a_heads_up_comes_a_day_back_on_the_calendar_across_the_switch() -> Result<()> {
     let store = store_at("2026-10-24T07:00:00.000Z")?;
     let id = reminder(&store, "dentist", Day::new(2026, 10, 25), Some(time(10, 0)))?;

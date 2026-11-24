@@ -70,6 +70,71 @@ void main() {
         );
       });
 
+      test('the editor offers a list per schedule and a custom length '
+          '(obf-1087)', () {
+        expect(HeadsUpKeys.choices(allDay: false), [
+          5,
+          10,
+          15,
+          30,
+          60,
+          120,
+          1440,
+          2880,
+          10080,
+        ]);
+        expect(HeadsUpKeys.choices(allDay: true), [1440, 2880, 4320, 10080]);
+        expect(HeadsUpKeys.units(allDay: false), HeadsUpUnit.values);
+        expect(HeadsUpKeys.units(allDay: true), [
+          HeadsUpUnit.days,
+          HeadsUpUnit.weeks,
+        ]);
+        expect(
+          [for (final u in HeadsUpUnit.values) u.most],
+          [43200, 720, 30, 4],
+        );
+        int? timed(int n, HeadsUpUnit unit) =>
+            HeadsUpKeys.minutesOf(n, unit, allDay: false);
+        int? allDay(int n, HeadsUpUnit unit) =>
+            HeadsUpKeys.minutesOf(n, unit, allDay: true);
+        expect(timed(45, HeadsUpUnit.minutes), 45);
+        expect(timed(3, HeadsUpUnit.hours), 180);
+        expect(timed(5, HeadsUpUnit.days), 7200);
+        expect(timed(4, HeadsUpUnit.weeks), 40320);
+        expect(timed(43200, HeadsUpUnit.minutes), 43200);
+        expect(timed(720, HeadsUpUnit.hours), 43200);
+        expect(timed(30, HeadsUpUnit.days), 43200);
+        for (final unit in HeadsUpUnit.values) {
+          expect(timed(0, unit), isNull);
+          expect(timed(-1, unit), isNull);
+          expect(timed(unit.most + 1, unit), isNull);
+        }
+        // Past the most even where multiplying would wrap.
+        expect(timed(0x7fffffffffffffff, HeadsUpUnit.weeks), isNull);
+        expect(allDay(2, HeadsUpUnit.days), 2880);
+        expect(allDay(3, HeadsUpUnit.weeks), 30240);
+        expect(allDay(31, HeadsUpUnit.days), isNull);
+        expect(allDay(5, HeadsUpUnit.weeks), isNull);
+        // Whole days given in minutes or hours are no unit it offers.
+        expect(allDay(1440, HeadsUpUnit.minutes), isNull);
+        expect(allDay(24, HeadsUpUnit.hours), isNull);
+      });
+
+      test('a custom length off the list is kept and planned', () {
+        final id = reminder('dentist', Day(2026, 10, 26), at(10));
+        final day = reminder('birthday', Day(2026, 10, 30));
+        routines.setHeadsUps(id, [45, 10 * 1440]);
+        routines.setHeadsUps(day, [90, 3 * 1440]);
+        expect(routines.headsUps(id), [45, 14400]);
+        expect(routines.headsUps(day), [90, 4320]);
+        // An all-day one plans its whole days only; the 90 minutes stay
+        // kept for a timed schedule again.
+        expect(
+          planned().map((p) => p.split(' ').take(2).join(' ')),
+          unorderedEquals(['45 2026-10-26T10:00', '4320 2026-10-30']),
+        );
+      });
+
       test('a Routine in the trash keeps them and plans none', () {
         final id = reminder('dentist', Day(2026, 10, 26), at(10));
         routines.trash(id);

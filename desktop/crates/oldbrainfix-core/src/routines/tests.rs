@@ -657,3 +657,39 @@ fn heads_ups_are_each_persons_own() -> crate::checklists::tests::TestResult {
     assert!(!crate::Alarms::new(&ann).heads_ups(&utc)?.is_empty());
     Ok(())
 }
+
+#[test]
+fn the_editor_offers_a_list_per_schedule_and_a_custom_length() {
+    use HeadsUpUnit::{Days, Hours, Minutes, Weeks};
+    assert_eq!(
+        heads_up_keys::choices(false),
+        [5, 10, 15, 30, 60, 120, 1440, 2880, 10080]
+    );
+    assert_eq!(heads_up_keys::choices(true), [1440, 2880, 4320, 10080]);
+    assert_eq!(heads_up_keys::units(false), HeadsUpUnit::ALL);
+    assert_eq!(heads_up_keys::units(true), [Days, Weeks]);
+    assert_eq!(HeadsUpUnit::ALL.map(HeadsUpUnit::most), [43200, 720, 30, 4]);
+    let timed = |n, unit| heads_up_keys::minutes_of(n, unit, false);
+    let all_day = |n, unit| heads_up_keys::minutes_of(n, unit, true);
+    assert_eq!(timed(45, Minutes), Some(45));
+    assert_eq!(timed(3, Hours), Some(180));
+    assert_eq!(timed(5, Days), Some(7200));
+    assert_eq!(timed(4, Weeks), Some(40320));
+    assert_eq!(timed(43200, Minutes), Some(43200));
+    assert_eq!(timed(720, Hours), Some(43200));
+    assert_eq!(timed(30, Days), Some(43200));
+    for unit in HeadsUpUnit::ALL {
+        assert_eq!(timed(0, unit), None);
+        assert_eq!(timed(-1, unit), None);
+        assert_eq!(timed(unit.most() + 1, unit), None);
+    }
+    // Past the most even where multiplying would overflow.
+    assert_eq!(timed(i64::MAX, Weeks), None);
+    assert_eq!(all_day(2, Days), Some(2880));
+    assert_eq!(all_day(3, Weeks), Some(30240));
+    assert_eq!(all_day(31, Days), None);
+    assert_eq!(all_day(5, Weeks), None);
+    // Whole days given in minutes or hours are no unit it offers.
+    assert_eq!(all_day(1440, Minutes), None);
+    assert_eq!(all_day(24, Hours), None);
+}

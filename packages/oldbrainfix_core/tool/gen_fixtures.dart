@@ -10424,6 +10424,75 @@ Map<String, Object?> _backlinks() {
   }
 }
 
+/// The Heads-ups the Routine editor offers (obf-1087): its list per
+/// schedule, the units a custom one is given in and the most of each,
+/// and the minutes a number of a unit makes or none, at the edges; then
+/// offsets as stored, read and written back.
+Map<String, Object?> _headsUps() {
+  const counts = [
+    -1,
+    0,
+    1,
+    2,
+    4,
+    5,
+    24,
+    30,
+    31,
+    45,
+    720,
+    721,
+    1440,
+    43200,
+    43201,
+    0x7fffffffffffffff,
+  ];
+  return {
+    'maxMinutes': HeadsUpKeys.maxMinutes,
+    'choices': {
+      for (final allDay in [false, true])
+        allDay ? 'allDay' : 'timed': HeadsUpKeys.choices(allDay: allDay),
+    },
+    'units': {
+      for (final allDay in [false, true])
+        allDay ? 'allDay' : 'timed': [
+          for (final unit in HeadsUpKeys.units(allDay: allDay)) unit.name,
+        ],
+    },
+    'most': {for (final unit in HeadsUpUnit.values) unit.name: unit.most},
+    'minutesOf': [
+      for (final allDay in [false, true])
+        for (final unit in HeadsUpUnit.values)
+          for (final count in counts)
+            {
+              'allDay': allDay,
+              'count': count,
+              'minutes': HeadsUpKeys.minutesOf(count, unit, allDay: allDay),
+              'unit': unit.name,
+            },
+    ],
+    'read': [
+      for (final value in [
+        null,
+        '',
+        '20',
+        '1440,20,20',
+        '45,90,14400,43200',
+        '43201,0,020,+5, 5,abc,-3,0x10,,99999',
+      ])
+        {'minutes': HeadsUpKeys.read(value), 'value': value},
+    ],
+    'write': [
+      for (final minutes in [
+        <int>[],
+        [0, -5, 43201],
+        [90, 45, 45, 43200, 1],
+      ])
+        {'minutes': minutes, 'value': HeadsUpKeys.write(minutes)},
+    ],
+  };
+}
+
 /// Schedules as sentences (ADR 0044), on a held day: each schedule of
 /// the simple editor written in English and German and read back, more
 /// texts read as typed with the parts not understood, and the words
@@ -12624,6 +12693,11 @@ Future<void> main(List<String> args) async {
     'German and read back, texts read as typed with the parts not '
     'understood, and the words suggested at a cursor, offsets counted in '
     'code points.\n'
+    '- `heads_ups.json`: the Heads-ups the Routine editor offers '
+    '(obf-1087): its list for a timed and an all-day schedule, the units '
+    'a custom one is given in for each and the most of every unit, and '
+    'the minutes a number of a unit makes, or none, at the edges; then '
+    'offsets as stored, read and written back.\n'
     '- `markdown.json`: formatted text: for each text its lines with their '
     'kind, level, number and parts, as read, what it reads as without its '
     'marks, whether it uses a format, the text escaped, as HTML, its '
@@ -12919,6 +12993,10 @@ Future<void> main(List<String> args) async {
   _write(
     File('${root.path}/schedule_sentences.json'),
     '${_json.convert(_scheduleSentences())}\n',
+  );
+  _write(
+    File('${root.path}/heads_ups.json'),
+    '${_json.convert(_headsUps())}\n',
   );
   _sync(root);
   _conflictsFixture(root);

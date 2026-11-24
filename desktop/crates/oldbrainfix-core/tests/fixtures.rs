@@ -8818,6 +8818,68 @@ fn sentence_repeat(value: &Value) -> Option<oldbrainfix_core::SimpleRepeat> {
 }
 
 #[test]
+fn heads_up_choices_and_lengths_are_the_dart_cores() -> TestResult {
+    use oldbrainfix_core::HeadsUpUnit;
+    let fixture = read_json(&fixtures().join("heads_ups.json"))?;
+    let names = |units: &[HeadsUpUnit]| -> Value {
+        units.iter().map(|u| u.name()).collect::<Vec<_>>().into()
+    };
+    assert_eq!(fixture["maxMinutes"], json!(heads_up_keys::MAX_MINUTES));
+    assert_eq!(
+        fixture["choices"],
+        json!({"allDay": heads_up_keys::choices(true), "timed": heads_up_keys::choices(false)})
+    );
+    assert_eq!(
+        fixture["units"],
+        json!({
+            "allDay": names(heads_up_keys::units(true)),
+            "timed": names(heads_up_keys::units(false)),
+        })
+    );
+    let most: serde_json::Map<String, Value> = HeadsUpUnit::ALL
+        .iter()
+        .map(|u| (u.name().to_string(), json!(u.most())))
+        .collect();
+    assert_eq!(fixture["most"], Value::Object(most));
+    let cases = fixture["minutesOf"].as_array().ok_or("minutesOf")?;
+    assert_eq!(cases.len(), 2 * HeadsUpUnit::ALL.len() * 16);
+    for case in cases {
+        let unit = HeadsUpUnit::ALL
+            .into_iter()
+            .find(|u| case["unit"] == u.name())
+            .ok_or("unit")?;
+        let minutes = heads_up_keys::minutes_of(
+            case["count"].as_i64().ok_or("count")?,
+            unit,
+            case["allDay"].as_bool().ok_or("allDay")?,
+        );
+        assert_eq!(case["minutes"], json!(minutes), "{case}");
+    }
+    let read = fixture["read"].as_array().ok_or("read")?;
+    assert_eq!(read.len(), 6);
+    for case in read {
+        let minutes = heads_up_keys::read(case["value"].as_str());
+        assert_eq!(case["minutes"], json!(minutes), "{case}");
+    }
+    let written = fixture["write"].as_array().ok_or("write")?;
+    assert_eq!(written.len(), 3);
+    for case in written {
+        let minutes: Vec<i64> = case["minutes"]
+            .as_array()
+            .ok_or("minutes")?
+            .iter()
+            .filter_map(Value::as_i64)
+            .collect();
+        assert_eq!(
+            case["value"],
+            json!(heads_up_keys::write(&minutes)),
+            "{case}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::schedule_sentence::{
         QuickChip, SentenceNow, SimpleSchedule, quick_reminders, read, read_at, sentence, suggest,

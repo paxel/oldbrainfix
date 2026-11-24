@@ -10,6 +10,12 @@ The same entity holds them for a Routine of the user's own, so there is one way 
 
 The field `headsUps` holds the offsets before the Occurrence's start in whole minutes, as decimal numbers joined by `,`, ascending, without duplicates, each from 1 to 43200 (30 days, as far as the alarm plan looks ahead); null for none. A part that is no such number is left out on reading. The same list again writes nothing. It carries no version (ADR 0034): a later one that needs another shape takes another field. An offset list maps one to one onto the `reminders` of an AXT Appointment (#340), which are offsets from its `start`.
 
+## The editor's choices and a custom length
+
+The Routine editor offers a list and "Custom…" at its end (obf-1087, C30 of 2026-11-22). Both cores hold the list so both apps show the same: `HeadsUpKeys.choices` / `heads_up_keys::choices`, for a timed schedule 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days and 1 week, for an all-day one 1, 2 and 3 days and 1 week. A custom Heads-up is a number and a unit, `HeadsUpUnit` minutes, hours, days or weeks, days and weeks only for an all-day schedule (`units`); `minutesOf` / `minutes_of` turns them into the minutes stored, or none when the number is not from 1 to the unit's most (43200 minutes, 720 hours, 30 days, 4 weeks) or the unit is not one the schedule takes. The cross-core fixture `desktop/fixtures/heads_ups.json` pins both.
+
+The stored form stays as it is: any offset from 1 to 43200 is kept, on the list or not, and the AI port's `set_heads_ups` takes any such length too. Whole days for an all-day schedule are enforced where they are offered and planned, not where they are stored: the editor offers days and weeks only and the plan leaves out the rest, so a timed schedule's minute offsets that a turn to all-day leaves in the log stay there unplanned, as the Consequences say.
+
 ## Planned beside the alarms
 
 `headsUpPlan` / `heads_up_plan` is a plan of its own next to the alarm plan (ADR 0004), so the alarms, their limits and their fixture stay as they were. For each Occurrence the alarm plan looks at that is neither Done nor skipped nor snoozed, each offset gives one Heads-up:
