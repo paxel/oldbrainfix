@@ -1582,13 +1582,19 @@ replace a law of Both apps where they say so. A desktop law marked
   takes the band's fill, the theme's surface container, set off from the
   page's ground in the light and the dark look, so top bar and band read
   as one header with one line under the band only; shown over the list,
-  and with the list pulled down, the cards go under it. Pages without
-  the search bar keep their top bar in the ground's colour.
+  and with the list pulled down, the cards go under it. The pages whose
+  search bar stands still over what they list, the Settings, File
+  into…, Merge into…, Add to Note… and Link to…, set it on the same
+  band, their top bar of its fill, with the line under it, so what
+  scrolls goes under the line and no edge in the page's colour cuts it
+  (obf-1088). Pages without a search bar keep their top bar in the
+  ground's colour.
 
 ### Settings
 
 - **A search field sits at the top of Settings** (#282), under the bar,
-  staying there while the page scrolls; nothing focuses it on opening.
+  staying there while the page scrolls, on the band of the list pages'
+  search bar (obf-1088); nothing focuses it on opening.
   It filters to the settings whose label or detail line holds every
   word typed, in any case, in the app's language, a setting without a
   label of its own by the names of its options, each under its
