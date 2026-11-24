@@ -3090,6 +3090,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personFilterShowing => 'Only Notes by';
 
   @override
+  String get madeHiddenByFilter => 'Made, hidden by the filter';
+
+  @override
+  String get showHidden => 'Show';
+
+  @override
   String get personTheirNotes => 'Their Notes';
 
   @override

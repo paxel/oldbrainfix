@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announcements.dart';
 import 'areas_screen.dart';
 import 'capture_fan.dart';
 import 'capture_screen.dart';
@@ -74,7 +75,8 @@ FanEntry _describe(BuildContext context, NewKind kind) {
 /// Tally or a Session on its one page; a Frog from its name. Leaving a
 /// form without its Create or Save makes nothing. [onChanged] runs once
 /// something was made. Not for [NewKind.topic], which the Area adds.
-Future<void> makeNew(
+/// Returns the id of the Note made, null when nothing was.
+Future<String?> makeNew(
   BuildContext context,
   Notes notes,
   Places places,
@@ -86,14 +88,22 @@ Future<void> makeNew(
   final store = notes.store;
   switch (kind) {
     case NewKind.note:
-      await captureNote(context, notes, place: place, onChanged: onChanged);
+      String? made;
+      await captureNote(
+        context,
+        notes,
+        place: place,
+        onChanged: onChanged,
+        onCaptured: (id) => made = id,
+      );
+      return made;
     case NewKind.checklist || NewKind.shopping:
       final checklist = kind == NewKind.checklist;
       final name = await askName(
         context,
         title: checklist ? t.newChecklist : t.newShoppingList,
       );
-      if (!context.mounted || name == null) return;
+      if (!context.mounted || name == null) return null;
       final note = store.batch(() {
         final note = notes.capture(name, place: place);
         if (checklist) {
@@ -106,6 +116,7 @@ Future<void> makeNew(
       onChanged();
       await openNote(context, notes, places, note, typeLines: true);
       if (context.mounted) onChanged();
+      return note.id;
     case NewKind.tally:
       final made = await Navigator.of(context).push<String>(
         MaterialPageRoute(
@@ -113,6 +124,7 @@ Future<void> makeNew(
         ),
       );
       if (made != null) onChanged();
+      return made;
     case NewKind.session:
       final made = await Navigator.of(context).push<String>(
         MaterialPageRoute(
@@ -120,16 +132,38 @@ Future<void> makeNew(
               SessionFormScreen(notes: notes, places: places, place: place),
         ),
       );
-      if (made != null) onChanged();
+      if (made == null) return null;
+      onChanged();
+      // The page pops the Session's Routine.
+      return Routines(store).byId(made)?.noteId;
     case NewKind.frog:
       final name = await askName(context, title: t.newFrog);
-      if (!context.mounted || name == null) return;
-      store.batch(() {
+      if (!context.mounted || name == null) return null;
+      final note = store.batch(() {
         final note = notes.capture(name, place: place);
         Frogs(store).spawn(note.id);
+        return note;
       });
       onChanged();
+      return note.id;
     case NewKind.topic:
-      return;
+      return null;
   }
+}
+
+/// When the Note [made] by "+" is one [filter], the person filter of the
+/// page it was made on, hides, says so at the top, "Made, hidden by the
+/// filter", with "Show", whose tap runs [show] to clear the filter
+/// (obf-1070). Nothing for no Note made or a page showing everyone's.
+void sayIfFilterHides(
+  BuildContext context,
+  Store store,
+  String? made,
+  PersonFilter filter, {
+  required VoidCallback show,
+}) {
+  if (made == null || store.wroteBy(made, filter)) return;
+  final t = context.t;
+  AnnouncementsScope.of(context)
+      ?.offer(t.madeHiddenByFilter, t.showHidden, show);
 }

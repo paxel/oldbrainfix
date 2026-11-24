@@ -1218,6 +1218,15 @@ replace a law of Both apps where they say so. A desktop law marked
   nothing. What it deleted stays where it always went: the Trash,
   "Removed entries", "Removed Lines", or "again" under its file; a
   "From …" label has no such place and stays gone.
+- **"+" stays whatever filter is on** (obf-1070, C13): in an Area, a
+  Topic and All Notes, "Show Notes by…" never hides it. A Note the
+  filter hides is made and opened as usual; back in the list the top
+  says "Made, hidden by the filter", ending with "Show", whose tap
+  clears the filter; this replaces Both apps ▸ Announcements, where a
+  tap opens the details or undoes. It is an offer as the one to undo is: it shows
+  before what waits, takes the place of the offer before, a screen
+  reader hears "Show" as the tap's hint, and left alone it goes by
+  itself after 10 seconds. With "Me" in the filter nothing is said.
 
 ### Capture
 

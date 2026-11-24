@@ -819,6 +819,8 @@
   "personFilterMe": "Mir",
   "personFilterEveryone": "Allen",
   "personFilterShowing": "Nur Notizen von",
+  "madeHiddenByFilter": "Angelegt, vom Filter ausgeblendet",
+  "showHidden": "Zeigen",
   "personTheirNotes": "Notizen dieser Person",
   "crashTitle": "Das hätte nicht passieren dürfen",
   "crashBody": "Old Brain Fix ist auf einen unerwarteten Fehler gestoßen. Deine gespeicherten Notizen sind sicher. Starte die App neu, und wenn es wieder passiert, schick den Bericht, damit es behoben werden kann.",

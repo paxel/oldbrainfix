@@ -4958,6 +4958,18 @@ abstract class AppLocalizations {
   /// **'Only Notes by'**
   String get personFilterShowing;
 
+  /// Announcement at the top after "+" of an Area, a Topic or All Notes made a Note that the person filter (Show Notes by…) hides (obf-1070); it ends with showHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Made, hidden by the filter'**
+  String get madeHiddenByFilter;
+
+  /// The word at the end of the announcement madeHiddenByFilter: its tap clears the person filter, so the Note made shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get showHidden;
+
   /// On another person's Profile: opens All Notes with only the Notes this person wrote.
   ///
   /// In en, this message translates to:

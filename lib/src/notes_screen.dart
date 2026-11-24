@@ -115,13 +115,24 @@ class _AllNotesScreenState extends State<AllNotesScreen>
       newKinds(widget.notes.store, null),
     );
     if (!mounted || kind == null) return;
-    await makeNew(
+    final made = await makeNew(
       context,
       widget.notes,
       widget.places,
       kind,
       onChanged: () {
         if (mounted) _reload();
+      },
+    );
+    if (!mounted) return;
+    sayIfFilterHides(
+      context,
+      widget.notes.store,
+      made,
+      _people,
+      show: () {
+        // "Show" clears the filter (obf-1070).
+        if (mounted) _filter(PersonFilter.everyone);
       },
     );
   }

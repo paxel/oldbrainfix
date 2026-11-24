@@ -907,6 +907,11 @@ class _AreaScreenState extends State<AreaScreen>
     _load();
   });
 
+  /// "Show" of a Note made but hidden by the filter clears it (obf-1070).
+  void _showEveryone() {
+    if (mounted) _filtered(PersonFilter.everyone);
+  }
+
   void _reloadIfMounted() {
     if (mounted) _reload();
   }
@@ -932,13 +937,21 @@ class _AreaScreenState extends State<AreaScreen>
     );
     if (!mounted || kind == null) return;
     if (kind != NewKind.topic) {
-      await makeNew(
+      final made = await makeNew(
         context,
         widget.notes,
         widget.places,
         kind,
         place: widget.areaId,
         onChanged: _reloadIfMounted,
+      );
+      if (!mounted) return;
+      sayIfFilterHides(
+        context,
+        widget.places.store,
+        made,
+        _filter,
+        show: _showEveryone,
       );
       return;
     }
@@ -1321,7 +1334,7 @@ class _TopicScreenState extends State<TopicScreen>
       newKinds(widget.places.store, widget.topicId),
     );
     if (!mounted || kind == null) return;
-    await makeNew(
+    final made = await makeNew(
       context,
       widget.notes,
       widget.places,
@@ -1329,6 +1342,19 @@ class _TopicScreenState extends State<TopicScreen>
       place: widget.topicId,
       onChanged: _reloadIfMounted,
     );
+    if (!mounted) return;
+    sayIfFilterHides(
+      context,
+      widget.places.store,
+      made,
+      _filter,
+      show: _showEveryone,
+    );
+  }
+
+  /// "Show" of a Note made but hidden by the filter clears it (obf-1070).
+  void _showEveryone() {
+    if (mounted) _filtered(PersonFilter.everyone);
   }
 
   void _reloadIfMounted() {

@@ -5,9 +5,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
+import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/notes_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
@@ -18,6 +20,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
 import 'fake_profile.dart';
+import 'open_capture.dart';
 import 'open_settings.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -543,6 +546,116 @@ void main() {
       await pick(tester, 'me');
       expect(find.text('Call the bank'), findsNothing);
       expect(find.text('No Note matches.'), findsOneWidget);
+    });
+
+    group('"+" with a filter on (obf-1070)', () {
+      late Announcements announcements;
+
+      /// Opens Ann's [place], "Household", "Kitchen" in it or All Notes,
+      /// with the Notes of [people] alone.
+      Future<void> open(
+        WidgetTester tester,
+        String place,
+        List<String> people,
+      ) async {
+        tester.view.physicalSize = const Size(800, 2400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        announcements = Announcements();
+        addTearDown(announcements.dispose);
+        await tester.pumpWidget(
+          OldBrainFixApp(
+            store: ann,
+            alarms: FakeAlarms(),
+            profile: platform,
+            announcements: announcements,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tap(tester, find.byKey(const ValueKey('browse')));
+        if (place == 'All Notes') {
+          await tap(tester, find.byTooltip('All Notes'));
+        } else {
+          await tap(tester, find.text('Household'));
+          if (place == 'Kitchen') await tap(tester, find.text('Kitchen'));
+        }
+        for (final person in people) {
+          await pick(tester, person);
+        }
+      }
+
+      /// Makes the Checklist [name] by "+", then leaves its editor.
+      Future<void> makeChecklist(WidgetTester tester, String name) async {
+        await tap(tester, find.byTooltip('Add here'));
+        await tap(tester, find.byKey(const ValueKey('addFan-checklist')));
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextField),
+          ),
+          name,
+        );
+        await tap(tester, find.text('Create'));
+        // Made and opened as usual.
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+
+      setUp(() {
+        Places(ann).addTopic(area, 'Kitchen');
+        Notes(ben).capture('Ben buys bread', place: area);
+        sync();
+      });
+
+      for (final place in ['Household', 'Kitchen', 'All Notes']) {
+        testWidgets('in $place a Note the filter hides is made, said at the '
+            'top, and "Show" clears the filter', (tester) async {
+          await open(tester, place, [benId]);
+          expect(find.byTooltip('Add here'), findsOneWidget);
+          await makeChecklist(tester, 'Pack the bags');
+          expect(
+            Notes(ann).all().map((n) => n.text),
+            contains('Pack the bags'),
+          );
+          expect(announcements.visible, 'Made, hidden by the filter');
+          expect(
+            find.byKey(const ValueKey('announcement-offer')),
+            findsOneWidget,
+          );
+          expect(find.text('Pack the bags'), findsNothing);
+          expect(chip(benId), findsOneWidget);
+
+          await tap(tester, find.text('Show'));
+          expect(announcements.visible, isNull);
+          expect(chip(benId), findsNothing);
+          expect(find.text('Pack the bags'), findsOneWidget);
+        });
+      }
+
+      testWidgets('a Note captured by "+" ▸ Note is said the same', (
+        tester,
+      ) async {
+        await open(tester, 'Household', [benId]);
+        await tap(tester, find.byTooltip('Add here'));
+        await tap(tester, find.byKey(const ValueKey('addFan-note')));
+        await tester.enterText(find.byType(TextField), 'Ann buys eggs');
+        await backFromCapture(tester);
+        expect(Notes(ann).all().map((n) => n.text), contains('Ann buys eggs'));
+        expect(announcements.visible, 'Made, hidden by the filter');
+        expect(find.text('Ann buys eggs'), findsNothing);
+        await tap(tester, find.text('Show'));
+        expect(find.text('Ann buys eggs'), findsOneWidget);
+      });
+
+      testWidgets('with "Me" in the filter the Note shows and nothing is '
+          'said', (tester) async {
+        await open(tester, 'Household', ['me']);
+        await makeChecklist(tester, 'Pack the bags');
+        expect(announcements.visible, isNull);
+        expect(find.text('Pack the bags'), findsOneWidget);
+        expect(chip('me'), findsOneWidget);
+      });
     });
 
     testWidgets('fits a phone in German', (tester) async {

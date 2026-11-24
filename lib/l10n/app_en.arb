@@ -1837,6 +1837,14 @@
   "personFilterMe": "Me",
   "personFilterEveryone": "Everyone",
   "personFilterShowing": "Only Notes by",
+  "madeHiddenByFilter": "Made, hidden by the filter",
+  "@madeHiddenByFilter": {
+    "description": "Announcement at the top after \"+\" of an Area, a Topic or All Notes made a Note that the person filter (Show Notes by…) hides (obf-1070); it ends with showHidden."
+  },
+  "showHidden": "Show",
+  "@showHidden": {
+    "description": "The word at the end of the announcement madeHiddenByFilter: its tap clears the person filter, so the Note made shows."
+  },
   "personTheirNotes": "Their Notes",
   "@personTheirNotes": {
     "description": "On another person's Profile: opens All Notes with only the Notes this person wrote."

@@ -3119,6 +3119,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get personFilterShowing => 'Nur Notizen von';
 
   @override
+  String get madeHiddenByFilter => 'Angelegt, vom Filter ausgeblendet';
+
+  @override
+  String get showHidden => 'Zeigen';
+
+  @override
   String get personTheirNotes => 'Notizen dieser Person';
 
   @override

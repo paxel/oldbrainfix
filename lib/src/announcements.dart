@@ -26,6 +26,10 @@ class Announcements extends ChangeNotifier {
   /// its tap undoes it, and it goes by itself after [undoLasts].
   bool get visibleUndoes => _waiting.firstOrNull?.undoes ?? false;
 
+  /// The word at the end of the visible [offer] that names what its tap
+  /// does; null for none, an offer to undo reading "Undo".
+  String? get visibleOffer => _waiting.firstOrNull?.offer;
+
   /// Queues [text], already in the reader's language. Tapping it
   /// dismisses it and then runs [onTap], when there is one.
   void announce(String text, {VoidCallback? onTap}) {
@@ -44,8 +48,19 @@ class Announcements extends ChangeNotifier {
     }
 
     _waiting
-      ..removeWhere((said) => said.undoes)
+      ..removeWhere((said) => said.timed)
       ..insert(0, _Said(text, undoing, undoes: true));
+    notifyListeners();
+  }
+
+  /// Says at once that [text] was just done and offers [action], the word
+  /// at its end, such as "Show" for a Note made but hidden by the filter
+  /// (obf-1070): a tap runs [onTap]; left alone it goes by itself after
+  /// [undoLasts], as an offer to undo does, and it takes that one's place.
+  void offer(String text, String action, VoidCallback onTap) {
+    _waiting
+      ..removeWhere((said) => said.timed)
+      ..insert(0, _Said(text, onTap, offer: action));
     notifyListeners();
   }
 
@@ -71,14 +86,21 @@ class Announcements extends ChangeNotifier {
   }
 }
 
-/// One announcement: its text, what its tap runs, and whether that
-/// undoes what was just done.
+/// One announcement: its text, what its tap runs, whether that undoes
+/// what was just done, and the word at its end for an offer.
 class _Said {
   final String text;
   final VoidCallback? onTap;
   final bool undoes;
 
-  _Said(this.text, this.onTap, {this.undoes = false});
+  /// The word naming the tap of an offer, which goes by itself; null for
+  /// an announcement that waits for its tap.
+  final String? offer;
+
+  _Said(this.text, this.onTap, {this.undoes = false, this.offer});
+
+  /// Whether it goes by itself: an offer to undo and any other offer.
+  bool get timed => undoes || offer != null;
 }
 
 /// Hands the app's [Announcements] down to every screen.
@@ -104,8 +126,8 @@ class AnnouncementsScope extends InheritedWidget {
 
 /// Shows the visible announcement at the top of the screen, under the
 /// status bar, and pushes [child] down below it. Tapping it dismisses
-/// it and opens what it is about, if anything; an offer to undo goes by
-/// itself after [Announcements.undoLasts]. Nothing ever comes from the
+/// it and opens what it is about, if anything; an offer, to undo or
+/// another, goes by itself after [Announcements.undoLasts]. Nothing ever comes from the
 /// bottom (adapted from Catlog's note strip).
 class AnnouncementStrip extends StatefulWidget {
   final Announcements announcements;
@@ -122,7 +144,7 @@ class AnnouncementStrip extends StatefulWidget {
 }
 
 class _AnnouncementStripState extends State<AnnouncementStrip> {
-  /// The offer to undo whose time runs, and its timer.
+  /// The offer whose time runs, and its timer.
   _Said? _timed;
   Timer? _expiry;
 
@@ -149,12 +171,12 @@ class _AnnouncementStripState extends State<AnnouncementStrip> {
     super.dispose();
   }
 
-  /// Starts the time of an offer to undo once it shows, and stops it
-  /// once it no longer does.
+  /// Starts the time of an offer once it shows, and stops it once it no
+  /// longer does.
   void _changed() {
     final announcements = widget.announcements;
     final shown = announcements._waiting.firstOrNull;
-    final said = shown != null && shown.undoes ? shown : null;
+    final said = shown != null && shown.timed ? shown : null;
     if (said == _timed) return;
     _expiry?.cancel();
     _timed = said;
@@ -182,6 +204,7 @@ class _AnnouncementStripState extends State<AnnouncementStrip> {
                 : _Line(
                     text: text,
                     undoes: announcements.visibleUndoes,
+                    offer: announcements.visibleOffer,
                     onTap: () {
                       final action = announcements.visibleAction;
                       announcements.dismiss();
@@ -211,18 +234,27 @@ class _Line extends StatelessWidget {
 
   /// Whether the tap undoes what was just done: "Undo" shows at the end.
   final bool undoes;
+
+  /// The word of another offer, shown at the end as "Undo" is.
+  final String? offer;
   final VoidCallback onTap;
 
-  const _Line({required this.text, required this.undoes, required this.onTap});
+  const _Line({
+    required this.text,
+    required this.undoes,
+    required this.offer,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final t = context.t;
     final style = TextStyle(color: scheme.onPrimary);
+    final action = undoes ? t.undo : offer;
     return Semantics(
       liveRegion: true,
-      onTapHint: undoes ? t.undo : t.dismissAnnouncement,
+      onTapHint: action ?? t.dismissAnnouncement,
       child: Material(
         color: scheme.primary,
         child: InkWell(
@@ -233,14 +265,18 @@ class _Line extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: SizedBox(
                 width: double.infinity,
-                child: undoes
+                child: action != null
                     ? Row(
                         children: [
                           Expanded(child: Text(text, style: style)),
                           const SizedBox(width: 16),
                           Text(
-                            t.undo,
-                            key: const ValueKey('announcement-undo'),
+                            action,
+                            key: ValueKey(
+                              undoes
+                                  ? 'announcement-undo'
+                                  : 'announcement-offer',
+                            ),
                             style: style.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
