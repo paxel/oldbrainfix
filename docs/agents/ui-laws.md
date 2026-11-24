@@ -1815,8 +1815,11 @@ replace a law of Both apps where they say so. A desktop law marked
   row holds back, forward and the path, the place shown last and large
   as the list's title; its second the search field, then the view
   switch, "Show Notes by…" and "+", all at one height, the Trash's the
-  field alone. A person the filter keeps is a chip with ✕ in the second
-  row, after "Show Notes by…", a click taking them out; there is no row
+  field alone. The search field is as tall as those buttons, its text
+  a card's text's size, the magnifier inside it at its left and ✕ to
+  clear it inside at its right while something is typed (obf-1063).
+  A person the filter keeps is a chip with ✕ in the second row, after
+  "Show Notes by…", a click taking them out; there is no row
   "Only Notes by". Too narrow for them beside the field, the buttons go
   to the line under it. The band, its words, icons and heights, grows
   with Text size (`BandSizes` in `app.rs`); for the band this replaces

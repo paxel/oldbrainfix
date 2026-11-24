@@ -16100,39 +16100,50 @@ impl App {
         if kinds.is_some() {
             beside += sizes.row + gap;
         }
-        // The field's margin makes it as tall as the row (egui's single
-        // line takes no height of its own).
-        let font = egui::TextStyle::Body.resolve(ui.style());
+        // The typed text at a card's text size (obf-1063); the margin
+        // makes the field as tall as the row (egui's single line takes no
+        // height of its own), the magnifier and ✕ inside it.
+        let font = FontId::proportional(theme::content(ui, BAND_FIELD_TEXT));
         let line = ui.fonts_mut(|f| f.row_height(&font));
-        let margin = egui::Margin::symmetric(4, ((sizes.row - line) / 2.0).round() as i8);
+        let inner = line.max(sizes.glyph);
+        let margin = egui::Margin::symmetric(
+            ((sizes.row - sizes.glyph) / 2.0).round() as i8,
+            ((sizes.row - inner) / 2.0).round() as i8,
+        );
         let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
         let room = egui::vec2(ui.available_width(), sizes.row);
         ui.allocate_ui_with_layout(room, layout, |ui| {
-            // The magnifier and the clear button around it, and the
-            // field's own margin.
-            let around = sizes.glyph + sizes.row + 2.0 * gap + 8.0;
-            let rest = ui.available_width() - beside - around;
+            let rest = ui.available_width() - beside;
             let width = if rest >= BAND_FIELD_MIN {
                 rest
             } else {
-                ui.available_width() - around
+                ui.available_width()
             };
-            icons::show(
-                ui,
-                icons::SEARCH,
-                sizes.glyph,
-                ui.visuals().weak_text_color(),
-            );
-            let field = ui.add(
-                TextEdit::singleline(&mut self.query)
-                    .id(Id::new("search"))
-                    .hint_text(hint)
-                    .text_color(text)
-                    .margin(margin)
-                    .desired_width(width.max(0.0)),
-            );
+            let (glass, cross) = (Id::new("search glass"), Id::new("search cross"));
+            let icon = egui::Vec2::splat(sizes.glyph);
+            let output = TextEdit::singleline(&mut self.query)
+                .id(Id::new("search"))
+                .font(font.clone())
+                .hint_text(RichText::new(hint).font(font))
+                .text_color(text)
+                .margin(margin)
+                .prefix(egui::Atom::custom(glass, icon))
+                // Its room kept while empty, so nothing moves as it fills.
+                .suffix(egui::Atom::custom(cross, icon))
+                .desired_width(width.max(0.0))
+                .show(ui);
+            let shown = &output.response;
+            let field = &shown.response;
+            if let Some(at) = shown.rect(glass) {
+                icons::paint(
+                    ui.painter(),
+                    at,
+                    icons::SEARCH,
+                    ui.visuals().weak_text_color(),
+                );
+            }
             spotlight::anchor(ui, "search", field.rect);
-            text_menu::show(ui, &t, &field, &self.query);
+            text_menu::show(ui, &t, field, &self.query);
             // Edit ▸ Find: after the field, so the menu's click does
             // not take it out again.
             if std::mem::take(&mut self.search_focus) {
@@ -16141,17 +16152,30 @@ impl App {
             if field.changed() {
                 actions.push(Action::Search);
             }
-            // Its room kept while empty, so nothing moves as it fills, and
-            // taken as the button would be, so the menus after it keep
-            // their ids and stay open while the search changes.
-            let clear = (t.clear_search(), sizes.row);
-            if self.query.is_empty() {
-                ui.allocate_exact_size(egui::vec2(clear.1, clear.1), Sense::hover());
-            } else if sized_icon_button(ui, (icons::CLOSE, clear.0, text), (clear.1, sizes.glyph))
-                .clicked()
+            // ✕ over the field's right end, as tall as the field, while
+            // something is typed; under its own id, so the menus after
+            // the field keep theirs and stay open while the search
+            // changes.
+            if !self.query.is_empty()
+                && let Some(at) = shown.rect(cross)
             {
-                self.query.clear();
-                actions.push(Action::Search);
+                let room = field.rect.right() - at.right();
+                let target = egui::Rect::from_min_max(
+                    egui::pos2(at.left() - room, field.rect.top()),
+                    field.rect.max,
+                )
+                .shrink(2.0);
+                let label = t.clear_search();
+                let clear = ui.interact(target, Id::new("search clear"), Sense::click());
+                clear.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+                theme::icon_button_back(ui, &clear, target);
+                icons::paint(ui.painter(), at, icons::CLOSE, text);
+                if clear.on_hover_text(label).clicked() {
+                    self.query.clear();
+                    // The cursor back in the field, to type anew.
+                    self.search_focus = true;
+                    actions.push(Action::Search);
+                }
             }
             // Every Note list but the trash has its compact/detailed switch.
             if switch && compact_button(ui, tones, &t, self.view.compact, sizes) {
@@ -23747,6 +23771,10 @@ pub(crate) fn list_scroll<R>(
 /// How narrow the search field of a list's band gets before the buttons
 /// beside it go to the line under it (obf-1064).
 const BAND_FIELD_MIN: f32 = 200.0;
+
+/// The size of the text typed into a list's search field (obf-1063): a
+/// card's text's ([`card_text`]), grown by the text size as it is.
+const BAND_FIELD_TEXT: f32 = 16.0;
 
 /// The measures of a list's header band (obf-1064), grown by the text
 /// size of this Device (#326): its second row's height, the arrows'

@@ -339,3 +339,83 @@ fn the_second_row_stays_one_line_at_any_wide_enough_width() -> TestResult {
     }
     Ok(())
 }
+
+/// Where the text shape reading `words` lies inside `within`, at which
+/// size; `None` if none does.
+fn text_in(harness: &Harness<'_, App>, words: &str, within: Rect) -> Option<(Rect, f32)> {
+    drawn(harness).iter().find_map(|shape| match shape {
+        Shape::Text(text) if text.galley.text() == words => {
+            let size = text.galley.job.sections.first()?.format.font_id.size;
+            let at = text.visual_bounding_rect();
+            within.expand(1.0).contains_rect(at).then_some((at, size))
+        }
+        _ => None,
+    })
+}
+
+#[test]
+fn the_search_field_is_as_tall_as_a_button_its_text_a_cards() -> TestResult {
+    for size in [TextSize::Normal, TextSize::Largest] {
+        let (store, kitchen) = store(size)?;
+        let mut harness = window(&store, Selection::Place(kitchen), egui::vec2(1280.0, 800.0));
+        let field = rect(&harness, Role::TextInput, None);
+        let menu = button(&harness, t().person_filter());
+        assert!(
+            (field.height() - menu.height()).abs() <= 2.5,
+            "{size:?}: the field {field:?}, the button {menu:?}"
+        );
+        // A card's text size, grown as a card's.
+        let card = 16.0 * size.factor();
+        let whole = Rect::EVERYTHING;
+        let (_, shown) = text_in(&harness, "Descale the kettle", whole)
+            .unwrap_or_else(|| panic!("{size:?}: no card"));
+        assert!((shown - card).abs() < 0.01, "{size:?}: the card at {shown}");
+        let (_, hint) = text_in(&harness, t().search_topic_hint(), field)
+            .unwrap_or_else(|| panic!("{size:?}: no hint in the field"));
+        assert!((hint - card).abs() < 0.01, "{size:?}: the hint at {hint}");
+        harness.get_by_role(Role::TextInput).click();
+        harness.run_steps(4);
+        harness.get_by(|n| n.is_focused()).type_text("kettle");
+        harness.run_steps(20);
+        let (_, typed) = text_in(&harness, "kettle", field)
+            .unwrap_or_else(|| panic!("{size:?}: nothing typed in the field"));
+        assert!((typed - card).abs() < 0.01, "{size:?}: typed at {typed}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_magnifier_and_clear_lie_inside_the_search_field() -> TestResult {
+    let (store, kitchen) = store(TextSize::Normal)?;
+    let mut harness = window(&store, Selection::Place(kitchen), egui::vec2(1280.0, 800.0));
+    let t = t();
+    let field = rect(&harness, Role::TextInput, None);
+    let glass = oldbrainfix_gui::icons::SEARCH.to_string();
+    let (at, _) = text_in(&harness, &glass, field)
+        .unwrap_or_else(|| panic!("no magnifier in the field {field:?}"));
+    assert!(at.center().x < field.left() + 30.0, "the magnifier {at:?}");
+    // No ✕ while nothing is typed.
+    let none = harness
+        .query_all_by_role_and_label(Role::Button, t.clear_search())
+        .next()
+        .is_none();
+    assert!(none, "a ✕ in the empty field");
+    harness.get_by_role(Role::TextInput).click();
+    harness.run_steps(4);
+    harness.get_by(|n| n.is_focused()).type_text("kettle");
+    harness.run_steps(20);
+    let typed = rect(&harness, Role::TextInput, None);
+    assert_eq!(typed, field, "the field moved as it filled");
+    let clear = button(&harness, t.clear_search());
+    assert!(field.contains_rect(clear), "✕ {clear:?} outside {field:?}");
+    assert!(clear.center().x > field.right() - 30.0, "✕ at {clear:?}");
+    harness.get_by_label(t.clear_search()).click();
+    harness.run_steps(20);
+    assert_eq!(harness.state().query(), "", "the search cleared");
+    let gone = harness
+        .query_all_by_role_and_label(Role::Button, t.clear_search())
+        .next()
+        .is_none();
+    assert!(gone, "✕ stays after clearing");
+    Ok(())
+}
