@@ -17,6 +17,7 @@ import 'place_names.dart';
 import 'schedule_text.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
+import 'trash_emptying.dart';
 
 /// The most jobs stopped the page Running keeps listing, the newest
 /// first.
@@ -33,6 +34,10 @@ enum RunningKind {
   attachmentTexts,
   speechModel,
   areaDeletion,
+
+  /// "Empty the trash now" (obf-1095): one batch, which Abort cannot
+  /// stop.
+  trashEmptying,
 }
 
 /// One job running beside the app, as its row on the page Running shows
@@ -94,11 +99,12 @@ class StoppedJob {
 /// Every job that runs beside the app, read from where each runs
 /// (obf-1078): a sync with a Device, an Import, the Transcripts, Photo
 /// Texts and Attachment Texts being read, the speech model being
-/// fetched, an Area being deleted. Abort stops a job at its next safe
+/// fetched, an Area being deleted, the trash being emptied. Abort stops a job at its next safe
 /// point: an Import or an Area deletion before its next Note, keeping
 /// what it did; a sync round or a recording, photo or file under way
 /// ends first, then the automatic syncs pause or the others wait, until
-/// Go on or the next start; the speech model's fetch is cancelled. What
+/// Go on or the next start; the speech model's fetch is cancelled; the
+/// trash being emptied is not offered Abort, as it is one batch. What
 /// Abort stopped stays listed while the app runs, at most
 /// [maxStoppedJobs]. It tells its listeners whenever a job starts, moves
 /// on or ends.
@@ -106,6 +112,7 @@ class Running extends ChangeNotifier {
   final AutoSync? sync;
   final ImportJobs? imports;
   final AreaDeletions? deletions;
+  final TrashEmptying? emptying;
   final Transcriber? transcriber;
   final PhotoReader? photos;
   final AttachmentReader? files;
@@ -124,6 +131,7 @@ class Running extends ChangeNotifier {
   ImportJob? _import;
   DateTime? _importSince;
   final _deleting = <String, ({DateTime since, Area? area})>{};
+  DateTime? _emptyingSince;
   DateTime? _modelSince;
   var _modelAborted = false;
   var _disposed = false;
@@ -133,6 +141,7 @@ class Running extends ChangeNotifier {
     this.sync,
     this.imports,
     this.deletions,
+    this.emptying,
     this.transcriber,
     this.photos,
     this.files,
@@ -150,6 +159,7 @@ class Running extends ChangeNotifier {
     ?sync?.syncing,
     ?imports?.running,
     ?deletions,
+    ?emptying,
     ?transcriber,
     ?photos,
     ?files,
@@ -208,6 +218,8 @@ class Running extends ChangeNotifier {
         unawaited(model.cancel());
       case RunningKind.areaDeletion:
         if (job.areaId case final id?) deletions?.abort(id);
+      case RunningKind.trashEmptying:
+        break;
     }
   }
 
@@ -224,7 +236,8 @@ class Running extends ChangeNotifier {
         }
       case RunningKind.import ||
           RunningKind.speechModel ||
-          RunningKind.areaDeletion:
+          RunningKind.areaDeletion ||
+          RunningKind.trashEmptying:
         break;
     }
   }
@@ -340,6 +353,13 @@ class Running extends ChangeNotifier {
           ),
         );
       }
+    }
+    if (emptying?.running ?? false) {
+      jobs.add(
+        RunningJob(RunningKind.trashEmptying, since: _emptyingSince ??= now),
+      );
+    } else {
+      _emptyingSince = null;
     }
     _jobs = List.unmodifiable(jobs);
     notifyListeners();
@@ -494,7 +514,10 @@ class _RunningScreenState extends State<RunningScreen> {
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(color: weak),
                       ),
-                    if (job.stopping)
+                    if (job.kind == RunningKind.trashEmptying)
+                      // One batch: there is nothing for Abort to stop.
+                      ...const <Widget>[]
+                    else if (job.stopping)
                       Text(
                         t.jobsStopping,
                         key: const ValueKey('running-stopping'),
@@ -597,6 +620,7 @@ class _RunningScreenState extends State<RunningScreen> {
     RunningKind.speechModel =>
       job.downloading ? t.jobsModelDownload : t.jobsModelCopy,
     RunningKind.areaDeletion => _areaWhat(t, job.area),
+    RunningKind.trashEmptying => t.jobsTrashEmptying,
   };
 
   /// How far [job] is, in words, when that is known.
@@ -629,7 +653,7 @@ class _RunningScreenState extends State<RunningScreen> {
         RunningKind.transcripts ||
         RunningKind.photoTexts ||
         RunningKind.attachmentTexts => t.jobsReadAbort,
-        RunningKind.speechModel => null,
+        RunningKind.speechModel || RunningKind.trashEmptying => null,
         RunningKind.areaDeletion => t.jobsAreaAbort,
       };
 
@@ -642,6 +666,7 @@ class _RunningScreenState extends State<RunningScreen> {
         RunningKind.attachmentTexts => t.jobsAttachmentTexts,
         RunningKind.speechModel => t.jobsModelDownload,
         RunningKind.areaDeletion => _areaWhat(t, job.area),
+        RunningKind.trashEmptying => t.jobsTrashEmptying,
       };
 
   /// How [job] ended: "Stopped: 120 of 340 imported".
@@ -653,5 +678,7 @@ class _RunningScreenState extends State<RunningScreen> {
     RunningKind.attachmentTexts => t.jobsReadStopped,
     RunningKind.speechModel => t.jobsModelStopped,
     RunningKind.areaDeletion => t.jobsAreaStopped(job.done ?? 0, job.of ?? 0),
+    // Never stopped: Abort is not offered.
+    RunningKind.trashEmptying => '',
   };
 }

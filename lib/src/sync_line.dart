@@ -4,6 +4,7 @@ import 'area_deletion.dart';
 import 'auto_sync.dart';
 import 'import_run.dart';
 import 'running.dart';
+import 'trash_emptying.dart';
 
 /// How thick the line is.
 const syncLineHeight = 3.0;
@@ -17,12 +18,14 @@ const syncLineSweep = Duration(milliseconds: 900);
 
 /// The line at the bottom of a page's bar while a sync of this Device
 /// runs (#225, UI laws "The sync line"), while an Import does
-/// (obf-1061) and while an Area is being deleted (obf-1093): a short
+/// (obf-1061), while an Area is being deleted (obf-1093) and while the
+/// trash is being emptied (obf-1095): a short
 /// stretch in the accent
 /// moving back and forth, the whole width standing still while the
 /// system's "remove animations" setting is on. It takes no room of its
 /// own and nothing else on the page changes; nothing without the app's
-/// [AutoSyncScope], [ImportJobsScope] and [AreaDeletionsScope]. A tap on
+/// [AutoSyncScope], [ImportJobsScope], [AreaDeletionsScope] and
+/// [TrashEmptyingScope]. A tap on
 /// it, or a little above it, opens the page Running (obf-1078); the
 /// bar's buttons over it keep their taps. Screen readers hear of the sync
 /// from the app, once, not from every page's bar, and reach the page
@@ -35,15 +38,25 @@ class SyncLine extends StatelessWidget {
     final syncing = AutoSyncScope.of(context)?.syncing;
     final importing = ImportJobsScope.of(context)?.running;
     final deleting = AreaDeletionsScope.of(context);
-    if (syncing == null && importing == null && deleting == null) {
+    final emptying = TrashEmptyingScope.of(context);
+    if (syncing == null &&
+        importing == null &&
+        deleting == null &&
+        emptying == null) {
       return const SizedBox.shrink();
     }
     return ListenableBuilder(
-      listenable: Listenable.merge([?syncing, ?importing, ?deleting]),
+      listenable: Listenable.merge([
+        ?syncing,
+        ?importing,
+        ?deleting,
+        ?emptying,
+      ]),
       builder: (context, _) =>
           (syncing?.value ?? false) ||
               importing?.value != null ||
-              (deleting?.running ?? false)
+              (deleting?.running ?? false) ||
+              (emptying?.running ?? false)
           ? const Align(
               alignment: Alignment.bottomCenter,
               child: _OpensRunning(

@@ -189,6 +189,24 @@
   "moveToTrash": "Move to trash",
   "trashTitle": "Trash",
   "trashEmpty": "The trash is empty.",
+  "trashEmptyNow": "Empty the trash now",
+  "@trashEmptyNow": {"description": "Bar action of the Trash that deletes everything in it for good at once (obf-1095)."},
+  "trashEmptyNotes": "{notes, plural, =1{Delete 1 Note for good? It can't come back.} other{Delete {notes} Notes for good? They can't come back.}}",
+  "@trashEmptyNotes": {"description": "The question before emptying the trash when only Notes go (obf-1095).", "placeholders": {"notes": {"type": "int"}}},
+  "trashEmptyRoutines": "{routines, plural, =1{Delete 1 Routine for good? It can't come back.} other{Delete {routines} Routines for good? They can't come back.}}",
+  "@trashEmptyRoutines": {"description": "The question before emptying the trash when only Routines and Reminders go (obf-1095).", "placeholders": {"routines": {"type": "int"}}},
+  "trashEmptyBoth": "Delete {notes, plural, =1{1 Note} other{{notes} Notes}} and {routines, plural, =1{1 Routine} other{{routines} Routines}} for good? They can't come back.",
+  "@trashEmptyBoth": {"description": "The question before emptying the trash when Notes and Routines or Reminders go (obf-1095).", "placeholders": {"notes": {"type": "int"}, "routines": {"type": "int"}}},
+  "deleteForGood": "Delete for good",
+  "@deleteForGood": {"description": "The confirm button of the question before emptying the trash (obf-1095)."},
+  "trashEmptyFailed": "The trash could not be emptied.",
+  "@trashEmptyFailed": {"description": "Announced at the top on the phone when emptying the trash beside the app failed (obf-1095)."},
+  "trashEmptyFailedTitle": "Trash not emptied",
+  "@trashEmptyFailedTitle": {"description": "Title of the dialog behind 'trashEmptyFailed'."},
+  "trashEmptyFailedCause": "The Notes in the trash could not be deleted for good.",
+  "@trashEmptyFailedCause": {"description": "The cause in the dialog behind 'trashEmptyFailed'."},
+  "trashEmptyFailedFix": "What was not deleted stays in the trash. Try again.",
+  "@trashEmptyFailedFix": {"description": "The fix in the dialog behind 'trashEmptyFailed'."},
   "restore": "Restore",
   "goneIn": "{count, plural, =0{Deleted for good within a day} =1{Deleted for good in 1 day} other{Deleted for good in {count} days}}",
   "@goneIn": {
@@ -3908,5 +3926,7 @@
   "jobsAreaAbort": "The Notes moved so far stay where they went. The Area stays with the others.",
   "@jobsAreaAbort": {"description": "Under the Abort of deleting an Area on the page Running (obf-1078)."},
   "jobsAreaStopped": "{count, plural, =1{Stopped: {moved} of 1 Note moved} other{Stopped: {moved} of {count} Notes moved}}",
-  "@jobsAreaStopped": {"description": "On the page Running for deleting an Area Abort stopped (obf-1078).", "placeholders": {"moved": {"type": "int"}, "count": {"type": "int"}}}
+  "@jobsAreaStopped": {"description": "On the page Running for deleting an Area Abort stopped (obf-1078).", "placeholders": {"moved": {"type": "int"}, "count": {"type": "int"}}},
+  "jobsTrashEmptying": "Emptying the trash",
+  "@jobsTrashEmptying": {"description": "A job on the page Running: Empty the trash now (obf-1095)."}
 }

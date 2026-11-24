@@ -75,6 +75,7 @@ import 'sync_runner.dart';
 import 'sync_screen.dart';
 import 'tally_entry_screen.dart';
 import 'text_marks_view.dart';
+import 'trash_emptying.dart';
 import 'voice_platform.dart';
 
 /// Stops what a run of the app does on its own, apart from its screens:
@@ -326,6 +327,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _jobs = widget.jobRunner ?? InlineJobRunner(widget.folders);
   late final _imports = ImportJobs(store: widget.store, runner: _jobs);
   late final _deletions = AreaDeletions(store: widget.store, runner: _jobs);
+  late final _emptying = TrashEmptying(store: widget.store, runner: _jobs);
 
   /// What the page Running lists (obf-1078), once the readers are made.
   late final _running = Running(
@@ -333,6 +335,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     sync: _autoSync,
     imports: _imports,
     deletions: _deletions,
+    emptying: _emptying,
     transcriber: _transcriber,
     photos: _photoReader,
     files: _attachmentReader,
@@ -418,6 +421,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       _frameTimes.dispose,
       _imports.dispose,
       _deletions.dispose,
+      _emptying.dispose,
     ]) {
       try {
         stop();
@@ -568,12 +572,16 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                                   child: AreaDeletionsScope(
                                                                     deletions:
                                                                         _deletions,
-                                                                    child: RunningScope(
-                                                                      running:
-                                                                          _running,
-                                                                      child: _spotlit(
-                                                                        child ??
-                                                                            const SizedBox.shrink(),
+                                                                    child: TrashEmptyingScope(
+                                                                      emptying:
+                                                                          _emptying,
+                                                                      child: RunningScope(
+                                                                        running:
+                                                                            _running,
+                                                                        child: _spotlit(
+                                                                          child ??
+                                                                              const SizedBox.shrink(),
+                                                                        ),
                                                                       ),
                                                                     ),
                                                                   ),

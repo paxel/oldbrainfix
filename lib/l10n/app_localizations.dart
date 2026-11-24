@@ -740,6 +740,60 @@ abstract class AppLocalizations {
   /// **'The trash is empty.'**
   String get trashEmpty;
 
+  /// Bar action of the Trash that deletes everything in it for good at once (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Empty the trash now'**
+  String get trashEmptyNow;
+
+  /// The question before emptying the trash when only Notes go (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'{notes, plural, =1{Delete 1 Note for good? It can\'t come back.} other{Delete {notes} Notes for good? They can\'t come back.}}'**
+  String trashEmptyNotes(int notes);
+
+  /// The question before emptying the trash when only Routines and Reminders go (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'{routines, plural, =1{Delete 1 Routine for good? It can\'t come back.} other{Delete {routines} Routines for good? They can\'t come back.}}'**
+  String trashEmptyRoutines(int routines);
+
+  /// The question before emptying the trash when Notes and Routines or Reminders go (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {notes, plural, =1{1 Note} other{{notes} Notes}} and {routines, plural, =1{1 Routine} other{{routines} Routines}} for good? They can\'t come back.'**
+  String trashEmptyBoth(int notes, int routines);
+
+  /// The confirm button of the question before emptying the trash (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete for good'**
+  String get deleteForGood;
+
+  /// Announced at the top on the phone when emptying the trash beside the app failed (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'The trash could not be emptied.'**
+  String get trashEmptyFailed;
+
+  /// Title of the dialog behind 'trashEmptyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash not emptied'**
+  String get trashEmptyFailedTitle;
+
+  /// The cause in the dialog behind 'trashEmptyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes in the trash could not be deleted for good.'**
+  String get trashEmptyFailedCause;
+
+  /// The fix in the dialog behind 'trashEmptyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'What was not deleted stays in the trash. Try again.'**
+  String get trashEmptyFailedFix;
+
   /// No description provided for @restore.
   ///
   /// In en, this message translates to:
@@ -11580,6 +11634,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Stopped: {moved} of 1 Note moved} other{Stopped: {moved} of {count} Notes moved}}'**
   String jobsAreaStopped(int moved, int count);
+
+  /// A job on the page Running: Empty the trash now (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Emptying the trash'**
+  String get jobsTrashEmptying;
 }
 
 class _AppLocalizationsDelegate

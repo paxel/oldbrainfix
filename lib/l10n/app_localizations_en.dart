@@ -364,6 +364,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trashEmpty => 'The trash is empty.';
 
   @override
+  String get trashEmptyNow => 'Empty the trash now';
+
+  @override
+  String trashEmptyNotes(int notes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other: 'Delete $notes Notes for good? They can\'t come back.',
+      one: 'Delete 1 Note for good? It can\'t come back.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyRoutines(int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other: 'Delete $routines Routines for good? They can\'t come back.',
+      one: 'Delete 1 Routine for good? It can\'t come back.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyBoth(int notes, int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other: '$notes Notes',
+      one: '1 Note',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other: '$routines Routines',
+      one: '1 Routine',
+    );
+    return 'Delete $_temp0 and $_temp1 for good? They can\'t come back.';
+  }
+
+  @override
+  String get deleteForGood => 'Delete for good';
+
+  @override
+  String get trashEmptyFailed => 'The trash could not be emptied.';
+
+  @override
+  String get trashEmptyFailedTitle => 'Trash not emptied';
+
+  @override
+  String get trashEmptyFailedCause =>
+      'The Notes in the trash could not be deleted for good.';
+
+  @override
+  String get trashEmptyFailedFix =>
+      'What was not deleted stays in the trash. Try again.';
+
+  @override
   String get restore => 'Restore';
 
   @override
@@ -7196,4 +7255,7 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get jobsTrashEmptying => 'Emptying the trash';
 }

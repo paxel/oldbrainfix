@@ -367,6 +367,67 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trashEmpty => 'Der Papierkorb ist leer.';
 
   @override
+  String get trashEmptyNow => 'Papierkorb jetzt leeren';
+
+  @override
+  String trashEmptyNotes(int notes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other:
+          '$notes Notizen endgültig löschen? Sie lassen sich nicht zurückholen.',
+      one: '1 Notiz endgültig löschen? Sie lässt sich nicht zurückholen.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyRoutines(int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other:
+          '$routines Routinen endgültig löschen? Sie lassen sich nicht zurückholen.',
+      one: '1 Routine endgültig löschen? Sie lässt sich nicht zurückholen.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyBoth(int notes, int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other: '$notes Notizen',
+      one: '1 Notiz',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other: '$routines Routinen',
+      one: '1 Routine',
+    );
+    return '$_temp0 und $_temp1 endgültig löschen? Sie lassen sich nicht zurückholen.';
+  }
+
+  @override
+  String get deleteForGood => 'Endgültig löschen';
+
+  @override
+  String get trashEmptyFailed => 'Der Papierkorb konnte nicht geleert werden.';
+
+  @override
+  String get trashEmptyFailedTitle => 'Papierkorb nicht geleert';
+
+  @override
+  String get trashEmptyFailedCause =>
+      'Die Notizen im Papierkorb ließen sich nicht endgültig löschen.';
+
+  @override
+  String get trashEmptyFailedFix =>
+      'Was nicht gelöscht wurde, bleibt im Papierkorb. Versuche es noch einmal.';
+
+  @override
   String get restore => 'Wiederherstellen';
 
   @override
@@ -7282,4 +7343,7 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get jobsTrashEmptying => 'Der Papierkorb wird geleert';
 }
