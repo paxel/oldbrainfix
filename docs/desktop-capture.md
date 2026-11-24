@@ -100,6 +100,6 @@ Examples for launchers and macro pads:
   `rofi -dmenu -p Note | oldbrainfix capture -`
 - A script: `echo "Call the dentist" | oldbrainfix capture -`
 
-On Windows the app has no console, so it prints nothing there, and each
-start runs on its own: `oldbrainfix capture` without a text opens a
-second copy of the app.
+On Windows the app has no console, so it prints nothing there; a second
+start hands its wish to the running app over a named pipe, as it does
+over a local socket on Linux and macOS.

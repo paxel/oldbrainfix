@@ -809,6 +809,10 @@ fn run() -> Result<i32, String> {
     // The menu entry and icon the window's app id names, kept current.
     #[cfg(target_os = "linux")]
     std::thread::spawn(oldbrainfix_gui::launcher::register);
+    // Offered under "Open with" for Markdown files, kept current; a file
+    // opened with it while it runs comes in over the named pipe (Q12).
+    #[cfg(windows)]
+    std::thread::spawn(oldbrainfix_gui::open_with::register);
     // A database of a newer version opens nothing: the window, the tray's
     // start and the capture popup's all show why instead.
     let store = match open_store(&dir) {
@@ -1066,6 +1070,20 @@ fn run() -> Result<i32, String> {
         (capture, import, open_file),
     ) {
         eprintln!("oldbrainfix: {e}");
+    }
+    // Markdown files the Finder opens with the app (Q12), as a later
+    // start's.
+    #[cfg(target_os = "macos")]
+    {
+        let (handed, commands, wake) = (handed.clone(), command_tx.clone(), waker(&window));
+        let open: instance::OpenFile = Box::new(move |path| {
+            if let Ok(mut held) = handed.lock() {
+                held.push(path.to_path_buf());
+            }
+        });
+        oldbrainfix_gui::mac_open::install(Box::new(move |path| {
+            instance::file_handed(&path, &open, &commands, &*wake);
+        }));
     }
     let labels = tray::Labels {
         title: t.app_title().into(),

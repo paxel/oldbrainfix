@@ -86,10 +86,11 @@ tray-icon = { version = "0.26", default-features = false }
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
-# The login's display name for the own Profile (`GetUserNameExW`), and
-# a file opened with its program without a shell (`ShellExecuteW`).
+# The login's display name for the own Profile (`GetUserNameExW`), a
+# file opened with its program without a shell (`ShellExecuteW`), and
+# the named pipe a second start hands its wish over (Q12).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Identity", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Identity", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Pipes", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 # Closing a notification once its Occurrence is Done.
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
@@ -104,6 +105,10 @@ mac-notification-sys = "0.6"
 # (obf-1039), at the versions eframe and tray-icon bring already.
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder"] }
+# Markdown files opened with it from the Finder ("Open with", Q12), as
+# the open documents Apple Event hands them, at the version objc2-app-kit
+# brings already.
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSAppleEventDescriptor", "NSAppleEventManager", "NSNotification", "NSString", "NSURL"] }
 
 [build-dependencies]
 oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.8.0" }

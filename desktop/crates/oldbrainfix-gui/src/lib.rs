@@ -58,6 +58,8 @@ pub mod launcher;
 pub mod leave_saves;
 pub mod line_editing;
 pub mod login;
+#[cfg(target_os = "macos")]
+pub mod mac_open;
 pub mod md_doc;
 pub mod md_source;
 pub mod md_view;

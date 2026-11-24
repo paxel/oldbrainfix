@@ -8,10 +8,9 @@
 //! login start does. On Linux the launcher's MimeType does it, on macOS
 //! the bundle's `CFBundleDocumentTypes`.
 //!
-//! Not called at start yet: on Windows a second start cannot hand its
-//! files to the running app ([`crate::instance`] needs Unix sockets), so
-//! every file opened with it would start a whole second app, its alarms
-//! and syncs too.
+//! Called on every start that runs the app: a file opened with it while
+//! it runs comes to the running app over its named pipe
+//! ([`crate::instance`], Q12), no second app starts.
 
 use std::path::Path;
 

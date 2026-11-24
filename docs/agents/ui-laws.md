@@ -2180,8 +2180,11 @@ There are three kinds, and an action takes the first that fits.
   from the command line (`oldbrainfix notes.md more.md`, several at
   once, into the running app, no second app), from "Open with" for `.md`
   and `.markdown` files on Linux, Windows and macOS, offered but never
-  made their default, and from File ▸ Open ▸ Markdown file…. It is a
-  window beside the main one, one per file, drawn as the reading view
+  made their default, and from File ▸ Open ▸ Markdown file…. A second
+  start hands its files, like a capture and `oldbrainfix open`, to the
+  running app over a local socket on Linux and macOS and over a named
+  pipe of the user's on Windows; the Finder hands them over as the open
+  documents Apple Event (Q12). It is a window beside the main one, one per file, drawn as the reading view
   draws a Note: all of CommonMark with GitHub's tables (as obf-1048 draws
   them), task lists, strike-through and footnotes, six heading levels,
   the front matter as a small table of properties at the top, Obsidian's
@@ -2200,7 +2203,14 @@ There are three kinds, and an action takes the first that fits.
   asks first "Also import the N files it links to?"; imported together,
   their links become App links to each other's Notes, their pictures
   photos. While an Import runs, the bar says so in its place. What the
-  Import made is announced at the top of the main window.
+  Import made is announced at the top of the main window. Inside the
+  Flatpak, where only the file opened is shared, a line under the bar,
+  "Open the folder to follow its links", asks once through the folder
+  portal for the folder its links are in, for a file with links or
+  pictures only; the viewer then reads only inside that folder, finding
+  the file's copy there by its name and bytes (a folder without it is
+  asked for again), Import as Note imports that copy, and the app keeps
+  the folder while it runs, for other files whose copy it holds (Q13).
 - **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
   7", #279), as the one list that asks to be emptied; no other place
   shows a count, and an empty Unsorted shows none. **An Area with Topics

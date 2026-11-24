@@ -150,6 +150,7 @@ use crate::l10n::{self, L10n};
 use crate::leave_saves::{self, Leaving};
 use crate::line_editing::{Listed, TypedLines};
 use crate::login;
+use crate::md_source;
 use crate::md_view;
 use crate::media::{
     Clipboard, FromFile, PauseWatch, Player, Recorder, SOUND_EXTENSIONS, from_file,
@@ -2731,6 +2732,12 @@ pub struct App {
     viewers_opened: u64,
     /// Asks for the Markdown file File ▸ Open Markdown file… shows.
     markdown_picker: FolderPicker,
+    /// Inside the Flatpak (Q13): the viewers ask for the folder their
+    /// links are found in, through `link_folder_picker`, and the folders
+    /// granted so are kept while the app runs.
+    in_flatpak: bool,
+    link_folder_picker: FolderPicker,
+    link_folders: Vec<std::path::PathBuf>,
 }
 
 /// A question asked off the window's thread (#267): the provider's
@@ -3277,6 +3284,13 @@ impl App {
             viewers: Vec::new(),
             viewers_opened: 0,
             markdown_picker: Box::new(|title| markdown_dialog(title).pick_file()),
+            in_flatpak: md_source::in_flatpak(),
+            // The file chooser portal inside the Flatpak, asking for a
+            // folder.
+            link_folder_picker: Box::new(|title| {
+                rfd::FileDialog::new().set_title(title).pick_folder()
+            }),
+            link_folders: Vec::new(),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -3472,6 +3486,14 @@ impl App {
     /// path.
     pub fn set_markdown_picker(&mut self, picker: FolderPicker) {
         self.markdown_picker = picker;
+    }
+
+    /// Whether the Markdown viewers ask for the folder their links are
+    /// found in, as inside the Flatpak (Q13), and `picker` asks for it
+    /// instead of the folder portal; tests hand in a path.
+    pub fn set_link_folders(&mut self, in_flatpak: bool, picker: FolderPicker) {
+        self.in_flatpak = in_flatpak;
+        self.link_folder_picker = picker;
     }
 
     /// Asks `picker` for the folder to import instead of the system's
@@ -13879,7 +13901,12 @@ impl App {
         self.viewers_opened += 1;
         let size = window_sizes::note_window_size(&self.store);
         let wake = self.redraw.clone();
-        let viewer = md_view::Viewer::open(file, self.viewers_opened, size, wake);
+        let viewer = if self.in_flatpak {
+            let granted = self.link_folders.clone();
+            md_view::Viewer::open_granted(file, self.viewers_opened, size, wake, granted)
+        } else {
+            md_view::Viewer::open(file, self.viewers_opened, size, wake)
+        };
         self.viewers.push(viewer);
     }
 
@@ -13927,6 +13954,22 @@ impl App {
                     };
                     if !opened {
                         self.notice = Some(self.t.link_not_available().to_string());
+                    }
+                }
+                md_view::Asked::OpenFolder(viewport) => {
+                    if let Some(folder) =
+                        (self.link_folder_picker)(self.t.desk_markdown_folder_title())
+                    {
+                        // Kept for the files opened later while it runs.
+                        let folder = folder.canonicalize().unwrap_or(folder);
+                        if !self.link_folders.contains(&folder) {
+                            self.link_folders.push(folder.clone());
+                        }
+                        if let Some(viewer) =
+                            self.viewers.iter_mut().find(|v| v.viewport == viewport)
+                        {
+                            viewer.grant(folder);
+                        }
                     }
                 }
                 md_view::Asked::Import { file, root, linked } => {

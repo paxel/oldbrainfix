@@ -13,7 +13,9 @@
 //! right-click menu (obf-1055), and Ctrl+Plus and Ctrl+Minus change the
 //! text size (obf-1019). "Import as Note…" imports the file, asking
 //! first whether the files it links to come along; ⋮ also opens it in
-//! the system's own program for it.
+//! the system's own program for it. Inside the Flatpak, where only the
+//! file is shared, a line under its bar, "Open the folder to follow its
+//! links", asks for the folder its links are found in (Q13).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -66,6 +68,10 @@ pub enum Asked {
     /// A table's ⋮ Copy (obf-1050): the table on the clipboard as its
     /// HTML beside its Markdown.
     Copy(TableCopy),
+    /// Open the folder to follow its links (Q13): the folder its links
+    /// are found in, asked through the folder portal for the viewer of
+    /// this viewport.
+    OpenFolder(ViewportId),
 }
 
 /// Where the view is to scroll to once drawn: a heading, by its words or
@@ -230,6 +236,10 @@ pub struct Viewer {
     closed: bool,
     /// A table copied from its ⋮ in this frame (obf-1050).
     copied: Option<TableCopy>,
+    /// Whether it runs inside the Flatpak, where it asks for the folder
+    /// its links are found in, and whether one was granted since (Q13).
+    asks_folder: bool,
+    granting: bool,
 }
 
 impl Viewer {
@@ -242,11 +252,39 @@ impl Viewer {
         size: Vec2,
         wake: Option<Arc<dyn Fn() + Send + Sync>>,
     ) -> Viewer {
+        Viewer::opened(file, serial, size, wake, None)
+    }
+
+    /// [`Viewer::open`] inside the Flatpak (Q13): its links are found in
+    /// the first of the folders `granted` while the app runs that holds
+    /// a copy of the file; without one it asks for the folder.
+    pub fn open_granted(
+        file: PathBuf,
+        serial: u64,
+        size: Vec2,
+        wake: Option<Arc<dyn Fn() + Send + Sync>>,
+        granted: Vec<PathBuf>,
+    ) -> Viewer {
+        Viewer::opened(file, serial, size, wake, Some(granted))
+    }
+
+    fn opened(
+        file: PathBuf,
+        serial: u64,
+        size: Vec2,
+        wake: Option<Arc<dyn Fn() + Send + Sync>>,
+        granted: Option<Vec<PathBuf>>,
+    ) -> Viewer {
         let polls = wake.is_none();
         let wake = wake.unwrap_or_else(|| Arc::new(|| {}));
+        let asks_folder = granted.is_some();
+        let watch = match granted {
+            Some(granted) => Watch::start_granted(file.clone(), granted, wake),
+            None => Watch::start(file.clone(), wake),
+        };
         Viewer {
             viewport: viewport_id(serial),
-            watch: Watch::start(file.clone(), wake),
+            watch,
             file,
             read: None,
             pieces: Arc::default(),
@@ -269,7 +307,28 @@ impl Viewer {
             size,
             closed: false,
             copied: None,
+            asks_folder,
+            granting: false,
         }
+    }
+
+    /// Finds its links in `folder`, granted through the folder portal
+    /// (Q13), and reads the file again.
+    pub fn grant(&mut self, folder: PathBuf) {
+        self.granting = true;
+        self.watch.grant(folder);
+    }
+
+    /// Whether it shows "Open the folder to follow its links": inside the
+    /// Flatpak, for a file with links or pictures, until a folder is
+    /// granted.
+    pub fn asks_for_folder(&self) -> bool {
+        self.asks_folder
+            && !self.granting
+            && self
+                .read
+                .as_ref()
+                .is_some_and(|r| !r.granted && (!r.notes.is_empty() || !r.pictures.is_empty()))
     }
 
     /// The file it shows.
@@ -331,6 +390,8 @@ impl Viewer {
             h.rotate_left(5) ^ find_marks::text_key(&p.text)
         });
         self.file = read.file.clone();
+        // Granted or not, the folder asked for has been looked at.
+        self.granting = false;
         self.read = Some(read);
         ctx.request_repaint();
     }
@@ -397,6 +458,9 @@ impl Viewer {
             .show(ui, |ui| {
                 ui.set_min_size(ui.available_size());
                 self.bar(ui, t, importing, &mut asked);
+                if self.asks_for_folder() {
+                    self.folder_line(ui, t, &mut asked);
+                }
                 let marks = self.find_row(ui, t, &mut asked);
                 let before = find_marks::set(&ctx, marks);
                 let searched = text_menu::searches(&ctx, true);
@@ -541,13 +605,28 @@ impl Viewer {
             match self.read.as_ref() {
                 Some(read) if !read.linked.is_empty() => self.asking = true,
                 Some(read) => asked.push(Asked::Import {
-                    file: read.file.clone(),
+                    file: read.to_import(),
                     root: read.root.clone(),
                     linked: Vec::new(),
                 }),
                 None => {}
             }
         }
+    }
+
+    /// "Open the folder to follow its links", under the bar inside the
+    /// Flatpak (Q13).
+    fn folder_line(&mut self, ui: &mut Ui, t: &L10n, asked: &mut Vec<Asked>) {
+        let text = ui.visuals().text_color();
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            let button =
+                egui::Button::new(RichText::new(t.desk_markdown_open_folder()).color(text));
+            if ui.add(button).clicked() {
+                asked.push(Asked::OpenFolder(self.viewport));
+            }
+        });
+        ui.add_space(4.0);
     }
 
     /// The find bar while it is open, finding in the file's texts; the
@@ -762,7 +841,7 @@ impl Viewer {
         if let Some(with_links) = modal.inner {
             self.asking = false;
             asked.push(Asked::Import {
-                file: read.file.clone(),
+                file: read.to_import(),
                 root: read.root.clone(),
                 linked: if with_links {
                     read.linked.clone()

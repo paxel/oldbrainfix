@@ -576,7 +576,7 @@
   <li><code>oldbrainfix capture -</code> behält, was über die Standardeingabe kommt.</li>
   <li><code>oldbrainfix import DATEI</code> importiert ein Bündel und gibt aus, was hereinkam.</li>
   <li><code>oldbrainfix open DATEI</code> zeigt eine gesendete Notiz im Fenster, zum Annehmen oder Ablehnen; eine Profilkartendatei fügt die Person hinzu und öffnet ihr Profil.</li>
-  <li><code>oldbrainfix notizen.md mehr.md</code> zeigt jede Markdown-Datei (<code>.md</code>, <code>.markdown</code>) in einem eigenen Betrachter-Fenster, in der laufenden App, wenn eine läuft. Unter Linux bietet „Öffnen mit“ Old Brain Fix für Markdown-Dateien an, ohne es zu ihrem Standardprogramm zu machen, und <strong>Datei</strong> ▸ <strong>Öffnen</strong> ▸ <strong>Markdown-Datei …</strong> wählt eine.</li>
+  <li><code>oldbrainfix notizen.md mehr.md</code> zeigt jede Markdown-Datei (<code>.md</code>, <code>.markdown</code>) in einem eigenen Betrachter-Fenster, in der laufenden App, wenn eine läuft. Unter Linux, Windows und macOS bietet „Öffnen mit“ Old Brain Fix für Markdown-Dateien an, ohne es zu ihrem Standardprogramm zu machen, und <strong>Datei</strong> ▸ <strong>Öffnen</strong> ▸ <strong>Markdown-Datei …</strong> wählt eine.</li>
   <li><code>oldbrainfix --version</code> oder <code>-V</code> gibt die Version aus, etwa „Old Brain Fix 0.6.0“, ohne die App zu starten.</li>
   <li><code>oldbrainfix --help</code> gibt die Bedienung aus.</li>
 </ul>
@@ -608,8 +608,10 @@
   Wurde sie schon importiert, fragt das Hauptfenster wie bei einem Ordner, ob dieser Import ergänzt
   oder neu importiert wird.
   ⋮ ▸ <strong>In anderer App öffnen</strong> öffnet die Datei in dem Programm, das das System
-  für sie hat. Im Flatpak wird nur die geöffnete Datei mit der App geteilt, daher gelten die Dateien,
-  die ihre Links nennen, als nicht gefunden.
+  für sie hat. Im Flatpak wird nur die geöffnete Datei mit der App geteilt: Die Zeile
+  <strong>Ordner öffnen, um den Links zu folgen</strong> unter der Leiste fragt einmal nach dem
+  Ordner, in dem ihre Links liegen, und der Betrachter liest dann nur darin. Die App behält diesen
+  Ordner, bis sie endet, für weitere Dateien daraus.
 </p>
 </box-more>
 </guide-box>
