@@ -1054,10 +1054,11 @@ class _AskScreenState extends State<AskScreen> {
                 style: theme.textTheme.titleSmall,
               ),
             ),
-            TextButton(
+            TextButton.icon(
               key: ValueKey('ask-edit-$i'),
               onPressed: _asking == null ? () => _edit(asked) : null,
-              child: Text(t.edit),
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(t.edit),
             ),
           ],
         ),

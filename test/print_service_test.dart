@@ -129,6 +129,14 @@ void main() {
       final printing = FakePrinting(PrintServiceState.off);
       await start(tester, printing: printing);
       await openRow(tester);
+      // A text button with its icon (obf-1104).
+      expect(
+        find.descendant(
+          of: key('printService-open'),
+          matching: find.byIcon(Icons.open_in_new),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(key('printService-open'));
       await tester.pumpAndSettle();
       expect(printing.opened, 1);

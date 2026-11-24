@@ -612,6 +612,14 @@ void main() {
       await pumpAsk(tester, desk);
       await ask(tester, 'Where is my passport?');
       await ask(tester, 'And which drawer?');
+      // A text button with its icon (obf-1104).
+      expect(
+        find.descendant(
+          of: key('ask-edit-0'),
+          matching: find.byIcon(Icons.edit_outlined),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(key('ask-edit-0'));
       await tester.pumpAndSettle();
       final typed = tester.widget<TextField>(key('ask-question')).controller!;

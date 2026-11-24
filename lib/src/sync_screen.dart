@@ -612,9 +612,10 @@ class _SyncScreenState extends State<SyncScreen> {
             t.pairedLastSync(when.format(device.lastSync.toLocal())),
           ].join('\n'),
         ),
-        control: TextButton(
+        control: TextButton.icon(
           onPressed: () => _forget(device),
-          child: Text(t.forgetDevice),
+          icon: const Icon(Icons.link_off),
+          label: Text(t.forgetDevice),
         ),
       ),
       // Only a Device that hosts can be found and synced with.

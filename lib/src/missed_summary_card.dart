@@ -138,7 +138,11 @@ class MissedSummaryCard extends StatelessWidget {
               // Below what it marks as seen (UI laws, "Dialogs and pages").
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: TextButton(onPressed: onSeen, child: Text(t.missedSeen)),
+                child: TextButton.icon(
+                  onPressed: onSeen,
+                  icon: const Icon(Icons.done_all),
+                  label: Text(t.missedSeen),
+                ),
               ),
             ],
           ),

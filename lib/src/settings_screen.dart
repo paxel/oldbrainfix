@@ -1050,10 +1050,11 @@ class _PrintServiceRowState extends State<_PrintServiceRow> {
         PrintServiceState.off => t.printServiceOff,
         PrintServiceState.unknown || null => t.printServiceUnknown,
       }, key: const ValueKey('printService-state')),
-      control: TextButton(
+      control: TextButton.icon(
         key: const ValueKey('printService-open'),
         onPressed: () => unawaited(widget.printing.openSettings()),
-        child: Text(t.printServiceOpen),
+        icon: const Icon(Icons.open_in_new),
+        label: Text(t.printServiceOpen),
       ),
     );
   }

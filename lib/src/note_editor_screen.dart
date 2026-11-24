@@ -3890,7 +3890,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     } else if (description.isEmpty && editable) {
       shown = Align(
         alignment: AlignmentDirectional.centerStart,
-        child: TextButton(
+        child: TextButton.icon(
           key: const ValueKey('note-description-add'),
           style: TextButton.styleFrom(
             visualDensity: VisualDensity.compact,
@@ -3898,7 +3898,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             textStyle: theme.textTheme.bodyMedium,
           ),
           onPressed: _openDescription,
-          child: Text(t.addADescription),
+          icon: const Icon(Icons.add),
+          label: Text(t.addADescription),
         ),
       );
     } else if (description.isEmpty) {

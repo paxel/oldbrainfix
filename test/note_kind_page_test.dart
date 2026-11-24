@@ -304,6 +304,14 @@ void main() {
         ),
         findsOneWidget,
       );
+      // A text button with its icon (obf-1104).
+      expect(
+        find.descendant(
+          of: key('note-description-add'),
+          matching: find.byIcon(Icons.add),
+        ),
+        findsOneWidget,
+      );
       await tap(tester, key('note-description-add'));
       expect(key('note-description-add'), findsNothing);
       expect(typedIn(tester, 'note-description'), '');

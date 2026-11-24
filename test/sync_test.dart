@@ -158,6 +158,17 @@ void main() {
 
     await tester.ensureVisible(find.text('Forget'));
     await tester.pumpAndSettle();
+    // A text button with its icon (obf-1104).
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Forget'),
+          matching: find.byWidgetPredicate((w) => w is TextButton),
+        ),
+        matching: find.byIcon(Icons.link_off),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Forget'));
     await tester.pumpAndSettle();
     expect(phone.pairedDevices(), isEmpty);
