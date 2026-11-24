@@ -2520,7 +2520,7 @@ replace a law of Both apps where they say so. A desktop law marked
   with Super, which the window does not hear off macOS.
 - **The Settings dialog is a column of cards** (draft, #196): each card
   embossed as a Note's, its heading strong on top (This computer, Tips,
-  Alarms, Nudges, Units, Agenda, History, Features, …), its settings
+  Capture, Alarms, Nudges, Units, Agenda, History, Features, …), its settings
   under it, each with its small weak detail line.
 - **A search field sits at the top of the Settings dialog** (#282),
   under its heading, on the band of the desktop's fixed search fields
