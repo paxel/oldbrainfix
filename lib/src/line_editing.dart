@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'checklist_view.dart';
 import 'edit_history.dart';
+import 'look.dart';
 import 'two_row_text_field.dart';
 
 /// What the Note editor tells the list in it (#141): [keep] stores what
@@ -717,6 +718,55 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
     if (rows case [final row] when row.id == null && row.typed.isEmpty) {
       focusOn(row, 0);
     }
+  }
+
+  /// "Add a Line" under the Lines (obf-1071), keyed [prefix]-add-line: a
+  /// tap puts the cursor into a new empty row at [at], as Return would,
+  /// or into the empty new row there is already. Nothing where this
+  /// Device may not add Lines.
+  Widget? addLineField({
+    required String prefix,
+    required String hint,
+    required int Function() at,
+  }) {
+    if (!mayAddLine || !linesWritable) return null;
+    final theme = Theme.of(context);
+    void add() => startRowAt(at());
+    // Read as a button: the field takes no focus, so it is none to the
+    // screen reader.
+    return Semantics(
+      key: ValueKey('$prefix-add-line'),
+      container: true,
+      button: true,
+      label: hint,
+      onTap: add,
+      excludeSemantics: true,
+      // At the Device's text size, as the Lines (#326).
+      child: ContentText(
+        child: TextField(
+          // Only a way in: what is typed goes into the new row. It takes no
+          // focus, so the keyboard stays up from a Line to the new one.
+          readOnly: true,
+          canRequestFocus: false,
+          showCursor: false,
+          onTap: add,
+          style: theme.textTheme.bodyLarge,
+          decoration: InputDecoration(
+            filled: false,
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            // Where a Line's box is, 40 wide.
+            prefixIcon: Icon(
+              Icons.add,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 40),
+            hintText: hint,
+          ),
+        ),
+      ),
+    );
   }
 
   /// The field of [shown] where it is typed in place: a new Line, or one

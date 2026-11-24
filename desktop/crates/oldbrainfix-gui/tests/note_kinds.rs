@@ -1,8 +1,9 @@
 //! A Note is its kind (#188), driven headless by egui_kittest: in the
 //! Note dialog a Checklist, a Shopping List and a Tally show their text
 //! as a name on top, one line, and a description under it folded to one
-//! line, a click unfolding it, then the kind's content, the badges and
-//! the Sections; a plain Note keeps its one text field; the name and the
+//! line, a click unfolding it, then the kind's content in the same card
+//! (obf-1071), "Add a Line" under a list's Lines, the badges and the
+//! Sections; an empty description waits for "Add a description"; a plain Note keeps its one text field; the name and the
 //! description are written back as one text, nothing when neither
 //! changed; the kind badge of every Note, a plain one's too, changes the
 //! kind with radio buttons, the Lines carried over between the two
@@ -457,5 +458,225 @@ fn a_full_card_shows_the_name_as_its_title_and_unfolds_the_description() -> Test
     assert!(harness.state().selected_cards().is_empty());
     // The name is the card's title, above the description and the Lines.
     assert!(top(&harness, "Packing")? < top(&harness, "for the trip")?);
+    Ok(())
+}
+
+/// Every rectangle drawn with a fill, out of its lists.
+fn filled(harness: &Harness<'_, App>) -> Vec<egui::Rect> {
+    fn flat(shape: &egui::Shape, into: &mut Vec<egui::Rect>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            egui::Shape::Rect(r) if r.fill.a() > 0 => into.push(r.rect),
+            _ => {}
+        }
+    }
+    let mut rects = Vec::new();
+    for egui::epaint::ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut rects);
+    }
+    rects
+}
+
+/// The rectangle of the first widget labelled or holding `text`.
+fn rect_of(
+    harness: &Harness<'_, App>,
+    text: &str,
+) -> Result<egui::Rect, Box<dyn std::error::Error>> {
+    Ok(harness
+        .query_all_by(|n| n.label().as_deref() == Some(text) || n.value().as_deref() == Some(text))
+        .map(|n| n.rect())
+        .next()
+        .ok_or(format!("{text:?}"))?)
+}
+
+#[test]
+fn each_kind_is_one_card_its_name_heading_its_content() -> TestResult {
+    for making in &KINDS {
+        let (store, elsewhere) = store()?;
+        let id = packing(&store, making)?;
+        let harness = dialog(&store, &elsewhere, &id);
+        let kind = making.0;
+        // No heading of the kind over the content: the name heads it.
+        assert!(
+            harness
+                .query_all_by(|n| n.role() == Role::Label
+                    && (n.value().as_deref() == Some("Checklist")
+                        || n.value().as_deref() == Some("Shopping List")))
+                .next()
+                .is_none(),
+            "{kind}"
+        );
+        // The card the name is drawn on holds the content too.
+        let name = name_field(&harness).rect();
+        let content = rect_of(&harness, "Passport")?;
+        let card = filled(&harness)
+            .into_iter()
+            .filter(|r| r.contains_rect(name))
+            .min_by(|a, b| a.area().total_cmp(&b.area()))
+            .ok_or("no card under the name")?;
+        assert!(card.contains_rect(content), "{kind}: {card:?} {content:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn an_empty_description_waits_for_add_a_description() -> TestResult {
+    for making in &KINDS {
+        let (store, elsewhere) = store()?;
+        let id = packing(&store, making)?;
+        Notes::new(&store).edit(&id, "Packing")?;
+        let mut harness = dialog(&store, &elsewhere, &id);
+        let kind = making.0;
+        assert!(shows(&harness, "Add a description"), "{kind}");
+        let fields = |harness: &Harness<'_, App>| {
+            harness
+                .query_all_by_role_and_label(Role::MultilineTextInput, "Description")
+                .count()
+        };
+        assert_eq!(fields(&harness), 0, "{kind}");
+        // A click opens its field with the keyboard in it.
+        click(&mut harness, "Add a description")?;
+        let focused = harness.get_by(|n| n.is_focused());
+        assert_eq!(
+            focused.accesskit_node().label().as_deref(),
+            Some("Description"),
+            "{kind}"
+        );
+        typed(&mut harness, "for the trip");
+        harness.state_mut().close_note();
+        harness.run();
+        assert_eq!(text_of(&store, &id)?, "Packing\nfor the trip", "{kind}");
+        // One there shows folded, with no button.
+        let harness = dialog(&store, &elsewhere, &id);
+        assert!(shows(&harness, "for the trip"), "{kind}");
+        assert!(!shows(&harness, "Add a description"), "{kind}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_description_opened_and_left_empty_writes_nothing() -> TestResult {
+    let (store, elsewhere) = store()?;
+    let id = packing(&store, &KINDS[0])?;
+    Notes::new(&store).edit(&id, "Packing")?;
+    let entries = text_entries(&store, &id)?;
+    let mut harness = dialog(&store, &elsewhere, &id);
+    click(&mut harness, "Add a description")?;
+    assert!(!shows(&harness, "Add a description"));
+    // Left empty, the button comes back.
+    name_field(&harness).click();
+    harness.run();
+    assert!(shows(&harness, "Add a description"));
+    let undo = harness.get_by_role_and_label(Role::Button, "Undo");
+    assert!(undo.accesskit_node().is_disabled());
+    harness.state_mut().close_note();
+    harness.run();
+    assert_eq!(text_of(&store, &id)?, "Packing");
+    assert_eq!(text_entries(&store, &id)?, entries);
+    Ok(())
+}
+
+#[test]
+fn add_a_line_starts_a_new_line_at_the_end_of_a_checklist_before_the_struck_ones() -> TestResult {
+    let wall = |utc: DateTime<Utc>| utc.naive_utc();
+    for making in &KINDS[..2] {
+        let (store, elsewhere) = store()?;
+        let id = packing(&store, making)?;
+        let kind = making.0;
+        // A checked Line after the open one.
+        if kind == "Checklist" {
+            let lists = Checklists::new(&store);
+            let done = lists.add(&id, "Tent", None, false)?;
+            lists.check(&done)?;
+        } else {
+            let lists = ShoppingLists::new(&store);
+            let done = lists.add(&id, "Tent", &wall)?;
+            lists.check(&done, &wall)?;
+        }
+        let lines = |store: &Store| -> Result<Vec<String>, Box<dyn std::error::Error>> {
+            Ok(match making.0 {
+                "Checklist" => Checklists::new(store)
+                    .by_note(&id)?
+                    .ok_or("the list")?
+                    .lines
+                    .into_iter()
+                    .map(|l| l.text)
+                    .collect(),
+                _ => ShoppingLists::new(store)
+                    .by_note(&id, &wall)?
+                    .ok_or("the list")?
+                    .lines
+                    .into_iter()
+                    .map(|l| l.text)
+                    .collect(),
+            })
+        };
+        let stored = lines(&store)?;
+        let mut harness = dialog(&store, &elsewhere, &id);
+        // Left unused, the new Line goes.
+        click(&mut harness, "Add a Line")?;
+        // While it waits, no second one.
+        assert!(!shows(&harness, "Add a Line"), "{kind}");
+        harness.state_mut().close_note();
+        harness.run();
+        assert_eq!(lines(&store)?, stored, "{kind}");
+        // Typed in, it is a Line.
+        let mut harness = dialog(&store, &elsewhere, &id);
+        click(&mut harness, "Add a Line")?;
+        let focused = harness.get_by(|n| n.is_focused());
+        assert_eq!(
+            focused.accesskit_node().value().as_deref(),
+            Some(""),
+            "{kind}"
+        );
+        typed(&mut harness, "Ticket");
+        harness.state_mut().close_note();
+        harness.run();
+        let after: &[&str] = match kind {
+            "Checklist" => &["Passport", "Tent", "Ticket"],
+            _ => &["Passport", "Ticket", "Tent"],
+        };
+        assert_eq!(lines(&store)?, after, "{kind}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_tally_and_a_list_only_read_have_no_add_buttons() -> TestResult {
+    let (store, elsewhere) = store()?;
+    let tally = packing(&store, &KINDS[2])?;
+    Notes::new(&store).edit(&tally, "Packing")?;
+    let harness = dialog(&store, &elsewhere, &tally);
+    assert!(!shows(&harness, "Add a Line"));
+    let id = packing(&store, &KINDS[0])?;
+    Notes::new(&store).edit(&id, "Packing")?;
+    Notes::new(&store).trash(&id)?;
+    let mut harness = window(&store, Selection::Trash);
+    harness.state_mut().select_note(&id);
+    harness.run();
+    assert!(!shows(&harness, "Add a description"));
+    assert!(!shows(&harness, "Add a Line"));
+    Ok(())
+}
+
+#[test]
+fn a_description_added_undoes_back_to_add_a_description() -> TestResult {
+    let (store, elsewhere) = store()?;
+    let id = packing(&store, &KINDS[0])?;
+    Notes::new(&store).edit(&id, "Packing")?;
+    let mut harness = dialog(&store, &elsewhere, &id);
+    click(&mut harness, "Add a description")?;
+    typed(&mut harness, "for the trip");
+    // Left, it is saved and folds.
+    name_field(&harness).click();
+    harness.run();
+    assert_eq!(text_of(&store, &id)?, "Packing\nfor the trip");
+    click(&mut harness, "Undo")?;
+    assert_eq!(text_of(&store, &id)?, "Packing");
+    assert!(shows(&harness, "Add a description"));
+    click(&mut harness, "Redo")?;
+    assert_eq!(text_of(&store, &id)?, "Packing\nfor the trip");
+    assert!(shows(&harness, "for the trip"));
+    assert!(!shows(&harness, "Add a description"));
     Ok(())
 }

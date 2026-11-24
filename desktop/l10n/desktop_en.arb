@@ -982,5 +982,9 @@
   "spotDeskListPlaceMore": "Renames, shares, exports or deletes this place.",
   "@spotDeskListPlaceMore": {"description": "A Spotlight's sentence (obf-1043) on the desktop, beside the ⋮ of an Area's or Topic's list band (obf-1065)."},
   "deskAddPart": "Add a part",
-  "@deskAddPart": {"description": "A button among the actions of the desktop's Note dialog and a Note's own window (obf-1072): opens the box that adds a Section, with “What's new?” and “Add to Note”, which shows only then."}
+  "@deskAddPart": {"description": "A button among the actions of the desktop's Note dialog and a Note's own window (obf-1072): opens the box that adds a Section, with “What's new?” and “Add to Note”, which shows only then."},
+  "deskAddDescription": "Add a description",
+  "@deskAddDescription": {"description": "Small text button under the name of a Checklist, Shopping List or Tally without a description in the desktop's Note dialog and a Note's own window (obf-1071): opens the description's field."},
+  "deskAddLine": "Add a Line",
+  "@deskAddLine": {"description": "Under the Lines of a Checklist or Shopping List in the desktop's Note dialog and a Note's own window (obf-1071): a click puts the cursor into a new empty Line at the end, on a Shopping List before the struck ones."}
 }

@@ -16401,7 +16401,8 @@ impl App {
         };
         let kind = KindShown::of(&self.view);
         // A Checklist, a Shopping List or a Tally shows its text as its
-        // name and its description, its content under them (#188).
+        // name and its description, its content under them in the same
+        // card (#188, obf-1071).
         let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
         let linked = &self.view.routines;
         let newer_routines = self.view.newer_routines;
@@ -16682,6 +16683,7 @@ impl App {
                                 note,
                                 writes,
                                 bar: self.view.advanced,
+                                asks: self.view.kind != Some(NoteKind::Session),
                                 boxes,
                                 ticks: (ticks, &ticked),
                             };
@@ -16782,28 +16784,29 @@ impl App {
                     if !kinded {
                         draw_sections(ui, &mut *cache, actions);
                     }
+                    // The kind's content under its name and description
+                    // (#188), in their card as the Lines are under them on
+                    // a card (obf-1071); nothing while the Note is no
+                    // Checklist.
+                    if let Some(shown) = checklist {
+                        let mut asked = Vec::new();
+                        checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
+                        actions.extend(asked.into_iter().map(Action::Checklist));
+                    }
+                    // Nothing while the Note is no Shopping List.
+                    if let Some(shown) = shopping {
+                        let mut asked = Vec::new();
+                        shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
+                        actions.extend(asked.into_iter().map(Action::Shopping));
+                    }
+                    // Only its setup, nothing while the Note is no Tally;
+                    // its chart and entries show on its card (#190).
+                    if let Some(tally) = tally {
+                        let mut asked = Vec::new();
+                        tally_view::setup(ui, &t, tones, tally, &mut asked);
+                        actions.extend(asked.into_iter().map(Action::Tally));
+                    }
                 });
-                // The kind's content under its name and description (#188),
-                // as the Lines are under them on a card; nothing while the
-                // Note is no Checklist.
-                if let Some(shown) = checklist {
-                    let mut asked = Vec::new();
-                    checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Checklist));
-                }
-                // Nothing while the Note is no Shopping List.
-                if let Some(shown) = shopping {
-                    let mut asked = Vec::new();
-                    shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Shopping));
-                }
-                // Only its setup, nothing while the Note is no Tally; its
-                // chart and entries show on its card (#190).
-                if let Some(tally) = tally {
-                    let mut asked = Vec::new();
-                    tally_view::setup(ui, &t, tones, tally, &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Tally));
-                }
                 // A Session's pool and count, each change written at once;
                 // its picks and history show on its card (#191).
                 if let (Some(draft), Some(setup)) = (session_draft.as_mut(), session_setup) {
@@ -24536,6 +24539,10 @@ struct KindedText<'a> {
     /// Whether the description's format bar shows: only in Advanced
     /// (#197).
     bar: bool,
+    /// Whether an empty description waits for "Add a description": a
+    /// Checklist's, a Shopping List's and a Tally's (obf-1071), not a
+    /// Session's.
+    asks: bool,
     boxes: &'a BoxLook,
     ticks: (bool, &'a dyn Fn(&str) -> bool),
 }
@@ -24555,9 +24562,11 @@ type KindedState<'a> = (
 /// The text of a Note of a kind as its name, a heading on one line, and
 /// its description under it (#188), small and weak, folded to its first
 /// line while it is not edited: a click unfolds it, into its field where
-/// this Device may change it, which an empty one always shows. Read only,
-/// both select to be copied (#183) and a click folds the description
-/// again.
+/// this Device may change it. An empty one there is "Add a description"
+/// on a Checklist, a Shopping List and a Tally (obf-1071), which opens
+/// its field until it is left empty, and its field on a Session. Read
+/// only, both select to be copied (#183) and a click folds the
+/// description again.
 fn kinded_text(
     ui: &mut Ui,
     (t, tones): (L10n, Tones),
@@ -24672,6 +24681,16 @@ fn kinded_text(
             (edited, editing, focus, select),
             actions,
         );
+    } else if edited.trim().is_empty() && shown.asks {
+        // Empty, only a way into its field (obf-1071), small and weak
+        // as the description is.
+        let asked = RichText::new(t.desk_add_description())
+            .size(theme::content(ui, DESCRIPTION_SIZE))
+            .color(weak);
+        if ui.add(egui::Button::new(asked).frame(false)).clicked() {
+            *editing = true;
+            *focus = true;
+        }
     } else if edited.trim().is_empty() {
         // Empty, its field with its hint; typed into, it is edited.
         let hint = RichText::new(t.note_description())

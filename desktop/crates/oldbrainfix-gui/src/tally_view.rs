@@ -362,7 +362,8 @@ fn values_lines(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem)
     lines
 }
 
-/// The setup of a Tally in the Note dialog (#190): the Tally's own
+/// The setup of a Tally in the Note dialog (#190), in the card of its
+/// name (obf-1071): the Tally's own
 /// settings as badges (#264), the length of a bar and whether it counts
 /// in sets; then a row per field, its name and its settings as badges as
 /// on the New Tally page (#161), how several sets or entries in a bar
@@ -383,7 +384,8 @@ pub fn setup(
     let tally = &shown.tally;
     let system = shown.system;
     let decimal = decimal_sign(t);
-    embossed(ui, tones, false, None, |ui| {
+    // In the card of its name, which heads it (obf-1071).
+    ui.scope(|ui| {
         ui.label(RichText::new(t.tally_fields()).strong().color(text));
         badge_row(ui, |ui| {
             let bar = Text(period_label(t, tally.bar));

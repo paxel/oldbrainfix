@@ -32,6 +32,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop ist „Heute ruhig“ ein Knopf in der oberen Zeile der Agenda, der während des ruhigen Tags „Ruhigen Tag beenden“ heißt. ([obf-1066](https://github.com/paxel/oldbrainfix/issues/379))
 - Auf dem Handy zeigt die Schnellnotiz nach einer Aufnahme „Wird transkribiert …“ und setzt das Transkript danach in ihren Text. ([obf-1082](https://github.com/paxel/oldbrainfix/issues/395))
 - Auf dem Handy und dem Desktop erscheint das Feld zum Ergänzen erst nach „Teil hinzufügen“, und eine neue Notiz hat keins. ([obf-1072](https://github.com/paxel/oldbrainfix/issues/385))
+- Auf dem Handy und dem Desktop ist eine Checkliste, Einkaufsliste oder Strichliste eine Karte mit „Zeile hinzufügen“, die Beschreibung erst nach „Beschreibung hinzufügen“. ([obf-1071](https://github.com/paxel/oldbrainfix/issues/384))
 
 ### Behoben
 

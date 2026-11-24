@@ -11,7 +11,6 @@ import 'announcements.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'look.dart';
-import 'note_editor_screen.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'setting_badges.dart';
@@ -314,14 +313,17 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
     final t = context.t;
     final decimal = decimalSign(context);
     final changes = widget.notes.store.mayChange(widget.noteId);
-    return EditorPanel(
+    // In the card of the Note, under its name (obf-1071).
+    return Padding(
       key: const ValueKey('tally-fields'),
-      heading: t.tallyFields,
+      padding: const EdgeInsets.only(bottom: 16),
       child: Material(
         type: MaterialType.transparency,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(t.tallyFields, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Wrap(

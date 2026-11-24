@@ -902,6 +902,40 @@ pub enum FieldOf {
     Shopping,
 }
 
+/// "Add a Line" under the Lines of `listed` (obf-1071), as the phone's:
+/// a click puts the cursor into a new empty row at the end, on a
+/// Shopping List before the struck Lines. Nothing where this Device may not add
+/// Lines, nor while an empty new row waits to be typed in. Only on
+/// screen, it is no step of Undo; left unused, the row goes as any
+/// empty one.
+pub fn add_line(ui: &mut Ui, t: &L10n, lines: &mut TypedLines, listed: Listed) {
+    if !lines.adds
+        || lines
+            .rows
+            .iter()
+            .any(|r| r.id.is_none() && r.typed().is_empty())
+    {
+        return;
+    }
+    let weak = ui.visuals().weak_text_color();
+    let asked = ui.horizontal(|ui| {
+        crate::icons::show(ui, crate::icons::ADD, 20.0, weak);
+        let words = egui::RichText::new(t.desk_add_line()).color(weak);
+        ui.add(egui::Button::new(words).frame(false))
+    });
+    if !asked.inner.clicked() {
+        return;
+    }
+    match listed {
+        Listed::Shopping(_) => lines.start_row(listed),
+        Listed::Checklist(_) => {
+            let row = lines.row(None, "", false);
+            lines.focus = Some((row.key, 0));
+            lines.rows.push(row);
+        }
+    }
+}
+
 /// The id of the field of the row `key`.
 pub fn field_id(key: u64) -> Id {
     Id::new(("typed line", key))

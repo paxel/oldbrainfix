@@ -9,7 +9,6 @@ import 'checklist_view.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
 import 'look.dart';
-import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'run_over.dart';
 import 'setting_badges.dart';
@@ -834,55 +833,59 @@ class _ShoppingSectionState extends State<ShoppingSection>
       );
     }
 
-    // Under the text field, as the Lines are under the text on a card.
+    // In the card of the Note, under its name (obf-1071), as the Lines
+    // are under the name on a card.
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: EditorPanel(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
         key: const ValueKey('shopping'),
-        heading: t.shoppingHeading,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ChecklistLines(
-              lines: [for (final row in rows) shownRow(row)],
-              onCheck: _checks ? _check : null,
-              onMenu: _menu,
-              editable: withMenus(_editable),
-              trailing: (shown) => switch (list.line(shown.id)) {
-                final line? => reappearBadge(
-                  t,
-                  line.id,
-                  line.reappear,
-                  onTap: _editable.contains(line.id)
-                      ? () => _reappear(shown.id)
-                      : null,
-                ),
-                // A new Line has none yet; a tap stores it first.
-                null => reappearBadge(
-                  t,
-                  shown.id,
-                  Reappear.unset,
-                  onTap: _checks ? () => _reappear(shown.id) : null,
-                ),
-              },
-              field: (shown) => typedField(
-                shown,
-                prefix: 'shopping',
-                editable: _editable,
-                twoRows: _twoRows,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ChecklistLines(
+            lines: [for (final row in rows) shownRow(row)],
+            onCheck: _checks ? _check : null,
+            onMenu: _menu,
+            editable: withMenus(_editable),
+            trailing: (shown) => switch (list.line(shown.id)) {
+              final line? => reappearBadge(
+                t,
+                line.id,
+                line.reappear,
+                onTap: _editable.contains(line.id)
+                    ? () => _reappear(shown.id)
+                    : null,
               ),
-              compact: true,
+              // A new Line has none yet; a tap stores it first.
+              null => reappearBadge(
+                t,
+                shown.id,
+                Reappear.unset,
+                onTap: _checks ? () => _reappear(shown.id) : null,
+              ),
+            },
+            field: (shown) => typedField(
+              shown,
+              prefix: 'shopping',
+              editable: _editable,
+              twoRows: _twoRows,
             ),
-            if (_removed.isNotEmpty)
-              RemovedLines(
-                store: widget.notes.store,
-                lines: _removed,
-                onRestore: linesWritable
-                    ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
-                    : (_) => null,
-              ),
-          ],
-        ),
+            compact: true,
+          ),
+          // Before the struck Lines, as a new Line goes there.
+          ?addLineField(
+            prefix: 'shopping',
+            hint: t.addALine,
+            at: () => rows.lastIndexWhere(placesAmong) + 1,
+          ),
+          if (_removed.isNotEmpty)
+            RemovedLines(
+              store: widget.notes.store,
+              lines: _removed,
+              onRestore: linesWritable
+                  ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
+                  : (_) => null,
+            ),
+        ],
       ),
     );
   }

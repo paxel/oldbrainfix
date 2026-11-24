@@ -723,7 +723,7 @@ fn shared() -> Result<Shared, Box<dyn std::error::Error>> {
 fn a_member_checks_and_adds_lines_but_changes_only_their_own() -> TestResult {
     let (_ann, ben, note) = shared()?;
     let mut harness = window(&ben, Some(&note));
-    assert!(shows(&harness, "Checklist"));
+    assert!(shows(&harness, "Kind: Checklist"));
     // Ann's Lines: no ⋮, and the kind stays hers.
     assert!(!shows_part(&harness, "More: Passport"));
     assert!(!shows(&harness, "Back to a plain Note"));

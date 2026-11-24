@@ -5625,6 +5625,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noteName => 'Name';
 
   @override
+  String get addALine => 'Zeile hinzufügen';
+
+  @override
+  String get addADescription => 'Beschreibung hinzufügen';
+
+  @override
   String get noteDescription => 'Beschreibung';
 
   @override

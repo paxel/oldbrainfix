@@ -5558,6 +5558,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteName => 'Name';
 
   @override
+  String get addALine => 'Add a Line';
+
+  @override
+  String get addADescription => 'Add a description';
+
+  @override
   String get noteDescription => 'Description';
 
   @override

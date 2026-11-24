@@ -647,8 +647,9 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 ///
 /// A Note of a kind (#188), a Checklist, Shopping List or Tally, shows its
 /// text as its name, a heading, and its description under it, folded to
-/// one line until a tap; then the kind's content, its Lines or its Tally,
-/// and the rest under it. Its kind badge changes the kind.
+/// one line until a tap, "Add a description" while it has none; then the
+/// kind's content in the same card (obf-1071), its Lines and "Add a Line"
+/// or its Tally, and the rest under it. Its kind badge changes the kind.
 ///
 /// Under each Transcript and Photo Text, "Replace Note text" and "Append
 /// to Note text" take it over into the text of its Note or Section, and
@@ -3641,14 +3642,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// and under it its description, small and weak, folded to one line
   /// while it is not edited; a tap unfolds it, and puts the cursor in it
   /// where this Device may change it ([editable]), else only shows it
-  /// whole. An empty one that may change is a field with its hint.
+  /// whole. An empty one that may change is "Add a description" on a
+  /// Checklist, Shopping List or Tally (obf-1071), which opens its field
+  /// until the cursor leaves it empty, and a field with its hint on a
+  /// Session.
   Widget _nameAndDescription(Note note, {required bool editable}) {
     final t = context.t;
     final theme = Theme.of(context);
     final weak = theme.colorScheme.onSurfaceVariant;
     final small = theme.textTheme.bodyMedium?.copyWith(color: weak);
     final description = _text.text;
-    final open = _descriptionOpen || (editable && description.isEmpty);
+    // A list's or Tally's empty one waits for "Add a description"
+    // (obf-1071); a Session's is a field with its hint.
+    final asked = _kind != NoteKind.session;
+    final open =
+        _descriptionOpen || (editable && description.isEmpty && !asked);
     final Widget shown;
     if (open) {
       shown = Row(
@@ -3685,6 +3693,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               icon: Icon(Icons.expand_less, color: weak),
             ),
         ],
+      );
+    } else if (description.isEmpty && editable) {
+      shown = Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton(
+          key: const ValueKey('note-description-add'),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            textStyle: theme.textTheme.bodyMedium,
+          ),
+          onPressed: _openDescription,
+          child: Text(t.addADescription),
+        ),
       );
     } else if (description.isEmpty) {
       // Only read and empty: nothing to show.
@@ -4148,6 +4170,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       border: InputBorder.none,
                     ),
                   ),
+                // The kind's content right under its name, in the same
+                // card (#188, obf-1071): nothing while the Note is no
+                // Checklist, Shopping List or Tally.
+                ChecklistSection(
+                  key: const ValueKey('checklist-section'),
+                  notes: widget.notes,
+                  noteId: widget.noteId,
+                  typed: _lines,
+                  startLine: widget.typeLines,
+                ),
+                ShoppingSection(
+                  key: const ValueKey('shopping-section'),
+                  notes: widget.notes,
+                  noteId: widget.noteId,
+                  typed: _lines,
+                  startLine: widget.typeLines,
+                ),
+                TallySetup(
+                  key: const ValueKey('tally-section'),
+                  notes: widget.notes,
+                  noteId: widget.noteId,
+                ),
                 // A Note of a kind keeps them below, as its diary part
                 // (#188).
                 if (!_named) ...[
@@ -4160,22 +4204,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         ),
         if (_offersCode && !_named) _codeOffer(t),
-        // The kind's content right under its name (#188): nothing
-        // while the Note is no Checklist, Shopping List or Tally.
-        ChecklistSection(
-          notes: widget.notes,
-          noteId: widget.noteId,
-          typed: _lines,
-          startLine: widget.typeLines,
-        ),
-        ShoppingSection(
-          notes: widget.notes,
-          noteId: widget.noteId,
-          typed: _lines,
-          startLine: widget.typeLines,
-        ),
-        if (_kind == NoteKind.tally) const SizedBox(height: 16),
-        TallySetup(notes: widget.notes, noteId: widget.noteId),
         if (_sessionDraft case final draft?) ...[
           const SizedBox(height: 16),
           SessionNoteSetup(
@@ -4185,8 +4213,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             onNewTally: _newPoolTally,
           ),
         ],
-        // A list's or Tally's panel keeps its own space under it.
-        if (!_named) const SizedBox(height: 16),
+        // A Session's panels keep their own space under them.
+        if (_sessionDraft == null) const SizedBox(height: 16),
         _badges(placed, when, place, colour),
         // Its past runs (#264), under its settings.
         if (_sessionDraft != null) ...[

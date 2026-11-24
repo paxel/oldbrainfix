@@ -427,6 +427,28 @@ void main() {
       expect(lists.byNote(id)?.lines.map((l) => l.text), ['socks', 'shirts']);
       expect(enabled(tester, 'editor-undo'), isFalse);
     });
+
+    testWidgets('"Add a Line" is no step; the Line typed there goes again '
+        '(obf-1071)', (tester) async {
+      await edit(tester, id);
+      await tap(tester, key('checklist-add-line'));
+      expect(enabled(tester, 'editor-undo'), isFalse);
+      final typed = find.descendant(
+        of: key('checklist-field-new-1'),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(typed, '${lineStart}hats');
+      await tester.pumpAndSettle();
+
+      await undo(tester);
+      expect(lists.byNote(id)?.lines.map((l) => l.text), ['socks', 'shirts']);
+      await redo(tester);
+      expect(lists.byNote(id)?.lines.map((l) => l.text), [
+        'socks',
+        'shirts',
+        'hats',
+      ]);
+    });
   });
 
   testWidgets('a struck Line of a Shopping List typed again is struck again '

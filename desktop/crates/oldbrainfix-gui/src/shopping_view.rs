@@ -36,12 +36,11 @@ use oldbrainfix_core::{
     WallClock,
 };
 
-use crate::app::embossed;
 use crate::checklist_view::{
     self, CardMenu, Drags, LineAsk, LineStep, RemovedAsk, RemovedLines, ShownLine,
 };
 use crate::l10n::L10n;
-use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
+use crate::line_editing::{self, FieldOf, Listed, TypedLine, TypedLines, Typing};
 use crate::setting_badges::{BadgeValue, badge};
 use crate::theme::{self, Tones};
 use crate::{icons, routine_editor};
@@ -344,9 +343,10 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &ShoppingList) {
     ui.label(RichText::new(said).size(14.0).color(text));
 }
 
-/// The Shopping List part of a Note's editor (#122), under its text: its
-/// Lines as they are typed in `typed`, in their rows, each typed in place
-/// where this Device may (#141, #184).
+/// The Shopping List part of a Note's editor (#122), under its text in
+/// its card (obf-1071): its Lines as they are typed in `typed`, in their
+/// rows, each typed in place where this Device may (#141, #184), and "Add
+/// a Line".
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -354,10 +354,9 @@ pub fn section(
     typed: &mut TypedLines,
     actions: &mut Vec<ShoppingAction>,
 ) {
-    let text = ui.visuals().text_color();
     let list = &shown.list;
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.shopping_heading()).strong().color(text));
+    // In the card of its name, which heads it (obf-1071).
+    ui.scope(|ui| {
         let menued = typed.with_menus(&shown.editable);
         let lines = shown_lines(t, list);
         let rows: Vec<ShownLine> = typed
@@ -493,6 +492,7 @@ pub fn section(
         if let Some((from, before)) = checklist_view::line_drop_shown(ui, tones, typed, &drawn) {
             actions.push(ShoppingAction::Drop(from, before));
         }
+        line_editing::add_line(ui, t, typed, Listed::Shopping(list));
         let mut removed = Vec::new();
         checklist_view::removed_lines(ui, t, &list.note_id, &shown.removed, &mut removed);
         actions.extend(removed.into_iter().map(ShoppingAction::Removed));

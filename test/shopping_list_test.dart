@@ -1002,7 +1002,18 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Einkaufsliste'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.byKey(const ValueKey('shopping-add-line')),
+                matching: find.byType(TextField),
+              ),
+            )
+            .decoration
+            ?.hintText,
+        'Zeile hinzufügen',
+      );
       expect(beside(tester, idOf(note, 'Milch')), 'in 7 Tagen');
       expect(badgeText(tester, idOf(note, 'Milch')), '1W');
       expect(find.bySemanticsLabel('Wiederkehr: 1 Woche'), findsOneWidget);

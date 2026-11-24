@@ -1477,6 +1477,8 @@
   "badgeKind": "Art",
   "kindPlain": "Einfache Notiz",
   "noteName": "Name",
+  "addALine": "Zeile hinzufügen",
+  "addADescription": "Beschreibung hinzufügen",
   "noteDescription": "Beschreibung",
   "noteDescriptionUnfold": "Ganze Beschreibung zeigen",
   "noteDescriptionFold": "Beschreibung einklappen",

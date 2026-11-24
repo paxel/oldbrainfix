@@ -6,7 +6,6 @@ import 'browser.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
 import 'look.dart';
-import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'tick_saves.dart';
 
@@ -882,59 +881,59 @@ class _ChecklistSectionState extends State<ChecklistSection>
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
     final uncheck = _checks && list.checkedCount > 0;
-    // Under the text field, as the Lines are under the text on a card.
+    // In the card of the Note, under its name (obf-1071), as the Lines
+    // are under the name on a card.
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: EditorPanel(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
         key: const ValueKey('checklist'),
-        heading: t.checklistHeading,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ChecklistLines(
-              lines: [
-                for (final row in rows)
-                  (
-                    id: TypedRows.shownId(row),
-                    text: row.kept,
-                    inGroup: row.inGroup,
-                    checked: switch (row.id) {
-                      final id? => list.line(id)?.checked ?? false,
-                      null => false,
-                    },
-                    below: null,
-                    beside: null,
-                  ),
-              ],
-              on: list.on,
-              onCheck: _checks ? _check : null,
-              onMenu: _menu,
-              editable: withMenus(_editable),
-              field: _adds ? _field : null,
-              compact: true,
-            ),
-            if (uncheck) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  key: const ValueKey('checklist-uncheck-all'),
-                  onPressed: _uncheckAll,
-                  icon: const Icon(Icons.check_box_outline_blank),
-                  label: Text(t.checklistUncheckAll),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ChecklistLines(
+            lines: [
+              for (final row in rows)
+                (
+                  id: TypedRows.shownId(row),
+                  text: row.kept,
+                  inGroup: row.inGroup,
+                  checked: switch (row.id) {
+                    final id? => list.line(id)?.checked ?? false,
+                    null => false,
+                  },
+                  below: null,
+                  beside: null,
                 ),
-              ),
             ],
-            if (_removed.isNotEmpty)
-              RemovedLines(
-                store: widget.notes.store,
-                lines: _removed,
-                onRestore: linesWritable
-                    ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
-                    : (_) => null,
+            on: list.on,
+            onCheck: _checks ? _check : null,
+            onMenu: _menu,
+            editable: withMenus(_editable),
+            field: _adds ? _field : null,
+            compact: true,
+          ),
+          // After the open Lines, as a list opened from the Agenda starts.
+          ?addLineField(prefix: 'checklist', hint: t.addALine, at: _afterOpen),
+          if (uncheck) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const ValueKey('checklist-uncheck-all'),
+                onPressed: _uncheckAll,
+                icon: const Icon(Icons.check_box_outline_blank),
+                label: Text(t.checklistUncheckAll),
               ),
+            ),
           ],
-        ),
+          if (_removed.isNotEmpty)
+            RemovedLines(
+              store: widget.notes.store,
+              lines: _removed,
+              onRestore: linesWritable
+                  ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
+                  : (_) => null,
+            ),
+        ],
       ),
     );
   }

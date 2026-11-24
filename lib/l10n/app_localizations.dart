@@ -8912,6 +8912,18 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get noteName;
 
+  /// The field under the Lines of a Checklist or Shopping List in the phone's Note editor (obf-1071): a tap puts the cursor into a new empty Line after the open Lines.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Line'**
+  String get addALine;
+
+  /// Small text button under the name of a Checklist, Shopping List or Tally without a description in the phone's Note editor (obf-1071): opens the description's field.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a description'**
+  String get addADescription;
+
   /// The label of the field for the description of a Note of a kind (#188): the rest of its text after the name, shown small under it.
   ///
   /// In en, this message translates to:

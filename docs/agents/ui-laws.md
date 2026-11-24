@@ -816,8 +816,9 @@ replace a law of Both apps where they say so. A desktop law marked
   rest of the Line into the new one. **Backspace at the start** of a
   Line joins it with the Line above: its text goes to the end of that
   Line, which keeps its box and state, and the Line goes, its checks
-  staying in the log; an empty Line simply goes. **No Add Line button
-  and no Add field**: Return makes new Lines.
+  staying in the log; an empty Line simply goes. Return makes new Lines,
+  and **Add a Line** under the Lines of the one card a Checklist or
+  Shopping List is (obf-1071) puts the cursor into a new empty Line.
 - **The frame around a group holds the group's own Line** and the Lines
   under it, on cards and in the editor.
 - **Nothing typed is lost on leaving**: what was typed is stored when
@@ -1653,6 +1654,23 @@ replace a law of Both apps where they say so. A desktop law marked
 - **In and out** sit on the bar above the keyboard, as the format bar
   does, and put the Line with the cursor under the Line above or back
   at the top.
+- **A Checklist, Shopping List or Tally is one card** in the Note
+  editor (obf-1071, C14): its name as the heading, then its Lines and
+  **"Add a Line"** (of a Tally its setup, as before), in the card of
+  the name and in no panel of its own, without the kind as a second
+  heading. "Add a Line" is a field under the Lines, where this Device
+  may add Lines; a tap puts the cursor into a new empty Line after the
+  open Lines, on a Shopping List before the struck ones, as Return
+  would, or into the empty new Line there is already, and is no step of
+  Undo. This
+  replaces "No Add Line button and no Add field" of Both apps on the
+  phone; Return still makes new Lines.
+- **Its description shows only after "Add a description"** (obf-1071),
+  a small text button under the name where this Device may change the
+  text and the description is empty: a tap opens its field, the cursor
+  in it; left empty, the button comes back. A description that is there
+  shows as before, folded to one line until a tap. A Session keeps its
+  description field with its hint.
 
 ### The bar
 
@@ -2308,6 +2326,24 @@ replace a law of Both apps where they say so. A desktop law marked
   question has no way back. A step that also waits for Ctrl+Z, as a Line
   deleted, goes from there once the bar's Undo takes it back. Nothing is
   stored: the steps go as the Note closes.
+- **A Checklist, Shopping List or Tally is one card** in the Note
+  dialog and a Note's own window (obf-1071, C14), as on the phone: its
+  name as the heading, then its Lines and **"Add a Line"** (of a Tally
+  its setup, "Fields" over it, as before), in the card of the name,
+  without the kind as a second heading. "Add a Line" is a small row
+  under the Lines, a plus icon and its words, where this Device may add
+  Lines: a click puts the keyboard into a new empty Line at the end, on
+  a Shopping List before the struck ones, and is no step of Undo; while an empty new Line waits it does not
+  show, and left unused the Line goes as any empty one. This replaces
+  "No Add Line button and no Add field" of Both apps on the desktop
+  too; Return still makes new Lines. **Its description shows only
+  after "Add a description"**, a small weak text button under the name
+  where this Device may change the text and the description is empty:
+  a click opens its field with the keyboard in it, as Enter in the name
+  does; left empty, the button comes back and nothing is written. A
+  description that is there shows as before, folded to its first line
+  until a click. A Session keeps its empty description field with its
+  hint.
 - **The Amend box shows only when asked** (obf-1072, C15): the Note
   dialog and a Note's own window show no format bar, "What's new?" nor
   "Add to Note" on their own. A Note just made and opened there, a

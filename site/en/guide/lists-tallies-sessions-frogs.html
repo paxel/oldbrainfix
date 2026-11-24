@@ -146,6 +146,12 @@
   the description are two fields; saving writes them back as one text, and a Note opened and left
   unchanged is not written.
 </p>
+<p>
+  In the phone's editor a Checklist, Shopping List or Tally is one card: its name as the heading,
+  then its Lines and <strong>Add a Line</strong>, or the setup of the Tally. While it has no
+  description, a small <strong>Add a description</strong> under the name opens the field for one;
+  left empty, the field goes again.
+</p>
 <ul>
   <li>The kind badge, the first badge in the Note editor, shows the kind in words, such as "Plain Note ▾". A tap offers the kinds the Note can become: a Plain Note becomes a Checklist, a Shopping List, a Tally or a Session, the last two only in Advanced; a Checklist becomes a Shopping List or a Plain Note; a Shopping List becomes a Checklist or a Plain Note; a Session becomes a Plain Note. A Tally stays a Tally.</li>
   <li>Made a Session with the kind badge, a Note gets the pool, the count and the rule but no Routine yet: it runs once a Routine is added, and until then its compact card shows how many it picks, such as "Picks 3 Tallies".</li>
@@ -154,7 +160,9 @@
 </ul>
 <p>
   On the desktop the Note dialog shows a Note of a kind as the phone's editor does: its name, its
-  description folded under it, then the Lines or the setup of the Tally or the Session. Its kind
+  description folded under it, then the Lines or the setup of the Tally or the Session. A
+  Checklist, Shopping List or Tally is one card there too, its Lines followed by <strong>Add a
+  Line</strong>, and <strong>Add a description</strong> opens the field of a description. Its kind
   badge changes the kind, as on the phone; its Session opens a dialog with the pool, the count,
   the counts per weekday and the rule, without a schedule. The card's menu, also opened with a
   right-click on the card, offers <strong>Make it a Checklist</strong> and <strong>Make it a Shopping
@@ -192,7 +200,7 @@
 <ul>
   <li>In the detailed view every Line has its checkbox; a checked Line is struck through in place. The compact view shows "3 of 5 open".</li>
   <li>A Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks the Line above it, checking that Line checks its whole group, and unchecking one Line of the group unchecks it again. A group shows in a frame with the Line it is under.</li>
-  <li>In the editor the Lines are edited as one block of text, every Line starting with its box; a new list starts with one empty Line. Return adds a new Line with an empty box under the cursor's Line; in the middle of a Line it moves the rest of the Line into the new one. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; the joined Line's checks stay in the log. An empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard move the Line with the cursor into a group and out.</li>
+  <li>In the editor the Lines are edited as one block of text, every Line starting with its box; a new list starts with one empty Line. Return adds a new Line with an empty box under the cursor's Line; in the middle of a Line it moves the rest of the Line into the new one. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; the joined Line's checks stay in the log. An empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard move the Line with the cursor into a group and out. On the phone a tap on <strong>Add a Line</strong> under the Lines puts the cursor into a new empty Line after the open Lines, on a Shopping List before the struck ones.</li>
   <li>Everything typed is kept on leaving the editor; Lines left empty are dropped. ⋮ on a Line offers <strong>Move up</strong>, <strong>Move down</strong>, <strong>Put under the Line above</strong> or <strong>Back to the top level</strong>, and <strong>Delete</strong>. On the phone Delete asks nothing: the announcement at the top, "Line deleted", brings the Line back with a tap, and the folded "Removed Lines" under the Lines restores each deleted Line with <strong>Restore</strong>. The desktop asks nothing either: Ctrl+Z or Edit ▸ Undo brings the Line back, and the Note dialog has the same "Removed Lines".</li>
   <li><strong>Uncheck all</strong> shows while a Line is checked, to use the list again. <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Checklist" turn it back: every Line becomes a line of the Note's text, a checked one marked "✓ ".</li>
   <li><strong>Copy text</strong>, under <strong>Share…</strong> in the ⋮ of the card, and on the desktop <strong>Copy as text</strong> put the name and then the Lines on the clipboard as Markdown tasks, such as <code>- [ ] Tent</code> and <code>- [x] Pegs</code>, a Line of a group indented by two spaces. Other Markdown apps show them as checkboxes, and pasted into a Note they become boxes again.</li>
@@ -217,7 +225,8 @@
   Line at the top with its group. The handle beside a Line's ⋮ drags it up or down by the same rule;
   a line shows where it goes, and let go where it stands it stays. A Shopping List's open Lines
   move the same way among the open ones; a struck Line has no handle and stays where it is. A
-  Line's menu opens with its ⋮.
+  Line's menu opens with its ⋮. A click on <strong>Add a Line</strong> under the Lines puts the
+  cursor into a new empty Line at the end, on a Shopping List before the struck Lines.
 </p>
 </box-more>
 </guide-box>
