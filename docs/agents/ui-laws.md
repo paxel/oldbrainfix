@@ -729,7 +729,10 @@ replace a law of Both apps where they say so. A desktop law marked
   size, long cells wrapping and a table wider than its room moving
   sideways inside it, the header row and a heading first column in view;
   a card shows the first 10 rows and "Show all N" (obf-1048). A click
-  opens the table full screen. **Copy in the bar of the table full screen**
+  opens the table full screen. A small ⋮ at a table's top right corner
+  (obf-1050) offers Copy wherever the table shows, and Move up, Move
+  down (past the block above or below) and Delete table where the Note
+  is edited; Undo takes them back. **Copy in the bar of the table full screen**
   (#324) puts the table on the clipboard as an HTML table and, as the
   plain text, as Markdown, each box in the state it shows, the cell
   being edited written first; on the phone the HTML goes through the
