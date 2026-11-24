@@ -27,7 +27,7 @@ Uint8List bigPhoto() =>
 /// A Device with something of everything: an Area with a Note, a photo
 /// and a voice recording, a Routine checked off once, a Moment, Area
 /// keys, another Device's pinned key and Device settings of all kinds,
-/// a playback speed among them.
+/// a playback speed, a theme and a Re-nag interval among them.
 Store fullDevice(Directory dir) {
   final store = Store.open('${dir.path}/old.db', clock: ticking());
   final places = Places(store);
@@ -55,10 +55,8 @@ Store fullDevice(Directory dir) {
   final other = Store.inMemory();
   store.learnKeys([other.ownKeyRecord], verifiedDevice: other.deviceId);
   other.close();
-  // Device settings, none of which may travel.
+  // Device settings bound to this Device, none of which may travel.
   store
-    ..themeChoice = ThemeChoice.dark
-    ..renagInterval = const Duration(minutes: 20)
     ..chooseSyncFolder('/somewhere/sync')
     ..backupFolder = '/somewhere/backups'
     ..setPin('1234', iterations: 1)
@@ -73,8 +71,11 @@ Store fullDevice(Directory dir) {
         lastSync: DateTime.utc(2026, 9, 1),
       ),
     );
-  // The one that does.
-  store.playbackSpeed = 1.5;
+  // Those that do (obf-1098).
+  store
+    ..playbackSpeed = 1.5
+    ..themeChoice = ThemeChoice.dark
+    ..renagInterval = const Duration(minutes: 20);
   return store;
 }
 
@@ -174,7 +175,7 @@ void main() {
   });
 
   group('a Backup', () {
-    test('restores everything but the settings, the playback speed aside, '
+    test('restores everything but the settings bound to the old Device '
         'onto a new identity, with the passphrase', () async {
       final (old, code, path) = await backedUp();
       addTearDown(old.close);
@@ -224,11 +225,10 @@ void main() {
         containsAll(old.pinnedKeys().map((p) => p.record.device)),
       );
       expect(pinned[old.deviceId]?.trust, KeyTrust.verified);
-      // None of the old Device's settings came along but the playback
-      // speed.
+      // Of the old Device's settings only those carried came along.
       expect(store.playbackSpeed, 1.5);
-      expect(store.themeChoice, ThemeChoice.system);
-      expect(store.renagInterval, DeviceSettings.defaultRenag);
+      expect(store.themeChoice, ThemeChoice.dark);
+      expect(store.renagInterval, const Duration(minutes: 20));
       expect(store.syncFolder, isNull);
       expect(store.backupFolder, isNull);
       expect(store.hasPin, isFalse);
@@ -246,6 +246,8 @@ void main() {
         'backup:pass',
         'backup:version',
         'playbackSpeed',
+        'renagMinutes',
+        'theme',
       });
       // The Recovery Sheet stays good.
       expect(store.recoveryCode, code);

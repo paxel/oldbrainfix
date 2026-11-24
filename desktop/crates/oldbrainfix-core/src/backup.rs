@@ -1,8 +1,9 @@
 //! Backups, as the Dart core's `backup.dart` writes and reads them
 //! (ADR 0010, 0016): an encrypted file holding everything on this
-//! Device but its settings, the playback speed aside, written by hand or
-//! weekly into a folder the user picks, and restored on a fresh install
-//! with the passphrase or the recovery key of the Recovery Sheet.
+//! Device and those of its settings that make sense on a new one
+//! (obf-1098), written by hand or weekly into a folder the user picks,
+//! and restored on a fresh install with the passphrase or the recovery
+//! key of the Recovery Sheet.
 //!
 //! Setting Backups up makes a random backup key, which the Recovery
 //! Sheet shows, and seals it once with a key the passphrase derives
@@ -23,6 +24,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::backup_settings::{SettingsApp, carried_settings, taken_settings};
 use crate::entry::{WireEntry, dart_iso, parse_time};
 use crate::keys::{AREA_KEY_BYTES, AreaKey, SEAL_NONCE_BYTES, SEAL_TAG_BYTES, seal, unseal};
 use crate::packs::{OpenedPack, Pack, PackAdded, PackTicks};
@@ -589,8 +591,9 @@ pub fn held_blobs(store: &Store) -> Result<Vec<String>> {
 
 /// Writes a Backup of `store` to `path`: this Device's identity, the own
 /// Profile with its binding and the backup key's version, the playback
-/// speed chosen here, every entry, Moment, Area key, pinned key and blob;
-/// none of its other settings. Backups must be set up.
+/// speed chosen here, the settings carried ([`carried_settings`]), every
+/// entry, Moment, Area key, pinned key and blob; none of its other
+/// settings. Backups must be set up.
 pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts> {
     let (Some(backup_key), Some(pass)) = (store.backup_key()?, store.backup_pass()?) else {
         return Err(Error::Invalid("Backups are not set up".into()));
@@ -630,6 +633,10 @@ pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts
     // write fractions alike.
     if let Some(speed) = DeviceSettings::new(store).chosen_playback_speed()? {
         out.line(&json!({"playbackSpeed": speed_text(speed)}).to_string())?;
+    }
+    let carried = carried_settings(store)?;
+    if !carried.is_empty() {
+        out.line(&json!({ "settings": carried }).to_string())?;
     }
     let entries = store.all_entries()?;
     for e in &entries {
@@ -847,6 +854,8 @@ struct Payload {
     pinned: Vec<PinnedKey>,
     profile: Option<(Value, i64)>,
     speed: Option<f64>,
+    /// The settings this app takes of the Backup's ([`taken_settings`]).
+    settings: Vec<(String, String)>,
     blobs: usize,
 }
 
@@ -902,6 +911,7 @@ fn read_payload(
     let mut pinned: Vec<PinnedKey> = Vec::new();
     let mut profile: Option<(Value, i64)> = None;
     let mut speed: Option<f64> = None;
+    let mut settings: Vec<(String, String)> = Vec::new();
     let mut blobs = 0;
     while let Some(text) = payload.line()? {
         let json: Value = serde_json::from_str(&text).map_err(|_| damaged())?;
@@ -959,6 +969,10 @@ fn read_payload(
             if let Some(kept) = offered_speed(text) {
                 speed = Some(kept);
             }
+        } else if let Some(record) = json.get("settings").filter(|s| s.is_object()) {
+            // Only those carried with a value offered, and only those the
+            // desktop has.
+            settings = taken_settings(record, SettingsApp::Desktop);
         } else if let Some(reference) = json.get("blob").and_then(Value::as_str) {
             let bytes = payload.bytes(size_of(&json)?)?;
             let (kind, hash) = split_blob_ref(reference);
@@ -981,6 +995,7 @@ fn read_payload(
         pinned,
         profile,
         speed,
+        settings,
         blobs,
     })
 }
@@ -991,9 +1006,11 @@ fn read_payload(
 /// and pinned keys, pins the old Device's key as verified, takes the own
 /// Profile back with its own key bound to it by the old Device's, keeps
 /// the backup key, and signs as the old Device its roles in the Shared
-/// Areas for itself. Of the old Device's settings only the playback
-/// speed comes along, if it is one offered. The log is written in one
-/// transaction, once the whole file proved sound.
+/// Areas for itself. Of the old Device's settings the playback speed and
+/// those carried come along, each only with a value offered here and
+/// only those the desktop has ([`taken_settings`]); its speech model as
+/// an offer ([`DeviceSettings::speech_model_offer`]). The log is written
+/// in one transaction, once the whole file proved sound.
 pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Result<Restored> {
     if store.current_seq()? != 0 {
         return Err(problem(Problem::NotEmpty));
@@ -1014,6 +1031,7 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
         pinned,
         profile,
         speed,
+        settings,
         blobs,
     } = payload;
     let roles = store.batch(|| {
@@ -1056,6 +1074,9 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
         )?;
         if let Some(speed) = speed {
             DeviceSettings::new(store).set_playback_speed(speed)?;
+        }
+        for (key, value) in &settings {
+            store.set_local_setting(key, value)?;
         }
         hand_roles(store, &old)
     })?;

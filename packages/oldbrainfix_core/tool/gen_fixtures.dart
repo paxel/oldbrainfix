@@ -6463,6 +6463,22 @@ Future<void> _bundle(Directory root) async {
   }
 }
 
+/// The Device settings of Ada's Device in the backup fixture besides the
+/// playback speed: carried for both apps, for one alone, the speech model,
+/// one with a value not offered and one bound to the Device.
+const _backupDeviceSettings = [
+  ('theme', 'dark'),
+  ('quietHours', '21:30-07:00'),
+  ('renagMinutes', '15'),
+  ('recordingPauseSeconds', '5'),
+  ('tipsOff', 'true'),
+  ('twoRowEditorOff', 'true'),
+  ('alertsOff', 'true'),
+  ('speechModel', 'small:file'),
+  ('textSize', 'huge'),
+  ('alarmSound', 'content://media/internal/audio/media/42'),
+];
+
 /// The new Device's fixed key seed in the backup fixture: bytes 65 to 96.
 final _restoredSeed = Uint8List.fromList(List<int>.generate(32, (i) => 65 + i));
 
@@ -6512,8 +6528,13 @@ Future<void> _backupFixture(Directory root) async {
     ada
       ..applyProfileDefaults(name: 'Desk')
       ..renameOwnProfile('Ada');
-    // The one Device setting a Backup carries.
+    // The Device settings a Backup carries (obf-1098), the phone's and the
+    // desktop's alone among them, one not offered and one bound to the
+    // Device, which stay behind.
     ada.playbackSpeed = 1.5;
+    for (final (key, value) in _backupDeviceSettings) {
+      ada.setLocalSetting(key, value);
+    }
     const passphrase = 'Grüße an die Katze';
     final code = await setUpBackups(ada, passphrase);
     final moment = ada.momentRows().single;
@@ -6526,6 +6547,7 @@ Future<void> _backupFixture(Directory root) async {
           ..._keySettings(ada),
           for (final (key, value) in ada.localSettingsWithPrefix('backup:')) [key, value],
           ['playbackSpeed', '${ada.playbackSpeed}'],
+          for (final (key, value) in _backupDeviceSettings) [key, value],
         ],
       })}\n',
     );
@@ -6539,6 +6561,7 @@ Future<void> _backupFixture(Directory root) async {
     secretBytes = _counted(5000);
     final file = '${out.path}/backup.$backupExtension';
     final counts = await writeBackup(ada, file);
+    final carried = carriedSettings(ada);
 
     final header = readBackupHeader(file);
     if (header == null) throw StateError('the backup fixture has no header');
@@ -6579,6 +6602,12 @@ Future<void> _backupFixture(Directory root) async {
           for (final (key, value) in restored.localSettingsWithPrefix(''))
             if (key != 'device' && key != 'signseed') [key, value],
         ],
+        'carried': carried,
+        'taken': {
+          for (final app in SettingsApp.values) app.name: [
+              for (final (key, value) in takenSettings(carried, app)) [key, value],
+            ],
+        },
         'read': expected,
       })}\n',
     );
@@ -12818,15 +12847,18 @@ Future<void> main(List<String> args) async {
     '- `backup/`: Ada\'s Device with Areas, a Shared Area, a photo, a '
     'recording longer than a chunk, a Routine checked off, a Moment and '
     'another Device\'s key: her log with its blobs (`device.jsonl`), the '
-    'keys, her Profile, the backup key she holds and the playback speed '
-    'she chose (`settings.json`), '
+    'keys, her Profile, the backup key she holds, the playback speed '
+    'she chose and her other Device settings, the phone\'s and the '
+    'desktop\'s alone, a speech model, one not offered and one bound to '
+    'the Device among them (`settings.json`), '
     'her Moments '
     '(`moments.json`), the Backup she wrote with the standard Argon2id '
     'cost (`backup.$backupExtension`, random bytes counted from 5001 on, '
     'at a held clock), and a new Device restoring it with the passphrase '
     'a day later: its log (`restored.jsonl`), the settings it keeps, her '
     'Profile with the new Device\'s key bound to it by the old one\'s '
-    'and her playback speed among them, and what it reads '
+    'and her playback speed among them, the settings record she wrote '
+    'and what the phone and the desktop take of it, and what it reads '
     '(`expected.json`).\n'
     '- `backup-notes/`: taking Notes back from a Backup (#285): Ada\'s '
     'Device with her Work before her Health, a Routine and a Reminder, a '

@@ -9,6 +9,7 @@ export 'src/area_offers.dart';
 export 'src/auto_sync.dart';
 export 'src/backlinks.dart';
 export 'src/backup.dart';
+export 'src/backup_settings.dart';
 export 'src/blobs.dart';
 export 'src/box_keys.dart';
 export 'src/boxes.dart';

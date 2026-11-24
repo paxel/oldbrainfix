@@ -7732,13 +7732,43 @@ fn the_backup_the_dart_core_wrote_is_restored_here_and_written_the_same() -> Tes
         .map(|m| json!({"seq": m.seq, "cause": m.cause, "label": m.label, "at": m.at}))
         .collect();
     assert_eq!(Value::Array(moments), expected["moments"]);
+    // The settings record each app takes as the Dart core's list says,
+    // and the desktop the settings the phone kept, but those the phone
+    // took of the record for those it takes (obf-1098).
+    use oldbrainfix_core::backup_settings::{SettingsApp, taken_settings};
+    let taken = |app| -> Value {
+        Value::Array(
+            taken_settings(&expected["carried"], app)
+                .into_iter()
+                .map(|(k, v)| json!([k, v]))
+                .collect(),
+        )
+    };
+    assert_eq!(taken(SettingsApp::Phone), expected["taken"]["phone"]);
+    assert_eq!(taken(SettingsApp::Desktop), expected["taken"]["desktop"]);
+    let phone_took = expected["taken"]["phone"].as_array().ok_or("taken")?;
+    let mut want: Vec<Value> = expected["settings"]
+        .as_array()
+        .ok_or("settings")?
+        .iter()
+        .filter(|pair| !phone_took.contains(pair))
+        .cloned()
+        .chain(
+            taken(SettingsApp::Desktop)
+                .as_array()
+                .into_iter()
+                .flatten()
+                .cloned(),
+        )
+        .collect();
+    want.sort_by(|a, b| a[0].as_str().cmp(&b[0].as_str()));
     let settings: Vec<Value> = restored
         .local_settings_with_prefix("")?
         .into_iter()
         .filter(|(k, _)| k != "device" && k != "signseed")
         .map(|(k, v)| json!([k, v]))
         .collect();
-    assert_eq!(Value::Array(settings), expected["settings"]);
+    assert_eq!(settings, want);
     let mut actual = read(&restored)?;
     let mut read_back = expected["read"].clone();
     for value in [&mut actual, &mut read_back] {
