@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'l10n.dart';
 import 'page_bar.dart';
+import 'settings_search.dart';
 import 'system_bars.dart';
 
 /// The first start's first screen: new to Old Brain Fix, a Device of
 /// one's own being added, or a Backup being restored, where [onRestore]
-/// is given. Each row is an action, not a choice of value.
+/// is given. Each row is an action, not a choice of value, on a card of
+/// its own with a chevron, as tappable as the Import page's rows
+/// (obf-1109).
 class FirstStartScreen extends StatelessWidget {
   final VoidCallback onNew;
   final VoidCallback onAddDevice;
@@ -36,30 +39,51 @@ class FirstStartScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Text(t.firstStartIntro),
           ),
-          ListTile(
+          _choice(
             key: const ValueKey('first-new'),
-            leading: const Icon(Icons.auto_awesome_outlined),
-            title: Text(t.firstStartNew),
-            subtitle: Text(t.firstStartNewDetail),
+            icon: Icons.auto_awesome_outlined,
+            title: t.firstStartNew,
+            detail: t.firstStartNewDetail,
             onTap: onNew,
           ),
-          ListTile(
+          _choice(
             key: const ValueKey('first-device'),
-            leading: const Icon(Icons.devices_outlined),
-            title: Text(t.firstStartDevice),
-            subtitle: Text(t.firstStartDeviceDetail),
+            icon: Icons.devices_outlined,
+            title: t.firstStartDevice,
+            detail: t.firstStartDeviceDetail,
             onTap: onAddDevice,
           ),
           if (onRestore case final restore?)
-            ListTile(
+            _choice(
               key: const ValueKey('restore-offer'),
-              leading: const Icon(Icons.settings_backup_restore),
-              title: Text(t.restoreOffer),
-              subtitle: Text(t.restoreOfferDetail),
+              icon: Icons.settings_backup_restore,
+              title: t.restoreOffer,
+              detail: t.restoreOfferDetail,
               onTap: restore,
             ),
         ],
       ),
     );
   }
+
+  /// The card of one start choice: its [icon], [title] over [detail],
+  /// and a chevron, the whole row taking the tap.
+  static Widget _choice({
+    required Key key,
+    required IconData icon,
+    required String title,
+    required String detail,
+    required VoidCallback onTap,
+  }) => SettingsSection(
+    children: [
+      ListTile(
+        key: key,
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(detail),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
+    ],
+  );
 }
