@@ -44,16 +44,18 @@ void main() {
     });
 
     test('by what it held when the file went and its text stayed', () {
+      // As versions before obf-1084 removed a file: its text stayed
+      // beside the Note.
       final memo = notes.capture('', recordings: [voice(1)]);
       notes.setTranscript(memo.id, memo.recordings.single, 'call the bank');
-      notes.removeRecording(memo.id, memo.recordings.single);
+      store.append(memo.id, NoteKeys.audio(memo.recordings.single), null);
       final both = notes.capture(
         '',
         photos: [photo(1)],
         recordings: [voice(2)],
       );
       notes.setPhotoText(both.id, both.photos.single, 'RECEIPT');
-      notes.removePhoto(both.id, both.photos.single);
+      store.append(both.id, NoteKeys.photo(both.photos.single), null);
       expect(notes.byId(memo.id)?.recordings, isEmpty);
       expect(wordless(memo.id), Wordless.voiceRecording);
       expect(notes.byId(both.id)?.photos, isEmpty);
@@ -164,8 +166,9 @@ void main() {
       expect(name(memo.id), 'Call the plumber');
       expect(calendar(memo.id), 'Call the plumber  \r\nabout the leak');
       expect(notes.byId(memo.id)?.text, '');
-      // Its recording gone, the Transcript stays and still names it.
-      notes.removeRecording(memo.id, memo.recordings.single);
+      // Its recording gone as versions before obf-1084 removed it, the
+      // Transcript stays and still names it.
+      store.append(memo.id, NoteKeys.audio(memo.recordings.single), null);
       expect(name(memo.id), 'Call the plumber');
     });
 

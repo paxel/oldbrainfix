@@ -18,6 +18,10 @@ ADR 0013 lets a Member add Transcripts and Photo Texts to any Note, since the ma
 
 An older version reads the null as absent: the recording or photo has no text, so it does not show one and search does not find it, but it transcribes or reads the file again when it holds the bytes and the model, and the new text then reaches every Device. An older version also judges a Member's removal as a text a Member may add, so on it such a removal counts.
 
+## Removed files (obf-1084)
+
+Amended by obf-1084 (ADR 0020): removing a recording or photo now puts its text into the Note's text and removes the Transcript or Photo Text with it, so a text with no file left exists only on Notes whose file was removed before. Refusing to remove that text stays as it was.
+
 ## Formatted text (ADR 0033)
 
 Amended by ADR 0033 (#127): "Replace Note text" and "Append to Note text" go through `takeOver` in both cores, which writes the generated text escaped into a formatted Note's text, so it reads as the plain text it is; into a plain Note it goes as it is.

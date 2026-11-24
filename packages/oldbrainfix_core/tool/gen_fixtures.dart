@@ -1059,16 +1059,18 @@ final _scenarios = <Scenario>[
         'with an untranscribed recording merged into another; a trashed '
         'Note whose media waits for nothing; a photo from another Device '
         'whose bytes are not here; a photo that may be removed; a photo '
-        'removed and its Photo Text kept, '
+        'removed and its Photo Text kept as the Note\'s text, '
         'its bytes kept for the other Note showing it; a merged Note\'s '
         'photo and a recording removed, their bytes gone, their texts '
-        'kept; Notes without words titled as a photo or as a voice '
+        'kept as a paragraph of the text, none left beside it '
+        '(obf-1084); Notes without words titled as a photo or as a voice '
         'recording, one with an empty Transcript; a Note merged into that '
         'one whose Photo Text was removed and whose Transcript was removed '
         'and transcribed again; Notes without text of their own named by '
         'their first Transcript with words before a Photo Text, by the '
         'order their recordings were added, and by a Transcript whose '
-        'recording was removed (obf-1049).',
+        'recording was removed as versions before obf-1084 removed it '
+        '(obf-1049).',
     build: (store) {
       final notes = Notes(store);
       final receipt = notes.capture('', photos: [_photo(1)]);
@@ -1160,7 +1162,9 @@ final _scenarios = <Scenario>[
       }
       final ferns = notes.capture('', recordings: [_recording(12)]);
       notes.setTranscript(ferns.id, ferns.recordings.single, 'Water the ferns');
-      notes.removeRecording(ferns.id, ferns.recordings.single);
+      // As versions before obf-1084 removed it: the Transcript stays.
+      store.append(ferns.id, NoteKeys.audio(ferns.recordings.single), null);
+      store.dropRemovedBlobs();
     },
   ),
   (

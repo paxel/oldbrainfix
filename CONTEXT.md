@@ -51,14 +51,14 @@ A spot the user gave a name ("Home", "Work", "Mum's"). A Note captured near it c
 _Avoid_: location, geofence, favourite
 
 **Transcript**:
-Text recognised from a Note's voice recording, kept next to the recording. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the recording stays, and transcribe the recording again. The recording can be removed and the Transcript stays. While the Note has no text of its own, the first line of its first Transcript with words names it on cards, the Agenda, the calendar and in notifications, before any Photo Text, and its calendar entry carries the whole Transcript as its description; nothing is copied into the Note (obf-1049).
+Text recognised from a Note's voice recording, kept next to the recording. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the recording stays, and transcribe the recording again. The recording can be removed while its words stay: they go into the Note's text as a paragraph of their own, edited or deleted as typed text, and no Transcript is left (obf-1084). While the Note has no text of its own, the first line of its first Transcript with words names it on cards, the Agenda, the calendar and in notifications, before any Photo Text, and its calendar entry carries the whole Transcript as its description; nothing is copied into the Note (obf-1049).
 
 **Photo Text**:
-Text recognised in a Note's photo or screenshot, kept next to the photo. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the photo stays, and read the text again. The photo can be removed and the Photo Text stays. While the Note has no text of its own and no Transcript with words, its first Photo Text with words names it as a Transcript would (obf-1049).
+Text recognised in a Note's photo or screenshot, kept next to the photo. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the photo stays, and read the text again. The photo can be removed while its text stays, in the Note's text as a Transcript's words do. While the Note has no text of its own and no Transcript with words, its first Photo Text with words names it as a Transcript would (obf-1049).
 _Avoid_: OCR (in the UI), caption
 
 **Attachment**:
-A file of any kind attached to a Note, such as a letter as a PDF, a Word document, a spreadsheet or a `.zip`, kept with its name, type and size and synced to every Device of the user and of the people in its Shared Area (ADR 0047). A Note can hold several next to its text, photos and recordings; a merged Note's travel with it. A Note made from a file alone shows the file as its card. There is no Kind for documents. The file can be removed while its Attachment Text stays, as a photo can. German: Anhang.
+A file of any kind attached to a Note, such as a letter as a PDF, a Word document, a spreadsheet or a `.zip`, kept with its name, type and size and synced to every Device of the user and of the people in its Shared Area (ADR 0047). A Note can hold several next to its text, photos and recordings; a merged Note's travel with it. A Note made from a file alone shows the file as its card. There is no Kind for documents. The file can be removed while its Attachment Text stays beside the Note. German: Anhang.
 _Avoid_: document (any file can be one), upload, file (in the UI where a Note's file is meant)
 
 **Attachment Text**:

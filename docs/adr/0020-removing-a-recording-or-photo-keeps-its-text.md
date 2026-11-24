@@ -29,6 +29,18 @@ An older version reads the null as every version reads it: the hash is not among
 
 Amended by ADR 0021 (#90): blocking a person deletes the bytes of their photos and recordings that nothing else in the log refers to, with no removal entry; their copies in the shared folder stay.
 
+## The text goes into the Note's text (obf-1084)
+
+Amended by obf-1084: a Transcript or Photo Text kept beside its removed file could never be removed. Removing a recording or photo now keeps its words as an ordinary paragraph of the Note's own text, edited or deleted as typed text is, and leaves no Transcript or Photo Text. `removeRecording` / `removePhoto` (`remove_recording` / `remove_photo`) write three entries in one batch, in this order: the Note's text (`edit`, a conflictable edit with its causal context, ADR 0011) with the words after the text, a blank line between, or as the whole text when it is blank, escaped into a formatted text as `takeOver` escapes them (ADR 0025, ADR 0033); `transcript:<hash>` or `ocr:<hash>` set to null; then `audio:<hash>` or `photo:<hash>` set to null. The hash is then among neither the removed recordings or photos nor the removed Transcripts or Photo Texts, and search finds the words in the text. The bytes go as before; `removedBlobs` reads only the blob fields. For a merged Note the words go into its own text, which its Section shows.
+
+`mayRemoveRecording` / `mayRemovePhoto` also refuse a Note whose text is in a format this version does not know (ADR 0018), as `edit` would. Nothing is written then, and the file and its text stay as they are.
+
+Two Devices removing files of one Note before they sync each edit the text, so the text is a Conflict (ADR 0011) whose versions each hold one paragraph; none is lost, and the person picks. An older version reads the new entries as an edited text and two removed fields: it shows the words in the text and no Transcript or Photo Text. A Transcript or Photo Text another Device writes for the file before it learns of the removal can win over the null; the Note then holds the words in its text and again a text beside the removed file, as before obf-1084.
+
+Notes whose file was removed before obf-1084 are left as they are: their text stays beside the Note, listed among `removedRecordings` / `removedPhotos` and shown, found and named by as before. Nothing moves it into the text on its own.
+
+Attached files are not changed: removing one still keeps its Attachment Text beside the Note, since that text can be a whole document.
+
 ## Attached files (ADR 0047)
 
 Amended by #267: an attached file is removed as a photo is: `file:<hash>` set to null, refused unless the file has an Attachment Text that is not empty, which stays and is still found, and its bytes go once nothing in the log names them (`mayRemoveAttachment`, `removeAttachment`; `may_remove_attachment`, `remove_attachment`). `file` is a blob kind beside `photo` and `audio`, so `removedBlobs` and `dropRemovedBlobs` let its bytes go by the same rules. The Note lists such a file among its removed ones with the name and type it had (`removedAttachments`), read from the last value its field held.

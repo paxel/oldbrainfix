@@ -99,6 +99,8 @@ void main() {
       (NoteChangeKind.trashed, null, null),
       (NoteChangeKind.recordingAdded, null, null),
       (NoteChangeKind.photoRemoved, null, null),
+      // Its Photo Text went into the text (obf-1084).
+      (NoteChangeKind.text, 'Tent', 'Tent\n\nTent pegs'),
       (NoteChangeKind.photoAdded, null, null),
       (NoteChangeKind.format, TextFormats.plain, TextFormats.markdown),
       (NoteChangeKind.filed, null, home.id),

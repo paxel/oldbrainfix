@@ -2684,7 +2684,14 @@ fn write_media(store: &Store) -> Built {
     }
     let ferns = notes.capture_with("", None, None, &[], &[recording(12)])?;
     notes.set_transcript(&ferns.id, &ferns.recordings[0], "Water the ferns")?;
-    notes.remove_recording(&ferns.id, &ferns.recordings[0])?;
+    // As versions before obf-1084 removed it: the Transcript stays.
+    store.append(
+        &ferns.id,
+        &note_keys::audio(&ferns.recordings[0]),
+        None,
+        None,
+    )?;
+    store.drop_removed_blobs()?;
     Ok(())
 }
 

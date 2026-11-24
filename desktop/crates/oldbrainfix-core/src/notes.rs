@@ -337,11 +337,12 @@ pub struct Note {
     pub photo_texts: BTreeMap<String, String>,
     /// The hashes of its photos that were removed while their Photo Text
     /// stays, in the order they were added; the text is in
-    /// `photo_texts`.
+    /// `photo_texts`. Only versions before obf-1084 removed one so; a
+    /// removal now puts the text into the Note's text.
     pub removed_photos: Vec<String>,
     /// The hashes of its voice recordings that were removed while their
     /// Transcript stays, in the order they were added; the text is in
-    /// `transcripts`.
+    /// `transcripts`. Only versions before obf-1084 removed one so.
     pub removed_recordings: Vec<String>,
     /// The hashes of its voice recordings whose Transcript was removed
     /// while the recording stays, in the order they were added; they are
@@ -1080,8 +1081,8 @@ impl<'a> Notes<'a> {
 
     /// Whether this Device may remove the attached file `hash` of the
     /// Note `note_id`, a merged one included, and keep its Attachment
-    /// Text, as for [`Notes::may_remove_photo`]: the file has one that
-    /// is not empty, and the Note is this Device's to change.
+    /// Text beside the Note: the file has one that is not empty, and the
+    /// Note is this Device's to change.
     pub fn may_remove_attachment(&self, note_id: &str, hash: &str) -> Result<bool> {
         let Some(note) = self.by_id(note_id)? else {
             return Ok(false);
@@ -1095,9 +1096,9 @@ impl<'a> Notes<'a> {
     }
 
     /// Removes the attached file `hash` from the Note `note_id` and keeps
-    /// its Attachment Text, which search still finds, as
-    /// [`Notes::remove_photo`] does (ADR 0020). Refused unless
-    /// [`Notes::may_remove_attachment`].
+    /// its Attachment Text beside the Note, which search still finds (ADR
+    /// 0020); unlike a photo's text it does not go into the Note's text.
+    /// Refused unless [`Notes::may_remove_attachment`].
     pub fn remove_attachment(&self, note_id: &str, hash: &str) -> Result<()> {
         self.require_attached(note_id, hash)?;
         if !self.may_remove_attachment(note_id, hash)? {
@@ -1197,24 +1198,29 @@ impl<'a> Notes<'a> {
     }
 
     /// Whether this Device may remove the photo `hash` of the Note
-    /// `note_id`, a merged one included, and keep its Photo Text: the
-    /// photo has one that is not empty, and the Note is this Device's to
-    /// change ([`Store::may_change`]).
+    /// `note_id`, a merged one included, and keep its Photo Text in the
+    /// Note's text: the photo has one that is not empty, the Note's text
+    /// is in a format known here (ADR 0018), and the Note is this
+    /// Device's to change ([`Store::may_change`]).
     pub fn may_remove_photo(&self, note_id: &str, hash: &str) -> Result<bool> {
-        self.may_remove(note_id, hash, |n| (&n.photos, &n.photo_texts))
+        self.may_remove(note_id, hash, true, |n| (&n.photos, &n.photo_texts))
     }
 
     /// Whether this Device may remove the voice recording `hash` of the
-    /// Note `note_id`, a merged one included, and keep its Transcript, as
-    /// for [`Notes::may_remove_photo`].
+    /// Note `note_id`, a merged one included, and keep its Transcript in
+    /// the Note's text, as for [`Notes::may_remove_photo`].
     pub fn may_remove_recording(&self, note_id: &str, hash: &str) -> Result<bool> {
-        self.may_remove(note_id, hash, |n| (&n.recordings, &n.transcripts))
+        self.may_remove(note_id, hash, true, |n| (&n.recordings, &n.transcripts))
     }
 
+    /// Whether the file or the text `hash` of `of` may go: the file is
+    /// there with a text that is not empty, the Note's text takes it when
+    /// `into_text`, and the Note is this Device's to change.
     fn may_remove(
         &self,
         note_id: &str,
         hash: &str,
+        into_text: bool,
         of: impl Fn(&Note) -> (&Vec<String>, &BTreeMap<String, String>),
     ) -> Result<bool> {
         let Some(note) = self.by_id(note_id)? else {
@@ -1224,48 +1230,79 @@ impl<'a> Notes<'a> {
         if !blobs.iter().any(|h| h == hash) || !has_text(texts.get(hash)) {
             return Ok(false);
         }
+        if into_text && !note.text_editable {
+            return Ok(false);
+        }
         self.store.may_change(note_id)
     }
 
     /// Removes the photo `hash` from the Note `note_id` and keeps its
-    /// Photo Text, which search still finds (ADR 0020). The edit syncs
-    /// like any other; every Device lets the bytes go once no Note refers
-    /// to them. Refused unless [`Notes::may_remove_photo`].
+    /// Photo Text as a paragraph of the Note's own text, edited or deleted
+    /// as typed text is (ADR 0020, obf-1084); no Photo Text is left. The
+    /// edit syncs like any other; every Device lets the bytes go once no
+    /// Note refers to them. Refused unless [`Notes::may_remove_photo`].
     pub fn remove_photo(&self, note_id: &str, hash: &str) -> Result<()> {
-        let held = self
+        let Some(note) = self
             .by_id(note_id)?
-            .is_some_and(|n| n.photos.iter().any(|h| h == hash));
-        if !held {
+            .filter(|n| n.photos.iter().any(|h| h == hash))
+        else {
             return Err(Error::Invalid(format!("not a photo of {note_id}: {hash}")));
-        }
+        };
         if !self.may_remove_photo(note_id, hash)? {
             return Err(Error::Invalid(format!(
                 "the photo {hash} of {note_id} may not be removed here"
             )));
         }
-        self.store.append(note_id, &keys::photo(hash), None, None)?;
+        let words = note.photo_texts.get(hash).map_or("", String::as_str);
+        self.store.batch(|| {
+            self.keep_in_text(&note, words)?;
+            self.store.append(note_id, &keys::ocr(hash), None, None)?;
+            self.store.append(note_id, &keys::photo(hash), None, None)
+        })?;
         self.store.drop_removed_blobs().map(drop)
     }
 
     /// Removes the voice recording `hash` from the Note `note_id` and
-    /// keeps its Transcript, as [`Notes::remove_photo`] does. Refused
-    /// unless [`Notes::may_remove_recording`].
+    /// keeps its Transcript as a paragraph of the Note's own text, as
+    /// [`Notes::remove_photo`] does. Refused unless
+    /// [`Notes::may_remove_recording`].
     pub fn remove_recording(&self, note_id: &str, hash: &str) -> Result<()> {
-        let held = self
+        let Some(note) = self
             .by_id(note_id)?
-            .is_some_and(|n| n.recordings.iter().any(|h| h == hash));
-        if !held {
+            .filter(|n| n.recordings.iter().any(|h| h == hash))
+        else {
             return Err(Error::Invalid(format!(
                 "not a recording of {note_id}: {hash}"
             )));
-        }
+        };
         if !self.may_remove_recording(note_id, hash)? {
             return Err(Error::Invalid(format!(
                 "the recording {hash} of {note_id} may not be removed here"
             )));
         }
-        self.store.append(note_id, &keys::audio(hash), None, None)?;
+        let words = note.transcripts.get(hash).map_or("", String::as_str);
+        self.store.batch(|| {
+            self.keep_in_text(&note, words)?;
+            self.store
+                .append(note_id, &keys::transcript(hash), None, None)?;
+            self.store.append(note_id, &keys::audio(hash), None, None)
+        })?;
         self.store.drop_removed_blobs().map(drop)
+    }
+
+    /// Adds the Transcript or Photo Text `words` of a file removed from
+    /// `note` to its text (obf-1084): a paragraph of its own after the
+    /// text, a blank line between, or the whole text when it has none.
+    /// Into a formatted text it goes escaped, reading as itself, as
+    /// [`Notes::take_over`] writes it.
+    fn keep_in_text(&self, note: &Note, words: &str) -> Result<()> {
+        let taken = text_format::literal(&note.text_format, words);
+        let joined = if note.text.trim().is_empty() {
+            taken
+        } else {
+            format!("{}\n\n{}", note.text.trim_end(), taken)
+        };
+        self.edit(&note.id, &joined)
     }
 
     /// Whether this Device may remove the Photo Text of the photo `hash`
@@ -1273,14 +1310,14 @@ impl<'a> Notes<'a> {
     /// the photo is there with a text that is not empty, and the Note is
     /// this Device's to change ([`Store::may_change`]).
     pub fn may_remove_photo_text(&self, note_id: &str, hash: &str) -> Result<bool> {
-        self.may_remove(note_id, hash, |n| (&n.photos, &n.photo_texts))
+        self.may_remove(note_id, hash, false, |n| (&n.photos, &n.photo_texts))
     }
 
     /// Whether this Device may remove the Transcript of the voice
     /// recording `hash` of the Note `note_id` and keep the recording, as
     /// for [`Notes::may_remove_photo_text`].
     pub fn may_remove_transcript(&self, note_id: &str, hash: &str) -> Result<bool> {
-        self.may_remove(note_id, hash, |n| (&n.recordings, &n.transcripts))
+        self.may_remove(note_id, hash, false, |n| (&n.recordings, &n.transcripts))
     }
 
     /// Removes the Photo Text of the photo `hash` from the Note

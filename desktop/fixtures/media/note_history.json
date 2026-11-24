@@ -4,12 +4,22 @@
       "id": "note:00000000000000000000000000000001",
       "history": [
         {
-          "at": "2026-01-01T10:00:53.000Z",
+          "at": "2026-01-01T10:00:55.000Z",
           "entity": "note:00000000000000000000000000000001",
           "kind": "photoRemoved",
           "before": null,
           "after": null,
           "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:53.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "text",
+          "before": "",
+          "after": "RECEIPT\nTotal 12,50",
+          "format": "plain",
           "by": null,
           "mayUse": false
         },
@@ -31,7 +41,7 @@
           "after": "",
           "format": "plain",
           "by": null,
-          "mayUse": false
+          "mayUse": true
         }
       ]
     },
@@ -39,12 +49,22 @@
       "id": "note:00000000000000000000000000000002",
       "history": [
         {
-          "at": "2026-01-01T10:00:55.000Z",
+          "at": "2026-01-01T10:01:01.000Z",
           "entity": "note:00000000000000000000000000000002",
           "kind": "recordingRemoved",
           "before": null,
           "after": null,
           "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:59.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "text",
+          "before": "Groceries",
+          "after": "Groceries\n\nMilk, eggs and bread",
+          "format": "plain",
           "by": null,
           "mayUse": false
         },
@@ -76,7 +96,7 @@
           "after": "Groceries",
           "format": "plain",
           "by": null,
-          "mayUse": false
+          "mayUse": true
         }
       ]
     },
@@ -149,6 +169,16 @@
       "id": "note:00000000000000000000000000000004",
       "history": [
         {
+          "at": "2026-01-01T10:00:56.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "amendEdited",
+          "before": "",
+          "after": "Dr. Müller, Tuesday 9:00",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
           "at": "2026-01-01T10:00:51.000Z",
           "entity": "note:00000000000000000000000000000004",
           "kind": "photoAdded",
@@ -173,7 +203,7 @@
           "entity": "note:00000000000000000000000000000005",
           "kind": "mergedIn",
           "before": null,
-          "after": "",
+          "after": "Dr. Müller, Tuesday 9:00",
           "format": null,
           "by": null,
           "mayUse": false
@@ -194,12 +224,22 @@
       "id": "note:00000000000000000000000000000005",
       "history": [
         {
-          "at": "2026-01-01T10:00:54.000Z",
+          "at": "2026-01-01T10:00:58.000Z",
           "entity": "note:00000000000000000000000000000005",
           "kind": "photoRemoved",
           "before": null,
           "after": null,
           "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:56.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "text",
+          "before": "",
+          "after": "Dr. Müller, Tuesday 9:00",
+          "format": "plain",
           "by": null,
           "mayUse": false
         },
@@ -221,7 +261,7 @@
           "after": "",
           "format": "plain",
           "by": null,
-          "mayUse": false
+          "mayUse": true
         }
       ]
     },
@@ -299,7 +339,7 @@
       "id": "note:00000000000000000000000000000008",
       "history": [
         {
-          "at": "2026-01-01T10:00:56.000Z",
+          "at": "2026-01-01T10:01:02.000Z",
           "entity": "note:00000000000000000000000000000008",
           "kind": "photoAdded",
           "before": null,
@@ -309,7 +349,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:00:56.000Z",
+          "at": "2026-01-01T10:01:02.000Z",
           "entity": "note:00000000000000000000000000000008",
           "kind": "captured",
           "before": null,
@@ -324,7 +364,7 @@
       "id": "note:00000000000000000000000000000009",
       "history": [
         {
-          "at": "2026-01-01T10:01:15.000Z",
+          "at": "2026-01-01T10:01:21.000Z",
           "entity": "note:0000000000000000000000000000000a",
           "kind": "mergedIn",
           "before": null,
@@ -334,7 +374,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:01.000Z",
+          "at": "2026-01-01T10:01:07.000Z",
           "entity": "note:00000000000000000000000000000009",
           "kind": "recordingAdded",
           "before": null,
@@ -344,7 +384,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:01.000Z",
+          "at": "2026-01-01T10:01:07.000Z",
           "entity": "note:00000000000000000000000000000009",
           "kind": "captured",
           "before": null,
@@ -359,7 +399,7 @@
       "id": "note:0000000000000000000000000000000a",
       "history": [
         {
-          "at": "2026-01-01T10:01:07.000Z",
+          "at": "2026-01-01T10:01:13.000Z",
           "entity": "note:0000000000000000000000000000000a",
           "kind": "recordingAdded",
           "before": null,
@@ -369,7 +409,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:07.000Z",
+          "at": "2026-01-01T10:01:13.000Z",
           "entity": "note:0000000000000000000000000000000a",
           "kind": "photoAdded",
           "before": null,
@@ -379,7 +419,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:07.000Z",
+          "at": "2026-01-01T10:01:13.000Z",
           "entity": "note:0000000000000000000000000000000a",
           "kind": "captured",
           "before": null,
@@ -394,7 +434,7 @@
       "id": "note:0000000000000000000000000000000b",
       "history": [
         {
-          "at": "2026-01-01T10:01:19.000Z",
+          "at": "2026-01-01T10:01:25.000Z",
           "entity": "note:0000000000000000000000000000000b",
           "kind": "recordingAdded",
           "before": null,
@@ -404,7 +444,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:19.000Z",
+          "at": "2026-01-01T10:01:25.000Z",
           "entity": "note:0000000000000000000000000000000b",
           "kind": "recordingAdded",
           "before": null,
@@ -414,7 +454,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:19.000Z",
+          "at": "2026-01-01T10:01:25.000Z",
           "entity": "note:0000000000000000000000000000000b",
           "kind": "photoAdded",
           "before": null,
@@ -424,7 +464,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:19.000Z",
+          "at": "2026-01-01T10:01:25.000Z",
           "entity": "note:0000000000000000000000000000000b",
           "kind": "captured",
           "before": null,
@@ -439,7 +479,7 @@
       "id": "note:0000000000000000000000000000000c",
       "history": [
         {
-          "at": "2026-01-01T10:01:29.000Z",
+          "at": "2026-01-01T10:01:35.000Z",
           "entity": "note:0000000000000000000000000000000c",
           "kind": "recordingAdded",
           "before": null,
@@ -449,7 +489,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:29.000Z",
+          "at": "2026-01-01T10:01:35.000Z",
           "entity": "note:0000000000000000000000000000000c",
           "kind": "recordingAdded",
           "before": null,
@@ -459,7 +499,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:29.000Z",
+          "at": "2026-01-01T10:01:35.000Z",
           "entity": "note:0000000000000000000000000000000c",
           "kind": "captured",
           "before": null,
@@ -474,7 +514,7 @@
       "id": "note:0000000000000000000000000000000d",
       "history": [
         {
-          "at": "2026-01-01T10:01:35.000Z",
+          "at": "2026-01-01T10:01:41.000Z",
           "entity": "note:0000000000000000000000000000000d",
           "kind": "recordingAdded",
           "before": null,
@@ -484,7 +524,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:35.000Z",
+          "at": "2026-01-01T10:01:41.000Z",
           "entity": "note:0000000000000000000000000000000d",
           "kind": "recordingAdded",
           "before": null,
@@ -494,7 +534,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:35.000Z",
+          "at": "2026-01-01T10:01:41.000Z",
           "entity": "note:0000000000000000000000000000000d",
           "kind": "captured",
           "before": null,
@@ -509,7 +549,7 @@
       "id": "note:0000000000000000000000000000000e",
       "history": [
         {
-          "at": "2026-01-01T10:01:51.000Z",
+          "at": "2026-01-01T10:01:57.000Z",
           "entity": "note:0000000000000000000000000000000e",
           "kind": "recordingRemoved",
           "before": null,
@@ -519,7 +559,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:45.000Z",
+          "at": "2026-01-01T10:01:51.000Z",
           "entity": "note:0000000000000000000000000000000e",
           "kind": "recordingAdded",
           "before": null,
@@ -529,7 +569,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-01T10:01:45.000Z",
+          "at": "2026-01-01T10:01:51.000Z",
           "entity": "note:0000000000000000000000000000000e",
           "kind": "captured",
           "before": null,

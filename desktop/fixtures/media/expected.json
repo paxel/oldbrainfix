@@ -1,11 +1,11 @@
 {
-  "now": "2026-01-02T10:01:51.000Z",
+  "now": "2026-01-02T10:01:57.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
     {
       "id": "note:00000000000000000000000000000001",
-      "text": "",
+      "text": "RECEIPT\nTotal 12,50",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
@@ -26,22 +26,16 @@
       "photos": [],
       "recordings": [],
       "transcripts": {},
-      "photoTexts": {
-        "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb": "RECEIPT\nTotal 12,50"
-      },
-      "removedPhotos": [
-        "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
-      ],
+      "photoTexts": {},
+      "removedPhotos": [],
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
-      "shownName": "RECEIPT",
-      "calendarText": "RECEIPT\nTotal 12,50"
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000002",
-      "text": "Groceries",
+      "text": "Groceries\n\nMilk, eggs and bread",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
@@ -63,14 +57,10 @@
         "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
       ],
       "recordings": [],
-      "transcripts": {
-        "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0": "Milk, eggs and bread"
-      },
+      "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": [
-        "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0"
-      ],
+      "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
@@ -151,7 +141,7 @@
     },
     {
       "id": "note:00000000000000000000000000000005",
-      "text": "",
+      "text": "Dr. Müller, Tuesday 9:00",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
@@ -172,18 +162,12 @@
       "photos": [],
       "recordings": [],
       "transcripts": {},
-      "photoTexts": {
-        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66": "Dr. Müller, Tuesday 9:00"
-      },
-      "removedPhotos": [
-        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
-      ],
+      "photoTexts": {},
+      "removedPhotos": [],
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo",
-      "shownName": "Dr. Müller, Tuesday 9:00",
-      "calendarText": "Dr. Müller, Tuesday 9:00"
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000006",
@@ -257,7 +241,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:00:56.000Z",
+      "captured": "2026-01-01T10:01:02.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -289,7 +273,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:01:01.000Z",
+      "captured": "2026-01-01T10:01:07.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -323,7 +307,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:01:07.000Z",
+      "captured": "2026-01-01T10:01:13.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -361,7 +345,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:01:19.000Z",
+      "captured": "2026-01-01T10:01:25.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -403,7 +387,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:01:29.000Z",
+      "captured": "2026-01-01T10:01:35.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -441,7 +425,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:01:35.000Z",
+      "captured": "2026-01-01T10:01:41.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -479,7 +463,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:01:45.000Z",
+      "captured": "2026-01-01T10:01:51.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -551,7 +535,7 @@
         "textFormat": "plain",
         "textVersion": 1,
         "textEditable": true,
-        "captured": "2026-01-01T10:01:07.000Z",
+        "captured": "2026-01-01T10:01:13.000Z",
         "context": {
           "location": null,
           "namedPlace": null,
@@ -585,7 +569,7 @@
       {
         "id": "note:00000000000000000000000000000005",
         "noteId": "note:00000000000000000000000000000004",
-        "text": "",
+        "text": "Dr. Müller, Tuesday 9:00",
         "textFormat": "plain",
         "textVersion": 1,
         "textEditable": true,
@@ -601,16 +585,12 @@
         "photos": [],
         "recordings": [],
         "transcripts": {},
-        "photoTexts": {
-          "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66": "Dr. Müller, Tuesday 9:00"
-        },
-        "removedPhotos": [
-          "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
-        ],
+        "photoTexts": {},
+        "removedPhotos": [],
         "removedRecordings": [],
         "removedTranscripts": [],
         "removedPhotoTexts": [],
-        "modified": null,
+        "modified": "2026-01-01T10:00:56.000Z",
         "editedBy": null
       },
       {
@@ -749,7 +729,7 @@
         "acc46e54dc1fb67e91de5283bcb4adc566cdf6b5ee4b24e47565e00e2bacf4d4",
         "d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58"
       ],
-      "text": "2026-01-01T10:01:07.000Z\nBike"
+      "text": "2026-01-01T10:01:13.000Z\nBike"
     },
     "note:00000000000000000000000000000008": {
       "html": null,
@@ -788,7 +768,7 @@
         "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
       ],
       "recordings": [],
-      "text": "Groceries"
+      "text": "Groceries\n\nMilk, eggs and bread"
     },
     "note:00000000000000000000000000000001": {
       "html": null,
@@ -866,9 +846,9 @@
           "contextEnd": 10,
           "contextStart": 4,
           "end": 10,
-          "key": "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66",
+          "key": "",
           "line": 0,
-          "part": "photoText",
+          "part": "text",
           "section": "note:00000000000000000000000000000005",
           "start": 4
         }
@@ -898,9 +878,9 @@
           "contextEnd": 7,
           "contextStart": 0,
           "end": 7,
-          "key": "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb",
+          "key": "",
           "line": 0,
-          "part": "photoText",
+          "part": "text",
           "section": null,
           "start": 0
         }

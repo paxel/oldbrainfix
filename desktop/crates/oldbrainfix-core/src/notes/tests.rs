@@ -28,12 +28,13 @@ fn a_note_without_words_is_titled_by_what_it_holds() -> Result<()> {
     assert_eq!(wordless(&silent.id)?, Some(Wordless::VoiceRecording));
     assert_eq!(wordless(&receipt.id)?, Some(Wordless::Photo));
     assert_eq!(wordless(&both.id)?, Some(Wordless::Photo));
-    // A file gone while its text stays still counts.
+    // A file gone while its text stays still counts, as versions before
+    // obf-1084 removed one.
     let memo = notes.capture_with("", None, None, &[], &[voice(4)])?;
     notes.set_transcript(&memo.id, &memo.recordings[0], "call the bank")?;
-    notes.remove_recording(&memo.id, &memo.recordings[0])?;
+    store.append(&memo.id, &keys::audio(&memo.recordings[0]), None, None)?;
     notes.set_photo_text(&both.id, &both.photos[0], "RECEIPT")?;
-    notes.remove_photo(&both.id, &both.photos[0])?;
+    store.append(&both.id, &keys::photo(&both.photos[0]), None, None)?;
     assert_eq!(notes.by_id(&memo.id)?.map(|n| n.recordings.len()), Some(0));
     assert_eq!(wordless(&memo.id)?, Some(Wordless::VoiceRecording));
     assert_eq!(notes.by_id(&both.id)?.map(|n| n.photos.len()), Some(0));
@@ -59,7 +60,8 @@ fn a_note_without_text_of_its_own_is_named_by_its_transcript_or_photo_text() -> 
     let whole = "Call the plumber  \r\nabout the leak";
     assert_eq!(named(&memo.id)?, pair("Call the plumber", whole));
     assert_eq!(notes.by_id(&memo.id)?.map(|n| n.text), Some(String::new()));
-    notes.remove_recording(&memo.id, &memo.recordings[0])?;
+    // As versions before obf-1084 removed a recording.
+    store.append(&memo.id, &keys::audio(&memo.recordings[0]), None, None)?;
     assert_eq!(named(&memo.id)?, pair("Call the plumber", whole));
     // Its own text while it has any.
     let groceries = notes.capture_with("Groceries", None, None, &[], &[voice(2)])?;
@@ -667,8 +669,10 @@ fn household(
     Ok((area, private))
 }
 
+const BOTH_KEPT: &str = "Dentist\n\nDr. Weber, Mon 9-12\n\nBring the old X-ray";
+
 #[test]
-fn a_removed_file_goes_and_its_text_stays_and_is_found() -> TestResult {
+fn a_removed_file_goes_and_its_text_becomes_a_paragraph_that_is_found() -> TestResult {
     let ann = Devices::new().device(1, "Ann")?;
     let notes = Notes::new(&ann);
     let (id, p, r) = with_texts(&ann, None, 1)?;
@@ -678,6 +682,98 @@ fn a_removed_file_goes_and_its_text_stays_and_is_found() -> TestResult {
     notes.remove_recording(&id, &r)?;
     let read = note(&ann, &id)?;
     assert!(read.photos.is_empty() && read.recordings.is_empty());
+    assert_eq!(read.text, BOTH_KEPT);
+    // No Photo Text or Transcript is left of them (obf-1084).
+    assert!(read.removed_photos.is_empty() && read.removed_recordings.is_empty());
+    assert!(read.photo_texts.is_empty() && read.transcripts.is_empty());
+    assert_eq!(ann.current(&id, &keys::ocr(&p))?, None);
+    assert_eq!(ann.current(&id, &keys::transcript(&r))?, None);
+    assert_eq!(ann.photo(&p), None);
+    assert_eq!(ann.audio(&r), None);
+    assert!(ann.missing_blobs()?.is_empty(), "not wanted back");
+    assert!(!ann.knows_blob(&format!("photo/{p}"))?);
+    assert_eq!(found(&ann, "weber")?, vec![id.clone()]);
+    assert_eq!(found(&ann, "x-ray")?, vec![id.clone()]);
+    assert!(!notes.may_remove_photo(&id, &p)?);
+    assert_eq!(ann.current(&id, &keys::photo(&p))?, None);
+    let last = ann.history(&id)?.pop().map(|e| e.field);
+    assert_eq!(last, Some(keys::audio(&r)));
+    Ok(())
+}
+
+#[test]
+fn into_an_empty_text_the_words_go_as_the_text() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let n = notes.capture_with("", None, None, &[], &[voice(1)])?;
+    notes.set_transcript(&n.id, &n.recordings[0], "Call the bank")?;
+    notes.remove_recording(&n.id, &n.recordings[0])?;
+    let read = note(&ann, &n.id)?;
+    assert_eq!(read.text, "Call the bank");
+    assert_eq!(read.shown_name(), "Call the bank");
+    assert!(read.transcripts.is_empty());
+    Ok(())
+}
+
+#[test]
+fn into_a_formatted_text_the_words_go_escaped() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let (id, p, _) = with_texts(&ann, None, 1)?;
+    notes.set_format(&id, text_format::MARKDOWN)?;
+    notes.set_photo_text(&id, &p, "2*3 = _six_")?;
+    notes.remove_photo(&id, &p)?;
+    let read = note(&ann, &id)?;
+    assert_eq!(read.text_format, text_format::MARKDOWN);
+    assert_eq!(read.visible_text(), "Dentist\n\n2*3 = _six_");
+    Ok(())
+}
+
+#[test]
+fn the_kept_words_are_edited_and_deleted_as_typed_text() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let (id, _, r) = with_texts(&ann, None, 1)?;
+    notes.remove_recording(&id, &r)?;
+    assert_eq!(found(&ann, "x-ray")?, vec![id.clone()]);
+    notes.edit(&id, "Dentist\n\nBring the new X-ray")?;
+    assert_eq!(note(&ann, &id)?.text, "Dentist\n\nBring the new X-ray");
+    notes.edit(&id, "Dentist")?;
+    let read = note(&ann, &id)?;
+    assert_eq!(read.text, "Dentist");
+    assert!(read.transcripts.is_empty() && read.removed_recordings.is_empty());
+    assert!(found(&ann, "x-ray")?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_text_in_a_format_not_known_here_refuses_the_removal() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let (id, p, r) = with_texts(&ann, None, 1)?;
+    let future = r#"{"format":"x-future","text":"T"}"#;
+    ann.append(&id, keys::TEXT, Some(future), None)?;
+    assert!(!notes.may_remove_photo(&id, &p)?);
+    assert!(!notes.may_remove_recording(&id, &r)?);
+    let mark = ann.current_seq()?;
+    assert!(notes.remove_photo(&id, &p).is_err());
+    assert!(notes.remove_recording(&id, &r).is_err());
+    assert!(ann.entries_after(mark)?.is_empty());
+    // Its texts may still go on their own; the files stay.
+    assert!(notes.may_remove_transcript(&id, &r)?);
+    Ok(())
+}
+
+#[test]
+fn a_file_removed_before_keeps_its_text_beside_the_note() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let (id, p, r) = with_texts(&ann, None, 1)?;
+    // As versions before obf-1084 wrote a removal.
+    ann.append(&id, &keys::photo(&p), None, None)?;
+    ann.append(&id, &keys::audio(&r), None, None)?;
+    let read = note(&ann, &id)?;
+    assert_eq!(read.text, "Dentist");
     assert_eq!(read.removed_photos, vec![p.clone()]);
     assert_eq!(read.removed_recordings, vec![r.clone()]);
     assert_eq!(
@@ -688,14 +784,8 @@ fn a_removed_file_goes_and_its_text_stays_and_is_found() -> TestResult {
         read.transcripts.get(&r).map(String::as_str),
         Some("Bring the old X-ray")
     );
-    assert_eq!(ann.photo(&p), None);
-    assert_eq!(ann.audio(&r), None);
-    assert!(ann.missing_blobs()?.is_empty(), "not wanted back");
-    assert!(!ann.knows_blob(&format!("photo/{p}"))?);
     assert_eq!(found(&ann, "weber")?, vec![id.clone()]);
-    assert_eq!(found(&ann, "x-ray")?, vec![id.clone()]);
-    assert!(!notes.may_remove_photo(&id, &p)?);
-    assert_eq!(ann.current(&id, &keys::photo(&p))?, None);
+    assert!(!notes.may_remove_photo_text(&id, &p)?);
     Ok(())
 }
 
@@ -737,7 +827,9 @@ fn the_bytes_stay_while_another_note_shows_the_same_photo() -> TestResult {
     notes.set_photo_text(&other.id, &p, "Same card")?;
     notes.remove_photo(&other.id, &p)?;
     let section = notes.sections(&target.id)?;
-    assert_eq!(section[0].removed_photos, vec![p.clone()]);
+    assert_eq!(section[0].text, "Same card\n\nSame card");
+    assert!(section[0].removed_photos.is_empty() && section[0].photo_texts.is_empty());
+    assert_eq!(note(&ann, &target.id)?.text, "Health");
     assert_eq!(ann.photo(&p), None, "gone with the last Note showing it");
     Ok(())
 }
@@ -751,17 +843,42 @@ fn the_removal_reaches_another_own_device() -> TestResult {
     exchange(&desk, &ann, None)?;
     assert!(desk.photo(&p).is_some() && desk.audio(&r).is_some());
     Notes::new(&ann).remove_photo(&id, &p)?;
+    exchange(&desk, &ann, None)?;
     Notes::new(&desk).remove_recording(&id, &r)?;
     exchange(&desk, &ann, None)?;
     for store in [&ann, &desk] {
         let read = note(store, &id)?;
         assert!(read.photos.is_empty() && read.recordings.is_empty());
-        assert_eq!(read.photo_texts.len() + read.transcripts.len(), 2);
+        assert_eq!(read.text, BOTH_KEPT);
+        assert_eq!(read.photo_texts.len() + read.transcripts.len(), 0);
         assert_eq!(store.photo(&p), None);
         assert_eq!(store.audio(&r), None);
         assert!(store.missing_blobs()?.is_empty());
         assert_eq!(found(store, "weber")?, vec![id.clone()]);
     }
+    Ok(())
+}
+
+#[test]
+fn removals_on_two_devices_at_once_are_a_conflict_that_keeps_both() -> TestResult {
+    let devices = Devices::new();
+    let ann = devices.device(1, "Ann")?;
+    let desk = devices.device(3, "Ann")?;
+    let (id, p, r) = with_texts(&ann, None, 1)?;
+    exchange(&desk, &ann, None)?;
+    Notes::new(&ann).remove_photo(&id, &p)?;
+    Notes::new(&desk).remove_recording(&id, &r)?;
+    exchange(&desk, &ann, None)?;
+    let conflict = ann.conflict_on(&id, keys::TEXT)?.ok_or("a Conflict")?;
+    let mut texts: Vec<String> = conflict.versions.iter().map(|v| v.text().text).collect();
+    texts.sort();
+    assert_eq!(
+        texts,
+        [
+            "Dentist\n\nBring the old X-ray",
+            "Dentist\n\nDr. Weber, Mon 9-12"
+        ]
+    );
     Ok(())
 }
 
@@ -779,12 +896,15 @@ fn a_removal_in_a_shared_area_reaches_the_member_and_the_manager() -> TestResult
     Notes::new(&ann).remove_photo(&id, &p)?;
     // A Member removes from their own Note, a Manager from anyone's.
     Notes::new(&ben).remove_photo(&own, &own_p)?;
+    exchange(&ben, &ann, None)?;
     Notes::new(&ann).remove_recording(&own, &own_r)?;
     exchange(&ben, &ann, None)?;
     for store in [&ann, &ben] {
-        assert_eq!(note(store, &id)?.removed_photos, vec![p.clone()]);
-        assert_eq!(note(store, &own)?.removed_photos, vec![own_p.clone()]);
-        assert_eq!(note(store, &own)?.removed_recordings, vec![own_r.clone()]);
+        assert_eq!(note(store, &id)?.text, "Dentist\n\nDr. Weber, Mon 9-12");
+        assert!(note(store, &id)?.photo_texts.is_empty());
+        assert_eq!(note(store, &own)?.text, BOTH_KEPT);
+        let own_note = note(store, &own)?;
+        assert!(own_note.photo_texts.is_empty() && own_note.transcripts.is_empty());
         assert_eq!(store.photo(&p), None);
         assert_eq!(store.photo(&own_p), None);
         assert_eq!(store.audio(&own_r), None);
@@ -799,15 +919,27 @@ fn a_members_removal_on_anothers_note_is_refused_and_ignored() -> TestResult {
     let ann = devices.device(1, "Ann")?;
     let ben = devices.device(2, "Ben")?;
     let (area, _) = household(&ann, &ben)?;
-    let (id, p, _) = with_texts(&ann, Some(&area), 1)?;
+    let (id, p, r) = with_texts(&ann, Some(&area), 1)?;
     exchange(&ben, &ann, None)?;
+    let mark = ben.current_seq()?;
     assert!(Notes::new(&ben).remove_photo(&id, &p).is_err());
+    assert!(Notes::new(&ben).remove_recording(&id, &r).is_err());
+    assert!(ben.entries_after(mark)?.is_empty(), "nothing written");
     // As a modified app would write it.
+    let gone = StoredText::of(text_format::PLAIN, "Gone", text_format::VERSION).encode();
+    ben.append(&id, keys::TEXT, Some(&gone), None)?;
+    ben.append(&id, &keys::ocr(&p), None, None)?;
     ben.append(&id, &keys::photo(&p), None, None)?;
     ben.drop_removed_blobs()?;
     exchange(&ben, &ann, None)?;
     for store in [&ann, &ben] {
-        assert_eq!(note(store, &id)?.photos, vec![p.clone()]);
+        let read = note(store, &id)?;
+        assert_eq!(read.photos, vec![p.clone()]);
+        assert_eq!(read.text, "Dentist");
+        assert_eq!(
+            read.photo_texts.get(&p).map(String::as_str),
+            Some("Dr. Weber, Mon 9-12")
+        );
         assert!(store.photo(&p).is_some());
     }
     Ok(())
@@ -999,7 +1131,7 @@ fn a_removed_photo_leaves_the_shared_folder() -> TestResult {
     folder_sync(&desk, &mut folder, &mut random_nonce)?;
     assert_eq!(desk.photo(&p), None);
     assert!(desk.audio(&r).is_some());
-    assert_eq!(note(&desk, &id)?.removed_photos, vec![p]);
+    assert_eq!(note(&desk, &id)?.text, "Dentist\n\nDr. Weber, Mon 9-12");
     Ok(())
 }
 
