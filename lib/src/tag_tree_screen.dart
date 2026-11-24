@@ -7,8 +7,10 @@ import 'l10n.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
 
-/// The tag tree (#267, Q623): every tag of the Notes by its levels, each
-/// with how many Notes carry it or a tag below it. A tap on a tag closes
+/// The tag tree (#267, Q623), opened by "All tags…" at the end of the row
+/// of tags under the Areas list's search (obf-1074): every tag of the
+/// Notes by its levels, each with how many Notes carry it or a tag below
+/// it. A tap on a tag closes
 /// the page with it, for the Areas list to search for it, as a tap on a
 /// tag in a text does (ADR 0032). The levels below a tag unfold by its
 /// arrow; at first only the top level shows. The tree is read when the
@@ -157,6 +159,75 @@ class _TagRow extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The most used tags of [tree] for the row under the Areas list's search
+/// (obf-1074): the tags of every level, those more Notes carry first, of
+/// as many the one first in the tree, at most [count].
+List<TagNode> mostUsedTags(List<TagNode> tree, {int count = 12}) {
+  final all = <TagNode>[];
+  void walk(List<TagNode> level) {
+    for (final node in level) {
+      all.add(node);
+      walk(node.children);
+    }
+  }
+
+  walk(tree);
+  final order = {for (final (i, node) in all.indexed) node: i};
+  all.sort((a, b) {
+    final more = b.notes.compareTo(a.notes);
+    return more != 0 ? more : (order[a] ?? 0).compareTo(order[b] ?? 0);
+  });
+  return all.take(count).toList();
+}
+
+/// One row of [tags] as chips under the Areas list's search field
+/// (obf-1074), ending in "All tags…", which runs [onAll]; a tap on a tag
+/// runs [onPick] with it. Wider than its room it scrolls sideways.
+class TagChipRow extends StatelessWidget {
+  final List<TagNode> tags;
+  final ValueChanged<String> onPick;
+  final VoidCallback onAll;
+
+  const TagChipRow({
+    super.key,
+    required this.tags,
+    required this.onPick,
+    required this.onAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    // From the start edge, also where it fits.
+    return SizedBox(
+      width: double.infinity,
+      child: SingleChildScrollView(
+        key: const ValueKey('tag-chips'),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Row(
+          spacing: 8,
+          children: [
+            for (final node in tags)
+              ActionChip(
+                key: ValueKey('tag-chip-${node.tag}'),
+                label: Text(node.tag),
+                tooltip: t.searchForTag(node.tag),
+                onPressed: () => onPick(node.tag),
+              ),
+            ActionChip(
+              key: const ValueKey('tag-chips-all'),
+              avatar: const Icon(Icons.tag),
+              label: Text(t.allTags),
+              onPressed: onAll,
+            ),
+          ],
         ),
       ),
     );

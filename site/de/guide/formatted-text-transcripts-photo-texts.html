@@ -409,7 +409,7 @@
 <p>Sieh alle #Wörter deiner Notizen nach ihren Ebenen, etwa #leben/gesundheit unter #leben.</p>
 <box-tab device="phone" alt="Die Liste der #Wörter: #garten und #leben, unter #leben gesundheit und rücken aufgeklappt, jedes mit der Anzahl seiner Notizen">
 <li>Tippe <strong>Suchen und stöbern</strong>.</li>
-<li>Tippe <strong>#Wörter</strong> unter den Bereichen.</li>
+<li>Tippe <strong>Alle #Wörter …</strong> am Ende der #Wörter unter der Suche.</li>
 <li>Tippe den Pfeil neben einem #Wort für die #Wörter darunter.</li>
 <li>Tippe ein #Wort, um danach zu suchen.</li>
 </box-tab>
@@ -428,11 +428,17 @@
   („#Leben“, „#leben“), zeigt sich so, wie die meisten seiner Notizen es schreiben.
 </p>
 <p>
+  Solange die Suche der Liste der Bereiche leer ist, zeigt eine Zeile darunter die meistgenutzten
+  #Wörter als Knöpfe, höchstens zwölf, die auf den meisten Notizen zuerst, und endet mit
+  <strong>Alle #Wörter …</strong>. Ein Tippen auf ein #Wort sucht danach. Ist die Zeile breiter als
+  der Bildschirm, verschiebt sie sich seitwärts unter dem Finger.
+</p>
+<p>
   Wenn du „#“ in die Suche der Liste der Bereiche tippst, zeigen sich die #Wörter, die mit dem
   Getippten beginnen, als Knöpfe unter dem Feld, höchstens zwölf; ein Tippen setzt eines ein, sodass
   du ein #Wort findest, ohne seine genaue Schreibweise zu kennen. Solange ein gesperrter Bereich zu
-  ist, fehlen die #Wörter seiner Notizen unter <strong>#Wörter</strong> und in diesen Knöpfen, wie
-  seine Notizen in jeder Liste fehlen.
+  ist, fehlen die #Wörter seiner Notizen in der Zeile der #Wörter, in der Liste der #Wörter und in
+  diesen Knöpfen, wie seine Notizen in jeder Liste fehlen.
 </p>
 <p>
   Auf dem Desktop zeigt <strong>#Wörter</strong> unter den Bereichen in der Seitenleiste die Liste der
@@ -692,7 +698,7 @@
 </p>
 <ul>
   <li><strong>Notiztext ersetzen</strong> macht ihn zum Text; <strong>An Notiztext anhängen</strong> fügt ihn auf einer eigenen Zeile nach dem Text an. Unter dem Transkript oder Fototext eines Abschnitts ändern sie den Text dieses Abschnitts. Der Text wird dann wie gewohnt bearbeitet. In einen formatierten Text geht er als einfacher Text, so geschrieben, dass er sich selbst liest. Beide erscheinen, solange der erkannte Text Worte hat und der Text geändert werden darf.</li>
-  <li><strong>Erkannten Text entfernen</strong> fragt nichts. Auf dem Handy holt die Meldung oben, „Transkript entfernt“ oder „Fototext entfernt“, den Text mit einem Tippen zurück, auf dem Desktop Strg+Z oder Bearbeiten ▸ Rückgängig. Dann findet die Suche den Text auf keinem deiner Geräte mehr, und Aufnahme oder Foto bleiben, sodass sich der Text daraus neu erkennen lässt. Der Text einer entfernten Aufnahme oder eines entfernten Fotos lässt sich nicht entfernen; er ist alles, was davon bleibt.</li>
+  <li><strong>Erkannten Text entfernen</strong> fragt nichts. Auf dem Handy holt die Meldung oben, „Transkript entfernt“ oder „Fototext entfernt“, den Text mit einem Tippen zurück, auf dem Desktop Strg+Z oder Bearbeiten ▸ Rückgängig. Dann findet die Suche den Text auf keinem deiner Geräte mehr, und Aufnahme oder Foto bleiben, sodass sich der Text daraus neu erkennen lässt. Der Text einer Aufnahme oder eines Fotos, die mit einer früheren Version entfernt wurden, bleibt darunter stehen und lässt sich nicht entfernen; er ist alles, was davon bleibt.</li>
   <li><strong>Erneut transkribieren</strong> und <strong>Text erneut lesen</strong> erzeugen den Text neu aus der Datei, anstelle des vorigen oder eines entfernten. Sie erscheinen, solange die Datei auf diesem Gerät ist und das Sprachmodell oder RustO dort läuft. Kommt nichts dabei heraus, sagt eine Meldung oben das, und ein Tippen darauf nennt den Grund; die Datei bleibt.</li>
 </ul>
 <p>
@@ -700,8 +706,10 @@
   behalten</strong>, im Editor und im ⋮ der Karte, tun das Umgekehrte für eine Aufnahme oder ein Foto
   mit Text: Sie fragen einmal nach („Diese Aufnahme entfernen und ihr Transkript behalten?“ oder
   „Dieses Foto entfernen und seinen Text behalten?“), dann verschwindet die Datei von all deinen
-  Geräten und bei allen, mit denen du den Bereich der Notiz teilst, und der Text bleibt in der
-  Notiz. Das ⋮ der Karte bietet sie für die eigenen Dateien der Notiz an, der Editor auch für die
+  Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Ihr Text kommt als eigener
+  Absatz nach einer Leerzeile in den Text der Notiz, oder wird ihr Text, wenn sie keinen hat; er
+  wird dann wie getippter Text bearbeitet oder gelöscht, und kein Transkript oder Fototext bleibt.
+  Das ⋮ der Karte bietet sie für die eigenen Dateien der Notiz an, der Editor auch für die
   ihrer Abschnitte. In einem geteilten Bereich tut ein Mitglied all das nur bei seinen eigenen
   Notizen.
 </p>

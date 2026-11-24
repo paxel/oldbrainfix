@@ -6388,6 +6388,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagFold => 'Hide the tags below';
 
   @override
+  String get allTags => 'All tags…';
+
+  @override
   String get hiddenFromAi => 'Hidden from AI';
 
   @override

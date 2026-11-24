@@ -10274,7 +10274,7 @@ abstract class AppLocalizations {
   /// **'Nothing was added; open the Backup again.'**
   String get backupAddDamagedFix;
 
-  /// Row below the Areas in the Areas list, and the title of the page it opens: every tag (#word) of the Notes by its levels (#267).
+  /// The title of the tag tree page: every tag (#word) of the Notes by its levels (#267).
   ///
   /// In en, this message translates to:
   /// **'Tags'**
@@ -10303,6 +10303,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide the tags below'**
   String get tagFold;
+
+  /// The last chip of the row of the most used tags under the Areas list's search field (obf-1074): opens the tag tree, every tag of the Notes by its levels.
+  ///
+  /// In en, this message translates to:
+  /// **'All tags…'**
+  String get allTags;
 
   /// The mark of a Note or an Area that hides it and everything on it from the AI on the user's computer (#267, ADR 0049): a switch in the card's and the Area's menu and a badge in the Note editor; also read by a screen reader for the shield beside a hidden Note or Area.
   ///

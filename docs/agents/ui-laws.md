@@ -1095,8 +1095,16 @@ replace a law of Both apps where they say so. A desktop law marked
   Capture). **The folder**, first in the Agenda's top bar, opens the
   Areas list (#221); search by text and by #tag stays inside the
   browser.
-- **The tag tree** (#267, Q623, Q639): a row "Tags" below the Areas in
-  the Areas list opens every tag of the Notes by its levels, the top
+- **Tags under the Areas list's search** (obf-1074): while its search
+  field is empty, one row of chips right under it shows the most used
+  tags, at most twelve, of every level, those more Notes carry first and
+  of as many the one first in the tag tree, and ends in "All tags…",
+  there also without a tag; a tap on a tag searches for it, as a tap on
+  a tag in a text does. Wider than the page the row moves sideways under
+  the finger. It leaves out the Notes of a locked Area while it is
+  closed, and is read only while the Areas list shows.
+- **The tag tree** (#267, Q623, Q639): "All tags…" at the end of the row
+  of tags opens every tag of the Notes by its levels, the top
   level as written (`#life`), a level below by its own part (`health`),
   indented, each with how many Notes carry it or a tag below it; the
   levels below a tag unfold by its arrow, the top level alone at first.
@@ -1212,7 +1220,9 @@ replace a law of Both apps where they say so. A desktop law marked
   cells moves sideways, as its bar does, and a Code text in the Note editor (#213),
   which a one-finger drag moves sideways; on a card a Code text is cut
   off at the edge instead; and an Area row while the Areas list
-  rearranges (obf-1089), where a drag moves the row.
+  rearranges (obf-1089), where a drag moves the row; and the row of tags
+  under the Areas list's search while it is wider than the page
+  (obf-1074), which a drag on it moves sideways.
 - **On the iPhone a pushed page goes back with the edge swipe** (#243,
   Q570), iOS's own, from the left edge; a browser level goes back with
   a swipe right anywhere, as on Android. A page that holds its leaving,

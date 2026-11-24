@@ -1709,6 +1709,7 @@
   "tagNotes": "{count, plural, =1{1 Notiz} other{{count} Notizen}}",
   "tagUnfold": "#Wörter darunter zeigen",
   "tagFold": "#Wörter darunter ausblenden",
+  "allTags": "Alle #Wörter …",
   "hiddenFromAi": "Vor KI verborgen",
   "hiddenFromAiByArea": "Aus, über ihren Bereich verborgen",
   "hiddenFromAiRefusedTitle": "Vor KI verborgen",

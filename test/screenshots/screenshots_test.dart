@@ -2090,7 +2090,13 @@ void main() {
               _guideDpr,
             );
             await _tap(tester, find.byTooltip(t.browseTooltip));
-            await _tap(tester, find.byKey(const ValueKey('tags-row')));
+            // "All tags…" ends the row of tags (obf-1074).
+            await tester.drag(
+              find.byKey(const ValueKey('tag-chips')),
+              const Offset(-2000, 0),
+            );
+            await tester.pumpAndSettle();
+            await _tap(tester, find.byKey(const ValueKey('tag-chips-all')));
             expect(find.byType(TagTreeScreen), findsOneWidget);
             await _tap(tester, find.byKey(ValueKey('tree-open-#$life')));
             await _tap(

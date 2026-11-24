@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/lock_settings.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart'
     show deviceWallClock;
+import 'package:oldbrainfix/src/tag_tree_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
@@ -250,9 +251,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AreaScreen), findsNothing);
     expect(key('area-move-${car.id}'), findsOneWidget);
-    await tester.tap(key('tags-row'));
+  });
+
+  testWidgets('All tags… while rearranging ends it, as leaving the page '
+      'does', (tester) async {
+    await openAreas(tester);
+    await rearrange(tester);
+    await tester.tap(key('tag-chips-all'));
     await tester.pumpAndSettle();
-    expect(key('area-move-${car.id}'), findsOneWidget);
+    expect(find.byType(TagTreeScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(key('area-move-${car.id}'), findsNothing);
+    expect(key('areas-rearrange-done'), findsNothing);
   });
 
   testWidgets('a swipe right on a row goes back to the Agenda', (tester) async {

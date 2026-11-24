@@ -6464,6 +6464,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tagFold => '#Wörter darunter ausblenden';
 
   @override
+  String get allTags => 'Alle #Wörter …';
+
+  @override
   String get hiddenFromAi => 'Vor KI verborgen';
 
   @override

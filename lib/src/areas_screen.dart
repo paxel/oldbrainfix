@@ -39,7 +39,9 @@ import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
 /// the Areas while it is empty, with "+" to add an Area. Tapping an Area
-/// opens its Topics; the app bar leads to all Notes and the trash.
+/// opens its Topics; the app bar leads to all Notes and the trash. Under
+/// the empty field a row of the most used tags searches for one, and its
+/// "All tags…" opens the tag tree (obf-1074).
 /// [query] starts the search, as a tap on a tag does (ADR 0032).
 class AreasScreen extends StatefulWidget {
   final Notes notes;
@@ -101,6 +103,17 @@ class _AreasScreenState extends State<AreasScreen>
   /// how far they are; none without the app.
   AreaDeletions? _deletions;
 
+  /// The most used tags under the empty search field (obf-1074), without
+  /// the Notes of the locked Areas closed, as every list. They are read
+  /// only while this page shows with no search, as reading them reads
+  /// every Note: beside the Agenda a change there would read them each
+  /// time. [_tagsStale] says a change came meanwhile.
+  List<TagNode> _tags = const [];
+  var _tagsStale = true;
+
+  /// The app's lock, followed for the tags.
+  AppLock? _lock;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -108,6 +121,12 @@ class _AreasScreenState extends State<AreasScreen>
     if (deletions != _deletions) {
       _deletions?.removeListener(_deletionsChanged);
       _deletions = deletions?..addListener(_deletionsChanged);
+    }
+    final lock = LockScope.of(context);
+    if (lock != _lock) {
+      _lock?.removeListener(_locksChanged);
+      _lock = lock?..addListener(_locksChanged);
+      _tagsStale = true;
     }
     if (_loaded) return;
     _load();
@@ -137,6 +156,7 @@ class _AreasScreenState extends State<AreasScreen>
   void dispose() {
     widget.pageShown?.removeListener(_pageChanged);
     _deletions?.removeListener(_deletionsChanged);
+    _lock?.removeListener(_locksChanged);
     _query.dispose();
     super.dispose();
   }
@@ -146,7 +166,39 @@ class _AreasScreenState extends State<AreasScreen>
     if (widget.pageShown?.value != HomePager.areas) {
       stopSelecting();
       _stopRearranging();
+    } else if (_tagsStale) {
+      setState(_readTags);
     }
+  }
+
+  /// Whether this page shows with an empty search field, the tags under
+  /// it.
+  bool get _tagsShown =>
+      (widget.pageShown?.value ?? HomePager.areas) == HomePager.areas &&
+      _query.text.trim().isEmpty;
+
+  /// Reads the most used tags when they show, else notes that they wait.
+  void _readTags() {
+    if (!_tagsShown) {
+      _tagsStale = true;
+      return;
+    }
+    _tagsStale = false;
+    _tags = mostUsedTags(
+      TagTree(widget.places.store)
+          .tree(closed: _lock?.closedAreas ?? const <String>{}),
+    );
+  }
+
+  /// An Area opened or closed, or the app locked: the tags again. Not
+  /// shown now, none stay until they are read, so a closed Area's tags
+  /// never show on the way back.
+  void _locksChanged() {
+    if (!mounted) return;
+    setState(() {
+      _readTags();
+      if (_tagsStale) _tags = const [];
+    });
   }
 
   /// Leaving the page ends rearranging (obf-1089); each move is already
@@ -194,6 +246,7 @@ class _AreasScreenState extends State<AreasScreen>
     keepShown(_hits);
     // A search shows no Areas to move.
     if (_searched.trim().isNotEmpty) _rearranging = false;
+    _readTags();
   }
 
   void _filtered(PersonFilter people) => setState(() {
@@ -312,6 +365,7 @@ class _AreasScreenState extends State<AreasScreen>
   /// Opens the tag tree, without the Notes of the locked Areas closed;
   /// a tag tapped there is searched for here.
   Future<void> _openTags() async {
+    _stopRearranging();
     final tag = await Navigator.of(context).push(
       MaterialPageRoute<String>(
         builder: (_) => TagTreeScreen(store: widget.places.store),
@@ -321,16 +375,6 @@ class _AreasScreenState extends State<AreasScreen>
     if (tag == null) return _reload();
     _searchTag(context, tag);
   }
-
-  /// The row below the Areas that opens the tag tree (#267, Q623).
-  Widget _tagsRow(AppLocalizations t) => _PlaceRow(
-    key: const ValueKey('tags-row'),
-    title: t.tagsTitle,
-    leading: const Icon(Icons.tag),
-    // While rearranging a tap on a row only moves it (obf-1089).
-    onTap: _rearranging ? null : _openTags,
-    menu: null,
-  );
 
   Future<void> _openTrash() async {
     _stopRearranging();
@@ -719,6 +763,20 @@ class _AreasScreenState extends State<AreasScreen>
                         tags: widget.places.store,
                         closedTags: closed,
                       ),
+                      // The most used tags, while nothing is typed
+                      // (obf-1074); a search shows its own chips.
+                      ListenableBuilder(
+                        listenable: _query,
+                        builder: (_, row) =>
+                            _query.text.trim().isEmpty && row != null
+                            ? row
+                            : const SizedBox.shrink(),
+                        child: TagChipRow(
+                          tags: _tags,
+                          onPick: (tag) => _searchTag(context, tag),
+                          onAll: _openTags,
+                        ),
+                      ),
                       if (searching)
                         PersonFilterChips(
                           store: widget.places.store,
@@ -752,24 +810,20 @@ class _AreasScreenState extends State<AreasScreen>
                               find: _searched,
                               onFind: _openAt,
                             )
-                          : [...rows, _tagsRow(t)],
+                          : rows,
                     ),
                   )
                 else ...[
                   // The Areas move only while rearranging (obf-1089): a
                   // long press never changes data (#280).
                   SliverPadding(
-                    padding: padding.copyWith(bottom: 0),
+                    padding: padding,
                     sliver: SliverReorderableList(
                       itemCount: rows.length,
                       itemBuilder: (_, index) => rows[index],
                       onReorderItem: _moved,
                       proxyDecorator: _lifted,
                     ),
-                  ),
-                  SliverPadding(
-                    padding: padding.copyWith(top: 0),
-                    sliver: SliverToBoxAdapter(child: _tagsRow(t)),
                   ),
                 ],
               ],
