@@ -5796,7 +5796,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop3 =>
-      'Erinnerung: in der Schnellnotiz schreiben, Mehr klicken, dann + und Erinnere mich …; die Zeit einstellen und Speichern klicken.';
+      'Erinnerung: in der Schnellnotiz schreiben, „Im Editor öffnen“ klicken, dann + und Erinnere mich …; die Zeit einstellen und Speichern klicken.';
 
   @override
   String get helpQuickStartDesktop4 =>

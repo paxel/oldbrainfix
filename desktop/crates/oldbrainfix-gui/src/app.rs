@@ -1581,8 +1581,9 @@ enum Action {
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
-    /// More (#142, #352): captures as leaving does and opens the Note in
-    /// the Note dialog (#146), its text taking the keyboard.
+    /// Open in the editor (#142, #352, obf-1080): captures as leaving does
+    /// and opens the Note in the Note dialog (#146), its text taking the
+    /// keyboard.
     CaptureToEditor,
     /// Record voice in the Note dialog (#352): starts recording voice
     /// into the Note open there.
@@ -14830,11 +14831,12 @@ impl App {
 
     /// The quick note's content (UI laws, "Capture"), in its dialog
     /// (#146): it never asks anything. The text, and once something is
-    /// typed or held, More (#352), which saves the Note and opens it in
-    /// the Note dialog, and under it the Nudge times, Ctrl+Enter taking
-    /// the 1 h one and Ctrl+1 to 3 each of them (#277); a Note filed by a
-    /// list's "+", or where the Nudge buttons are switched off, gets one
-    /// Save instead, nudging only an Unsorted Note. What the files
+    /// typed or held, the Nudge times, Ctrl+Enter taking the 1 h one and
+    /// Ctrl+1 to 3 each of them (#277), and under them Open in the editor
+    /// (#352, obf-1080), which saves the Note and opens it in the Note
+    /// dialog; a Note filed by a list's "+", or where the Nudge buttons
+    /// are switched off, gets one Save instead of the Nudge times,
+    /// nudging only an Unsorted Note. What the files
     /// dropped, File ▸ Attach file… and Ctrl+V brought shows above the
     /// text; everything else is the Note dialog's.
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
@@ -14919,42 +14921,41 @@ impl App {
                 return;
             }
             ui.add_space(4.0);
-            // Saves as leaving does and opens the Note dialog (#352).
-            let more = ui.button(RichText::new(t.more()).color(text));
-            spotlight::anchor(ui, "quick-more", more.rect);
-            if more.clicked() {
-                actions.push(Action::CaptureToEditor);
-            }
-            ui.add_space(4.0);
-            if sorted || !quick.nudge_buttons {
+            let hint = if sorted || !quick.nudge_buttons {
                 // A sorted Note needs no Nudge (#113); without the Nudge
                 // buttons, Save nudges in 1 h (#142).
                 if theme::primary(ui, true, t.save()).clicked() {
                     actions.push(Action::Capture(Notes::default_nudge()));
                 }
-                let hint = if sorted {
+                if sorted {
                     t.capture_keys_hint_sorted()
                 } else {
                     t.capture_keys_hint()
-                };
-                ui.label(RichText::new(hint).small().color(weak));
-                return;
-            }
-            ui.label(RichText::new(t.nudge_heading()).strong().color(text));
-            let nudges = ui.horizontal(|ui| {
-                let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
-                for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times()) {
-                    if ui.button(RichText::new(label).color(text)).clicked() {
-                        actions.push(Action::Capture(nudge_in));
-                    }
                 }
-            });
-            spotlight::anchor(ui, "quick-nudges", nudges.response.rect);
-            ui.label(
-                RichText::new(t.capture_nudge_keys_hint())
-                    .small()
-                    .color(weak),
-            );
+            } else {
+                ui.label(RichText::new(t.nudge_heading()).strong().color(text));
+                let nudges = ui.horizontal(|ui| {
+                    let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
+                    for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times())
+                    {
+                        if ui.button(RichText::new(label).color(text)).clicked() {
+                            actions.push(Action::Capture(nudge_in));
+                        }
+                    }
+                });
+                spotlight::anchor(ui, "quick-nudges", nudges.response.rect);
+                t.capture_nudge_keys_hint()
+            };
+            ui.add_space(4.0);
+            // Saves as leaving does and opens the Note dialog (#352,
+            // obf-1080).
+            let to_editor = capture_choices::open_in_editor(ui, &t, true);
+            spotlight::anchor(ui, "quick-more", to_editor.rect);
+            if to_editor.clicked() {
+                actions.push(Action::CaptureToEditor);
+            }
+            ui.add_space(4.0);
+            ui.label(RichText::new(hint).small().color(weak));
         });
     }
 
@@ -20477,9 +20478,9 @@ fn quick_note_shows(query: &str, t: &L10n) -> [bool; 2] {
 }
 
 /// The Settings' card on what the quick note, its dialog in the window
-/// and the popup, shows besides its text and More (#142, #352): the
-/// Nudge buttons, on until switched off; of it the rows `shows` (#282).
-/// The switches for File into…, the Frog and Session, Add to a Shopping
+/// and the popup, shows besides its text and Open in the editor (#142,
+/// #352): the Nudge buttons, on until switched off; of it the rows
+/// `shows` (#282). The switches for File into…, the Frog and Session, Add to a Shopping
 /// List, the Importance and the format bar went with those controls
 /// into the Note dialog; what they stored stays, unused.
 fn quick_note_card(

@@ -5729,7 +5729,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop3 =>
-      'Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.';
+      'Reminder: in the quick note, type, click Open in the editor, then + and Remind me…; set its time and click Save.';
 
   @override
   String get helpQuickStartDesktop4 =>

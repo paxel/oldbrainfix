@@ -103,11 +103,12 @@ replace a law of Both apps where they say so. A desktop law marked
   button**. No hold-to-talk, no stop on silence. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
   with the recording or photo on it and room to type. Leaving saves.
-- **The quick note is the text, three Nudge buttons and More, nothing
-  else** (#352): the text field at the top, under it remind me in
-  **10 min, 30 min, 1 h**, and More, which saves the Note as leaving
-  does and opens it in the full editor in its place (on the desktop the
-  Note dialog). On the phone they sit right under the text field and do
+- **The quick note is the text, three Nudge buttons and Open in the
+  editor, nothing else** (#352): the text field at the top, under it
+  remind me in **10 min, 30 min, 1 h**, and under them Open in the
+  editor, a full-width outlined button with the editor's pencil
+  (obf-1080), which saves the Note as leaving does and opens it in the
+  full editor in its place (on the desktop the Note dialog). On the phone they sit right under the text field and do
   not move when the keyboard opens (#396); a long text scrolls and they
   stay above the keyboard. Simple and Advanced alike, on the phone, in the desktop's
   quick note dialog and in the capture popup. No Save and no Back on
@@ -119,7 +120,7 @@ replace a law of Both apps where they say so. A desktop law marked
   in the full editor and the Note dialog. An entry point that starts
   with something, voice, the camera, a picker, the clipboard, a share or
   a list's "+", still opens the quick note with it: what it brought
-  shows above the text, and More takes it on.
+  shows above the text, and Open in the editor takes it on.
 - Leaving without tapping a Nudge button means 1 h. The three are
   actions, not a choice of value: a tap saves the Note with that Nudge
   time, so the single-choice law does not apply to them. Where the
@@ -142,7 +143,7 @@ replace a law of Both apps where they say so. A desktop law marked
   also when the speech model is downloaded later. They are added once:
   transcribing again adds nothing.
 - **Everything is saved together** when the user leaves the screen or
-  taps a Nudge button, Save or More. Nothing is half-saved: for an
+  taps a Nudge button, Save or Open in the editor. Nothing is half-saved: for an
   empty Note nothing is saved.
 - **A sorted Note needs no Nudge.** Opened from an Area's or Topic's
   "+", the quick note files the Note there: the three Nudge buttons
@@ -1283,13 +1284,14 @@ replace a law of Both apps where they say so. A desktop law marked
   Settings ▸ Capture ▸ "Print to Old Brain Fix", in Simple and Advanced,
   says whether Android has the service on and opens Android's print
   settings, where only the user turns it on; the iPhone has no row.
-- **The quick note is the text, the Nudge buttons and More** (#142,
-  #352): nothing else, in Simple and Advanced alike, on every capture
-  path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
-  shortcut, also one a phone key or gesture starts). What a path brought
-  in, a recording, photos or files, shows above the text. **More** saves
-  the Note at once, Unsorted with the default Nudge, and opens the Note
-  editor on it in place of the capture screen; leaving the editor
+- **The quick note is the text, the Nudge buttons and Open in the
+  editor** (#142, #352, obf-1080): nothing else, in Simple and Advanced
+  alike, on every capture path (text, Voice, Photo, Gallery, Paste,
+  share, widget, tile, shortcut, also one a phone key or gesture
+  starts). What a path brought in, a recording, photos or files, shows
+  above the text. **Open in the editor** saves the Note at once,
+  Unsorted with the default Nudge, and opens the Note editor on it in
+  place of the capture screen; leaving the editor
   returns to where Capture was opened from. It waits while there is
   nothing to save and is not offered behind the App Lock.
 - **The Note editor holds what the quick note no longer shows** (#352):
@@ -2069,8 +2071,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - **On the desktop** the capture popup and the window's quick note
   dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
   quick note (#352): the text, then, once something is typed or held,
-  More and the Nudge buttons, nothing else; desktop Settings ▸ Quick
-  note keeps only Nudge buttons. More saves the Note and opens it in the
+  the Nudge buttons and under them Open in the editor, nothing else;
+  desktop Settings ▸ Quick note keeps only Nudge buttons. Open in the
+  editor saves the Note and opens it in the
   window's Note dialog in place of the dialog; in the popup it closes
   the popup and opens the Note there in the window, brought back from
   the tray. The Note dialog holds Record voice, Paste (in a row with

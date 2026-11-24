@@ -142,13 +142,11 @@ fn enter_on_a_nudge_button_takes_that_buttons_time() -> TestResult {
     let mut harness = popup_over(store.clone(), "en");
     typing(&harness).type_text("Water the plants");
     harness.run();
-    // More comes first, above the Nudge times; everything else is the
-    // Note dialog's (#352).
-    for label in ["More", "10 min"] {
-        harness.key_press(Key::Tab);
-        harness.run();
-        assert!(harness.get_by_label(label).is_focused(), "{label}");
-    }
+    // The Nudge times come first, Open in the editor under them
+    // (obf-1080); everything else is the Note dialog's (#352).
+    harness.key_press(Key::Tab);
+    harness.run();
+    assert!(harness.get_by_label("10 min").is_focused());
     harness.key_press(Key::Enter);
     harness.run();
     assert!(harness.state().closed);

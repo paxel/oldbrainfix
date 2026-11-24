@@ -3125,7 +3125,7 @@
   "helpQuickStartDesktop1": "Capture: File ▸ New Note or Ctrl+N, type, then Ctrl+Enter.",
   "@helpQuickStartDesktop1": {"description": "The desktop's way for the Quick start's Line of the same number (#260), a line of its Description: the step's short name, a colon, then the menus, keys and clicks; nothing of Advanced."},
   "helpQuickStartDesktop2": "File: in Unsorted in the sidebar, drag the card onto an Area, or right-click it, File into…, and pick the Area.",
-  "helpQuickStartDesktop3": "Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.",
+  "helpQuickStartDesktop3": "Reminder: in the quick note, type, click Open in the editor, then + and Remind me…; set its time and click Save.",
   "helpQuickStartDesktop4": "Routine: the same, then Every … and when it repeats.",
   "helpQuickStartDesktop5": "Tick: click the box in front of a Line.",
   "helpQuickStartDesktop6": "Search and browse: click an Area in the sidebar, or Edit ▸ Find (Ctrl+F).",

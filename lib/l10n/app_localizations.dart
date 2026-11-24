@@ -9209,7 +9209,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStartDesktop3.
   ///
   /// In en, this message translates to:
-  /// **'Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.'**
+  /// **'Reminder: in the quick note, type, click Open in the editor, then + and Remind me…; set its time and click Save.'**
   String get helpQuickStartDesktop3;
 
   /// No description provided for @helpQuickStartDesktop4.

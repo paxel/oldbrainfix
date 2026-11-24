@@ -1,7 +1,7 @@
 //! Add to Note… on the desktop (#308), driven headless by egui_kittest:
 //! an Unsorted Note's card offers it in place of Merge into…, and the
 //! Note picked gets it merged in as a Section. The quick note offers it
-//! no longer (#352): its More opens the Note dialog, whose Merge into…
+//! no longer (#352): its Open in the editor opens the Note dialog, whose Merge into…
 //! adds the capture to another Note.
 
 use chrono::{DateTime, Utc};
@@ -112,13 +112,13 @@ fn unsorted(store: &Store) -> Result<Vec<String>, Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn the_quick_notes_more_leads_to_merge_into_another_note() -> TestResult {
-    // The quick note no longer adds to another Note itself (#352): More
-    // saves it and opens the Note dialog, whose Merge into… does it.
+fn the_quick_notes_open_in_the_editor_leads_to_merge_into_another_note() -> TestResult {
+    // The quick note no longer adds to another Note itself (#352): Open
+    // in the editor saves it and opens the Note dialog, whose Merge into… does it.
     let store = store()?;
     let mut harness = quick_note(App::new(store, "en"), "more garlic");
     assert!(!shows(&harness, "Add to Note…"));
-    press(&mut harness, "More")?;
+    press(&mut harness, "Open in the editor")?;
     assert!(!harness.state().quick_note_open());
     press(&mut harness, "Merge into…")?;
     type_here(&mut harness, "sauce");

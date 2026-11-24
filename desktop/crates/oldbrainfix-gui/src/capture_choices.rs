@@ -8,8 +8,9 @@
 //! nothing at all.
 //!
 //! The quick note, the capture popup and the window's quick note dialog,
-//! shows only the text, the Nudge buttons and More (#352); the Note
-//! dialog does the rest once the Note is saved. Both save through
+//! shows only the text, the Nudge buttons and Open in the editor (#352,
+//! obf-1080); the Note dialog does the rest once the Note is saved. Both
+//! save through
 //! [`save`], so the two cannot tell this apart. The Kind (#310) applies
 //! to the typed text only: with nothing typed the Note stays a Plain
 //! Note. With a Shopping List set (#124), each line typed becomes a Line
@@ -25,7 +26,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::{Key, Modifiers, RichText, Ui};
+use egui::{Atom, Button, Color32, Id, Key, Modifiers, Response, RichText, Ui, Vec2};
 use oldbrainfix_core::{
     Checklists, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes, Routines, Schedule,
     SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, WallClock, markdown,
@@ -35,6 +36,7 @@ use oldbrainfix_core::{
 use crate::app::Wall;
 use crate::attachment_view::HeldFile;
 use crate::enrich::Said;
+use crate::icons;
 use crate::l10n::L10n;
 
 /// A Session's pool, count, weekdays' own counts and rule as plain
@@ -460,8 +462,9 @@ pub fn shopping_picker(
 }
 
 /// What this Device's quick note, its dialog in the window and the
-/// popup, shows besides its text and More (#142, #352, ADR 0008): the
-/// Nudge buttons until switched off in Settings ▸ Quick note.
+/// popup, shows besides its text and Open in the editor (#142, #352,
+/// ADR 0008): the Nudge buttons until switched off in Settings ▸ Quick
+/// note.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QuickNote {
     pub nudge_buttons: bool,
@@ -515,6 +518,34 @@ pub fn nudge_key(ui: &Ui, nudges: bool) -> Option<Duration> {
         i.consume_key(Modifiers::COMMAND, Key::Enter)
             .then(Notes::default_nudge)
     })
+}
+
+/// The quick note's Open in the editor (obf-1080), under the Nudge
+/// buttons or their Save: a full-width outlined button with the editor's
+/// pencil before its words, greyed unless `enabled`. Its caller saves
+/// the Note and opens it in the Note dialog.
+pub fn open_in_editor(ui: &mut Ui, t: &L10n, enabled: bool) -> Response {
+    let text = ui.visuals().text_color();
+    let pencil = Id::new("open in the editor pencil");
+    ui.add_enabled_ui(enabled, |ui| {
+        // Outlined: no fill until the pointer is on it.
+        ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
+        // The pencil and the words in the middle of the width.
+        let atoms = (
+            Atom::grow(),
+            Atom::custom(pencil, Vec2::splat(18.0)),
+            RichText::new(t.capture_open_in_editor()).color(text),
+            Atom::grow(),
+        );
+        let shown = Button::new(atoms)
+            .min_size(egui::vec2(ui.available_width(), 0.0))
+            .atom_ui(ui);
+        if let Some(rect) = shown.rect(pencil) {
+            icons::paint(ui.painter(), rect, icons::EDIT, text);
+        }
+        shown.response
+    })
+    .inner
 }
 
 /// Makes each line of the text of the saved Note `note_id` a Line of the

@@ -5,8 +5,8 @@
 //! Enter taking the first row shown, Esc leaving, New Area… with the
 //! filter's text filled in and New Topic… in Advanced only, both making
 //! the place and filing into it, and Cancel there making nothing. The
-//! quick note files nothing itself (#352): its More opens the Note
-//! dialog, where File into… files it.
+//! quick note files nothing itself (#352): its Open in the editor opens
+//! the Note dialog, where File into… files it.
 
 use chrono::{DateTime, Utc};
 use egui::accesskit::Role;
@@ -313,9 +313,9 @@ fn new_topic_ends_each_area_in_advanced_only_and_files_into_the_topic() -> TestR
 }
 
 #[test]
-fn the_quick_notes_more_leads_to_file_into_in_the_note_dialog() -> TestResult {
-    // The quick note no longer files (#352): More saves it Unsorted and
-    // opens the Note dialog, where File into… files it.
+fn the_quick_notes_open_in_the_editor_leads_to_file_into_in_the_note_dialog() -> TestResult {
+    // The quick note no longer files (#352): Open in the editor saves it
+    // Unsorted and opens the Note dialog, where File into… files it.
     let store = store()?;
     DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
     let mut harness = harness(store);
@@ -327,7 +327,7 @@ fn the_quick_notes_more_leads_to_file_into_in_the_note_dialog() -> TestResult {
     harness.run();
     type_here(&mut harness, "Buy bread");
     assert!(!shows(&harness, "File into…"));
-    press(&mut harness, "More")?;
+    press(&mut harness, "Open in the editor")?;
     assert!(!harness.state().quick_note_open());
     let bread = Notes::new(harness.state().store())
         .all()?

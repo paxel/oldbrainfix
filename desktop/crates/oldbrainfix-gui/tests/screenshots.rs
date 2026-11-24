@@ -969,8 +969,8 @@ fn all_guide_frames() -> TestResult {
                 &box_frame("getting-started", "import-keep"),
             )?);
             // A thought typed into the quick note, opened over the Agenda
-            // as File ▸ New Note opens it (#146): More and the Nudge times
-            // show under the text, nothing else (#352).
+            // as File ▸ New Note opens it (#146): the Nudge times and Open
+            // in the editor show under the text, nothing else (#352).
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().new_note();
             harness.run();
@@ -984,12 +984,12 @@ fn all_guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame("capture-and-sort", "capture"),
             )?);
-            // Capture and sort: the quick note's More, which saves it and
-            // opens the Note dialog on it, where it is sorted (#352); the
-            // capture popup of the hotkey, the Unsorted Notes, the Note
-            // dialog and its History.
+            // Capture and sort: the quick note's Open in the editor, which
+            // saves it and opens the Note dialog on it, where it is sorted
+            // (#352); the capture popup of the hotkey, the Unsorted Notes,
+            // the Note dialog and its History.
             harness
-                .get_by_role_and_label(Role::Button, L10n::new(language).more())
+                .get_by_role_and_label(Role::Button, L10n::new(language).capture_open_in_editor())
                 .click();
             harness.run();
             problems.extend(match_frame(

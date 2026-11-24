@@ -279,7 +279,8 @@ pub const MANIFEST: &[Screen] = &[
 /// from it counts them as shown ([`seed`]). Never computed from
 /// [`MANIFEST`], and nothing is ever added to it: 0.7.0's new things
 /// (Quiet today, Remind me…, Heads-ups, Linked from, the code's language,
-/// Add grammar…, the quick note's More, Show tips again) stay due.
+/// Add grammar…, the quick note's More, now Open in the editor, Show
+/// tips again) stay due.
 pub const BEFORE_070: &[(&str, &[&str])] = &[
     (
         AGENDA,

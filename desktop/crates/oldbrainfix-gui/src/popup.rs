@@ -1,17 +1,18 @@
 //! The capture popup (UI laws, "Capture"): a small window over all
 //! others that the hotkey, the tray's Capture and `oldbrainfix capture`
 //! open. It is the quick note (#352): the text, the three Nudge buttons
-//! and More, nothing else, and it never asks anything. Enter keeps the
-//! text with a Nudge in 1 h, the three buttons with theirs, and leaving
-//! it with Esc or its close button keeps what is typed the same way as
-//! Enter, as leaving the phone's capture screen does; empty, it just
-//! closes.
+//! and Open in the editor, nothing else, and it never asks anything.
+//! Enter keeps the text with a Nudge in 1 h, the three buttons with
+//! theirs, and leaving it with Esc or its close button keeps what is
+//! typed the same way as Enter, as leaving the phone's capture screen
+//! does; empty, it just closes.
 //!
-//! More, above the Nudge buttons, saves the Note as Enter does and opens
-//! it in the window's Note dialog, where the rest is done to it; it
-//! shows once something is typed or held. A Note's place, Kind,
-//! Reminder, recording and the rest are the Note dialog's. With the
-//! Nudge buttons switched off in Settings ▸ Quick note, one Save takes
+//! Open in the editor, a full-width button under the Nudge buttons
+//! (obf-1080), saves the Note as Enter does and opens it in the window's
+//! Note dialog, where the rest is done to it; it can be clicked once
+//! something is typed or held. A Note's place, Kind, Reminder,
+//! recording and the rest are the Note dialog's. With the Nudge buttons
+//! switched off in Settings ▸ Quick note, one Save takes
 //! their place and nudges in 1 h.
 //!
 //! Ctrl+V in the empty field, and Paste in its right-click menu, take
@@ -58,7 +59,7 @@ pub enum Outcome {
     /// Done with: it saved what was typed, or nothing was.
     Closed,
     /// Done with, the Note of this id saved, to be opened in the
-    /// window's Note dialog (More, #142, #146, #352).
+    /// window's Note dialog (Open in the editor, #142, #146, #352).
     Edit(String),
 }
 
@@ -264,8 +265,8 @@ impl CapturePopup {
         self.keep(nudge_in).0
     }
 
-    /// More: saves as leaving does, and hands the Note on to the window's
-    /// Note dialog; stays open when nothing was saved.
+    /// Open in the editor: saves as leaving does, and hands the Note on to
+    /// the window's Note dialog; stays open when nothing was saved.
     fn open_in_editor(&mut self) -> Outcome {
         match self.keep(Notes::default_nudge()) {
             (Outcome::Closed, Some(id)) => Outcome::Edit(id),
@@ -426,12 +427,6 @@ impl CapturePopup {
                     ui.ctx().send_viewport_cmd(ViewportCommand::Focus);
                 }
                 ui.add_space(4.0);
-                // Saves as Enter does and opens the Note dialog (#352).
-                let more = egui::Button::new(RichText::new(t.more()).color(text));
-                if ui.add_enabled(typed, more).clicked() {
-                    to_editor = true;
-                }
-                ui.add_space(4.0);
                 if !quick.nudge_buttons {
                     // Without the Nudge buttons, Save nudges in 1 h (#142).
                     if theme::primary(ui, typed, t.save()).clicked() {
@@ -450,6 +445,12 @@ impl CapturePopup {
                             }
                         }
                     });
+                }
+                ui.add_space(4.0);
+                // Saves as Enter does and opens the Note dialog (#352,
+                // obf-1080).
+                if capture_choices::open_in_editor(ui, &t, typed).clicked() {
+                    to_editor = true;
                 }
                 ui.add_space(4.0);
                 let hint = if quick.nudge_buttons {
