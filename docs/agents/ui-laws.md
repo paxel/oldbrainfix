@@ -1193,7 +1193,7 @@ There are three kinds, and an action takes the first that fits.
   room, so nothing else on the screen moves. It shows only while a
   folder round or a join of this Device runs, on the desktop also while
   its paired host answers, or an Import runs (obf-1061), or an Area is
-  being deleted (obf-1093), and the app is in view; every sync shows it, also the one each minute. The sync runs beside the app (an isolate on
+  being deleted (obf-1093), or the trash is being emptied (obf-1095), and the app is in view; every sync shows it, also the one each minute. The sync runs beside the app (an isolate on
   the phone, a thread with its own connection on the desktop): the app
   stays usable and draws on. With the system's "remove animations" the
   phone's line stands still across the whole width; the desktop reads
@@ -1784,7 +1784,7 @@ There are three kinds, and an action takes the first that fits.
   folders; it closes when the app locks. A card for each job beside the
   app (a sync with a Device, an Import, the Transcripts, Photo Texts and
   Attachment Texts being read, the speech model's download or copy, an
-  Area being deleted) says what it does, how far it is when known ("120
+  Area being deleted, the trash being emptied) says what it does, how far it is when known ("120
   of 340 Notes", "3 of 12"), "Since 14:32", what Abort does where it
   does more or less than stop at once, and an outlined Abort, which
   reads "Stopping…" until the job stops; with none, "Nothing runs in the
@@ -1801,6 +1801,18 @@ There are three kinds, and an action takes the first that fits.
   cancelled. What Abort stopped stays under "Stopped" while the app
   runs, the paused ones first with Go on, then the newest, at most ten.
   The search index is built within a search, so it is no job here.
+- **Empty the trash now**, last on the Trash's bar (in its ⋮ when the
+  bar is full) and not while selecting (obf-1095), is greyed while
+  nothing in the trash can go and while the trash is being emptied; what
+  can go is counted beside the app when the page opens and as the log
+  changes, never in a frame. It asks once, "Delete 128 Notes and 4
+  Routines for good? They can't come back.", a part that would say 0
+  left out, with Cancel and **Delete for good** on the error colour, and
+  cannot be undone. It runs beside the app as one batch: the line under
+  the bar moves, the page Running lists "Emptying the trash" without
+  Abort, a failure is announced at the top, success is not, and the
+  Trash reads itself again once the log changed. Notes this Device may
+  not change and Frogs stay.
 
 ### Text editor
 
@@ -2230,7 +2242,7 @@ There are three kinds, and an action takes the first that fits.
   as the list's title; its second the search field, then the view
   switch, "Show Notes by…" and "+", in an Area or a Topic ⋮ last
   (obf-1065, C8, see Menu bar and keys), all at one height, the Trash's
-  the field alone. The view switch and "+" are icon and word in the frame
+  the field and "Empty the trash now" (obf-1095). The view switch and "+" are icon and word in the frame
   "Show Notes by…" has, "View" and "New Note" (obf-1067); to a screen
   reader and in its tooltip the switch says what a click does, and
   "+" with a menu says "Add here". The search field is as tall as those buttons, its text
@@ -2244,6 +2256,15 @@ There are three kinds, and an action takes the first that fits.
   Both apps ▸ Look, "The text has a size of its own", where bars and
   headings keep their size. The other places keep their arrows and
   path over their own heading.
+- **"Empty the trash now" asks once with the counts** (obf-1095): it is
+  greyed while nothing in the trash can be deleted, counted beside the
+  window whenever the log changed while the Trash shows, and while the
+  trash is being emptied. Its question names what goes, "Delete 128
+  Notes and 4 Routines for good?", a count of none left out, with
+  "They can't come back.", Cancel and **Delete for good** on the error
+  colour. The trash is then emptied beside the window, the line under
+  the menu bar and the page Running showing it; the Trash shows what
+  is left once it is done, and a failure is announced at the top.
 - **"New Note" stays whatever filter is on** (obf-1070, C13): in All
   Notes, Unsorted, an Area and a Topic, "Show Notes by…" never hides
   it. A Note the filter hides is made and opened as usual: the quick
@@ -2317,7 +2338,8 @@ There are three kinds, and an action takes the first that fits.
   page Running** (obf-1078, C21): never greyed, a Page dialog as the
   Settings, listing each job beside the window (a sync with a Device, an
   Import, the Transcripts, Photo Texts and Attachment Texts being read,
-  the speech model's download, an Area being deleted, a Pack being
+  the speech model's download, an Area being deleted, the trash being
+  emptied, a Pack being
   opened, the Agenda's first read) with what it does, how far it is when
   known ("120 of 340 Notes"), "Since 14:32", and Abort, which stops it at
   its next safe point and reads "Stopping…" until then; with none, "Nothing
@@ -2329,7 +2351,8 @@ There are three kinds, and an action takes the first that fits.
   cut and ends first; then the automatic syncs pause (a paired Device
   asking is told to come back later) until Sync now, or the other
   recordings, photos and files wait, until Go on on the page or the next
-  start. The Agenda's first read has no Abort. What Abort stopped stays
+  start. The Agenda's first read has no Abort, nor has emptying the
+  trash, which deletes all of it at once or nothing. What Abort stopped stays
   listed under "Stopped" while the app runs, the newest first, at most
   ten. The line takes the click a little above and below itself, never on
   the menus.

@@ -342,6 +342,15 @@ fn unsorted_all_notes_and_the_trash_have_the_band_too() -> TestResult {
             .next()
             .is_some();
         assert_eq!(filter, selection != Selection::Trash, "{selection:?}");
+        // The Trash's own button in its second row (obf-1095).
+        let empty = harness
+            .query_all_by_role_and_label(Role::Button, t.desk_trash_empty_now())
+            .next()
+            .is_some();
+        assert_eq!(empty, selection == Selection::Trash, "{selection:?}");
+        if empty {
+            assert!(band.contains_rect(button(&harness, t.desk_trash_empty_now())));
+        }
     }
     Ok(())
 }

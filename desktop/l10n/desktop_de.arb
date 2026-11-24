@@ -558,5 +558,18 @@
   "importStopped": "Import angehalten.",
   "notificationAlreadyDone": "Schon erledigt",
   "feedbackNotificationClicks": "Klicks auf Benachrichtigungen",
-  "feedbackNotificationClicksValue": "{count, plural, =1{Der letzte: wann, welche Benachrichtigung, wohin er führte; kein Text einer Notiz} other{Die letzten {count}: wann, welche Benachrichtigung, wohin jeder führte; kein Text einer Notiz}}"
+  "feedbackNotificationClicksValue": "{count, plural, =1{Der letzte: wann, welche Benachrichtigung, wohin er führte; kein Text einer Notiz} other{Die letzten {count}: wann, welche Benachrichtigung, wohin jeder führte; kein Text einer Notiz}}",
+  "deskTrashEmptyNow": "Papierkorb jetzt leeren",
+  "deskTrashEmptyQuestion": "{what} endgültig löschen?",
+  "deskTrashNotes": "{count, plural, =1{1 Notiz} other{{count} Notizen}}",
+  "deskTrashRoutines": "{count, plural, =1{1 Routine} other{{count} Routinen}}",
+  "deskTrashNotesAndRoutines": "{notes} und {routines}",
+  "deskTrashEmptyDetail": "{count, plural, =1{Sie lässt sich nicht zurückholen.} other{Sie lassen sich nicht zurückholen.}}",
+  "deskTrashDeleteForGood": "Endgültig löschen",
+  "deskTrashEmptying": "Der Papierkorb wird geleert",
+  "deskTrashEmptyingLine": "Der Papierkorb wird geleert …",
+  "deskTrashEmptyFailed": "Der Papierkorb konnte nicht geleert werden.",
+  "deskTrashEmptyFailedTitle": "Papierkorb nicht geleert",
+  "deskTrashEmptyFailedCause": "Was im Papierkorb liegt, konnte nicht gelöscht werden.",
+  "deskTrashEmptyFailedFix": "Was noch im Papierkorb liegt, bleibt dort. Klicke noch einmal auf „Papierkorb jetzt leeren“."
 }

@@ -1,8 +1,8 @@
 //! The page Running (obf-1078): every job that runs beside the window,
 //! read from where each runs: a sync with a Device, an Import, the
 //! Transcripts, Photo Texts and Attachment Texts being read, the speech
-//! model being fetched, an Area being deleted, a Pack being opened and
-//! the Agenda's first read. Each says what it is doing, how far it is
+//! model being fetched, an Area being deleted, the trash being emptied,
+//! a Pack being opened and the Agenda's first read. Each says what it is doing, how far it is
 //! when that is known, since when, and offers Abort, which stops it at
 //! its next safe point; the Agenda's first read, which the window waits
 //! for, offers none. What Abort stopped stays listed under them while the
@@ -34,6 +34,8 @@ pub enum JobId {
     AreaDeletion(String),
     PackOpening,
     AgendaRead,
+    /// The trash being emptied (obf-1095).
+    TrashEmptying,
 }
 
 /// What Abort does for a row.

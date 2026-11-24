@@ -201,6 +201,7 @@ use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots, TableAct, TableRoom};
 use crate::text_menu::{self, Clip, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::tick_saves;
+use crate::trash_emptying::{self, TrashEmptying};
 use crate::undo::Undo;
 use crate::unsorted_steps::{self, MovedOn, Sorting};
 use crate::vault_view::{self, VaultDone, VaultJob};
@@ -795,6 +796,8 @@ impl Reads {
             Action::MergeQuery | Action::AddToNotePicked(NoteAsk::Find) => Reads::Nothing,
             // Only the Note's steps, or a question about them (obf-1051).
             Action::WholeStep { .. } | Action::AskRevert => Reads::Nothing,
+            // Only a question, with the counts read beside (obf-1095).
+            Action::AskEmptyTrash => Reads::Nothing,
             _ => Reads::All,
         }
     }
@@ -1344,6 +1347,12 @@ enum Dialog {
     },
     /// Whether every change of the AI Task is rejected (#112).
     RejectAi,
+    /// "Delete 128 Notes and 4 Routines for good?" (obf-1095): whether
+    /// to empty the trash at once, with what it deletes.
+    EmptyTrash {
+        notes: usize,
+        routines: usize,
+    },
     /// "Discard changes?" on leaving an edit dialog whose change can't be
     /// saved (#275).
     Discard(Leave),
@@ -1849,6 +1858,12 @@ enum Action {
     TrashNotes(Vec<String>),
     /// Back from the trash together (#273).
     RestoreNotes(Vec<String>),
+    /// "Empty the trash now" in the Trash's band (obf-1095): asks with
+    /// what it deletes.
+    AskEmptyTrash,
+    /// "Delete for good" in that question: empties the trash, beside the
+    /// window where it has the Import's opener.
+    EmptyTrash,
     /// This Importance for each of them (#273).
     ImportanceOf(Vec<String>, Importance),
     /// Asks which Note they are merged into, together (#273).
@@ -2537,6 +2552,9 @@ pub struct App {
     import_open: Option<StoreOpener>,
     /// The Areas being deleted beside the window (obf-1093).
     deletions: AreaDeletions,
+    /// "Empty the trash now" (obf-1095): what it deletes, counted while
+    /// the Trash shows, and the emptying beside the window.
+    trash_emptying: TrashEmptying,
     /// The jobs Abort stopped on the page Running (obf-1078), while the
     /// app runs.
     stopped_jobs: running::Stopped,
@@ -3153,6 +3171,7 @@ impl App {
             import: FolderImport::default(),
             import_open: None,
             deletions: AreaDeletions::default(),
+            trash_emptying: TrashEmptying::default(),
             stopped_jobs: running::Stopped::default(),
             vault_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             vault: VaultJob::default(),
@@ -4718,6 +4737,17 @@ impl App {
                 id: JobId::AreaDeletion(deleting.area_id),
             });
         }
+        // One transaction, which deletes all of it or nothing: no Abort.
+        if let Some(((notes, routines), since)) = self.trash_emptying.under_way() {
+            jobs.push(Job {
+                id: JobId::TrashEmptying,
+                what: t.desk_trash_emptying().to_string(),
+                far: Some(trash_counts(&t, notes, routines)),
+                since: Some(since),
+                abort: Abort::No,
+                abort_does: None,
+            });
+        }
         for opening in self
             .pack_work
             .iter()
@@ -4875,7 +4905,7 @@ impl App {
                     goes_on: false,
                 });
             }
-            running::Act::Abort(JobId::AgendaRead) => {}
+            running::Act::Abort(JobId::AgendaRead | JobId::TrashEmptying) => {}
             running::Act::GoOn(JobId::Sync) => self.sync_goes_on(),
             running::Act::GoOn(JobId::Reading(kind)) => {
                 if let Some((enricher, _)) = self.enrichers().into_iter().find(|(_, k)| *k == kind)
@@ -6197,6 +6227,104 @@ impl App {
         }
     }
 
+    /// Counts what "Empty the trash now" deletes (obf-1095) while the
+    /// Trash shows, where the log changed since they were counted: on a
+    /// thread with the Agenda's opener, as reading them reads every Note,
+    /// else here. Not while the trash is being emptied: its end counts
+    /// again.
+    fn count_trash(&mut self) {
+        if self.selection != Selection::Trash {
+            return;
+        }
+        let Ok(seq) = self.store.current_seq() else {
+            return;
+        };
+        if !self.trash_emptying.wants_read(seq) {
+            return;
+        }
+        if let Some(open) = self.agenda_reads.as_ref().map(|reads| reads.open.clone())
+            && self
+                .trash_emptying
+                .read_aside(seq, Box::new(move || open()))
+        {
+            return;
+        }
+        let read = trash_emptying::count(&self.store);
+        self.trash_counted(seq, read);
+    }
+
+    /// Keeps the counts `read` at the log's mark `seq`; one that failed
+    /// says so.
+    fn trash_counted(&mut self, seq: i64, read: Result<trash_emptying::Counted, String>) {
+        if let Err(e) = self.trash_emptying.read_in(seq, read) {
+            self.error = Some(e);
+        }
+    }
+
+    /// Takes in the counts from their thread once they are in, and
+    /// counts again where the log changed meanwhile. The window looks
+    /// again shortly while they are counted.
+    fn trash_counts_arrived(&mut self, ctx: &egui::Context) {
+        if !self.trash_emptying.reading() {
+            return;
+        }
+        match self.trash_emptying.read_arrived() {
+            Some((seq, read)) => {
+                self.trash_counted(seq, read);
+                // A question open shows the counts as they are now, and
+                // goes where nothing is left to delete.
+                if let Some(Dialog::EmptyTrash { notes, routines }) = &mut self.dialog {
+                    match self.trash_emptying.counted() {
+                        Some(counted) if self.trash_emptying.offered() => {
+                            (*notes, *routines) = counted;
+                        }
+                        _ => self.dialog = None,
+                    }
+                }
+                self.count_trash();
+                ctx.request_repaint();
+            }
+            None => ctx.request_repaint_after(std::time::Duration::from_millis(30)),
+        }
+    }
+
+    /// Empties the trash, `counted` being what the question named
+    /// (obf-1095): beside the window on a connection of its own where
+    /// there is the Import's opener, as deleting an Area, else at once.
+    fn empty_trash(&mut self, counted: trash_emptying::Counted) {
+        if self.trash_emptying.running() {
+            return;
+        }
+        if self.import_open.is_some() {
+            let open = self.import_store();
+            self.trash_emptying.start(open, counted);
+        } else {
+            let emptied = trash_emptying::empty(&self.store);
+            self.trash_emptied(emptied);
+        }
+    }
+
+    /// Once the trash was emptied: a failure is announced at the top with
+    /// what went wrong; the alarms plan anew, as Routines and Reminders
+    /// went with their Notes.
+    fn trash_emptied(&mut self, emptied: trash_emptying::Emptied) {
+        let t = self.t;
+        if let Err(details) = emptied {
+            self.announce_failure(
+                t.desk_trash_empty_failed(),
+                t.desk_trash_empty_failed_title(),
+                (
+                    t.desk_trash_empty_failed_cause(),
+                    t.desk_trash_empty_failed_fix(),
+                ),
+                details,
+            );
+        }
+        if let Some(wake) = &self.wake {
+            drop(wake.send(Event::Wake));
+        }
+    }
+
     /// Shows the Agenda's read from its thread once it is in, unless the
     /// log changed since it was read: then it reads again (#207). The
     /// window looks again shortly while it runs.
@@ -7389,6 +7517,8 @@ impl App {
         self.keep_cards = false;
         // All Notes' most used tags, where the log changed (obf-1074).
         self.read_tags();
+        // What emptying the trash deletes, while it shows (obf-1095).
+        self.count_trash();
         if let Some(e) = left {
             self.error = Some(e.to_string());
         }
@@ -9159,6 +9289,23 @@ impl App {
             Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
             Action::TrashNotes(ids) => self.trash_notes(&ids)?,
             Action::RestoreNotes(ids) => self.restore_notes(&ids)?,
+            // Asked once, with the counts read last; not over another
+            // dialog, nor while the trash is being emptied (obf-1095).
+            Action::AskEmptyTrash => {
+                if self.dialog.is_none()
+                    && self.selection == Selection::Trash
+                    && self.trash_emptying.offered()
+                    && let Some((notes, routines)) = self.trash_emptying.counted()
+                {
+                    self.dialog = Some(Dialog::EmptyTrash { notes, routines });
+                }
+            }
+            Action::EmptyTrash => {
+                if let Some(Dialog::EmptyTrash { notes, routines }) = self.dialog {
+                    self.dialog = None;
+                    self.empty_trash((notes, routines));
+                }
+            }
             Action::ImportanceOf(ids, importance) => self.importance_of(&ids, importance)?,
             Action::AskMergeNotes(ids) => {
                 let others = self.merge_candidates("", &ids)?;
@@ -12894,6 +13041,7 @@ impl App {
         self.place_notified();
         self.search_arrived(ui.ctx());
         self.tags_arrived(ui.ctx());
+        self.trash_counts_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
         self.ask_arrived(ui.ctx());
         // However its page went, what a Backup opened held goes with it.
@@ -13096,6 +13244,22 @@ impl App {
                     drop(wake.send(Event::Wake));
                 }
                 ui.ctx().request_repaint();
+            }
+        }
+        // The trash being emptied beside the window (obf-1095): in one
+        // transaction on a connection of its own; the Trash shows what
+        // is left once it is in.
+        if self.trash_emptying.running() {
+            match self.trash_emptying.finished() {
+                Some(emptied) => {
+                    self.store.changed_elsewhere();
+                    self.trash_emptied(emptied);
+                    self.refresh();
+                    ui.ctx().request_repaint();
+                }
+                None => ui
+                    .ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(100)),
             }
         }
         // A vault being written or rebuilt, also after its dialog closed:
@@ -13383,6 +13547,9 @@ impl App {
             } else if self.deletions.running() {
                 // And while an Area is being deleted beside it (obf-1093).
                 Some(self.t.area_deleting_line())
+            } else if self.trash_emptying.running() {
+                // And while the trash is emptied beside it (obf-1095).
+                Some(self.t.desk_trash_emptying_line())
             } else if self.agenda_waiting() {
                 // And while the Agenda is read for the first time
                 // (obf-1090).
@@ -16971,9 +17138,10 @@ impl App {
     }
 
     /// The band's second row (obf-1064): the search field, then the view
-    /// switch of every list but the Trash, "Show Notes by…" with a chip
-    /// for each person it keeps, and "+", wrapping under the field where
-    /// the list is too narrow for them beside it.
+    /// switch of every list but the Trash, the Trash's "Empty the trash
+    /// now" (obf-1095), "Show Notes by…" with a chip for each person it
+    /// keeps, and "+", wrapping under the field where the list is too
+    /// narrow for them beside it.
     fn band_tools(
         &mut self,
         ui: &mut Ui,
@@ -16992,6 +17160,9 @@ impl App {
         let mut beside = 0.0;
         if switch {
             beside += band_button_width(ui, t.menu_view(), sizes) + gap;
+        }
+        if trash {
+            beside += band_button_width(ui, t.desk_trash_empty_now(), sizes) + gap;
         }
         if !trash {
             let font = FontId::proportional(sizes.words);
@@ -17096,6 +17267,18 @@ impl App {
             // Every Note list but the trash has its compact/detailed switch.
             if switch && compact_button(ui, tones, &t, self.view.compact, sizes) {
                 actions.push(Action::Compact(!self.view.compact));
+            }
+            // The trash empties at once (obf-1095), greyed while nothing
+            // in it can be deleted or it is being emptied.
+            if trash {
+                let word = t.desk_trash_empty_now();
+                let offered = self.trash_emptying.offered();
+                let empty = ui.add_enabled_ui(offered, |ui| {
+                    band_button(ui, (icons::TRASH, word, word), sizes, None)
+                });
+                if empty.inner.clicked() {
+                    actions.push(Action::AskEmptyTrash);
+                }
             }
             if !trash {
                 self.person_filter_menu(ui, sizes, actions);
@@ -18845,6 +19028,22 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.ai_reject_all()) {
                                 actions.push(Action::Ai(AiAction::Reject));
+                            }
+                        });
+                    }
+                    // Asked once, as it cannot be undone (UI laws, #268).
+                    Dialog::EmptyTrash { notes, routines } => {
+                        title(
+                            ui,
+                            &t.desk_trash_empty_question(&trash_counts(&t, *notes, *routines)),
+                        );
+                        let text = ui.visuals().text_color();
+                        let detail = t.desk_trash_empty_detail((*notes + *routines) as i64);
+                        ui.label(RichText::new(detail).color(text));
+                        ui.horizontal_wrapped(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.desk_trash_delete_for_good()) {
+                                actions.push(Action::EmptyTrash);
                             }
                         });
                     }
@@ -21441,6 +21640,20 @@ fn unblock_form(ui: &mut Ui, t: &L10n, name: &str, actions: &mut Vec<Action>) {
             actions.push(Action::Unblock);
         }
     });
+}
+
+/// "128 Notes and 4 Routines": what emptying the trash deletes
+/// (obf-1095), a count of none left out.
+fn trash_counts(t: &L10n, notes: usize, routines: usize) -> String {
+    let (notes, routines) = (notes as i64, routines as i64);
+    match (notes, routines) {
+        (_, 0) => t.desk_trash_notes(notes),
+        (0, _) => t.desk_trash_routines(routines),
+        _ => t.desk_trash_notes_and_routines(
+            &t.desk_trash_notes(notes),
+            &t.desk_trash_routines(routines),
+        ),
+    }
 }
 
 /// A confirm button for a destructive step: its verb on the error
@@ -25349,9 +25562,11 @@ fn band_button(
 ) -> egui::Response {
     let width = band_button_width(ui, word, sizes);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, sizes.row), Sense::click());
+    // Greyed where the ui is, to a screen reader too.
+    let enabled = ui.is_enabled();
     resp.widget_info(|| match selected {
-        Some((on, _)) => WidgetInfo::selected(WidgetType::Button, true, on, label),
-        None => WidgetInfo::labeled(WidgetType::Button, true, label),
+        Some((on, _)) => WidgetInfo::selected(WidgetType::Button, enabled, on, label),
+        None => WidgetInfo::labeled(WidgetType::Button, enabled, label),
     });
     if ui.is_rect_visible(rect) {
         // The frame egui's button paints, for this state.

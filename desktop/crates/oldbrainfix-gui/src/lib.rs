@@ -108,6 +108,7 @@ pub mod text_marks_view;
 pub mod text_menu;
 pub mod theme;
 pub mod tick_saves;
+pub mod trash_emptying;
 pub mod tray;
 pub mod undo;
 pub mod unsorted_steps;
