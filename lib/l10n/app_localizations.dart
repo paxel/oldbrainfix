@@ -11053,6 +11053,12 @@ abstract class AppLocalizations {
   /// **'Got it'**
   String get spotDone;
 
+  /// The button on every Spotlight's card (obf-1060) that switches Show tips off at once: no screen of this Device shows a tip until it is switched on again in the Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'No more tips'**
+  String get spotNoMoreTips;
+
   /// The Settings row (obf-1043) that brings back every Spotlight on this Device: each screen explains itself again on its next visit.
   ///
   /// In en, this message translates to:
@@ -11064,6 +11070,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Each screen shows its tips again.'**
   String get settingsShowTipsDone;
+
+  /// Title of the Settings card (obf-1060) with Show tips and Show tips again. CONTEXT.md, Spotlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get settingsTips;
+
+  /// The Settings switch (obf-1060), on by default and kept on this Device: off, no screen shows a Spotlight, a new one neither.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tips'**
+  String get settingsTipsSwitch;
+
+  /// The line under Show tips in the Settings (obf-1060).
+  ///
+  /// In en, this message translates to:
+  /// **'Each screen explains its buttons once.'**
+  String get settingsTipsSwitchDetail;
 
   /// A Spotlight (obf-1043) on the Agenda's +: one sentence of what it does.
   ///
@@ -11226,6 +11250,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add grammar… colours code in one more language, on all your Devices.'**
   String get spotSettingsGrammar;
+
+  /// A Spotlight (obf-1060) on the Show tips switch in the Settings (new in 0.8.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Switched off, no screen shows a tip; No more tips does the same.'**
+  String get spotSettingsTipsSwitch;
 
   /// In the Note editor's top bar (obf-1051): takes back the last change made since it opened.
   ///

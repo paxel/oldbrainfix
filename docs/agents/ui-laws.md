@@ -1722,6 +1722,11 @@ replace a law of Both apps where they say so. A desktop law marked
   C28): on the phone and the desktop each section's rows sit on one
   card under its title, Look, Units and Complexity included; a search
   shows the card with only its matching rows.
+- **The phone's Tips card** (obf-1060, C3): the switch "Show tips", on
+  by default and kept on this Device, and "Show tips again" under it.
+  Off, no screen shows a Spotlight, a new one neither, and none is
+  counted as shown; "No more tips" on every tip's card turns it off at
+  once. "Show tips again" brings every tip back and turns the switch on.
 - **A search field sits at the top of Settings** (#282), under the bar,
   staying there while the page scrolls, on the band of the list pages'
   search bar (obf-1088); nothing focuses it on opening.

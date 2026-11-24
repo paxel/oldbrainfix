@@ -51,8 +51,8 @@ enum _UnitChoice { region, metric, imperial }
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; in Advanced, Ask (#333); Show tips again
-/// (obf-1043); the person's own Code languages (obf-1037); and Send
+/// Google Keep export; in Advanced, Ask (#333); Show tips (obf-1060)
+/// and Show tips again (obf-1043); the person's own Code languages (obf-1037); and Send
 /// feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
@@ -116,8 +116,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  /// Show tips (obf-1060), which "No more tips" on a tip over this page
+  /// switches off too.
+  late final _tips = TipsSwitch.of(widget.store);
+
   /// Show tips again (obf-1043): every screen of this Device shows its
-  /// Spotlights again on its next visit, and the top says so.
+  /// Spotlights again on its next visit, "Show tips" on, and the top
+  /// says so.
   void _showTips() {
     resetSpotlights(widget.store);
     AnnouncementsScope.of(context)?.announce(context.t.settingsShowTipsDone);
@@ -1175,13 +1180,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
-                    // The last of this phone's own (obf-1043): every
-                    // screen explains itself again.
+                    // The last of this phone's own: whether tips show
+                    // (obf-1060), and every screen explaining itself
+                    // again (obf-1043).
                     SettingsGroup(
+                      heading: t.settingsTips,
                       children: [
-                        const SizedBox(height: 16),
                         SettingsSection(
                           children: [
+                            SettingsRow(
+                              words: [
+                                t.settingsTipsSwitch,
+                                t.settingsTipsSwitchDetail,
+                              ],
+                              child: Spotlight(
+                                id: 'settings-tips-switch',
+                                child: ValueListenableBuilder<bool>(
+                                  valueListenable: _tips,
+                                  builder: (context, on, _) => SwitchBelow(
+                                    switchKey: const ValueKey('tipsOn'),
+                                    leading: const Icon(
+                                      Icons.lightbulb_outline,
+                                    ),
+                                    value: on,
+                                    onChanged: _tips.set,
+                                    title: Text(t.settingsTipsSwitch),
+                                    subtitle: Text(t.settingsTipsSwitchDetail),
+                                  ),
+                                ),
+                              ),
+                            ),
                             SettingsRow(
                               words: [t.settingsShowTips],
                               child: Spotlight(

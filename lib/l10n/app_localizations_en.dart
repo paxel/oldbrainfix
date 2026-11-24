@@ -6865,10 +6865,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spotDone => 'Got it';
 
   @override
+  String get spotNoMoreTips => 'No more tips';
+
+  @override
   String get settingsShowTips => 'Show tips again';
 
   @override
   String get settingsShowTipsDone => 'Each screen shows its tips again.';
+
+  @override
+  String get settingsTips => 'Tips';
+
+  @override
+  String get settingsTipsSwitch => 'Show tips';
+
+  @override
+  String get settingsTipsSwitchDetail =>
+      'Each screen explains its buttons once.';
 
   @override
   String get spotAgendaPlus =>
@@ -6973,6 +6986,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get spotSettingsGrammar =>
       'Add grammar… colours code in one more language, on all your Devices.';
+
+  @override
+  String get spotSettingsTipsSwitch =>
+      'Switched off, no screen shows a tip; No more tips does the same.';
 
   @override
   String get editorUndo => 'Undo';

@@ -6948,10 +6948,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get spotDone => 'Verstanden';
 
   @override
+  String get spotNoMoreTips => 'Keine Tipps mehr';
+
+  @override
   String get settingsShowTips => 'Tipps wieder zeigen';
 
   @override
   String get settingsShowTipsDone => 'Jede Seite zeigt ihre Tipps wieder.';
+
+  @override
+  String get settingsTips => 'Tipps';
+
+  @override
+  String get settingsTipsSwitch => 'Tipps zeigen';
+
+  @override
+  String get settingsTipsSwitchDetail =>
+      'Jede Seite erklärt ihre Schaltflächen einmal.';
 
   @override
   String get spotAgendaPlus =>
@@ -7058,6 +7071,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get spotSettingsGrammar =>
       '„Grammatik hinzufügen …“ färbt Code in einer weiteren Sprache ein, auf all deinen Geräten.';
+
+  @override
+  String get spotSettingsTipsSwitch =>
+      'Ausgeschaltet zeigt keine Seite einen Tipp; „Keine Tipps mehr“ tut dasselbe.';
 
   @override
   String get editorUndo => 'Rückgängig';

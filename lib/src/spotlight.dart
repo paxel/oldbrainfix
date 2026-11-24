@@ -10,8 +10,9 @@ import 'l10n.dart';
 /// Spotlights (obf-1043): a screen explains itself on a person's first
 /// visit, one element at a time. The page dims, the element shows
 /// through, a card beside it says one sentence; Next goes on, Skip, a
-/// tap outside or Back end the screen's tour. Never an unskippable
-/// tutorial.
+/// tap outside or Back end the screen's tour; No more tips, like "Show
+/// tips" off in the Settings (obf-1060), ends every tour to come. Never
+/// an unskippable tutorial.
 ///
 /// What this Device has shown is kept per tip, as local settings never
 /// synced and never in a Backup (ADR 0008): the ids under
@@ -71,6 +72,7 @@ final Map<String, List<SpotlightItem>> spotlightManifest = {
     SpotlightItem('settings-show-tips', (t) => t.spotSettingsShowTips),
     SpotlightItem('settings-features', (t) => t.spotSettingsFeatures),
     SpotlightItem('settings-grammar', (t) => t.spotSettingsGrammar),
+    SpotlightItem('settings-tips-switch', (t) => t.spotSettingsTipsSwitch),
   ],
 };
 
@@ -99,6 +101,33 @@ String spotlightKey(String screen) => 'spot:$screen';
 
 /// The local setting set once this Device first ran with Spotlights on.
 const spotlightsStartedKey = 'spotStarted';
+
+/// The local setting that holds "Show tips" off (obf-1060), 'true'
+/// then; nothing kept, or 'false', is on, the default.
+const tipsOffKey = 'tipsOff';
+
+/// "Show tips" (obf-1060): while off, no screen shows a tip, a new one
+/// neither; what is due stays due for when it is on again. One per
+/// store, so the switch in the Settings follows "No more tips" on a tip
+/// shown over them.
+class TipsSwitch extends ValueNotifier<bool> {
+  static final _of = Expando<TipsSwitch>('tips switch');
+
+  final Store store;
+
+  TipsSwitch._(this.store) : super(store.localSetting(tipsOffKey) != 'true');
+
+  /// The switch of [store]'s Device.
+  factory TipsSwitch.of(Store store) => _of[store] ??= TipsSwitch._(store);
+
+  /// Switches the tips on or off, and keeps it for this Device.
+  void set(bool on) {
+    on
+        ? store.removeLocalSetting(tipsOffKey)
+        : store.setLocalSetting(tipsOffKey, 'true');
+    value = on;
+  }
+}
 
 /// The screen whose manifest holds the tip [id]; none for an unknown id.
 String? spotlightScreenOf(String id) {
@@ -156,8 +185,10 @@ void markAllSpotlightsSeen(Store store) {
 }
 
 /// "Show tips again": every screen shows its tips again on its next
-/// visit. The Device stays seeded: an update does not count them shown.
+/// visit, "Show tips" on. The Device stays seeded: an update does not
+/// count them shown.
 void resetSpotlights(Store store) {
+  TipsSwitch.of(store).set(true);
   for (final screen in {...spotlightManifest.keys, ...before070.keys}) {
     store.removeLocalSetting(spotlightKey(screen));
   }
@@ -248,6 +279,9 @@ class _SpotlightScopeState extends State<SpotlightScope> {
     final route = asker._route;
     if (items == null || route == null) return;
     final store = widget.store;
+    final tips = TipsSwitch.of(store);
+    // Off, nothing shows and nothing is marked: the tips stay due.
+    if (!tips.value) return;
     if (dueSpotlights(seenSpotlights(store, screen), items).isEmpty) return;
     // Anchors move while the page slides in, or back as the one over it
     // goes: measured early, the light falls beside them. The page
@@ -257,13 +291,13 @@ class _SpotlightScopeState extends State<SpotlightScope> {
     await _nextFrame();
     // Only on the page on top: never over a dialog, a menu or another
     // page, never under the App Lock.
-    if (!mounted || !route.isCurrent) return;
+    if (!mounted || !route.isCurrent || !tips.value) return;
     final due = [
       for (final item in dueSpotlights(seenSpotlights(store, screen), items))
         if (_anchorOn(route, item.id) != null) item,
     ];
     for (final (i, item) in due.indexed) {
-      if (!mounted || !route.isCurrent) return;
+      if (!mounted || !route.isCurrent || !tips.value) return;
       final anchor = _anchorOn(route, item.id);
       if (anchor == null) continue;
       await _bringOnScreen(anchor);
@@ -291,6 +325,11 @@ class _SpotlightScopeState extends State<SpotlightScope> {
         case SpotlightAnswer.gone:
           // Its page went out of sight, as under the App Lock: the rest
           // stays due for its next showing.
+          return;
+        case SpotlightAnswer.off:
+          // No more tips: "Show tips" goes off at once; the rest stays
+          // due should it be switched on again.
+          tips.set(false);
           return;
         case SpotlightAnswer.end || null:
           // Skip, a tap outside, Back: the tour ends, the rest of it
@@ -474,6 +513,9 @@ enum SpotlightAnswer {
 
   /// Its element went out of sight while it showed.
   gone,
+
+  /// No more tips: "Show tips" goes off.
+  off,
 }
 
 /// Widest a tip card gets: one sentence stretched across a tablet is the
@@ -486,8 +528,9 @@ const tipMargin = 24.0;
 /// Gap between the card and the element it explains.
 const tipGap = 16.0;
 
-/// The room a card needs at least, its buttons included.
-const tipMinHeight = 160.0;
+/// The room a card needs at least, its buttons included: No more tips,
+/// Skip and Next (obf-1060) take a row each on a narrow phone.
+const tipMinHeight = 240.0;
 
 /// How far the light reaches beyond the element.
 const tipInflate = 6.0;
@@ -643,6 +686,11 @@ class _SpotlightTipState extends State<SpotlightTip>
                       alignment: WrapAlignment.end,
                       spacing: 8,
                       children: [
+                        TextButton(
+                          key: const ValueKey('spotOff'),
+                          onPressed: () => _close(SpotlightAnswer.off),
+                          child: Text(t.spotNoMoreTips),
+                        ),
                         TextButton(
                           key: const ValueKey('spotSkip'),
                           onPressed: () => _close(SpotlightAnswer.end),
