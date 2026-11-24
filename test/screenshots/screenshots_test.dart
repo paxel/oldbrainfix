@@ -1308,9 +1308,10 @@ void _storeScreenshots({required bool iphone}) {
           await openTextCapture(tester);
           await tester.enterText(find.byType(TextField), texts.captureText);
           await tester.pumpAndSettle();
-          // The quick note: the text, three Nudge buttons and More (#352).
+          // The quick note: the text, three Nudge buttons and Open in the
+          // editor (#352, obf-1080).
           expect(find.byType(NudgeButtons), findsOneWidget);
-          expect(find.text(t.more), findsOneWidget);
+          expect(find.text(t.captureOpenInEditor), findsOneWidget);
         });
 
         frame('3-diary.png', (tester) async {

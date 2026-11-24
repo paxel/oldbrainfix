@@ -14,8 +14,8 @@ import 'open_capture.dart';
 import 'open_settings.dart';
 
 /// The quick note (#352): the text at the top, under it the three Nudge
-/// buttons and More, nothing else; Back saves as the 1 h button does, and
-/// More saves and opens the full editor in its place.
+/// buttons and Open in the editor, nothing else; Back saves as the 1 h button does, and
+/// Open in the editor saves and opens the full editor in its place.
 void main() {
   late Store store;
   late Notes notes;
@@ -64,7 +64,8 @@ void main() {
       .toList();
 
   for (final simple in [false, true]) {
-    testWidgets('shows only the text, the three Nudge buttons and More, '
+    testWidgets('shows only the text, the three Nudge buttons and Open in '
+        'the editor, '
         '${simple ? 'in Simple' : 'in Advanced'} alike', (tester) async {
       store.advanced = !simple;
       // What the quick note's switches showed before stays stored and
@@ -94,8 +95,9 @@ void main() {
         inCapture(find.byKey(const ValueKey('note-actions'))),
         findsNothing,
       );
-      expect(find.text('More'), findsOneWidget);
-      // The text first, at the top; the buttons under it, More last.
+      expect(find.text('Open in the editor'), findsOneWidget);
+      // The text first, at the top; the buttons under it, Open in the
+      // editor last.
       final field = tester.getRect(inCapture(find.byType(TextField)));
       expect(field.top, lessThan(tester.getRect(nudge10).top));
       expect(
@@ -173,15 +175,36 @@ void main() {
     }
   });
 
-  group('More', () {
+  group('Open in the editor', () {
+    testWidgets('is a full-width outlined button with the editor\'s pencil, '
+        'under the Nudge buttons', (tester) async {
+      await start(tester);
+      await openTextCapture(tester);
+
+      expect(tester.widget(more), isA<OutlinedButton>());
+      expect(
+        find.descendant(of: more, matching: find.byIcon(Icons.edit_outlined)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: more, matching: find.text('Open in the editor')),
+        findsOneWidget,
+      );
+      final row = tester.getRect(find.byType(NudgeButtons));
+      final button = tester.getRect(more);
+      expect(button.left, row.left);
+      expect(button.right, row.right);
+      expect(button.top, greaterThan(row.bottom));
+    });
+
     testWidgets('waits for something to save', (tester) async {
       await start(tester);
       await openTextCapture(tester);
-      expect(tester.widget<TextButton>(more).onPressed, isNull);
+      expect(tester.widget<OutlinedButton>(more).onPressed, isNull);
 
       await tester.enterText(find.byType(TextField), 'ring the plumber');
       await tester.pump();
-      expect(tester.widget<TextButton>(more).onPressed, isNotNull);
+      expect(tester.widget<OutlinedButton>(more).onPressed, isNotNull);
     });
 
     testWidgets('saves the Note Unsorted with the default Nudge and opens '
@@ -226,8 +249,8 @@ void main() {
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'descale the kettle');
       await tester.pump();
-      // A tip shows over the quick note while More is saving.
-      final pressed = tester.widget<TextButton>(more).onPressed!;
+      // A tip shows over the quick note while Open in the editor is saving.
+      final pressed = tester.widget<OutlinedButton>(more).onPressed!;
       final tip = showDialog<SpotlightAnswer>(
         context: tester.element(more),
         builder: (_) => const SizedBox(),
@@ -262,21 +285,22 @@ void main() {
   });
 
   group('Every way in that brings something', () {
-    testWidgets('a photo shows above the text, and More takes it on', (
-      tester,
-    ) async {
-      await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
-      await tap(tester, fanEntry('photo'));
+    testWidgets(
+      'a photo shows above the text, and Open in the editor takes it on',
+      (tester) async {
+        await start(tester);
+        await tap(tester, find.byIcon(Icons.add));
+        await tap(tester, fanEntry('photo'));
 
-      expect(find.byType(CaptureScreen), findsOneWidget);
-      final note = notes.all().single;
-      expect(note.photos, hasLength(1));
-      expect(tester.widget<TextButton>(more).onPressed, isNotNull);
-      await tap(tester, more);
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
-      expect(notes.all().single.id, note.id);
-    });
+        expect(find.byType(CaptureScreen), findsOneWidget);
+        final note = notes.all().single;
+        expect(note.photos, hasLength(1));
+        expect(tester.widget<OutlinedButton>(more).onPressed, isNotNull);
+        await tap(tester, more);
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        expect(notes.all().single.id, note.id);
+      },
+    );
 
     testWidgets('pictures picked show above the text', (tester) async {
       await start(tester);
@@ -366,7 +390,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Mehr'), findsOneWidget);
+    expect(find.text('Im Editor öffnen'), findsOneWidget);
     expect(tester.getRect(more).bottom, lessThanOrEqualTo(height - keyboard));
     await tester.tap(nudge10);
     await tester.pumpAndSettle();

@@ -24,7 +24,7 @@ import 'voice_platform.dart';
 
 /// A Note just captured, and for its location and for the rest of its
 /// Capture Context whether it got attached, each once that is known;
-/// with [editing] when More opened the full editor on it, done once the user
+/// with [editing] when Open in the editor opened the full editor on it, done once the user
 /// left the editor.
 typedef Captured = ({
   String noteId,
@@ -39,7 +39,7 @@ typedef Captured = ({
 /// show the new Note, and again when its location or more of its Capture
 /// Context arrived later.
 /// [onCaptured] gets the new Note's id first, when there is one.
-/// More leaves Capture for the Note's editor; leaving that
+/// Open in the editor leaves Capture for the Note's editor; leaving that
 /// comes back here, and [onChanged] runs once more.
 ///
 /// A shared sound file this Device cannot transcribe is kept all the
@@ -181,8 +181,8 @@ void announceUntranscribable(
 }
 
 /// Text capture, the quick note (#352): the text field at the top, opened
-/// with the keyboard up, right under it the three Nudge buttons and More,
-/// which stay put when the keyboard opens (#396), nothing else, in Simple
+/// with the keyboard up, right under it the three Nudge buttons and Open
+/// in the editor, which stay put when the keyboard opens (#396), nothing else, in Simple
 /// and Advanced alike. The position, and the calendar events and
 /// Bluetooth devices where they are switched on, are looked up from the
 /// start, without asking, and attached when they arrive: they never hold
@@ -194,8 +194,8 @@ void announceUntranscribable(
 /// empty text saves nothing. Where the Nudge buttons are switched off
 /// (Settings ▸ Quick note), one Save takes their place and nudges in 1 h.
 ///
-/// More saves the Note at once, Unsorted and nudged in 1 h, and opens it
-/// in the Note editor in place of this screen (#142), where Photo, Voice,
+/// Open in the editor saves the Note at once, Unsorted and nudged in 1 h,
+/// and opens it in the Note editor in place of this screen (#142), where Photo, Voice,
 /// Gallery, Paste, File, the Kind, Add to Note…, Remind me…, File into…,
 /// the Frog, the Importance and the format bar are; not offered behind
 /// the App Lock, as the editor shows the Areas, and not while there is
@@ -406,7 +406,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// Locking again closes what this screen opened, such as the
-  /// microphone's explanation, and hides More: only Capture itself needs
+  /// microphone's explanation, and hides Open in the editor: only Capture itself needs
   /// no unlocking.
   void _lockChanged() {
     if (!mounted) return;
@@ -694,7 +694,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     Navigator.of(context).pop(_captured);
   }
 
-  /// More: saves the Note as leaving does, Unsorted and nudged in 1 h
+  /// Open in the editor: saves the Note as leaving does, Unsorted and nudged in 1 h
   /// unless it is filed, and opens its editor in place of this screen, so
   /// leaving the editor comes back to where Capture was opened from. A
   /// recording running is ended and kept first, and pictures still being
@@ -866,23 +866,27 @@ class _CaptureScreenState extends State<CaptureScreen> {
     ),
   );
 
-  /// More, under the Nudge buttons: none behind the App Lock, and it
-  /// waits while there is nothing to save.
+  /// Open in the editor, a full-width button under the Nudge buttons
+  /// (obf-1080): none behind the App Lock, and it waits while there is
+  /// nothing to save.
   Widget? _moreButton(BuildContext context) {
     if (_lock?.locked ?? false) return null;
-    return Align(
-      alignment: Alignment.centerLeft,
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
       child: Spotlight(
         id: 'capture-more',
         child: ListenableBuilder(
           listenable: _text,
-          builder: (context, _) => TextButton.icon(
-            key: const ValueKey('captureToEditor'),
-            onPressed: _captured != null || _text.text.trim().isNotEmpty
-                ? _toEditor
-                : null,
-            icon: const Icon(Icons.open_in_full),
-            label: Text(context.t.more),
+          builder: (context, _) => SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const ValueKey('captureToEditor'),
+              onPressed: _captured != null || _text.text.trim().isNotEmpty
+                  ? _toEditor
+                  : null,
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(context.t.captureOpenInEditor),
+            ),
           ),
         ),
       ),

@@ -5234,7 +5234,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.';
+      'The quick note shows the text, the three Nudge buttons and Open in the editor, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -5693,11 +5693,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Type a task in +, tap More, then + and Remind me…; set its time and tap Save.';
+      'Type a task in +, tap Open in the editor, then + and Remind me…; set its time and tap Save.';
 
   @override
   String get helpQuickStart4 =>
-      'Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.';
+      'Type a habit in +, tap Open in the editor, then + and Remind me…; pick Every …, set when, and Save.';
 
   @override
   String get helpQuickStart5 =>
@@ -6813,7 +6813,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get spotCaptureMore =>
-      'More saves the Note and opens it in the full editor.';
+      'Open in the editor saves the Note and opens it in the full editor.';
+
+  @override
+  String get captureOpenInEditor => 'Open in the editor';
 
   @override
   String get spotEditorKind =>

@@ -8429,7 +8429,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.'**
+  /// **'The quick note shows the text, the three Nudge buttons and Open in the editor, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -9155,13 +9155,13 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStart3.
   ///
   /// In en, this message translates to:
-  /// **'Type a task in +, tap More, then + and Remind me…; set its time and tap Save.'**
+  /// **'Type a task in +, tap Open in the editor, then + and Remind me…; set its time and tap Save.'**
   String get helpQuickStart3;
 
   /// No description provided for @helpQuickStart4.
   ///
   /// In en, this message translates to:
-  /// **'Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.'**
+  /// **'Type a habit in +, tap Open in the editor, then + and Remind me…; pick Every …, set when, and Save.'**
   String get helpQuickStart4;
 
   /// No description provided for @helpQuickStart5.
@@ -10969,11 +10969,17 @@ abstract class AppLocalizations {
   /// **'Each button saves the Note, and a Nudge reminds you to sort it then.'**
   String get spotCaptureNudge;
 
-  /// A Spotlight (obf-1043) on the quick note's More (new in 0.7.0): one sentence of what it does.
+  /// A Spotlight (obf-1043) on the quick note's Open in the editor (obf-1080): one sentence of what it does.
   ///
   /// In en, this message translates to:
-  /// **'More saves the Note and opens it in the full editor.'**
+  /// **'Open in the editor saves the Note and opens it in the full editor.'**
   String get spotCaptureMore;
+
+  /// The quick note's full-width button under the Nudge buttons (obf-1080): saves the Note and opens it in the Note editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in the editor'**
+  String get captureOpenInEditor;
 
   /// A Spotlight (obf-1043) on the Note editor's kind badge: one sentence of what it does.
   ///

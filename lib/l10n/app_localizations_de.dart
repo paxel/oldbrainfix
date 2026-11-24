@@ -5300,7 +5300,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, die drei Stupser-Knöpfe und „Mehr“, das den vollen Editor öffnet. Foto, Sprache, Galerie, Einfügen, Datei und alles, was die Notiz einsortiert, gibt es im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, die drei Stupser-Knöpfe und „Im Editor öffnen“, das den vollen Editor öffnet. Foto, Sprache, Galerie, Einfügen, Datei und alles, was die Notiz einsortiert, gibt es im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';
@@ -5760,11 +5760,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Schreib unter + eine Aufgabe, tippe „Mehr“, dann + und Erinnere mich …; stell die Zeit ein und speichere.';
+      'Schreib unter + eine Aufgabe, tippe „Im Editor öffnen“, dann + und Erinnere mich …; stell die Zeit ein und speichere.';
 
   @override
   String get helpQuickStart4 =>
-      'Schreib unter + eine Gewohnheit, tippe „Mehr“, dann + und Erinnere mich …; wähl Alle …, wann, und Speichern.';
+      'Schreib unter + eine Gewohnheit, tippe „Im Editor öffnen“, dann + und Erinnere mich …; wähl Alle …, wann, und Speichern.';
 
   @override
   String get helpQuickStart5 =>
@@ -6895,7 +6895,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get spotCaptureMore =>
-      '„Mehr“ speichert die Notiz und öffnet sie im vollen Editor.';
+      '„Im Editor öffnen“ speichert die Notiz und öffnet sie im vollen Editor.';
+
+  @override
+  String get captureOpenInEditor => 'Im Editor öffnen';
 
   @override
   String get spotEditorKind =>
