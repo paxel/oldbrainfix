@@ -108,9 +108,13 @@ class _AreasScreenState extends State<AreasScreen>
   /// the Notes of the locked Areas closed, as every list. They are read
   /// only while this page shows with no search, as reading them reads
   /// every Note: beside the Agenda a change there would read them each
-  /// time. [_tagsStale] says a change came meanwhile.
-  List<TagNode> _tags = const [];
+  /// time. [_tagsStale] says a change came meanwhile. Only the chip row
+  /// follows them, so arriving here builds no more than that row.
+  final _tags = ValueNotifier<List<TagNode>>(const []);
   var _tagsStale = true;
+
+  /// What the chip row follows: the field, which hides it, and the tags.
+  late final _tagRow = Listenable.merge([_query, _tags]);
 
   /// The app's lock, followed for the tags.
   AppLock? _lock;
@@ -159,6 +163,7 @@ class _AreasScreenState extends State<AreasScreen>
     _deletions?.removeListener(_deletionsChanged);
     _lock?.removeListener(_locksChanged);
     _query.dispose();
+    _tags.dispose();
     super.dispose();
   }
 
@@ -168,7 +173,7 @@ class _AreasScreenState extends State<AreasScreen>
       stopSelecting();
       _stopRearranging();
     } else if (_tagsStale) {
-      setState(_readTags);
+      _readTags();
     }
   }
 
@@ -185,7 +190,7 @@ class _AreasScreenState extends State<AreasScreen>
       return;
     }
     _tagsStale = false;
-    _tags = mostUsedTags(
+    _tags.value = mostUsedTags(
       TagTree(widget.places.store)
           .tree(closed: _lock?.closedAreas ?? const <String>{}),
     );
@@ -198,7 +203,7 @@ class _AreasScreenState extends State<AreasScreen>
     if (!mounted) return;
     setState(() {
       _readTags();
-      if (_tagsStale) _tags = const [];
+      if (_tagsStale) _tags.value = const [];
     });
   }
 
@@ -774,16 +779,14 @@ class _AreasScreenState extends State<AreasScreen>
                       // The most used tags, while nothing is typed
                       // (obf-1074); a search shows its own chips.
                       ListenableBuilder(
-                        listenable: _query,
-                        builder: (_, row) =>
-                            _query.text.trim().isEmpty && row != null
-                            ? row
+                        listenable: _tagRow,
+                        builder: (_, _) => _query.text.trim().isEmpty
+                            ? TagChipRow(
+                                tags: _tags.value,
+                                onPick: (tag) => _searchTag(context, tag),
+                                onAll: _openTags,
+                              )
                             : const SizedBox.shrink(),
-                        child: TagChipRow(
-                          tags: _tags,
-                          onPick: (tag) => _searchTag(context, tag),
-                          onAll: _openTags,
-                        ),
                       ),
                       if (searching)
                         PersonFilterChips(
