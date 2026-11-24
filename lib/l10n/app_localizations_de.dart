@@ -5173,6 +5173,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tableCopy => 'Kopieren';
 
   @override
+  String get tableMore => 'Mehr zur Tabelle';
+
+  @override
+  String get tableUp => 'Nach oben';
+
+  @override
+  String get tableDown => 'Nach unten';
+
+  @override
+  String get tableDelete => 'Tabelle löschen';
+
+  @override
   String get tableOpen => 'Tabelle öffnen';
 
   @override

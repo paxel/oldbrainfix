@@ -1043,6 +1043,7 @@ class TagTextController extends TextEditingController {
                         style: style,
                         ticking: _boxes,
                         found: found?.shifted(-table.start),
+                        tableMenu: false,
                       ),
                     ),
                   ),
@@ -1247,8 +1248,9 @@ int storedOffset(List<ShownBox> boxes, int shown) {
 /// and that many rows under it, and "Show all" unfolds the rest in
 /// place; a table holding [unfoldAt] shows all of them. A tap on it opens
 /// it full screen ([openTable]) in the text as stored ([source]), where
-/// [tableEdit] changes it; it is only read there without one. A compact
-/// line ([maxLines]) of a table shows the words of its row.
+/// [tableEdit] changes it; it is only read there without one. Its ⋮ at
+/// its top right corner copies it (obf-1050). A compact line
+/// ([maxLines]) of a table shows the words of its row.
 ///
 /// The places of [found], in [text] as it shows, are drawn on a tint
 /// (obf-1047), in a table's cells too; its current one on a stronger one.
@@ -1281,6 +1283,10 @@ class MarkedText extends StatefulWidget {
   /// The places a search or the find bar found in [text] (obf-1047).
   final FoundMarks? found;
 
+  /// Whether each table has its ⋮ with Copy (obf-1050); not where the
+  /// text is drawn only for a field that takes the taps.
+  final bool tableMenu;
+
   const MarkedText(
     this.text, {
     super.key,
@@ -1298,6 +1304,7 @@ class MarkedText extends StatefulWidget {
     this.rows,
     this.unfoldAt,
     this.found,
+    this.tableMenu = true,
   }) : assert(
          boxes == null || source != null || tableEdit == null,
          'a table is changed in the text as stored, its ids in it',
@@ -1821,6 +1828,14 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
           ticking: ticking,
         ),
       ),
+      onCopy: widget.tableMenu
+          ? () => copyTable(
+              context,
+              text: found.stored(widget.source),
+              at: found.storedAt(table.start),
+              ticking: ticking,
+            )
+          : null,
     );
   }
 
@@ -1873,7 +1888,8 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
 /// the first column staying while it holds headings. With [rows] it shows
 /// its header and that many rows under it, and "Show all" under it
 /// unfolds the rest in place; [unfold] shows all of them. Only the rows
-/// shown are measured and built. A tap opens it ([onOpen]).
+/// shown are measured and built. A tap opens it ([onOpen]); its ⋮ at its
+/// top right corner offers Copy ([onCopy], obf-1050), none without it.
 class _ReadTable extends StatefulWidget {
   final MarkdownTable table;
   final TextStyle base;
@@ -1884,6 +1900,7 @@ class _ReadTable extends StatefulWidget {
   final Widget Function(BuildContext context, int r, int c, TextStyle style)
   cell;
   final VoidCallback onOpen;
+  final Future<void> Function()? onCopy;
 
   const _ReadTable({
     super.key,
@@ -1893,6 +1910,7 @@ class _ReadTable extends StatefulWidget {
     required this.unfold,
     required this.cell,
     required this.onOpen,
+    this.onCopy,
   });
 
   @override
@@ -1977,6 +1995,13 @@ class _ReadTableState extends State<_ReadTable> {
     _measure();
   });
 
+  /// The ⋮ at [at] (global): Copy.
+  Future<void> _menu(Offset at) async {
+    final picked = await showTableMenu(context, at);
+    if (!mounted || picked != TableAction.copy) return;
+    await widget.onCopy?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -1988,7 +2013,19 @@ class _ReadTableState extends State<_ReadTable> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: LayoutBuilder(builder: _grid),
+          child: widget.onCopy == null
+              ? LayoutBuilder(builder: _grid)
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(child: LayoutBuilder(builder: _grid)),
+                    TableMenuButton(
+                      key: ValueKey('table-menu-${table.firstLine}'),
+                      onMenu: (at) => unawaited(_menu(at)),
+                    ),
+                  ],
+                ),
         ),
         if (hidden > 0)
           TextButton(

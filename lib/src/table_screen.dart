@@ -101,6 +101,115 @@ Future<bool> confirmTableDelete(
   return sure ?? false;
 }
 
+/// Puts the table at [at] of [text], as stored, on the clipboard as an
+/// HTML table and, as the plain text, as Markdown (#324), each box in
+/// the state [ticking] shows. Where the platform takes no HTML, the
+/// Markdown alone. Copied says nothing (UI laws).
+Future<void> copyTable(
+  BuildContext context, {
+  required String text,
+  required int at,
+  BoxTicking? ticking,
+}) async {
+  final copy = MarkdownTables.copy(text, at, {
+    for (final b in storedBoxes(text, ticking)) b.id: b.state,
+  });
+  if (copy == null) return;
+  if (await PhotoScope.of(context).copyHtml(copy.markdown, copy.html)) {
+    return;
+  }
+  await Clipboard.setData(ClipboardData(text: copy.markdown));
+}
+
+/// What a table's ⋮ does (obf-1050).
+enum TableAction { copy, up, down, delete }
+
+/// A table's ⋮ at its top right corner (obf-1050): it takes its own tap,
+/// never the card's or the table's under it, and tells [onMenu] where
+/// the finger was (global), a screen reader's press at its middle.
+class TableMenuButton extends StatefulWidget {
+  final void Function(Offset at) onMenu;
+
+  const TableMenuButton({super.key, required this.onMenu});
+
+  @override
+  State<TableMenuButton> createState() => _TableMenuButtonState();
+}
+
+class _TableMenuButtonState extends State<TableMenuButton> {
+  Offset? _finger;
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (event) => _finger = event.position,
+    child: IconButton(
+      tooltip: context.t.tableMore,
+      visualDensity: VisualDensity.compact,
+      icon: const Icon(Icons.more_vert),
+      onPressed: () {
+        final finger = _finger;
+        _finger = null;
+        if (finger != null) return widget.onMenu(finger);
+        final box = context.findRenderObject() as RenderBox?;
+        if (box == null) return;
+        widget.onMenu(box.localToGlobal(box.size.center(Offset.zero)));
+      },
+    ),
+  );
+}
+
+/// Opens a table's ⋮ at [at] (global): Copy, and with [edits] Move up
+/// while [up], Move down while [down], and Delete; what was picked, or
+/// null.
+Future<TableAction?> showTableMenu(
+  BuildContext context,
+  Offset at, {
+  bool edits = false,
+  bool up = false,
+  bool down = false,
+}) {
+  final t = context.t;
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  if (overlay == null) return Future.value();
+  PopupMenuItem<TableAction> item(
+    TableAction action,
+    IconData icon,
+    String label, {
+    bool enabled = true,
+  }) => PopupMenuItem(
+    key: ValueKey('table-menu-${action.name}'),
+    value: action,
+    enabled: enabled,
+    child: Row(
+      children: [
+        Icon(icon),
+        const SizedBox(width: 12),
+        Flexible(child: Text(label)),
+      ],
+    ),
+  );
+  return showMenu<TableAction>(
+    context: context,
+    position: RelativeRect.fromRect(
+      overlay.globalToLocal(at) & Size.zero,
+      Offset.zero & overlay.size,
+    ),
+    items: [
+      item(TableAction.copy, Icons.copy, t.tableCopy),
+      if (edits) ...[
+        item(TableAction.up, Icons.arrow_upward, t.tableUp, enabled: up),
+        item(
+          TableAction.down,
+          Icons.arrow_downward,
+          t.tableDown,
+          enabled: down,
+        ),
+        item(TableAction.delete, Icons.delete_outline, t.tableDelete),
+      ],
+    ],
+  );
+}
+
 /// A table of a formatted text full screen (ADR 0033): its header row
 /// stays on screen while the rows scroll up and down, and so does its
 /// first column when it holds headings. Sideways the table moves by the
@@ -119,8 +228,9 @@ Future<bool> confirmTableDelete(
 /// A tap on a box of a cell opens its menu at the finger while there is
 /// [ticking], also where the table is only read (ADR 0035).
 ///
-/// Copy in the bar puts the table on the clipboard as an HTML table and,
-/// as the plain text, as Markdown (#324).
+/// Copy in the bar, and in the ⋮ at the table's top right corner
+/// (obf-1050), puts the table on the clipboard as an HTML table and, as
+/// the plain text, as Markdown (#324).
 class TableScreen extends StatefulWidget {
   /// How wide a column may get at most and at least, and how wide the
   /// empty column that adds one is.
@@ -522,14 +632,7 @@ class _TableScreenState extends State<TableScreen> {
   /// Markdown alone. Copied says nothing (UI laws).
   Future<void> _copy() async {
     _commit();
-    final copy = MarkdownTables.copy(_text, _at, {
-      for (final b in _boxes) b.id: b.state,
-    });
-    if (copy == null) return;
-    if (await PhotoScope.of(context).copyHtml(copy.markdown, copy.html)) {
-      return;
-    }
-    await Clipboard.setData(ClipboardData(text: copy.markdown));
+    await copyTable(context, text: _text, at: _at, ticking: _ticking);
   }
 
   @override
@@ -564,6 +667,13 @@ class _TableScreenState extends State<TableScreen> {
     );
   }
 
+  /// The table's ⋮ at [at] (global): Copy.
+  Future<void> _tableMenu(Offset at) async {
+    final picked = await showTableMenu(context, at);
+    if (!mounted || picked != TableAction.copy) return;
+    await _copy();
+  }
+
   Widget _grid(BuildContext context, MarkdownTable table, double width) {
     final t = context.t;
     final first = table.headingColumn ? 1 : 0;
@@ -590,15 +700,28 @@ class _TableScreenState extends State<TableScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_most > 0)
-              TableSidewaysBar(
-                key: const ValueKey('table-sideways'),
-                offset: _offset,
-                most: _most,
-                room: _room,
-                whole: moving,
-                label: t.tableSideways,
-              ),
+            // The ⋮ at the top right corner, offering Copy (obf-1050),
+            // beside the bar that moves the table sideways.
+            Row(
+              children: [
+                Expanded(
+                  child: _most > 0
+                      ? TableSidewaysBar(
+                          key: const ValueKey('table-sideways'),
+                          offset: _offset,
+                          most: _most,
+                          room: _room,
+                          whole: moving,
+                          label: t.tableSideways,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                TableMenuButton(
+                  key: const ValueKey('table-screen-menu'),
+                  onMenu: (at) => unawaited(_tableMenu(at)),
+                ),
+              ],
+            ),
             if (_edits) _letters(table),
             _row(context, table, 0),
             Expanded(

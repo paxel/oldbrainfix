@@ -8198,11 +8198,35 @@ abstract class AppLocalizations {
   /// **'Table'**
   String get tableTitle;
 
-  /// Button in the bar of a table full screen: puts the table on the clipboard as an HTML table and, as plain text, as Markdown (#324).
+  /// Button in the bar of a table full screen and entry of a table's ⋮ (obf-1050): puts the table on the clipboard as an HTML table and, as plain text, as Markdown (#324).
   ///
   /// In en, this message translates to:
   /// **'Copy'**
   String get tableCopy;
+
+  /// Tooltip and screen reader label of the ⋮ at a table's top right corner (obf-1050): Copy, and in the Note editor Move up, Move down and Delete table.
+  ///
+  /// In en, this message translates to:
+  /// **'More for the table'**
+  String get tableMore;
+
+  /// Entry of a table's ⋮ in the Note editor (obf-1050): moves the whole table past the block of the text above it.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get tableUp;
+
+  /// Entry of a table's ⋮ in the Note editor (obf-1050): moves the whole table past the block of the text below it.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get tableDown;
+
+  /// Entry of a table's ⋮ in the Note editor (obf-1050): deletes the whole table, asking first while its cells hold words.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete table'**
+  String get tableDelete;
 
   /// Screen reader hint of a table in a text: a tap opens it full screen.
   ///

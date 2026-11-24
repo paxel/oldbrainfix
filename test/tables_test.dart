@@ -6,6 +6,7 @@ import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/table_grid.dart';
 import 'package:oldbrainfix/src/table_screen.dart';
@@ -154,8 +155,9 @@ void main() {
                 onForward: () => forward++,
                 child: Align(
                   alignment: Alignment.topLeft,
+                  // Room for the table and its ⋮ beside it (obf-1050).
                   child: SizedBox(
-                    width: 300,
+                    width: 340,
                     child: MarkedText(
                       text,
                       key: ValueKey(text),
@@ -681,6 +683,29 @@ void main() {
       expect(written.single.text, '# Shop\n\n$table');
       expect(photos.copiedHtml.single.text, table);
       expect(plain, [table]);
+    });
+
+    testWidgets('its ⋮ at the top right corner copies the table too, the '
+        'cell edited written first (obf-1050)', (tester) async {
+      final photos = FakePhotos();
+      final written = await open(tester, shop, edits: true, photos: photos);
+      await tester.tap(key('cell-2-1'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '3');
+      await tester.tap(key('table-screen-menu'));
+      await tester.pumpAndSettle();
+      // Full screen only Copy: moving and deleting are the editor's.
+      expect(key('table-menu-up'), findsNothing);
+      expect(key('table-menu-delete'), findsNothing);
+      await tester.tap(key('table-menu-copy'));
+      await tester.pumpAndSettle();
+      expect(written, hasLength(1));
+      expect(
+        photos.copiedHtml.single.text,
+        '| Item | Qty |\n| --- | --: |\n| ☐ **milk** #dairy | 2 |\n'
+        '| oat | 3 |',
+      );
+      expect(find.byType(TableScreen), findsOneWidget);
     });
 
     testWidgets('a cell\'s box is ticked in place, the text unchanged', (
@@ -1276,6 +1301,65 @@ void main() {
         find.byKey(const ValueKey('table-0-row-200'), skipOffstage: false),
         findsOneWidget,
       );
+    });
+
+    testWidgets('the ⋮ of a card\'s table copies it, each box as it shows, '
+        'taking its own tap (obf-1050)', (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final id = notes.capture(shop, format: TextFormats.markdown).id;
+      final box = notes.byId(id)!.boxes.single;
+      Boxes(store).tick(id, box.id, BoxState.done);
+      final photos = FakePhotos();
+      await tester.pumpWidget(OldBrainFixApp(store: store, photos: photos));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('All Notes'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(key('table-menu-2'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsNothing);
+      // Only read here: Copy alone.
+      expect(key('table-menu-up'), findsNothing);
+      expect(key('table-menu-delete'), findsNothing);
+      await tester.tap(key('table-menu-copy'));
+      await tester.pumpAndSettle();
+      expect(
+        photos.copiedHtml.single.text,
+        '| Item | Qty |\n| --- | --: |\n| ✅ **milk** #dairy | 2 |\n'
+        '| oat | 1 |',
+      );
+      expect(find.byType(TableScreen), findsNothing);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(notes.byId(id)?.text, contains('| oat | 1 |'));
+    });
+
+    testWidgets('the ⋮ of a table on a search\'s card opens its menu, not '
+        'the Note', (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      notes.capture(shop, format: TextFormats.markdown);
+      final photos = FakePhotos();
+      await tester.pumpWidget(OldBrainFixApp(store: store, photos: photos));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'oat');
+      await tester.pump(BrowserSearchField.pause);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('table-menu-2')).first);
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      await tester.tap(key('table-menu-copy'));
+      await tester.pumpAndSettle();
+      expect(photos.copiedHtml, hasLength(1));
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(find.byType(TableScreen), findsNothing);
     });
 
     testWidgets('a box ticked on the card keeps its tick when a cell is '

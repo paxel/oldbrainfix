@@ -14,6 +14,7 @@ import 'look.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
+import 'whole_tables.dart';
 
 /// A cell of a table: its row, the header row 0, and its column.
 typedef GridCell = ({int row, int column});
@@ -38,7 +39,10 @@ typedef GridWritten = ({String text, int at});
 /// (asking once while it holds words; the last one takes the table), for
 /// a column how it lines up its cells, and on the first column whether it
 /// holds headings. "Show as lines" in its corner shows the table's lines
-/// as text instead ([onShowLines]).
+/// as text instead ([onShowLines]). Its ⋮ at the top right corner, at the
+/// finger, copies the whole table, moves it past the block of the text
+/// above or below it, or deletes it, asking once while it holds words
+/// (obf-1050).
 ///
 /// Every change is made by the table edits of the core
 /// ([MarkdownTables]) on [text], the table [table] in it, and given to
@@ -615,6 +619,48 @@ class TableGridState extends State<TableGrid> {
     }
   }
 
+  /// The table's ⋮ at [at] (global): Copy, Move up and Move down while
+  /// there is a block of the text to move past, and Delete (obf-1050).
+  Future<void> _tableMenu(Offset at) async {
+    if (_table == null) return;
+    stop();
+    final (text, where) = (_text, _at);
+    final picked = await showTableMenu(
+      context,
+      at,
+      edits: true,
+      up: WholeTables.canMove(text, where, up: true),
+      down: WholeTables.canMove(text, where, up: false),
+    );
+    if (!mounted || picked == null) return;
+    switch (picked) {
+      case TableAction.copy:
+        await copyTable(context, text: _text, at: _at, ticking: widget.ticking);
+      case TableAction.up || TableAction.down:
+        final moved = WholeTables.move(
+          _text,
+          _at,
+          up: picked == TableAction.up,
+        );
+        if (moved != null) _apply(moved);
+      case TableAction.delete:
+        await _deleteTable();
+    }
+  }
+
+  /// Deletes the whole table after asking once while it holds words.
+  Future<void> _deleteTable() async {
+    final table = _table;
+    if (table == null) return;
+    final holds = table.rows.any(
+      (row) => row.cells.any((cell) => cell.end > cell.start),
+    );
+    if (holds && !await confirmTableDelete(context)) return;
+    if (!mounted) return;
+    final gone = WholeTables.delete(_text, _at);
+    if (gone != null) _apply(gone);
+  }
+
   /// Deletes the row or column [index] after asking once while it holds
   /// words; the last one takes the table with it.
   Future<void> _delete(
@@ -643,9 +689,6 @@ class TableGridState extends State<TableGrid> {
   Widget build(BuildContext context) {
     final table = _table;
     if (table == null) return const SizedBox.shrink();
-    final t = context.t;
-    // One table of all the cells, so that the field of the cell being
-    // edited moves from one to the next as itself, keeping the keyboard.
     return OverlayPortal(
       controller: _barShown,
       overlayChildBuilder: (context) {
@@ -658,86 +701,102 @@ class TableGridState extends State<TableGrid> {
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: SingleChildScrollView(
-          key: const ValueKey('table-grid-sideways'),
-          controller: _sideways,
-          scrollDirection: Axis.horizontal,
-          child: Table(
-            defaultColumnWidth: const FixedColumnWidth(TableGrid.adding),
-            columnWidths: {
-              0: const FixedColumnWidth(TableGrid.gutter),
-              for (var c = 0; c < table.columns; c++)
-                c + 1: FixedColumnWidth(_widthOf(c)),
-            },
-            defaultVerticalAlignment:
-                TableCellVerticalAlignment.intrinsicHeight,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(child: _sidewaysGrid(context, table)),
+            TableMenuButton(
+              key: const ValueKey('grid-menu'),
+              onMenu: (at) => unawaited(_tableMenu(at)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The table's cells with its row numbers, column letters and "+",
+  /// moving sideways when wider than its room.
+  Widget _sidewaysGrid(BuildContext context, MarkdownTable table) {
+    final t = context.t;
+    // One table of all the cells, so that the field of the cell being
+    // edited moves from one to the next as itself, keeping the keyboard.
+    return SingleChildScrollView(
+      key: const ValueKey('table-grid-sideways'),
+      controller: _sideways,
+      scrollDirection: Axis.horizontal,
+      child: Table(
+        defaultColumnWidth: const FixedColumnWidth(TableGrid.adding),
+        columnWidths: {
+          0: const FixedColumnWidth(TableGrid.gutter),
+          for (var c = 0; c < table.columns; c++)
+            c + 1: FixedColumnWidth(_widthOf(c)),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.intrinsicHeight,
+        children: [
+          TableRow(
             children: [
-              TableRow(
-                children: [
-                  SizedBox(
-                    height: TableGrid.letters,
-                    child: IconButton(
-                      key: const ValueKey('table-show-lines'),
-                      tooltip: t.tableShowLines,
-                      padding: EdgeInsets.zero,
-                      iconSize: 20,
-                      onPressed: _showLines,
-                      icon: const Icon(Icons.notes),
-                    ),
-                  ),
-                  for (var c = 0; c < table.columns; c++)
-                    SizedBox(
-                      height: TableGrid.letters,
-                      child: _Heading(
-                        key: ValueKey('grid-column-$c'),
-                        text: TableScreen.letter(c),
-                        label: t.tableColumn(TableScreen.letter(c)),
-                        onMenu: (at) => unawaited(_menu(c, at, column: true)),
-                      ),
-                    ),
-                  SizedBox(
-                    height: TableGrid.letters,
-                    child: _Heading(
-                      key: const ValueKey('grid-add-column'),
-                      text: '+',
-                      label: t.tableAddColumn,
-                      onTap: _addColumn,
-                    ),
-                  ),
-                ],
-              ),
-              for (var r = 0; r < table.rows.length; r++)
-                TableRow(
-                  children: [
-                    _Heading(
-                      key: ValueKey('grid-row-$r'),
-                      text: '${r + 1}',
-                      label: t.tableRow(r + 1),
-                      onMenu: (at) => unawaited(_menu(r, at, column: false)),
-                    ),
-                    for (var c = 0; c < table.columns; c++)
-                      _cell(context, table, r, c),
-                    const SizedBox.shrink(),
-                  ],
+              SizedBox(
+                height: TableGrid.letters,
+                child: IconButton(
+                  key: const ValueKey('table-show-lines'),
+                  tooltip: t.tableShowLines,
+                  padding: EdgeInsets.zero,
+                  iconSize: 20,
+                  onPressed: _showLines,
+                  icon: const Icon(Icons.notes),
                 ),
-              TableRow(
-                children: [
-                  SizedBox(
-                    height: TableGrid.letters,
-                    child: _Heading(
-                      key: const ValueKey('grid-add-row'),
-                      text: '+',
-                      label: t.tableAddRow,
-                      onTap: _addRow,
-                    ),
+              ),
+              for (var c = 0; c < table.columns; c++)
+                SizedBox(
+                  height: TableGrid.letters,
+                  child: _Heading(
+                    key: ValueKey('grid-column-$c'),
+                    text: TableScreen.letter(c),
+                    label: t.tableColumn(TableScreen.letter(c)),
+                    onMenu: (at) => unawaited(_menu(c, at, column: true)),
                   ),
-                  for (var c = 0; c <= table.columns; c++)
-                    const SizedBox.shrink(),
-                ],
+                ),
+              SizedBox(
+                height: TableGrid.letters,
+                child: _Heading(
+                  key: const ValueKey('grid-add-column'),
+                  text: '+',
+                  label: t.tableAddColumn,
+                  onTap: _addColumn,
+                ),
               ),
             ],
           ),
-        ),
+          for (var r = 0; r < table.rows.length; r++)
+            TableRow(
+              children: [
+                _Heading(
+                  key: ValueKey('grid-row-$r'),
+                  text: '${r + 1}',
+                  label: t.tableRow(r + 1),
+                  onMenu: (at) => unawaited(_menu(r, at, column: false)),
+                ),
+                for (var c = 0; c < table.columns; c++)
+                  _cell(context, table, r, c),
+                const SizedBox.shrink(),
+              ],
+            ),
+          TableRow(
+            children: [
+              SizedBox(
+                height: TableGrid.letters,
+                child: _Heading(
+                  key: const ValueKey('grid-add-row'),
+                  text: '+',
+                  label: t.tableAddRow,
+                  onTap: _addRow,
+                ),
+              ),
+              for (var c = 0; c <= table.columns; c++) const SizedBox.shrink(),
+            ],
+          ),
+        ],
       ),
     );
   }

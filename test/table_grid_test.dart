@@ -429,6 +429,69 @@ void main() {
     expect(controller.text, 'Shop\n\n\nBread');
   });
 
+  testWidgets('the table\'s ⋮ copies it, moves it past the block above or '
+      'below and deletes it, asking once while it holds words (obf-1050)', (
+    tester,
+  ) async {
+    final copied = <String?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String?);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final controller = await pumpField(tester, shop);
+    const table = '| Item | Qty |\n| --- | --: |\n| milk | 2 |\n| oat | 1 |';
+
+    await pick(tester, 'grid-menu', 'table-menu-copy');
+    expect(copied, [table]);
+    expect(controller.text, shop);
+
+    await pick(tester, 'grid-menu', 'table-menu-up');
+    expect(controller.text, '$table\n\nShop\n\nBread');
+    await tester.tap(key('grid-menu'));
+    await tester.pumpAndSettle();
+    PopupMenuItem<Object?> item(String name) =>
+        tester.widget<PopupMenuItem<Object?>>(key(name));
+    expect(item('table-menu-up').enabled, isFalse);
+    expect(item('table-menu-down').enabled, isTrue);
+    await tester.tap(key('table-menu-down'));
+    await tester.pumpAndSettle();
+    expect(controller.text, shop);
+    await pick(tester, 'grid-menu', 'table-menu-down');
+    expect(controller.text, 'Shop\n\nBread\n\n$table');
+
+    await pick(tester, 'grid-menu', 'table-menu-delete');
+    expect(find.text('Delete the table?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(controller.text, 'Shop\n\nBread\n\n$table');
+    await pick(tester, 'grid-menu', 'table-menu-delete');
+    await tester.tap(key('table-delete-confirm'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TableGrid), findsNothing);
+    expect(controller.text, 'Shop\n\nBread\n');
+  });
+
+  testWidgets('an empty table\'s ⋮ deletes it without asking', (tester) async {
+    final controller = await pumpField(
+      tester,
+      'Shop\n\n|  |  |\n| --- | --- |\n|  |  |',
+    );
+    await pick(tester, 'grid-menu', 'table-menu-delete');
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(controller.text, 'Shop\n');
+  });
+
   testWidgets('a column\'s menu lines it up, the way it does checked', (
     tester,
   ) async {

@@ -246,6 +246,29 @@ void main() {
       );
     });
 
+    testWidgets('a table moved or deleted from its ⋮ goes back and comes '
+        'again, a step each (obf-1050)', (tester) async {
+      const table = '| Item | Count |\n| --- | --- |\n| tea | 1 |';
+      await edit(tester, id);
+      await tap(tester, key('grid-menu'));
+      await tap(tester, key('table-menu-up'));
+      expect(typed(tester), '$table\n\nShop');
+      await tap(tester, key('grid-menu'));
+      await tap(tester, key('table-menu-delete'));
+      await tap(tester, key('table-delete-confirm'));
+      // The table and the line break after it go, as its last row would.
+      expect(typed(tester), '\nShop');
+
+      await undo(tester);
+      expect(typed(tester), '$table\n\nShop');
+      await undo(tester);
+      expect(typed(tester), 'Shop\n\n$table');
+      await redo(tester);
+      expect(typed(tester), '$table\n\nShop');
+      await leave(tester);
+      expect(notes.byId(id)?.text, '$table\n\nShop');
+    });
+
     testWidgets('a box ticked after it was typed keeps its tick when the '
         'typing after it goes back', (tester) async {
       final plain = notes.capture('list').id;
