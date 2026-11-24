@@ -1659,11 +1659,6 @@ impl Store {
         inviting: Option<&Invite>,
         joiner: Option<&str>,
     ) -> Result<(Response, Option<Session>)> {
-        // Sync waits while an AI Task does (ADR 0026); the joiner tries
-        // again later, as when the host is busy.
-        if self.sync_paused()? {
-            return Ok((Response::text(503, "paused"), None));
-        }
         let path = request.path.as_str();
         Ok(match (request.method.as_str(), path) {
             ("GET", "/vector") => {

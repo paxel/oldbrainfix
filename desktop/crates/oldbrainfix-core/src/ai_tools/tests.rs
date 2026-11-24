@@ -1690,7 +1690,6 @@ fn the_ask_panel_reads_without_an_ai_task_and_drafts_its_first_change_into_one()
     let read = store.ask_tool("read_note", &json!({"id": note.id}), &utc, &mut task)?;
     assert!(!read.is_error);
     assert_eq!((task.clone(), store.ai_task()?), (None, None));
-    assert!(!store.sync_paused()?);
     // What the panel does not offer, it refuses.
     for unoffered in ["list_notes", "read_photo", "trash_note", "no_such"] {
         let out = store.ask_tool(unoffered, &json!({}), &utc, &mut task)?;
@@ -1705,6 +1704,6 @@ fn the_ask_panel_reads_without_an_ai_task_and_drafts_its_first_change_into_one()
     )?;
     assert!(!filed.is_error, "{filed:?}");
     assert_eq!(task, store.ai_task()?);
-    assert!(task.is_some() && store.sync_paused()?);
+    assert!(task.is_some());
     Ok(())
 }

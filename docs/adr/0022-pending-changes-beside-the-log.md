@@ -30,7 +30,7 @@ Nothing that decides trust or what leaves the Device sees a set:
 - the fields only the user's own Devices count for, such as a block, an Override or a Sent Item's link (`currentByOwn`);
 - the numbering of new entries, and everything held, relayed or backed up.
 
-The one exception is the causal context of an edit made while a set is shown: what the set holds of other Devices counts as seen, since the user saw it when they wrote. Such an edit does not stand as a Conflict against the value it replaced, before Accept or after. The ticket that shows a set pauses the sync while the set waits, as the AI Task does (#112), so that Sent Items and syncs carry nothing that is undecided. A set that is never shown, as a stranger's Sent Item, needs no pause.
+The one exception is the causal context of an edit made while a set is shown: what the set holds of other Devices counts as seen, since the user saw it when they wrote. Such an edit does not stand as a Conflict against the value it replaced, before Accept or after. Syncs and bundles carry entries of the log, never a set, so they carry nothing that is undecided, and sync goes on while a set is shown (#389). A Sent Item is made from the Note's reads, so the Rust core makes it from the log alone (ADR 0026); the phone shows no set, and must do the same before it shows one.
 
 ## Accept, Decline and the user's own edits
 
@@ -68,4 +68,4 @@ Amended by ADR 0023 (#108): an offered Area is a set of kind `area-offer`, never
 
 ## The AI Task (ADR 0026)
 
-Amended by ADR 0026 (#112): an AI Task is a set of kind `ai-task`, shown, with no payload, holding drafts only, written through `Store::drafting`. While a shown set waits, the Rust core itself refuses to sync, send or take in a bundle, and the alarm plan reads the log alone.
+Amended by ADR 0026 (#112): an AI Task is a set of kind `ai-task`, shown, with no payload, holding drafts only, written through `Store::drafting`. While a shown set waits, the alarm plan reads the log alone. Amended by #389: sync, sending and bundles no longer wait for it (ADR 0026).

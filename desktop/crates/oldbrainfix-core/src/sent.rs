@@ -672,16 +672,17 @@ impl Store {
     /// Writes the file the Note `note_id` goes out as: encrypted to the
     /// keys of `to`, else signed only; with `cancel` as its cancellation.
     /// Remembers `to` as the person this Device last sent the Note to,
-    /// or forgets it for a file to anyone ([`Store::last_sent_to`]).
+    /// or forgets it for a file to anyone ([`Store::last_sent_to`]). The
+    /// Note goes as the log has it, without what an AI Task drafted.
     pub fn send_note(
         &self,
         note_id: &str,
         to: Option<&Recipient>,
         cancel: bool,
     ) -> Result<Vec<u8>> {
-        // What the AI Task changed must not leave (ADR 0026).
-        self.refuse_while_paused()?;
-        let item = self.sent_item_of(note_id, cancel)?;
+        // What an AI Task changed does not leave before Accept: the Note
+        // goes out as the log has it (ADR 0026, obf-1076).
+        let item = self.log_only(|| self.sent_item_of(note_id, cancel))?;
         let keys = to.map(|r| r.keys.clone()).unwrap_or_default();
         let file = encode(&item, &self.signing_key()?, &keys, &mut |n| {
             let mut out = vec![0u8; n];

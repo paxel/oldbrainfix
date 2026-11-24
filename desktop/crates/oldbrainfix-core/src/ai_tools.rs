@@ -1288,11 +1288,11 @@ impl Store {
 
     /// Answers the call of the Ask panel's tool `name` ([`ASK_TOOLS`])
     /// with `args` (#267, ADR 0051), as the AI sees the store. A tool that
-    /// reads runs in no AI Task, so asking does not pause sync; the first
-    /// change opens the AI Task ([`Store::open_ai_task`]) into `task`,
-    /// where it and every later one are drafted as [`Store::ai_tool`]
-    /// drafts them. A tool the panel does not offer, or one that fails,
-    /// says why in an output marked as an error.
+    /// reads runs in no AI Task; the first change opens the AI Task
+    /// ([`Store::open_ai_task`]) into `task`, where it and every later one
+    /// are drafted as [`Store::ai_tool`] drafts them. A tool the panel does
+    /// not offer, or one that fails, says why in an output marked as an
+    /// error.
     pub fn ask_tool(
         &self,
         name: &str,

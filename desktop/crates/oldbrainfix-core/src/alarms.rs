@@ -917,13 +917,9 @@ impl<'a> Alarms<'a> {
     /// The Changes Nudge at the store's now (#109): the people changes
     /// travel with by bundles who lack some
     /// ([`Store::waiting_for_changes`]), with the Nudge's repeat interval
-    /// and Quiet Hours; `None` when nobody waits, or while sync is paused
-    /// ([`Store::sync_paused`]). On a quiet day it waits for the day's end
-    /// (obf-1044).
+    /// and Quiet Hours; `None` when nobody waits. On a quiet day it waits
+    /// for the day's end (obf-1044).
     pub fn changes_nudge(&self, wall: &WallClock) -> Result<Option<PlannedChangesNudge>> {
-        if self.store.sync_paused()? {
-            return Ok(None);
-        }
         let settings = DeviceSettings::new(self.store);
         let quiet = if settings.quiet_hours_on()? {
             Some(settings.quiet_hours()?)

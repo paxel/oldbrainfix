@@ -12,9 +12,12 @@
 //! user's own edits on other threads, or after the call, reach the log
 //! as ever.
 //!
-//! While a shown set waits, sync waits too ([`Store::sync_paused`]), and
-//! the alarms fire from the log alone ([`Store::log_only`]): an alarm
-//! never moves or comes because of a change nobody accepted yet.
+//! Sync goes on meanwhile (obf-1076): the drafts are no entries, so
+//! nothing that syncs, sends or backs up carries them, and what comes in
+//! goes into the log, the review marking where it touches a draft
+//! ([`AiFieldChange::synced`]). The alarms fire from the log alone
+//! ([`Store::log_only`]): an alarm never moves or comes because of a
+//! change nobody accepted yet.
 
 use std::collections::{BTreeMap, HashMap};
 use std::thread::ThreadId;
@@ -25,7 +28,7 @@ use crate::checklists::{Checklists, keys as line_keys};
 use crate::entry::Entry;
 use crate::frogs::keys as frog_keys;
 use crate::notes::keys as note_keys;
-use crate::pending::{GiveWay, PendingDraft};
+use crate::pending::{GiveWay, PendingDraft, unit_fields};
 use crate::places::keys as place_keys;
 use crate::routines::{Routines, heads_up_keys, keys as routine_keys};
 use crate::sessions::{Sessions, keys as session_keys};
@@ -214,12 +217,17 @@ pub enum AiChangeKind {
 /// One field an AI Task changes: what the log holds now (`before`) and
 /// what the task wrote (`after`). `mine_wins` when one of the user's own
 /// Devices wrote the field after the task did: Accept keeps the user's.
+/// `synced` when another Device's edit of it came in by sync after the
+/// task wrote it (obf-1076): with `mine_wins` one of the user's own,
+/// which Accept keeps; without, another person's, which Accept writes
+/// the task's value over.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AiFieldChange {
     pub field: String,
     pub before: Option<String>,
     pub after: Option<String>,
     pub mine_wins: bool,
+    pub synced: bool,
 }
 
 /// One entity an AI Task changes, within one group: a Note, Section,
@@ -508,25 +516,35 @@ impl Store {
         Ok(())
     }
 
-    /// Whether sync waits: while a shown pending set does, such as an AI
-    /// Task, open or waiting for its review (ADR 0022, 0026), nothing is
-    /// synced, sent or taken in from a bundle.
+    /// Whether a shown pending set waits, such as an AI Task, open or
+    /// waiting for its review. Sync no longer waits for it (obf-1076);
+    /// kept only while the desktop still asks, to go with its last use.
     pub fn sync_paused(&self) -> Result<bool> {
         Ok(self.pending_sets()?.iter().any(|s| s.shown))
     }
 
-    /// [`Error::SyncPaused`] while [`Store::sync_paused`].
-    pub(crate) fn refuse_while_paused(&self) -> Result<()> {
-        if self.sync_paused()? {
-            return Err(Error::SyncPaused);
+    /// Whether another Device's edit of `field` on `entity` (its whole
+    /// schedule, for a Routine's) came into the log after `mark`, as one
+    /// that counts: by sync, while the AI Task waited (obf-1076).
+    fn synced_over(&self, entity: &str, field: &str, mark: i64, by: &mut GiveWay) -> Result<bool> {
+        let fields = unit_fields(field);
+        if !by.histories.contains_key(entity) {
+            let history = self.logged_history(entity)?;
+            by.histories.insert(entity.to_string(), history);
         }
-        Ok(())
+        let device = self.device_id()?;
+        Ok(by.histories.get(entity).is_some_and(|history| {
+            history
+                .iter()
+                .any(|e| e.seq > mark && e.device != device && fields.contains(&e.field))
+        }))
     }
 
     /// The review of the AI Task `id`: every field it changes, by entity
     /// and grouped by kind ([`AiChangeKind`]), with what the log holds now
-    /// and what the task wrote last. A field written back to what the log
-    /// holds is no change.
+    /// and what the task wrote last, and whether an edit that came in by
+    /// sync since touches it. A field written back to what the log holds
+    /// is no change.
     pub fn ai_review(&self, id: &str) -> Result<AiReview> {
         let set = self
             .pending_set(id)?
@@ -575,6 +593,7 @@ impl Store {
                     field: field.clone(),
                     before,
                     mine_wins: self.gives_way(entity, field, d.mark, &mut by)?,
+                    synced: self.synced_over(entity, field, d.mark, &mut by)?,
                     after: d.value.clone(),
                 };
                 let kind = kind_of(ty, made, session, field, d.value.as_deref());

@@ -7,8 +7,8 @@
 //! most others speak. The model works through the AI port's asking tools
 //! ([`crate::ai_tools::ASK_TOOLS`]), answered in-process by
 //! [`Store::ask_tool`]: a read runs as the AI sees the store, in no AI
-//! Task, so asking does not pause sync; a change is a draft of the AI
-//! Task, reviewed as Pending Changes (ADR 0022, 0026).
+//! Task; a change is a draft of the AI Task, reviewed as Pending Changes
+//! (ADR 0022, 0026).
 //!
 //! A [`Conversation`] is the protocol alone, with no network and no store:
 //! it gives the next [`Request`], takes its [`Reply`], and says whether
@@ -372,8 +372,8 @@ impl Store {
     }
 
     /// Declines the AI Task `id` when it holds no change, so that a
-    /// question whose model changed nothing leaves sync running; whether
-    /// it did.
+    /// question whose model changed nothing leaves no review waiting;
+    /// whether it did.
     pub fn drop_empty_ai_task(&self, id: &str) -> Result<bool> {
         if self.ai_task()?.as_deref() != Some(id) || !self.ai_review(id)?.is_empty() {
             return Ok(false);
