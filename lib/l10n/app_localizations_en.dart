@@ -5686,6 +5686,44 @@ class AppLocalizationsEn extends AppLocalizations {
       'You can leave this page. The Import goes on beside the app, and the top of the screen says when it is done.';
 
   @override
+  String importFillInAsk(String date, String area) {
+    return 'Fill in the Import of $date into $area? Only what that Import did not bring in is added there.';
+  }
+
+  @override
+  String get importFillIn => 'Fill in';
+
+  @override
+  String get importAsNew => 'Import as new';
+
+  @override
+  String importFilledIn(int count, String area) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes went into the Area $area.',
+      one: '1 Note went into the Area $area.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importAlready(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count were imported before and are left out.',
+      one: '1 was imported before and is left out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importNothingNew(int count) {
+    return 'Nothing new: $count already imported';
+  }
+
+  @override
   String settingBadgeLabel(String setting, String value) {
     return '$setting: $value';
   }

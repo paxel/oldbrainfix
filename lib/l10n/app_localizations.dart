@@ -9056,6 +9056,42 @@ abstract class AppLocalizations {
   /// **'You can leave this page. The Import goes on beside the app, and the top of the screen says when it is done.'**
   String get importGoesOn;
 
+  /// The question asked on the phone after a folder or Keep export was picked that an earlier Import came from (obf-1078); above 'importFillIn' and 'importAsNew'.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in the Import of {date} into {area}? Only what that Import did not bring in is added there.'**
+  String importFillInAsk(String date, String area);
+
+  /// Answer to 'importFillInAsk': the missing items go into the Area of the earlier Import.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in'**
+  String get importFillIn;
+
+  /// Answer to 'importFillInAsk': a new Area with every item, as a first Import makes.
+  ///
+  /// In en, this message translates to:
+  /// **'Import as new'**
+  String get importAsNew;
+
+  /// First line of what an Import that filled in an earlier one made (obf-1078), instead of 'importFinishedNotes'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note went into the Area {area}.} other{{count} Notes went into the Area {area}.}}'**
+  String importFilledIn(int count, String area);
+
+  /// Under 'importFilledIn': the items the earlier Import made already (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 was imported before and is left out.} other{{count} were imported before and are left out.}}'**
+  String importAlready(int count);
+
+  /// What an Import that filled in an earlier one says when nothing was missing (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing new: {count} already imported'**
+  String importNothingNew(int count);
+
   /// What a screen reader reads for a badge of a Note's setting in the Note editor (#160): the setting's name and its current value.
   ///
   /// In en, this message translates to:

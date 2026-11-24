@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'folder_import.dart';
 import 'folder_platform.dart';
 import 'import_run.dart';
 
@@ -11,16 +12,21 @@ import 'import_run.dart';
 /// [Imports.keepReads] takes are handed over, none read beyond its
 /// limit. A file that cannot be read throws, and then nothing is
 /// written. [progress] hears how far the writing is; [stop] is asked
-/// before each Note (obf-1078).
+/// before each Note (obf-1078). The files [listed] already, by
+/// [keepLook], are not listed again; with [fillIn], the Area of an
+/// earlier Import of the [folder], only those it did not make go into it
+/// (obf-1078).
 Future<ImportSummary> importKeepFolder(
   Store store,
   FolderPlatform folders,
   String folder,
   String areaName, {
+  List<FolderFile>? listed,
+  String? fillIn,
   ImportProgress? progress,
   Stopping? stop,
 }) async {
-  final files = await folders.files(folder);
+  final files = listed ?? await folders.files(folder);
   final kept = _ofKeep([for (final f in files) f.path]).toSet();
   final over = <int, Uint8List>{};
   return Imports(store).keep(
@@ -29,6 +35,8 @@ Future<ImportSummary> importKeepFolder(
       for (final file in files)
         if (kept.contains(file.path)) ?await _read(folders, file, over),
     ],
+    from: folder,
+    fillIn: fillIn,
     progress: progress,
     stop: stop,
   );
@@ -37,18 +45,21 @@ Future<ImportSummary> importKeepFolder(
 /// As [importKeepFolder] for the Takeout export as the [zip] picked
 /// through [folders]: the zip's files the core takes are copied aside,
 /// none beyond its limit and one byte more, read from there and deleted
-/// afterwards, also when the Import fails.
+/// afterwards, also when the Import fails. Its paths [listed] already,
+/// by [keepLook], are not listed again.
 Future<ImportSummary> importKeepZip(
   Store store,
   FolderPlatform folders,
   String zip,
   String areaName, {
+  List<String>? listed,
+  String? fillIn,
   ImportProgress? progress,
   Stopping? stop,
 }) async {
   try {
     final wanted = {
-      for (final path in _ofKeep(await folders.zipEntries(zip)))
+      for (final path in _ofKeep(listed ?? await folders.zipEntries(zip)))
         path: ?Imports.keepReads(path),
     };
     final entries = <ImportFile>[];
@@ -58,23 +69,68 @@ Future<ImportSummary> importKeepZip(
         entries.add(entry);
       }
     }
-    return Imports(store)
-        .keep(areaName, entries, progress: progress, stop: stop);
+    return Imports(store).keep(
+      areaName,
+      entries,
+      from: zip,
+      fillIn: fillIn,
+      progress: progress,
+      stop: stop,
+    );
   } finally {
     await folders.dropUnzipped();
   }
 }
 
+/// The paths inside the Takeout export at [source], a [zip] or a folder,
+/// and the earlier Import of it, as a job for a [JobRunner] (obf-1078):
+/// for a folder its files, for a zip the paths of its entries. A zip
+/// that cannot be listed leaves no copies behind, as [importKeepZip].
+LongWork<Looked<KeepListed>> keepLook(String source, {required bool zip}) =>
+    (store, folders, progress, stop) async {
+      final KeepListed listed;
+      if (zip) {
+        try {
+          listed = (files: null, entries: await folders.zipEntries(source));
+        } on Object {
+          await folders.dropUnzipped();
+          rethrow;
+        }
+      } else {
+        listed = (files: await folders.files(source), entries: null);
+      }
+      final paths =
+          listed.entries ??
+          [for (final f in listed.files ?? const <FolderFile>[]) f.path];
+      return (
+        listed: listed,
+        earlier: Imports(store).earlier(ImportSourceKind.keep, source, paths),
+      );
+    };
+
+/// What [keepLook] lists: the [files] of a folder, or the paths of a
+/// zip's [entries].
+typedef KeepListed = ({List<FolderFile>? files, List<String>? entries});
+
 /// [importKeepZip] of [zip], or [importKeepFolder] of [source] when it
 /// is no [zip], into [areaName], as a job for a [JobRunner]
-/// (obf-1061).
-ImportWork keepImport(String source, String areaName, {required bool zip}) =>
+/// (obf-1061), of what [listed] holds and filling in [fillIn] when given
+/// (obf-1078).
+ImportWork keepImport(
+  String source,
+  String areaName, {
+  required bool zip,
+  KeepListed? listed,
+  String? fillIn,
+}) =>
     (store, folders, progress, stop) => zip
     ? importKeepZip(
         store,
         folders,
         source,
         areaName,
+        listed: listed?.entries,
+        fillIn: fillIn,
         progress: progress,
         stop: stop,
       )
@@ -83,6 +139,8 @@ ImportWork keepImport(String source, String areaName, {required bool zip}) =>
         folders,
         source,
         areaName,
+        listed: listed?.files,
+        fillIn: fillIn,
         progress: progress,
         stop: stop,
       );

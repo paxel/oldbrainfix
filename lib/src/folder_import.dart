@@ -11,30 +11,68 @@ import 'import_run.dart';
 /// [Imports.maxFileBytes]; every other file is handed over unread, so
 /// the core counts it as skipped. A file that cannot be read throws, and
 /// then nothing is written. [progress] hears how far the writing is;
-/// [stop] is asked before each Note (obf-1078).
+/// [stop] is asked before each Note (obf-1078). The files [listed]
+/// already, by [folderLook], are not listed again; with [fillIn], the
+/// Area of an earlier Import of the [folder], only those it did not
+/// make go into it (obf-1078).
 Future<ImportSummary> importFolder(
   Store store,
   FolderPlatform folders,
   String folder,
   String areaName, {
+  List<FolderFile>? listed,
+  String? fillIn,
   ImportProgress? progress,
   Stopping? stop,
 }) async {
   final files = <ImportFile>[];
-  for (final file in await folders.files(folder)) {
+  for (final file in listed ?? await folders.files(folder)) {
     files.add(await _read(folders, file));
   }
-  return Imports(store).folder(areaName, files, progress: progress, stop: stop);
+  return Imports(store).folder(
+    areaName,
+    files,
+    from: folder,
+    fillIn: fillIn,
+    progress: progress,
+    stop: stop,
+  );
 }
 
+/// What a look at a picked source found before any of its files is read
+/// (obf-1078): what it lists, and the [earlier] Import of it a new one
+/// may fill in, null when there is none.
+typedef Looked<L> = ({L listed, EarlierImport? earlier});
+
+/// The files of [folder] and the earlier Import of it, as a job for a
+/// [JobRunner] (obf-1078).
+LongWork<Looked<List<FolderFile>>> folderLook(String folder) =>
+    (store, folders, progress, stop) async {
+      final files = await folders.files(folder);
+      return (
+        listed: files,
+        earlier: Imports(store).earlier(ImportSourceKind.folder, folder, [
+          for (final file in files) file.path,
+        ]),
+      );
+    };
+
 /// [importFolder] of [folder] into [areaName] as a job for a
-/// [JobRunner] (obf-1061).
-ImportWork folderImport(String folder, String areaName) =>
+/// [JobRunner] (obf-1061), of the files [listed] and filling in [fillIn]
+/// when given (obf-1078).
+ImportWork folderImport(
+  String folder,
+  String areaName, {
+  List<FolderFile>? listed,
+  String? fillIn,
+}) =>
     (store, folders, progress, stop) => importFolder(
       store,
       folders,
       folder,
       areaName,
+      listed: listed,
+      fillIn: fillIn,
       progress: progress,
       stop: stop,
     );

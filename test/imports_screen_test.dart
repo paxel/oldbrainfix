@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
@@ -682,6 +683,249 @@ void main() {
       expect(folders.read, hasLength(4));
       expect(folders.dropped, 1);
       expect(folders.released, isEmpty);
+    });
+  });
+
+  group('the same source imported again (obf-1078)', () {
+    late FakeImportFolders folders;
+    late Announcements announcements;
+    final march = DateTime.utc(2025, 3, 1, 8);
+
+    setUp(() {
+      folders = FakeImportFolders()
+        ..put('Dentist.txt', march, utf8.encode('Tuesday 9:00'));
+      announcements = Announcements();
+    });
+    tearDown(() => announcements.dispose());
+
+    Finder question() => find.byKey(const ValueKey('importFillIn'));
+
+    /// A few frames: the line under the bar moves while the question
+    /// waits, so nothing settles.
+    Future<void> frames(WidgetTester tester) async {
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+    }
+
+    /// Taps the row [key] again, up to the question.
+    Future<void> again(WidgetTester tester, String key) async {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await frames(tester);
+    }
+
+    /// The app on the Imports, the folder imported once and its page left.
+    Future<void> importedOnce(WidgetTester tester) async {
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: store,
+          alarms: alarms,
+          folders: folders,
+          announcements: announcements,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openImports(tester);
+      await tap(tester, find.byKey(const ValueKey('importFolder')));
+      // The first Import of a folder asks nothing.
+      expect(question(), findsNothing);
+      expect(announcements.visible, 'Import finished.');
+      announcements.dismiss();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(ImportsScreen), findsOneWidget);
+    }
+
+    /// The Notes of the Area named [name].
+    List<Note> inside(String name) => Notes(store)
+        .inside(Places(store).areas().singleWhere((a) => a.name == name).id);
+
+    testWidgets('asks once whether it fills in the first, naming its date '
+        'and Area; Fill in adds only the missing files to that Area', (
+      tester,
+    ) async {
+      await importedOnce(tester);
+      folders.put('Plan.md', march, utf8.encode('Ship it'));
+      final earlier = Imports(store).earlier(
+        ImportSourceKind.folder,
+        'content://tree/primary%3ANotes',
+        ['Dentist.txt'],
+      )!;
+      final date = DateFormat.yMd('en').format(earlier.at.toLocal());
+
+      await again(tester, 'importFolder');
+      expect(
+        inDialog(
+          'Fill in the Import of $date into From Notes? Only what that '
+          'Import did not bring in is added there.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('importAsNew')), findsOneWidget);
+      await tester.tap(question());
+      await tester.pumpAndSettle();
+
+      expect(
+        inside('From Notes').map((n) => n.text),
+        unorderedEquals(['Dentist\nTuesday 9:00', '# Plan\nShip it']),
+      );
+      expect(
+        Places(store).areas().where((a) => a.name == 'From Notes (2)'),
+        isEmpty,
+      );
+      const said =
+          '1 Note went into the Area From Notes.\n'
+          '1 was imported before and is left out.';
+      expect(find.text(said), findsOneWidget);
+      expect(find.byKey(const ValueKey('importPageOpenArea')), findsOneWidget);
+      expect(announcements.visible, 'Import finished.');
+      await tapVisible(tester, announcements);
+      expect(inDialog(said), findsOneWidget);
+    });
+
+    testWidgets('Import as new makes a new Area with every file, as the '
+        'first Import did', (tester) async {
+      await importedOnce(tester);
+      folders.put('Plan.md', march, utf8.encode('Ship it'));
+      await again(tester, 'importFolder');
+      await tester.tap(find.byKey(const ValueKey('importAsNew')));
+      await tester.pumpAndSettle();
+
+      expect(inside('From Notes'), hasLength(1));
+      expect(inside('From Notes (2)'), hasLength(2));
+      expect(
+        find.text('2 Notes went into the new Area From Notes (2).'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('with nothing missing it says so, offering no Area to open', (
+      tester,
+    ) async {
+      await importedOnce(tester);
+      final areas = Places(store).areas().length;
+      await again(tester, 'importFolder');
+      await tester.tap(question());
+      await tester.pumpAndSettle();
+
+      expect(Places(store).areas(), hasLength(areas));
+      expect(inside('From Notes'), hasLength(1));
+      expect(find.text('Nothing new: 1 already imported'), findsOneWidget);
+      expect(find.byKey(const ValueKey('importPageOpenArea')), findsNothing);
+      expect(announcements.visible, 'Import finished.');
+      await tapVisible(tester, announcements);
+      expect(inDialog('Nothing new: 1 already imported'), findsOneWidget);
+      expect(find.byKey(const ValueKey('importOpenArea')), findsNothing);
+    });
+
+    testWidgets('Cancel writes nothing and takes its page away', (
+      tester,
+    ) async {
+      await importedOnce(tester);
+      folders.put('Plan.md', march, utf8.encode('Ship it'));
+      final areas = Places(store).areas().length;
+      await again(tester, 'importFolder');
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(ImportScreen), findsNothing);
+      expect(find.byType(ImportsScreen), findsOneWidget);
+      expect(Places(store).areas(), hasLength(areas));
+      expect(inside('From Notes'), hasLength(1));
+      expect(announcements.visible, isNull);
+      // Its folder's access goes all the same.
+      expect(folders.released, hasLength(2));
+      // Nothing is running any more: the row takes a new Import.
+      expect(
+        tester
+            .widget<ListTile>(find.byKey(const ValueKey('importFolder')))
+            .enabled,
+        isTrue,
+      );
+    });
+
+    testWidgets('another folder is not asked about, even of the same name '
+        'and files', (tester) async {
+      await importedOnce(tester);
+      folders.picks = 'content://tree/primary%3AOther%2FNotes';
+      await tap(tester, find.byKey(const ValueKey('importFolder')));
+
+      expect(question(), findsNothing);
+      expect(inside('From Notes'), hasLength(1));
+      expect(inside('From Notes (2)'), hasLength(1));
+    });
+
+    testWidgets('a Google Keep zip imported again is filled in too', (
+      tester,
+    ) async {
+      folders.putZip(
+        'Takeout/Keep/Garden.json',
+        utf8.encode(
+          jsonEncode({
+            'createdTimestampUsec': march.microsecondsSinceEpoch,
+            'title': 'Garden',
+            'textContent': 'Water the roses',
+          }),
+        ),
+      );
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: store,
+          alarms: alarms,
+          folders: folders,
+          announcements: announcements,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openImports(tester);
+      Future<void> importZip() async {
+        await tap(tester, find.byKey(const ValueKey('importKeep')));
+        await tester.tap(find.byKey(const ValueKey('importKeepZip')));
+        await frames(tester);
+      }
+
+      await importZip();
+      await tester.pumpAndSettle();
+      expect(question(), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      folders.putZip(
+        'Takeout/Keep/Packing.json',
+        utf8.encode(
+          jsonEncode({
+            'createdTimestampUsec': march.microsecondsSinceEpoch,
+            'title': 'Packing',
+          }),
+        ),
+      );
+      await importZip();
+      expect(inDialog('Import from Google Keep'), findsOneWidget);
+      await tester.tap(question());
+      await tester.pumpAndSettle();
+
+      expect(
+        inside('From Google Keep').map((n) => n.text),
+        unorderedEquals(['Garden\nWater the roses', 'Packing']),
+      );
+      expect(
+        find.text(
+          '1 Note went into the Area From Google Keep.\n'
+          '1 was imported before and is left out.',
+        ),
+        findsOneWidget,
+      );
+
+      // Cancelled, the zip is not read, and the picker's copy goes.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final dropped = folders.dropped;
+      await importZip();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ImportScreen), findsNothing);
+      expect(folders.dropped, dropped + 1);
+      expect(inside('From Google Keep'), hasLength(2));
     });
   });
 }

@@ -5756,6 +5756,44 @@ class AppLocalizationsDe extends AppLocalizations {
       'Du kannst diese Seite verlassen. Der Import läuft neben der App weiter, und oben auf dem Bildschirm steht, wenn er fertig ist.';
 
   @override
+  String importFillInAsk(String date, String area) {
+    return 'Den Import vom $date in $area ergänzen? Dort kommt nur hinzu, was dieser Import nicht mitgebracht hat.';
+  }
+
+  @override
+  String get importFillIn => 'Ergänzen';
+
+  @override
+  String get importAsNew => 'Neu importieren';
+
+  @override
+  String importFilledIn(int count, String area) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen kamen in den Bereich $area.',
+      one: '1 Notiz kam in den Bereich $area.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importAlready(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count wurden schon früher importiert und bleiben weg.',
+      one: '1 wurde schon früher importiert und bleibt weg.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importNothingNew(int count) {
+    return 'Nichts Neues: $count schon importiert';
+  }
+
+  @override
   String settingBadgeLabel(String setting, String value) {
     return '$setting: $value';
   }

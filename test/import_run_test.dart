@@ -98,6 +98,48 @@ void main() {
       expect(heard, 1);
       expect(Notes(app).inside(summary.areaId!), hasLength(2));
     });
+
+    test('finds the earlier Import of a folder there and fills it in, the '
+        'files listed by the look not listed again (obf-1078)', () async {
+      const tree = 'content://tree/Notes';
+      final folders = FakeImportFolders()
+        ..put('Dentist.txt', march, utf8.encode('Tuesday 9:00'));
+      final runner = IsolateJobRunner(path: path, folders: folders);
+      final first = await runner.run(
+        app,
+        folderImport(tree, 'From Notes'),
+        (_, _) {},
+        JobStop(),
+      );
+      folders.put('Plan.md', march, utf8.encode('Ship it'));
+      final looked = await runner.run(
+        app,
+        folderLook(tree),
+        (_, _) {},
+        JobStop(),
+      );
+      expect(looked.listed.map((f) => f.path), ['Dentist.txt', 'Plan.md']);
+      final earlier = looked.earlier!;
+      expect(earlier.areaId, first.areaId);
+      expect(earlier.held, 1);
+
+      folders.fails = true;
+      final summary = await runner.run(
+        app,
+        folderImport(
+          tree,
+          'From Notes',
+          listed: looked.listed,
+          fillIn: earlier.areaId,
+        ),
+        (_, _) {},
+        JobStop(),
+      );
+      expect(summary.areaId, earlier.areaId);
+      expect(summary.notes, 1);
+      expect(summary.already, 1);
+      expect(Notes(app).inside(earlier.areaId), hasLength(2));
+    });
   });
 
   group('beside the app (obf-1061)', () {

@@ -262,19 +262,56 @@ class ImportJobs {
   /// Runs [work] as [job], its count told to it as it goes, until it ends
   /// or [ImportJob.abort] stops it.
   Future<ImportSummary> run(ImportJob job, ImportWork work) async {
+    final stop = _started(job);
+    try {
+      return await _write(job, work, stop);
+    } finally {
+      _ended(job, stop);
+    }
+  }
+
+  /// Runs [look] as [job], then the work [then] makes of what it found,
+  /// as [run] does (obf-1078): the job runs all the while, also while
+  /// [then] asks the user. Null when [then] makes none, and then nothing
+  /// is written.
+  Future<ImportSummary?> runLooking<L>(
+    ImportJob job,
+    LongWork<L> look,
+    Future<ImportWork?> Function(L found) then,
+  ) async {
+    final stop = _started(job);
+    try {
+      final found = await runner.run(store, look, job._progress, stop);
+      final work = await then(found);
+      if (work == null) return null;
+      return await _write(job, work, stop);
+    } finally {
+      _ended(job, stop);
+    }
+  }
+
+  JobStop _started(ImportJob job) {
     final stop = JobStop();
     job._stop = stop;
     running.value = job;
-    try {
-      final summary = await runner.run(store, work, job._progress, stop);
-      if (summary.stopped case final of?) {
-        job._stopped = (done: summary.notes, of: of);
-      }
-      return summary;
-    } finally {
-      stop.clear();
-      if (!_disposed && identical(running.value, job)) running.value = null;
+    return stop;
+  }
+
+  Future<ImportSummary> _write(
+    ImportJob job,
+    ImportWork work,
+    JobStop stop,
+  ) async {
+    final summary = await runner.run(store, work, job._progress, stop);
+    if (summary.stopped case final of?) {
+      job._stopped = (done: summary.notes, of: of);
     }
+    return summary;
+  }
+
+  void _ended(ImportJob job, JobStop stop) {
+    stop.clear();
+    if (!_disposed && identical(running.value, job)) running.value = null;
   }
 
   void dispose() {
