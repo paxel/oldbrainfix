@@ -919,6 +919,10 @@ struct View {
     ai_task: Option<String>,
     /// The AI Task's review, while it shows.
     ai_review: Option<ReviewShown>,
+    /// How many Notes, Sections, Routines, Areas and Topics the AI Task
+    /// changes, as its review lists them: what the top line's Review
+    /// counts (obf-1075).
+    ai_changes: usize,
     /// The provider the Ask panel asks, while it shows (#267).
     ask_provider: Option<Provider>,
     /// Whether "AI (experimental)" is switched on on this computer
@@ -7238,6 +7242,20 @@ impl App {
             _ => None,
         };
         let ai_task = self.store.ai_task()?;
+        let ai_review = match &ai_task {
+            Some(task) if self.selection == Selection::AiReview => {
+                Some(ai_view::read_review(&self.store, &self.t, task)?)
+            }
+            _ => None,
+        };
+        let ai_changes = match (&ai_review, &ai_task) {
+            (Some(shown), _) => shown.groups.iter().map(|(_, items)| items.len()).sum(),
+            (None, Some(task)) => {
+                let review = self.store.ai_review(task)?;
+                review.groups.iter().map(|(_, items)| items.len()).sum()
+            }
+            (None, None) => 0,
+        };
         let mut trashed_routines = Vec::new();
         if self.selection == Selection::Trash {
             for routine in routines.trashed()? {
@@ -7434,12 +7452,8 @@ impl App {
             profile_code: OwnProfile::new(&self.store).code()?,
             profile_newer: OwnProfile::new(&self.store).is_newer()?,
             profile_question: OwnProfile::new(&self.store).question()?,
-            ai_review: match &ai_task {
-                Some(task) if self.selection == Selection::AiReview => {
-                    Some(ai_view::read_review(&self.store, &self.t, task)?)
-                }
-                _ => None,
-            },
+            ai_review,
+            ai_changes,
             ai_task,
             ask_provider: if self.selection == Selection::Ask {
                 Some(self.store.ask_provider()?)
@@ -13595,8 +13609,10 @@ impl App {
             // The AI port open, or its AI Task waiting for its review,
             // below every announcement that goes by a click; sync goes
             // on meanwhile (obf-1076). The click leads to the port or the
-            // review.
-            let (text, asked) = if self.ai_port.is_some() {
+            // review; beside it Review with the count of changes, or
+            // with none yet "Close the port" (obf-1075).
+            let open = self.ai_port.is_some();
+            let (text, asked) = if open {
                 (
                     self.t.ai_port_open_banner(),
                     Action::OpenAiSettings(Some(AI_PORT_SECTION)),
@@ -13604,15 +13620,53 @@ impl App {
             } else {
                 (self.t.ai_review_banner(), Action::Ai(AiAction::Review))
             };
+            // Not in a Note window, which has no list to review in.
+            let changes = self.view.ai_changes;
+            let offer = if self.alone.is_some() {
+                None
+            } else if changes > 0 {
+                Some((self.t.ai_review_changes(changes as i64), AiAction::Review))
+            } else if open {
+                Some((self.t.ai_port_close().to_string(), AiAction::Done))
+            } else {
+                None
+            };
+            // The review shows in the list: the Note dialog and the quick
+            // note close for it first, what was typed kept.
+            let mut leave = Vec::new();
+            if self.alone.is_none() {
+                if self.quick_open {
+                    leave.push(Action::CloseQuickNote);
+                }
+                if self.note_open() {
+                    leave.push(Action::CloseNote);
+                }
+            }
+            let reviews = |action: &Action| *action == Action::Ai(AiAction::Review);
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(asked);
-                    }
+                    ui.horizontal(|ui| {
+                        let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                            .sense(egui::Sense::click());
+                        if ui.add(label).clicked() {
+                            if reviews(&asked) {
+                                actions.extend(leave.iter().cloned());
+                            }
+                            actions.push(asked);
+                        }
+                        if let Some((offered, action)) = offer {
+                            let button = RichText::new(offered).strong().color(colour);
+                            if ui.button(button).clicked() {
+                                let action = Action::Ai(action);
+                                if reviews(&action) {
+                                    actions.extend(leave.iter().cloned());
+                                }
+                                actions.push(action);
+                            }
+                        }
+                    });
                 });
         }
     }

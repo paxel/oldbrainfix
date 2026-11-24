@@ -2014,7 +2014,13 @@ replace a law of Both apps where they say so. A desktop law marked
   the page. The announcement of the open AI port opens the page at the
   port's card. The standing line at the top says "AI port open" or "AI
   Task waits for review", no word of a pause: sync goes on (obf-1076),
-  the drafts sent nowhere until Accept. The review marks each change a
+  the drafts sent nowhere until Accept. On every page and dialog it
+  offers "Review (3 changes)" while the AI Task holds changes, which
+  closes the dialogs over the list and opens the review, and with
+  none yet "Close the port" (obf-1075, C18); the count is the one
+  value an announcement holds, replacing "Values never go into an
+  announcement" for this line. A Note window shows the line alone.
+  The review marks each change a
   later edit synced in touches: one of the user's other Devices' as
   staying, another person's, in the warning colour, as written over by
   Accept.

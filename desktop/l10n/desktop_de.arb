@@ -167,6 +167,7 @@
   "aiReviewIntro": "Nichts davon wird behalten, bevor du es annimmst. Wo du nach der KI selbst etwas geändert hast, bleibt deine Änderung.",
   "aiReviewNoChanges": "Noch keine Änderungen.",
   "aiPortClose": "KI-Port schließen",
+  "aiReviewChanges": "{count, plural, =1{Prüfen (1 Änderung)} other{Prüfen ({count} Änderungen)}}",
   "aiAcceptAll": "Alle annehmen",
   "aiRejectAll": "Alle ablehnen",
   "aiRejectQuestion": "Alle Änderungen der KI-Aufgabe ablehnen?",

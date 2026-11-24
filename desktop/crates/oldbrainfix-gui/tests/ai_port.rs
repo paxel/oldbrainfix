@@ -11,7 +11,9 @@
 //! "Close the port" in place of Accept all (obf-1077). A task left
 //! waiting shows its review on
 //! start; a bundle comes in meanwhile, as sync goes on, and the review
-//! marks the drafts it touched, which edit Accept keeps.
+//! marks the drafts it touched, which edit Accept keeps. The top line
+//! offers "Review (3 changes)" while the task holds changes and "Close
+//! the port" with none yet, on every page and dialog (obf-1075).
 //! Who may connect (#167) is chosen on the card while the port is
 //! closed, this computer only until then, and kept for the next start;
 //! the Docker choice without a Docker bridge says so and does not open.
@@ -854,5 +856,136 @@ fn closing_the_port_from_a_review_with_no_changes_keeps_nothing() -> TestResult 
     assert!(store.ai_task()?.is_none());
     assert!(!shows(&harness, t.ai_port_open_banner()));
     assert!(!shows(&harness, t.ai_review_banner()));
+    Ok(())
+}
+
+#[test]
+fn the_top_line_offers_review_with_the_count_or_closes_the_port() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let milk = Notes::new(&store).capture("Milk", None, None)?;
+    let bread = Notes::new(&store).capture("Bread", None, None)?;
+    let mut harness = settings(&store);
+    click(&mut harness, t.ai_port_open());
+    // Nothing drafted yet: "Close the port", over the AI settings too.
+    assert!(shows(&harness, t.ai_port_open_banner()));
+    assert!(shows(&harness, t.ai_port_close()));
+    assert!(!shows(&harness, &t.ai_review_changes(1)));
+    harness.state_mut().close_page();
+    harness.run_steps(4);
+    assert!(shows(&harness, t.ai_port_close()));
+
+    let task = task(&harness)?;
+    store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
+    harness.state_mut().select(Selection::Agenda);
+    harness.run_steps(4);
+    assert!(shows(&harness, &t.ai_review_changes(1)));
+    assert!(!shows(&harness, t.ai_port_close()));
+    store.drafting(&task, || Notes::new(&store).edit(&bread.id, "Rye bread"))?;
+    harness.state_mut().select(Selection::Agenda);
+    harness.run_steps(4);
+    assert!(shows(&harness, &t.ai_review_changes(2)));
+
+    // Over the Note dialog it shows too, and the review takes its place,
+    // the Note's text kept.
+    harness.state_mut().select_note(&milk.id);
+    harness.run_steps(4);
+    assert!(harness.state().note_open());
+    click(&mut harness, &t.ai_review_changes(2));
+    assert!(!harness.state().note_open());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(harness.state().ai_port().is_some());
+    assert!(shows(&harness, &t.ai_after("Rye bread")));
+
+    // Closed from the review page, the line still offers it; over a
+    // page dialog too, which closes for the review.
+    click(&mut harness, t.ai_port_close());
+    assert!(harness.state().ai_port().is_none());
+    assert!(shows(&harness, t.ai_review_banner()));
+    assert!(shows(&harness, &t.ai_review_changes(2)));
+    harness.state_mut().select(Selection::Agenda);
+    harness.state_mut().open(Page::AiSettings);
+    harness.run_steps(4);
+    assert!(shows(&harness, &t.ai_review_changes(2)));
+    click(&mut harness, &t.ai_review_changes(2));
+    assert_eq!(harness.state().page(), None);
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(shows(&harness, t.ai_accept_all()));
+    Ok(())
+}
+
+#[test]
+fn closing_the_port_from_the_top_line_with_no_changes_keeps_nothing() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let mut harness = settings(&store);
+    click(&mut harness, t.ai_port_open());
+    harness.state_mut().close_page();
+    // Over the quick note too, which stays open.
+    harness.state_mut().new_note();
+    harness.run_steps(4);
+    click(&mut harness, t.ai_port_close());
+    assert!(harness.state().ai_port().is_none());
+    assert!(store.ai_task()?.is_none());
+    assert!(harness.state().quick_note_open());
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    assert!(!shows(&harness, t.ai_port_open_banner()));
+    assert!(!shows(&harness, t.ai_review_banner()));
+    Ok(())
+}
+
+#[test]
+fn the_count_of_changes_reads_in_german_plural_forms() {
+    let t = L10n::new("de");
+    assert_eq!(t.ai_review_changes(1), "Prüfen (1 Änderung)");
+    assert_eq!(t.ai_review_changes(3), "Prüfen (3 Änderungen)");
+    let t = L10n::new("en");
+    assert_eq!(t.ai_review_changes(1), "Review (1 change)");
+    assert_eq!(t.ai_review_changes(3), "Review (3 changes)");
+}
+
+#[test]
+fn review_from_the_top_line_over_the_quick_note_keeps_what_was_typed() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let milk = Notes::new(&store).capture("Milk", None, None)?;
+    let task = store.open_ai_task()?;
+    store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
+    let mut harness = window(App::new(store.clone(), "en"));
+    assert!(shows(&harness, t.ai_review_banner()));
+    harness.state_mut().new_note();
+    harness.run_steps(4);
+    harness.get_by(|n| n.is_focused()).type_text("Buy stamps");
+    harness.run_steps(4);
+    click(&mut harness, &t.ai_review_changes(1));
+    assert!(!harness.state().quick_note_open());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(shows(&harness, &t.ai_after("Milk and eggs")));
+    let kept = Notes::new(&store).all()?;
+    assert!(kept.iter().any(|n| n.text == "Buy stamps"));
+    Ok(())
+}
+
+#[test]
+fn a_note_window_shows_the_line_without_its_offer() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let milk = Notes::new(&store).capture("Milk", None, None)?;
+    let task = store.open_ai_task()?;
+    store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
+    let app = App::for_note_window(store.clone(), "en", &milk.id, true);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(800.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show_note_window(ui);
+            },
+            app,
+        );
+    harness.run_steps(4);
+    assert!(shows(&harness, t.ai_review_banner()));
+    assert!(!shows(&harness, &t.ai_review_changes(1)));
+    assert!(!shows(&harness, t.ai_port_close()));
     Ok(())
 }
