@@ -98,7 +98,8 @@ typedef MarkdownTableCopy = ({String markdown, String html});
 /// content as it was written, and the line break that followed the
 /// header row. The change it gives selects the table in the new text, so
 /// [at] finds it again; an edit that cannot be made gives the text as it
-/// was and its cursor where it was asked for.
+/// was and its cursor where it was asked for. Sorting the rows
+/// ([sortRows]) alone moves their lines as they were written instead.
 abstract final class MarkdownTables {
   /// The line right before a header row that marks the first column of
   /// its table as headings. GFM has no such flag; a comment shows nowhere
@@ -310,6 +311,38 @@ abstract final class MarkdownTables {
         grid.headings = !grid.headings;
         return true;
       });
+
+  /// How the column [column] of [table] compares its cells when its rows
+  /// are sorted by it ([MarkdownSortKind]); text for a column it does not
+  /// have.
+  static MarkdownSortKind sortKind(MarkdownTable table, int column) =>
+      _sortColumn(table, column).kind;
+
+  /// The rows under the header row of [table] sorted by the column
+  /// [column], ascending or [descending], as [MarkdownSortKind] compares
+  /// them (obf-1052): each by its index in [MarkdownTable.rows], the
+  /// header row 0, so the first row under it is 1. A cell that shows
+  /// nothing goes last both ways; rows that compare equal keep the order
+  /// they are written in, both ways. A column the table does not have
+  /// gives them as written.
+  static List<int> sortedRows(
+    MarkdownTable table,
+    int column, {
+    bool descending = false,
+  }) => _sortedRows(table, column, descending);
+
+  /// [text] with the rows under the header row of its table at [at] in
+  /// the order [sortedRows] gives: each row's line as it was written
+  /// moved, the line breaks where they were, and the header row, the
+  /// delimiter row and [headingColumnLine] untouched. The change selects
+  /// the table; rows already in that order, a column the table does not
+  /// have or no table give the text as it was.
+  static MarkdownChange sortRows(
+    String text,
+    int at,
+    int column, {
+    bool descending = false,
+  }) => _sortRows(text, at, column, descending);
 
   /// [text] with a new empty table of two columns, a header row and one
   /// more row, on lines of its own, a blank line between it and the

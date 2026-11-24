@@ -11518,6 +11518,112 @@ Map<String, Object?> _markdown() {
       'index': 0,
     }, (at) => MarkdownTables.deleteColumn(text, at, 0));
   }
+  // Sorting a table's rows by a column (obf-1052).
+  String sortColumn(List<String> cells) =>
+      ['| h |', '|---|', for (final c in cells) '| $c |'].join('\n');
+  final sortIds = [for (var i = 9; i > 0; i--) 'box$i'].iterator;
+  final sortTexts = [
+    '| Item | Price | Weight | Date | Note |\n|---|--:|---|---|---|\n'
+        '| Milk | 1,29 € | 1 kg | 24.11.2026 | |\n'
+        '| Äpfel | 12,50 € | 500 g | 2026-01-05 | b |\n'
+        '| eggs | € 3 | 3,5 kg | 3/1/2026 | A |\n'
+        '| Bread |  | 0,75 kg | | ☐ x |\n'
+        '| zebra | 0,99 € | 2 | 29.2.2024 | 🧠 |\n'
+        '| milk | 1,29 € | 1 kg | 24.11.2026 |',
+    for (final cells in [
+      ['1.234', '12,5', '999'],
+      ['1,234', '1.5', '999'],
+      ['1.234.567', '2,345', '3'],
+      ['1,234', '567', '2,000'],
+      ['0.500', '2', '0,5'],
+      ['0.500', '2'],
+      ["1'234.5", '1\u00a0234.25 €', '999', '1\u202f000'],
+      ['1’000,5', '2'],
+      ["1'234.5", '1’000,5'],
+      ['1,5', '2.5'],
+      ['1.2,3', '4'],
+      ['1,23,456', '4'],
+      ['1.234 567', '4'],
+      ['3 x 4', '5'],
+      ['ca. 5', '6'],
+      ['10:30', '9:15'],
+      ['٣', '4'],
+      ['12.', '3,-', '7kg', '1st', '5'],
+      ['€', '5'],
+      ['−7 %', '-€5', '€-6', '+4', '€ +2', r'\$1'],
+      ['- 3', '4'],
+      ['12345678901234567890123', '12345678901234567890122.9', '-0', '0.0'],
+      ['-0.000001', '007', '7.000', '-7', '-7.5'],
+      ['24.11.2026', '2026-01-05', '3/1/2026', '29.2.2024', '01.01.2000'],
+      ['31.02.2026', '1.1.2026'],
+      ['29.2.2026', '1.1.2026'],
+      ['29.2.1900', '1.1.2026'],
+      ['29.2.2000', '31.12.1999', '30.4.2026'],
+      ['31.4.2026', '1.1.2026'],
+      ['24.11.26', '1.1.2026'],
+      ['24/11/2026', '1/1/2026'],
+      ['2026.11.24', '1.1.2026'],
+      ['2026-11-24.', '1.1.2026'],
+      ['2026', '2025'],
+      ['Zebra', 'äpfel', 'Müller', 'muller', 'Apfel', 'eclair', 'Straße'],
+      ['strasse', 'Œuvre', 'oeuvre', 'ǅ', 'İ', 'i'],
+      ['🧠', 'ａ', 'Ａ', '\ue000'],
+      ['**b**', '*a*', '`c`', '[d](u)', '~~e~~'],
+      ['', ''],
+      ['', 'x', '', '1'],
+      [for (var i = 0; i < 40; i++) '${i % 3} kg'],
+      [for (var i = 0; i < 40; i++) i.isEven ? 'Ä' : 'a'],
+    ])
+      sortColumn(cells),
+    TextBoxes.convert(
+      sortColumn(['☐ b', '☐\ufe0f a', '✅ c', '☐ c']),
+      format: TextFormats.markdown,
+      newId: () => (sortIds..moveNext()).current,
+    ),
+    '${MarkdownTables.headingColumnLine}\r\nItem|  Price\r\n:--- | ---:\r\n'
+        '  bread | 2,50 € | beyond\r\n| milk |1 €|\r\neggs | 12 €\r\n\r\nafter',
+    '| a | b |\n|---|---|\n| x | 2 |\n| y |\n|  | 1 |\n| z | 3 |',
+    '| only |\n|---|',
+  ];
+  final sorts = [
+    for (final text in sortTexts)
+      if (MarkdownTables.all(text) case [final table, ...])
+        {
+          'columns': [
+            for (var c = 0; c <= table.columns; c++)
+              {
+                'ascending': MarkdownTables.sortedRows(table, c),
+                'column': c,
+                'descending': MarkdownTables.sortedRows(
+                  table,
+                  c,
+                  descending: true,
+                ),
+                'kind': MarkdownTables.sortKind(table, c).name,
+              },
+          ],
+          'text': text,
+        },
+  ];
+  for (final text in [sortTexts.first, ...sortTexts.reversed.take(4)]) {
+    final table = MarkdownTables.all(text).first;
+    final at = cp(text, table.rows.first.start) + 1;
+    for (var c = 0; c <= table.columns; c++) {
+      for (final descending in [false, true]) {
+        tableEdit(
+          'sortRows',
+          text,
+          at,
+          {'column': c, 'descending': descending},
+          (at) => MarkdownTables.sortRows(text, at, c, descending: descending),
+        );
+      }
+    }
+  }
+  tableEdit('sortRows', 'plain', 3, {
+    'column': 0,
+    'descending': false,
+  }, (at) => MarkdownTables.sortRows('plain', at, 0));
   for (final (text, at) in [
     ('', 0),
     ('abc def', 5),
@@ -11623,6 +11729,7 @@ Map<String, Object?> _markdown() {
         },
     ],
     'edits': edits,
+    'sorts': sorts,
     'mayOpen': {
       for (final url in [
         'https://x.org',
@@ -12479,9 +12586,15 @@ Future<void> main(List<String> args) async {
     'put on and taken off at a cursor, on a word, a selection and lines, '
     'links put on, changed and taken off, every line format on and off, '
     'items in and out, a table\'s cell set, its rows and columns put in, '
-    'moved and deleted, its first column marked, a new table put in, the '
+    'moved and deleted, its first column marked, its rows sorted by each '
+    'column both ways (obf-1052), a new table put in, the '
     'task list items of the lines a selection touches made boxes, with '
-    'the text and the selection they gave; which link destinations '
+    'the text and the selection they gave; for tables the order each '
+    'column sorts the rows under the header row in, ascending and '
+    'descending, and whether it compares them as numbers, dates or text: '
+    'units, currency signs, decimal marks and groups, dates in the '
+    'calendar and not, folded letters, marks, boxes, empty cells and '
+    'equal keys; which link destinations '
     'may be opened; and which pasted texts look like code (#213): a '
     'shebang, lines of code punctuation or indented, and lists, prose, '
     'Markdown and short texts that do not. Offsets are counted in '

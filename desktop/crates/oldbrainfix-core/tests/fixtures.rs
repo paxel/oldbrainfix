@@ -9163,6 +9163,12 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
                 table::set_align(text, start, number("column")?, align)
             }
             "headingColumn" => table::toggle_heading_column(text, start),
+            "sortRows" => table::sort_rows(
+                text,
+                start,
+                number("column")?,
+                edit["descending"].as_bool().ok_or("descending")?,
+            ),
             "insertTable" => table::insert(text, start),
             "taskBoxes" => markdown::task_boxes(text, start, end),
             op => return Err(format!("an op: {op}").into()),
@@ -9174,6 +9180,26 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             "text": got.text,
         });
         assert_eq!(&ours, &edit["result"], "{edit}");
+    }
+    // A table's rows sorted by each column (obf-1052).
+    let sorts = fixture["sorts"].as_array().ok_or("sorts")?;
+    assert!(sorts.len() >= 40);
+    for sort in sorts {
+        let text = sort["text"].as_str().ok_or("text")?;
+        let tables = table::all(text);
+        let of = tables.first().ok_or("a table")?;
+        let columns: Vec<Value> = (0..=of.columns())
+            .map(|c| {
+                json!({
+                    "ascending": table::sorted_rows(of, c, false),
+                    "column": c,
+                    "descending": table::sorted_rows(of, c, true),
+                    "kind": table::sort_kind(of, c).name(),
+                })
+            })
+            .collect();
+        let ours = json!({"columns": columns, "text": text});
+        assert_eq!(&ours, sort, "{text:?}");
     }
     for (url, opens) in fixture["mayOpen"].as_object().ok_or("mayOpen")? {
         assert_eq!(Some(may_open(url)), opens.as_bool(), "{url:?}");
