@@ -645,8 +645,13 @@ replace a law of Both apps where they say so. A desktop law marked
   schedule, "Heads-ups" lists each one set ("20 min before", "1 day
   before"), earliest warning first, each with its remove ✕, and "Add
   heads-up" offers 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days and
-  1 week before; an all-day schedule offers and keeps whole days only
-  (1, 2 and 3 days, 1 week). They are the person's own, on their own
+  1 week before, and "Custom…" at its end (obf-1087): a number and a
+  unit, minutes, hours, days or weeks, up to 30 days, listed as the
+  others are ("45 min before"), with its ✕; it stays when every other
+  is set, and one set already is not set twice. An all-day schedule
+  offers and keeps whole days only (1, 2 and 3 days, 1 week, and in
+  Custom… days and weeks only). The lists come from the core
+  (`heads_up_keys`). They are the person's own, on their own
   Devices: in a Shared Area a Member who may not change the Routine
   still sets their own, and nobody else sees them: the editor opens for
   them with everything else shown, not edited, and its Save keeps only
@@ -2185,6 +2190,14 @@ replace a law of Both apps where they say so. A desktop law marked
   stands beside its words; Save… saves the file where the user says, in
   place of Share…; "Add … to People" takes the person in and keeps the
   dialog open.
+- **A custom Heads-up is a small dialog over the Routine editor**
+  (obf-1087): "Custom heads-up" with "How long before" over a number
+  field, "From 1 to 720." small under it for hours, the units as a
+  `chip_row` under that, starting at minutes, at days on an all-day
+  schedule; Cancel and Add, Add greyed until the number fits the unit,
+  Enter in the field adding as Add does. Esc and a click beside it
+  close it and add nothing, the editor staying open under it; back
+  does nothing while it shows.
 - **A search field over what it lists sits on a band** (obf-1088, as
   the phone's): the Settings', File into…'s, Merge into…'s, Add to
   Note…'s and Link to…'s field, and the main window's over a list of

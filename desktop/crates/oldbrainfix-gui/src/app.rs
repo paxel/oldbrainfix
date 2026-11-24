@@ -87,7 +87,7 @@ use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
 use oldbrainfix_core::packs::{self, OpenedPack, Pack, PackError, PackFrom, PackTicks};
 use oldbrainfix_core::profile::ProfileChoice;
-use oldbrainfix_core::routines::routines_by_name;
+use oldbrainfix_core::routines::{HeadsUpUnit, heads_up_keys, routines_by_name};
 use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
@@ -1040,6 +1040,13 @@ enum Dialog {
         name: String,
         by: String,
     },
+    /// A custom Heads-up for the Routine editor (obf-1087): the number
+    /// typed and its unit, days and weeks only on an all-day schedule.
+    CustomHeadsUp {
+        count: String,
+        unit: HeadsUpUnit,
+        all_day: bool,
+    },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
         area: Option<String>,
@@ -1751,6 +1758,8 @@ enum Action {
     /// The merge dialog's search changed.
     MergeQuery,
     CloseDialog,
+    /// Adds the custom Heads-up typed to the Routine editor (obf-1087).
+    AddCustomHeadsUp,
     AddPlace,
     SaveName,
     Colour(String, Option<String>),
@@ -8438,6 +8447,21 @@ impl App {
                 }
             }
             Action::CloseDialog => self.close_dialog()?,
+            Action::AddCustomHeadsUp => {
+                if let Some(Dialog::CustomHeadsUp {
+                    count,
+                    unit,
+                    all_day,
+                }) = &self.dialog
+                    && let Some(minutes) = custom_heads_up(count, *unit, *all_day)
+                {
+                    // One set already is not set twice.
+                    if let Some(editor) = &mut self.editor {
+                        editor.add_heads_up(minutes);
+                    }
+                    self.dialog = None;
+                }
+            }
             Action::AddPlace => {
                 if let Some(Dialog::NewPlace { area, name }) = &self.dialog {
                     match area {
@@ -8711,6 +8735,22 @@ impl App {
                 Intent::OpenNote(id) => {
                     self.editor = None;
                     self.selected_note = Some(id);
+                }
+                // Over the editor, which stays open under it.
+                Intent::CustomHeadsUp => {
+                    if let Some(editor) = &self.editor {
+                        let all_day = editor.all_day();
+                        let unit = heads_up_keys::units(all_day)
+                            .first()
+                            .copied()
+                            .unwrap_or(HeadsUpUnit::Days);
+                        self.dialog = Some(Dialog::CustomHeadsUp {
+                            count: String::new(),
+                            unit,
+                            all_day,
+                        });
+                        self.focus = true;
+                    }
                 }
                 // The History shows in the list, the editor left.
                 Intent::History(id) => {
@@ -17322,6 +17362,11 @@ impl App {
                             }
                         });
                     }
+                    Dialog::CustomHeadsUp {
+                        count,
+                        unit,
+                        all_day,
+                    } => custom_heads_up_form(ui, &t, (count, focus), (unit, *all_day), actions),
                     Dialog::NewPlace { area, name } => {
                         let title = if area.is_some() {
                             t.new_topic()
@@ -20301,6 +20346,71 @@ fn link_form(
         cancel(ui, t, actions);
         if theme::main_action(ui, ready, t.link_set()) {
             actions.push(Action::SetLink);
+        }
+    });
+}
+
+/// The custom Heads-up `count` `unit`s make in minutes, `None` while they
+/// make none (obf-1087).
+fn custom_heads_up(count: &str, unit: HeadsUpUnit, all_day: bool) -> Option<i64> {
+    let count = count.parse::<i64>().ok()?;
+    heads_up_keys::minutes_of(count, unit, all_day)
+}
+
+/// The custom Heads-up's dialog (obf-1087): a number, the numbers its
+/// unit takes under it, the units as chips, minutes, hours, days and
+/// weeks, days and weeks only for an all-day schedule; Add, or Enter in
+/// the number, while they make a Heads-up.
+fn custom_heads_up_form(
+    ui: &mut Ui,
+    t: &L10n,
+    (count, focus): (&mut String, bool),
+    (unit, all_day): (&mut HeadsUpUnit, bool),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    title(ui, t.heads_up_custom_title());
+    let label = ui.label(RichText::new(t.heads_up_custom_count()).color(text));
+    let field = ui
+        .add(
+            TextEdit::singleline(count)
+                .id(Id::new("custom heads-up"))
+                .char_limit(5)
+                .text_color(text)
+                .desired_width(120.0),
+        )
+        .labelled_by(label.id);
+    // Digits only, as the phone's field takes.
+    count.retain(|c| c.is_ascii_digit());
+    if focus {
+        field.request_focus();
+    }
+    ui.label(
+        RichText::new(t.heads_up_custom_range(unit.most()))
+            .small()
+            .color(weak),
+    );
+    // The units' words agree with the number typed.
+    let typed = count.parse::<i64>().unwrap_or(0);
+    let units = heads_up_keys::units(all_day).iter().map(|u| {
+        let words = match u {
+            HeadsUpUnit::Minutes => t.unit_minutes(typed),
+            HeadsUpUnit::Hours => t.unit_hours(typed),
+            HeadsUpUnit::Days => t.unit_days(typed),
+            HeadsUpUnit::Weeks => t.unit_weeks(typed),
+        };
+        (*u, words)
+    });
+    chip_row(ui, unit, units);
+    let ready = custom_heads_up(count, *unit, all_day).is_some();
+    if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        actions.push(Action::AddCustomHeadsUp);
+    }
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        if theme::main_action(ui, ready, t.add()) {
+            actions.push(Action::AddCustomHeadsUp);
         }
     });
 }

@@ -13,6 +13,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop kopiert das ⋮ einer Tabelle sie, und im Editor schiebt es sie nach oben oder unten oder löscht sie. ([obf-1050](https://github.com/paxel/oldbrainfix/issues/361))
 - Auf dem Handy und dem Desktop sortiert ein Tippen auf die Kopfreihe eine Tabelle beim Lesen; der Editor sortiert ihre Zeilen nach Spalte. ([obf-1052](https://github.com/paxel/oldbrainfix/issues/363))
 - Auf dem Handy und dem Desktop wählt langes Drücken oder Ziehen auf einer Tabellenzelle ein Rechteck aus Zellen, das sich als Tabelle kopieren lässt. ([obf-1054](https://github.com/paxel/oldbrainfix/issues/365))
+- Auf dem Handy und dem Desktop kann eine Vorwarnung eine eigene Länge haben: Minuten, Stunden, Tage oder Wochen. ([obf-1087](https://github.com/paxel/oldbrainfix/issues/400))
 
 ### Geändert
 

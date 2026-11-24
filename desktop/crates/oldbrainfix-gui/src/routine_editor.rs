@@ -27,6 +27,7 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
+use oldbrainfix_core::routines::heads_up_keys;
 use oldbrainfix_core::schedule::WallClock;
 use oldbrainfix_core::schedule::WeekdayRule;
 use oldbrainfix_core::schedule_sentence::{
@@ -57,14 +58,6 @@ pub const RENAG_CHOICES: [i64; 5] = [5, 10, 15, 30, 60];
 
 /// The numbers of ignored Re-nags offered before Escalation.
 pub const ESCALATION_CHOICES: [i64; 5] = [1, 2, 3, 5, 10];
-
-/// The Heads-ups offered on a schedule with times, in minutes before an
-/// Occurrence: 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days, 1 week.
-pub const HEADS_UP_CHOICES: [i64; 9] = [5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
-
-/// The Heads-ups offered on an all-day schedule, whole days only: 1, 2
-/// and 3 days, 1 week.
-pub const HEADS_UP_DAY_CHOICES: [i64; 4] = [1440, 2880, 4320, 10080];
 
 /// How many coming Occurrences the editor shows.
 const PREVIEW: usize = 3;
@@ -104,6 +97,8 @@ pub enum Intent {
     OpenNote(String),
     /// Show the History of the Routine with this id.
     History(String),
+    /// Ask for a custom Heads-up, a number and a unit (obf-1087).
+    CustomHeadsUp,
     /// Something asked of a Session's part.
     Session(SessionIntent),
 }
@@ -200,6 +195,9 @@ pub struct RoutineEditor {
     /// among them count ([`RoutineEditor::kept_heads_ups`]), the others
     /// kept for a time set again.
     pub heads_ups: Vec<i64>,
+    /// Whether "Custom…" was picked in "Add heads-up" (obf-1087), for
+    /// [`RoutineEditor::show`] to ask for it.
+    custom_asked: bool,
     /// Whether only the Heads-ups are edited, the rest shown as it is: a
     /// Routine this Device may not change (obf-1046).
     locked: bool,
@@ -294,6 +292,7 @@ impl RoutineEditor {
             named: false,
             name_missing: false,
             heads_ups: Vec::new(),
+            custom_asked: false,
             locked: false,
             opened: Edited::default(),
         };
@@ -446,6 +445,7 @@ impl RoutineEditor {
             named: false,
             name_missing: false,
             heads_ups: Vec::new(),
+            custom_asked: false,
             locked: false,
             opened: Edited::default(),
         };
@@ -491,16 +491,17 @@ impl RoutineEditor {
             .collect()
     }
 
+    /// Whether the schedule is all-day, without times, which takes whole
+    /// days only as Heads-ups.
+    pub fn all_day(&self) -> bool {
+        self.times.is_empty()
+    }
+
     /// The Heads-ups offered to add: those of the schedule's kind not set
-    /// yet.
+    /// yet; "Custom…" follows them (obf-1087).
     pub fn heads_up_choices(&self) -> Vec<i64> {
-        let offered: &[i64] = if self.times.is_empty() {
-            &HEADS_UP_DAY_CHOICES
-        } else {
-            &HEADS_UP_CHOICES
-        };
         let kept = self.kept_heads_ups();
-        offered
+        heads_up_keys::choices(self.all_day())
             .iter()
             .copied()
             .filter(|m| !kept.contains(m))
@@ -1032,6 +1033,9 @@ impl RoutineEditor {
         if !ui.is_sizing_pass() {
             self.focus_first = false;
         }
+        if std::mem::take(&mut self.custom_asked) {
+            intent = Some(Intent::CustomHeadsUp);
+        }
         intent
     }
 
@@ -1099,8 +1103,9 @@ impl RoutineEditor {
     }
 
     /// The person's own Heads-ups (obf-1046): each set, the earliest
-    /// warning first, with its ✕, and "Add heads-up" offering those not
-    /// set yet, whole days only on an all-day schedule.
+    /// warning first, a custom one too, with its ✕, and "Add heads-up"
+    /// offering those not set yet, whole days only on an all-day
+    /// schedule, and "Custom…" at the end (obf-1087).
     fn heads_ups_editor(&mut self, ui: &mut Ui, t: &L10n) {
         let text = ui.visuals().text_color();
         ui.label(RichText::new(t.heads_ups_heading()).strong().color(text));
@@ -1120,9 +1125,6 @@ impl RoutineEditor {
             self.heads_ups.retain(|m| *m != gone);
         }
         let offered = self.heads_up_choices();
-        if offered.is_empty() {
-            return;
-        }
         let add = ui.button(RichText::new(t.add_heads_up()).color(text));
         let mut picked = None;
         egui::Popup::menu(&add).show(|ui| {
@@ -1135,6 +1137,14 @@ impl RoutineEditor {
                     picked = Some(minutes);
                     ui.close();
                 }
+            }
+            // Also with every one above set.
+            if ui
+                .button(RichText::new(t.heads_up_custom()).color(text))
+                .clicked()
+            {
+                self.custom_asked = true;
+                ui.close();
             }
         });
         if let Some(minutes) = picked {
