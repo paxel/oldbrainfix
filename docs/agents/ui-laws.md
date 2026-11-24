@@ -1162,7 +1162,9 @@ There are three kinds, and an action takes the first that fits.
   no such setting, so its line always moves. On the phone a screen
   reader hears "Syncing…" once each time the app comes into view, not
   with every sync; on the desktop the line is a progress indicator named
-  "Syncing…".
+  "Syncing…". A tap or click on the line, or a little above it, opens
+  the page Running (obf-1078; see Phone ▸ Dialogs and pages and Desktop ▸
+  Menu bar and keys).
 - **Deleting an Area runs beside the app** (obf-1093), in both apps:
   once the dialog is answered, the Area's row says how many of its Notes
   have gone ("Being deleted: 120 of 340 Notes moved"), a spinner in
@@ -1714,6 +1716,32 @@ There are three kinds, and an action takes the first that fits.
   mark is only named with the Area, and the question says the mark
   comes off in the Area's menu; one tap never shows the other Notes of
   that Area to the AI. Send and sharing an Area ask before whom.
+- **Running, last in the ⋮ of the Agenda and of the Areas list, and a
+  tap on a moving line open the page Running** (obf-1078, C21): the
+  line under a bar takes the tap a little above itself, never on the
+  bar's buttons, and the quick note's line under "Transcribing…" a
+  little above and below; the page's own line opens nothing more, and
+  while the app is locked no line opens it, as it names Areas and
+  folders; it closes when the app locks. A card for each job beside the
+  app (a sync with a Device, an Import, the Transcripts, Photo Texts and
+  Attachment Texts being read, the speech model's download or copy, an
+  Area being deleted) says what it does, how far it is when known ("120
+  of 340 Notes", "3 of 12"), "Since 14:32", what Abort does where it
+  does more or less than stop at once, and an outlined Abort, which
+  reads "Stopping…" until the job stops; with none, "Nothing runs in the
+  background." An Import stops before its next Note and keeps the Notes
+  it made, its page and the page Running say "Stopped: 120 of 340
+  imported", and the top says "Import stopped.", what it made behind
+  the tap. Deleting an Area stops before its next Note, the Area staying
+  with the Notes not moved. A sync round or join, a recording, photo or
+  file under way ends first; then the automatic syncs pause (a paired
+  Device asking hears 503 and comes back later) until Sync now, or the
+  other recordings, photos and files wait, those asked for again and a
+  recording something waits for still read; either until Go on on the
+  page or the next start. The speech model's fetch is
+  cancelled. What Abort stopped stays under "Stopped" while the app
+  runs, the paused ones first with Go on, then the newest, at most ten.
+  The search index is built within a search, so it is no job here.
 
 ### Text editor
 
@@ -1878,7 +1906,10 @@ There are three kinds, and an action takes the first that fits.
   has, the rest overflow into ⋮, and ⋮ exists only when it holds
   something. ⋮ is last. The one exception is the Areas list's ⋮ with
   Rearrange (obf-1089), which stands whenever it offers Rearrange and
-  gives way to Done meanwhile. Nothing adapts to use. Settings, Backups and
+  gives way to Done meanwhile, Running after Rearrange in it; and the
+  Agenda's ⋮, which always holds Running last (obf-1078,
+  `BarAction.inMenu`) and so always stands, on a wide screen too.
+  Nothing adapts to use. Settings, Backups and
   Sync never go into ⋮; they stay behind the Profile picture. A page
   gives such an action as a `BarAction`; the bar counts a button 48
   wide, 1.3 times with Fat fingers (#224).

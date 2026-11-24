@@ -18,6 +18,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a Show tips switch in the Settings and No more tips on every tip turn the tips off. ([obf-1060](https://github.com/paxel/oldbrainfix/issues/373))
 - On the phone and the desktop, a voice recording can end on its own after a pause of 2, 3, 5 or 10 seconds. ([obf-1053](https://github.com/paxel/oldbrainfix/issues/364))
 - On the desktop, a Running page lists the background jobs, how far each is, and Abort; an aborted Import keeps its Notes. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
+- On the phone, a Running page lists the background jobs with Abort, opened from the moving line or ⋮. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
 
 ### Changed
 
