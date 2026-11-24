@@ -455,7 +455,15 @@ void main() {
           OutlinedButton(onPressed: () {}, child: const Text('Open')),
         );
         final material = materialIn(tester, OutlinedButton);
-        expect(material.color, scheme.secondaryContainer);
+        // Set off from the light ground, which Material's tone is not
+        // (obf-1106); the dark look keeps it.
+        if (brightness == Brightness.light) {
+          expect(material.color, lightButtonFill);
+          expect(material.color, isNot(LookTones.light.background));
+          expect(material.color, isNot(LookTones.light.mark));
+        } else {
+          expect(material.color, scheme.secondaryContainer);
+        }
         final side = (material.shape as OutlinedBorder).side;
         expect(side.width, 1);
         expect(side.color, scheme.outline);

@@ -50,6 +50,12 @@ class LookTones {
       brightness == Brightness.dark ? dark : light;
 }
 
+/// The outlined button's tonal fill in the light look (obf-1106), set off
+/// from the light ground as the desktop's secondary buttons are: Material's
+/// `secondaryContainer` there is the ground's own tone. The dark look keeps
+/// `secondaryContainer`.
+const lightButtonFill = Color(0xFFB2DFDB);
+
 /// How much "Fat fingers" grows text, icons and tap targets (#224).
 const fatFingersScale = 1.3;
 
@@ -332,7 +338,9 @@ ThemeData lookTheme(
     // outline, so it reads as a button on the question marks too.
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: scheme.secondaryContainer,
+        backgroundColor: brightness == Brightness.light
+            ? lightButtonFill
+            : scheme.secondaryContainer,
         foregroundColor: scheme.onSecondaryContainer,
         disabledBackgroundColor: scheme.onSurface.withValues(alpha: 0.12),
       ).copyWith(iconSize: fatFingers ? buttonIcon : null),
