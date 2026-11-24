@@ -543,6 +543,17 @@ class Routines {
     List<Note> notes, {
     void Function(int trashed, int of)? progress,
   }) {
+    trashNotesStopping(notes, progress: progress);
+  }
+
+  /// As [trashNotes], asking [stop] before each Note (obf-1078): once it
+  /// says so, the Notes in the trash stay there, the others where they
+  /// are, and it answers false; true once all are in.
+  bool trashNotesStopping(
+    List<Note> notes, {
+    void Function(int trashed, int of)? progress,
+    bool Function()? stop,
+  }) {
     final byNote = <String, List<Routine>>{};
     for (final routine in all()) {
       if (note(routine) case final note?) {
@@ -551,6 +562,7 @@ class Routines {
     }
     progress?.call(0, notes.length);
     for (final (i, note) in notes.indexed) {
+      if (stop?.call() ?? false) return false;
       store.batch(() {
         final at = _now();
         store.append(note.id, NoteKeys.trashed, at);
@@ -561,6 +573,7 @@ class Routines {
       });
       progress?.call(i + 1, notes.length);
     }
+    return true;
   }
 
   /// Brings the Note [noteId] back from the trash, with the Routines and

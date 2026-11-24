@@ -132,6 +132,11 @@ const starterSet = <({String slug, String name, List<StarterPlace> topics})>[
 /// gone where they go (obf-1093), told before the first and after each.
 typedef MoveProgress = void Function(int moved, int of);
 
+/// Whether a long job beside the window is to stop (obf-1078), asked
+/// before each of its steps: deleting an Area before each Note, an Import
+/// before each Note it writes. What was done before stays done.
+typedef Stopping = bool Function();
+
 /// Where a deleted place's Notes go.
 enum NotesGo {
   /// Back to Unsorted.
@@ -280,17 +285,31 @@ class Places {
   /// app's while this runs beside it, waits at most for one Note;
   /// [progress] hears how many have gone.
   void deleteArea(String areaId, NotesGo notesGo, {MoveProgress? progress}) {
+    deleteAreaStopping(areaId, notesGo, progress: progress);
+  }
+
+  /// As [deleteArea], asking [stop] before each Note (obf-1078): once it
+  /// says so, the Notes gone stay where they went, the others and the
+  /// Area with its Topics stay, and it answers false; true once the Area
+  /// is deleted.
+  bool deleteAreaStopping(
+    String areaId,
+    NotesGo notesGo, {
+    MoveProgress? progress,
+    Stopping? stop,
+  }) {
     _requireArea(areaId);
     if (notesGo == NotesGo.area) {
       throw ArgumentError.value(notesGo, 'notesGo', 'an Area has no Area');
     }
-    _moveNotes(areaId, notesGo, null, progress);
+    if (!_moveNotes(areaId, notesGo, null, progress, stop)) return false;
     store.batch(() {
       for (final topic in topics(areaId)) {
         store.append(topic.id, PlaceKeys.type, null);
       }
       store.append(areaId, PlaceKeys.type, null);
     });
+    return true;
   }
 
   /// Plants the Starter Set entries whose slugs are in [picked]. A Topic
@@ -357,22 +376,25 @@ class Places {
 
   /// Sends the Notes inside [id] where [notesGo] says, each Note in a
   /// transaction of its own unless a batch holds them all; [areaId] is
-  /// where [NotesGo.area] leads. [progress] hears how many have gone.
-  void _moveNotes(
+  /// where [NotesGo.area] leads. [progress] hears how many have gone;
+  /// [stop] is asked before each, and false is answered once it said so.
+  bool _moveNotes(
     String id,
     NotesGo notesGo,
     String? areaId, [
     MoveProgress? progress,
+    Stopping? stop,
   ]) {
     final notes = _notesInside(id);
     if (notesGo == NotesGo.trash) {
       // With their Routines and Reminders, as every deletion (#262), those
       // read once for all of them (obf-1093).
-      Routines(store).trashNotes(notes, progress: progress);
-      return;
+      return Routines(store)
+          .trashNotesStopping(notes, progress: progress, stop: stop);
     }
     progress?.call(0, notes.length);
     for (final (i, note) in notes.indexed) {
+      if (stop?.call() ?? false) return false;
       store.batch(() {
         if (notesGo == NotesGo.area) {
           store.append(note.id, NoteKeys.place, areaId);
@@ -384,6 +406,7 @@ class Places {
       });
       progress?.call(i + 1, notes.length);
     }
+    return true;
   }
 
   // The writes behind addArea and addTopic, for use inside one batch.

@@ -92,6 +92,11 @@ class ImportSummary {
   /// Files a note names that are no photo, such as a voice recording.
   final int notPhoto;
 
+  /// How many Notes it was to write, when it was stopped before all of
+  /// them were in (obf-1078): the [notes] written stay, the others are
+  /// not made. Null when it was not stopped.
+  final int? stopped;
+
   const ImportSummary({
     required this.areaId,
     required this.notes,
@@ -102,6 +107,7 @@ class ImportSummary {
     this.trashed = 0,
     this.missing = 0,
     this.notPhoto = 0,
+    this.stopped,
   });
 
   /// How many files and notes were skipped.
@@ -137,11 +143,13 @@ class Imports {
   /// its Markdown as written; a text file's is plain; the others' are
   /// formatted, read into the Markdown subset ([ImportFormats]). A Note
   /// is dated by its file's modification time, and by now when that is
-  /// unknown or later. [progress] hears how far the writing is.
+  /// unknown or later. [progress] hears how far the writing is; [stop]
+  /// is asked before each Note, as [notes] asks it.
   ImportSummary folder(
     String areaName,
     List<ImportFile> files, {
     ImportProgress? progress,
+    Stopping? stop,
   }) {
     final name = _areaName(areaName);
     final now = store.clock().toUtc();
@@ -191,6 +199,7 @@ class Imports {
       notText: notText,
       tooLarge: tooLarge,
       progress: progress,
+      stop: stop,
     );
   }
 
@@ -204,18 +213,23 @@ class Imports {
   /// with nothing left, no Area is made. The Area and each Note are a
   /// transaction of their own, so another connection to the database,
   /// such as the app's while the Import runs beside it (obf-1061), waits
-  /// at most for one Note; [progress] hears how many are in.
+  /// at most for one Note; [progress] hears how many are in. [stop] is
+  /// asked before each Note (obf-1078): once it says so, the Notes
+  /// written stay and [ImportSummary.stopped] says how many were to be;
+  /// stopped before the first, no Area is made.
   ImportSummary notes(
     String areaName,
     List<ImportedNote> notes, {
     int notText = 0,
     int tooLarge = 0,
     ImportProgress? progress,
+    Stopping? stop,
   }) => _write(
     areaName,
     notes,
     ImportSummary(areaId: null, notes: 0, notText: notText, tooLarge: tooLarge),
     progress,
+    stop,
   );
 
   /// [notes] with the files and notes [skipped] before them counted.
@@ -224,6 +238,7 @@ class Imports {
     List<ImportedNote> notes,
     ImportSummary skipped,
     ImportProgress? progress,
+    Stopping? stop,
   ) {
     final name = _areaName(areaName);
     for (final note in notes) {
@@ -261,6 +276,7 @@ class Imports {
       int notes = 0,
       int checklists = 0,
       int photos = 0,
+      int? stopped,
     }) => ImportSummary(
       areaId: areaId,
       notes: notes,
@@ -271,8 +287,11 @@ class Imports {
       trashed: skipped.trashed,
       missing: skipped.missing,
       notPhoto: skipped.notPhoto,
+      stopped: stopped,
     );
     if (kept.isEmpty) return summary();
+    // Stopped before anything was written: no Area either.
+    if (stop?.call() ?? false) return summary(stopped: kept.length);
     final writing = kept.reversed.toList();
     // The bytes are kept before the log names them, each photo once.
     final hashes = [
@@ -281,7 +300,12 @@ class Imports {
     ];
     final areaId = Places(store).addArea(_unused(name)).id;
     progress?.call(0, writing.length);
+    var written = writing.length;
     for (final (i, (:note, :at)) in writing.indexed) {
+      if (stop?.call() ?? false) {
+        written = i;
+        break;
+      }
       store.batch(() {
         final id = 'note:${Store.newId()}';
         store.append(id, NoteKeys.type, NoteKeys.typeNote, date: at);
@@ -305,11 +329,13 @@ class Imports {
       });
       progress?.call(i + 1, writing.length);
     }
+    final made = writing.take(written);
     return summary(
       areaId: areaId,
-      notes: kept.length,
-      checklists: kept.where((k) => k.note.lines != null).length,
-      photos: hashes.fold(0, (n, h) => n + h.length),
+      notes: written,
+      checklists: made.where((k) => k.note.lines != null).length,
+      photos: hashes.take(written).fold(0, (n, h) => n + h.length),
+      stopped: written < writing.length ? writing.length : null,
     );
   }
 
@@ -373,11 +399,13 @@ class Imports {
   /// tags in a last line, a list is a Checklist with its Lines checked as
   /// in Keep, its photos are its photos. It is captured when Keep says it
   /// was made, and its checks are dated when it was last changed.
-  /// [progress] hears how far the writing is.
+  /// [progress] hears how far the writing is; [stop] is asked before each
+  /// Note, as [notes] asks it.
   ImportSummary keep(
     String areaName,
     List<ImportFile> entries, {
     ImportProgress? progress,
+    Stopping? stop,
   }) {
     final name = _areaName(areaName);
     final now = store.clock().toUtc();
@@ -482,6 +510,7 @@ class Imports {
         notPhoto: notPhoto,
       ),
       progress,
+      stop,
     );
   }
 
