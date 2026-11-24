@@ -108,13 +108,15 @@ void main() {
     expect(shown(en.settingsLook), findsOneWidget);
     expect(keyed('theme'), findsOneWidget);
     expect(keyed('fatFingers'), findsNothing);
-    // No card is left without its rows.
+    // The one card left is the theme's, holding only its row (obf-1085).
+    final cards = find.descendant(
+      of: find.byType(SettingsScreen),
+      matching: find.byType(Embossed),
+    );
+    expect(cards, findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byType(SettingsScreen),
-        matching: find.byType(Embossed),
-      ),
-      findsNothing,
+      find.descendant(of: cards, matching: find.byKey(const ValueKey('theme'))),
+      findsOneWidget,
     );
 
     // "Default on this phone" by "ignored alarm rings again".

@@ -668,42 +668,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       heading: t.settingsLook,
                       headingKey: _heading('look'),
                       children: [
-                        SettingsRow(
-                          words: [t.themeSystem, t.themeLight, t.themeDark],
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: ChoiceChips<ThemeChoice>(
-                              key: const ValueKey('theme'),
-                              value: _theme,
-                              options: [
-                                RadioOption(
-                                  value: ThemeChoice.system,
-                                  title: Text(t.themeSystem),
-                                  secondary: const Icon(
-                                    Icons.brightness_auto_outlined,
-                                  ),
-                                ),
-                                RadioOption(
-                                  value: ThemeChoice.light,
-                                  title: Text(t.themeLight),
-                                  secondary: const Icon(
-                                    Icons.light_mode_outlined,
-                                  ),
-                                ),
-                                RadioOption(
-                                  value: ThemeChoice.dark,
-                                  title: Text(t.themeDark),
-                                  secondary: const Icon(
-                                    Icons.dark_mode_outlined,
-                                  ),
-                                ),
-                              ],
-                              onChanged: _setTheme,
-                            ),
-                          ),
-                        ),
                         SettingsSection(
                           children: [
+                            SettingsRow(
+                              words: [t.themeSystem, t.themeLight, t.themeDark],
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  8,
+                                  16,
+                                  0,
+                                ),
+                                // At the card's start, not its middle.
+                                child: Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: ChoiceChips<ThemeChoice>(
+                                    key: const ValueKey('theme'),
+                                    value: _theme,
+                                    options: [
+                                      RadioOption(
+                                        value: ThemeChoice.system,
+                                        title: Text(t.themeSystem),
+                                        secondary: const Icon(
+                                          Icons.brightness_auto_outlined,
+                                        ),
+                                      ),
+                                      RadioOption(
+                                        value: ThemeChoice.light,
+                                        title: Text(t.themeLight),
+                                        secondary: const Icon(
+                                          Icons.light_mode_outlined,
+                                        ),
+                                      ),
+                                      RadioOption(
+                                        value: ThemeChoice.dark,
+                                        title: Text(t.themeDark),
+                                        secondary: const Icon(
+                                          Icons.dark_mode_outlined,
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: _setTheme,
+                                  ),
+                                ),
+                              ),
+                            ),
                             SettingsRow(
                               words: [
                                 t.textSize,
@@ -759,56 +768,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       heading: t.settingsUnits,
                       headingKey: _heading('units'),
                       children: [
-                        SettingsRow(
-                          words: [
-                            t.settingsUnitsDetail,
-                            regionUnits,
-                            t.unitSystemMetric,
-                            t.unitSystemImperial,
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [
+                                t.settingsUnitsDetail,
+                                regionUnits,
+                                t.unitSystemMetric,
+                                t.unitSystemImperial,
+                              ],
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      12,
+                                      16,
+                                      0,
+                                    ),
+                                    child: Text(t.settingsUnitsDetail),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: RadioColumn<_UnitChoice>(
+                                      key: const ValueKey('unitSystem'),
+                                      value: _units,
+                                      options: [
+                                        RadioOption(
+                                          key: const ValueKey(
+                                            'unitSystem-region',
+                                          ),
+                                          value: _UnitChoice.region,
+                                          title: Text(regionUnits),
+                                        ),
+                                        RadioOption(
+                                          key: const ValueKey(
+                                            'unitSystem-metric',
+                                          ),
+                                          value: _UnitChoice.metric,
+                                          title: Text(t.unitSystemMetric),
+                                        ),
+                                        RadioOption(
+                                          key: const ValueKey(
+                                            'unitSystem-imperial',
+                                          ),
+                                          value: _UnitChoice.imperial,
+                                          title: Text(t.unitSystemImperial),
+                                        ),
+                                      ],
+                                      onChanged: _setUnits,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  24,
-                                  0,
-                                  24,
-                                  0,
-                                ),
-                                child: Text(t.settingsUnitsDetail),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: RadioColumn<_UnitChoice>(
-                                  key: const ValueKey('unitSystem'),
-                                  value: _units,
-                                  options: [
-                                    RadioOption(
-                                      key: const ValueKey('unitSystem-region'),
-                                      value: _UnitChoice.region,
-                                      title: Text(regionUnits),
-                                    ),
-                                    RadioOption(
-                                      key: const ValueKey('unitSystem-metric'),
-                                      value: _UnitChoice.metric,
-                                      title: Text(t.unitSystemMetric),
-                                    ),
-                                    RadioOption(
-                                      key: const ValueKey(
-                                        'unitSystem-imperial',
-                                      ),
-                                      value: _UnitChoice.imperial,
-                                      title: Text(t.unitSystemImperial),
-                                    ),
-                                  ],
-                                  onChanged: _setUnits,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ],
                     ),
@@ -1190,21 +1207,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       heading: t.features,
                       headingKey: _heading('features'),
                       children: [
-                        SettingsRow(
-                          words: [
-                            t.featuresDetail,
-                            t.featuresSimple,
-                            t.featuresSimpleDetail,
-                            t.featuresAdvanced,
-                            t.featuresAdvancedDetail,
-                          ],
-                          child: Spotlight(
-                            id: 'settings-features',
-                            child: FeaturesChoice(
-                              advanced: _advanced,
-                              onChanged: _setAdvanced,
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [
+                                t.featuresDetail,
+                                t.featuresSimple,
+                                t.featuresSimpleDetail,
+                                t.featuresAdvanced,
+                                t.featuresAdvancedDetail,
+                              ],
+                              child: Spotlight(
+                                id: 'settings-features',
+                                child: FeaturesChoice(
+                                  advanced: _advanced,
+                                  onChanged: _setAdvanced,
+                                  detailPadding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    0,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),

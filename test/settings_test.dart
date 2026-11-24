@@ -14,6 +14,7 @@ import 'package:oldbrainfix/src/import_screen.dart';
 import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
+import 'package:oldbrainfix/src/settings_search.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -466,6 +467,57 @@ void main() {
         expect(alarms.sound, bell);
         expect(alarms.arms, arms, reason: 'nothing to arm anew');
       });
+    });
+
+    testWidgets('draw every section as one card with its title on top', (
+      tester,
+    ) async {
+      await start(tester);
+      await openDeviceSettings(tester);
+      Finder under(Finder of, Type type) => find.descendant(
+        of: of,
+        matching: find.byType(type, skipOffstage: false),
+      );
+      final page = find.byType(SettingsScreen);
+      final rows = under(page, SettingsRow);
+      expect(rows, findsWidgets);
+      for (final row in rows.evaluate()) {
+        expect(
+          find.ancestor(
+            of: find.byWidget(row.widget, skipOffstage: false),
+            matching: find.byType(SettingsSection, skipOffstage: false),
+          ),
+          findsOneWidget,
+          reason: '${row.widget.key ?? row.widget} sits on a card',
+        );
+      }
+      final groups = under(page, SettingsGroup);
+      expect(groups, findsAtLeastNWidgets(10));
+      for (var i = 0; i < groups.evaluate().length; i++) {
+        final group = groups.at(i);
+        final heading = (tester.widget(group) as SettingsGroup).heading;
+        final card = under(group, SettingsSection);
+        expect(card, findsOneWidget, reason: '$heading is one card');
+        if (heading == null) continue;
+        final title = under(group, SettingsHeading);
+        expect(title, findsOneWidget);
+        expect(
+          tester.getRect(title).bottom,
+          lessThanOrEqualTo(tester.getRect(card).top),
+          reason: '$heading is the title on top of its card',
+        );
+      }
+      // The theme's chips start at the card's start, not in its middle.
+      final theme = find.byKey(const ValueKey('theme'));
+      expect(
+        tester.getTopLeft(theme).dx,
+        tester
+                .getTopLeft(
+                  find.ancestor(of: theme, matching: find.byType(Embossed)),
+                )
+                .dx +
+            16,
+      );
     });
 
     testWidgets('fit a phone in German', (tester) async {
