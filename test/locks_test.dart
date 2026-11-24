@@ -182,8 +182,8 @@ void main() {
       expect(find.text('Call the vet'), findsWidgets);
     });
 
-    testWidgets("an Occurrence's notification tapped opens its Note only "
-        'after the unlock (#270)', (tester) async {
+    testWidgets("an Occurrence's notification tapped marks its row on the "
+        'Agenda only after the unlock (obf-1039)', (tester) async {
       final routine = routines.create('Call the vet', daily(10));
       alarms.tapOccurrence((
         routineId: routine.id,
@@ -191,12 +191,20 @@ void main() {
       ));
       await start(tester);
 
+      final marked = find.byKey(const ValueKey('agenda-marked'));
       expect(lockScreen, findsOneWidget);
-      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(marked, findsNothing);
       await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
       await tap(tester, find.byKey(const ValueKey('unlockPin')));
       expect(lockScreen, findsNothing);
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('row-${routine.id}@2026-10-24T10:00')),
+          matching: marked,
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('opens with biometrics where they are on', (tester) async {
@@ -590,8 +598,10 @@ void main() {
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
     });
 
-    testWidgets("asks for the PIN before a tap on a locked Area's "
-        'notification opens its Note (#270)', (tester) async {
+    testWidgets("a tap on a locked Area's notification marks its Masked "
+        'row, asking for no PIN and showing nothing of it (obf-1039)', (
+      tester,
+    ) async {
       final (:routine, doctor: _, note: _) = lockedDoctor();
       await start(tester);
 
@@ -600,11 +610,16 @@ void main() {
         occurrenceKey: '2026-10-24T10:00',
       ));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
+      expect(find.byKey(const ValueKey('pinField')), findsNothing);
       expect(find.byType(NoteEditorScreen), findsNothing);
-      await enterPin(tester, pin);
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
-      expect(find.text('Pills'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('row-${routine.id}@2026-10-24T10:00')),
+          matching: find.byKey(const ValueKey('agenda-marked')),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Pills'), findsNothing);
     });
 
     testWidgets("asks for the PIN before a Masked row's History opens; "

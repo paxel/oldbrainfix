@@ -30,6 +30,7 @@ import 'src/home_shortcuts.dart';
 import 'src/import_run.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
+import 'src/notification_taps.dart';
 import 'src/ocr_platform.dart';
 import 'src/pairing_platform.dart';
 import 'src/photo_platform.dart';
@@ -91,6 +92,9 @@ Future<void> main() async {
         navigator: _navigator,
       );
     }
+    // The trace of the notification taps, beside the crash report
+    // (obf-1039).
+    notificationTaps.keepIn(dir);
     markRunning();
     watchRunning();
     await _openAndRun(dir);

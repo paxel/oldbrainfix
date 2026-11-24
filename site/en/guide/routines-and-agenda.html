@@ -202,9 +202,9 @@
 <guide-box name="check-off">
 <h2>Check it off when it rings</h2>
 <p>Mark a Routine or Reminder as Done.</p>
-<box-tab device="phone" alt="The Note editor of the boiler's Note with Due 09:30, Done, Snooze, Not today and Done and move to trash at the top">
+<box-tab device="phone" alt="The Agenda with the boiler's row marked, scrolled into view, its box and ⋮ at hand">
 <li>Tap the notification.</li>
-<li>Tap <strong>Done</strong> at the top.</li>
+<li>Tap the box of the marked row.</li>
 </box-tab>
 <box-tab device="desktop" alt="The Note dialog of the parking's Note with Due 08:00, Done, Snooze, Not today and Done and move to trash at the top">
 <li>Double-click the Note's card.</li>
@@ -227,7 +227,16 @@
   seconds, and a tap on it takes it back; the box still checks a skipped Occurrence off.
 </p>
 <p>
-  Tapping the notification opens its Note. At the top of the Note editor, above the name, the
+  Tapping the notification opens the Agenda with the Occurrence scrolled into view and marked:
+  today's row, a coming day's, or its line in the Missed Summary, from whatever page the app showed,
+  also when the app was not running. Its box checks it off, and its ⋮ holds
+  <strong>Snooze</strong> and <strong>Not today</strong>. One Done or skipped meanwhile, which the
+  Agenda no longer lists, shows "Already done" or "Skipped" at the top. Capture and the full-screen
+  alarm stay open over the Agenda, and the mark goes once the app is out of sight. Tapping the
+  Nudge still opens the Nudge page, and "Missed while the phone was off" the Agenda.
+</p>
+<p>
+  At the top of the Note editor, above the name, the
   Occurrence that is due shows as "Due 15:00", once its time has come, or else the latest Missed one
   with its day, with <strong>Done</strong>, <strong>Snooze</strong> while it is not Missed, and
   <strong>Not today</strong>; each opens its choices where you tap. A one-time Reminder that is the
@@ -265,12 +274,17 @@
   Done, Snooze, Not today and "Open Old Brain Fix", as Windows and many Linux desktops show only a
   few buttons: Snooze shows the same notification again with 10 min, 30 min and 1 h, and Not today
   with Skip and Tomorrow, Tomorrow only for an Occurrence of today or later. On macOS they show
-  without buttons. A click on the notification or "Open Old Brain Fix" brings the window up with
-  the Note dialog of its Note, as a click on its row on the Agenda or a double-click on the Note's
-  card opens it; a Routine editor open stays over it with what was typed. A Routine or Note gone
-  or in the trash brings up only the window, and a row whose Note is gone or in the trash opens
-  the Routine's editor. <strong>Edit schedule</strong> in the row's ⋮ or right-click menu, before
-  History, opens the Routine's editor. The Note dialog shows the same Due line at the
+  without buttons. A click on the notification or "Open Old Brain Fix" brings the window before
+  the other apps, on macOS too, and the notification goes. The Agenda shows, with the Occurrence
+  scrolled into view and outlined: today's row, a later day's, or its Routine in the Missed
+  Summary; one Done or skipped meanwhile that the Agenda no longer lists shows "Already done" or
+  "Skipped" at the top, and one still due that no day of the Agenda shows, such as a weekly one
+  from yesterday, opens its Note dialog. <strong>Done</strong>, <strong>Snooze</strong> and
+  <strong>Not today</strong> are in the row's ⋮ or right-click menu. A Routine editor open stays over the
+  Agenda with what was typed. A click on the Nudge opens Unsorted, one on "Missed while Old Brain
+  Fix was not running" the Agenda. A row whose Note is gone or in the trash opens the Routine's
+  editor. <strong>Edit schedule</strong> in the row's menu, before History, opens the Routine's
+  editor. The Note dialog shows the same Due line at the
   top, with Done, Snooze while it is not Missed, Not today, each opening its choices under
   it, and Done and move to trash; a click on the box on a card checks it off and opens nothing. A
   Skip or Tomorrow made in the app shows no message at the top; Ctrl+Z or Edit ▸ Undo takes it back,
@@ -423,7 +437,8 @@
   while the Occurrence is due, <strong>Not today</strong> (Skip, Tomorrow) while it is neither Done
   nor skipped, <strong>Edit schedule</strong> and <strong>History</strong> for a Routine. An Occurrence from a locked Area set to
   Masked shows as "Private Routine" with its time and can still be checked off; opening it, its
-  Note or its schedule, also from its notification, asks for its Area to be opened first.
+  Note or its schedule asks for its Area to be opened first. Its notification marks the row as it
+  shows, without asking.
 </p>
 <p>
   The Agenda's bar holds, in this order: the folder <strong>Search and browse</strong>, which opens

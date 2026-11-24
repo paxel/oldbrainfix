@@ -215,7 +215,8 @@ There are three kinds, and an action takes the first that fits.
 - **A time budget** (#339, Q753): every tap or click shows its effect
   within 100 ms, every page change within 500 ms, counted from the tap to
   the frame that shows it. A notification tapped while the app runs
-  opens its Note within the 500 ms. On the phone and on the desktop.
+  opens what it is about within the 500 ms (obf-1039). On the phone and
+  on the desktop.
 
 ### Announcements
 
@@ -816,8 +817,9 @@ There are three kinds, and an action takes the first that fits.
   Reminder and a Session show none.
 - **Send feedback shows what it sends** (#214): Settings ▸ "Send
   feedback" is a page with a field for the words, ticks for what goes
-  along (version, system and device, install method ticked at first;
-  the phone's last crash report and Notes as a Pack not) and the
+  along (version, system and device, install method ticked at first,
+  and the last notification taps while there are any (obf-1039); the
+  phone's last crash report and Notes as a Pack not) and the
   preview, the exact text sent, always above its buttons, which wait
   for words: Mail, a mail link to the developer while the text fits one,
   and on the phone Share…, the text and the Pack to the app picked, on
@@ -1593,6 +1595,12 @@ There are three kinds, and an action takes the first that fits.
   rows and the appointments' rows are as tight. Not as tight as the
   widget, whose rows lie 4 apart. With Fat fingers every one of these
   measures is 1.3 times (#224).
+- **The row a notification tap asked for is marked** (obf-1039): its
+  card on the find bar's tint (tertiary container) in a 3 dp ring of
+  the tint's strong colour (tertiary), a Missed Occurrence's line in
+  the Missed Summary alike with corners of 8, scrolled a fifth down
+  from the top; one mark at a time, gone once the app goes out of
+  sight. See Alarms and notifications.
 - **A calendar appointment's row is read only**: no checkbox, the
   calendar's colour down its side, the calendar icon and the calendar's
   name. A tap unfolds its place and description and folds them again;
@@ -2023,11 +2031,31 @@ There are three kinds, and an action takes the first that fits.
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".
-- **A tap on an Occurrence's notification opens the editor of its
-  Note** (#270), with Done, Snooze and Not today in its Due line, over
-  whatever the app showed; a locked Area asks to open first, and behind
-  the App Lock it opens after the unlock. A Routine or Note gone or in
-  the trash opens only the app.
+- **A tap on an Occurrence's notification, its ring's or its
+  Heads-up's, opens the Agenda with that Occurrence marked** (obf-1039,
+  Q39–Q41), from whatever page the app showed, the Areas list too,
+  within 500 ms, whether the app was running, in the background or not
+  started; Capture and the full-screen alarm stay on top of it, nothing
+  typed lost. The Agenda scrolls the row into view, a fifth down from
+  the top, and marks it on the find bar's tint in a ring of its colour
+  (tertiary) until the app goes out of sight or another tap marks
+  another; Done is its box, Snooze and Not today are in its ⋮. One
+  today's rows do not hold is marked where the Agenda lists it: in the
+  Missed Summary, as far as its card shows, or on a coming day. One the
+  Agenda lists nowhere opens the Agenda with "Already done" or
+  "Skipped" at the top when it was Done or skipped meanwhile, and with
+  nothing said otherwise. A Masked row is marked as it shows, asking
+  for no PIN. Behind the App Lock it is marked after the unlock. A
+  Routine or Note gone or in the trash shows the Agenda alone.
+- **Every notification tap goes into a trace of its own** (obf-1039):
+  the kind ("occurrence", "headsUp", "ring", "nudge", "changes",
+  "catchUp"), the Routine's id and the Occurrence's key where it has
+  them, whether the app was running, in the background or started by it
+  ("unknown" on the iPhone), when, and where the app took it; never a
+  Note's text. It keeps the last 10 taps in a file beside the crash
+  report, and Send feedback sends it along under "The last notification
+  taps", ticked at first while there are any, greyed while there are
+  none, as the desktop's clicks.
 - **On Android an Occurrence's notification has three buttons** (#269,
   Q650): Done · Snooze · Not today, as Android shows no more. Snooze
   replaces them in place with 10 min, 30 min and 1 h, and Not today with
@@ -2929,11 +2957,25 @@ There are three kinds, and an action takes the first that fits.
   time?", Tomorrow only for an Occurrence of today or later. On macOS it
   has no buttons; there is no full-screen alarm. A click on the Nudge
   opens the window on Unsorted, in place of the phone's Nudge screen.
-- **A click on an Occurrence's notification opens its Note dialog**
-  (#270), the body or "Open Old Brain Fix" alike: the window comes up
-  with the Note dialog of its Note and its Due line, over whatever it
-  showed; a Routine editor or Tally form open stays over it with its
-  draft. A Routine or Note gone or in the trash opens only the window.
+- **A click on a notification brings the window before the other apps
+  and opens what it is about** (obf-1039), on Linux, Windows and macOS
+  alike, the body or "Open Old Brain Fix" alike, and the notification
+  goes. A Reminder's or Routine's opens the Agenda with that Occurrence
+  scrolled into view and outlined in the accent colour: today's row, a
+  later day's, else its Routine in the Missed Summary. Listed nowhere,
+  as one Done or skipped meanwhile, the Agenda opens with "Already
+  done" or "Skipped" at the top; one still open that no day shows, as a
+  weekly one of yesterday, opens its Note dialog over the Agenda, its
+  Due line answering it. Done, Snooze and Not today are in the
+  row's ⋮ and right-click menu; Done also is its box. The outline goes
+  once the Agenda is left. The Note open is kept and closed first; a
+  Routine editor or Tally form stays over the Agenda with its draft. The
+  Catch-up Notification's click opens the Agenda, the Nudge's Unsorted.
+- **Every click on a notification is traced** (obf-1039): when, the
+  notification's kind and ids, the button, whether the window showed or
+  waited in the tray, and where it went, never a Note's text; the last
+  eight, in memory while the app runs. Send feedback offers them as
+  "Notification clicks", ticked, while there are any.
 
 ### What the desktop does not have
 

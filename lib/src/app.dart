@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_focus.dart';
 import 'agenda_reader.dart';
 import 'agenda_screen.dart';
 import 'alarm_platform.dart';
@@ -44,7 +45,7 @@ import 'location.dart';
 import 'lock_platform.dart';
 import 'lock_screen.dart';
 import 'look.dart';
-import 'note_editor_screen.dart';
+import 'notification_taps.dart';
 import 'nudge_screen.dart';
 import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
@@ -806,7 +807,11 @@ class _HomeState extends State<_Home> {
   var _changesWaiting = false;
   var _unsortedWaiting = false;
   WidgetPick? _pickWaiting;
-  OpenedOccurrence? _occurrenceWaiting;
+  ({OpenedOccurrence opened, TapArrival? arrival})? _occurrenceWaiting;
+
+  /// The way an Occurrence's notification tap reaches the Agenda
+  /// (obf-1039).
+  final _agendaFocus = AgendaFocus();
 
   /// The Note of the Tally whose shortcut was tapped while locked (#284).
   String? _tallyWaiting;
@@ -846,6 +851,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_unsortedOpened);
     widget.alarms.addListener(_pickOpened);
     widget.alarms.addListener(_occurrenceOpened);
+    widget.alarms.addListener(_ringTapped);
     widget.lock.addListener(_lockChanged);
     widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
@@ -990,6 +996,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_unsortedOpened);
     widget.alarms.removeListener(_pickOpened);
     widget.alarms.removeListener(_occurrenceOpened);
+    widget.alarms.removeListener(_ringTapped);
     widget.lock.removeListener(_lockChanged);
     widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
@@ -999,6 +1006,7 @@ class _HomeState extends State<_Home> {
     unawaited(_tallyAsked.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
+    _agendaFocus.dispose();
     super.dispose();
   }
 
@@ -1065,6 +1073,20 @@ class _HomeState extends State<_Home> {
     unawaited(navigator.push(route));
   }
 
+  /// Notes a tap on the full-screen alarm's notification in the trace
+  /// of the taps (obf-1039): it shows the full-screen alarm while one
+  /// rings, else the app as it was.
+  void _ringTapped() {
+    if (!mounted) return;
+    final arrival = widget.alarms.takeTapArrived(const {'ring'});
+    if (arrival == null) return;
+    notificationTaps.record(
+      kind: 'ring',
+      arrival: arrival,
+      went: widget.alarms.ringing == null ? TapWent.agenda : TapWent.ring,
+    );
+  }
+
   /// Shows the lock screen when the app locks, with the browser gone,
   /// and what waited for the unlock after it.
   void _lockChanged() {
@@ -1088,9 +1110,9 @@ class _HomeState extends State<_Home> {
       _pickWaiting = null;
       unawaited(_openPick(pick));
     }
-    if (_occurrenceWaiting case final opened?) {
+    if (_occurrenceWaiting case (:final opened, :final arrival)?) {
       _occurrenceWaiting = null;
-      unawaited(_openOccurrence(opened));
+      _showOccurrence(opened, arrival);
     }
     if (_tallyWaiting case final noteId?) {
       _tallyWaiting = null;
@@ -1131,7 +1153,13 @@ class _HomeState extends State<_Home> {
   /// Opens the Nudge screen when the Nudge's notification was tapped.
   void _nudgeOpened() {
     if (!mounted || !widget.alarms.takeNudgeOpened()) return;
-    if (widget.lock.locked) {
+    final locked = widget.lock.locked;
+    notificationTaps.record(
+      kind: 'nudge',
+      arrival: widget.alarms.takeTapArrived(const {'nudge'}),
+      went: locked ? TapWent.locked : TapWent.nudge,
+    );
+    if (locked) {
       _nudgeWaiting = true;
       return;
     }
@@ -1156,8 +1184,26 @@ class _HomeState extends State<_Home> {
   /// lock has put the Agenda under it already.
   void _catchUpOpened() {
     if (!mounted || !widget.alarms.takeCatchUpOpened()) return;
+    notificationTaps.record(
+      kind: 'catchUp',
+      arrival: widget.alarms.takeTapArrived(const {'catchUp'}),
+      went: TapWent.agenda,
+    );
     if (widget.lock.locked) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    _backToAgenda();
+  }
+
+  /// Back to the Agenda from whatever page shows, the Areas list too:
+  /// each page closes as Back closes it, up to Capture, the full-screen
+  /// alarm or a page that holds its leaving to save or ask first (#275),
+  /// which stay over it, nothing typed lost (obf-1039).
+  void _backToAgenda() {
+    Navigator.of(context).popUntil(
+      (route) =>
+          route.isFirst ||
+          LockFreeRoutes.contains(route) ||
+          route.popDisposition == RoutePopDisposition.doNotPop,
+    );
     _pager.jumpToAgenda();
   }
 
@@ -1165,6 +1211,11 @@ class _HomeState extends State<_Home> {
   /// tapped (#109); behind the App Lock they wait for the unlock.
   void _changesOpened() {
     if (!mounted || !widget.alarms.takeChangesOpened()) return;
+    notificationTaps.record(
+      kind: 'changes',
+      arrival: widget.alarms.takeTapArrived(const {'changes'}),
+      went: widget.lock.locked ? TapWent.locked : TapWent.changes,
+    );
     if (widget.lock.locked) {
       _changesWaiting = true;
       return;
@@ -1258,42 +1309,65 @@ class _HomeState extends State<_Home> {
     lock?.closeAreas();
   }
 
-  /// Opens the Note of an Occurrence whose notification was tapped
-  /// (#270); behind the App Lock it waits for the unlock.
+  /// Shows the Occurrence whose notification was tapped on the Agenda,
+  /// marked (obf-1039); behind the App Lock it waits for the unlock.
   void _occurrenceOpened() {
     if (!mounted) return;
     final opened = widget.alarms.takeOccurrenceOpened();
     if (opened == null) return;
+    final arrival = widget.alarms.takeTapArrived(occurrenceTapKinds);
     if (widget.lock.locked) {
-      _occurrenceWaiting = opened;
+      _occurrenceWaiting = (opened: opened, arrival: arrival);
+      notificationTaps.record(
+        kind: 'occurrence',
+        arrival: arrival,
+        ids: _tapIds(opened),
+        went: TapWent.locked,
+      );
       return;
     }
-    unawaited(_openOccurrence(opened));
+    _showOccurrence(opened, arrival);
   }
 
-  /// Opens the editor of the Note of [opened]'s Routine, as a tap on its
-  /// row on the Agenda does: its locked Area first. A Routine or Note no
-  /// longer there, or in the trash, opens nothing, the Agenda being open.
-  Future<void> _openOccurrence(OpenedOccurrence opened) async {
-    final store = widget.store;
-    final routine = Routines(store).byId(opened.routineId);
-    if (routine == null || routine.isTrashed) return;
-    final note = widget.notes.byId(routine.noteId);
-    if (note == null || note.isTrashed) return;
-    final lock = LockScope.of(context);
-    final areaId = AreaLocks(store).lockedAreaOf(note);
-    if (areaId != null) {
-      final area = widget.places.areaById(areaId);
-      final open = await openLockedArea(
-        context,
-        lock,
-        areaId,
-        area == null ? '' : areaName(context.t, area),
-      );
-      if (!open || !mounted) return;
+  /// The ids of [opened] as the trace of the taps notes them: never a
+  /// Note's text.
+  static Map<String, String> _tapIds(OpenedOccurrence opened) => {
+    'routine': opened.routineId,
+    'occurrence': opened.occurrenceKey,
+  };
+
+  /// Shows the Agenda, from whatever page the app showed, as the
+  /// Catch-up Notification does ([_backToAgenda]), with [opened] marked
+  /// where it lists it. A Routine or Note gone or in the trash shows the
+  /// Agenda alone. The trace of the taps notes where it went.
+  void _showOccurrence(OpenedOccurrence opened, TapArrival? arrival) {
+    void traced(String went) => notificationTaps.record(
+      kind: 'occurrence',
+      arrival: arrival,
+      ids: _tapIds(opened),
+      went: went,
+    );
+    _backToAgenda();
+    final routine = Routines(widget.store).byId(opened.routineId);
+    final note = routine == null ? null : widget.notes.byId(routine.noteId);
+    if (routine == null ||
+        routine.isTrashed ||
+        note == null ||
+        note.isTrashed) {
+      traced(TapWent.agendaGone);
+      return;
     }
-    await openNote(context, widget.notes, widget.places, note);
-    lock?.closeAreas();
+    _agendaFocus.show(
+      opened,
+      (found) => traced(switch (found) {
+        AgendaFound.today => TapWent.agendaToday,
+        AgendaFound.missed => TapWent.agendaMissed,
+        AgendaFound.comingDay => TapWent.agendaLater,
+        AgendaFound.done => TapWent.agendaDone,
+        AgendaFound.skipped => TapWent.agendaSkipped,
+        AgendaFound.nowhere => TapWent.agendaNowhere,
+      }),
+    );
   }
 
   /// Opens the entry page of the Tally whose shortcut on the home screen
@@ -1622,6 +1696,7 @@ class _HomeState extends State<_Home> {
                 profile: widget.profile,
                 onThemeChanged: widget.onThemeChanged,
                 pager: _pager,
+                focus: _agendaFocus,
               ),
               areas: AreasScreen(
                 notes: widget.notes,

@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import 'agenda_reader.dart';
 import 'agenda_widget.dart';
 import 'alarm_platform.dart';
+import 'notification_taps.dart';
 import 'unit_system.dart';
 
 /// Keeps the platform's alarms in step with the core's alarm plan: on
@@ -81,6 +82,7 @@ class AlarmSync extends ChangeNotifier {
   var _unsortedOpened = false;
   WidgetPick? _pickOpened;
   OpenedOccurrence? _occurrenceOpened;
+  TapArrival? _tapArrived;
 
   AlarmSync({
     required this.store,
@@ -184,6 +186,16 @@ class AlarmSync extends ChangeNotifier {
     return opened;
   }
 
+  /// The last notification tap the platform told of, for the trace of
+  /// the taps (obf-1039), when it is one of [kinds]; taking it clears
+  /// it.
+  TapArrival? takeTapArrived(Set<String> kinds) {
+    final arrived = _tapArrived;
+    if (arrived == null || !kinds.contains(arrived.kind)) return null;
+    _tapArrived = null;
+    return arrived;
+  }
+
   /// Done, or a snooze for [snooze], from the full-screen alarm: the
   /// platform stops ringing and queues it, and it is applied at once.
   Future<void> answer(Ringing ring, {Duration? snooze}) async {
@@ -236,6 +248,7 @@ class AlarmSync extends ChangeNotifier {
     final unsortedOpened = await platform.unsortedOpened();
     final pickOpened = await platform.pickOpened();
     final occurrenceOpened = await platform.occurrenceOpened();
+    final tapArrived = await platform.tapArrived();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
     if (changesOpened) _changesOpened = true;
@@ -243,6 +256,7 @@ class AlarmSync extends ChangeNotifier {
     if (unsortedOpened) _unsortedOpened = true;
     if (pickOpened != null) _pickOpened = pickOpened;
     if (occurrenceOpened != null) _occurrenceOpened = occurrenceOpened;
+    if (tapArrived != null) _tapArrived = tapArrived;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
     _granted = granted;
@@ -256,7 +270,8 @@ class AlarmSync extends ChangeNotifier {
         catchUpOpened ||
         unsortedOpened ||
         pickOpened != null ||
-        occurrenceOpened != null) {
+        occurrenceOpened != null ||
+        tapArrived != null) {
       notifyListeners();
     }
     await _arm(force: true);

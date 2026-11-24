@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'agenda_group.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -28,6 +29,12 @@ class MissedSummaryCard extends StatelessWidget {
   final bool Function(Routine routine, Occurrence occurrence)? ticked;
   final VoidCallback onSeen;
 
+  /// The Missed Occurrence a notification tap asked for (obf-1039), by
+  /// its Routine's id and its key: it shows marked, and [markKey] finds
+  /// it to scroll it into view.
+  final ({String routineId, String occurrenceKey})? marked;
+  final GlobalKey? markKey;
+
   const MissedSummaryCard({
     super.key,
     required this.summary,
@@ -35,7 +42,20 @@ class MissedSummaryCard extends StatelessWidget {
     required this.onCheck,
     this.ticked,
     required this.onSeen,
+    this.marked,
+    this.markKey,
   });
+
+  /// [row] of [occurrence] of [routine], marked when it is [marked].
+  Widget _markedIf(Routine routine, Occurrence occurrence, Widget row) {
+    if (marked != (routineId: routine.id, occurrenceKey: occurrence.key)) {
+      return row;
+    }
+    return KeyedSubtree(
+      key: markKey,
+      child: AgendaMark(radius: 8, child: row),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,28 +99,32 @@ class MissedSummaryCard extends StatelessWidget {
                 ))
                   if (ticked?.call(missed.routine, occurrence) ?? false
                       case final done)
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: done,
-                          semanticLabel: t.markDone,
-                          onChanged: done
-                              ? null
-                              : (_) => onCheck(missed.routine, occurrence),
-                        ),
-                        // Wraps on a narrow phone rather than running off.
-                        Expanded(
-                          child: Text(
-                            '${dayText(locale, occurrence.day)}  '
-                            '${occurrenceTime(t, locale, occurrence)}',
-                            style: done
-                                ? const TextStyle(
-                                    decoration: TextDecoration.lineThrough,
-                                  )
-                                : null,
+                    _markedIf(
+                      missed.routine,
+                      occurrence,
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: done,
+                            semanticLabel: t.markDone,
+                            onChanged: done
+                                ? null
+                                : (_) => onCheck(missed.routine, occurrence),
                           ),
-                        ),
-                      ],
+                          // Wraps on a narrow phone rather than running off.
+                          Expanded(
+                            child: Text(
+                              '${dayText(locale, occurrence.day)}  '
+                              '${occurrenceTime(t, locale, occurrence)}',
+                              style: done
+                                  ? const TextStyle(
+                                      decoration: TextDecoration.lineThrough,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                 if (missed.count > shown)
                   Padding(

@@ -99,6 +99,13 @@ class MainActivity : FlutterActivity() {
     /** The periodic sync the app runs for the worker, until the app says it is over. */
     private var inAppSync: CountDownLatch? = null
 
+    /**
+     * Whether the activity was stopped since it last resumed: a tap that
+     * comes then came from the background (obf-1039). onNewIntent comes
+     * after onStart, before onResume, so onStart cannot tell.
+     */
+    private var stopped = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
@@ -107,6 +114,7 @@ class MainActivity : FlutterActivity() {
         if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
         if (savedInstanceState == null) pickOf(intent)?.let { pickOpened = it }
         if (savedInstanceState == null) occurrenceOf(intent)?.let { occurrenceOpened = it }
+        if (savedInstanceState == null) tapOf(intent, cold = true)?.let { tapArrived = it }
         if (savedInstanceState == null) {
             CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
         }
@@ -144,6 +152,10 @@ class MainActivity : FlutterActivity() {
         }
         occurrenceOf(intent)?.let {
             occurrenceOpened = it
+            actionsArrived()
+        }
+        tapOf(intent, cold = false)?.let {
+            tapArrived = it
             actionsArrived()
         }
         // Something was shared in while the app runs: it takes it now.
@@ -618,6 +630,10 @@ class MainActivity : FlutterActivity() {
                         result.success(occurrenceOpened)
                         occurrenceOpened = null
                     }
+                    "tapArrived" -> {
+                        result.success(tapArrived)
+                        tapArrived = null
+                    }
                     "request" -> {
                         Permissions.request(this@MainActivity, call.arguments as String)
                         result.success(null)
@@ -661,8 +677,14 @@ class MainActivity : FlutterActivity() {
         if (shareAnswer != null) shareLeft = true
     }
 
+    override fun onStop() {
+        super.onStop()
+        stopped = true
+    }
+
     override fun onResume() {
         super.onResume()
+        stopped = false
         if (!shareLeft) return
         val answer = shareAnswer ?: return
         shareAnswer = null
@@ -1205,6 +1227,17 @@ class MainActivity : FlutterActivity() {
         OccurrenceOpen.of({ key -> it.getStringExtra(key) }, it.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0)
     }
 
+    /** The notification tap behind [intent] for the trace of the taps (obf-1039), or null. */
+    private fun tapOf(intent: Intent?, cold: Boolean): Map<String, Any>? {
+        if (intent == null) return null
+        val kind = NotificationTaps.kindOf(
+            { key -> intent.getBooleanExtra(key, false) },
+            { key -> intent.getStringExtra(key) },
+            intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0,
+        ) ?: return null
+        return NotificationTaps.arrival(kind, NotificationTaps.from(cold, stopped), System.currentTimeMillis())
+    }
+
     private fun opensUnsorted(intent: Intent?): Boolean =
         intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
             intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
@@ -1290,8 +1323,11 @@ class MainActivity : FlutterActivity() {
         /** The pick tapped on the Agenda widget whose entry form the app has not opened yet. */
         private var pickOpened: Map<String, String>? = null
 
-        /** The Occurrence whose notification was tapped and whose Note the app has not opened yet. */
+        /** The Occurrence whose notification was tapped and which the app has not shown yet. */
         private var occurrenceOpened: Map<String, String>? = null
+
+        /** The last notification tap the app has not noted in its trace yet (obf-1039). */
+        private var tapArrived: Map<String, Any>? = null
 
         /** The capture screen an entry point asked for and the app has not opened yet. */
         private var captureRequested: String? = null

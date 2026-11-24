@@ -1,18 +1,23 @@
 package io.github.paxel.oldbrainfix
 
 /**
- * A tap on an Occurrence's notification opens the editor of its Note
- * (#270): the notification's content intent carries the Routine and the
- * Occurrence, and the app asks for them once it shows.
+ * A tap on an Occurrence's notification shows it on the Agenda, marked
+ * (obf-1039): the notification's content intent carries the Routine and
+ * the Occurrence, and the app asks for them once it shows.
  */
 object OccurrenceOpen {
     const val EXTRA_ROUTINE = "oldbrainfix.open.routine"
     const val EXTRA_OCCURRENCE = "oldbrainfix.open.occurrence"
 
-    /** The extras of the content intent of [alarm]'s notification. */
-    fun extras(alarm: Alarm): Map<String, String> = mapOf(
+    /**
+     * The extras of the content intent of [alarm]'s notification, its
+     * Heads-up's when [headsUp], which the trace of the taps tells apart
+     * ([NotificationTaps]).
+     */
+    fun extras(alarm: Alarm, headsUp: Boolean = false): Map<String, String> = mapOf(
         EXTRA_ROUTINE to alarm.routine,
         EXTRA_OCCURRENCE to alarm.occurrence,
+        NotificationTaps.EXTRA_KIND to if (headsUp) NotificationTaps.HEADS_UP else NotificationTaps.OCCURRENCE,
     )
 
     /**

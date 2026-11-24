@@ -1538,6 +1538,18 @@ abstract class AppLocalizations {
   /// **'From the day before'**
   String get occurrenceFromDayBefore;
 
+  /// At the top of the Agenda when an Occurrence's notification was tapped and the Occurrence was Done meanwhile, so the Agenda lists it nowhere (obf-1039).
+  ///
+  /// In en, this message translates to:
+  /// **'Already done'**
+  String get notificationAlreadyDone;
+
+  /// At the top of the Agenda when an Occurrence's notification was tapped and the Occurrence was skipped meanwhile, so the Agenda lists it nowhere (obf-1039).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get notificationSkipped;
+
   /// No description provided for @alarmsBanner.
   ///
   /// In en, this message translates to:
@@ -9967,6 +9979,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'From {date}'**
   String feedbackCrashFrom(String date);
+
+  /// Tick, on at first while there are any: the trace of the last notification taps goes along, what each tap opened, without any Note's text (obf-1039).
+  ///
+  /// In en, this message translates to:
+  /// **'The last notification taps'**
+  String get feedbackTaps;
+
+  /// Under 'The last notification taps' when no notification was tapped yet; the tick is greyed.
+  ///
+  /// In en, this message translates to:
+  /// **'None so far.'**
+  String get feedbackTapsNone;
+
+  /// Under 'The last notification taps': how many taps are kept; only kinds and ids go along, no Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 tap, without the Notes\' text} other{{count} taps, without the Notes\' text}}'**
+  String feedbackTapsKept(int count);
 
   /// Tick, off at first: copies of Notes picked in the Pack's tree go along as a Pack file.
   ///

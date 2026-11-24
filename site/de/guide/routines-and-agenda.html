@@ -212,9 +212,9 @@
 <guide-box name="check-off">
 <h2>Abhaken, wenn es klingelt</h2>
 <p>Markiere eine Routine oder Erinnerung als erledigt.</p>
-<box-tab device="phone" alt="Der Notiz-Editor der Therme mit Fällig 09:30, Erledigt, Später, Nicht heute und Erledigt und in den Papierkorb oben">
+<box-tab device="phone" alt="Die Agenda mit der markierten Zeile der Therme, ins Bild gerollt, ihr Kästchen und ⋮ zur Hand">
 <li>Tippe die Benachrichtigung.</li>
-<li>Tippe oben <strong>Erledigt</strong>.</li>
+<li>Tippe das Kästchen der markierten Zeile.</li>
 </box-tab>
 <box-tab device="desktop" alt="Der Notiz-Dialog der Notiz zum Parken mit Fällig 08:00, Erledigt, Später, Nicht heute und Erledigt und in den Papierkorb oben">
 <li>Doppelklicke die Karte der Notiz.</li>
@@ -238,7 +238,17 @@
   darauf nimmt es zurück; das Kästchen hakt eine ausgelassene Fälligkeit weiter ab.
 </p>
 <p>
-  Ein Tippen auf die Benachrichtigung öffnet ihre Notiz. Oben im Notiz-Editor, über dem Namen, steht
+  Ein Tippen auf die Benachrichtigung öffnet die Agenda mit der Fälligkeit ins Bild gerollt und
+  markiert: die Zeile von heute, die eines kommenden Tages oder ihre Zeile unter Verpasst, von
+  welcher Seite auch immer, auch wenn die App nicht lief. Ihr Kästchen hakt sie ab, und ihr ⋮ hat
+  <strong>Später</strong> und <strong>Nicht heute</strong>. Eine inzwischen erledigte oder
+  ausgelassene, die die Agenda nicht mehr zeigt, lässt oben „Schon erledigt“ oder „Ausgelassen“
+  stehen. Das Erfassen und der Vollbild-Alarm bleiben über der Agenda offen, und die Markierung
+  geht, sobald die App aus dem Blick ist. Ein Tippen auf den Stupser öffnet weiter die Seite des
+  Stupsers, eines auf „Verpasst, während das Handy aus war“ die Agenda.
+</p>
+<p>
+  Oben im Notiz-Editor, über dem Namen, steht
   die Fälligkeit, die gerade fällig ist, als „Fällig 15:00“, sobald ihre Zeit gekommen ist, sonst die
   zuletzt verpasste mit ihrem Tag, mit <strong>Erledigt</strong>, <strong>Später</strong>, solange
   sie nicht verpasst ist, und <strong>Nicht heute</strong>; jedes öffnet seine Auswahl dort, wo du
@@ -279,12 +289,17 @@
   öffnen“, da Windows und viele Linux-Desktops nur wenige Knöpfe zeigen: Später zeigt dieselbe
   Benachrichtigung erneut mit 10 Min., 30 Min. und 1 Std., Nicht heute mit Auslassen und Morgen,
   Morgen nur für eine Fälligkeit von heute oder später. Unter macOS erscheinen sie ohne Knöpfe. Ein
-  Klick auf die Benachrichtigung oder „Old Brain Fix öffnen“ holt das Fenster mit dem Notiz-Dialog
-  ihrer Notiz nach vorn, wie ihn ein Klick auf ihre Zeile in der Agenda oder ein Doppelklick auf die
-  Karte der Notiz öffnet; ein offener Routinen-Editor bleibt mit dem Getippten darüber. Eine Routine
-  oder Notiz, die es nicht mehr gibt oder die im Papierkorb ist, holt nur das Fenster nach vorn, und eine
-  Zeile, deren Notiz nicht mehr da oder im Papierkorb ist, öffnet den Editor der Routine. <strong>Plan bearbeiten</strong>
-  im ⋮ oder im Menü des Rechtsklicks der Zeile, vor Verlauf, öffnet den Editor der
+  Klick auf die Benachrichtigung oder „Old Brain Fix öffnen“ holt das Fenster vor die anderen Apps,
+  auch unter macOS, und die Benachrichtigung verschwindet. Die Agenda erscheint, die Fälligkeit
+  hineingescrollt und umrandet: die Zeile von heute, die eines späteren Tages oder ihre Routine in
+  der Verpasst-Übersicht; eine inzwischen erledigte oder ausgelassene, die die Agenda nicht
+  mehr zeigt, meldet oben „Schon erledigt“ oder „Ausgelassen“, und eine noch fällige, die kein Tag
+  der Agenda zeigt, etwa eine wöchentliche von gestern, öffnet ihren Notiz-Dialog. <strong>Erledigt</strong>,
+  <strong>Später</strong> und <strong>Nicht heute</strong> stehen im ⋮ oder im Menü des
+  Rechtsklicks der Zeile. Ein offener Routinen-Editor bleibt mit dem Getippten über der Agenda. Ein
+  Klick auf den Stupser öffnet Unsortiert, einer auf „Verpasst, während Old Brain Fix nicht lief“
+  die Agenda. Eine Zeile, deren Notiz nicht mehr da oder im Papierkorb ist, öffnet den Editor der
+  Routine. <strong>Plan bearbeiten</strong> im Menü der Zeile, vor Verlauf, öffnet den Editor der
   Routine. Der Notiz-Dialog zeigt oben dieselbe Zeile „Fällig“, mit Erledigt, Später, solange sie nicht verpasst ist, Nicht heute,
   die ihre Wahl jeweils darunter öffnen, und Erledigt und in den Papierkorb; ein Klick auf das
   Kästchen einer Karte hakt ab und öffnet nichts. Ein Auslassen oder Morgen in der App zeigt oben
@@ -453,8 +468,9 @@
   Morgen), solange sie weder erledigt noch ausgelassen ist, <strong>Plan bearbeiten</strong> und
   <strong>Verlauf</strong> bei einer Routine. Eine Fälligkeit aus einem
   gesperrten Bereich, der auf maskiert steht, erscheint als „Private Routine“ mit ihrer Uhrzeit und
-  lässt sich trotzdem abhaken; sie, ihre Notiz oder ihren Plan zu öffnen, auch aus ihrer
-  Benachrichtigung, fragt zuerst nach dem Öffnen ihres Bereichs.
+  lässt sich trotzdem abhaken; sie, ihre Notiz oder ihren Plan zu öffnen, fragt zuerst nach dem
+  Öffnen ihres Bereichs. Ihre Benachrichtigung markiert die Zeile so, wie sie erscheint, ohne zu
+  fragen.
 </p>
 <p>
   Die Leiste der Agenda enthält in dieser Reihenfolge: den Ordner <strong>Suchen und

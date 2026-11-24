@@ -19,7 +19,7 @@ import android.os.Build
  * snooze choices (10 min, 30 min, 1 h), and Not today into Skip and
  * Tomorrow (#269). Every action is a broadcast, so it works from the
  * lock screen without opening the app; a tap on the notification
- * itself opens its Note (#270).
+ * itself shows its Occurrence on the Agenda, marked (obf-1039).
  */
 object Notifications {
     private const val ESCALATED_CHANNEL = "escalated"
@@ -55,8 +55,8 @@ object Notifications {
      * A Heads-up (obf-1046): one plain notification before its
      * Occurrence, its Note's title and "in 20 min", without actions or a
      * full screen. It is the Occurrence's own notification, so its ring
-     * replaces it and Done takes it away; tapping it opens the Note, as
-     * the ring's does. A [silent] one fires in the Quiet Hours: on their
+     * replaces it and Done takes it away; tapping it shows the Occurrence
+     * on the Agenda, as the ring's does (obf-1039). A [silent] one fires in the Quiet Hours: on their
      * channel, without sound or vibration.
      */
     fun showHeadsUp(context: Context, headsUp: Alarm, silent: Boolean = false) {
@@ -68,7 +68,7 @@ object Notifications {
             // As its ring shows.
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
-            .setContentIntent(openNote(context, headsUp))
+            .setContentIntent(openOccurrence(context, headsUp, headsUp = true))
             .build()
         context.getSystemService(NotificationManager::class.java)
             .notify(AlarmPlan.notificationId(headsUp.routine, headsUp.occurrence), notification)
@@ -310,7 +310,7 @@ object Notifications {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(alertOnce)
             .setAutoCancel(true)
-            .setContentIntent(openNote(context, alarm))
+            .setContentIntent(openOccurrence(context, alarm))
             .setActions(*actions.toTypedArray())
             .build()
         manager.notify(AlarmPlan.notificationId(alarm.routine, alarm.occurrence), notification)
@@ -405,14 +405,15 @@ object Notifications {
     )
 
     /**
-     * Opens the app on the editor of [alarm]'s Note (#270). Its own
+     * Opens the app on the Agenda with [alarm]'s Occurrence marked
+     * (obf-1039), for its ring or its Heads-up ([headsUp]). Its own
      * request code per Occurrence, as extras alone do not tell two
      * PendingIntents apart.
      */
-    private fun openNote(context: Context, alarm: Alarm): PendingIntent {
+    private fun openOccurrence(context: Context, alarm: Alarm, headsUp: Boolean = false): PendingIntent {
         val intent = Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        OccurrenceOpen.extras(alarm).forEach { (key, value) -> intent.putExtra(key, value) }
+        OccurrenceOpen.extras(alarm, headsUp).forEach { (key, value) -> intent.putExtra(key, value) }
         return PendingIntent.getActivity(
             context, AlarmPlan.notificationId(alarm.routine, alarm.occurrence), intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

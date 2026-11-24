@@ -942,6 +942,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get occurrenceFromDayBefore => 'From the day before';
 
   @override
+  String get notificationAlreadyDone => 'Already done';
+
+  @override
+  String get notificationSkipped => 'Skipped';
+
+  @override
   String get alarmsBanner =>
       'Alarms may come late or not at all: a permission is missing. Tap to fix it.';
 
@@ -6181,6 +6187,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String feedbackCrashFrom(String date) {
     return 'From $date';
+  }
+
+  @override
+  String get feedbackTaps => 'The last notification taps';
+
+  @override
+  String get feedbackTapsNone => 'None so far.';
+
+  @override
+  String feedbackTapsKept(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count taps, without the Notes\' text',
+      one: '1 tap, without the Notes\' text',
+    );
+    return '$_temp0';
   }
 
   @override

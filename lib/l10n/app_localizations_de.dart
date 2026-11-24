@@ -947,6 +947,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get occurrenceFromDayBefore => 'Vom Vortag';
 
   @override
+  String get notificationAlreadyDone => 'Schon erledigt';
+
+  @override
+  String get notificationSkipped => 'Ausgelassen';
+
+  @override
   String get alarmsBanner =>
       'Alarme kommen vielleicht zu spät oder gar nicht: Eine Erlaubnis fehlt. Tippe hier, um das zu beheben.';
 
@@ -6257,6 +6263,23 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String feedbackCrashFrom(String date) {
     return 'Vom $date';
+  }
+
+  @override
+  String get feedbackTaps => 'Die zuletzt angetippten Benachrichtigungen';
+
+  @override
+  String get feedbackTapsNone => 'Bisher keine.';
+
+  @override
+  String feedbackTapsKept(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Benachrichtigungen, ohne den Text der Notizen',
+      one: '1 Benachrichtigung, ohne den Text der Notizen',
+    );
+    return '$_temp0';
   }
 
   @override

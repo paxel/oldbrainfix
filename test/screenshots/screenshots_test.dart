@@ -1672,18 +1672,34 @@ void main() {
             await reveal(tester, find.byKey(const ValueKey('escalationAfter')));
           });
 
+          // The boiler's notification tapped: the Agenda with its row
+          // marked (obf-1039).
           boxFrame('routines-and-agenda', 'check-off', (tester) async {
-            final t = await start(
-              tester,
-              _Seeded(texts, dueReminder: true)..store.themeChoice = choice,
+            final seeded = _Seeded(texts, dueReminder: true)
+              ..store.themeChoice = choice;
+            final reminder = Routines(seeded.store).all().firstWhere(
+              (r) =>
+                  r.schedule.start == Day(2026, 10, 27) &&
+                  r.schedule.times.contains(ClockTime(9, 30)),
             );
-            await _tap(tester, find.byTooltip(t.browseTooltip));
-            await _tap(tester, find.text(t.starterHousehold));
-            await tester.longPress(find.text(texts.boiler));
-            await tester.pumpAndSettle();
-            expect(find.byKey(const ValueKey('open-done')), findsOneWidget);
+            final alarms = FakeAlarms()
+              ..tapOccurrence((
+                routineId: reminder.id,
+                occurrenceKey: '2026-10-27T09:30',
+              ));
+            await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+              alarms: alarms,
+            );
             expect(
-              find.byKey(const ValueKey('open-done-trash')),
+              find.descendant(
+                of: find.byKey(ValueKey('row-${reminder.id}@2026-10-27T09:30')),
+                matching: find.byKey(const ValueKey('agenda-marked')),
+              ),
               findsOneWidget,
             );
           });
@@ -2654,6 +2670,14 @@ void main() {
                       install: 'F-Droid',
                     ),
                     crash: () => null,
+                    // One tap, the same in every frame (obf-1039).
+                    taps: () => (
+                      text:
+                          '2026-10-27T08:30:04.000Z occurrence '
+                          'routine=routine:boiler occurrence=2026-10-27T09:30 '
+                          'from=background -> agenda today, marked',
+                      count: 1,
+                    ),
                     mail: (_) async {},
                   ),
                 ),
