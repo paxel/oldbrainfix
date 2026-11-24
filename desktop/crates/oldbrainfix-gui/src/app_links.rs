@@ -14,6 +14,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::text_marks_view;
+use crate::theme;
 
 /// What the picker groups its targets under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,13 +130,16 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.label(RichText::new(t.format_link_to()).heading().color(text));
-    let field = ui.add(
-        TextEdit::singleline(&mut picker.search)
-            .id(Id::new("link to search"))
-            .hint_text(t.link_to_search())
-            .text_color(text)
-            .desired_width(f32::INFINITY),
-    );
+    // On its band, so the targets scroll under its line (obf-1088).
+    let field = theme::search_band(ui, |ui| {
+        ui.add(
+            TextEdit::singleline(&mut picker.search)
+                .id(Id::new("link to search"))
+                .hint_text(t.link_to_search())
+                .text_color(text)
+                .desired_width(f32::INFINITY),
+        )
+    });
     if focus {
         field.request_focus();
     }
@@ -150,6 +154,8 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
         .id_salt("link to")
         .max_height(360.0)
         .show(ui, |ui| {
+            // Room under the band's line, inside, so the list is cut there.
+            ui.add_space(4.0);
             if found.is_empty() {
                 ui.label(RichText::new(t.link_to_nothing()).color(weak));
             }

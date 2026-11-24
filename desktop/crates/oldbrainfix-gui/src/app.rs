@@ -15697,52 +15697,62 @@ impl App {
             Selection::Trash => Some(self.t.search_trash_hint()),
             _ => None,
         };
+        // On its band, so the cards scroll under its line (obf-1088).
         if let Some(hint) = hint {
-            ui.horizontal(|ui| {
-                icons::show(ui, icons::SEARCH, 20.0, ui.visuals().weak_text_color());
-                let field = ui.add(
-                    TextEdit::singleline(&mut self.query)
-                        .id(Id::new("search"))
-                        .hint_text(hint)
-                        .text_color(text)
-                        .desired_width(ui.available_width() - 32.0),
-                );
-                spotlight::anchor(ui, "search", field.rect);
-                text_menu::show(ui, &self.t, &field, &self.query);
-                // Edit ▸ Find: after the field, so the menu's click does
-                // not take it out again.
-                if std::mem::take(&mut self.search_focus) {
-                    field.request_focus();
-                }
-                if field.changed() {
-                    actions.push(Action::Search);
-                }
-                if !self.query.is_empty()
-                    && icon_button(ui, icons::CLOSE, self.t.clear_search(), text).clicked()
+            theme::search_band(ui, |ui| {
+                ui.horizontal(|ui| {
+                    icons::show(ui, icons::SEARCH, 20.0, ui.visuals().weak_text_color());
+                    let field = ui.add(
+                        TextEdit::singleline(&mut self.query)
+                            .id(Id::new("search"))
+                            .hint_text(hint)
+                            .text_color(text)
+                            .desired_width(ui.available_width() - 32.0),
+                    );
+                    spotlight::anchor(ui, "search", field.rect);
+                    text_menu::show(ui, &self.t, &field, &self.query);
+                    // Edit ▸ Find: after the field, so the menu's click does
+                    // not take it out again.
+                    if std::mem::take(&mut self.search_focus) {
+                        field.request_focus();
+                    }
+                    if field.changed() {
+                        actions.push(Action::Search);
+                    }
+                    if !self.query.is_empty()
+                        && icon_button(ui, icons::CLOSE, self.t.clear_search(), text).clicked()
+                    {
+                        self.query.clear();
+                        actions.push(Action::Search);
+                    }
+                });
+                // The tags starting with the "#…" typed (#267, Q639).
+                if let Some(tag) =
+                    tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions)
                 {
-                    self.query.clear();
+                    // The cursor after it, to type on.
+                    let end = tag.chars().count();
+                    self.query = tag;
+                    let id = Id::new("search");
+                    let mut state =
+                        egui::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
+                    let at = egui::text::CCursor::new(end);
+                    state
+                        .cursor
+                        .set_char_range(Some(egui::text::CCursorRange::one(at)));
+                    state.store(ui.ctx(), id);
+                    self.search_focus = true;
                     actions.push(Action::Search);
                 }
             });
-            // The tags starting with the "#…" typed (#267, Q639).
-            if let Some(tag) = tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions) {
-                // The cursor after it, to type on.
-                let end = tag.chars().count();
-                self.query = tag;
-                let id = Id::new("search");
-                let mut state =
-                    egui::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
-                let at = egui::text::CCursor::new(end);
-                state
-                    .cursor
-                    .set_char_range(Some(egui::text::CCursorRange::one(at)));
-                state.store(ui.ctx(), id);
-                self.search_focus = true;
-                actions.push(Action::Search);
-            }
-            ui.add_space(8.0);
         }
         let trash = self.selection == Selection::Trash;
+        // Room under the band before what does not scroll under it.
+        let still = trash
+            && (!self.view.trashed_routines.is_empty() || !self.view.trashed_frogs.is_empty());
+        if hint.is_some() && (still || self.view.notes.is_empty()) {
+            ui.add_space(8.0);
+        }
         if !trash {
             ui.spacing_mut().item_spacing.y = 16.0;
         }
@@ -18484,33 +18494,32 @@ impl App {
             && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::F));
         self.settings_find |= finds;
         let searched = self.settings_query.clone();
-        ui.horizontal(|ui| {
-            icons::show(ui, icons::SEARCH, 20.0, weak);
-            let field = ui.add(
-                TextEdit::singleline(&mut self.settings_query)
-                    .id(Id::new("settings search"))
-                    .hint_text(t.settings_search_hint())
-                    .text_color(text)
-                    .desired_width(ui.available_width() - 32.0),
-            );
-            spotlight::anchor(ui, "settings-search", field.rect);
-            name_field(ui, &field, t.settings_search_hint());
-            text_menu::show(ui, &t, &field, &self.settings_query);
-            if std::mem::take(&mut self.settings_find) {
-                field.request_focus();
-            }
-            if !self.settings_query.is_empty()
-                && icon_button(ui, icons::CLOSE, t.clear_search(), text).clicked()
-            {
-                self.settings_query.clear();
-            }
+        // On its band, so the cards scroll under its line (obf-1088).
+        theme::search_band(ui, |ui| {
+            ui.horizontal(|ui| {
+                icons::show(ui, icons::SEARCH, 20.0, weak);
+                let field = ui.add(
+                    TextEdit::singleline(&mut self.settings_query)
+                        .id(Id::new("settings search"))
+                        .hint_text(t.settings_search_hint())
+                        .text_color(text)
+                        .desired_width(ui.available_width() - 32.0),
+                );
+                spotlight::anchor(ui, "settings-search", field.rect);
+                name_field(ui, &field, t.settings_search_hint());
+                text_menu::show(ui, &t, &field, &self.settings_query);
+                if std::mem::take(&mut self.settings_find) {
+                    field.request_focus();
+                }
+                if !self.settings_query.is_empty()
+                    && icon_button(ui, icons::CLOSE, t.clear_search(), text).clicked()
+                {
+                    self.settings_query.clear();
+                }
+            });
         });
         let typed = self.settings_query.trim().to_string();
         let query = settings_search::query_of(&typed);
-        if query.is_empty() {
-            ui.label(RichText::new(t.settings_intro()).color(weak));
-        }
-        ui.add_space(8.0);
         let quiet_text = &mut self.quiet_text;
         let all_day_text = &mut self.all_day_text;
         let all_day_from = settings
@@ -18563,6 +18572,10 @@ impl App {
         scroll.show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 16.0;
             ui.add_space(4.0);
+            // In the list, so nothing stands between it and the band.
+            if q.is_empty() {
+                ui.label(RichText::new(t.settings_intro()).color(weak));
+            }
             let shows = settings_search::rows(
                 q,
                 Some(t.settings_computer()),
@@ -21001,13 +21014,16 @@ fn merge_form(
 ) {
     let weak = ui.visuals().weak_text_color();
     title(ui, t.merge_into());
-    let field = focused_field(
-        ui,
-        t,
-        (&mut *query, focus),
-        "merge query",
-        t.search_all_hint(),
-    );
+    // On its band, so the Notes scroll under its line (obf-1088).
+    let field = theme::search_band(ui, |ui| {
+        focused_field(
+            ui,
+            t,
+            (&mut *query, focus),
+            "merge query",
+            t.search_all_hint(),
+        )
+    });
     if field.changed() {
         actions.push(Action::MergeQuery);
     }
@@ -21028,12 +21044,15 @@ fn merge_form(
         } else {
             t.nothing_found()
         };
+        ui.add_space(4.0);
         ui.label(RichText::new(empty).color(weak));
     }
     egui::ScrollArea::vertical()
         .id_salt("merge")
         .max_height(320.0)
         .show(ui, |ui| {
+            // Room under the band's line, inside, so the list is cut there.
+            ui.add_space(4.0);
             for (id, text) in shown {
                 if merge_row(ui, tones, text).clicked() {
                     actions.push(Action::Merge(id.clone()));

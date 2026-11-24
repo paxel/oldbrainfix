@@ -124,15 +124,19 @@ impl NotePicker {
     pub fn show(&mut self, ui: &mut Ui, (t, tones): (&L10n, Tones)) -> Option<NoteAsk> {
         let weak = ui.visuals().weak_text_color();
         let text = ui.visuals().text_color();
-        let field = ui.add(
-            TextEdit::singleline(&mut self.query)
-                .id(Id::new("add to note filter"))
-                .hint_text(t.search_all_hint())
-                .text_color(text)
-                .desired_width(f32::INFINITY),
-        );
-        text_menu::show(ui, t, &field, &self.query);
-        name_field(ui, &field, t.search_all_hint());
+        // On its band, so the Notes scroll under its line (obf-1088).
+        let field = theme::search_band(ui, |ui| {
+            let field = ui.add(
+                TextEdit::singleline(&mut self.query)
+                    .id(Id::new("add to note filter"))
+                    .hint_text(t.search_all_hint())
+                    .text_color(text)
+                    .desired_width(f32::INFINITY),
+            );
+            text_menu::show(ui, t, &field, &self.query);
+            name_field(ui, &field, t.search_all_hint());
+            field
+        });
         if self.focus {
             field.request_focus();
             if !ui.is_sizing_pass() {
@@ -151,12 +155,16 @@ impl NotePicker {
             } else {
                 t.no_note_to_add_to()
             };
+            ui.add_space(4.0);
             ui.label(RichText::new(empty).color(weak));
         }
         egui::ScrollArea::vertical()
             .id_salt("add to note")
             .max_height(LIST_HEIGHT)
             .show(ui, |ui| {
+                // Room under the band's line, inside, so the list is cut
+                // there.
+                ui.add_space(4.0);
                 if !self.filtering() && !self.recent.is_empty() {
                     ui.label(RichText::new(t.add_to_note_recent()).small().color(weak));
                     for (id, title) in &self.recent {

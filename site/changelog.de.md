@@ -22,6 +22,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy ist jeder Abschnitt der Einstellungen eine Karte mit Titel darüber, auch Aussehen, Einheiten und Komplexität. ([obf-1085](https://github.com/paxel/oldbrainfix/issues/398))
 - Auf dem Handy und dem Desktop ist „Mehr“ der Schnellnotiz ein breiter Knopf „Im Editor öffnen“ unter den Stupser-Knöpfen. ([obf-1080](https://github.com/paxel/oldbrainfix/issues/393))
 
+### Behoben
+
+- Auf dem Handy und dem Desktop schneidet keine Suchleiste mehr ab, was darunter scrollt; jede steht auf einem Streifen mit einer Linie darunter. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
+
 ## [0.7.2] - 2026-11-23
 
 ### Geändert
@@ -39,6 +43,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy stürzt die App nach einem Absturz und „App neu starten“ nicht kurz darauf erneut ab. ([obf-1059](https://github.com/paxel/oldbrainfix/issues/372))
 - Auf dem Handy und dem Desktop friert ein Import die App nicht mehr ein: Er läuft daneben und zählt seine Notizen, auch wenn du weggehst. ([obf-1061](https://github.com/paxel/oldbrainfix/issues/374))
 - Auf dem Handy und dem Desktop friert das Verschieben eines Bereichs in den Papierkorb die App nicht mehr ein; seine Zeile zählt die verschobenen Notizen. ([obf-1093](https://github.com/paxel/oldbrainfix/issues/406))
+- Auf dem Handy und dem Desktop schneidet keine Suchleiste mehr ab, was darunter scrollt; jede steht auf einem Streifen mit einer Linie darunter. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
 
 ## [0.7.1] - 2026-11-21
 

@@ -468,5 +468,40 @@ pub fn tear_line(ui: &mut Ui) -> Response {
     response
 }
 
+/// The fill of the band a search field stands on over what it lists
+/// (obf-1088): the marks' tone, clearly set off from a dialog's card and
+/// a shade off the window's ground, where its line sets it off most, in
+/// the light and the dark look.
+pub fn band_fill(tones: Tones) -> Color32 {
+    tones.mark
+}
+
+/// The band a search field stands on over what scrolls under it
+/// (obf-1088, the phone's `SearchBand`): `add`'s field on [`band_fill`]
+/// across the width, a separator's line along its bottom, and nothing
+/// between it and what comes next, so a list right under it scrolls
+/// under the line, not under an edge in the page's own colour.
+pub fn search_band<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
+    let fill = band_fill(tones(ui.visuals()));
+    let line = ui.visuals().widgets.noninteractive.bg_stroke;
+    let spacing = ui.spacing().item_spacing.y;
+    // The room after an item is taken as it is placed: none after the band.
+    ui.spacing_mut().item_spacing.y = 0.0;
+    let band = egui::Frame::NONE
+        .fill(fill)
+        .inner_margin(egui::Margin::symmetric(8, 8))
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = spacing;
+            ui.set_min_width(ui.available_width());
+            add(ui)
+        });
+    ui.spacing_mut().item_spacing.y = spacing;
+    let rect = band.response.rect;
+    // Inside the band, so what scrolls under it does not cover it.
+    let y = rect.bottom() - line.width / 2.0;
+    ui.painter().hline(rect.x_range(), y, line);
+    band.inner
+}
+
 #[cfg(test)]
 mod tests;

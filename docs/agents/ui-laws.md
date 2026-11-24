@@ -2009,6 +2009,13 @@ replace a law of Both apps where they say so. A desktop law marked
   stands beside its words; Save… saves the file where the user says, in
   place of Share…; "Add … to People" takes the person in and keeps the
   dialog open.
+- **A search field over what it lists sits on a band** (obf-1088, as
+  the phone's): the Settings', File into…'s, Merge into…'s, Add to
+  Note…'s and Link to…'s field, and the main window's over a list of
+  Notes, stand on a band of the marks' tone across the width with a
+  separator's line along its bottom (`theme::search_band`), and the
+  list starts right at the line, so what scrolls goes under the line
+  and no edge in the page's or the dialog's colour cuts it.
 
 ### Cards and selection
 
@@ -2217,8 +2224,9 @@ replace a law of Both apps where they say so. A desktop law marked
   Alarms, Nudges, Units, Agenda, History, Features, …), its settings
   under it, each with its small weak detail line.
 - **A search field sits at the top of the Settings dialog** (#282),
-  under its heading and above the intro line, staying there while the
-  cards scroll; nothing focuses it on opening, so Alt+Left and Esc keep
+  under its heading, on the band of the desktop's fixed search fields
+  (see Dialogs, obf-1088), staying there while the cards, the intro line
+  first, scroll under its line; nothing focuses it on opening, so Alt+Left and Esc keep
   leaving, and Ctrl+F while the Settings show puts the cursor into it.
   It filters as on the phone (Phone ▸ Settings): every word typed in a
   setting's label, detail line or, without a label of its own, its

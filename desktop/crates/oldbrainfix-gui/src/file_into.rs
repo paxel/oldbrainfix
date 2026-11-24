@@ -188,15 +188,19 @@ impl FileIntoPicker {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let accent = theme::tones(ui.visuals()).accent;
-        let field = ui.add(
-            TextEdit::singleline(&mut self.query)
-                .id(Id::new("file into filter"))
-                .hint_text(t.file_into_filter_hint())
-                .text_color(text)
-                .desired_width(f32::INFINITY),
-        );
-        text_menu::show(ui, t, &field, &self.query);
-        name_field(ui, &field, t.file_into_filter_hint());
+        // On its band, so the places scroll under its line (obf-1088).
+        let field = theme::search_band(ui, |ui| {
+            let field = ui.add(
+                TextEdit::singleline(&mut self.query)
+                    .id(Id::new("file into filter"))
+                    .hint_text(t.file_into_filter_hint())
+                    .text_color(text)
+                    .desired_width(f32::INFINITY),
+            );
+            text_menu::show(ui, t, &field, &self.query);
+            name_field(ui, &field, t.file_into_filter_hint());
+            field
+        });
         self.take_focus(ui, &field);
         let mut row = None;
         // Ctrl+Enter as Enter, as in every dialog (#277).
@@ -217,6 +221,8 @@ impl FileIntoPicker {
         }
         let list = list.show(ui, |ui| {
             ui.set_min_height(tall);
+            // Room under the band's line, inside, so the list is cut there.
+            ui.add_space(4.0);
             let place = |ui: &mut Ui, id: &str, name: String, indent: f32| {
                 ui.horizontal(|ui| {
                     ui.add_space(indent);

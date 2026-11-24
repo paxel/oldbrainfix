@@ -23,6 +23,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, every section of the Settings is a card with its title on top, Look, Units and Complexity included. ([obf-1085](https://github.com/paxel/oldbrainfix/issues/398))
 - On the phone and the desktop, the quick note's More is a full-width "Open in the editor" button under the Nudge buttons. ([obf-1080](https://github.com/paxel/oldbrainfix/issues/393))
 
+### Fixed
+
+- On the phone and the desktop, no search bar cuts off what scrolls under it; each sits on a band with a line under it. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
+
 ---
 
 Historical changes have been moved to [OLDER_CHANGES.md](OLDER_CHANGES.md).
