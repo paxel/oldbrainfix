@@ -86,6 +86,7 @@ pub mod text_boxes;
 pub mod text_format;
 pub mod text_tags;
 pub mod transcript_prompts;
+pub mod trash;
 pub mod vault;
 
 /// The symbol of `alphabet` for the low five bits of `value`, as the
@@ -167,6 +168,7 @@ pub use text_boxes::{BoxState, BoxTick, FoundBox, ShownBox, ShownText};
 pub use text_format::StoredText;
 pub use text_tags::FoundTag;
 pub use transcript_prompts::TranscriptPrompts;
+pub use trash::{Trash, TrashEmptied};
 
 /// The app's name, as the window title shows it.
 pub const APP_NAME: &str = "Old Brain Fix";

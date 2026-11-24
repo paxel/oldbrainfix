@@ -44,3 +44,15 @@ Attached files are not changed: removing one still keeps its Attachment Text bes
 ## Attached files (ADR 0047)
 
 Amended by #267: an attached file is removed as a photo is: `file:<hash>` set to null, refused unless the file has an Attachment Text that is not empty, which stays and is still found, and its bytes go once nothing in the log names them (`mayRemoveAttachment`, `removeAttachment`; `may_remove_attachment`, `remove_attachment`). `file` is a blob kind beside `photo` and `audio`, so `removedBlobs` and `dropRemovedBlobs` let its bytes go by the same rules. The Note lists such a file among its removed ones with the name and type it had (`removedAttachments`), read from the last value its field held.
+
+## Emptying the trash (obf-1095)
+
+Amended by obf-1095: "Empty the trash now" (`Trash.empty`; `Trash::empty` in Rust) purges what is in the trash at once, as the 30-day purge does once the 30 days have passed, in one batch: each Note in the trash that is not merged and that this Device may change (`mayChange`) gets its `$type` set to null, its Sections and the Notes merged into it first where it may change them, then each Routine or Reminder in the trash it may change (`mayChangeRoutine`). Frogs stay (ADR 0027). Notes this Device may not change in a Shared Area stay in the trash, as the 30-day purge leaves them. Only what is in the trash in the log goes, in both purges: a Note or Routine an AI Task, or another pending set shown on the screens, only drafted into the trash (ADR 0022) stays, so that rejecting the set brings it back. `Trash.toEmpty` (`Trash::to_empty`) names the same Notes and Routines beforehand, for the question the apps ask.
+
+The log keeps every entry, so sync is unchanged, and no removal is written: after the batch, the bytes of every photo, recording and file those entities named leave this Device only, unless a Note that was not purged still names the same hash. The user's other Devices keep theirs until they empty their own trash.
+
+A blob field on a Note whose `$type` is null no longer counts as one the log refers to: `missingBlobs` does not want it back from another Device and `knowsBlob` refuses its bytes when they are pushed. Without that, the next sync would bring back what was let go. This holds for every purged Note, by the 30-day purge or a discard as well; the bytes those keep here stay where they are, as before, unless blocking a person or declining an offered Area, which let go of what the log does not refer to, takes them along. An older version still asks for such a blob; a Device that let it go answers that it lacks it, as for any blob it does not hold.
+
+The AI port has no tool for it: an AI Task writes a type only as what the entity's id says it is (ADR 0026), and the purge cannot be undone.
+
+Considered: setting every blob field of the purged Notes to null (rejected: a removal by the user's own Device lets the bytes go on every Device and shows in the Note's History, where "from this Device" was asked for).

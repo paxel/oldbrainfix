@@ -6,7 +6,7 @@
 //! settings never travel (ADR 0008).
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::Result;
 use crate::blocks::wire_kept_from_blocked;
@@ -15,7 +15,7 @@ use crate::notes::keys as note_keys;
 use crate::signing::{
     ImportReport, KeyRecord, KeyTrust, PinnedKey, entry_bytes_with, verify_signature,
 };
-use crate::store::Store;
+use crate::store::{Fields, Store};
 
 const KEY_PREFIX: &str = "key:";
 
@@ -263,13 +263,14 @@ impl Store {
     }
 
     /// The blobs the log refers to whose bytes are not here, as
-    /// `photo/<hash>`, `audio/<hash>` and `file/<hash>`, sorted.
+    /// `photo/<hash>`, `audio/<hash>` and `file/<hash>`, sorted. A Note
+    /// purged (`refers_to`) wants none of its files back.
     pub fn missing_blobs(&self) -> Result<Vec<String>> {
         let mut missing = BTreeSet::new();
         for (kind, prefix) in BLOB_KINDS {
             for (entity, field) in self.fields_with_prefix(prefix)? {
                 let hash = &field[prefix.len()..];
-                if self.current(&entity, &field)?.is_none() {
+                if !self.refers_to(&entity, &field)? {
                     continue;
                 }
                 if self.blob(kind, hash).is_none() {
@@ -280,8 +281,41 @@ impl Store {
         Ok(missing.into_iter().collect())
     }
 
+    /// Whether the blob `field` of `entity` is one the log refers to
+    /// now: it is set, and the Note holding it was not purged (its
+    /// `$type` is null), by the 30-day purge, "Empty the trash now"
+    /// (obf-1095) or a discard. Read from the entity's fields once.
+    fn refers_to(&self, entity: &str, field: &str) -> Result<bool> {
+        Ok(Self::refers(&self.current_fields(entity)?, field))
+    }
+
+    /// `refers_to` of the current `fields` of an entity.
+    fn refers(fields: &Fields, field: &str) -> bool {
+        fields.get(field).is_some() && fields.get(note_keys::TYPE).is_some()
+    }
+
+    /// Every blob the log refers to now, as [`Store::knows_blob`] knows
+    /// each, read in one pass for all of them: for many at once, as the
+    /// Dart core's `knownBlobs` (obf-1095).
+    pub(crate) fn known_blobs(&self) -> Result<HashSet<String>> {
+        let mut named = Vec::new();
+        for (kind, prefix) in BLOB_KINDS {
+            for (entity, field) in self.fields_with_prefix(prefix)? {
+                let reference = format!("{kind}/{}", &field[prefix.len()..]);
+                named.push((entity, field, reference));
+            }
+        }
+        let fields = self.current_fields_of(named.iter().map(|(e, _, _)| e.as_str()))?;
+        Ok(named
+            .into_iter()
+            .filter(|(entity, field, _)| fields.get(entity).is_some_and(|f| Self::refers(f, field)))
+            .map(|(_, _, reference)| reference)
+            .collect())
+    }
+
     /// Whether the log refers to the blob `reference` now: only those
-    /// are taken from another Device. A removed one stays out (ADR 0020).
+    /// are taken from another Device. A removed one stays out (ADR 0020),
+    /// as does one only a purged Note holds (obf-1095).
     pub fn knows_blob(&self, reference: &str) -> Result<bool> {
         let (kind, hash) = split_blob_ref(reference);
         for (k, prefix) in BLOB_KINDS {
@@ -290,7 +324,7 @@ impl Store {
             }
             let field = format!("{prefix}{hash}");
             for (entity, f) in self.fields_with_prefix(&field)? {
-                if f == field && self.current(&entity, &f)?.is_some() {
+                if f == field && self.refers_to(&entity, &f)? {
                     return Ok(true);
                 }
             }

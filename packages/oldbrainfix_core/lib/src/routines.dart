@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 import 'checklists.dart';
 import 'note_kinds.dart';
 import 'notes.dart';
@@ -616,17 +618,27 @@ class Routines {
   void purgeTrash() {
     final now = store.clock().toUtc();
     store.batch(() {
-      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) {
-        final routine = byId(id);
-        final at = routine == null ? null : purgeAt(routine);
-        // Only where this Device may change it (ADR 0013).
-        if (at == null || now.isBefore(at) || !store.mayChangeRoutine(id)) {
-          continue;
-        }
+      for (final id in purgeable(due: now)) {
         store.append(id, RoutineKeys.type, null);
       }
     });
   }
+
+  /// The Routines and Reminders in the trash a purge removes, by id: with
+  /// [due], those that have been there for [Notes.trashKeep] by then;
+  /// without, every one, as "Empty the trash now" removes them
+  /// (obf-1095).
+  @internal
+  List<String> purgeable({DateTime? due}) => [
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine))
+      if (byId(id) case final routine?)
+        if (purgeAt(routine) case final at?
+            when due == null || !due.isBefore(at))
+          // In the trash in the log, as for a Note ([Notes.purgeable]).
+          if (store.logged(id, RoutineKeys.trashed) != null)
+            // Only where this Device may change it (ADR 0013).
+            if (store.mayChangeRoutine(id)) id,
+  ];
 
   /// Checks off [occurrence] of the Routine [id] as Done, at [at] or the
   /// store's now: [at] is when it was tapped on a notification, applied

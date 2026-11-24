@@ -1930,23 +1930,47 @@ class Notes {
   void purgeTrash() {
     final now = store.clock().toUtc();
     store.batch(() {
-      for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-        final note = byId(id);
-        // A merged Note goes with its target, never on its own.
-        final at = note == null || note.isMerged ? null : purgeAt(note);
-        // What this Device may not change in a Shared Area waits for
-        // someone who may: written here, it would be ignored every time.
-        if (at == null || now.isBefore(at) || !store.mayChange(id)) continue;
-        // A merged Note's Section is the Note itself; both keep their
-        // type under the same key.
-        for (final section in sections(id)) {
-          if (store.mayChange(section.id)) {
-            store.append(section.id, SectionKeys.type, null);
-          }
-        }
-        store.append(id, NoteKeys.type, null);
+      for (final id in purgeable(due: now)) {
+        purge(id);
       }
     });
+  }
+
+  /// The Notes in the trash a purge removes, by id: with [due], those
+  /// that have been there for [trashKeep] by then; without, every one,
+  /// as "Empty the trash now" removes them (obf-1095).
+  @internal
+  List<String> purgeable({DateTime? due}) => [
+    for (final id in store.entitiesOfType(NoteKeys.typeNote))
+      // A merged Note goes with its target, never on its own.
+      if (byId(id) case final note? when !note.isMerged)
+        if (purgeAt(note) case final at? when due == null || !due.isBefore(at))
+          // In the trash in the log, not only in a change still to be
+          // accepted or rejected (ADR 0022): rejected, it is back.
+          if (store.logged(id, NoteKeys.trashed) != null)
+            // What this Device may not change in a Shared Area waits for
+            // someone who may: written here, it would be ignored every
+            // time.
+            if (store.mayChange(id)) id,
+  ];
+
+  /// Purges the Note [id] with its Sections, the Notes merged into it
+  /// included, given as [sections] reads them where they were read for
+  /// many Notes at once; returns the entities it took the type of, the
+  /// Note last. The log keeps their entries.
+  @internal
+  List<String> purge(String id, {List<Section>? sections}) {
+    final gone = <String>[];
+    // A merged Note's Section is the Note itself; both keep their type
+    // under the same key.
+    for (final section in sections ?? this.sections(id)) {
+      if (store.mayChange(section.id)) {
+        store.append(section.id, SectionKeys.type, null);
+        gone.add(section.id);
+      }
+    }
+    store.append(id, NoteKeys.type, null);
+    return gone..add(id);
   }
 
   /// The Note [id], trashed or not, or null when there is none.
