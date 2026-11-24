@@ -155,6 +155,7 @@
 <box-tab device="desktop" alt="The Import dialog in the desktop app">
 <li>Click <strong>File ▸ Import…</strong>.</li>
 <li>Click <strong>A folder…</strong> and pick the folder.</li>
+<li>Click <strong>Fill in</strong> or <strong>Import as new</strong> when asked.</li>
 <li>Click <strong>Open the Area</strong> once the Import finishes.</li>
 </box-tab>
 <box-more>
@@ -176,8 +177,7 @@
   folder may hold all these kinds at once.
 </p>
 <p>
-  All of them land in a new Area named after the folder, such as "From Notes"; importing the same
-  folder again makes a second Area, "From Notes (2)". None of them is Unsorted, and no Nudge comes
+  All of them land in a new Area named after the folder, such as "From Notes". None of them is Unsorted, and no Nudge comes
   for them. Other files, hidden files and files too large for a Note (more than 1 MiB) are skipped.
   On the phone the Import runs beside the app on a page of its own: it says "Reading the folder…",
   then counts the Notes as they come in, such as "120 of 340 Notes". You can leave the page and use
@@ -191,6 +191,24 @@
   shows, and at the end the phone's page and the desktop's dialog: how many Notes went into which Area and how many files were skipped and why, with
   <strong>Open the Area</strong>. A folder without such a file changes nothing. After the Import the app keeps no access to the folder, unless it is the shared folder
   or the Backup folder.
+</p>
+<p>
+  On an Android phone, when you pick a folder you imported from before, the app asks once, before it reads
+  any file: "Fill in the Import of 3/1/2025 into From Notes?" <strong>Fill in</strong> adds only the
+  files that Import did not make a Note of to its Area; a file whose Note you moved or trashed since
+  is not added again, and a changed file neither. The page then says how many Notes went in and how
+  many were imported before, or, with nothing missing, "Nothing new: 340 already imported".
+  <strong>Import as new</strong> makes a second Area with every file, "From Notes (2)", and
+  <strong>Cancel</strong> imports nothing. A folder is known by where you picked it, never by its
+  name alone. On the iPhone a second Import always makes a new Area.
+</p>
+<p>
+  The desktop app asks the same in its window once a folder or a Google Keep export you imported
+  from before is picked, and for a Markdown file whose <strong>Import as Note…</strong> ran before:
+  <strong>Cancel</strong>, <strong>Import as new</strong> or <strong>Fill in</strong>. Esc and a
+  click beside the question import nothing too. With nothing missing the top says "Nothing new to
+  import.", and its click shows how many were imported already, with <strong>Open the
+  Area</strong>.
 </p>
 </box-more>
 </guide-box>
@@ -209,6 +227,7 @@
 <li>Export Keep alone on <a href="https://takeout.google.com">takeout.google.com</a>.</li>
 <li>Click <strong>File ▸ Import…</strong>, then <strong>Google Keep…</strong>.</li>
 <li>Click <strong>Zip file</strong> or <strong>Folder</strong> and pick the export.</li>
+<li>Click <strong>Fill in</strong> or <strong>Import as new</strong> when asked.</li>
 </box-tab>
 <box-more>
 <p>
@@ -234,6 +253,12 @@
   the top, and the phone's page or the desktop's dialog, show how many Notes, Checklists and photos went into the Area and what was
   skipped and why, with <strong>Open the Area</strong>. After the Import the app keeps no
   access to the zip file or the folder.
+</p>
+<p>
+  On an Android phone, picking the same zip file or folder again asks as for a folder: <strong>Fill
+  in</strong> adds only the Keep notes the first Import did not bring in to "From Google Keep",
+  <strong>Import as new</strong> makes a second Area with all of them. See
+  <a href="#import-notes-from-another-app">Import notes from another app</a>.
 </p>
 </box-more>
 </guide-box>

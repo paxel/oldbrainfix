@@ -325,6 +325,63 @@ fn import_as_note_asks_about_the_linked_files_and_links_their_notes() -> TestRes
     Ok(())
 }
 
+/// Clicks "Import as Note…" in the viewer, takes the linked file too and
+/// steps until `done` says so.
+fn import_as_note(harness: &mut Harness<'_, App>, done: impl Fn(&Harness<'_, App>) -> bool) {
+    harness
+        .query_all_by(|n| {
+            n.role() == Role::Button && n.label().as_deref() == Some("Import as Note…")
+        })
+        .next()
+        .unwrap()
+        .click();
+    harness.run_steps(4);
+    harness.get_by_label("Import them too").click();
+    for _ in 0..300 {
+        harness.step();
+        if done(harness) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    panic!("never got there");
+}
+
+#[test]
+fn importing_the_file_again_asks_to_fill_in_and_finds_nothing_new() -> TestResult {
+    let store = store()?;
+    let (_dir, garden) = vault();
+    let handed = Arc::default();
+    let mut harness = window(&store, Arc::clone(&handed));
+    open(&mut harness, &handed, &garden);
+    import_as_note(&mut harness, |h| {
+        h.state().notice().is_some() && !h.state().importing()
+    });
+    assert!(!shows(&harness, "Fill in the Import of"));
+    import_as_note(&mut harness, |h| {
+        shows(h, "Fill in the Import of Mon, 3/2/2026 into From Garden?")
+    });
+    harness.get_by_label("Fill in").click_accesskit();
+    for _ in 0..300 {
+        harness.step();
+        if !harness.state().importing() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    harness.run_steps(2);
+    assert_eq!(harness.state().notice(), Some("Nothing new to import."));
+    let areas = Places::new(&store).areas()?;
+    assert_eq!(
+        areas
+            .iter()
+            .filter(|a| a.name.starts_with("From Garden"))
+            .count(),
+        1
+    );
+    Ok(())
+}
+
 /// A viewer of `file` alone at the window's root, its window's keys its
 /// own as in a viewport of its own, with what it asked of the main
 /// window.

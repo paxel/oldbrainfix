@@ -571,5 +571,13 @@
   "deskTrashEmptyFailed": "Der Papierkorb konnte nicht geleert werden.",
   "deskTrashEmptyFailedTitle": "Papierkorb nicht geleert",
   "deskTrashEmptyFailedCause": "Was im Papierkorb liegt, konnte nicht gelöscht werden.",
-  "deskTrashEmptyFailedFix": "Was noch im Papierkorb liegt, bleibt dort. Klicke noch einmal auf „Papierkorb jetzt leeren“."
+  "deskTrashEmptyFailedFix": "Was noch im Papierkorb liegt, bleibt dort. Klicke noch einmal auf „Papierkorb jetzt leeren“.",
+  "deskImportFillInAsk": "Den Import vom {date} in {area} ergänzen?",
+  "deskImportFillInDetail": "Ergänzen fügt dort nur hinzu, was dieser Import nicht mitgebracht hat. Neu importieren legt einen neuen Bereich mit allem an.",
+  "deskImportFillIn": "Ergänzen",
+  "deskImportAsNew": "Neu importieren",
+  "deskImportFilledIn": "{count, plural, =1{1 Notiz kam in den Bereich {area}.} other{{count} Notizen kamen in den Bereich {area}.}}",
+  "deskImportAlready": "{count, plural, =1{1 wurde schon früher importiert und bleibt weg.} other{{count} wurden schon früher importiert und bleiben weg.}}",
+  "deskImportNothingNew": "Nichts Neues zu importieren.",
+  "deskImportNothingNewDetails": "Nichts Neues: {count} schon importiert."
 }

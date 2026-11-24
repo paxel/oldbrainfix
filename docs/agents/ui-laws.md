@@ -2027,6 +2027,19 @@ There are three kinds, and an action takes the first that fits.
   again. Settings has no Import section; a search there for the Imports
   shows the line "Import… is in the Areas list's ⋮", which opens the
   Areas list. The desktop keeps File ▸ Import….
+- **An Import of a source imported before asks once** (obf-1078):
+  after the folder or the Keep export is picked and listed, and before
+  any of its files is read, when an earlier Import of the same picked
+  location made Notes of any of its paths, the phone asks "Fill in the
+  Import of <date> into <Area>?", Fill in and Import as new stacked
+  full width, Cancel below, which writes nothing and closes the
+  Import's page. Fill in adds only the items whose path that Import
+  never made into its Area, and its page and announcement say how many
+  went in and how many were imported before; with none missing, "Nothing
+  new: 340 already imported", without Open the Area. Import as new, as a
+  first Import, makes a new Area with every item. A name alone never
+  matches. On the iPhone the pickers hand no stable location yet, so
+  the question does not come there and a second Import makes a new Area.
 - **A search field sits at the top of Settings** (#282), under the bar,
   staying there while the page scrolls, on the band of the list pages'
   search bar (obf-1088); nothing focuses it on opening.
@@ -2577,6 +2590,21 @@ There are three kinds, and an action takes the first that fits.
   Enter in the field adding as Add does. Esc and a click beside it
   close it and add nothing, the editor staying open under it; back
   does nothing while it shows.
+- **An Import of a source imported before asks once** (obf-1078): after
+  File ▸ Import… picks a folder or a Google Keep export, or the
+  Markdown viewer's Import as Note… is asked, the Import lists the
+  items' paths beside the window, and when an earlier Import of the same
+  folder, zip or file made Notes of any of them, the main window asks
+  "Fill in the Import of <day> into <Area>?" (coming forward for the
+  viewer) with Cancel, "Import as new" and "Fill in" on the accent.
+  Fill in puts only the items never made into that Area, and "Import
+  finished." says behind the click how many went in and how many were
+  imported before; with none missing the top says "Nothing new to
+  import.", behind the click "Nothing new: 340 already imported.", and
+  no Area is made. Import as new makes a new Area with every item, as
+  a first Import does. Cancel, Esc and a click beside it import
+  nothing and say nothing; another dialog in its place puts the
+  question off until it closes. A first Import asks nothing.
 - **A search field over what it lists sits on a band** (obf-1088, as
   the phone's): the Settings', File into…'s, Merge into…'s, Add to
   Note…'s and Link to…'s field, and the main window's over a list of

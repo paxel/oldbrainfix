@@ -83,6 +83,7 @@ use oldbrainfix_core::checklists::keys as checklist_keys;
 use oldbrainfix_core::findings::{self, Finding, FindingPart};
 use oldbrainfix_core::highlight::Grammars;
 use oldbrainfix_core::ics::routines_ics;
+use oldbrainfix_core::imports::{EarlierImport, ImportSummary};
 use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
 use oldbrainfix_core::packs::{self, OpenedPack, Pack, PackError, PackFrom, PackTicks};
@@ -136,7 +137,7 @@ use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::find_bar::{self, FindBar};
 use crate::find_marks;
-use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
+use crate::folder_import::{FillIn, FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown, NoteFrog};
@@ -1306,6 +1307,10 @@ enum Dialog {
     /// Whether the Google Takeout export to import from Google Keep is
     /// still its zip or a folder unpacked from it (ADR 0036).
     ImportKeep,
+    /// The question of an Import whose source an earlier Import came
+    /// from (obf-1078), "Fill in the Import of … into …?", with Fill in,
+    /// Import as new and Cancel.
+    FillIn(String),
     /// File ▸ Import… (#145): a folder of Markdown, text and other documents, or a
     /// Google Keep export, each with what it does, or that it reads
     /// while it runs.
@@ -2062,6 +2067,9 @@ enum Action {
     /// Asks for the Google Takeout export the Import dialog says, its
     /// zip (`true`) or the folder unpacked from it, and imports it.
     ImportKeep(bool),
+    /// Answers the question of the Import running about the earlier
+    /// Import of its source (obf-1078).
+    FillIn(FillIn),
     /// Shares the Area of the Share dialog and hosts its invite.
     StartInvite,
     SetRole {
@@ -5929,7 +5937,7 @@ impl App {
     /// "Announcements"): that it finished, what went where behind the
     /// click with a way into the new Area; that nothing in it was
     /// usable; or that it failed, each with the cause and the fix.
-    fn announce_folder_imported(&mut self, name: &str, imported: Imported) {
+    fn announce_folder_imported(&mut self, name: &str, imported: Imported, fill_in: Option<&str>) {
         let t = self.t;
         let summary = match imported {
             Ok(summary) => summary,
@@ -5945,6 +5953,15 @@ impl App {
         };
         let skipped =
             t.import_skipped_details(name, summary.not_text as i64, summary.too_large as i64);
+        let skipped_block = (summary.skipped() > 0).then(|| {
+            format!(
+                "{}\n{skipped}",
+                t.import_finished_skipped(summary.skipped() as i64)
+            )
+        });
+        if self.announce_nothing_new(&summary, fill_in, skipped_block) {
+            return;
+        }
         let Some(area) = summary.area_id.clone() else {
             self.announce_failure(
                 t.import_nothing(),
@@ -5960,7 +5977,7 @@ impl App {
             Ok(Some(made)) => area_name(&t, &made),
             _ => t.import_area_name(name),
         };
-        let mut details = t.import_finished_notes(summary.notes as i64, &shown);
+        let mut details = made_line(&t, &summary, fill_in, &shown);
         if summary.skipped() > 0 {
             details.push_str("\n\n");
             details.push_str(&t.import_finished_skipped(summary.skipped() as i64));
@@ -5974,12 +5991,60 @@ impl App {
         ));
     }
 
+    /// Announces that an Import told to fill in the Area `fill_in`
+    /// found nothing missing (obf-1078): "Nothing new to import." at the
+    /// top, behind the click how many were imported already, then the
+    /// `skipped` lines, with a way into that Area; whether it was so.
+    fn announce_nothing_new(
+        &mut self,
+        summary: &ImportSummary,
+        fill_in: Option<&str>,
+        skipped: Option<String>,
+    ) -> bool {
+        let Some(area) = fill_in.filter(|_| {
+            summary.area_id.is_none() && summary.already > 0 && summary.stopped.is_none()
+        }) else {
+            return false;
+        };
+        let t = self.t;
+        let mut details = t.desk_import_nothing_new_details(summary.already as i64);
+        if let Some(skipped) = skipped {
+            details.push_str("\n\n");
+            details.push_str(&skipped);
+        }
+        self.notice = Some(t.desk_import_nothing_new().to_string());
+        self.notice_dialog = Some((
+            t.desk_import_nothing_new().to_string(),
+            Dialog::Imported {
+                details,
+                area: area.to_string(),
+            },
+        ));
+        true
+    }
+
+    /// "Fill in the Import of <day> into <Area>?" about the earlier
+    /// Import `earlier` (obf-1078), its Area by the name it shows under.
+    fn fill_in_question(&self, earlier: &EarlierImport) -> String {
+        let mut area = self.area_called(&earlier.area_id);
+        if area.is_empty() {
+            area = earlier.area_name.clone();
+        }
+        let day = day_text(&self.t, Day::of((self.wall)(earlier.at)));
+        self.t.desk_import_fill_in_ask(&day, &area)
+    }
+
     /// Announces how the Import of the Markdown file `name` from its viewer
     /// ended (obf-1056), as [`App::announce_folder_imported`] does for a
     /// folder: that it finished, what went where behind the click with a
     /// way into the new Area; that the file was too large to take; or
     /// that it failed.
-    fn announce_markdown_imported(&mut self, name: &str, imported: Imported) {
+    fn announce_markdown_imported(
+        &mut self,
+        name: &str,
+        imported: Imported,
+        fill_in: Option<&str>,
+    ) {
         let t = self.t;
         let summary = match imported {
             Ok(summary) => summary,
@@ -5998,6 +6063,15 @@ impl App {
         };
         let skipped =
             t.desk_markdown_import_skipped(name, summary.not_text as i64, summary.too_large as i64);
+        let skipped_block = (summary.skipped() > 0).then(|| {
+            format!(
+                "{}\n{skipped}",
+                t.import_finished_skipped(summary.skipped() as i64)
+            )
+        });
+        if self.announce_nothing_new(&summary, fill_in, skipped_block) {
+            return;
+        }
         let Some(area) = summary.area_id.clone() else {
             self.announce_failure(
                 t.desk_markdown_import_nothing(),
@@ -6014,7 +6088,7 @@ impl App {
             Ok(Some(made)) => area_name(&t, &made),
             _ => t.import_area_name(name),
         };
-        let mut details = t.import_finished_notes(summary.notes as i64, &shown);
+        let mut details = made_line(&t, &summary, fill_in, &shown);
         if summary.photos > 0 {
             details.push('\n');
             details.push_str(&t.import_keep_photos(summary.photos as i64));
@@ -6037,7 +6111,7 @@ impl App {
     /// click, the Checklists and photos among it and what was skipped
     /// and why, in the phone's order; that the export held no note to
     /// take; or that it failed.
-    fn announce_keep_imported(&mut self, imported: Imported) {
+    fn announce_keep_imported(&mut self, imported: Imported, fill_in: Option<&str>) {
         let t = self.t;
         let summary = match imported {
             Ok(summary) => summary,
@@ -6058,6 +6132,15 @@ impl App {
             summary.too_large as i64,
             summary.not_text as i64,
         );
+        let skipped_block = (summary.skipped() > 0).then(|| {
+            format!(
+                "{}\n{skipped}",
+                t.import_keep_skipped(summary.skipped() as i64)
+            )
+        });
+        if self.announce_nothing_new(&summary, fill_in, skipped_block) {
+            return;
+        }
         let Some(area) = summary.area_id.clone() else {
             self.announce_failure(
                 t.import_keep_nothing(),
@@ -6071,7 +6154,7 @@ impl App {
             Ok(Some(made)) => area_name(&t, &made),
             _ => t.import_keep_area_name().to_string(),
         };
-        let mut details = vec![t.import_finished_notes(summary.notes as i64, &shown)];
+        let mut details = vec![made_line(&t, &summary, fill_in, &shown)];
         if summary.checklists > 0 {
             details.push(t.import_keep_checklists(summary.checklists as i64));
         }
@@ -9856,6 +9939,13 @@ impl App {
                     }
                 }
             }
+            Action::FillIn(fill_in) => {
+                let viewer = matches!(self.import.kind(), Some(Importing::Markdown(_)));
+                self.import.answer(fill_in);
+                // Answered, the Import dialog says how far it is again;
+                // one asked in a viewer says so in the viewer's bar.
+                self.dialog = (fill_in != FillIn::Cancel && !viewer).then_some(Dialog::Import);
+            }
             Action::OpenFile(path) => self.open_file(&path),
             Action::SendWaitingChanges => self.send_waiting_changes()?,
             Action::Backup(asked) => self.backup(asked)?,
@@ -13156,8 +13246,21 @@ impl App {
         // An Import running beside the window (obf-1061), also after its
         // dialog closed: its answer is announced when it comes.
         if self.import.running() {
+            // Asking about an earlier Import of its source (obf-1078): the
+            // question shows once no other dialog does, and again when it
+            // was left otherwise than by its answer.
+            if let Some(earlier) = self.import.asking()
+                && matches!(self.dialog, None | Some(Dialog::Import))
+            {
+                self.dialog = Some(Dialog::FillIn(self.fill_in_question(&earlier)));
+                // Asked in a viewer, it is asked here: this window comes
+                // forward to ask it.
+                ui.ctx()
+                    .send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
+                ui.ctx().request_repaint();
+            }
             match self.import.finished() {
-                Some((kind, imported)) => {
+                Some((kind, imported, fill_in)) => {
                     let made = imported.as_ref().is_ok_and(|s| s.area_id.is_some());
                     // Aborted on the page Running (obf-1078): how far it came.
                     let stopped = imported
@@ -13169,11 +13272,14 @@ impl App {
                     // another, also when it failed on the way: this one
                     // reads the log anew, the new Area too.
                     self.store.changed_elsewhere();
+                    let fill_in = fill_in.as_deref();
                     match kind {
-                        Importing::Folder(name) => self.announce_folder_imported(&name, imported),
-                        Importing::Keep => self.announce_keep_imported(imported),
+                        Importing::Folder(name) => {
+                            self.announce_folder_imported(&name, imported, fill_in)
+                        }
+                        Importing::Keep => self.announce_keep_imported(imported, fill_in),
                         Importing::Markdown(name) => {
-                            self.announce_markdown_imported(&name, imported);
+                            self.announce_markdown_imported(&name, imported, fill_in);
                             // Asked in a viewer, it is said here: this
                             // window comes forward to say it.
                             ui.ctx().send_viewport_cmd_to(
@@ -18904,6 +19010,25 @@ impl App {
                         }
                         cancel(ui, &t, actions);
                     }
+                    Dialog::FillIn(question) => {
+                        title(ui, question);
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.desk_import_fill_in_detail()).color(text));
+                        ui.horizontal_wrapped(|ui| {
+                            if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                                actions.push(Action::FillIn(FillIn::Cancel));
+                            }
+                            if ui
+                                .button(RichText::new(t.desk_import_as_new()).color(text))
+                                .clicked()
+                            {
+                                actions.push(Action::FillIn(FillIn::New));
+                            }
+                            if theme::main_action(ui, true, t.desk_import_fill_in()) {
+                                actions.push(Action::FillIn(FillIn::Fill));
+                            }
+                        });
+                    }
                     Dialog::Import => {
                         title(ui, t.settings_import());
                         let text = ui.visuals().text_color();
@@ -19512,6 +19637,11 @@ impl App {
     /// whose sender the user blocked there shows nothing more and closes
     /// too (#90).
     fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
+        // The Import's question left, by Esc, a click beside it or back,
+        // it imports nothing (obf-1078).
+        if matches!(self.dialog, Some(Dialog::FillIn(_))) {
+            self.import.answer(FillIn::Cancel);
+        }
         // The link not set: the field has the keyboard again.
         match &self.dialog {
             Some(Dialog::Link { amend: true, .. }) => self.amend_focus = true,
@@ -21194,6 +21324,24 @@ pub(crate) fn done_form(ui: &mut Ui, t: &L10n, heading: &str, details: &str) -> 
     let text = ui.visuals().text_color();
     ui.label(RichText::new(details).color(text));
     ui.button(RichText::new(t.close()).color(text)).clicked()
+}
+
+/// The first line of what an Import made, `summary`, in the Area shown
+/// as `shown`: the Notes that went into the new Area, or, when it filled
+/// in the earlier Import's Area `fill_in` (obf-1078), the Notes that went
+/// into it and how many were imported already. A fill-in refused, in a
+/// new Area, says what a new Import says.
+fn made_line(t: &L10n, summary: &ImportSummary, fill_in: Option<&str>, shown: &str) -> String {
+    let notes = summary.notes as i64;
+    if fill_in.is_none() || summary.area_id.as_deref() != fill_in {
+        return t.import_finished_notes(notes, shown);
+    }
+    let mut line = t.desk_import_filled_in(notes, shown);
+    if summary.already > 0 {
+        line.push('\n');
+        line.push_str(&t.desk_import_already(summary.already as i64));
+    }
+    line
 }
 
 /// What an Import made, `details` under "Import finished.", with Close

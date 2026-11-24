@@ -1096,5 +1096,21 @@
   "deskTrashEmptyFailedCause": "What is in the trash could not be deleted.",
   "@deskTrashEmptyFailedCause": {"description": "The cause in the dialog behind 'deskTrashEmptyFailed'."},
   "deskTrashEmptyFailedFix": "What is still in the trash stays there. Click \"Empty the trash now\" again.",
-  "@deskTrashEmptyFailedFix": {"description": "The fix in the dialog behind 'deskTrashEmptyFailed'."}
+  "@deskTrashEmptyFailedFix": {"description": "The fix in the dialog behind 'deskTrashEmptyFailed'."},
+  "deskImportFillInAsk": "Fill in the Import of {date} into {area}?",
+  "@deskImportFillInAsk": {"description": "Heading of the question the desktop asks when the folder, Keep export or Markdown file picked for an Import is one an earlier Import came from (obf-1078); date is that Import's day, area the Area it made.", "placeholders": {"date": {"type": "String", "example": "Tuesday, 3/1/2024"}, "area": {"type": "String", "example": "From Notes"}}},
+  "deskImportFillInDetail": "Fill in adds there only what that Import did not bring in. Import as new makes a new Area with everything.",
+  "@deskImportFillInDetail": {"description": "Under 'deskImportFillInAsk' on the desktop (obf-1078), naming its two answers."},
+  "deskImportFillIn": "Fill in",
+  "@deskImportFillIn": {"description": "The main answer to 'deskImportFillInAsk' on the desktop: the missing items go into the Area of the earlier Import."},
+  "deskImportAsNew": "Import as new",
+  "@deskImportAsNew": {"description": "Answer to 'deskImportFillInAsk' on the desktop: a new Area with every item, as a first Import makes."},
+  "deskImportFilledIn": "{count, plural, =1{1 Note went into the Area {area}.} other{{count} Notes went into the Area {area}.}}",
+  "@deskImportFilledIn": {"description": "First line behind 'importFinished' on the desktop after an Import that filled in an earlier one (obf-1078), in place of 'importFinishedNotes'.", "placeholders": {"count": {"type": "int"}, "area": {"type": "String"}}},
+  "deskImportAlready": "{count, plural, =1{1 was imported before and is left out.} other{{count} were imported before and are left out.}}",
+  "@deskImportAlready": {"description": "Under 'deskImportFilledIn' on the desktop: the items the earlier Import made already (obf-1078).", "placeholders": {"count": {"type": "int"}}},
+  "deskImportNothingNew": "Nothing new to import.",
+  "@deskImportNothingNew": {"description": "Announced at the top on the desktop when an Import that filled in an earlier one found nothing missing (obf-1078); no Area is made. Says no count."},
+  "deskImportNothingNewDetails": "Nothing new: {count} already imported.",
+  "@deskImportNothingNewDetails": {"description": "Behind 'deskImportNothingNew' on the desktop (obf-1078): how many items the earlier Import made already.", "placeholders": {"count": {"type": "int"}}}
 }
