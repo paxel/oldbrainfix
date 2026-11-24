@@ -1627,7 +1627,8 @@ replace a law of Both apps where they say so. A desktop law marked
   fingers too, greyed while there is nothing to undo or redo. They go
   step by step through everything changed since the editor opened: the
   text and the Sections' texts, a text History brought back or a
-  Transcript or Photo Text taken over, a table's cells, the Lines (typed,
+  Transcript or Photo Text taken over, the words a removed recording or
+  photo put into the text (obf-1084; the file stays gone), a table's cells, the Lines (typed,
   added, deleted, checked, moved, in and out, a Shopping List's reappear
   time) and the badges (kind between Plain Note, Checklist and Shopping
   List, Importance, Area and Topic, text format, code language, Show on

@@ -3231,14 +3231,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeRecordingQuestion =>
-      'Remove this recording and keep its Transcript?';
+      'Remove this recording and keep its words in the text?';
 
   @override
   String get removePhotoQuestion =>
-      'Remove this photo and keep its Photo Text?';
+      'Remove this photo and keep its words in the text?';
 
   @override
   String get removeMediaDetail =>
+      'The file goes from all your Devices and from everyone you share the Note\'s Area with. Its words go into the text, to be edited or deleted like typed text.';
+
+  @override
+  String get removeAttachmentDetail =>
       'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.';
 
   @override

@@ -5165,20 +5165,26 @@ abstract class AppLocalizations {
   /// No description provided for @removeRecordingQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Remove this recording and keep its Transcript?'**
+  /// **'Remove this recording and keep its words in the text?'**
   String get removeRecordingQuestion;
 
   /// No description provided for @removePhotoQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Remove this photo and keep its Photo Text?'**
+  /// **'Remove this photo and keep its words in the text?'**
   String get removePhotoQuestion;
 
   /// No description provided for @removeMediaDetail.
   ///
   /// In en, this message translates to:
-  /// **'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.'**
+  /// **'The file goes from all your Devices and from everyone you share the Note\'s Area with. Its words go into the text, to be edited or deleted like typed text.'**
   String get removeMediaDetail;
+
+  /// No description provided for @removeAttachmentDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.'**
+  String get removeAttachmentDetail;
 
   /// No description provided for @remove.
   ///

@@ -203,14 +203,16 @@ void removePackFrom(BuildContext context, Store store, String noteId) {
 }
 
 /// Asks once whether the photo ([photo]) or voice recording [hash] of
-/// the Note or Section [noteId] goes while its text stays, with the verb
-/// on the button in the error colour, and removes it; whether it did.
+/// the Note or Section [noteId] goes while its words go into the text
+/// there (obf-1084), with the verb on the button in the error colour,
+/// and removes it; whether it did. [removing] runs just before.
 Future<bool> removeMedia(
   BuildContext context,
   Notes notes,
   String noteId,
   String hash, {
   required bool photo,
+  VoidCallback? removing,
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -226,6 +228,7 @@ Future<bool> removeMedia(
       ? notes.mayRemovePhoto(noteId, hash)
       : notes.mayRemoveRecording(noteId, hash);
   if (confirmed != true || !allowed) return false;
+  removing?.call();
   if (photo) {
     notes.removePhoto(noteId, hash);
   } else {
@@ -247,7 +250,7 @@ Future<bool> removeAttachment(
     context: context,
     builder: (context) => _RemoveDialog(
       title: context.t.removeFileQuestion,
-      detail: context.t.removeMediaDetail,
+      detail: context.t.removeAttachmentDetail,
     ),
   );
   // A sync while the dialog was open may have taken it already.
@@ -3122,23 +3125,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Removes the photo ([photo]) or recording [hash] of the Note or
-  /// Section [id] after asking once; its text stays.
+  /// Section [id] after asking once; its words go into the text there,
+  /// which the fields then show, as one step for Undo (obf-1084).
   Future<void> _removeMedia(String id, String hash, bool photo) async {
     _saveText();
+    var stored = _storedTexts();
     final removed = await removeMedia(
       context,
       widget.notes,
       id,
       hash,
       photo: photo,
+      // What a sync wrote while the dialog was open is no part of it.
+      removing: () => stored = _storedTexts(),
     );
     if (!mounted || !removed) return;
-    _reload();
+    _recordStored(stored);
+    _showStored(id);
   }
 
   /// The button under the photo ([photo]) or recording [hash] of the
-  /// Note or Section [id] that removes it and keeps its text; none when
-  /// it may not go.
+  /// Note or Section [id] that removes it and keeps its words in the
+  /// text; none when it may not go.
   List<Widget> _removeButton(String id, String hash, {required bool photo}) {
     if (!_removable.contains((id, hash))) return const [];
     final t = context.t;
@@ -3170,10 +3178,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // Into a formatted text it goes escaped, reading as itself.
     widget.notes.takeOver(id, generated, append: append);
     _recordStored(stored);
+    _showStored(id);
+  }
+
+  /// Reads the Note again and puts the stored text of the Note or
+  /// Section [id] into its field, or the next save would put the old one
+  /// back.
+  void _showStored(String id) {
     setState(_load);
     if (id == widget.noteId) _show();
-    // A Section's field shows the text it has now, or the next save
-    // would put the old one back.
     if ((_sectionTexts[id], widget.notes.section(id)) case (
       final field?,
       final section?,

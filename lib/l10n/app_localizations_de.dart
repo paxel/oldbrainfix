@@ -3260,14 +3260,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get removeRecordingQuestion =>
-      'Diese Aufnahme entfernen und ihr Transkript behalten?';
+      'Diese Aufnahme entfernen und ihre Worte im Text behalten?';
 
   @override
   String get removePhotoQuestion =>
-      'Dieses Foto entfernen und seinen Text behalten?';
+      'Dieses Foto entfernen und seine Worte im Text behalten?';
 
   @override
   String get removeMediaDetail =>
+      'Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Ihre Worte kommen in den Text und werden wie getippter Text bearbeitet oder gelöscht.';
+
+  @override
+  String get removeAttachmentDetail =>
       'Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Der Text bleibt in der Notiz.';
 
   @override

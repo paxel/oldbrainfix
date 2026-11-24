@@ -368,11 +368,12 @@ void main() {
       expect(find.text('Room 14'), findsOneWidget);
     });
 
-    testWidgets('the text of a removed recording can still be taken over, '
-        'not removed or made again', (tester) async {
+    testWidgets('the text of a recording removed by an earlier version can '
+        'still be taken over, not removed or made again', (tester) async {
       final note = mixed();
       final spoken = note.recordings.first;
-      notes.removeRecording(note.id, spoken);
+      // An earlier version took only the file and kept the Transcript.
+      store.append(note.id, NoteKeys.audio(spoken), null);
       await start(tester);
       await edit(tester, note.id);
       await seek(tester, key('replace-text', spoken));

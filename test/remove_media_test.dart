@@ -81,6 +81,12 @@ void main() {
   Finder inEditor(Finder finder) =>
       find.descendant(of: find.byType(NoteEditorScreen), matching: finder);
 
+  /// Scrolls the editor back to its top, where the Note's text is.
+  Future<void> top(WidgetTester tester) async {
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 5000));
+    await tester.pumpAndSettle();
+  }
+
   group('the card\'s ⋮', () {
     testWidgets('offers only photos and recordings with a text', (
       tester,
@@ -108,8 +114,8 @@ void main() {
       expect(find.text('Remove recording, keep text'), findsOneWidget);
     });
 
-    testWidgets('removes the photo after asking; the card and the editor '
-        'still show its text', (tester) async {
+    testWidgets('removes the photo after asking; its words go into the '
+        'Note\'s text, on the card and in the editor', (tester) async {
       final note = mixed();
       final read = note.photos.first;
       await start(tester);
@@ -121,7 +127,7 @@ void main() {
       await tap(tester, find.byKey(ValueKey('note-remove-$read')));
 
       expect(
-        find.text('Remove this photo and keep its Photo Text?'),
+        find.text('Remove this photo and keep its words in the text?'),
         findsOneWidget,
       );
       final confirm = tester.widget<TextButton>(
@@ -136,21 +142,23 @@ void main() {
 
       final after = notes.byId(note.id)!;
       expect(after.photos, [note.photos.last]);
-      expect(after.removedPhotos, [read]);
+      expect(after.photoTexts, isEmpty);
+      expect(after.text, 'doctor\n\nRoom 12');
       expect(inCard(find.byType(NotePhoto)), findsOneWidget);
-      expect(inCard(find.text('Room 12')), findsOneWidget);
+      final text = inCard(find.textContaining('Room 12', findRichText: true));
+      expect(text, findsOneWidget);
 
       // The card got shorter: its first line may sit above the screen.
-      await reveal(tester, inCard(find.text('doctor')));
-      await tester.longPress(inCard(find.text('doctor')));
+      await reveal(tester, text);
+      await tester.longPress(text);
       await tester.pumpAndSettle();
       expect(inEditor(find.byType(NotePhoto)), findsOneWidget);
-      await reveal(tester, inEditor(find.text('Room 12')));
-      expect(inEditor(find.text('Room 12')), findsOneWidget);
+      expect(inEditor(find.text('doctor\n\nRoom 12')), findsOneWidget);
     });
 
-    testWidgets('search still finds the Note by the text of a removed '
-        'photo', (tester) async {
+    testWidgets('search finds the Note by the words of a removed photo', (
+      tester,
+    ) async {
       final note = mixed();
       notes
         ..removePhoto(note.id, note.photos.first)
@@ -168,9 +176,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(NoteCard), findsOneWidget);
-      expect(inCard(find.text('doctor')), findsOneWidget);
-      // Its Photo Text, and among the places found under it (obf-1047).
-      expect(inCard(find.text('Room 12')), findsNWidgets(2));
+      // In the Note's text now, and among the places found (obf-1047).
+      expect(
+        inCard(find.textContaining('Room 12', findRichText: true)),
+        findsWidgets,
+      );
     });
 
     testWidgets('Cancel keeps the recording', (tester) async {
@@ -181,7 +191,7 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('note-menu')));
       await tap(tester, find.byKey(ValueKey('note-remove-$spoken')));
       expect(
-        find.text('Remove this recording and keep its Transcript?'),
+        find.text('Remove this recording and keep its words in the text?'),
         findsOneWidget,
       );
       await tap(tester, find.text('Cancel'));
@@ -195,7 +205,9 @@ void main() {
 
   group('the editor', () {
     testWidgets('has the button only under a recording with a Transcript; '
-        'removed, the Transcript stays', (tester) async {
+        'removed, its words show in the text field and stay there', (
+      tester,
+    ) async {
       final note = mixed();
       final [spoken, silent] = note.recordings;
       await start(tester);
@@ -216,24 +228,49 @@ void main() {
       await tap(tester, button);
       await tap(tester, find.byKey(const ValueKey('remove-media-confirm')));
 
-      expect(notes.byId(note.id)!.removedRecordings, [spoken]);
+      const words = 'doctor\n\nBring the insurance card';
+      final after = notes.byId(note.id)!;
+      expect(after.text, words);
+      expect(after.transcripts.keys, [silent]);
       expect(recording(spoken), findsNothing);
       expect(
         find.byKey(ValueKey('remove:$spoken'), skipOffstage: false),
         findsNothing,
       );
       // The page grew shorter: from the top again.
-      await tester.drag(find.byType(Scrollable).first, const Offset(0, 5000));
-      await tester.pumpAndSettle();
-      await reveal(tester, inEditor(find.text('Bring the insurance card')));
-      expect(inEditor(find.text('Bring the insurance card')), findsOneWidget);
+      await top(tester);
+      expect(inEditor(find.text(words)), findsOneWidget);
 
-      // Back on the card, the Transcript shows without its recording.
+      // Leaving saves the field, the words in it.
       await tester.pageBack();
       await tester.pumpAndSettle();
+      expect(notes.byId(note.id)!.text, words);
       await tap(tester, find.text('1 Unsorted'));
       expect(inCard(find.byType(RecordingButton)), findsOneWidget);
-      expect(inCard(find.text('Bring the insurance card')), findsOneWidget);
+      expect(
+        inCard(find.textContaining('Bring the insurance', findRichText: true)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Undo takes the words out of the text again; the recording '
+        'stays removed', (tester) async {
+      final note = mixed();
+      final spoken = note.recordings.first;
+      await start(tester);
+      await edit(tester, note.id);
+      await reveal(tester, find.byKey(ValueKey('remove:$spoken')));
+      await tap(tester, find.byKey(ValueKey('remove:$spoken')));
+      await tap(tester, find.byKey(const ValueKey('remove-media-confirm')));
+      expect(notes.byId(note.id)!.text, 'doctor\n\nBring the insurance card');
+
+      await tap(tester, find.byKey(const ValueKey('editor-undo')));
+      expect(notes.byId(note.id)!.text, 'doctor');
+      await top(tester);
+      expect(inEditor(find.text('doctor')), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('editor-redo')));
+      expect(notes.byId(note.id)!.text, 'doctor\n\nBring the insurance card');
+      expect(notes.byId(note.id)!.recordings, [note.recordings.last]);
     });
 
     testWidgets('Cancel keeps the photo', (tester) async {
@@ -249,8 +286,8 @@ void main() {
       expect(find.byKey(ValueKey('remove:$read')), findsOneWidget);
     });
 
-    testWidgets('a merged Note\'s photo goes from its Section; the text '
-        'stays there', (tester) async {
+    testWidgets('a merged Note\'s photo goes from its Section; its words '
+        'become the Section\'s text and stay', (tester) async {
       final into = notes.capture('sauce');
       now = now.add(const Duration(minutes: 5));
       final merged = notes.capture('', photos: [onePixelPng]);
@@ -267,15 +304,20 @@ void main() {
 
       final section = notes.sections(into.id).single;
       expect(section.photos, isEmpty);
-      expect(section.removedPhotos, [hash]);
+      expect(section.photoTexts, isEmpty);
+      expect(section.text, 'Tomatoes 400 g');
       expect(inEditor(find.byType(NotePhoto)), findsNothing);
-      // Above, where the page ends in the editor's groups (obf-1073).
+      // The Section's field shows them, or leaving would write '' back.
       await tester.scrollUntilVisible(
         inEditor(find.text('Tomatoes 400 g')),
         -100,
         scrollable: find.byType(Scrollable).first,
       );
       expect(inEditor(find.text('Tomatoes 400 g')), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(notes.sections(into.id).single.text, 'Tomatoes 400 g');
+      expect(notes.byId(into.id)!.text, 'sauce');
     });
 
     testWidgets('German fits on a narrow phone', (tester) async {
@@ -293,7 +335,7 @@ void main() {
       expect(find.text('Foto entfernen, Text behalten'), findsOneWidget);
       await tap(tester, find.byKey(ValueKey('remove:$read')));
       expect(
-        find.text('Dieses Foto entfernen und seinen Text behalten?'),
+        find.text('Dieses Foto entfernen und seine Worte im Text behalten?'),
         findsOneWidget,
       );
       expect(find.text('Entfernen'), findsOneWidget);
