@@ -23,6 +23,8 @@
   "noAreasYet": "Noch keine Bereiche. Tippe auf +, um einen anzulegen.",
   "noTopicsYet": "Noch keine Themen. Notizen können direkt im Bereich liegen, oder tippe auf +, um ein Thema anzulegen.",
   "newArea": "Neuer Bereich",
+  "rearrangeAreas": "Neu anordnen",
+  "rearrangeDone": "Fertig",
   "newTopic": "Neues Thema",
   "nameHint": "Name",
   "cancel": "Abbrechen",

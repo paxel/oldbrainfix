@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a table keeps the text size, wraps long cells and scrolls sideways; a card shows its first 10 rows. ([obf-1048](https://github.com/paxel/oldbrainfix/issues/359))
 - On the phone and the desktop, search ignores accents and umlauts, so "muller" finds "Müller" and "strasse" finds "Straße". ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
 - On the phone, Code sits early in the bar of formats and also makes a code block of several lines or an empty line. ([obf-1097](https://github.com/paxel/oldbrainfix/issues/410))
+- On the phone, the Areas list shows move handles only after Rearrange in its ⋮, so scrolling and swiping no longer catch them. ([obf-1089](https://github.com/paxel/oldbrainfix/issues/402))
 
 ---
 

@@ -83,6 +83,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newArea => 'New Area';
 
   @override
+  String get rearrangeAreas => 'Rearrange';
+
+  @override
+  String get rearrangeDone => 'Done';
+
+  @override
   String get newTopic => 'New Topic';
 
   @override

@@ -17,7 +17,8 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_alarms.dart';
 
 /// The Areas in the person's own order (#280): the Areas list moves
-/// them by their handles, and every list of Areas follows it.
+/// them by their handles while rearranging (obf-1089), and every list of
+/// Areas follows it.
 void main() {
   late Store store;
   late Places places;
@@ -77,6 +78,32 @@ void main() {
     return [...names]..sort((a, b) => top(a).compareTo(top(b)));
   }
 
+  /// ⋮ ▸ Rearrange on the Areas list.
+  Future<void> rearrange(WidgetTester tester) async {
+    await tester.tap(key('areas-more'));
+    await tester.pumpAndSettle();
+    await tester.tap(key('areas-rearrange'));
+    await tester.pumpAndSettle();
+  }
+
+  /// A slow drag from [start] to just past [past], down the list.
+  Future<void> dragDown(
+    WidgetTester tester,
+    Offset start,
+    Offset from,
+    Offset past,
+  ) async {
+    final drag = await tester.startGesture(start);
+    await tester.pump(const Duration(milliseconds: 100));
+    final step = (past.dy - from.dy + 20) / 10;
+    for (var i = 0; i < 10; i++) {
+      await drag.moveBy(Offset(0, step));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await drag.up();
+    await tester.pumpAndSettle();
+  }
+
   List<String> stored() => [for (final a in store.areasInOrder()) a.name];
 
   const names = ['Household', 'Work', 'Car'];
@@ -87,25 +114,40 @@ void main() {
     expect(shown(tester, AreasScreen, names), ['Work', 'Car', 'Household']);
   });
 
+  testWidgets('no handles until Rearrange, and Done in the place of ⋮', (
+    tester,
+  ) async {
+    await openAreas(tester);
+    expect(key('area-move-${car.id}'), findsNothing);
+    expect(key('area-menu-${car.id}'), findsOneWidget);
+    expect(key('areas-rearrange-done'), findsNothing);
+
+    await rearrange(tester);
+    expect(key('area-move-${car.id}'), findsOneWidget);
+    expect(key('area-menu-${car.id}'), findsNothing);
+    expect(key('areas-more'), findsNothing);
+    expect(find.text('Done'), findsOneWidget);
+
+    await tester.tap(key('areas-rearrange-done'));
+    await tester.pumpAndSettle();
+    expect(key('area-move-${car.id}'), findsNothing);
+    expect(key('area-menu-${car.id}'), findsOneWidget);
+    expect(key('areas-more'), findsOneWidget);
+  });
+
   testWidgets('dragging a handle moves the Area, for every Device', (
     tester,
   ) async {
     await openAreas(tester);
     expect(shown(tester, AreasScreen, names), ['Car', 'Household', 'Work']);
+    await rearrange(tester);
 
-    final from = tester.getCenter(key('area-row-${car.id}'));
-    final past = tester.getCenter(key('area-row-${home.id}'));
-    final drag = await tester.startGesture(
+    await dragDown(
+      tester,
       tester.getCenter(key('area-move-${car.id}')),
+      tester.getCenter(key('area-row-${car.id}')),
+      tester.getCenter(key('area-row-${home.id}')),
     );
-    await tester.pump(const Duration(milliseconds: 100));
-    final step = (past.dy - from.dy + 20) / 10;
-    for (var i = 0; i < 10; i++) {
-      await drag.moveBy(Offset(0, step));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    await drag.up();
-    await tester.pumpAndSettle();
 
     expect(stored(), ['Household', 'Car', 'Work']);
     expect(shown(tester, AreasScreen, names), ['Household', 'Car', 'Work']);
@@ -125,20 +167,15 @@ void main() {
     await tester.pumpAndSettle();
     const german = ['Haushalt', 'Arbeit', 'Auto'];
     expect(shown(tester, AreasScreen, german), ['Arbeit', 'Auto', 'Haushalt']);
+    await rearrange(tester);
+    expect(find.text('Fertig'), findsOneWidget);
 
-    final from = tester.getCenter(key('area-row-${id('car')}'));
-    final past = tester.getCenter(key('area-row-${id('household')}'));
-    final drag = await tester.startGesture(
+    await dragDown(
+      tester,
       tester.getCenter(key('area-move-${id('car')}')),
+      tester.getCenter(key('area-row-${id('car')}')),
+      tester.getCenter(key('area-row-${id('household')}')),
     );
-    await tester.pump(const Duration(milliseconds: 100));
-    final step = (past.dy - from.dy + 20) / 10;
-    for (var i = 0; i < 10; i++) {
-      await drag.moveBy(Offset(0, step));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    await drag.up();
-    await tester.pumpAndSettle();
 
     expect(
       [for (final a in store.areasInOrder()) a.id],
@@ -191,12 +228,37 @@ void main() {
     expect(stored(), ['Car', 'Household', 'Work']);
   });
 
-  testWidgets('a swipe right from a handle still goes back to the Agenda', (
+  testWidgets('while rearranging a drag anywhere on a row moves it', (
     tester,
   ) async {
     await openAreas(tester);
+    await rearrange(tester);
+    final row = tester.getRect(key('area-row-${car.id}'));
+    await dragDown(
+      tester,
+      row.centerLeft + const Offset(40, 0),
+      row.center,
+      tester.getCenter(key('area-row-${home.id}')),
+    );
+    expect(stored(), ['Household', 'Car', 'Work']);
+  });
+
+  testWidgets('while rearranging a tap on a row opens nothing', (tester) async {
+    await openAreas(tester);
+    await rearrange(tester);
+    await tester.tap(key('area-row-${car.id}'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AreaScreen), findsNothing);
+    expect(key('area-move-${car.id}'), findsOneWidget);
+    await tester.tap(key('tags-row'));
+    await tester.pumpAndSettle();
+    expect(key('area-move-${car.id}'), findsOneWidget);
+  });
+
+  testWidgets('a swipe right on a row goes back to the Agenda', (tester) async {
+    await openAreas(tester);
     await tester.flingFrom(
-      tester.getCenter(key('area-move-${home.id}')),
+      tester.getCenter(key('area-row-${home.id}')),
       const Offset(600, 0),
       1000,
     );
@@ -204,6 +266,79 @@ void main() {
     expect(stored(), ['Car', 'Household', 'Work']);
     expect(find.byType(AgendaScreen), findsOneWidget);
     expect(find.byType(AreasScreen), findsNothing);
+  });
+
+  testWidgets('while rearranging a swipe on a row stays on the page', (
+    tester,
+  ) async {
+    await openAreas(tester);
+    // A last chosen Area, which swipe left would open.
+    await tester.tap(key('area-row-${car.id}'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AreaScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await rearrange(tester);
+    for (final way in [const Offset(600, 0), const Offset(-600, 0)]) {
+      await tester.flingFrom(
+        tester.getCenter(key('area-row-${home.id}')),
+        way,
+        1000,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(find.byType(AreaScreen), findsNothing);
+      expect(key('area-move-${home.id}'), findsOneWidget);
+    }
+    expect(stored(), ['Car', 'Household', 'Work']);
+  });
+
+  testWidgets('leaving the page ends rearranging and keeps the order', (
+    tester,
+  ) async {
+    await openAreas(tester);
+    await rearrange(tester);
+    await dragDown(
+      tester,
+      tester.getCenter(key('area-move-${car.id}')),
+      tester.getCenter(key('area-row-${car.id}')),
+      tester.getCenter(key('area-row-${home.id}')),
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(AgendaScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Search and browse'));
+    await tester.pumpAndSettle();
+    expect(key('area-move-${car.id}'), findsNothing);
+    expect(key('areas-more'), findsOneWidget);
+    expect(stored(), ['Household', 'Car', 'Work']);
+    expect(shown(tester, AreasScreen, names), ['Household', 'Car', 'Work']);
+  });
+
+  testWidgets('Done fits a narrow bar with Fat fingers', (tester) async {
+    store.fatFingers = true;
+    tester.view.physicalSize = const Size(960, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(OldBrainFixApp(store: store));
+    await tester.tap(find.byTooltip('Search and browse'));
+    await tester.pumpAndSettle();
+    // Fat fingers grew the bar's buttons.
+    expect(tester.getSize(find.byTooltip('All Notes')).width, greaterThan(48));
+    await rearrange(tester);
+    expect(key('areas-rearrange-done'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('All Notes ends rearranging', (tester) async {
+    await openAreas(tester);
+    await rearrange(tester);
+    await tester.tap(find.byTooltip('All Notes'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(key('area-move-${car.id}'), findsNothing);
+    expect(key('areas-more'), findsOneWidget);
   });
 
   testWidgets('a screen reader moves an Area down and up', (tester) async {
@@ -253,13 +388,20 @@ void main() {
     ]);
   });
 
-  testWidgets('no handles while searching', (tester) async {
+  testWidgets('a search ends rearranging and has no Rearrange', (tester) async {
     await openAreas(tester);
+    await rearrange(tester);
     expect(key('area-move-${car.id}'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'milk');
     await tester.pump(BrowserSearchField.pause);
     await tester.pumpAndSettle();
     expect(key('area-move-${car.id}'), findsNothing);
+    expect(key('areas-rearrange-done'), findsNothing);
+    expect(key('areas-more'), findsNothing);
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pumpAndSettle();
+    expect(key('area-move-${car.id}'), findsNothing);
+    expect(key('areas-more'), findsOneWidget);
   });
 
   testWidgets('File into… lists the Areas in the person\'s order', (

@@ -236,6 +236,18 @@ abstract class AppLocalizations {
   /// **'New Area'**
   String get newArea;
 
+  /// In ⋮ of the Areas list's top bar (obf-1089): shows a move handle on each Area row until Done.
+  ///
+  /// In en, this message translates to:
+  /// **'Rearrange'**
+  String get rearrangeAreas;
+
+  /// The button in the place of ⋮ on the Areas list while rearranging (obf-1089): hides the move handles again; the order is kept.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get rearrangeDone;
+
   /// No description provided for @newTopic.
   ///
   /// In en, this message translates to:

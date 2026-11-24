@@ -1167,13 +1167,16 @@ replace a law of Both apps where they say so. A desktop law marked
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A
   long-press on "+" of the Agenda or the lock screen opens text capture
   (#282; see Capture). A long-press never changes data by itself.
-- **An Area moves by its handle** (#280): each row of the phone's Areas
-  list carries a drag handle before ⋮, and a drag up or down on it,
-  taken at once, moves the Area in the list; a swipe sideways that
-  starts on it still moves between the pages, and a long press on the
-  row moves nothing. A screen reader moves it with the row's actions, Move
-  up, Move down, Move to the start and Move to the end. The search's
-  hits carry no handles.
+- **An Area moves while rearranging** (#280, obf-1089): the phone's
+  Areas list's ⋮ in the top bar offers Rearrange with two Areas or more.
+  Until Done, which takes ⋮'s place, leaving the page or a search, each
+  row shows a drag handle in place of its ⋮; a drag that starts anywhere
+  on the row, either way, moves the Area, a tap on a row opens nothing,
+  a swipe on it does not change the page, and the Tags row and the swipe
+  left do nothing. Each move is kept at once. Outside of it a row has no
+  handle and a long press moves nothing. A screen reader moves an Area
+  with the row's actions, Move up, Move down, Move to the start and Move
+  to the end. The search's hits carry no handles.
 - **A horizontal swipe only navigates** (see Navigation); it never
   changes data or swipes a row or card away. The exceptions are the
   full-screen table, where a one-finger drag on its cells moves it
@@ -1182,7 +1185,8 @@ replace a law of Both apps where they say so. A desktop law marked
   on a card or in a text being read (obf-1048), which a drag on its
   cells moves sideways, as its bar does, and a Code text in the Note editor (#213),
   which a one-finger drag moves sideways; on a card a Code text is cut
-  off at the edge instead.
+  off at the edge instead; and an Area row while the Areas list
+  rearranges (obf-1089), where a drag moves the row.
 - **On the iPhone a pushed page goes back with the edge swipe** (#243,
   Q570), iOS's own, from the left edge; a browser level goes back with
   a swipe right anywhere, as on Android. A page that holds its leaving,
@@ -1553,7 +1557,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - **An action goes into ⋮ only when the bar is full.** A page lists its
   actions in a fixed order; the bar shows as many as fit at the width it
   has, the rest overflow into ⋮, and ⋮ exists only when it holds
-  something. ⋮ is last. Nothing adapts to use. Settings, Backups and
+  something. ⋮ is last. The one exception is the Areas list's ⋮ with
+  Rearrange (obf-1089), which stands whenever it offers Rearrange and
+  gives way to Done meanwhile. Nothing adapts to use. Settings, Backups and
   Sync never go into ⋮; they stay behind the Profile picture. A page
   gives such an action as a `BarAction`; the bar counts a button 48
   wide, 1.3 times with Fat fingers (#224).

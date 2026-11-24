@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -93,6 +92,11 @@ class _AreasScreenState extends State<AreasScreen>
   PersonFilter _filter = PersonFilter.everyone;
   bool _loaded = false;
 
+  /// Whether the Areas show their handles (obf-1089): from Rearrange in
+  /// ⋮ until Done, a search or leaving the page; a tap or a swipe on a row
+  /// only moves it meanwhile.
+  bool _rearranging = false;
+
   /// The Areas being deleted beside the app (obf-1093), whose rows say
   /// how far they are; none without the app.
   AreaDeletions? _deletions;
@@ -139,7 +143,16 @@ class _AreasScreenState extends State<AreasScreen>
 
   /// The Agenda came in its place: the selection goes (#273).
   void _pageChanged() {
-    if (widget.pageShown?.value != HomePager.areas) stopSelecting();
+    if (widget.pageShown?.value != HomePager.areas) {
+      stopSelecting();
+      _stopRearranging();
+    }
+  }
+
+  /// Leaving the page ends rearranging (obf-1089); each move is already
+  /// kept.
+  void _stopRearranging() {
+    if (_rearranging) setState(() => _rearranging = false);
   }
 
   /// [child] under the selection's back, when this page is a route of
@@ -179,6 +192,8 @@ class _AreasScreenState extends State<AreasScreen>
             people: _filter,
           );
     keepShown(_hits);
+    // A search shows no Areas to move.
+    if (_searched.trim().isNotEmpty) _rearranging = false;
   }
 
   void _filtered(PersonFilter people) => setState(() {
@@ -275,6 +290,7 @@ class _AreasScreenState extends State<AreasScreen>
   }
 
   Future<void> _openAllNotes() async {
+    _stopRearranging();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
@@ -287,6 +303,7 @@ class _AreasScreenState extends State<AreasScreen>
 
   /// Opens the Frog view: the open Frogs and the eaten ones folded.
   Future<void> _openFrogs() async {
+    _stopRearranging();
     await openFrogs(context, widget.notes, widget.places);
     if (!mounted) return;
     _reload();
@@ -310,11 +327,13 @@ class _AreasScreenState extends State<AreasScreen>
     key: const ValueKey('tags-row'),
     title: t.tagsTitle,
     leading: const Icon(Icons.tag),
-    onTap: _openTags,
+    // While rearranging a tap on a row only moves it (obf-1089).
+    onTap: _rearranging ? null : _openTags,
     menu: null,
   );
 
   Future<void> _openTrash() async {
+    _stopRearranging();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => TrashScreen(notes: widget.notes, places: widget.places),
@@ -477,7 +496,6 @@ class _AreasScreenState extends State<AreasScreen>
               null => t.areaDeletingStarted,
             },
             leading: _AreaMark(area: area),
-            handle: const SizedBox(width: 48, height: 48),
             menu: SizedBox(
               key: ValueKey('area-deleting-${area.id}'),
               width: 48,
@@ -490,16 +508,37 @@ class _AreasScreenState extends State<AreasScreen>
               ),
             ),
           )
+        else if (_rearranging)
+          // Rearranging (obf-1089): a drag that starts anywhere on the row,
+          // either way, takes it at once and moves it; a tap does nothing,
+          // and the handle in ⋮'s place says so. The order is the
+          // person's own, so every Area moves, a Shared one too (#280). A
+          // screen reader moves it by the row's own actions, Move up and
+          // Move down, so the handle says nothing.
+          ReorderableDragStartListener(
+            key: ValueKey('area-row-${area.id}'),
+            index: index,
+            child: _PlaceRow(
+              title: areaName(t, area),
+              subtitle: _sharedWith(t, area),
+              leading: _AreaMark(area: area),
+              locked: lock?.isAreaClosed(area.id) ?? false,
+              shared: _people.containsKey(area.id),
+              hiddenFromAi: _hidden.contains(area.id),
+              highlighted: area.id == last,
+              menu: SizedBox(
+                key: ValueKey('area-move-${area.id}'),
+                width: 48,
+                height: 48,
+                child: const Icon(Icons.drag_handle),
+              ),
+            ),
+          )
         else
           _PlaceRow(
             key: ValueKey('area-row-${area.id}'),
             title: areaName(t, area),
-            subtitle: _people[area.id] == null
-                ? null
-                : [
-                    for (final p in _people[area.id] ?? const <Person>[])
-                      profileDisplayName(t, _names[p.id] ?? ''),
-                  ].join(', '),
+            subtitle: _sharedWith(t, area),
             leading: _AreaMark(area: area),
             locked: lock?.isAreaClosed(area.id) ?? false,
             shared: _people.containsKey(area.id),
@@ -507,21 +546,18 @@ class _AreasScreenState extends State<AreasScreen>
             highlighted: area.id == last,
             onTap: () => _open(area),
             menu: _areaMenu(t, area),
-            // The order is the person's own, so every Area moves, a Shared
-            // one too (#280). A screen reader moves it by the row's own
-            // actions, Move up and Move down, so the handle says nothing.
-            handle: _VerticalDragStart(
-              key: ValueKey('area-move-${area.id}'),
-              index: index,
-              child: const SizedBox(
-                width: 48,
-                height: 48,
-                child: Icon(Icons.drag_handle),
-              ),
-            ),
           ),
     ];
   }
+
+  /// Who a Shared [area] is shared with, under its name; null for one
+  /// of the person's own.
+  String? _sharedWith(AppLocalizations t, Area area) => _people[area.id] == null
+      ? null
+      : [
+          for (final p in _people[area.id] ?? const <Person>[])
+            profileDisplayName(t, _names[p.id] ?? ''),
+        ].join(', ');
 
   /// The Area at [from] dragged to [to], counted after it was taken
   /// out: its new place, on all of the person's Devices (#280).
@@ -571,6 +607,22 @@ class _AreasScreenState extends State<AreasScreen>
     );
   }
 
+  /// ⋮ of the Areas list: Rearrange shows the Areas' handles
+  /// (obf-1089).
+  Widget _areasMenu(AppLocalizations t) => PopupMenuButton<VoidCallback>(
+    key: const ValueKey('areas-more'),
+    tooltip: t.more,
+    icon: const Icon(Icons.more_vert),
+    onSelected: (run) => run(),
+    itemBuilder: (_) => [
+      PopupMenuItem(
+        key: const ValueKey('areas-rearrange'),
+        value: () => setState(() => _rearranging = true),
+        child: Text(t.rearrangeAreas),
+      ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -588,8 +640,9 @@ class _AreasScreenState extends State<AreasScreen>
       const EdgeInsets.symmetric(vertical: 8),
     );
     return BrowserSwipes(
-      forwardRoute: _forwardRoute,
-      onForward: _forward,
+      // Rearranging stays on the page: a swipe on a row moves it.
+      forwardRoute: _rearranging ? null : _forwardRoute,
+      onForward: _rearranging ? null : _forward,
       back: widget.onBack == null,
       child: TagSearchScope(
         onSearch: _searchTag,
@@ -641,6 +694,14 @@ class _AreasScreenState extends State<AreasScreen>
                         icon: const Icon(Icons.restore_from_trash),
                       ),
                       if (searching && mayTick(_hits)) selectButton(context),
+                      if (_rearranging)
+                        TextButton(
+                          key: const ValueKey('areas-rearrange-done'),
+                          onPressed: _stopRearranging,
+                          child: Text(t.rearrangeDone),
+                        )
+                      else if (!searching && _areas.length > 1)
+                        _areasMenu(t),
                     ],
             ),
             body: CustomScrollView(
@@ -695,8 +756,8 @@ class _AreasScreenState extends State<AreasScreen>
                     ),
                   )
                 else ...[
-                  // The Areas move by their handles only: a long press
-                  // never changes data (#280).
+                  // The Areas move only while rearranging (obf-1089): a
+                  // long press never changes data (#280).
                   SliverPadding(
                     padding: padding.copyWith(bottom: 0),
                     sliver: SliverReorderableList(
@@ -1584,25 +1645,8 @@ class _AreaMark extends StatelessWidget {
 }
 
 /// One Area or Topic as an embossed row with its menu.
-/// A drag handle that takes only a drag up or down: a swipe sideways
-/// that starts on it still moves between the pages (#280).
-class _VerticalDragStart extends ReorderableDragStartListener {
-  const _VerticalDragStart({
-    super.key,
-    required super.index,
-    required super.child,
-  });
-
-  @override
-  MultiDragGestureRecognizer createRecognizer() =>
-      VerticalMultiDragGestureRecognizer(debugOwner: this);
-}
-
 class _PlaceRow extends StatelessWidget {
   final String title;
-
-  /// Where the row is dragged to another place in the list: an Area's.
-  final Widget? handle;
 
   /// Under the title: who a Shared Area is shared with.
   final String? subtitle;
@@ -1628,7 +1672,6 @@ class _PlaceRow extends StatelessWidget {
     super.key,
     required this.title,
     required this.menu,
-    this.handle,
     this.subtitle,
     this.leading,
     this.onTap,
@@ -1693,7 +1736,6 @@ class _PlaceRow extends StatelessWidget {
                       Icons.lock_outline,
                       semanticLabel: context.t.areaLocked,
                     ),
-                  ?handle,
                   if (menu case final menu?)
                     menu
                   else

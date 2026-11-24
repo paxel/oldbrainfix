@@ -84,6 +84,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get newArea => 'Neuer Bereich';
 
   @override
+  String get rearrangeAreas => 'Neu anordnen';
+
+  @override
+  String get rearrangeDone => 'Fertig';
+
+  @override
   String get newTopic => 'Neues Thema';
 
   @override
