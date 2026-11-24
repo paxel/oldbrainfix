@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:01:18.000Z",
+  "now": "2026-01-02T10:01:51.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -35,7 +35,9 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "photo",
+      "shownName": "RECEIPT",
+      "calendarText": "RECEIPT\nTotal 12,50"
     },
     {
       "id": "note:00000000000000000000000000000002",
@@ -179,7 +181,9 @@
       "removedRecordings": [],
       "removedTranscripts": [],
       "removedPhotoTexts": [],
-      "wordless": "photo"
+      "wordless": "photo",
+      "shownName": "Dr. Müller, Tuesday 9:00",
+      "calendarText": "Dr. Müller, Tuesday 9:00"
     },
     {
       "id": "note:00000000000000000000000000000006",
@@ -350,9 +354,167 @@
         "557383277bf8ba9fdbe899439670c7a47a5e0abfb679f48025ce9d6cf1fd4872"
       ],
       "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:19.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "0bc4334e5e65486ee581a16b55aecf1faec6cd5f5e28a7e4a9a2e6fb0bad32e7"
+      ],
+      "recordings": [
+        "98945068172a0463cddca60309d3f78259b2acb25cd3e0aef8b12bf3dcdc2aa5",
+        "6b19a45a0b2581c81270acb7e9eefb624714b8b238d4626c4ef1cbe8cce36216"
+      ],
+      "transcripts": {
+        "98945068172a0463cddca60309d3f78259b2acb25cd3e0aef8b12bf3dcdc2aa5": "",
+        "6b19a45a0b2581c81270acb7e9eefb624714b8b238d4626c4ef1cbe8cce36216": "Call the plumber  \r\nabout the leak"
+      },
+      "photoTexts": {
+        "0bc4334e5e65486ee581a16b55aecf1faec6cd5f5e28a7e4a9a2e6fb0bad32e7": "SALE"
+      },
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo",
+      "shownName": "Call the plumber",
+      "calendarText": "Call the plumber  \r\nabout the leak"
+    },
+    {
+      "id": "note:0000000000000000000000000000000c",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:29.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99",
+        "d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785"
+      ],
+      "transcripts": {
+        "c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99": "Ten",
+        "d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785": "Eleven"
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "voiceRecording",
+      "shownName": "Ten",
+      "calendarText": "Ten"
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:35.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785",
+        "c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99"
+      ],
+      "transcripts": {
+        "c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99": "Ten",
+        "d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785": "Eleven"
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "voiceRecording",
+      "shownName": "Eleven",
+      "calendarText": "Eleven"
+    },
+    {
+      "id": "note:0000000000000000000000000000000e",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:45.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {
+        "e40fd9795873210f465b369ab11db5ca2981e30069f574f9eb7121988d7c6712": "Water the ferns"
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [
+        "e40fd9795873210f465b369ab11db5ca2981e30069f574f9eb7121988d7c6712"
+      ],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "voiceRecording",
+      "shownName": "Water the ferns",
+      "calendarText": "Water the ferns"
     }
   ],
   "all": [
+    "note:0000000000000000000000000000000e",
+    "note:0000000000000000000000000000000d",
+    "note:0000000000000000000000000000000c",
+    "note:0000000000000000000000000000000b",
     "note:00000000000000000000000000000009",
     "note:00000000000000000000000000000008",
     "note:00000000000000000000000000000004",
@@ -366,13 +528,21 @@
     "note:00000000000000000000000000000003",
     "note:00000000000000000000000000000004",
     "note:00000000000000000000000000000008",
-    "note:00000000000000000000000000000009"
+    "note:00000000000000000000000000000009",
+    "note:0000000000000000000000000000000b",
+    "note:0000000000000000000000000000000c",
+    "note:0000000000000000000000000000000d",
+    "note:0000000000000000000000000000000e"
   ],
   "trashed": [
     "note:00000000000000000000000000000007"
   ],
   "inside": {},
   "sections": {
+    "note:0000000000000000000000000000000e": [],
+    "note:0000000000000000000000000000000d": [],
+    "note:0000000000000000000000000000000c": [],
+    "note:0000000000000000000000000000000b": [],
     "note:00000000000000000000000000000009": [
       {
         "id": "note:0000000000000000000000000000000a",
@@ -514,9 +684,62 @@
     "note:0000000000000000000000000000000a": [
       "audio/d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58",
       "transcript/d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58"
+    ],
+    "note:0000000000000000000000000000000b": [
+      "photo/0bc4334e5e65486ee581a16b55aecf1faec6cd5f5e28a7e4a9a2e6fb0bad32e7",
+      "audio/6b19a45a0b2581c81270acb7e9eefb624714b8b238d4626c4ef1cbe8cce36216",
+      "ocr/0bc4334e5e65486ee581a16b55aecf1faec6cd5f5e28a7e4a9a2e6fb0bad32e7",
+      "transcript/6b19a45a0b2581c81270acb7e9eefb624714b8b238d4626c4ef1cbe8cce36216"
+    ],
+    "note:0000000000000000000000000000000c": [
+      "audio/c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99",
+      "audio/d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785",
+      "transcript/c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99",
+      "transcript/d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785"
+    ],
+    "note:0000000000000000000000000000000d": [
+      "audio/d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785",
+      "audio/c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99",
+      "transcript/d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785",
+      "transcript/c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99"
     ]
   },
   "shares": {
+    "note:0000000000000000000000000000000e": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Water the ferns"
+    },
+    "note:0000000000000000000000000000000d": {
+      "html": null,
+      "photos": [],
+      "recordings": [
+        "d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785",
+        "c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99"
+      ],
+      "text": "Eleven\nTen"
+    },
+    "note:0000000000000000000000000000000c": {
+      "html": null,
+      "photos": [],
+      "recordings": [
+        "c4d5bfb8981cdd0e8f808acb9b573eb086e896febb075dc979814e796a74fd99",
+        "d5ff5e2f0a53ea36b1aaee83d1183b3ffa9dc47ade2dc8e129b3a6588bec8785"
+      ],
+      "text": "Ten\nEleven"
+    },
+    "note:0000000000000000000000000000000b": {
+      "html": null,
+      "photos": [
+        "0bc4334e5e65486ee581a16b55aecf1faec6cd5f5e28a7e4a9a2e6fb0bad32e7"
+      ],
+      "recordings": [
+        "98945068172a0463cddca60309d3f78259b2acb25cd3e0aef8b12bf3dcdc2aa5",
+        "6b19a45a0b2581c81270acb7e9eefb624714b8b238d4626c4ef1cbe8cce36216"
+      ],
+      "text": "SALE\nCall the plumber  \r\nabout the leak"
+    },
     "note:00000000000000000000000000000009": {
       "html": null,
       "photos": [
@@ -586,6 +809,10 @@
   },
   "search": {
     "": [
+      "note:0000000000000000000000000000000e",
+      "note:0000000000000000000000000000000d",
+      "note:0000000000000000000000000000000c",
+      "note:0000000000000000000000000000000b",
       "note:00000000000000000000000000000009",
       "note:00000000000000000000000000000008",
       "note:00000000000000000000000000000004",
@@ -613,6 +840,10 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:0000000000000000000000000000000e",
+      "note:0000000000000000000000000000000d",
+      "note:0000000000000000000000000000000c",
+      "note:0000000000000000000000000000000b",
       "note:00000000000000000000000000000009",
       "note:00000000000000000000000000000004",
       "note:00000000000000000000000000000003",

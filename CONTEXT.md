@@ -51,10 +51,10 @@ A spot the user gave a name ("Home", "Work", "Mum's"). A Note captured near it c
 _Avoid_: location, geofence, favourite
 
 **Transcript**:
-Text recognised from a Note's voice recording, kept next to the recording. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the recording stays, and transcribe the recording again. The recording can be removed and the Transcript stays.
+Text recognised from a Note's voice recording, kept next to the recording. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the recording stays, and transcribe the recording again. The recording can be removed and the Transcript stays. While the Note has no text of its own, the first line of its first Transcript with words names it on cards, the Agenda, the calendar and in notifications, before any Photo Text, and its calendar entry carries the whole Transcript as its description; nothing is copied into the Note (obf-1049).
 
 **Photo Text**:
-Text recognised in a Note's photo or screenshot, kept next to the photo. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the photo stays, and read the text again. The photo can be removed and the Photo Text stays.
+Text recognised in a Note's photo or screenshot, kept next to the photo. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the photo stays, and read the text again. The photo can be removed and the Photo Text stays. While the Note has no text of its own and no Transcript with words, its first Photo Text with words names it as a Transcript would (obf-1049).
 _Avoid_: OCR (in the UI), caption
 
 **Attachment**:

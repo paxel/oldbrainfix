@@ -1065,7 +1065,10 @@ final _scenarios = <Scenario>[
         'kept; Notes without words titled as a photo or as a voice '
         'recording, one with an empty Transcript; a Note merged into that '
         'one whose Photo Text was removed and whose Transcript was removed '
-        'and transcribed again.',
+        'and transcribed again; Notes without text of their own named by '
+        'their first Transcript with words before a Photo Text, by the '
+        'order their recordings were added, and by a Transcript whose '
+        'recording was removed (obf-1049).',
     build: (store) {
       final notes = Notes(store);
       final receipt = notes.capture('', photos: [_photo(1)]);
@@ -1131,6 +1134,33 @@ final _scenarios = <Scenario>[
       notes.removePhotoText(bike.id, frame);
       notes.removeTranscript(bike.id, lock);
       notes.setTranscript(bike.id, lock, 'Lock code 1234');
+      final plumber = notes.capture(
+        '',
+        photos: [_photo(9)],
+        recordings: [_recording(8), _recording(9)],
+      );
+      notes.setPhotoText(plumber.id, plumber.photos.single, 'SALE');
+      notes.setTranscript(plumber.id, plumber.recordings.first, '');
+      notes.setTranscript(
+        plumber.id,
+        plumber.recordings.last,
+        '\n  Call the plumber  \r\nabout the leak\n',
+      );
+      final ordered = notes.capture(
+        '',
+        recordings: [_recording(10), _recording(11)],
+      );
+      final swapped = notes.capture(
+        '',
+        recordings: [_recording(11), _recording(10)],
+      );
+      for (final note in [ordered, swapped]) {
+        notes.setTranscript(note.id, ordered.recordings.first, 'Ten');
+        notes.setTranscript(note.id, ordered.recordings.last, 'Eleven');
+      }
+      final ferns = notes.capture('', recordings: [_recording(12)]);
+      notes.setTranscript(ferns.id, ferns.recordings.single, 'Water the ferns');
+      notes.removeRecording(ferns.id, ferns.recordings.single);
     },
   ),
   (
@@ -4149,6 +4179,13 @@ Map<String, Object?> _note(Note note) => {
   ),
   if (note.attachments.isNotEmpty) 'aloneFile': note.aloneFile?.hash,
   if (note.wordless == Wordless.file) 'wordlessName': note.wordlessName,
+  // The name a Note without text of its own is shown by (obf-1049): only
+  // when it is not its text.
+  if (note.calendarText.isNotEmpty &&
+      note.calendarText != note.visibleText) ...{
+    'shownName': note.shownName,
+    'calendarText': note.calendarText,
+  },
 };
 
 /// The attached files of a Note or Section, only when it has any, so a

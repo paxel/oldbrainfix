@@ -265,10 +265,10 @@ pub struct PlannedAlarm {
     /// (obf-1045); `None` when they are off or its Routine escalates,
     /// which rings with sound from its first ring.
     pub quiet: Option<QuietHours>,
-    /// The text of the Note the Routine links back to as it reads without
-    /// its marks ([`Note::visible_text`]); `None` when gone.
+    /// The name the Note the Routine links back to is shown by
+    /// ([`Note::shown_name`], obf-1049); `None` when gone.
     pub text: Option<String>,
-    /// What that Note is titled as while `text` is blank
+    /// What that Note is titled as while `text` is empty
     /// ([`Note::wordless`]).
     pub wordless: Wordless,
     /// The name of the file it goes by as [`Wordless::File`]
@@ -433,7 +433,7 @@ pub fn alarm_plan(
                 ends_at: t.ends_at,
                 // Escalation is the only way through Quiet Hours.
                 quiet: quiet.filter(|_| routine.escalation.is_none()),
-                text: note.as_ref().map(Note::visible_text),
+                text: note.as_ref().map(Note::shown_name),
                 wordless: note.as_ref().map(Note::wordless).unwrap_or_default(),
                 wordless_name: note.as_ref().map(Note::wordless_name).unwrap_or_default(),
             });
@@ -466,10 +466,10 @@ pub struct PlannedHeadsUp {
     /// off. A Heads-up never escalates, so its Routine's Escalation
     /// changes nothing.
     pub quiet: Option<QuietHours>,
-    /// The text of the Note the Routine links back to as it reads without
-    /// its marks ([`Note::visible_text`]); `None` when gone.
+    /// The name the Note the Routine links back to is shown by
+    /// ([`Note::shown_name`], obf-1049); `None` when gone.
     pub text: Option<String>,
-    /// What that Note is titled as while `text` is blank
+    /// What that Note is titled as while `text` is empty
     /// ([`Note::wordless`]).
     pub wordless: Wordless,
     /// The name of the file it goes by as [`Wordless::File`]
@@ -630,7 +630,7 @@ pub fn heads_up_plan(
                     wall: moment,
                     start: start_of(&occurrence, all_day_from),
                     quiet,
-                    text: note.as_ref().map(Note::visible_text),
+                    text: note.as_ref().map(Note::shown_name),
                     wordless: note.as_ref().map(Note::wordless).unwrap_or_default(),
                     wordless_name: note.as_ref().map(Note::wordless_name).unwrap_or_default(),
                 });

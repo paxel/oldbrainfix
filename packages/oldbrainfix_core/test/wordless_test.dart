@@ -148,4 +148,114 @@ void main() {
       });
     });
   });
+
+  group('a Note without text of its own is named (obf-1049)', () {
+    String? name(String id) => notes.byId(id)?.shownName;
+    String? calendar(String id) => notes.byId(id)?.calendarText;
+
+    test('by the first line of its Transcript, the whole of it for the '
+        'calendar, nothing copied into it', () {
+      final memo = notes.capture('', recordings: [voice(1)]);
+      notes.setTranscript(
+        memo.id,
+        memo.recordings.single,
+        '\n  Call the plumber  \r\nabout the leak\n',
+      );
+      expect(name(memo.id), 'Call the plumber');
+      expect(calendar(memo.id), 'Call the plumber  \r\nabout the leak');
+      expect(notes.byId(memo.id)?.text, '');
+      // Its recording gone, the Transcript stays and still names it.
+      notes.removeRecording(memo.id, memo.recordings.single);
+      expect(name(memo.id), 'Call the plumber');
+    });
+
+    test('by its own text while it has any', () {
+      final groceries = notes.capture('Groceries', recordings: [voice(1)]);
+      notes.setTranscript(groceries.id, groceries.recordings.single, 'Milk');
+      expect(name(groceries.id), 'Groceries');
+      expect(calendar(groceries.id), 'Groceries');
+    });
+
+    test('by its first Transcript with words, in the order added, before '
+        'any Photo Text', () {
+      final both = notes.capture(
+        '',
+        photos: [photo(1)],
+        recordings: [voice(1), voice(2)],
+      );
+      notes.setPhotoText(both.id, both.photos.single, 'RECEIPT');
+      expect(name(both.id), 'RECEIPT');
+      notes.setTranscript(both.id, both.recordings.first, '');
+      notes.setTranscript(both.id, both.recordings.last, 'Second words');
+      expect(name(both.id), 'Second words');
+      // The order added counts, not the order of the hashes.
+      final ab = notes.capture('', recordings: [voice(3), voice(4)]);
+      final ba = notes.capture('', recordings: [voice(4), voice(3)]);
+      final [three, four] = ab.recordings;
+      expect(ba.recordings, [four, three]);
+      for (final note in [ab, ba]) {
+        notes.setTranscript(note.id, three, 'Three');
+        notes.setTranscript(note.id, four, 'Four');
+      }
+      expect(name(ab.id), 'Three');
+      expect(name(ba.id), 'Four');
+    });
+
+    test('by its first Photo Text while no Transcript has words', () {
+      final receipt = notes.capture('', photos: [photo(1)]);
+      notes.setPhotoText(
+        receipt.id,
+        receipt.photos.single,
+        '  RECEIPT\nTotal 12,50  ',
+      );
+      expect(name(receipt.id), 'RECEIPT');
+      expect(calendar(receipt.id), 'RECEIPT\nTotal 12,50');
+    });
+
+    test('by nothing while it has neither, titled by what it holds', () {
+      final untranscribed = notes.capture('', recordings: [voice(1)]);
+      expect(name(untranscribed.id), '');
+      expect(calendar(untranscribed.id), '');
+      expect(notes.byId(untranscribed.id)?.wordless, Wordless.voiceRecording);
+    });
+
+    test('in its alarms and Heads-ups', () {
+      final routines = Routines(store);
+      final memo = notes.capture('', recordings: [voice(1)]);
+      notes.setTranscript(memo.id, memo.recordings.single, 'Pills\nblue');
+      final silent = notes.capture('', recordings: [voice(2)]);
+      for (final note in [memo, silent]) {
+        final id = routines
+            .spawn(
+              note.id,
+              Schedule(start: Day(2026, 10, 25), times: [ClockTime(10, 0)]),
+            )
+            .id;
+        routines.setHeadsUps(id, [20]);
+      }
+      String? noteOf(String routineId) => routines.byId(routineId)?.noteId;
+      final alarms = Alarms(store);
+      expect(
+        {for (final a in alarms.plan(europe)) noteOf(a.routineId): a.text},
+        {memo.id: 'Pills', silent.id: ''},
+      );
+      expect(
+        {for (final h in alarms.headsUps(europe)) noteOf(h.routineId): h.text},
+        {memo.id: 'Pills', silent.id: ''},
+      );
+    });
+
+    test('in the calendar, the whole Transcript its description', () {
+      final memo = notes.capture('', recordings: [voice(1)]);
+      notes.setTranscript(memo.id, memo.recordings.single, 'Pills\nthe blue');
+      final routine = Routines(store).spawn(
+        memo.id,
+        Schedule(start: Day(2026, 10, 25), times: [ClockTime(10, 0)]),
+      );
+      final text = notes.byId(memo.id)?.calendarText ?? '';
+      final event = routineEvents(routine, text).single;
+      expect(event.summary, 'Pills');
+      expect(event.description, 'Pills\nthe blue');
+    });
+  });
 }

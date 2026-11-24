@@ -646,6 +646,45 @@ class Note {
   String get wordlessName => wordless == Wordless.file
       ? (attachments.firstOrNull ?? removedAttachments.first).name
       : '';
+
+  /// The name the Note is shown by where only its words fit: on cards,
+  /// the Agenda, in the calendar and in notifications (obf-1049). Its text
+  /// as it reads ([visibleText]) while it has any; else the first line of
+  /// [calendarText], the Transcript or Photo Text it goes by; empty when it
+  /// has none of them, and then it is titled by [wordless]. Nothing of it
+  /// is copied into the Note.
+  String get shownName {
+    final visible = visibleText;
+    if (visible.trim().isNotEmpty) return visible;
+    return _standIn.split(RegExp(r'\r?\n')).first.trim();
+  }
+
+  /// What a calendar entry of the Note reads, its first line the entry's
+  /// title and the whole its description: its text as it reads while it
+  /// has any; else the first Transcript of its recordings, else the first
+  /// Photo Text of its photos, removed ones included, each in the order
+  /// added (obf-1049); empty when it has none of them.
+  String get calendarText {
+    final visible = visibleText;
+    return visible.trim().isNotEmpty ? visible : _standIn;
+  }
+
+  /// The first Transcript with words, else the first Photo Text with
+  /// words, trimmed; empty when there is none.
+  String get _standIn {
+    for (final (hashes, texts) in [
+      (recordings, transcripts),
+      (removedRecordings, transcripts),
+      (photos, photoTexts),
+      (removedPhotos, photoTexts),
+    ]) {
+      for (final hash in hashes) {
+        final text = texts[hash]?.trim() ?? '';
+        if (text.isNotEmpty) return text;
+      }
+    }
+    return '';
+  }
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).

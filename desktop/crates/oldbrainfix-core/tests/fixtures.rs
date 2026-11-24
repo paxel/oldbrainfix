@@ -242,6 +242,13 @@ fn note_json(note: &Note) -> Value {
         if note.wordless() == Wordless::File {
             all.insert("wordlessName".into(), json!(note.wordless_name()));
         }
+        // The name a Note without text of its own is shown by (obf-1049):
+        // only when it is not its text.
+        let calendar = note.calendar_text();
+        if !calendar.is_empty() && calendar != note.visible_text() {
+            all.insert("shownName".into(), json!(note.shown_name()));
+            all.insert("calendarText".into(), json!(calendar));
+        }
     }
     out
 }
@@ -2664,6 +2671,20 @@ fn write_media(store: &Store) -> Built {
     notes.remove_photo_text(&bike.id, frame)?;
     notes.remove_transcript(&bike.id, lock)?;
     notes.set_transcript(&bike.id, lock, "Lock code 1234")?;
+    let plumber = notes.capture_with("", None, None, &[photo(9)], &[recording(8), recording(9)])?;
+    notes.set_photo_text(&plumber.id, &plumber.photos[0], "SALE")?;
+    notes.set_transcript(&plumber.id, &plumber.recordings[0], "")?;
+    let call = "\n  Call the plumber  \r\nabout the leak\n";
+    notes.set_transcript(&plumber.id, &plumber.recordings[1], call)?;
+    let ordered = notes.capture_with("", None, None, &[], &[recording(10), recording(11)])?;
+    let swapped = notes.capture_with("", None, None, &[], &[recording(11), recording(10)])?;
+    for note in [&ordered, &swapped] {
+        notes.set_transcript(&note.id, &ordered.recordings[0], "Ten")?;
+        notes.set_transcript(&note.id, &ordered.recordings[1], "Eleven")?;
+    }
+    let ferns = notes.capture_with("", None, None, &[], &[recording(12)])?;
+    notes.set_transcript(&ferns.id, &ferns.recordings[0], "Water the ferns")?;
+    notes.remove_recording(&ferns.id, &ferns.recordings[0])?;
     Ok(())
 }
 

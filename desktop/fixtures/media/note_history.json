@@ -389,6 +389,156 @@
           "mayUse": false
         }
       ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:19.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:19.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:19.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "photoAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:19.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "captured",
+          "before": null,
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000c",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:29.000Z",
+          "entity": "note:0000000000000000000000000000000c",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:29.000Z",
+          "entity": "note:0000000000000000000000000000000c",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:29.000Z",
+          "entity": "note:0000000000000000000000000000000c",
+          "kind": "captured",
+          "before": null,
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:35.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:35.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:35.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "captured",
+          "before": null,
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000e",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:51.000Z",
+          "entity": "note:0000000000000000000000000000000e",
+          "kind": "recordingRemoved",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:45.000Z",
+          "entity": "note:0000000000000000000000000000000e",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:45.000Z",
+          "entity": "note:0000000000000000000000000000000e",
+          "kind": "captured",
+          "before": null,
+          "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
     }
   ]
 }

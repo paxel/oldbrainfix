@@ -42,6 +42,79 @@ fn a_note_without_words_is_titled_by_what_it_holds() -> Result<()> {
 }
 
 #[test]
+fn a_note_without_text_of_its_own_is_named_by_its_transcript_or_photo_text() -> Result<()> {
+    let store = crate::store::tests::store();
+    let notes = Notes::new(&store);
+    let named = |id: &str| -> Result<Option<(String, String)>> {
+        Ok(notes
+            .by_id(id)?
+            .map(|n| (n.shown_name(), n.calendar_text())))
+    };
+    let pair = |name: &str, calendar: &str| Some((name.to_string(), calendar.to_string()));
+    // The first line names it, the whole is the calendar's; nothing is
+    // copied into the Note, and its recording gone the Transcript stays.
+    let memo = notes.capture_with("", None, None, &[], &[voice(1)])?;
+    let call = "\n  Call the plumber  \r\nabout the leak\n";
+    notes.set_transcript(&memo.id, &memo.recordings[0], call)?;
+    let whole = "Call the plumber  \r\nabout the leak";
+    assert_eq!(named(&memo.id)?, pair("Call the plumber", whole));
+    assert_eq!(notes.by_id(&memo.id)?.map(|n| n.text), Some(String::new()));
+    notes.remove_recording(&memo.id, &memo.recordings[0])?;
+    assert_eq!(named(&memo.id)?, pair("Call the plumber", whole));
+    // Its own text while it has any.
+    let groceries = notes.capture_with("Groceries", None, None, &[], &[voice(2)])?;
+    notes.set_transcript(&groceries.id, &groceries.recordings[0], "Milk")?;
+    assert_eq!(named(&groceries.id)?, pair("Groceries", "Groceries"));
+    // The first Transcript with words, before any Photo Text.
+    let both = notes.capture_with("", None, None, &[photo(1)], &[voice(3), voice(4)])?;
+    notes.set_photo_text(&both.id, &both.photos[0], "RECEIPT")?;
+    assert_eq!(named(&both.id)?, pair("RECEIPT", "RECEIPT"));
+    notes.set_transcript(&both.id, &both.recordings[0], "")?;
+    notes.set_transcript(&both.id, &both.recordings[1], "Second words")?;
+    assert_eq!(named(&both.id)?, pair("Second words", "Second words"));
+    // In the order added, not in the order of the hashes.
+    let ab = notes.capture_with("", None, None, &[], &[voice(5), voice(6)])?;
+    let ba = notes.capture_with("", None, None, &[], &[voice(6), voice(5)])?;
+    let (five, six) = (&ab.recordings[0], &ab.recordings[1]);
+    assert_eq!(&ba.recordings, &[six.clone(), five.clone()]);
+    for note in [&ab, &ba] {
+        notes.set_transcript(&note.id, five, "Five")?;
+        notes.set_transcript(&note.id, six, "Six")?;
+    }
+    assert_eq!(named(&ab.id)?, pair("Five", "Five"));
+    assert_eq!(named(&ba.id)?, pair("Six", "Six"));
+    // A Photo Text while no Transcript has words.
+    let receipt = notes.capture_with("", None, None, &[photo(2)], &[])?;
+    let read = "  RECEIPT\nTotal 12,50  ";
+    notes.set_photo_text(&receipt.id, &receipt.photos[0], read)?;
+    assert_eq!(named(&receipt.id)?, pair("RECEIPT", "RECEIPT\nTotal 12,50"));
+    // Neither: titled by what it holds.
+    let untranscribed = notes.capture_with("", None, None, &[], &[voice(7)])?;
+    assert_eq!(named(&untranscribed.id)?, pair("", ""));
+    // The calendar takes the whole as the description.
+    let pills = notes.capture_with("", None, None, &[], &[voice(8)])?;
+    notes.set_transcript(&pills.id, &pills.recordings[0], "Pills\nthe blue")?;
+    let ten = crate::schedule::ClockTime::new(10, 0)
+        .into_iter()
+        .collect::<Vec<_>>();
+    let schedule =
+        crate::schedule::Schedule::new(crate::schedule::Day::new(2026, 1, 2), &ten, None)
+            .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+    let routine = crate::Routines::new(&store).spawn(&pills.id, &schedule)?;
+    let text = notes
+        .by_id(&pills.id)?
+        .map(|n| n.calendar_text())
+        .unwrap_or_default();
+    let events = crate::ics::routine_events(&routine, &text);
+    let event = events
+        .first()
+        .ok_or_else(|| Error::Invalid("an event".into()))?;
+    assert_eq!(event.summary, "Pills");
+    assert_eq!(event.description, "Pills\nthe blue");
+    Ok(())
+}
+
+#[test]
 fn a_note_of_files_without_words_is_titled_by_its_first_files_name() -> Result<()> {
     let store = crate::store::tests::store();
     let notes = Notes::new(&store);

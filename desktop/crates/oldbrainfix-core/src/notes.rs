@@ -458,6 +458,56 @@ impl Note {
             .map(|a| a.name.clone())
             .unwrap_or_default()
     }
+
+    /// The name the Note is shown by where only its words fit: on cards,
+    /// the Agenda, in the calendar and in notifications (obf-1049). Its
+    /// text as it reads ([`Note::visible_text`]) while it has any; else
+    /// the first line of [`Note::calendar_text`], the Transcript or Photo
+    /// Text it goes by; empty when it has none of them, and then it is
+    /// titled by [`Note::wordless`]. Nothing of it is copied into the
+    /// Note. As the Dart core's `shownName`.
+    pub fn shown_name(&self) -> String {
+        let visible = self.visible_text();
+        if !dart_trim(&visible).is_empty() {
+            return visible;
+        }
+        let stand_in = self.stand_in();
+        let first = stand_in.split('\n').next().unwrap_or_default();
+        dart_trim(first).to_string()
+    }
+
+    /// What a calendar entry of the Note reads, its first line the
+    /// entry's title and the whole its description: its text as it reads
+    /// while it has any; else the first Transcript of its recordings,
+    /// else the first Photo Text of its photos, removed ones included,
+    /// each in the order added (obf-1049); empty when it has none of
+    /// them. As the Dart core's `calendarText`.
+    pub fn calendar_text(&self) -> String {
+        let visible = self.visible_text();
+        if dart_trim(&visible).is_empty() {
+            self.stand_in().to_string()
+        } else {
+            visible
+        }
+    }
+
+    /// The first Transcript with words, else the first Photo Text with
+    /// words, trimmed; empty when there is none. Walked in the order the
+    /// files were added, never in the maps' order.
+    fn stand_in(&self) -> &str {
+        let lists = [
+            (&self.recordings, &self.transcripts),
+            (&self.removed_recordings, &self.transcripts),
+            (&self.photos, &self.photo_texts),
+            (&self.removed_photos, &self.photo_texts),
+        ];
+        lists
+            .into_iter()
+            .flat_map(|(hashes, texts)| hashes.iter().filter_map(|h| texts.get(h)))
+            .map(|text| dart_trim(text))
+            .find(|text| !text.is_empty())
+            .unwrap_or_default()
+    }
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).
