@@ -181,18 +181,18 @@ void announceUntranscribable(
 }
 
 /// Text capture, the quick note (#352): the text field at the top, opened
-/// with the keyboard up, under it the three Nudge buttons and More,
-/// nothing else, in Simple and Advanced alike. The position, and the
-/// calendar events and Bluetooth devices where they are switched on, are
-/// looked up from the start, without asking, and attached when they
-/// arrive: they never hold the Note back. While Unsorted the Note is
-/// nudged in 10 min, 30 min or 1 h, picked with the buttons under the
-/// text, each of which saves (UI laws, "Capture"). There is no Save and
-/// no Back on top: Android's Back saves, nudged in 1 h, and so does the
-/// back arrow the iPhone keeps top left, and the app going to the
-/// background writes the text too; an empty text saves nothing. Where the
-/// Nudge buttons are switched off (Settings ▸ Quick note), one Save takes
-/// their place and nudges in 1 h.
+/// with the keyboard up, right under it the three Nudge buttons and More,
+/// which stay put when the keyboard opens (#396), nothing else, in Simple
+/// and Advanced alike. The position, and the calendar events and
+/// Bluetooth devices where they are switched on, are looked up from the
+/// start, without asking, and attached when they arrive: they never hold
+/// the Note back. While Unsorted the Note is nudged in 10 min, 30 min
+/// or 1 h, picked with the buttons under the text, each of which saves
+/// (UI laws, "Capture"). There is no Save and no Back on top: Android's
+/// Back saves, nudged in 1 h, and so does the back arrow the iPhone keeps
+/// top left, and the app going to the background writes the text too; an
+/// empty text saves nothing. Where the Nudge buttons are switched off
+/// (Settings ▸ Quick note), one Save takes their place and nudges in 1 h.
 ///
 /// More saves the Note at once, Unsorted and nudged in 1 h, and opens it
 /// in the Note editor in place of this screen (#142), where Photo, Voice,
@@ -752,11 +752,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final recording = _voiceMode && !_micMissing;
-    // With the keyboard up the room is small: the photos and recordings
-    // scroll with the text, the buttons stay.
-    final text = Expanded(
-      child: _voiceMode
-          ? Column(
+    // The buttons sit right under the text and do not move when the
+    // keyboard opens (#396); once the text fills the room, the photos,
+    // recordings and text scroll and the buttons stay above the keyboard.
+    final Widget text = _voiceMode
+        ? Expanded(
+            child: Column(
               children: [
                 ..._attachments(context),
                 Expanded(
@@ -770,8 +771,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   ),
                 ),
               ],
-            )
-          : CustomScrollView(
+            ),
+          )
+        : Flexible(
+            child: CustomScrollView(
+              shrinkWrap: true,
               slivers: [
                 for (final attachment in _attachments(context))
                   SliverToBoxAdapter(child: attachment),
@@ -788,13 +792,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       ),
                     ),
                   ),
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _field(context),
-                ),
+                SliverToBoxAdapter(child: _field(context)),
               ],
             ),
-    );
+          );
     // Leaving by Back saves as well (UI laws, "Capture").
     return PopScope(
       canPop: false,

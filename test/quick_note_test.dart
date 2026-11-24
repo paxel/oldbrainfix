@@ -372,4 +372,67 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CaptureScreen), findsNothing);
   });
+
+  group('the buttons stay right under the text (#396)', () {
+    const height = 640.0;
+    const keyboard = 300.0;
+    final pills = find.byType(NudgeButtons);
+
+    Future<void> openOnSmallPhone(WidgetTester tester) async {
+      final ratio = tester.view.devicePixelRatio;
+      tester.view.physicalSize = Size(360 * ratio, height * ratio);
+      addTearDown(tester.view.reset);
+      await start(tester);
+      await openTextCapture(tester);
+    }
+
+    Future<void> openKeyboard(WidgetTester tester) async {
+      await tester.showKeyboard(find.byType(TextField));
+      final ratio = tester.view.devicePixelRatio;
+      tester.view.viewInsets = FakeViewPadding(bottom: keyboard * ratio);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('and do not move when the keyboard opens', (tester) async {
+      await openOnSmallPhone(tester);
+      await tester.enterText(find.byType(TextField), 'call the dentist');
+      await tester.pumpAndSettle();
+      final field = tester.getRect(find.byType(TextField));
+      final pillsAt = tester.getRect(pills);
+      final moreAt = tester.getRect(more);
+      expect(pillsAt.top, field.bottom + 8, reason: 'right under the field');
+      expect(
+        pillsAt.bottom,
+        lessThan(height / 2),
+        reason: 'not at the bottom of the screen',
+      );
+      expect(moreAt.top, greaterThanOrEqualTo(pillsAt.bottom));
+
+      await openKeyboard(tester);
+      expect(tester.takeException(), isNull);
+      expect(tester.getRect(find.byType(TextField)), field);
+      expect(tester.getRect(pills), pillsAt);
+      expect(tester.getRect(more), moreAt);
+    });
+
+    testWidgets('and above the keyboard once the text fills the room', (
+      tester,
+    ) async {
+      await openOnSmallPhone(tester);
+      await openKeyboard(tester);
+      await tester.enterText(
+        find.byType(TextField),
+        [for (var i = 1; i <= 40; i++) 'line $i'].join('\n'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final scroll = tester.getRect(inCapture(find.byType(CustomScrollView)));
+      expect(tester.getRect(pills).top, scroll.bottom + 8);
+      expect(tester.getRect(more).bottom, lessThanOrEqualTo(height - keyboard));
+      await tester.tap(nudge10);
+      await tester.pumpAndSettle();
+      expect(notes.all().single.text, contains('line 40'));
+    });
+  });
 }

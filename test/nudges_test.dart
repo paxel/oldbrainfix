@@ -69,7 +69,7 @@ void main() {
   ];
 
   group('capture', () {
-    testWidgets('shows "remind me in" 10 min, 30 min and 1 h at the bottom, '
+    testWidgets('shows "remind me in" 10 min, 30 min and 1 h under the text, '
         'not as a bar', (tester) async {
       await start(tester);
       await openTextCapture(tester);
@@ -83,7 +83,8 @@ void main() {
       expect(find.text('1 h'), findsOneWidget);
       final screen = tester.getRect(find.byType(CaptureScreen));
       final buttons = tester.getRect(find.byKey(const ValueKey('nudge10')));
-      expect(buttons.top, greaterThan(screen.center.dy));
+      // Right under the text, not at the bottom (#396).
+      expect(buttons.top, lessThan(screen.center.dy));
       expect(
         tester.getRect(find.byType(TextField)).bottom,
         lessThanOrEqualTo(buttons.top),

@@ -107,7 +107,9 @@ replace a law of Both apps where they say so. A desktop law marked
   else** (#352): the text field at the top, under it remind me in
   **10 min, 30 min, 1 h**, and More, which saves the Note as leaving
   does and opens it in the full editor in its place (on the desktop the
-  Note dialog). Simple and Advanced alike, on the phone, in the desktop's
+  Note dialog). On the phone they sit right under the text field and do
+  not move when the keyboard opens (#396); a long text scrolls and they
+  stay above the keyboard. Simple and Advanced alike, on the phone, in the desktop's
   quick note dialog and in the capture popup. No Save and no Back on
   top: Android's system Back saves, the iPhone keeps a back arrow top
   left that saves, the desktop's Esc and the dialog's cross save, each
