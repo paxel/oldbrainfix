@@ -83,4 +83,14 @@ class VoiceTest {
         // ADTS AAC shares the sync bits but has no layer: not MP3.
         assertEquals("m4a", Voice.extension(byteArrayOf(0xFF.toByte(), 0xF1.toByte(), 0x50, 0x80.toByte())))
     }
+
+    @Test
+    fun `MediaRecorder's amplitude is a level from 0 to 1`() {
+        assertEquals(0.0, Voice.level(0), 0.0)
+        assertEquals(1.0, Voice.level(Voice.LOUDEST), 0.0)
+        assertEquals(0.5, Voice.level(Voice.LOUDEST / 2), 0.001)
+        // Out of range never leaves it.
+        assertEquals(0.0, Voice.level(-1), 0.0)
+        assertEquals(1.0, Voice.level(40_000), 0.0)
+    }
 }

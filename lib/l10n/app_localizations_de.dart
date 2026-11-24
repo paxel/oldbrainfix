@@ -7094,4 +7094,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get revertAllConfirm => 'Zurücknehmen';
+
+  @override
+  String get recordingPause => 'Aufnahme nach einer Pause beenden';
+
+  @override
+  String get recordingPauseDetail =>
+      'Beendet eine Sprachaufnahme von selbst, wenn du so lange nichts gesagt hast, und behält sie wie „Beenden“. Aus: Pausen zählen nicht.';
+
+  @override
+  String get recordingPauseOff => 'Aus';
+
+  @override
+  String recordingPauseSeconds(int seconds) {
+    return '$seconds Sek.';
+  }
 }

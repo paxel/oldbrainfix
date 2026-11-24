@@ -259,6 +259,7 @@ class MainActivity : FlutterActivity() {
                                 .also { stopped.file.delete() }
                         }
                     }
+                    "level" -> result.success(voice.level())
                     "play" -> result.success(
                         voice.play(call.arguments as ByteArray) {
                             voiceChannel?.invokeMethod("played", null)

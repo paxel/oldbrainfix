@@ -3805,5 +3805,13 @@
   "revertAllBody": "The Note goes back to how it was when it was opened. Redo brings the changes back one by one.",
   "@revertAllBody": {"description": "Body of the question behind 'revertAllChanges'; two sentences at most."},
   "revertAllConfirm": "Revert",
-  "@revertAllConfirm": {"description": "Confirm button of the question behind 'revertAllChanges'."}
+  "@revertAllConfirm": {"description": "Confirm button of the question behind 'revertAllChanges'."},
+  "recordingPause": "End a recording after a pause",
+  "@recordingPause": {"description": "Settings ▸ Capture (obf-1053), this Device only: the title of the choice after how long a pause a voice recording ends on its own; Off by default."},
+  "recordingPauseDetail": "Ends a voice recording on its own once you have said nothing this long, and keeps it as Stop does. Off: pauses are ignored.",
+  "@recordingPauseDetail": {"description": "The detail line under 'recordingPause' in Settings ▸ Capture (obf-1053)."},
+  "recordingPauseOff": "Off",
+  "@recordingPauseOff": {"description": "The option of 'recordingPause' that ignores pauses, the default (obf-1053)."},
+  "recordingPauseSeconds": "{seconds} s",
+  "@recordingPauseSeconds": {"description": "An option of 'recordingPause' (obf-1053): a pause of this many seconds ends a recording.", "placeholders": {"seconds": {"type": "int"}}}
 }

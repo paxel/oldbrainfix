@@ -29,6 +29,11 @@ abstract interface class VoicePlatform {
   /// recorded.
   Future<Uint8List?> stop();
 
+  /// How loud the microphone was at its loudest since the last ask while
+  /// a recording runs, 0 silent to 1 the loudest it records; null while
+  /// none runs or when the phone cannot tell (obf-1053).
+  Future<double?> level();
+
   /// Plays the recording [bytes], stopping whatever played before.
   /// Whether it plays.
   Future<bool> play(Uint8List bytes);
@@ -62,6 +67,9 @@ class NoVoice implements VoicePlatform {
 
   @override
   Future<Uint8List?> stop() async => null;
+
+  @override
+  Future<double?> level() async => null;
 
   @override
   Future<bool> play(Uint8List bytes) async => false;
@@ -104,6 +112,17 @@ class AndroidVoice implements VoicePlatform {
   Future<Uint8List?> stop() async {
     try {
       return await _channel.invokeMethod<Uint8List>('stop');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  @override
+  Future<double?> level() async {
+    try {
+      return await _channel.invokeMethod<double>('level');
     } on PlatformException {
       return null;
     } on MissingPluginException {

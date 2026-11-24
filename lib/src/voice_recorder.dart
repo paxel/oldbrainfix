@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
+import 'recording_pause.dart';
 import 'sync_line.dart';
 import 'voice_platform.dart';
 
@@ -12,11 +13,22 @@ import 'voice_platform.dart';
 /// editor alike: it starts at once, the microphone asked for with an
 /// explanation the first time, and ends by one big stop button or by its
 /// screen going, and what was recorded is kept with [keep] (UI laws,
-/// "Capture"). On the iPhone the recording goes on with the app in the
-/// background and the phone locked (#350); on Android, which records
-/// under no foreground service, leaving the app or locking the phone ends
-/// and keeps it (#368).
+/// "Capture"). With "End a recording after a pause" on (obf-1053), a
+/// pause of its length after something was heard ends and keeps it as
+/// Stop does. On the iPhone the recording goes on with the app in the
+/// background and the phone locked (#350), and ends after such a pause
+/// there too; on Android, which records under no foreground service,
+/// leaving the app or locking the phone ends and keeps it (#368).
 class VoiceRecorder {
+  /// How often the microphone's level is asked while a pause is to end
+  /// the recording.
+  static const levelEvery = Duration(milliseconds: 200);
+
+  /// The level below which the microphone counts as quiet: 0.02 of the
+  /// loudest, about −34 dBFS at its peak, under speech and above a quiet
+  /// room.
+  static const quietBelow = 0.02;
+
   final VoicePlatform voice;
 
   /// Writes what was recorded into its Note.
@@ -24,6 +36,10 @@ class VoiceRecorder {
 
   /// Runs once a recording ended and [keep] had it.
   final VoidCallback? ended;
+
+  /// The pause after which a recording ends on its own, read as each
+  /// starts; null, as by default, ignores pauses (obf-1053).
+  final Duration? Function()? pause;
 
   /// The running time, counted while it records.
   final elapsed = ValueNotifier(Duration.zero);
@@ -48,7 +64,11 @@ class VoiceRecorder {
   /// Counts the recording's seconds while it runs.
   Timer? _ticker;
 
-  VoiceRecorder(this.voice, {required this.keep, this.ended}) {
+  /// Asks the microphone's level every [levelEvery] while a pause is to
+  /// end the recording.
+  Timer? _listening;
+
+  VoiceRecorder(this.voice, {required this.keep, this.ended, this.pause}) {
     _lifecycle = AppLifecycleListener(
       onStateChange: (state) {
         if (defaultTargetPlatform == TargetPlatform.iOS) return;
@@ -100,7 +120,36 @@ class VoiceRecorder {
     _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
       elapsed.value = Duration(seconds: timer.tick);
     });
+    if (pause?.call() case final pause?) _listen(recording, pause);
     return true;
+  }
+
+  /// Ends [recording] once the microphone was quiet for [pause] after it
+  /// heard something: a recording not spoken into yet goes on. The quiet
+  /// is counted by the timer's ticks, a level the phone cannot tell
+  /// counting as none, so a late or failing ask never ends it early.
+  void _listen(Future<bool> recording, Duration pause) {
+    final quietTicks = (pause.inMilliseconds / levelEvery.inMilliseconds)
+        .ceil();
+    var heard = false;
+    var asking = false;
+    int? quietFrom;
+    _listening = Timer.periodic(levelEvery, (timer) async {
+      if (asking) return;
+      asking = true;
+      final level = await voice.level();
+      asking = false;
+      if (_recording != recording) return;
+      if (level == null) {
+        quietFrom = null;
+      } else if (level >= quietBelow) {
+        heard = true;
+        quietFrom = null;
+      } else if (heard) {
+        final from = quietFrom ??= timer.tick;
+        if (timer.tick - from + 1 >= quietTicks) unawaited(stop());
+      }
+    });
   }
 
   /// Ends the recording and keeps it; the same ending when asked again,
@@ -111,6 +160,7 @@ class VoiceRecorder {
       _recording = null;
       if (_running == this) _running = null;
       _ticker?.cancel();
+      _listening?.cancel();
       _stopping = _keep(recording);
     }
     return _stopping ?? Future.value();
@@ -133,6 +183,7 @@ class VoiceRecorder {
     _lifecycle.dispose();
     if (_recording != null) unawaited(stop());
     _ticker?.cancel();
+    _listening?.cancel();
     elapsed.dispose();
   }
 }
@@ -263,6 +314,7 @@ class _RecordScreenState extends State<_RecordScreen> {
     VoiceScope.of(context),
     keep: (bytes) => widget.notes.addRecording(widget.noteId, bytes),
     ended: _close,
+    pause: () => recordingPause(widget.notes.store),
   );
 
   /// Whether the microphone was found not allowed or not working.

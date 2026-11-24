@@ -1872,5 +1872,9 @@
   "revertAllChanges": "Alle Änderungen zurücknehmen",
   "revertAllQuestion": "Alle Änderungen zurücknehmen?",
   "revertAllBody": "Die Notiz wird wieder so, wie sie beim Öffnen war. „Wiederholen“ holt die Änderungen einzeln zurück.",
-  "revertAllConfirm": "Zurücknehmen"
+  "revertAllConfirm": "Zurücknehmen",
+  "recordingPause": "Aufnahme nach einer Pause beenden",
+  "recordingPauseDetail": "Beendet eine Sprachaufnahme von selbst, wenn du so lange nichts gesagt hast, und behält sie wie „Beenden“. Aus: Pausen zählen nicht.",
+  "recordingPauseOff": "Aus",
+  "recordingPauseSeconds": "{seconds} Sek."
 }

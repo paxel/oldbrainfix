@@ -29,6 +29,7 @@ import 'named_places_screen.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
 import 'print_platform.dart';
+import 'recording_pause.dart';
 import 'routine_editor_screen.dart';
 import 'run_over.dart';
 import 'schedule_text.dart';
@@ -38,6 +39,7 @@ import 'speech_model_screen.dart';
 import 'speech_platform.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
+import 'voice_platform.dart';
 
 export 'settings_search.dart' show SettingsHeading, SettingsSection;
 
@@ -49,7 +51,7 @@ enum _UnitChoice { region, metric, imperial }
 /// page: the theme, the text size (#326, obf-1019) and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
-/// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
+/// switches, the speech model, End a recording after a pause (obf-1053) and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
 /// Google Keep export; in Advanced, Ask (#333); Show tips (obf-1060)
 /// and Show tips again (obf-1043); the person's own Code languages (obf-1037); and Send
@@ -151,6 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _advanced = widget.store.advanced;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late bool _askOn = widget.store.askOn;
+  late int _pauseSeconds = recordingPause(widget.store)?.inSeconds ?? 0;
   late String? _sound = widget.store.alarmSound;
   late ClockTime _allDayFrom = widget.store.allDayFrom;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
@@ -257,6 +260,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setAsk(bool on) {
     widget.store.askOn = on;
     setState(() => _askOn = on);
+  }
+
+  /// End a recording after a pause (obf-1053): its seconds, 0 for Off;
+  /// the next recording follows it.
+  void _setPause(int seconds) {
+    setRecordingPause(widget.store, seconds == 0 ? null : seconds);
+    setState(() => _pauseSeconds = seconds);
   }
 
   void _setTwoRows(bool on) {
@@ -1014,6 +1024,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   subtitle: Text(t.settingsSpeechModelDetail),
                                   onTap: () => _push(
                                     SpeechModelScreen(model: speech.model),
+                                  ),
+                                ),
+                              ),
+                            if (VoiceScope.of(context).available)
+                              SettingsRow(
+                                words: [
+                                  t.recordingPause,
+                                  t.recordingPauseDetail,
+                                ],
+                                child: ControlBelow(
+                                  leading: const Icon(Icons.mic_off_outlined),
+                                  title: Text(t.recordingPause),
+                                  subtitle: Text(t.recordingPauseDetail),
+                                  control: ChoiceChips<int>(
+                                    key: const ValueKey('recordingPause'),
+                                    value: _pauseSeconds,
+                                    onChanged: _setPause,
+                                    options: [
+                                      RadioOption(
+                                        value: 0,
+                                        title: Text(t.recordingPauseOff),
+                                      ),
+                                      for (final s in recordingPauseChoices)
+                                        RadioOption(
+                                          value: s,
+                                          title: Text(
+                                            t.recordingPauseSeconds(s),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),

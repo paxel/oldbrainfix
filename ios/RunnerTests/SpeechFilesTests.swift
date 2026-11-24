@@ -166,4 +166,12 @@ class SpeechFilesTests: XCTestCase {
     XCTAssertEqual(named(Array("\0\0\0\u{18}ftypM4A ".utf8)), "m4a")
     XCTAssertEqual(named([]), "m4a")
   }
+
+  func testThePeakPowerIsALevelFrom0To1() {
+    XCTAssertEqual(VoiceFiles.level(decibels: 0), 1)
+    XCTAssertEqual(VoiceFiles.level(decibels: -20), 0.1, accuracy: 0.0001)
+    XCTAssertEqual(VoiceFiles.level(decibels: -160), 0, accuracy: 0.0001)
+    // Above full scale never leaves it.
+    XCTAssertEqual(VoiceFiles.level(decibels: 3), 1)
+  }
 }

@@ -37,6 +37,8 @@ enum VoiceChannel {
           result(bytes.map { FlutterStandardTypedData(bytes: $0) })
         }
       }
+    case "level":
+      result(voice.level())
     case "play":
       guard let bytes = (call.arguments as? FlutterStandardTypedData)?.data else {
         result(false)
@@ -127,9 +129,10 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
       return false
     }
     for settings in Voice.settings {
-      guard let recorder = try? AVAudioRecorder(url: file, settings: settings),
-        recorder.prepareToRecord(), recorder.record()
-      else { continue }
+      guard let recorder = try? AVAudioRecorder(url: file, settings: settings) else { continue }
+      // Its level ends a recording after a pause (obf-1053).
+      recorder.isMeteringEnabled = true
+      guard recorder.prepareToRecord(), recorder.record() else { continue }
       self.recorder = recorder
       // The screen stays on while it runs (#350); locked anyway, the
       // active session and the audio background mode keep it going.
@@ -156,6 +159,15 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
     if let size = SpeechFiles.stamp(file)?.size, size > 0 { return file }
     try? FileManager.default.removeItem(at: file)
     return nil
+  }
+
+  /// How loud the microphone was at its loudest of late, 0 silent to 1
+  /// the loudest, as Voice.kt's level; nil while no recording runs
+  /// (obf-1053).
+  func level() -> Double? {
+    guard let recorder, recorder.isRecording else { return nil }
+    recorder.updateMeters()
+    return VoiceFiles.level(decibels: recorder.peakPower(forChannel: 0))
   }
 
   /// Ends a recording without keeping it.
@@ -216,6 +228,13 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
 /// The rule of Voice.kt's companion on the iPhone (#239), free of
 /// AVFoundation: what kind of sound file a recording is.
 enum VoiceFiles {
+  /// AVAudioRecorder's peak power in [decibels] below full scale as a
+  /// level, 0 silent to 1 the loudest, as MediaRecorder's amplitude is on
+  /// Android.
+  static func level(decibels: Float) -> Double {
+    min(1, max(0, pow(10, Double(decibels) / 20)))
+  }
+
   /// The file extension of the recording [bytes]: `wav` for a WAV file
   /// (`RIFF`…`WAVE`), as the desktop records; `ogg` for an Ogg file
   /// (`OggS`); `mp3` for an MP3 file (an `ID3` tag or an MPEG audio

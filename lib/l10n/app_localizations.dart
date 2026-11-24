@@ -11292,6 +11292,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Revert'**
   String get revertAllConfirm;
+
+  /// Settings ▸ Capture (obf-1053), this Device only: the title of the choice after how long a pause a voice recording ends on its own; Off by default.
+  ///
+  /// In en, this message translates to:
+  /// **'End a recording after a pause'**
+  String get recordingPause;
+
+  /// The detail line under 'recordingPause' in Settings ▸ Capture (obf-1053).
+  ///
+  /// In en, this message translates to:
+  /// **'Ends a voice recording on its own once you have said nothing this long, and keeps it as Stop does. Off: pauses are ignored.'**
+  String get recordingPauseDetail;
+
+  /// The option of 'recordingPause' that ignores pauses, the default (obf-1053).
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get recordingPauseOff;
+
+  /// An option of 'recordingPause' (obf-1053): a pause of this many seconds ends a recording.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String recordingPauseSeconds(int seconds);
 }
 
 class _AppLocalizationsDelegate

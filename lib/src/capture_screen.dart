@@ -17,6 +17,7 @@ import 'location.dart';
 import 'note_editor_screen.dart';
 import 'photo_platform.dart';
 import 'photo_views.dart';
+import 'recording_pause.dart';
 import 'routine_editor_screen.dart';
 import 'speech_platform.dart';
 import 'spotlight.dart';
@@ -224,7 +225,8 @@ void announceUntranscribable(
 /// [startVoice] opens voice: recording starts at once, the elapsed time
 /// runs, and one big stop button ends it and comes back to the text with
 /// the recording; the Nudge buttons and Back end it and save; there is no
-/// hold-to-talk and no stop on silence (UI laws, "Capture"). The first
+/// hold-to-talk, and a pause ends it only where Settings ▸ Capture says
+/// so (obf-1053), as Stop does (UI laws, "Capture"). The first
 /// time, while the microphone is not allowed yet, it explains why and
 /// asks. The screen stays on while recording (#350). On the iPhone the
 /// recording goes on with the app in the background and the phone locked,
@@ -374,6 +376,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       widget.voice,
       keep: _addRecording,
       ended: _recordingEnded,
+      pause: () => recordingPause(widget.notes.store),
     );
     // A share is meant to be kept: it is written at once, as one Note.
     final shared = widget.shared;

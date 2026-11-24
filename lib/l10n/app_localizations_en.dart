@@ -7009,4 +7009,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get revertAllConfirm => 'Revert';
+
+  @override
+  String get recordingPause => 'End a recording after a pause';
+
+  @override
+  String get recordingPauseDetail =>
+      'Ends a voice recording on its own once you have said nothing this long, and keeps it as Stop does. Off: pauses are ignored.';
+
+  @override
+  String get recordingPauseOff => 'Off';
+
+  @override
+  String recordingPauseSeconds(int seconds) {
+    return '$seconds s';
+  }
 }

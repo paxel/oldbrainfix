@@ -1332,6 +1332,15 @@ replace a law of Both apps where they say so. A desktop law marked
   format bar rides on the keyboard. Voice records on a page of its own
   with the big stop button; Stop, Back and Stop on the notification keep
   the recording on the Note.
+- **A pause ends a recording only where the Device says so**
+  (obf-1053): Settings ▸ Capture ▸ "End a recording after a pause",
+  kept on this Device only, offers Off, the default, which ignores
+  pauses, and 2, 3, 5 or 10 s. Set, every voice recording on the phone,
+  the quick note's and the editor's page alike, also one the iPhone
+  goes on with locked, ends once the microphone stayed quiet that long
+  after it heard something, and is kept as Stop keeps it; a recording
+  nothing was said into yet goes on. Android ends a recording on
+  locking anyway (#368). The row shows only where the phone records.
 - **Settings ▸ Quick note** (per Device, ADR 0008) keeps only the switch
   Nudge buttons, on by default. The switches that once added File
   into…, Frog, Session or Tally, Add to a Shopping List, the Importance
