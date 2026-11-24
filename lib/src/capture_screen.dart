@@ -832,6 +832,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                 places: Places(notes.store),
                 drafts: drafts,
                 noteId: captured.noteId,
+                made: true,
               ),
             ),
             result: (

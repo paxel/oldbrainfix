@@ -349,6 +349,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get amendHint => 'Was gibt es Neues?';
 
   @override
+  String get addAPart => 'Teil hinzufügen';
+
+  @override
   String get add => 'Hinzufügen';
 
   @override
@@ -6962,6 +6965,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get spotEditorLinkedFrom =>
       '„Verlinkt von“ nennt die Notizen, deren Links zu dieser führen.';
+
+  @override
+  String get spotEditorAddPart =>
+      'Teil hinzufügen setzt Neues unter die Notiz, mit eigener Zeit.';
 
   @override
   String get spotAreaSearch => 'Die Suche findet die hier abgelegten Notizen.';

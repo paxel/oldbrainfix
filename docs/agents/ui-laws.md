@@ -1584,6 +1584,14 @@ replace a law of Both apps where they say so. A desktop law marked
   opens the search over every Note for its words on top, as a tap on a
   tag does, greyed while it holds none; back returns to the Note with
   its find bar.
+- **The Amend box shows only when asked** (obf-1072, C15c): the Note
+  editor has no "Add to Note" field or button of its own. An existing
+  Note has **Add a part** (`post_add`) on its bar, after Revert all
+  changes and before Photo, for everyone who may Amend it; it opens the
+  box "Add to Note" with its format bar, "What's new?" and Add. A Note
+  being made, in the editor opened by the quick note's Open in the
+  editor or a list's "+", has none; opened again later, it has. Its
+  Spotlight is the editor's last tip.
 - A screen reader reads both rows and the buttons by name, and the
   character the cursor passes.
 - **On the phone a table in the field is its grid**, never its

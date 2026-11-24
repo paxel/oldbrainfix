@@ -114,7 +114,7 @@ Future<String?> makeNew(
         return note;
       });
       onChanged();
-      await openNote(context, notes, places, note, typeLines: true);
+      await openNote(context, notes, places, note, typeLines: true, made: true);
       if (context.mounted) onChanged();
       return note.id;
     case NewKind.tally:

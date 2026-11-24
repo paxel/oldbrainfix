@@ -6,10 +6,10 @@ import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'announced.dart';
 import 'fake_location.dart';
 import 'open_settings.dart';
-import 'reveal.dart';
 import 'open_capture.dart';
 
 void main() {
@@ -195,8 +195,7 @@ void main() {
       expect(find.textContaining('48.1372'), findsNothing);
       await tap(tester, find.byKey(const ValueKey('badge-close')));
 
-      await reveal(tester, find.text('Add to Note'));
-      await tap(tester, find.text('Add to Note'));
+      await addAPart(tester);
       await tester.enterText(
         find.descendant(
           of: find.byType(AlertDialog),

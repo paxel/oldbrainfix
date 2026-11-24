@@ -346,6 +346,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get amendHint => 'What\'s new?';
 
   @override
+  String get addAPart => 'Add a part';
+
+  @override
   String get add => 'Add';
 
   @override
@@ -6879,6 +6882,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get spotEditorLinkedFrom =>
       'Linked from lists the Notes whose links lead to this one.';
+
+  @override
+  String get spotEditorAddPart =>
+      'Add a part puts something new under the Note, with its own time.';
 
   @override
   String get spotAreaSearch => 'Search finds the Notes filed here.';

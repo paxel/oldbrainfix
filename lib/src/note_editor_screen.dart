@@ -68,7 +68,8 @@ import 'voice_recorder.dart';
 /// moved on to the next of [sorting]. With [typeLines] the cursor starts
 /// in a new Line of a list after its open ones (#161, #276). With [find]
 /// it opens with its find bar finding the search's words, at the place
-/// the search found (obf-1047).
+/// the search found (obf-1047). [made] says the Note is being made
+/// (obf-1072).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
@@ -77,6 +78,7 @@ Future<void> openNote(
   bool typeLines = false,
   UnsortedShown? sorting,
   NoteFind? find,
+  bool made = false,
 }) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (_) => NoteEditorScreen(
@@ -87,6 +89,7 @@ Future<void> openNote(
       typeLines: typeLines,
       sorting: sorting,
       find: find,
+      made: made,
     ),
   ),
 );
@@ -627,8 +630,9 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// Sections, each with its own Capture Context. A Section this Device may
 /// edit, while the Note is not in the trash, is edited in a field of its
 /// own as the Note's text is and saved with it; the others are only read,
-/// their text selected and copied with a long press (#183). "Add to
-/// Note" amends it; the "+" badge spawns a Routine, Reminder, Frog or
+/// their text selected and copied with a long press (#183). "Add a
+/// part" among its actions opens the box that amends it, not on a Note
+/// being made (obf-1072); the "+" badge spawns a Routine, Reminder, Frog or
 /// Session from it, as the card's menu does; the calendar button adds it,
 /// or its Routines and Reminders, to the calendar; the send button sends
 /// it as a Sent Item; "merge into…" merges it into another Note; the
@@ -685,6 +689,11 @@ class NoteEditorScreen extends StatefulWidget {
   /// show (obf-1047); the find bar is closed when null.
   final NoteFind? find;
 
+  /// Whether the Note is being made: opened from the quick note's Open in
+  /// the editor or a list's "+" (obf-1072). Such a Note has no "Add a
+  /// part"; adding a part is for an existing Note, opened again.
+  final bool made;
+
   const NoteEditorScreen({
     super.key,
     required this.notes,
@@ -694,6 +703,7 @@ class NoteEditorScreen extends StatefulWidget {
     this.typeLines = false,
     this.sorting,
     this.find,
+    this.made = false,
   });
 
   @override
@@ -3952,6 +3962,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     : null,
                 icon: Icons.settings_backup_restore,
               ),
+              // Opens the Amend box, only when asked (obf-1072).
+              if (amends && !widget.made)
+                BarAction(
+                  key: const ValueKey('editor-add-part'),
+                  spotlight: 'editor-add-part',
+                  label: t.addAPart,
+                  onPressed: () => unawaited(_amend()),
+                  icon: Icons.post_add,
+                ),
               if (changes) ...[
                 // What the quick note offered before (#352).
                 if (PhotoScope.of(context).available)
@@ -4029,7 +4048,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       placed,
                       note,
                       editable,
-                      amends,
                       when,
                       place,
                       colour,
@@ -4060,7 +4078,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     PlacedNote placed,
     Note note,
     bool editable,
-    bool amends,
     DateFormat when,
     String place,
     Color? colour,
@@ -4283,15 +4300,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             child: LinkedFrom(linking: _linkedFrom),
           ),
         const SizedBox(height: 24),
-        if (amends)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
-              onPressed: _amend,
-              icon: const Icon(Icons.add),
-              label: Text(t.amend),
-            ),
-          ),
       ],
     );
   }

@@ -145,11 +145,10 @@ void main() {
         tester.getBottomLeft(key('tear:$section')).dy,
         lessThanOrEqualTo(tester.getTopLeft(key('section-text:$section')).dy),
       );
-      await reveal(tester, find.text('Add to Note'));
-      expect(
-        tester.getTopLeft(find.text('Add to Note')).dy,
-        greaterThan(tester.getBottomLeft(key('section-text:$section')).dy),
-      );
+      // No Amend box or button under it: "Add a part" opens it
+      // (obf-1072).
+      expect(find.text('Add to Note'), findsNothing);
+      expect(find.text("What's new?"), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }

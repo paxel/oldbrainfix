@@ -7,12 +7,12 @@ import 'package:oldbrainfix/src/context_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'announced.dart';
 import 'fake_context.dart';
 import 'fake_location.dart';
 import 'fake_photos.dart';
 import 'open_settings.dart';
-import 'reveal.dart';
 import 'open_capture.dart';
 
 void main() {
@@ -192,8 +192,7 @@ void main() {
       await openEditor(tester, 'nees mor sauce');
       expect(find.textContaining('Headphones'), findsNothing);
 
-      await reveal(tester, find.text('Add to Note'));
-      await tap(tester, find.text('Add to Note'));
+      await addAPart(tester);
       await tester.enterText(
         find.descendant(
           of: find.byType(AlertDialog),

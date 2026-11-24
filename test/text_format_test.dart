@@ -6,6 +6,7 @@ import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'reveal.dart';
 
 /// A text in a format this version does not know, as a later version
@@ -58,12 +59,7 @@ void main() {
     expect(field.controller?.text, '# Shopping\n**milk**');
 
     // Amend adds a Section and leaves the text as it is.
-    await tester.scrollUntilVisible(
-      find.text('Add to Note'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tap(tester, find.text('Add to Note'));
+    await addAPart(tester);
     await tester.enterText(find.byType(TextField).last, 'Oat milk');
     await tap(tester, find.text('Add'));
     expect(store.current(note.id, NoteKeys.text), _future);

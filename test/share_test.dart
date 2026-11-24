@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'announced.dart';
 import 'fake_photos.dart';
 import 'reveal.dart';
@@ -178,8 +179,12 @@ void main() {
     }
     final field = tester.widget<TextField>(find.byType(TextField).first);
     expect(field.readOnly, isTrue);
-    await reveal(tester, find.text('Add to Note'));
-    expect(find.text('Add to Note'), findsOneWidget);
+    // Amend stays: "Add a part" on the bar or in ⋮ (obf-1072).
+    if (addAPartAction.evaluate().isEmpty) {
+      await tester.tap(find.byKey(const ValueKey('bar-more')));
+      await tester.pumpAndSettle();
+    }
+    expect(addAPartAction, findsOneWidget);
   });
 
   testWidgets('a Member checks off a Frog of the Area on the Agenda but '

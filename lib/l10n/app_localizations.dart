@@ -704,6 +704,12 @@ abstract class AppLocalizations {
   /// **'What\'s new?'**
   String get amendHint;
 
+  /// The Note editor's action that opens the box adding a part (a Section) to an existing Note; a Note being made has none (obf-1072).
+  ///
+  /// In en, this message translates to:
+  /// **'Add a part'**
+  String get addAPart;
+
   /// No description provided for @add.
   ///
   /// In en, this message translates to:
@@ -11094,6 +11100,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Linked from lists the Notes whose links lead to this one.'**
   String get spotEditorLinkedFrom;
+
+  /// A Spotlight (obf-1043) on Add a part in the Note editor's bar or its ⋮ menu (new in 0.8.0, obf-1072): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a part puts something new under the Note, with its own time.'**
+  String get spotEditorAddPart;
 
   /// A Spotlight (obf-1043) on the search field of an Area or a Topic: one sentence of what it does.
   ///

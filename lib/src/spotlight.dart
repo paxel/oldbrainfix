@@ -48,6 +48,7 @@ final Map<String, List<SpotlightItem>> spotlightManifest = {
     SpotlightItem('editor-remind', (t) => t.spotEditorRemind),
     SpotlightItem('editor-code-language', (t) => t.spotEditorCodeLanguage),
     SpotlightItem('editor-linked-from', (t) => t.spotEditorLinkedFrom),
+    SpotlightItem('editor-add-part', (t) => t.spotEditorAddPart),
   ],
   // An Area's list and a Topic's alike.
   'area': [

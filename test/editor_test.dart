@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'reveal.dart';
 
 void main() {
@@ -150,8 +151,7 @@ void main() {
       await edit(tester, find.text('nees mor sauce'));
 
       tick(const Duration(hours: 3));
-      await reveal(tester, find.text('Add to Note'));
-      await tap(tester, find.text('Add to Note'));
+      await addAPart(tester);
       await tester.enterText(
         find.descendant(
           of: find.byType(AlertDialog),
@@ -358,8 +358,12 @@ void main() {
     await edit(tester, find.text('Soße kaufen'));
     await tap(tester, find.byKey(const ValueKey('badge-importance')));
     await tap(tester, find.text('Unwichtig'));
-    await reveal(tester, find.text('Zur Notiz hinzufügen'));
-    expect(find.text('Zur Notiz hinzufügen'), findsOneWidget);
+    await reveal(tester, find.text('Gekauft'));
+    // "Add a part" in ⋮ on a phone this wide (obf-1072).
+    await tap(tester, find.byKey(const ValueKey('bar-more')));
+    expect(find.text('Teil hinzufügen'), findsOneWidget);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
     await tap(tester, find.byType(BackButton));
     await tap(tester, find.byType(BackButton));
     await tap(tester, find.text('Ein ziemlich langer Bereichsname'));
