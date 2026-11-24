@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import 'app_links.dart';
 import 'box_ids.dart';
+import 'cell_selection.dart';
 import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -1287,6 +1288,11 @@ class MarkedText extends StatefulWidget {
   /// text is drawn only for a field that takes the taps.
   final bool tableMenu;
 
+  /// Whether a long press on a cell of a table selects a rectangle of
+  /// cells to copy (obf-1054): in a text being read in the Note editor,
+  /// not on a card, which selects no text.
+  final bool selectCells;
+
   const MarkedText(
     this.text, {
     super.key,
@@ -1305,6 +1311,7 @@ class MarkedText extends StatefulWidget {
     this.unfoldAt,
     this.found,
     this.tableMenu = true,
+    this.selectCells = false,
   }) : assert(
          boxes == null || source != null || tableEdit == null,
          'a table is changed in the text as stored, its ids in it',
@@ -1836,6 +1843,17 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
               ticking: ticking,
             )
           : null,
+      onCopyCells: widget.selectCells
+          ? (rows, left, right) => copyCells(
+              context,
+              text: found.stored(widget.source),
+              at: found.storedAt(table.start),
+              rows: rows,
+              left: left,
+              right: right,
+              ticking: ticking,
+            )
+          : null,
     );
   }
 
@@ -1893,7 +1911,10 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
 /// A tap on a column's heading sorts the rows by it instead (obf-1052),
 /// ascending, then descending, then as written, in the view only: the
 /// first rows shown are the first in that order, and it is forgotten
-/// with the view.
+/// with the view. With [onCopyCells] a long press on a cell selects a
+/// rectangle of cells to copy (obf-1054, [CellSelection]), given as the
+/// rows' indices in the table in the order shown and the columns from
+/// and to; a tap then ends it before anything else.
 class _ReadTable extends StatefulWidget {
   final MarkdownTable table;
   final TextStyle base;
@@ -1905,6 +1926,7 @@ class _ReadTable extends StatefulWidget {
   cell;
   final VoidCallback onOpen;
   final Future<void> Function()? onCopy;
+  final Future<void> Function(List<int> rows, int left, int right)? onCopyCells;
 
   const _ReadTable({
     super.key,
@@ -1915,6 +1937,7 @@ class _ReadTable extends StatefulWidget {
     required this.cell,
     required this.onOpen,
     this.onCopy,
+    this.onCopyCells,
   });
 
   @override
@@ -1927,6 +1950,7 @@ class _ReadTableState extends State<_ReadTable> {
   static const _down = 4.0;
 
   final _offset = ValueNotifier<double>(0);
+  final _cells = GlobalKey<CellSelectionState>();
   late bool _unfolded = widget.unfold;
   List<double> _widths = const [];
 
@@ -1959,6 +1983,7 @@ class _ReadTableState extends State<_ReadTable> {
         _sort = null;
       }
       _order = tableRowOrder(widget.table, _sort);
+      _cells.currentState?.clear();
     }
     if (!identical(old.table, widget.table) ||
         old.base != widget.base ||
@@ -1969,10 +1994,19 @@ class _ReadTableState extends State<_ReadTable> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _offset.addListener(_moved);
+  }
+
+  @override
   void dispose() {
     _offset.dispose();
     super.dispose();
   }
+
+  /// The cells selected end as the table moves sideways.
+  void _moved() => _cells.currentState?.clear();
 
   /// Each column as wide as its widest shown cell's words in bold, within
   /// bounds.
@@ -2016,6 +2050,7 @@ class _ReadTableState extends State<_ReadTable> {
   /// A tap on the heading of [column]: the rows show sorted by it
   /// ascending, then descending, then as written.
   void _sortBy(int column) => setState(() {
+    _cells.currentState?.clear();
     _sort = nextTableSort(_sort, column);
     _order = tableRowOrder(widget.table, _sort);
     _measure();
@@ -2025,6 +2060,30 @@ class _ReadTableState extends State<_ReadTable> {
     _unfolded = true;
     _measure();
   });
+
+  /// A tap ends the cells selected, else it does [then].
+  void _tapped(VoidCallback then) {
+    if (_cells.currentState?.clear() ?? false) return;
+    then();
+  }
+
+  /// The rows of [cells] by their index in the table, in the order shown.
+  List<int> _rowsOf(CellRect cells) => [
+    for (var r = cells.top; r <= cells.bottom && r < _order.length; r++)
+      _order[r],
+  ];
+
+  /// The words of [cells] as they show, a space between them.
+  String _wordsOf(CellRect cells) {
+    final rows = widget.table.rows;
+    return [
+      for (final r in _rowsOf(cells))
+        for (var c = cells.left; c <= cells.right; c++)
+          if (rows[r].cells[c].visible.trim() case final words
+              when words.isNotEmpty)
+            words,
+    ].join(' ');
+  }
 
   /// The ⋮ at [at] (global): Copy.
   Future<void> _menu(Offset at) async {
@@ -2087,15 +2146,14 @@ class _ReadTableState extends State<_ReadTable> {
     final rest = math.max(0.0, room - fixed);
     final most = math.max(0.0, moving - rest);
     final rows = [
-      for (var r = 0; r < _shown; r++)
-        _row(context, _order[r], widths, first, most),
+      for (var r = 0; r < _shown; r++) _row(context, r, widths, first, most),
     ];
-    return Semantics(
+    final grid = Semantics(
       container: true,
       onTapHint: t.tableOpen,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onOpen,
+        onTap: () => _tapped(widget.onOpen),
         // A drag on the cells moves a table wider than its room under the
         // finger; one that fits leaves the swipe to the page.
         onHorizontalDragUpdate: most > 0
@@ -2119,21 +2177,31 @@ class _ReadTableState extends State<_ReadTable> {
         ),
       ),
     );
+    final copy = widget.onCopyCells;
+    if (copy == null) return grid;
+    return CellSelection(
+      key: _cells,
+      onCopy: (cells) => copy(_rowsOf(cells), cells.left, cells.right),
+      words: _wordsOf,
+      child: grid,
+    );
   }
 
-  /// The row [r] of the table: its first column stays when it holds
-  /// headings ([first] is 1), the others move by the offset up to [most].
+  /// The row shown [shown]th of the table: its first column stays when it
+  /// holds headings ([first] is 1), the others move by the offset up to
+  /// [most].
   Widget _row(
     BuildContext context,
-    int r,
+    int shown,
     List<double> widths,
     int first,
     double most,
   ) {
     final table = widget.table;
+    final r = _order[shown];
     final cells = [
       for (var c = first; c < table.columns; c++)
-        SizedBox(width: widths[c], child: _cellAt(context, r, c)),
+        SizedBox(width: widths[c], child: _cellAt(context, r, c, shown)),
     ];
     return IntrinsicHeight(
       key: ValueKey('table-${table.firstLine}-row-$r'),
@@ -2142,7 +2210,7 @@ class _ReadTableState extends State<_ReadTable> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (first == 1)
-            SizedBox(width: widths[0], child: _cellAt(context, r, 0)),
+            SizedBox(width: widths[0], child: _cellAt(context, r, 0, shown)),
           if (most > 0)
             Expanded(
               child: TableShifted(
@@ -2162,7 +2230,9 @@ class _ReadTableState extends State<_ReadTable> {
     );
   }
 
-  Widget _cellAt(BuildContext context, int r, int c) {
+  /// The cell in row [r] of the table and column [c], the row shown
+  /// [shown]th.
+  Widget _cellAt(BuildContext context, int r, int c, int shown) {
     final scheme = Theme.of(context).colorScheme;
     final table = widget.table;
     final heading = r == 0 || (c == 0 && table.headingColumn);
@@ -2171,30 +2241,33 @@ class _ReadTableState extends State<_ReadTable> {
     final words = widget.cell(context, r, c, style);
     final sort = _sort;
     final sorted = r == 0 && sort != null && sort.column == c;
-    final cell = DecoratedBox(
-      decoration: BoxDecoration(
-        color: heading ? scheme.surfaceContainerHighest : null,
-        border: Border.all(color: scheme.outline, width: 0.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: _across,
-          vertical: _down,
+    final cell = SelectableCell(
+      cell: (row: shown, column: c),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: heading ? scheme.surfaceContainerHighest : null,
+          border: Border.all(color: scheme.outline, width: 0.5),
         ),
-        child: sorted
-            ? TableSortedHeading(
-                words: words,
-                descending: sort.descending,
-                size: base.fontSize ?? 14,
-              )
-            : words,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _across,
+            vertical: _down,
+          ),
+          child: sorted
+              ? TableSortedHeading(
+                  words: words,
+                  descending: sort.descending,
+                  size: base.fontSize ?? 14,
+                )
+              : words,
+        ),
       ),
     );
     if (r != 0) return cell;
     // The header row's tap sorts, before the table's and the card's.
     return TableSortTap(
       key: ValueKey('table-${table.firstLine}-sort-$c'),
-      onSort: () => _sortBy(c),
+      onSort: () => _tapped(() => _sortBy(c)),
       descending: sorted ? sort.descending : null,
       child: cell,
     );

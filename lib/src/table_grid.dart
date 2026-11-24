@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
+import 'cell_selection.dart';
 import 'edit_history.dart';
 import 'found_marks.dart';
 import 'l10n.dart';
@@ -43,7 +44,10 @@ typedef GridWritten = ({String text, int at});
 /// as text instead ([onShowLines]). Its ⋮ at the top right corner, at the
 /// finger, copies the whole table, moves it past the block of the text
 /// above or below it, or deletes it, asking once while it holds words
-/// (obf-1050).
+/// (obf-1050). A long press on a cell not being edited selects a
+/// rectangle of cells to copy, a drag on without lifting the finger
+/// spanning it (obf-1054, [CellSelection]); a tap then ends it before
+/// editing anything.
 ///
 /// Every change is made by the table edits of the core
 /// ([MarkdownTables]) on [text], the table [table] in it, and given to
@@ -140,6 +144,7 @@ class TableGridState extends State<TableGrid> {
   final _bar = TwoRowBarHost();
   final _barShown = OverlayPortalController();
   final _sideways = ScrollController();
+  final _cells = GlobalKey<CellSelectionState>();
   ModalRoute<Object?>? _route;
 
   /// The editor field's text actions, left to the cell's own field.
@@ -369,6 +374,7 @@ class TableGridState extends State<TableGrid> {
   /// gives.
   void _apply(MarkdownChange change) {
     if (change.text == _text) return;
+    _cells.currentState?.clear();
     // A row or column changed is a step of its own for Undo (obf-1051).
     EditHistory.wholeStep(context, () => _write(change));
     setState(_measure);
@@ -629,6 +635,20 @@ class TableGridState extends State<TableGrid> {
     }
   }
 
+  /// The words of [cells] as they show, a space between them.
+  String _wordsOf(CellRect cells) {
+    final table = _table;
+    if (table == null) return '';
+    return [
+      for (var r = cells.top; r <= cells.bottom; r++)
+        for (var c = cells.left; c <= cells.right; c++)
+          if (r < table.rows.length && c < table.columns)
+            if (withoutIds(table.rows[r].cells[c].visible).trim()
+                case final words when words.isNotEmpty)
+              words,
+    ].join(' ');
+  }
+
   /// The table's ⋮ at [at] (global): Copy, Move up and Move down while
   /// there is a block of the text to move past, and Delete (obf-1050).
   Future<void> _tableMenu(Offset at) async {
@@ -731,7 +751,7 @@ class TableGridState extends State<TableGrid> {
     final t = context.t;
     // One table of all the cells, so that the field of the cell being
     // edited moves from one to the next as itself, keeping the keyboard.
-    return SingleChildScrollView(
+    final grid = SingleChildScrollView(
       key: const ValueKey('table-grid-sideways'),
       controller: _sideways,
       scrollDirection: Axis.horizontal,
@@ -809,6 +829,20 @@ class TableGridState extends State<TableGrid> {
         ],
       ),
     );
+    return CellSelection(
+      key: _cells,
+      onCopy: (cells) => copyCells(
+        context,
+        text: _text,
+        at: _at,
+        rows: [for (var r = cells.top; r <= cells.bottom; r++) r],
+        left: cells.left,
+        right: cells.right,
+        ticking: widget.ticking,
+      ),
+      words: _wordsOf,
+      child: grid,
+    );
   }
 
   Widget _cell(BuildContext context, MarkdownTable table, int r, int c) {
@@ -861,17 +895,26 @@ class TableGridState extends State<TableGrid> {
       child: GestureDetector(
         key: ValueKey('grid-cell-$r-$c'),
         behavior: HitTestBehavior.opaque,
-        onTap: editing ? null : () => edit(cell, atEnd: true),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: heading ? scheme.surfaceContainerHighest : scheme.surface,
-            border: editing
-                ? Border.all(color: scheme.primary, width: 2)
-                : Border.all(color: scheme.outline, width: 0.5),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: content,
+        onTap: editing
+            ? null
+            : () {
+                if (_cells.currentState?.clear() ?? false) return;
+                edit(cell, atEnd: true);
+              },
+        child: SelectableCell(
+          cell: cell,
+          presses: !editing,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: heading ? scheme.surfaceContainerHighest : scheme.surface,
+              border: editing
+                  ? Border.all(color: scheme.primary, width: 2)
+                  : Border.all(color: scheme.outline, width: 0.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: content,
+            ),
           ),
         ),
       ),

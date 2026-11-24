@@ -3535,6 +3535,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ticking: _sectionTicking[section.id],
             // What the find bar found in it (obf-1047).
             found: _findMarks[(section.id, FindingPart.text, '')],
+            // A long press on a cell selects cells to copy (obf-1054).
+            selectCells: true,
           ),
         ),
       for (final hash in section.photos) ...[

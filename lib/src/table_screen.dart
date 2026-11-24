@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
+import 'cell_selection.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'page_bar.dart';
@@ -336,7 +337,10 @@ Future<TableAction?> showTableMenu(
 ///
 /// Copy in the bar, and in the ⋮ at the table's top right corner
 /// (obf-1050), puts the table on the clipboard as an HTML table and, as
-/// the plain text, as Markdown (#324).
+/// the plain text, as Markdown (#324). A long press on a cell not being
+/// edited selects a rectangle of cells to copy, a drag on without lifting
+/// the finger spanning it (obf-1054, [CellSelection]); a tap then ends it
+/// before anything else.
 class TableScreen extends StatefulWidget {
   /// How wide a column may get at most and at least, and how wide the
   /// empty column that adds one is.
@@ -415,6 +419,7 @@ class _TableScreenState extends State<TableScreen> {
 
   /// How far the table is moved sideways, and how far it can be.
   final _offset = ValueNotifier<double>(0);
+  final _cells = GlobalKey<CellSelectionState>();
   double _most = 0;
   double _room = 0;
 
@@ -431,6 +436,7 @@ class _TableScreenState extends State<TableScreen> {
     super.initState();
     _read();
     _lifecycle = AppLifecycleListener(onStateChange: _lifecycleChanged);
+    _offset.addListener(_moved);
     if (widget.cell case final cell? when _edits) _startEditing(cell);
   }
 
@@ -449,6 +455,9 @@ class _TableScreenState extends State<TableScreen> {
     super.dispose();
   }
 
+  /// The cells selected end as the table moves sideways.
+  void _moved() => _cells.currentState?.clear();
+
   /// The app may be killed in the background: the cell is written.
   void _lifecycleChanged(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
@@ -458,6 +467,7 @@ class _TableScreenState extends State<TableScreen> {
   }
 
   void _read() {
+    _cells.currentState?.clear();
     final table = _table = MarkdownTables.at(_text, _at);
     _order = table == null ? const [] : tableRowOrder(table, _sort);
     _tags = Markdown.tags(_text);
@@ -559,6 +569,7 @@ class _TableScreenState extends State<TableScreen> {
 
   /// A tap on [cell]: the one edited before is written, this one edited.
   void _edit(({int row, int column}) cell) {
+    if (_cells.currentState?.clear() ?? false) return;
     if (_editing == cell) return;
     _commit();
     _dropCell();
@@ -567,6 +578,7 @@ class _TableScreenState extends State<TableScreen> {
 
   /// Ends editing, the cell written.
   void _finish() {
+    _cells.currentState?.clear();
     if (_editing == null) return;
     _commit();
     setState(_dropCell);
@@ -822,6 +834,37 @@ class _TableScreenState extends State<TableScreen> {
     );
   }
 
+  /// Puts [cells] on the clipboard (obf-1054), the cell edited written
+  /// first.
+  Future<void> _copyCells(CellRect cells) async {
+    _commit();
+    await copyCells(
+      context,
+      text: _text,
+      at: _at,
+      rows: [
+        for (var r = cells.top; r <= cells.bottom && r < _order.length; r++)
+          _order[r],
+      ],
+      left: cells.left,
+      right: cells.right,
+      ticking: _ticking,
+    );
+  }
+
+  /// The words of [cells] as they show, a space between them.
+  String _wordsOf(CellRect cells) {
+    final table = _table;
+    if (table == null) return '';
+    return [
+      for (var r = cells.top; r <= cells.bottom && r < _order.length; r++)
+        for (var c = cells.left; c <= cells.right && c < table.columns; c++)
+          if (withoutIds(table.rows[_order[r]].cells[c].visible).trim()
+              case final words when words.isNotEmpty)
+            words,
+    ].join(' ');
+  }
+
   /// The table's ⋮ at [at] (global): Copy.
   Future<void> _tableMenu(Offset at) async {
     final picked = await showTableMenu(context, at);
@@ -852,50 +895,57 @@ class _TableScreenState extends State<TableScreen> {
             ? (d) =>
                   _offset.value = (_offset.value - d.delta.dx).clamp(0, _most)
             : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // The ⋮ at the top right corner, offering Copy (obf-1050),
-            // beside the bar that moves the table sideways.
-            Row(
-              children: [
-                Expanded(
-                  child: _most > 0
-                      ? TableSidewaysBar(
-                          key: const ValueKey('table-sideways'),
-                          offset: _offset,
-                          most: _most,
-                          room: _room,
-                          whole: moving,
-                          label: t.tableSideways,
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                TableMenuButton(
-                  key: const ValueKey('table-screen-menu'),
-                  onMenu: (at) => unawaited(_tableMenu(at)),
-                ),
-              ],
-            ),
-            if (_edits) _letters(table),
-            _row(context, table, 0),
-            Expanded(
-              child: GestureDetector(
-                // A tap beside the cells ends editing.
-                behavior: HitTestBehavior.translucent,
-                onTap: _finish,
-                child: ListView(
-                  key: const ValueKey('table-rows'),
-                  padding: EdgeInsets.only(bottom: padding.bottom + 16),
-                  children: [
-                    // In the order shown, each by its index in the table.
-                    for (final r in _order.skip(1)) _row(context, table, r),
-                    if (_edits) _row(context, table, table.rows.length),
-                  ],
+        child: CellSelection(
+          key: _cells,
+          onCopy: _copyCells,
+          words: _wordsOf,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // The ⋮ at the top right corner, offering Copy (obf-1050),
+              // beside the bar that moves the table sideways.
+              Row(
+                children: [
+                  Expanded(
+                    child: _most > 0
+                        ? TableSidewaysBar(
+                            key: const ValueKey('table-sideways'),
+                            offset: _offset,
+                            most: _most,
+                            room: _room,
+                            whole: moving,
+                            label: t.tableSideways,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  TableMenuButton(
+                    key: const ValueKey('table-screen-menu'),
+                    onMenu: (at) => unawaited(_tableMenu(at)),
+                  ),
+                ],
+              ),
+              if (_edits) _letters(table),
+              _row(context, table, 0, 0),
+              Expanded(
+                child: GestureDetector(
+                  // A tap beside the cells ends editing.
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _finish,
+                  child: ListView(
+                    key: const ValueKey('table-rows'),
+                    padding: EdgeInsets.only(bottom: padding.bottom + 16),
+                    children: [
+                      // In the order shown, each by its index in the table.
+                      for (final (shown, r) in _order.indexed.skip(1))
+                        _row(context, table, r, shown),
+                      if (_edits)
+                        _row(context, table, table.rows.length, _order.length),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -948,9 +998,9 @@ class _TableScreenState extends State<TableScreen> {
     );
   }
 
-  /// The row [r], the one after the last adding one; its first column
-  /// stays when it holds headings.
-  Widget _row(BuildContext context, MarkdownTable table, int r) {
+  /// The row [r], the one after the last adding one, shown [shown]th; its
+  /// first column stays when it holds headings.
+  Widget _row(BuildContext context, MarkdownTable table, int r, int shown) {
     final t = context.t;
     final first = table.headingColumn ? 1 : 0;
     final adds = r >= table.rows.length;
@@ -973,7 +1023,10 @@ class _TableScreenState extends State<TableScreen> {
               ),
             ),
           if (table.headingColumn)
-            SizedBox(width: _widths[0], child: _cellAt(context, table, r, 0)),
+            SizedBox(
+              width: _widths[0],
+              child: _cellAt(context, table, r, 0, shown),
+            ),
           Expanded(
             child: TableShifted(
               offset: _offset,
@@ -985,12 +1038,12 @@ class _TableScreenState extends State<TableScreen> {
                   for (var c = first; c < table.columns; c++)
                     SizedBox(
                       width: _widths[c],
-                      child: _cellAt(context, table, r, c),
+                      child: _cellAt(context, table, r, c, shown),
                     ),
                   if (_edits)
                     SizedBox(
                       width: TableScreen.adding,
-                      child: _cellAt(context, table, r, table.columns),
+                      child: _cellAt(context, table, r, table.columns, shown),
                     ),
                 ],
               ),
@@ -1001,7 +1054,13 @@ class _TableScreenState extends State<TableScreen> {
     );
   }
 
-  Widget _cellAt(BuildContext context, MarkdownTable table, int r, int c) {
+  Widget _cellAt(
+    BuildContext context,
+    MarkdownTable table,
+    int r,
+    int c,
+    int shown,
+  ) {
     final scheme = Theme.of(context).colorScheme;
     final base = DefaultTextStyle.of(context).style
         .merge(Theme.of(context).textTheme.bodyLarge);
@@ -1046,7 +1105,7 @@ class _TableScreenState extends State<TableScreen> {
         _ => words,
       };
     }
-    final box = DecoratedBox(
+    final Widget box = DecoratedBox(
       decoration: BoxDecoration(
         color: heading ? scheme.surfaceContainerHighest : scheme.surface,
         border: editing
@@ -1061,21 +1120,32 @@ class _TableScreenState extends State<TableScreen> {
         child: content,
       ),
     );
+    // The cells of the empty row and column select nothing.
+    final selectable = adds
+        ? box
+        : SelectableCell(
+            cell: (row: shown, column: c),
+            presses: !editing,
+            child: box,
+          );
     // Where it is only read, a heading's tap sorts the rows by its
     // column (obf-1052).
     if (edit == null && r == 0 && !adds) {
       return TableSortTap(
         key: ValueKey('cell-$r-$c'),
-        onSort: () => _sortBy(nextTableSort(_sort, c)),
+        onSort: () {
+          if (_cells.currentState?.clear() ?? false) return;
+          _sortBy(nextTableSort(_sort, c));
+        },
         descending: _sort?.column == c ? _sort?.descending : null,
-        child: box,
+        child: selectable,
       );
     }
     return GestureDetector(
       key: ValueKey('cell-$r-$c'),
       behavior: HitTestBehavior.opaque,
       onTap: edit == null || editing ? null : () => _edit((row: r, column: c)),
-      child: box,
+      child: selectable,
     );
   }
 }

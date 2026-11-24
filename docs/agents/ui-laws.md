@@ -1598,6 +1598,21 @@ replace a law of Both apps where they say so. A desktop law marked
   Sort rows by this column and Sort rows by this column, descending,
   which rewrite the rows in the text, each a step of Undo, none when the
   rows already stand so.
+- **A long press on a cell selects cells** (obf-1054), on the grid in
+  the Note editor's field (not on the cell being edited, whose field
+  selects its words), in a Section's text being read and full screen;
+  never on a card, which selects no text. Dragging on without lifting
+  the finger selects the rectangle from that cell to the one under it,
+  in the rows as they show; a drag that does not start with a long
+  press still moves a wide table sideways, and a tap still opens, sorts
+  or edits. On lifting, the toolbar above the cells offers Copy, and
+  Search with the words of one cell. Copy puts the cells on the
+  clipboard as a table of their own, as the table's Copy does, the
+  first row its header row, also a single cell. A tap, Copy, a scroll
+  of the page or of the rows and the table moving sideways end the
+  selection, the tap doing nothing else. A selection that starts
+  outside a table runs through its cells as through the rest of the
+  text and copies as text.
 
 ### Checklist and Shopping List Lines
 
