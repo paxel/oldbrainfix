@@ -361,11 +361,18 @@ fn their_notes_on_a_profile_shows_all_notes_with_only_theirs() -> TestResult {
         &PersonFilter::person(&ben_id)
     );
     assert_eq!(harness.state().shown_notes(), vec![theirs.clone()]);
-    assert!(shows(&harness, "Only Notes by"));
+    // Ben as a chip with ✕ beside "Show Notes by…" (obf-1064).
+    let chip = |harness: &Harness<'_, App>| {
+        harness
+            .query_all_by_role_and_label(Role::Button, "Ben")
+            .next()
+            .is_some()
+    };
+    assert!(chip(&harness));
     // Taking Ben out shows everybody's again.
     press(&mut harness, Role::Button, "Ben");
     assert!(harness.state().people_filter().is_everyone());
-    assert!(!shows(&harness, "Only Notes by"));
+    assert!(!chip(&harness));
     let mut shown = harness.state().shown_notes();
     shown.sort();
     let mut both = vec![mine, theirs];

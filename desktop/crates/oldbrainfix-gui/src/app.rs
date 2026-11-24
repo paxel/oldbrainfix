@@ -12458,7 +12458,10 @@ impl App {
         egui::CentralPanel::default()
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .show(ui, |ui| {
-                self.nav_row(ui, &mut actions);
+                // A list of Notes has them in its band (obf-1064).
+                if self.list_hint().is_none() {
+                    self.nav_row(ui, &mut actions);
+                }
                 self.notes_pane(ui, tones, &mut actions);
             });
         if let Some(offset) = ui.data_mut(|d| d.remove_temp::<f32>(Id::new(LIST_OFFSET))) {
@@ -14643,50 +14646,80 @@ impl App {
     /// Back and forward at the top of the list, and the path to the place
     /// it shows, each level above it a click away (#145).
     fn nav_row(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
-        let t = self.t;
-        let text = ui.visuals().text_color();
-        let weak = ui.visuals().weak_text_color();
         let row = ui.horizontal(|ui| {
-            let arrows = [
-                (
-                    self.nav.can_go_back(),
-                    icons::ARROW_BACK,
-                    t.nav_back(),
-                    Action::Back,
-                ),
-                (
-                    self.nav.can_go_forward(),
-                    icons::ARROW_FORWARD,
-                    t.nav_forward(),
-                    Action::Forward,
-                ),
-            ];
-            for (may, icon, label, action) in arrows {
-                let colour = if may { text } else { weak };
-                let arrow = ui.add_enabled_ui(may, |ui| icon_button(ui, icon, label, colour));
-                if arrow.inner.clicked() {
-                    actions.push(action);
-                }
-            }
+            self.nav_arrows(ui, (24.0, 20.0), actions);
             ui.add_space(8.0);
-            for (i, (name, to)) in self.path().into_iter().enumerate() {
-                if i > 0 {
-                    crumb(ui, "›", weak, None);
-                }
-                match to {
-                    Some(to) => {
-                        if crumb(ui, &name, text, Some(&t.path_up(&name))) {
-                            actions.push(Action::Select(to));
-                        }
-                    }
-                    None => {
-                        crumb(ui, &name, weak, None);
-                    }
-                }
-            }
+            self.path_crumbs(ui, (14.0, None), actions);
         });
         spotlight::anchor(ui, "nav", row.response.rect);
         ui.add_space(4.0);
+    }
+
+    /// Back and forward, each `side` square with its icon `glyph` big,
+    /// greyed where they lead nowhere.
+    fn nav_arrows(&self, ui: &mut Ui, (side, glyph): (f32, f32), actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let arrows = [
+            (
+                self.nav.can_go_back(),
+                icons::ARROW_BACK,
+                t.nav_back(),
+                Action::Back,
+            ),
+            (
+                self.nav.can_go_forward(),
+                icons::ARROW_FORWARD,
+                t.nav_forward(),
+                Action::Forward,
+            ),
+        ];
+        for (may, icon, label, action) in arrows {
+            let colour = if may { text } else { weak };
+            let arrow = ui.add_enabled_ui(may, |ui| {
+                sized_icon_button(ui, (icon, label, colour), (side, glyph))
+            });
+            if arrow.inner.clicked() {
+                actions.push(action);
+            }
+        }
+    }
+
+    /// The path to the place shown (#145), its levels `size` big; with a
+    /// `title` size the place shown is the list's title at that size
+    /// (obf-1064), its rect given, otherwise a weak level as the others.
+    fn path_crumbs(
+        &self,
+        ui: &mut Ui,
+        (size, title): (f32, Option<f32>),
+        actions: &mut Vec<Action>,
+    ) -> Option<egui::Rect> {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let mut shown = None;
+        for (i, (name, to)) in self.path().into_iter().enumerate() {
+            if i > 0 {
+                crumb(ui, "›", (size, weak), None);
+            }
+            match (to, title) {
+                (Some(to), _) => {
+                    if crumb(ui, &name, (size, text), Some(&t.path_up(&name))) {
+                        actions.push(Action::Select(to));
+                    }
+                }
+                (None, Some(title)) => {
+                    let label =
+                        egui::Label::new(RichText::new(name).size(title).color(text)).truncate();
+                    shown = Some(ui.add(label).rect);
+                }
+                (None, None) => {
+                    crumb(ui, &name, (size, weak), None);
+                }
+            }
+        }
+        shown
     }
 
     /// The dialog of what was a view of its own (#145), over the window
@@ -15457,37 +15490,6 @@ impl App {
         }
     }
 
-    /// The title of the middle pane.
-    fn title(&self) -> String {
-        match &self.selection {
-            Selection::Agenda => self.t.agenda_title().to_string(),
-            Selection::SentItemsWaiting => self.t.sent_items_waiting_title().to_string(),
-            Selection::AreaOffersWaiting => self.t.area_offers_waiting_title().to_string(),
-            Selection::AiReview => self.t.ai_review_title().to_string(),
-            Selection::Frogs => self.t.frogs_title().to_string(),
-            Selection::AllRoutines => self.t.all_routines_title().to_string(),
-            Selection::History(_) => self.t.history_title().to_string(),
-            Selection::All => self.t.all_notes_title().to_string(),
-            Selection::Unsorted => self.t.unsorted().to_string(),
-            Selection::Tags => self.t.tags_title().to_string(),
-            Selection::Trash => self.t.trash_title().to_string(),
-            Selection::Ask => self.t.ask_title().to_string(),
-            Selection::Place(id) => self
-                .view
-                .areas
-                .iter()
-                .find_map(|(area, topics)| {
-                    if area.id == *id {
-                        return Some(area_name(&self.t, area));
-                    }
-                    topics.iter().find(|t| t.id == *id).map(|t| {
-                        format!("{} / {}", area_name(&self.t, area), topic_name(&self.t, t))
-                    })
-                })
-                .unwrap_or_default(),
-        }
-    }
-
     /// The quick note's content (UI laws, "Capture"), in its dialog
     /// (#146): it never asks anything. The text, and once something is
     /// typed or held, the Nudge times, Ctrl+Enter taking the 1 h one and
@@ -15672,86 +15674,9 @@ impl App {
             }
             _ => {}
         }
-        let text = ui.visuals().text_color();
-        ui.horizontal(|ui| {
-            let heading = ui.heading(RichText::new(self.title()).color(text));
-            spotlight::anchor(ui, "heading", heading.rect);
-            // Every Note list but the trash has its compact/detailed switch.
-            if self.cards_key().is_some() && compact_button(ui, tones, &self.t, self.view.compact) {
-                actions.push(Action::Compact(!self.view.compact));
-            }
-            if self.selection != Selection::Trash {
-                self.person_filter_menu(ui, actions);
-            }
-            // "+" makes what the list holds (#161), an Area's level its
-            // Topics too (UI laws, "Navigation"); last, so the buttons
-            // before it keep their place while it goes.
-            if let Some(kinds) = self.new_kinds()
-                && let Some(kind) = add_button(ui, &self.t, &kinds)
-            {
-                actions.push(Action::Add(kind));
-            }
-        });
-        if self.selection != Selection::Trash {
-            self.person_filter_chips(ui, tones, actions);
-        }
-        ui.add_space(8.0);
-        let hint = match &self.selection {
-            Selection::All => Some(self.t.search_all_hint()),
-            Selection::Unsorted => Some(self.t.search_unsorted_hint()),
-            Selection::Place(id) if self.view.area(id).is_some() => Some(self.t.search_area_hint()),
-            Selection::Place(_) => Some(self.t.search_topic_hint()),
-            Selection::Trash => Some(self.t.search_trash_hint()),
-            _ => None,
-        };
-        // On its band, so the cards scroll under its line (obf-1088).
+        let hint = self.list_hint();
         if let Some(hint) = hint {
-            theme::search_band(ui, |ui| {
-                ui.horizontal(|ui| {
-                    icons::show(ui, icons::SEARCH, 20.0, ui.visuals().weak_text_color());
-                    let field = ui.add(
-                        TextEdit::singleline(&mut self.query)
-                            .id(Id::new("search"))
-                            .hint_text(hint)
-                            .text_color(text)
-                            .desired_width(ui.available_width() - 32.0),
-                    );
-                    spotlight::anchor(ui, "search", field.rect);
-                    text_menu::show(ui, &self.t, &field, &self.query);
-                    // Edit ▸ Find: after the field, so the menu's click does
-                    // not take it out again.
-                    if std::mem::take(&mut self.search_focus) {
-                        field.request_focus();
-                    }
-                    if field.changed() {
-                        actions.push(Action::Search);
-                    }
-                    if !self.query.is_empty()
-                        && icon_button(ui, icons::CLOSE, self.t.clear_search(), text).clicked()
-                    {
-                        self.query.clear();
-                        actions.push(Action::Search);
-                    }
-                });
-                // The tags starting with the "#…" typed (#267, Q639).
-                if let Some(tag) =
-                    tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions)
-                {
-                    // The cursor after it, to type on.
-                    let end = tag.chars().count();
-                    self.query = tag;
-                    let id = Id::new("search");
-                    let mut state =
-                        egui::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
-                    let at = egui::text::CCursor::new(end);
-                    state
-                        .cursor
-                        .set_char_range(Some(egui::text::CCursorRange::one(at)));
-                    state.store(ui.ctx(), id);
-                    self.search_focus = true;
-                    actions.push(Action::Search);
-                }
-            });
+            self.list_band(ui, tones, hint, actions);
         }
         let trash = self.selection == Selection::Trash;
         // Room under the band before what does not scroll under it.
@@ -16080,6 +16005,173 @@ impl App {
         }
     }
 
+    /// The search hint of a list of Notes (All Notes, Unsorted, an Area,
+    /// a Topic, the Trash), which have their header band (obf-1064);
+    /// nothing elsewhere.
+    fn list_hint(&self) -> Option<&'static str> {
+        let t = self.t;
+        match &self.selection {
+            Selection::All => Some(t.search_all_hint()),
+            Selection::Unsorted => Some(t.search_unsorted_hint()),
+            Selection::Place(id) if self.view.area(id).is_some() => Some(t.search_area_hint()),
+            Selection::Place(_) => Some(t.search_topic_hint()),
+            Selection::Trash => Some(t.search_trash_hint()),
+            _ => None,
+        }
+    }
+
+    /// The top of a list of Notes (obf-1064, as the phone's band,
+    /// obf-1041): one band on the search's fill with its line under it
+    /// (obf-1088), so the cards scroll under the line. Its first row
+    /// holds back, forward and the path, the place shown as the title;
+    /// its second the search field, the view switch, the person filter's
+    /// menu and its chips, and "+", all one height; under them the tags
+    /// the "#…" typed starts. All of it grows with Text size.
+    fn list_band(&mut self, ui: &mut Ui, tones: Tones, hint: &str, actions: &mut Vec<Action>) {
+        let sizes = BandSizes::of(ui);
+        theme::search_band(ui, |ui| {
+            let row = ui.horizontal(|ui| {
+                self.nav_arrows(ui, (sizes.arrow, sizes.glyph), actions);
+                ui.add_space(8.0);
+                let title = self.path_crumbs(ui, (sizes.words, Some(sizes.title)), actions);
+                if let Some(title) = title {
+                    spotlight::anchor(ui, "heading", title);
+                }
+            });
+            spotlight::anchor(ui, "nav", row.response.rect);
+            self.band_tools(ui, tones, sizes, hint, actions);
+            // The tags starting with the "#…" typed (#267, Q639).
+            if let Some(tag) = tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions) {
+                // The cursor after it, to type on.
+                let end = tag.chars().count();
+                self.query = tag;
+                let id = Id::new("search");
+                let mut state =
+                    egui::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
+                let at = egui::text::CCursor::new(end);
+                state
+                    .cursor
+                    .set_char_range(Some(egui::text::CCursorRange::one(at)));
+                state.store(ui.ctx(), id);
+                self.search_focus = true;
+                actions.push(Action::Search);
+            }
+        });
+    }
+
+    /// The band's second row (obf-1064): the search field, then the view
+    /// switch of every list but the Trash, "Show Notes by…" with a chip
+    /// for each person it keeps, and "+", wrapping under the field where
+    /// the list is too narrow for them beside it.
+    fn band_tools(
+        &mut self,
+        ui: &mut Ui,
+        tones: Tones,
+        sizes: BandSizes,
+        hint: &str,
+        actions: &mut Vec<Action>,
+    ) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let trash = self.selection == Selection::Trash;
+        let switch = self.cards_key().is_some();
+        let kinds = self.new_kinds();
+        let gap = ui.spacing().item_spacing.x;
+        // What stands beside the field, so it takes the rest.
+        let mut beside = 0.0;
+        if switch {
+            beside += sizes.row + gap;
+        }
+        if !trash {
+            let font = FontId::proportional(sizes.words);
+            let words = ui
+                .painter()
+                .layout_no_wrap(t.person_filter().to_string(), font, text);
+            beside += words.size().x + 2.0 * ui.spacing().button_padding.x + gap;
+        }
+        let kept = if trash {
+            Vec::new()
+        } else {
+            self.filter_kept()
+        };
+        for (_, name) in &kept {
+            beside += chip_width(ui, name, sizes) + gap;
+        }
+        if kinds.is_some() {
+            beside += sizes.row + gap;
+        }
+        // The field's margin makes it as tall as the row (egui's single
+        // line takes no height of its own).
+        let font = egui::TextStyle::Body.resolve(ui.style());
+        let line = ui.fonts_mut(|f| f.row_height(&font));
+        let margin = egui::Margin::symmetric(4, ((sizes.row - line) / 2.0).round() as i8);
+        let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
+        let room = egui::vec2(ui.available_width(), sizes.row);
+        ui.allocate_ui_with_layout(room, layout, |ui| {
+            // The magnifier and the clear button around it, and the
+            // field's own margin.
+            let around = sizes.glyph + sizes.row + 2.0 * gap + 8.0;
+            let rest = ui.available_width() - beside - around;
+            let width = if rest >= BAND_FIELD_MIN {
+                rest
+            } else {
+                ui.available_width() - around
+            };
+            icons::show(
+                ui,
+                icons::SEARCH,
+                sizes.glyph,
+                ui.visuals().weak_text_color(),
+            );
+            let field = ui.add(
+                TextEdit::singleline(&mut self.query)
+                    .id(Id::new("search"))
+                    .hint_text(hint)
+                    .text_color(text)
+                    .margin(margin)
+                    .desired_width(width.max(0.0)),
+            );
+            spotlight::anchor(ui, "search", field.rect);
+            text_menu::show(ui, &t, &field, &self.query);
+            // Edit ▸ Find: after the field, so the menu's click does
+            // not take it out again.
+            if std::mem::take(&mut self.search_focus) {
+                field.request_focus();
+            }
+            if field.changed() {
+                actions.push(Action::Search);
+            }
+            // Its room kept while empty, so nothing moves as it fills, and
+            // taken as the button would be, so the menus after it keep
+            // their ids and stay open while the search changes.
+            let clear = (t.clear_search(), sizes.row);
+            if self.query.is_empty() {
+                ui.allocate_exact_size(egui::vec2(clear.1, clear.1), Sense::hover());
+            } else if sized_icon_button(ui, (icons::CLOSE, clear.0, text), (clear.1, sizes.glyph))
+                .clicked()
+            {
+                self.query.clear();
+                actions.push(Action::Search);
+            }
+            // Every Note list but the trash has its compact/detailed switch.
+            if switch && compact_button(ui, tones, &t, self.view.compact, sizes) {
+                actions.push(Action::Compact(!self.view.compact));
+            }
+            if !trash {
+                self.person_filter_menu(ui, sizes, actions);
+                self.person_filter_chips(ui, (tones, sizes), kept, actions);
+            }
+            // "+" makes what the list holds (#161), an Area's level its
+            // Topics too (UI laws, "Navigation"); last, so the buttons
+            // before it keep their place while it goes.
+            if let Some(kinds) = kinds
+                && let Some(kind) = add_button(ui, &t, &kinds, (sizes.row, sizes.glyph))
+            {
+                actions.push(Action::Add(kind));
+            }
+        });
+    }
+
     /// What "+" at the top of the list makes (#161), in the order its
     /// menu shows them: in All Notes, an Area and a Topic the six kinds,
     /// Session and Frog only for who may set them up there, in an Area
@@ -16119,16 +16211,20 @@ impl App {
     /// The person filter's menu (#53): "Me", every person of People and,
     /// while it filters, "Everyone"; it stays open while people are
     /// ticked.
-    fn person_filter_menu(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
+    fn person_filter_menu(&self, ui: &mut Ui, sizes: BandSizes, actions: &mut Vec<Action>) {
         let t = &self.t;
         let text = ui.visuals().text_color();
         let filter = &self.people;
+        let label = RichText::new(t.person_filter())
+            .size(sizes.words)
+            .color(text);
         let label = if filter.is_everyone() {
-            RichText::new(t.person_filter()).color(text)
+            label
         } else {
-            RichText::new(t.person_filter()).strong().color(text)
+            label.strong()
         };
-        MenuButton::new(label)
+        let button = egui::Button::new(label).min_size(egui::vec2(0.0, sizes.row));
+        MenuButton::from_button(button)
             .config(MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside))
             .ui(ui, |ui| {
                 let mut me = filter.me;
@@ -16159,16 +16255,15 @@ impl App {
             });
     }
 
-    /// Who the person filter keeps, each with ✕ to take them out; nothing
-    /// while it keeps everyone, so Notes never leave the list unseen.
-    fn person_filter_chips(&self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+    /// Who the person filter keeps, by id (none for Me) and the name
+    /// shown; nobody while it keeps everyone.
+    fn filter_kept(&self) -> Vec<(Option<String>, String)> {
         let filter = &self.people;
-        if filter.is_everyone() {
-            return;
-        }
         let t = &self.t;
-        let text = ui.visuals().text_color();
         let mut kept: Vec<(Option<String>, String)> = Vec::new();
+        if filter.is_everyone() {
+            return kept;
+        }
         if filter.me {
             kept.push((None, t.person_filter_me().to_string()));
         }
@@ -16186,22 +16281,33 @@ impl App {
                 profile_view::display_name(t, &name).to_string(),
             ));
         }
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(t.person_filter_showing()).color(text));
-            for (id, name) in kept {
-                if pill(ui, tones, true, &name)
-                    .on_hover_text(t.person_filter_remove(&name))
-                    .clicked()
-                {
-                    let mut next = filter.clone();
-                    match id {
-                        Some(id) => next.toggle(&id),
-                        None => next.me = false,
-                    }
-                    actions.push(Action::FilterPeople(next));
+        kept
+    }
+
+    /// Who the person filter keeps, `kept`, each a chip with ✕ to take
+    /// them out (obf-1064), after "Show Notes by…"; nothing while it
+    /// keeps everyone, so Notes never leave the list unseen.
+    fn person_filter_chips(
+        &self,
+        ui: &mut Ui,
+        (tones, sizes): (Tones, BandSizes),
+        kept: Vec<(Option<String>, String)>,
+        actions: &mut Vec<Action>,
+    ) {
+        let filter = &self.people;
+        for (id, name) in kept {
+            if filter_chip(ui, tones, &name, sizes)
+                .on_hover_text(self.t.person_filter_remove(&name))
+                .clicked()
+            {
+                let mut next = filter.clone();
+                match id {
+                    Some(id) => next.toggle(&id),
+                    None => next.me = false,
                 }
+                actions.push(Action::FilterPeople(next));
             }
-        });
+        }
     }
 
     /// The selected Note's editor (UI laws, "Desktop").
@@ -17671,7 +17777,7 @@ impl App {
             // As the phone's bar, without its Calendar (UI laws, "The
             // Agenda's bar").
             // "+" captures, as the phone's Agenda's does (#146).
-            if add_button(ui, &t, &[NewKind::Note]).is_some() {
+            if add_button(ui, &t, &[NewKind::Note], (24.0, 20.0)).is_some() {
                 actions.push(Action::NewNote);
             }
             // Room for the buttons at the end: 24 wide and 8 apart, and
@@ -19367,10 +19473,10 @@ fn menu_entries<const N: usize>(
 /// drawn, so a screen reader hears the places as the sidebar and the
 /// heading name them, and a level above as the way `up` there, clicked
 /// when it says so. The place shown leads nowhere.
-fn crumb(ui: &mut Ui, name: &str, colour: Color32, up: Option<&str>) -> bool {
+fn crumb(ui: &mut Ui, name: &str, (size, colour): (f32, Color32), up: Option<&str>) -> bool {
     let galley = ui
         .painter()
-        .layout_no_wrap(name.to_string(), FontId::proportional(14.0), colour);
+        .layout_no_wrap(name.to_string(), FontId::proportional(size), colour);
     let sense = if up.is_some() {
         Sense::click()
     } else {
@@ -19440,10 +19546,20 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
 
 /// A square button that shows `icon`, called `label`.
 pub(crate) fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
+    sized_icon_button(ui, (icon, label, colour), (24.0, 20.0))
+}
+
+/// An [`icon_button`] `side` square, its icon `glyph` big in its middle.
+fn sized_icon_button(
+    ui: &mut Ui,
+    (icon, label, colour): (char, &str, Color32),
+    (side, glyph): (f32, f32),
+) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(side, side), Sense::click());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
     theme::icon_button_back(ui, &resp, rect);
-    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+    let at = egui::Rect::from_center_size(rect.center(), egui::vec2(glyph, glyph));
+    icons::paint(ui.painter(), at, icon, colour);
     resp.on_hover_text(label)
 }
 
@@ -23628,17 +23744,93 @@ pub(crate) fn list_scroll<R>(
     output
 }
 
+/// How narrow the search field of a list's band gets before the buttons
+/// beside it go to the line under it (obf-1064).
+const BAND_FIELD_MIN: f32 = 200.0;
+
+/// The measures of a list's header band (obf-1064), grown by the text
+/// size of this Device (#326): its second row's height, the arrows'
+/// side, the icons' size and the path's and title's words.
+#[derive(Clone, Copy, Debug)]
+struct BandSizes {
+    row: f32,
+    arrow: f32,
+    glyph: f32,
+    words: f32,
+    title: f32,
+}
+
+impl BandSizes {
+    fn of(ui: &Ui) -> Self {
+        let factor = theme::text_factor(ui.ctx());
+        Self {
+            row: 36.0 * factor,
+            arrow: 28.0 * factor,
+            glyph: 20.0 * factor,
+            words: 14.0 * factor,
+            title: 22.0 * factor,
+        }
+    }
+}
+
+/// The room left and right in a [`filter_chip`].
+const CHIP_PAD: f32 = 12.0;
+
+/// How wide [`filter_chip`] draws `name`'s chip.
+fn chip_width(ui: &Ui, name: &str, sizes: BandSizes) -> f32 {
+    let font = FontId::proportional(sizes.words);
+    let colour = ui.visuals().text_color();
+    let words = ui.painter().layout_no_wrap(name.to_string(), font, colour);
+    CHIP_PAD + words.size().x + 6.0 + sizes.words + CHIP_PAD
+}
+
+/// A person the filter keeps, as a chip of the band's row (obf-1064):
+/// the name and ✕, a click taking them out; a screen reader hears the
+/// name.
+fn filter_chip(ui: &mut Ui, tones: Tones, name: &str, sizes: BandSizes) -> egui::Response {
+    let text = ui.visuals().text_color();
+    let galley =
+        ui.painter()
+            .layout_no_wrap(name.to_string(), FontId::proportional(sizes.words), text);
+    let (pad, cross) = (CHIP_PAD, sizes.words);
+    let width = chip_width(ui, name, sizes);
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, sizes.row), Sense::click());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, true, name));
+    if ui.is_rect_visible(rect) {
+        let radius = rect.height() / 2.0;
+        let tint = if resp.hovered() { 0.45 } else { 0.3 };
+        ui.painter()
+            .rect_filled(rect, radius, tones.accent.gamma_multiply(tint));
+        let line = egui::Stroke::new(1.0, tones.accent);
+        ui.painter()
+            .rect_stroke(rect, radius, line, egui::StrokeKind::Inside);
+        let at = egui::pos2(rect.left() + pad, rect.center().y - galley.size().y / 2.0);
+        ui.painter().galley(at, galley, text);
+        let x = egui::Rect::from_center_size(
+            egui::pos2(rect.right() - pad - cross / 2.0, rect.center().y),
+            egui::vec2(cross, cross),
+        );
+        icons::paint(ui.painter(), x, icons::CLOSE, text);
+        if resp.has_focus() {
+            let ring = ui.visuals().widgets.active.bg_stroke;
+            ui.painter()
+                .rect_stroke(rect, radius, ring, egui::StrokeKind::Outside);
+        }
+    }
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
 /// "+" at the top of a list (#146, #161): with one kind it makes that at
 /// once, with more its menu offers them, Note first, each with its icon
 /// and words; the kind picked.
-fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
+fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind], size: (f32, f32)) -> Option<NewKind> {
     let text = ui.visuals().text_color();
     if let [kind] = kinds {
-        let add = icon_button(ui, icons::ADD, t.menu_new_note(), text);
+        let add = sized_icon_button(ui, (icons::ADD, t.menu_new_note(), text), size);
         spotlight::anchor(ui, "add", add.rect);
         return add.clicked().then_some(*kind);
     }
-    let add = icon_button(ui, icons::ADD, t.add_here(), text);
+    let add = sized_icon_button(ui, (icons::ADD, t.add_here(), text), size);
     spotlight::anchor(ui, "add", add.rect);
     let mut picked = None;
     egui::Popup::menu(&add).show(|ui| {
@@ -23663,14 +23855,15 @@ fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
 
 /// The bar button of a Note list's compact/detailed switch (#114, #189):
 /// it says what clicking it does and shows as selected while the list is
-/// `compact`; whether it was clicked.
-fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
+/// `compact`, one height with the band's row (obf-1064); whether it was
+/// clicked.
+fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool, sizes: BandSizes) -> bool {
     let (icon, label) = if compact {
         (icons::NOTES_COMPACT, t.show_notes_full())
     } else {
         (icons::NOTES_FULL, t.show_notes_compact())
     };
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(sizes.row, sizes.row), Sense::click());
     spotlight::anchor(ui, "compact", rect);
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
     // The hover under the tint, so the selected look stays.
@@ -23680,7 +23873,8 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
         ui.painter().rect_filled(rect, theme::BUTTON_RADIUS, fill);
     }
     let text = ui.visuals().text_color();
-    icons::paint(ui.painter(), rect.shrink(2.0), icon, text);
+    let at = egui::Rect::from_center_size(rect.center(), egui::vec2(sizes.glyph, sizes.glyph));
+    icons::paint(ui.painter(), at, icon, text);
     resp.on_hover_text(label).clicked()
 }
 

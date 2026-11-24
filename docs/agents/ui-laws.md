@@ -1790,8 +1790,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **On the desktop nothing floats over a list** (#158); every list ends
   with the same room after its last card, so that card scrolls fully
   into view.
-- **On the desktop "+" sits at the end of the list's heading** (#146, #161)
-  and opens a menu of the same kinds, Note first, each with its icon and
+- **On the desktop "+" sits at the end of the list's heading** (#146, #161),
+  in a list of Notes last in its band's second row (obf-1064), and opens a menu of the same kinds, Note first, each with its icon and
   words; the Agenda's and Unsorted's "+" open the quick note at once. The
   pages open as dialogs over the window; the desktop's Session page is
   the Routine editor's, its name first, the count, rule and schedule as
@@ -1808,6 +1808,21 @@ replace a law of Both apps where they say so. A desktop law marked
 - **The path beside the arrows leads up the levels**, such as "Areas ›
   Household › Repairs"; a click on a level shows it, "Areas" leading to
   All Notes.
+- **A list of Notes has one header band** (obf-1064, C7, as the phone's
+  band, obf-1041): All Notes, Unsorted, an Area, a Topic and the Trash
+  start with one band on the search band's fill with its line under it
+  (`theme::search_band`), the cards scrolling under the line. Its first
+  row holds back, forward and the path, the place shown last and large
+  as the list's title; its second the search field, then the view
+  switch, "Show Notes by…" and "+", all at one height, the Trash's the
+  field alone. A person the filter keeps is a chip with ✕ in the second
+  row, after "Show Notes by…", a click taking them out; there is no row
+  "Only Notes by". Too narrow for them beside the field, the buttons go
+  to the line under it. The band, its words, icons and heights, grows
+  with Text size (`BandSizes` in `app.rs`); for the band this replaces
+  Both apps ▸ Look, "The text has a size of its own", where bars and
+  headings keep their size. The other places keep their arrows and
+  path over their own heading.
 - **The Agenda's bar on the desktop holds All Routines and Reminders and
   New Routine or Reminder** (draft, #196): no Calendar and no Profile
   picture; the menu bar leads to the rest.
@@ -2028,7 +2043,7 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A search field over what it lists sits on a band** (obf-1088, as
   the phone's): the Settings', File into…'s, Merge into…'s, Add to
   Note…'s and Link to…'s field, and the main window's over a list of
-  Notes, stand on a band of the marks' tone across the width with a
+  Notes (there the whole header band, see The window), stand on a band of the marks' tone across the width with a
   separator's line along its bottom (`theme::search_band`), and the
   list starts right at the line, so what scrolls goes under the line
   and no edge in the page's or the dialog's colour cuts it.

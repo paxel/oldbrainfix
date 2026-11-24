@@ -23,6 +23,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, the Settings section for Simple and Advanced is called Complexity. ([obf-1086](https://github.com/paxel/oldbrainfix/issues/399))
 - On the phone, every section of the Settings is a card with its title on top, Look, Units and Complexity included. ([obf-1085](https://github.com/paxel/oldbrainfix/issues/398))
 - On the phone and the desktop, the quick note's More is a full-width "Open in the editor" button under the Nudge buttons. ([obf-1080](https://github.com/paxel/oldbrainfix/issues/393))
+- On the desktop, every Note list starts with one header band of two rows that grows with Text size. ([obf-1064](https://github.com/paxel/oldbrainfix/issues/377))
 
 ### Fixed
 

@@ -22,6 +22,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop heißt der Abschnitt der Einstellungen für Einfach und Erweitert jetzt Komplexität. ([obf-1086](https://github.com/paxel/oldbrainfix/issues/399))
 - Auf dem Handy ist jeder Abschnitt der Einstellungen eine Karte mit Titel darüber, auch Aussehen, Einheiten und Komplexität. ([obf-1085](https://github.com/paxel/oldbrainfix/issues/398))
 - Auf dem Handy und dem Desktop ist „Mehr“ der Schnellnotiz ein breiter Knopf „Im Editor öffnen“ unter den Stupser-Knöpfen. ([obf-1080](https://github.com/paxel/oldbrainfix/issues/393))
+- Auf dem Desktop beginnt jede Liste von Notizen mit einem zweizeiligen Kopfstreifen, der mit der Textgröße wächst. ([obf-1064](https://github.com/paxel/oldbrainfix/issues/377))
 
 ### Behoben
 
