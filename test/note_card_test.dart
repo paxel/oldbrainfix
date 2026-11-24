@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
+import 'card_menu.dart';
 import 'fake_calendar.dart';
 
 void main() {
@@ -148,9 +149,16 @@ void main() {
       final note = notes.capture('Buy milk');
       await card(tester, note, schedules: false);
 
+      await openCardMenu(tester, 'note-file');
+      expect(find.byKey(const ValueKey('note-file')), findsOneWidget);
+      await closeMenu(tester);
       await tester.tap(find.byKey(const ValueKey('note-menu')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('note-file')), findsOneWidget);
+      // Add holds them, when it is there at all.
+      if (find.byKey(const ValueKey('note-group-add')).evaluate().isNotEmpty) {
+        await tester.tap(find.byKey(const ValueKey('note-group-add')));
+        await tester.pumpAndSettle();
+      }
       for (final spawn in Spawn.values) {
         expect(
           find.byKey(ValueKey('note-spawn-${spawn.name}')),
@@ -424,33 +432,48 @@ void main() {
     /// Taps the ⋮ item [key] after scrolling it on screen: the menu is
     /// longer than the test surface, and it scrolls.
     Future<void> pick(WidgetTester tester, String key) async {
+      // In its group of the ⋮ (obf-1014).
+      if (find.byKey(ValueKey(key)).evaluate().isEmpty) {
+        await openCardGroup(tester, key);
+      }
       await tester.ensureVisible(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
     }
 
-    testWidgets('offers sending, the calendar, adding and deleting with '
-        'words', (tester) async {
+    testWidgets('offers sending, the calendar, adding and moving to the '
+        'trash with words, in the editor\'s groups (obf-1014)', (tester) async {
       notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
-
-      for (final words in [
-        'Share…',
-        'Add to calendar',
-        'Add to Note',
-        'Delete',
-      ]) {
+      for (final words in ['Edit', 'This Note', 'Add', 'Share', 'Tidy']) {
         expect(find.text(words), findsOneWidget, reason: words);
       }
-      // Without Routines there are no events to share as a file.
-      expect(find.text('Share as calendar file'), findsNothing);
+      await closeMenu(tester);
+
+      for (final (entry, words) in [
+        ('note-send', 'Send to a person'),
+        ('note-calendar', 'Add to calendar'),
+        ('note-amend', 'Add a part'),
+        ('note-delete', 'Move to trash'),
+      ]) {
+        await openCardMenu(tester, entry);
+        expect(find.text(words), findsOneWidget, reason: words);
+        if (entry == 'note-calendar') {
+          // Without Routines there are no events to share as a file.
+          expect(find.text('Share as calendar file'), findsNothing);
+        }
+        await closeMenu(tester);
+      }
     });
 
     testWidgets('has no Importance: its badge in the editor changes it '
         '(#182)', (tester) async {
       notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
+      // Nor in This Note, where the editor has its badge (obf-1014).
+      await pick(tester, 'note-group-this-note');
+      expect(find.byKey(const ValueKey('note-importance')), findsNothing);
 
       for (final words in [
         'Importance',
@@ -472,7 +495,7 @@ void main() {
     testWidgets('Send to a person sends it as a Sent Item', (tester) async {
       notes.capture('Dentist on Friday');
       await menu(tester, 'Dentist on Friday');
-      await pick(tester, 'note-share-menu');
+      await pick(tester, 'note-group-share');
       await pick(tester, 'note-send');
 
       expect(find.byType(SendNoteDialog), findsOneWidget);
@@ -499,7 +522,7 @@ void main() {
       expect(calendar.shared.single.$2, contains('Dentist'));
     });
 
-    testWidgets('Add to Note adds a Section', (tester) async {
+    testWidgets('Add a part adds a Section', (tester) async {
       final note = notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
       await pick(tester, 'note-amend');
@@ -510,7 +533,7 @@ void main() {
       expect(notes.sections(note.id).single.text, 'and bread');
     });
 
-    testWidgets('Delete moves the Note to the trash without asking; the '
+    testWidgets('Move to trash moves the Note there without asking; the '
         'announcement at the top brings it back (#268)', (tester) async {
       final note = notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
@@ -519,15 +542,15 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
       expect(notes.byId(note.id)!.isTrashed, isTrue);
       expect(find.text('Buy milk'), findsNothing);
-      expect(find.text('Moved to the Trash'), findsOneWidget);
+      expect(find.text('Moved to the trash'), findsOneWidget);
 
-      await tester.tap(find.text('Moved to the Trash'));
+      await tester.tap(find.text('Moved to the trash'));
       await tester.pumpAndSettle();
       expect(notes.byId(note.id)!.isTrashed, isFalse);
       expect(find.text('Buy milk'), findsOneWidget);
     });
 
-    testWidgets('Delete takes the Note\'s Routines along, and the undo '
+    testWidgets('Move to trash takes the Note\'s Routines along, and the undo '
         'brings them back', (tester) async {
       final note = notes.capture('Dentist');
       final routines = Routines(store);
@@ -541,7 +564,7 @@ void main() {
       expect(notes.byId(note.id)!.isTrashed, isTrue);
       expect(routines.ofNote(note.id), isEmpty);
       expect(routines.all(), isEmpty);
-      await tester.tap(find.text('Moved to the Trash'));
+      await tester.tap(find.text('Moved to the trash'));
       await tester.pumpAndSettle();
       expect(routines.ofNote(note.id), hasLength(1));
     });
@@ -554,7 +577,7 @@ void main() {
       await pick(tester, 'note-delete');
       // As the Trash's Restore does.
       Routines(store).restoreNote(note.id);
-      await tester.tap(find.text('Moved to the Trash'));
+      await tester.tap(find.text('Moved to the trash'));
       await tester.pumpAndSettle();
       expect(notes.byId(note.id)!.isTrashed, isFalse);
       expect(tester.takeException(), isNull);

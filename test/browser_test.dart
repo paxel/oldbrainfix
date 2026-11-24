@@ -321,7 +321,7 @@ void main() {
       final note = find.byKey(const ValueKey('addFan-note'));
       expect(tester.getRect(note).bottom, lessThanOrEqualTo(plus.top));
       expect((tester.getCenter(note) - plus.center).distance, lessThan(200));
-      expect(find.text('Topic'), findsOneWidget);
+      expect(find.text('New Topic'), findsOneWidget);
       expect(find.byType(BottomSheet), findsNothing);
 
       await tester.tap(note);
@@ -334,7 +334,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Add here'));
       await tester.pumpAndSettle();
-      await open(tester, 'Topic');
+      await open(tester, 'New Topic');
       await tester.enterText(
         find.descendant(
           of: find.byType(AlertDialog),

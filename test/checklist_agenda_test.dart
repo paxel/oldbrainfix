@@ -5,6 +5,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'reveal.dart';
 
 /// Checklists on the Agenda (#143, #208, #219): each without a Routine
@@ -284,16 +285,19 @@ void main() {
     final id = trip();
     await startAtNotes(tester);
     await tap(tester, key('note-menu'));
+    await openCardGroup(tester, 'note-show-on-agenda-off');
     expect(find.text('Show on the Agenda'), findsOneWidget);
     expect(key('note-show-on-agenda'), findsNothing, reason: 'no switch');
     expect(menuChosen(), [false, false, true]);
     await tap(tester, key('note-show-on-agenda-count'));
     expect(lists.onAgenda(id), ListOnAgenda.count);
     await tap(tester, key('note-menu'));
+    await openCardGroup(tester, 'note-show-on-agenda-off');
     expect(menuChosen(), [false, true, false]);
     await tap(tester, key('note-show-on-agenda-off'));
     expect(lists.onAgenda(id), ListOnAgenda.off);
     await tap(tester, key('note-menu'));
+    await openCardGroup(tester, 'note-show-on-agenda-lines');
     await tap(tester, key('note-show-on-agenda-lines'));
     expect(lists.onAgenda(id), ListOnAgenda.lines);
   });
@@ -329,7 +333,8 @@ void main() {
     );
     await startAtNotes(tester);
     await tap(tester, key('note-menu'));
-    expect(key('note-show-on-agenda-lines'), findsNothing);
+    await openCardGroup(tester, 'note-to-plain');
+    expect(key('note-show-on-agenda'), findsNothing);
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();
     await tester.longPress(find.text('Before the trip').first);

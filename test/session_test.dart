@@ -156,7 +156,7 @@ void main() {
       await start(tester);
       await edit(tester, id);
       await tap(tester, key('badge-add'));
-      for (final item in ['Remind me…', 'Frog', 'Session']) {
+      for (final item in ['Remind me…', 'Frog', 'Session…']) {
         expect(find.widgetWithText(PopupMenuItem<Spawn>, item), findsOneWidget);
       }
 
@@ -307,7 +307,7 @@ void main() {
       for (final item in ['Remind me…', 'Frog']) {
         expect(find.text(item), findsOneWidget);
       }
-      await tap(tester, find.text('Session'));
+      await tap(tester, find.text('Session…'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(find.text('New Session'), findsOneWidget);
       // The rule is a column of radio buttons.

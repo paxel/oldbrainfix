@@ -7,14 +7,16 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'editor_actions.dart';
 import 'fake_photos.dart';
 import 'fake_voice.dart';
 import 'open_capture.dart';
 
-/// "Add to Note…" (#308): an Unsorted Note's card adds to another Note
-/// as a Section, picked with a filter and the Notes added to last at the
-/// top; a capture does so in the full editor (#352).
+/// An Unsorted Note's card merges into another Note as a Section with
+/// Merge into…, as every card does (obf-1014), picked with a filter and
+/// the Notes added to last at the top (#308); a capture does so in the
+/// full editor (#352).
 void main() {
   late Store store;
   late Places places;
@@ -98,20 +100,22 @@ void main() {
       matching: find.byTooltip(tooltip),
     );
 
-    testWidgets('offers Add to Note… in place of Merge into…, which merges '
-        'it into the Note picked', (tester) async {
+    testWidgets('offers Merge into… as a filed Note\'s does, which merges '
+        'it into the Note picked, the Notes added to last first', (
+      tester,
+    ) async {
       final sauce = notes.capture('Sauce', place: places.addArea('Home').id);
       tick();
       final garlic = notes.capture('more garlic');
       await allNotes(tester);
 
-      expect(on('more garlic', 'Add to Note…'), findsOneWidget);
-      expect(on('more garlic', 'Merge into…'), findsNothing);
-      // A filed Note's card keeps Merge into….
+      expect(on('more garlic', 'Merge into…'), findsOneWidget);
+      expect(on('more garlic', 'Add to Note…'), findsNothing);
       expect(on('Sauce', 'Merge into…'), findsOneWidget);
-      expect(on('Sauce', 'Add to Note…'), findsNothing);
-      await tap(tester, on('more garlic', 'Add to Note…'));
-      expect(find.text('Add to Note…'), findsOneWidget);
+      await tap(tester, on('more garlic', 'Merge into…'));
+      // One name for one action (obf-1014): the page is Merge into… too.
+      expect(find.text('Merge into…'), findsOneWidget);
+      expect(find.text('Add to Note…'), findsNothing);
       await tap(tester, listed('Sauce'));
 
       // The core's Merge, as ever.
@@ -120,16 +124,19 @@ void main() {
       expect(store.recentlyAddedTo, [sauce.id]);
     });
 
-    testWidgets('names it so in its compact view\'s ⋮', (tester) async {
+    testWidgets('names it Merge into… in its compact view\'s ⋮ ▸ Tidy', (
+      tester,
+    ) async {
       notes.capture('Sauce', place: places.addArea('Home').id);
       tick();
       notes.capture('more garlic');
       // The list shows every card compact (#189).
       store.setLocalSetting('compactNotes:allNotes', 'true');
       await allNotes(tester);
-      await tap(
+      await openCardMenu(
         tester,
-        find.descendant(
+        'note-merge',
+        menu: find.descendant(
           of: find.ancestor(
             of: find.text('more garlic'),
             matching: find.byType(NoteCard),
@@ -141,7 +148,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('note-merge')),
-          matching: find.text('Add to Note…'),
+          matching: find.text('Merge into…'),
         ),
         findsOneWidget,
       );

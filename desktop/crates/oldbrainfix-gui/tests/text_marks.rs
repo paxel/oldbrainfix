@@ -334,6 +334,13 @@ fn show_ticks_says_who_ticked_each_box_and_is_kept_per_note() -> TestResult {
         .ok_or("the card's ⋮")?;
     menu.click_accesskit();
     harness.run();
+    // Under This Note ▸ (obf-1014).
+    harness
+        .query_all_by_label("This Note ⏵")
+        .last()
+        .ok_or("This Note ⏵")?
+        .click();
+    harness.run();
     click(&mut harness, "Show ticks")?;
     assert!(
         harness

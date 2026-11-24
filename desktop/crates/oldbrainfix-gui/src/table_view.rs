@@ -1096,48 +1096,92 @@ pub(crate) fn menu(
 ) -> Option<Op> {
     let mut picked = None;
     let mut entries = |ui: &mut Ui| {
-        let text = ui.visuals().text_color();
-        let items = if column {
-            [
-                (Op::Before, t.table_column_before()),
-                (Op::After, t.table_column_after()),
+        if column {
+            column_entries(ui, t, (index, count), (headings, align, sorts), &mut picked);
+            return;
+        }
+        let items = [
+            (Op::Before, t.table_row_above()),
+            (Op::After, t.table_row_below()),
+            (Op::Back, t.table_row_up()),
+            (Op::Forward, t.table_row_down()),
+            (Op::Delete, t.table_row_delete()),
+        ];
+        op_entries(ui, (index, count), items, &mut picked);
+    };
+    // The right-click's menu has its own id: on a click the context menu
+    // closes its popup, which would otherwise be this one just opened.
+    Popup::menu(resp).show(&mut entries);
+    Popup::context_menu(resp)
+        .id(Popup::default_response_id(resp).with("context"))
+        .show(&mut entries);
+    picked
+}
+
+/// The entries `items`, Move greyed at its end and Delete in the error
+/// colour, the one picked put into `picked`, closing the menu.
+fn op_entries<const N: usize>(
+    ui: &mut Ui,
+    (index, count): (usize, usize),
+    items: [(Op, &str); N],
+    picked: &mut Option<Op>,
+) {
+    let text = ui.visuals().text_color();
+    for (op, words) in items {
+        let enabled = match op {
+            Op::Back => index > 0,
+            Op::Forward => index + 1 < count,
+            _ => true,
+        };
+        let colour = if op == Op::Delete {
+            ui.visuals().error_fg_color
+        } else {
+            text
+        };
+        if ui
+            .add_enabled(
+                enabled,
+                egui::Button::new(RichText::new(words).color(colour)),
+            )
+            .clicked()
+        {
+            *picked = Some(op);
+            ui.close();
+        }
+    }
+}
+
+/// A column's menu, at most seven entries (obf-1014): Insert ▸, Move ▸,
+/// on the editor's grid Align ▸ and Sort rows ▸ before Delete column,
+/// full screen Show sorted ▸ after it, and First column as headings on
+/// the first.
+fn column_entries(
+    ui: &mut Ui,
+    t: &L10n,
+    (index, count): (usize, usize),
+    (headings, align, sorts): (bool, Option<Align>, Sorts),
+    picked: &mut Option<Op>,
+) {
+    let text = ui.visuals().text_color();
+    ui.menu_button(RichText::new(t.table_insert_menu()).color(text), |ui| {
+        let items = [
+            (Op::Before, t.table_column_before()),
+            (Op::After, t.table_column_after()),
+        ];
+        op_entries(ui, (index, count), items, picked);
+    });
+    let moves = count > 1;
+    ui.add_enabled_ui(moves, |ui| {
+        ui.menu_button(RichText::new(t.table_move_menu()).color(text), |ui| {
+            let items = [
                 (Op::Back, t.table_column_left()),
                 (Op::Forward, t.table_column_right()),
-                (Op::Delete, t.table_column_delete()),
-            ]
-        } else {
-            [
-                (Op::Before, t.table_row_above()),
-                (Op::After, t.table_row_below()),
-                (Op::Back, t.table_row_up()),
-                (Op::Forward, t.table_row_down()),
-                (Op::Delete, t.table_row_delete()),
-            ]
-        };
-        for (op, words) in items {
-            let enabled = match op {
-                Op::Back => index > 0,
-                Op::Forward => index + 1 < count,
-                _ => true,
-            };
-            let colour = if op == Op::Delete {
-                ui.visuals().error_fg_color
-            } else {
-                text
-            };
-            if ui
-                .add_enabled(
-                    enabled,
-                    egui::Button::new(RichText::new(words).color(colour)),
-                )
-                .clicked()
-            {
-                picked = Some(op);
-                ui.close();
-            }
-        }
-        if let Some(now) = align.filter(|_| column) {
-            ui.separator();
+            ];
+            op_entries(ui, (index, count), items, picked);
+        });
+    });
+    if let Some(now) = align {
+        ui.menu_button(RichText::new(t.table_align_menu()).color(text), |ui| {
             let aligns = [
                 (Align::Left, t.table_align_left()),
                 (Align::Center, t.table_align_center()),
@@ -1148,61 +1192,67 @@ pub(crate) fn menu(
                 let on = now == to || (now == Align::None && to == Align::Left);
                 let entry = egui::Button::selectable(on, RichText::new(words).color(text));
                 if ui.add(entry).clicked() {
-                    picked = Some(Op::Align(to));
+                    *picked = Some(Op::Align(to));
                     ui.close();
                 }
             }
-        }
-        // Shown sorted, the entry of how it shows now is left out, and
-        // As written while the rows show so.
-        let sorting = match sorts {
-            _ if !column => Vec::new(),
-            Sorts::Nothing => Vec::new(),
-            Sorts::View(now) => {
-                let this = now.filter(|s| s.column == index).map(|s| s.descending);
-                let mut entries = Vec::new();
-                if this != Some(false) {
-                    entries.push((Op::ShowSorted(false), t.table_show_sorted_up()));
-                }
-                if this != Some(true) {
-                    entries.push((Op::ShowSorted(true), t.table_show_sorted_down()));
-                }
-                if now.is_some() {
-                    entries.push((Op::AsWritten, t.table_show_as_written()));
-                }
-                entries
+        });
+    }
+    let delete = [(Op::Delete, t.table_column_delete())];
+    // Shown sorted, the entry of how it shows now is left out, and As
+    // written while the rows show so.
+    let (sorting, label) = match sorts {
+        Sorts::Nothing => (Vec::new(), ""),
+        Sorts::View(now) => {
+            let this = now.filter(|s| s.column == index).map(|s| s.descending);
+            let mut entries = Vec::new();
+            if this != Some(false) {
+                entries.push((Op::ShowSorted(false), t.table_show_sorted_up()));
             }
-            Sorts::Rows => vec![
+            if this != Some(true) {
+                entries.push((Op::ShowSorted(true), t.table_show_sorted_down()));
+            }
+            if now.is_some() {
+                entries.push((Op::AsWritten, t.table_show_as_written()));
+            }
+            (entries, t.table_show_sorted_menu())
+        }
+        Sorts::Rows => (
+            vec![
                 (Op::SortRows(false), t.table_sort_rows()),
                 (Op::SortRows(true), t.table_sort_rows_down()),
             ],
-        };
-        if !sorting.is_empty() {
-            ui.separator();
-        }
-        for (op, words) in sorting {
-            if ui.button(RichText::new(words).color(text)).clicked() {
-                picked = Some(op);
-                ui.close();
-            }
-        }
-        if column && index == 0 {
-            ui.separator();
-            let mut on = headings;
-            let words = RichText::new(t.table_heading_column()).color(text);
-            if theme::checkbox(ui, &mut on, words).changed() {
-                picked = Some(Op::Headings);
-                ui.close();
-            }
-        }
+            t.table_sort_rows_menu(),
+        ),
     };
-    // The right-click's menu has its own id: on a click the context menu
-    // closes its popup, which would otherwise be this one just opened.
-    Popup::menu(resp).show(&mut entries);
-    Popup::context_menu(resp)
-        .id(Popup::default_response_id(resp).with("context"))
-        .show(&mut entries);
-    picked
+    // Full screen Delete column comes before Show sorted ▸, on the grid
+    // after Sort rows ▸.
+    let rows_sort = sorts == Sorts::Rows;
+    if !rows_sort {
+        op_entries(ui, (index, count), delete, picked);
+    }
+    if !sorting.is_empty() {
+        ui.menu_button(RichText::new(label).color(text), |ui| {
+            for (op, words) in sorting {
+                if ui.button(RichText::new(words).color(text)).clicked() {
+                    *picked = Some(op);
+                    ui.close();
+                }
+            }
+        });
+    }
+    if rows_sort {
+        op_entries(ui, (index, count), delete, picked);
+    }
+    if index == 0 {
+        ui.separator();
+        let mut on = headings;
+        let words = RichText::new(t.table_heading_column()).color(text);
+        if theme::checkbox(ui, &mut on, words).changed() {
+            *picked = Some(Op::Headings);
+            ui.close();
+        }
+    }
 }
 
 /// Where each of the lengths `sizes` begins, one after another from

@@ -318,9 +318,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get findClose => 'Suchleiste schließen';
 
   @override
-  String get selectionSearch => 'Suchen';
-
-  @override
   String get noNotesHere =>
       'Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen.';
 
@@ -1375,9 +1372,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get moreCaptureContext => 'Mehr zur Erfassung';
-
-  @override
-  String get recordVoice => 'Sprache aufnehmen';
 
   @override
   String get recording => 'Aufnahme läuft …';
@@ -2496,7 +2490,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bundleNoApp => 'Keine App hier kann das Bündel annehmen.';
 
   @override
-  String get shareArea => 'Teilen …';
+  String get shareArea => 'Mit Menschen teilen …';
 
   @override
   String get areaShared => 'Geteilt';
@@ -3232,7 +3226,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get addToCalendar => 'In den Kalender';
 
   @override
-  String get deleteNoteQuestion => 'Diese Notiz löschen?';
+  String get deleteNoteQuestion => 'Diese Notiz in den Papierkorb verschieben?';
 
   @override
   String get deleteNoteDetail => 'Sie bleibt 30 Tage im Papierkorb.';
@@ -3242,15 +3236,16 @@ class AppLocalizationsDe extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Diese Notiz und ihre $count Routinen und Erinnerungen löschen?',
-      one: 'Diese Notiz und ihre 1 Routine löschen?',
+      other:
+          'Diese Notiz und ihre $count Routinen und Erinnerungen in den Papierkorb verschieben?',
+      one: 'Diese Notiz und ihre 1 Routine in den Papierkorb verschieben?',
     );
     return '$_temp0';
   }
 
   @override
   String get deleteNoteReminderQuestion =>
-      'Diese Notiz und ihre 1 Erinnerung löschen?';
+      'Diese Notiz und ihre 1 Erinnerung in den Papierkorb verschieben?';
 
   @override
   String get removeRecordingKeepText => 'Aufnahme entfernen, Text behalten';
@@ -3791,7 +3786,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get deleteFrogQuestion =>
-      'Diesen Frosch löschen? Er bleibt im Papierkorb. Seine Notiz bleibt.';
+      'Diesen Frosch in den Papierkorb verschieben? Seine Notiz bleibt.';
 
   @override
   String get frogOpen => 'Offen';
@@ -4898,9 +4893,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shareToApp => 'Mit einer App teilen';
 
   @override
-  String get shareNote => 'Teilen …';
-
-  @override
   String get noteNotShared => 'Die Notiz wurde nicht geteilt.';
 
   @override
@@ -5379,6 +5371,24 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zeilen nach dieser Spalte absteigend sortieren';
 
   @override
+  String get tableInsertMenu => 'Einfügen';
+
+  @override
+  String get tableMoveMenu => 'Verschieben';
+
+  @override
+  String get tableAlignMenu => 'Ausrichten';
+
+  @override
+  String get tableSortRowsMenu => 'Zeilen sortieren';
+
+  @override
+  String get tableShowSortedMenu => 'Sortiert zeigen';
+
+  @override
+  String get menuMore => 'Mehr …';
+
+  @override
   String get pairCodeNeedsUpdate =>
       'Dieser Code stammt von einem neueren Old Brain Fix. Aktualisiere Old Brain Fix auf diesem Gerät und versuch es dann noch einmal.';
 
@@ -5429,13 +5439,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get quickNoteSchedule => 'Frosch, Einheit oder Strichliste';
 
   @override
-  String get copyPhoto => 'Kopieren';
+  String get copyPhoto => 'Foto kopieren';
 
   @override
-  String get savePhoto => 'Speichern';
-
-  @override
-  String get sharePhoto => 'Teilen';
+  String get savePhoto => 'Foto speichern';
 
   @override
   String get photoSaveFailed => 'Das Foto wurde nicht gespeichert.';
@@ -6491,7 +6498,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get file => 'Datei';
 
   @override
-  String get attachFile => 'Datei anhängen';
+  String get attachFile => 'Datei anhängen …';
 
   @override
   String get attachmentTextLabel => 'Anhangtext';

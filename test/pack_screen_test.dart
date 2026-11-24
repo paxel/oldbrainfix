@@ -11,6 +11,7 @@ import 'package:oldbrainfix/src/pack_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
+import 'card_menu.dart';
 import 'fake_profile.dart';
 
 void main() {
@@ -235,7 +236,7 @@ void main() {
           matching: find.byKey(const ValueKey('note-menu')),
         ),
       );
-      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-group-share')));
       await tap(tester, find.byKey(const ValueKey('note-pack')));
       expect(find.byType(PackExportScreen), findsOneWidget);
       expect(find.text('Training'), findsWidgets);
@@ -378,6 +379,7 @@ void main() {
           matching: find.byKey(const ValueKey('note-menu')),
         ),
       );
+      await openCardGroup(tester, 'note-remove-pack-from');
       await tap(tester, find.byKey(const ValueKey('note-remove-pack-from')));
       expect(store.packFrom(water.id), isNull);
       expect(find.byKey(ValueKey('pack-from-${water.id}')), findsNothing);

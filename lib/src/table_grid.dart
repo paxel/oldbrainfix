@@ -12,6 +12,7 @@ import 'edit_history.dart';
 import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'menu_groups.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
@@ -116,6 +117,10 @@ enum _Op {
   sortUp,
   sortDown,
 }
+
+/// A group of a column's menu, opening its [_Op]s in a second menu at the
+/// finger (obf-1014).
+enum _Group { insert, move, align, sort }
 
 class TableGridState extends State<TableGrid> {
   late String _text = widget.text;
@@ -491,17 +496,24 @@ class TableGridState extends State<TableGrid> {
   }
 
   /// The menu of the row [index] or, with [column], of the column
-  /// [index], at [at] (global).
+  /// [index], at [at] (global). A column's has Insert, Move, Align and
+  /// Sort rows, each opening its entries in a second menu at the finger,
+  /// then Delete column and, on the first, First column as headings
+  /// (obf-1014).
   Future<void> _menu(int index, Offset at, {required bool column}) async {
     final table = _table;
     if (table == null) return;
     stop();
     final t = context.t;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (overlay == null) return;
     final count = column ? table.columns : table.rows.length;
-    PopupMenuItem<_Op> item(
+    PopupMenuItem<Object> group(_Group which, IconData icon, String label) =>
+        groupMenuItem(
+          key: ValueKey('table-group-${which.name}'),
+          value: which,
+          icon: Icon(icon),
+          label: label,
+        );
+    PopupMenuItem<Object> item(
       _Op op,
       IconData icon,
       String label, {
@@ -527,39 +539,15 @@ class TableGridState extends State<TableGrid> {
       ),
     );
     final align = column ? table.aligns[index] : MarkdownAlign.none;
-    final picked = await showMenu<_Op>(
-      context: context,
-      position: RelativeRect.fromRect(
-        overlay.globalToLocal(at) & Size.zero,
-        Offset.zero & overlay.size,
-      ),
-      items: column
+    var picked = await showMenuAt<Object>(
+      context,
+      at,
+      column
           ? [
-              item(_Op.before, Icons.west, t.tableColumnBefore),
-              item(_Op.after, Icons.east, t.tableColumnAfter),
-              item(_Op.back, Icons.arrow_back, t.tableColumnLeft),
-              item(_Op.forward, Icons.arrow_forward, t.tableColumnRight),
-              item(
-                _Op.alignLeft,
-                Icons.format_align_left,
-                t.tableAlignLeft,
-                checked:
-                    align == MarkdownAlign.none || align == MarkdownAlign.left,
-              ),
-              item(
-                _Op.alignCenter,
-                Icons.format_align_center,
-                t.tableAlignCenter,
-                checked: align == MarkdownAlign.center,
-              ),
-              item(
-                _Op.alignRight,
-                Icons.format_align_right,
-                t.tableAlignRight,
-                checked: align == MarkdownAlign.right,
-              ),
-              item(_Op.sortUp, Icons.arrow_upward, t.tableSortRows),
-              item(_Op.sortDown, Icons.arrow_downward, t.tableSortRowsDown),
+              group(_Group.insert, Icons.add, t.tableInsertMenu),
+              group(_Group.move, Icons.swap_horiz, t.tableMoveMenu),
+              group(_Group.align, Icons.format_align_left, t.tableAlignMenu),
+              group(_Group.sort, Icons.sort, t.tableSortRowsMenu),
               item(_Op.delete, Icons.delete_outline, t.tableColumnDelete),
               if (index == 0)
                 PopupMenuItem(
@@ -589,7 +577,45 @@ class TableGridState extends State<TableGrid> {
               item(_Op.delete, Icons.delete_outline, t.tableRowDelete),
             ],
     );
-    if (!mounted || picked == null) return;
+    if (!mounted) return;
+    if (picked is _Group) {
+      picked = await showMenuAt<Object>(context, at, switch (picked) {
+        _Group.insert => [
+          item(_Op.before, Icons.west, t.tableColumnBefore),
+          item(_Op.after, Icons.east, t.tableColumnAfter),
+        ],
+        _Group.move => [
+          item(_Op.back, Icons.arrow_back, t.tableColumnLeft),
+          item(_Op.forward, Icons.arrow_forward, t.tableColumnRight),
+        ],
+        _Group.align => [
+          item(
+            _Op.alignLeft,
+            Icons.format_align_left,
+            t.tableAlignLeft,
+            checked: align == MarkdownAlign.none || align == MarkdownAlign.left,
+          ),
+          item(
+            _Op.alignCenter,
+            Icons.format_align_center,
+            t.tableAlignCenter,
+            checked: align == MarkdownAlign.center,
+          ),
+          item(
+            _Op.alignRight,
+            Icons.format_align_right,
+            t.tableAlignRight,
+            checked: align == MarkdownAlign.right,
+          ),
+        ],
+        _Group.sort => [
+          item(_Op.sortUp, Icons.arrow_upward, t.tableSortRows),
+          item(_Op.sortDown, Icons.arrow_downward, t.tableSortRowsDown),
+        ],
+      });
+      if (!mounted) return;
+    }
+    if (picked is! _Op) return;
     final (text, where) = (_text, _at);
     switch ((picked, column)) {
       case (_Op.before, false):

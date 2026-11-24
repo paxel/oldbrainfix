@@ -31,7 +31,7 @@ There are three kinds, and an action takes the first that fits.
 - **Filled: the main action.** At most one on a dialog or page (Save,
   Create, Done, Use, Restore, Continue), on the accent with its words
   in `on_accent`. An action that deletes or removes (Delete, Remove,
-  Move to Trash) is filled on the error colour instead. Phone:
+  Move to trash) is filled on the error colour instead. Phone:
   `FilledButton` / `FilledButton.icon`, and `DestructiveButton` in
   `look.dart`. Desktop: `theme::primary`,
   `theme::main_action` (which Ctrl+Enter also runs) and
@@ -158,7 +158,8 @@ There are three kinds, and an action takes the first that fits.
 - Every browser level (Areas, Topics, Notes) has a "+" that adds the
   thing shown on that level. On the Areas list it adds an Area. **In an
   Area, a Topic and All Notes "+" offers Note, Checklist, Shopping
-  List, Tally, Session and Frog** (#161), and in an Area Topic;
+  List, Tally, Session and Frog** (#161), and in an Area New Topic
+  (obf-1014);
   Session, Frog and Topic only for who may set them up, and Tally,
   Session, Frog and Topic only in Advanced (#197). What it makes is
   filed into the Area or Topic shown, from All Notes into none: Note
@@ -337,10 +338,9 @@ There are three kinds, and an action takes the first that fits.
   neither Done nor skipped and this Device may check it off (#269), each
   under its heading; then **Edit schedule**, which opens the Routine or
   Reminder editor (#270), as the Routine's badge in the Note editor
-  does; History for a Routine, and Share, which hands the Routine as
-  its whole series with its end, or the Reminder, to another app as a
-  calendar file. Edit schedule, History and Share ask a Masked row's
-  Area to open first; Snooze and Not today answer it as its box does.
+  does; and History for a Routine. The row shares no calendar file
+  (obf-1014). Edit schedule and History ask a Masked row's Area to open
+  first; Snooze and Not today answer it as its box does.
 - **A Checklist without a Routine or Reminder is a group today** while
   it has open Lines or Lines checked today (#143, #208, #276): its name
   as the heading, without a box, and its open Lines under it, each with
@@ -502,14 +502,16 @@ There are three kinds, and an action takes the first that fits.
   this week" over all of them (#191); a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
   the card** (File into, Routine, Merge, the pencil); **its ⋮ sits top
-  right** and offers after Edit File into…, Remind me… (#344), in
-  Advanced Frog and Session… (#197), and Merge into…, as far as the
-  action row would (#281): the spawns only for who may set them up
-  (ADR 0013) and Session… only on a plain Note. **On an Unsorted Note's
-  card Merge into… is named "Add to Note…"** (#308), in the action row,
-  the ⋮ and on the desktop the right-click: the same Merge, picked in
-  Add to Note… (see Dialogs and pages); the Note editor, the Note
-  dialog and a selection keep Merge into…. In the detailed view a Shopping List shows its open Lines,
+  right** and offers in its groups what the action row would (#281,
+  obf-1014): File into… under This Note, Remind me… (#344) and in
+  Advanced Frog and Session… (#197) under Add, and Merge into… under
+  Tidy: the spawns only for who may set them up (ADR 0013) and Session…
+  only on a plain Note. **An Unsorted Note's card names its Merge
+  "Merge into…" too** (#308, obf-1014), in the action row, the ⋮ and on
+  the desktop the right-click, as the Note editor, the Note dialog and a
+  selection do: the same Merge, its page titled Merge into… and picking
+  the Note as Add to Note… does, the Notes added to last first (see
+  Dialogs and pages). In the detailed view a Shopping List shows its open Lines,
   tickable, the struck ones folded under them ("2 struck through") until
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
@@ -555,17 +557,19 @@ There are three kinds, and an action takes the first that fits.
   off, moves the Note with the Reminder to the trash and closes the
   editor. On the desktop the same lines open the Note dialog, Done on the
   accent and "Done and move to trash" on the error colour.
-- **A card's ⋮ on the phone stays short** (#281): Send to a person,
-  Share to an app, Copy text and Export as Pack… are one entry,
-  **Share…**, after Show ticks, which opens a small menu of the four at
-  the ⋮; the Importance is not in it (the editor's badge and the
-  selection change it, #182, #273).
+- **A card's ⋮ holds Edit and the Note editor's four groups** (#281,
+  obf-1014): Edit, then **This Note ▸**, **Add ▸**, **Share ▸** and
+  **Tidy ▸**, each holding what the card offers of the editor's group
+  of that name, as the editor names it; a group with nothing this
+  Device may do is left out. On the phone the Importance is not in it
+  (the editor's badge and the selection change it, #182, #273); see
+  Phone ▸ Cards for what each group holds there.
 - **The detailed card's action row has a pencil** (#281), right before
   its ⋮: one tap opens the Note editor, as the long press and ⋮ ▸ Edit
   do. Where the card is too narrow for the whole row, as with Fat
   fingers on a small phone, the pencil and ⋮ go onto a line of their own
   under the other buttons, at the right, so no button is cut.
-- **Copy text** in a card's ⋮ (under Share… on the phone) puts the text
+- **Copy text** in a card's ⋮ (under Share ▸) puts the text
   of the Note and of each Section on the clipboard as they show, oldest first, a blank line
   between them, and says nothing (#183); a Checklist's or Shopping List's Lines come after its
   text as a Markdown task list, `- [ ] Milk`, `- [x] Eggs`, a group indented (#323).
@@ -626,9 +630,9 @@ There are three kinds, and an action takes the first that fits.
   its schedule; its Frog (#259) while one is open or was eaten today or
   yesterday, the frog with "Open", "Eaten today" or "Eaten yesterday",
   in Simple too, its tap offering at the finger Eat now while it is open
-  and this Device may check it off and "Remove the Frog" for who may
-  manage it, which asks nothing and is undone as the Frog view's Delete
-  is (#268); for a Member an
+  and this Device may check it off and Move to trash for who may
+  manage it, which asks nothing and is undone as the Frog view's Move
+  to trash is (#268, obf-1014); for a Member an
   eaten one only shows; the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
@@ -664,7 +668,7 @@ There are three kinds, and an action takes the first that fits.
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value" in words, an icon's value
   too. The row ends with "+",
-  whose menu at the finger offers Remind me…, Frog and Session,
+  whose menu at the finger offers Remind me…, Frog and Session…,
   there only for who may set them up; no Frog while the Note has an open
   one (#259); on a Session it offers no
   Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and
@@ -678,11 +682,11 @@ There are three kinds, and an action takes the first that fits.
   person's picture, anywhere it shows, opens their Profile.
 - **A Note a Pack brought unclaimed says who it came from** (#164):
   "From Ann" on a weak line with `inventory_2` under the card's top row (#330),
-  in either view, until "Remove “From Ann”" in the card's ⋮ or its badge
+  in either view, until "Remove “From Ann”" in the card's ⋮ ▸ This Note or its badge
   in the Note editor takes it away.
 - **"Export as Pack…"** (#164) is in the menu of every Area and Topic,
   for anyone who may read them, in a Note card's ⋮ after Copy text
-  (under Share… on the phone, #281) and
+  (under Share ▸, #281, obf-1014) and
   in the Note editor's Share group after Share to an app
   (`inventory_2`, obf-1073). It
   opens the Pack's tree: Areas and Topics as headings, each Note with
@@ -734,8 +738,8 @@ There are three kinds, and an action takes the first that fits.
   place File into… does not list (deleted, a Topic of a closed locked
   Area, a Shared Area the Device left) is not offered among the recent
   ones either.
-- **Add to Note…** (#308), from capture, an Unsorted Note's card or an
-  answer of Ask (#316), is
+- **Add to Note…** (#308), from capture or an answer of Ask (#316), and
+  the page of an Unsorted Note's Merge into… (obf-1014), is
   a filter over the Notes, the core's search (focused on the desktop,
   not on the phone), then "Added to recently" with the last three Notes
   this Device added to, the latest first, while nothing is typed, then
@@ -871,7 +875,10 @@ There are three kinds, and an action takes the first that fits.
   the last column adds one. A row's number and a column's letter open
   its menu: insert, move, delete (asking once while it holds words; the
   last one deletes the table), for a column Align left, Centre and Align
-  right, and for the first column First column as headings. While a
+  right, and for the first column First column as headings. A column's
+  menu groups them (obf-1014): Insert ▸, Move ▸, Align ▸, Sort rows ▸,
+  Delete column and First column as headings; full screen Insert ▸,
+  Move ▸, Delete column, Show sorted ▸ and First column as headings. While a
   cell is edited, the format bar, where the field has one, holds only ☐,
   bold, italic, strike-through, link and code, on the cell's words.
   Every change writes the table's lines anew (ADR 0033); the Markdown
@@ -1052,7 +1059,24 @@ There are three kinds, and an action takes the first that fits.
   badge, in the editor and on a button, on the phone and the desktop
   alike.
 - **A menu shows at most seven entries** (#321, Q724); the rest go under
-  "More…".
+  "More…". Entries of one kind go under one entry that opens them as a
+  group (the card's This Note ▸, Add ▸, Share ▸, Tidy ▸, a table
+  column's Insert ▸, Move ▸, Align ▸, Sort rows ▸, Show sorted ▸,
+  obf-1014). The law covers menus of actions only; exempt are **a list
+  of choices** (Heads-up lengths, people, calendars, Shopping Lists), **a text
+  field's edit menu**, **the badge group** (This Note) and **the
+  phone's format bar's ⋮**, which holds every format without room.
+- **The names are one per action** (obf-1014): Add a part (the box it
+  opens confirms with Add), Merge into…, Find in Note wherever the
+  Note's find bar opens (Search stays for the lists and Search all
+  Notes), Move to trash (also for a Frog; "Move this Note to the
+  trash?" where it asks), Send to a person, Copy text, Open in
+  another app, Save photo (Save photo… on the desktop) and Copy photo,
+  Share as calendar file,
+  Session…, New Topic, Quick note, Share to an app, Attach a file…;
+  the card keeps Edit and the quick note Open in the editor, which
+  saves first. An Area's entry is Share with people…; the Note's menu
+  and group keep Share.
 - Errors name the cause and the fix in one sentence each.
 
 ### Spotlights
@@ -1379,8 +1403,8 @@ There are three kinds, and an action takes the first that fits.
 ### Announcements
 
 - **An offer to undo** (#268): what was just deleted on the phone and
-  can be restored says so at the top at once ("Moved to the Trash",
-  "Line deleted", "Entry deleted", "Frog moved to the Trash", "“From”
+  can be restored says so at the top at once ("Moved to the trash",
+  "Line deleted", "Entry deleted", "Frog moved to the trash", "“From”
   label removed", "Transcript removed"), and so does a Skip or Tomorrow
   made in the app ("Skipped", "The day after instead", #269), whose undo
   takes the skip back; one made on a notification offers none. A
@@ -1508,13 +1532,13 @@ There are three kinds, and an action takes the first that fits.
 - **The Note editor holds what the quick note no longer shows** (#352):
   under This Note its badges the Kind, the place (File into…) and the
   Importance; under Add "+" with Remind me…, in Advanced Frog and
-  Session, Voice, Photo, Gallery, Paste and Attach a file; under Tidy
+  Session…, Voice, Photo, Gallery, Paste and Attach a file…; under Tidy
   Merge into…, which adds it to another Note, and Add to a Shopping
   List; the format bar rides on the keyboard.
 - **The Note editor's actions stand in four named groups** (obf-1073),
   as in the desktop's Note dialog: **This Note**, the row of badges
   under the text; at the page's end, after all the Note holds, **Add**
-  ("+", Voice, Photo, Gallery, Paste, Attach a file, Add a part),
+  ("+", Voice, Photo, Gallery, Paste, Attach a file…, Add a part),
   **Share** (Send to a person, Share to an app, Export as Pack…) and
   **Tidy** (Merge into…, Add to a Shopping List, Move to trash, the
   last in the error colour). Each group is a small heading, read as a
@@ -1623,9 +1647,10 @@ There are three kinds, and an action takes the first that fits.
 ### Cards
 
 - **A photo gets out of the Note** (#149): full screen its ⋮ offers
-  Save, Copy and Share on the phone, Save putting it into the phone's
-  Pictures in the album "Old Brain Fix" (Android 10 and later; before
-  it, Save is announced as failed with Share as the fix), and only while
+  Save photo, Copy photo and Share to an app on the phone (obf-1014),
+  Save photo putting it into the phone's Pictures in the album "Old
+  Brain Fix" (Android 10 and later; before it, Save photo is announced
+  as failed with Share to an app as the fix), and only while
   its file is on the phone. Saved and copied say nothing, nor does
   a share sheet left without an app; a failure is announced.
 - **An Attachment shows on its card** (#267, ADR 0047): each file a row
@@ -1658,8 +1683,22 @@ There are three kinds, and an action takes the first that fits.
   Append for its text, Remove for the text (with the undo at the top,
   #268), Read the text again (not for a file left to a computer), and
   "Remove Attachment, keep text", asked once, where this Device may;
-  the card's ⋮ offers the last too. "Attach a file" under the editor's
-  Add (obf-1073) picks more files.
+  the card's ⋮ ▸ Tidy offers the last too. "Attach a file…" under the
+  editor's Add (obf-1073) picks more files.
+- **What each group of a card's ⋮ holds on the phone** (obf-1014), each
+  opening as a second menu at the ⋮, one thumb's reach from the first:
+  **This Note** File into… (compact card), Show ticks, Hidden from AI,
+  Remove "From …", a Tally's Add to home screen, Make it a Tally, Make
+  it a Checklist, Make it a Shopping List, Show on the Agenda ▸ (its
+  choices in a menu of their own) and Back to a plain Note; **Add**
+  Remind me…, in Advanced Frog and Session… (compact card), Add a part
+  and a Tally's Add entry; **Share** Send to a person, Share to an app,
+  Copy text, Export as Pack…, Add to calendar and Share as calendar
+  file; **Tidy** Merge into… (compact card), Add to a Shopping List,
+  Uncheck all, Move to trash, which asks nothing and is undone at the
+  top (#268), and Remove photo, keep text and its kin, one per photo,
+  recording or file. A group past seven entries shows six and More…,
+  which opens the rest the same way.
 - **Hidden from AI** (#267, ADR 0049): a card's ⋮ and an Area's menu in
   the Areas list have the switch "Hidden from AI", the Note editor its
   badge, offered on a Note or Area in no Shared Area and, once marked,
@@ -1672,8 +1711,8 @@ There are three kinds, and an action takes the first that fits.
   search's card that lists places found opens on a tap, at its first
   place, and a tap on a place opens the Note there (obf-1047).
 - In the Note editor a text that is only read, the Note's or a
-  Section's, selects with a long press, with Copy and Search in the
-  toolbar above the selection (#183, obf-1055; see Text editor).
+  Section's, selects with a long press, with Copy and Find in Note in
+  the toolbar above the selection (#183, obf-1055; see Text editor).
 - **Several Notes are selected with "Select"** (#273, Q655): every Note
   list, Unsorted and its Nudge page, an Area, a Topic, All Notes, the
   search's hits and the Trash, has Select in its bar while it shows a
@@ -1778,7 +1817,7 @@ There are three kinds, and an action takes the first that fits.
 - **A long press on the bottom row starts selecting** where the cursor
   is and never moves it. While selecting, ◀ and ▶ show in inverted
   colours and move only the selection's moving end; the toolbar above
-  the selection offers Copy, Paste, Search and Delete; typing replaces the selection and ends
+  the selection offers Copy, Paste, Find in Note and Delete; typing replaces the selection and ends
   selecting; another long press ends it with the cursor at the moving
   end.
 - **A small toolbar floats just above a selection** (obf-1055), in
@@ -1824,8 +1863,9 @@ There are three kinds, and an action takes the first that fits.
 - **The Amend box shows only when asked** (obf-1072, C15c): the Note
   editor has no "Add to Note" field or button of its own. An existing
   Note has **Add a part** (`post_add`) last under Add at the page's end
-  (obf-1073), for everyone who may Amend it; it opens the
-  box "Add to Note" with its format bar, "What's new?" and Add. A Note
+  (obf-1073), for everyone who may Amend it, and so has a card's ⋮ ▸
+  Add (obf-1014); it opens the box "Add a part" with its format bar,
+  "What's new?" and Add. A Note
   being made, in the editor opened by the quick note's Open in the
   editor or a list's "+", has none; opened again later, it has. Its
   Spotlight is the editor's last tip.
@@ -1863,11 +1903,11 @@ There are three kinds, and an action takes the first that fits.
   the header row's alone, never the card's, the search card's or the
   table's, which the rows under it keep. Full screen where the table is
   edited, a tap on a cell of the header row edits it, the column's letter
-  offers Show sorted ascending, Show sorted descending and Show as
-  written, and putting in, moving or deleting a row or column shows the
-  rows as written again. On the editor's grid the column's letter offers
-  Sort rows by this column and Sort rows by this column, descending,
-  which rewrite the rows in the text, each a step of Undo, none when the
+  offers under Show sorted ▸ Show sorted ascending, Show sorted
+  descending and Show as written, and putting in, moving or deleting a
+  row or column shows the rows as written again. On the editor's grid
+  the column's letter offers under Sort rows ▸ Sort rows by this column
+  and Sort rows by this column, descending, which rewrite the rows in the text, each a step of Undo, none when the
   rows already stand so.
 - **A long press on a cell selects cells** (obf-1054), on the grid in
   the Note editor's field (not on the cell being edited, whose field
@@ -2013,7 +2053,7 @@ There are three kinds, and an action takes the first that fits.
 ### The window
 
 - The desktop window is a classic desktop window (#145): **the menu
-  bar** on top (File, Edit, View, Area, Note, AI, Sync, Help); **the
+  bar** on top (File, Edit, View, AI, Sync, Help); **the
   sidebar** on the left with the Agenda, Unsorted, All Notes, Frogs, the
   Areas with their Topics and the Trash, marking the place shown (the
   tag tree opens from All Notes, obf-1074); **the list** in
@@ -2069,7 +2109,7 @@ There are three kinds, and an action takes the first that fits.
   from the command line (`oldbrainfix notes.md more.md`, several at
   once, into the running app, no second app), from "Open with" for `.md`
   and `.markdown` files on Linux, Windows and macOS, offered but never
-  made their default, and from File ▸ Open Markdown file…. It is a
+  made their default, and from File ▸ Open ▸ Markdown file…. It is a
   window beside the main one, one per file, drawn as the reading view
   draws a Note: all of CommonMark with GitHub's tables (as obf-1048 draws
   them), task lists, strike-through and footnotes, six heading levels,
@@ -2083,8 +2123,8 @@ There are three kinds, and an action takes the first that fits.
   read. Back and forward (the arrows at the top, Alt+Left and Alt+Right,
   the mouse's back and forward buttons) go through the files it showed.
   It has the find bar (Ctrl+F), selection with the right-click's Copy and
-  Search, Ctrl+Plus and Ctrl+Minus for the text size, and in ⋮ Find,
-  Open in the default app and Import as Note…, which also stands in its
+  Find, Ctrl+Plus and Ctrl+Minus for the text size, and in ⋮ Find,
+  Open in another app and Import as Note…, which also stands in its
   bar: it imports by the Import rules and, when the file links to others,
   asks first "Also import the N files it links to?"; imported together,
   their links become App links to each other's Notes, their pictures
@@ -2207,7 +2247,17 @@ There are three kinds, and an action takes the first that fits.
   File, Edit, View, AI, Sync and Help. It has no Area and no Note menu;
   an Area's or a Topic's actions are in the ⋮ of its list's band, a
   Note's in its card's ⋮ and right-click and in the Note dialog (its
-  badges, its buttons and its bar's ⋮, which holds History).
+  badges, its buttons and its bar's ⋮, which holds History). Its menus
+  keep to seven entries (#321, obf-1014): **File** holds New Note
+  (Ctrl+N), Quick note, Import…, Open ▸ (Markdown file…, Pack…, A
+  Backup…), Export as vault… and Quit; **Edit** Undo, Cut, Copy, Paste,
+  Find in Note (Ctrl+F) where it opens the Note's find bar, else Search,
+  and Settings…; **View** Go to ▸ (Agenda, Unsorted, All Notes, Frogs,
+  All Routines and Reminders, the one shown marked), Running, Detailed
+  views, Compact views, Theme ▸ and Text size ▸. Attach a file… and
+  Save as Markdown… are the Note dialog's, under Add and Share. The
+  tray's menu has Open Old Brain Fix, Quick note, which opens the
+  capture popup, and Quit.
 - **Every menu entry acts on what it names and closes its menu**, also
   when picked by keyboard or screen reader. The keys (Ctrl+N, Ctrl+F,
   Ctrl+M for File into…, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on
@@ -2247,25 +2297,32 @@ There are three kinds, and an action takes the first that fits.
   listed under "Stopped" while the app runs, the newest first, at most
   ten. The line takes the click a little above and below itself, never on
   the menus.
-- **File ▸ Attach a file…** (#267) picks files of any kind and does
-  with them what a drop does (see Capture): onto the Note in the Note
-  dialog, else into the quick note for a new Note.
-- **The band's ⋮ acts on the Area or Topic the list shows** (#279,
-  obf-1065), last in the band's second row, "More for this Area" or
-  "More for this Topic" to a screen reader: Rename (F2), Colour and
-  icon, Share…, People, Export as Pack…, the switch Hidden from AI (#267)
-  and Delete, the sidebar right-click's entries, each greyed where that
-  menu would leave it out (a Topic has no Colour and icon, Share…,
-  People or Hidden from AI, nor has an Area in a Shared Area that is not
-  marked), and all of them while a dialog lies over the list, the Note
-  dialog included, so that none acts on a place behind it; no other
-  place shows it, and its keys rest there too. F2 rests in a text field and while a menu is open.
-  The sidebar's right-click stays, and keeps New Topic. Move up
-  (Alt+Up) and Move down (Alt+Down) move the Area shown one place in
-  the person's own order (#280), for whoever is in it, greyed for a
-  Topic and at the ends, where the right-click leaves them out; they
-  rest while a text field has the keyboard, so in a Checklist's Line
-  they move the Line instead (#283).
+- **Attach a file…** (#267) picks files of any kind and does with them
+  what a drop does (see Capture): under Add in the Note dialog onto its
+  Note, in a card's Add ▸ onto the card's Note (obf-1014).
+- **An Area's menu is the same in the sidebar and the band** (#279,
+  obf-1065, obf-1014): a right-click on an Area in the sidebar and the
+  ⋮ last in its list band's second row ("More for this Area" to a
+  screen reader) offer New Topic (in Advanced), **Name, colour and
+  icon…** (F2), **Share with people…**, Move ▸ (Move up with Alt+Up,
+  Move down with Alt+Down), Export as Pack…, the switch Hidden from AI
+  (#267) and Delete, seven entries. The right-click leaves out what this
+  Device may not do there, the band's ⋮ greys it, and greys all of it
+  while a dialog lies over the list, the Note dialog included, so that
+  none acts on a place behind it; its keys rest there too. A Topic's
+  right-click and band ⋮ ("More for this Topic") offer Rename (F2),
+  Export as Pack… and Delete. F2 rests in a text field and while a menu
+  is open. Name, colour and icon… is one dialog: the name, the colours
+  and the icons, each marked as it is picked, kept with Save or Enter
+  and dropped with Cancel. Share with people… is offered to whoever
+  manages the Area and to everyone in a Shared Area: it lists the
+  Area's people with their roles first, where it is shared, a Manager
+  changing them and taking them out there, then for who manages it the
+  role, Show code and "Someone not nearby"; a Member sees the people
+  and Close. Move up and Move down move the Area shown one place in the
+  person's own order (#280), for whoever is in it, greyed or left out at
+  the ends; they rest while a text field has the keyboard, so in a
+  Checklist's Line they move the Line instead (#283).
 - **The sidebar's Areas are dragged by their rows** (#280, Q676): a
   line shows the gap the Area goes into; let go where it stands or
   away from the Areas, it stays and nothing is written. A card dropped
@@ -2315,9 +2372,9 @@ There are three kinds, and an action takes the first that fits.
   the cursor at its end to be asked again after the whole thread, then
   its answer as a formatted text whose links open their Notes, "From
   these Notes" and "Also read" with each Note's title as a link, and a
-  row of Copy as text, Keep as Note, then "Kept as a Note" opening it,
+  row of Copy text, Keep as Note, then "Kept as a Note" opening it,
   Add to Note… and Save as Markdown…, the desktop's Share to an app
-  (#316): Copy as text and Save as Markdown… hand on the answer alone as
+  (#316): Copy text and Save as Markdown… hand on the answer alone as
   Markdown with HTML beside, the file named after the question; Add to
   Note… adds the question and answer, as Keep as Note keeps them, to the
   Note picked as a Section, then "Added to “…”" opens that Note; Copy
@@ -2439,7 +2496,9 @@ There are three kinds, and an action takes the first that fits.
 - **The question Hidden from AI is a dialog** (#267), asked as on the
   phone (Phone ▸ Dialogs and pages, "Something Hidden from AI is not
   given away"): before the Send dialog
-  and the Share dialog open, and when File into…, a drag onto an Area,
+  and the Share dialog open (Share with people… on an Area shared
+  already opens with its people, the invite asking instead,
+  obf-1014), and when File into…, a drag onto an Area,
   Merge into… or Export as Pack… is refused, with Cancel and "Show to
   the AI" on the accent, which takes the marks off and does again what
   was asked; a Note hidden by another Area's mark only names that Area,
@@ -2472,8 +2531,9 @@ There are three kinds, and an action takes the first that fits.
   Area and Topic, Captured, Show on the Agenda, Hidden from AI and the
   others a Note has), with Make it a Tally in Advanced; at the dialog's
   end, after the Note's files, Sections and Linked from, **Add** ("+"
-  with Remind me…, Voice, Paste, Attach a file…, Add a part), **Share**
-  (Send…, Copy as text, Save as Markdown…, Export as Pack…) and
+  with Remind me…, Frog and Session…, Voice, Paste, Attach a file…, Add
+  a part), **Share** (Send to a person, Copy text, Save as Markdown…,
+  Export as Pack…) and
   **Tidy** (Merge into…, Add to a Shopping List, Move to trash in the
   error colour). Each group is a small strong heading, read as a
   heading, over its compact buttons side by side, wrapping; the groups
@@ -2496,17 +2556,27 @@ There are three kinds, and an action takes the first that fits.
   another place drop the selection. Up, Down, Shift and Ctrl+A select
   from the keyboard (#274, see Menu bar and keys). A double-click, Edit
   or Enter opens the Note dialog.
+- **A card's menu has the Note dialog's groups** (obf-1014): the ⋮
+  and the right-click are one menu in both views, **Edit**, Open in its
+  own window, then **This Note ▸** (File into…, Importance ▸ Important,
+  Normal or Unimportant, Kind ▸ with Make it a Checklist, Make it a
+  Shopping List and Back to a plain Note, a list's Show on the Agenda ▸,
+  Remove “From …”, Show ticks and Hidden from AI), **Add ▸** (Remind me…,
+  in Advanced Frog while the Note has no open Frog and Session… on a
+  plain Note, Attach a file… and Add a part, which opens the Note dialog
+  with its Amend box), **Share ▸** (Send to a person, Copy text, Save as
+  Markdown…, Export as Pack…) and **Tidy ▸** (Merge into…, a Checklist's
+  Uncheck all, Move to trash in the error colour), each entry only where
+  this Device may do it and a group without one left out. Voice, Paste
+  and Add to a Shopping List act on the Note open and stay in the
+  dialog.
 - **A selection is acted on from a card's right-click** (#273, Q656):
-  its menu offers, after File into…, Merge into… (on an Unsorted Note's
-  card Add to Note…, #308) and Importance ▸
-  Important, Normal or Unimportant, and Move to trash last, each only on
-  a card this Device may change; a card in the Trash has no ⋮, and its
-  right-click offers Restore alone. Between File into… and Merge into…
-  stand Remind me…, in Advanced Frog while the Note has no
-  open Frog and Session… on a plain Note, as in the phone's compact ⋮
-  (#281), only for who may set them up (ADR 0013) and for that card
-  alone, selected or not; the ⋮ and the right-click are one menu in
-  both views. On a selected card each acts on all
+  File into…, Importance ▸, Merge into… (on an Unsorted Note's card
+  picked as a capture picks its Note, #308) and Move to trash, each only
+  on a card this Device may change; a card in the Trash has no ⋮, and
+  its right-click offers Restore alone. Remind me…, Frog and Session…
+  (#281) are only for who may set them up (ADR 0013) and for that card
+  alone, selected or not. On a selected card each acts on all
   the cards selected, on another on that card alone, as File into…
   does, and Ctrl+M, Ctrl+Shift+M, Delete and 1 to 3 do the same while
   no Note is open (see Menu bar and keys). Merge into… opens the Note picker with every Note,
@@ -2524,8 +2594,8 @@ There are three kinds, and an action takes the first that fits.
   while nothing is selected, and Select all, which selects that whole
   text; the right-click and the menu keep the selection. The cards in
   the list stay click-to-select. A Section this Device may edit has its
-  own field and format bar there. "Copy as text" in a card's right-click menu and
-  the dialog is the desktop's "Copy text": the Note and
+  own field and format bar there. "Copy text" in a card's menu and
+  the dialog puts on the clipboard the Note and
   its Sections as they show, a list's Lines as a Markdown task list
   (#323), with HTML beside it, the boxes as glyphs.
 - **Cards move into an Area or Topic together** (#148): dragged onto it
@@ -2561,13 +2631,13 @@ There are three kinds, and an action takes the first that fits.
   (obf-1073) picks more. The card's menu has none of these, as it has none for a
   photo.
 - **Hidden from AI on the desktop** (#267, ADR 0049): a card's ⋮ and
-  right-click, an Area's right-click in the sidebar and the ⋮ of its
-  band have the checkbox "Hidden from AI", the Note dialog its badge, offered
+  right-click under This Note ▸, an Area's right-click in the sidebar
+  and the ⋮ of its band have the checkbox "Hidden from AI", the Note dialog its badge, offered
   as on the phone (Phone ▸ Cards) and read as the menu opens; the badge
   says "Off, hidden by its Area" while only another mark hides it.
 - **A photo gets out of the Note** (#149): on the desktop a right-click
-  on a photo in the Note editor or full screen offers "Save image as…",
-  "Copy image" and "Open in another program". Saved and copied say
+  on a photo in the Note editor or full screen offers "Save photo…",
+  "Copy photo" and "Open in another app" (obf-1014). Saved and copied say
   nothing; a failure is announced.
 - **The Agenda's rows are tight** (#208): on the desktop a row's card
   has 6 above and below its content, 6 between cards and 2 between a
@@ -2588,9 +2658,9 @@ There are three kinds, and an action takes the first that fits.
   Add (obf-1073), Add to a Shopping List under Tidy (between Merge
   into… and Move to trash; its lists as radio buttons, the one used last
   at the top; with one list a single entry naming it, "Add to Weekly",
-  #276), the badges under This Note and the format bar. Files dropped onto the window,
-  and File ▸ Attach a file… with no Note open, open the quick note
-  dialog and wait in it above the text (#267): a picture as a photo, a
+  #276), the badges under This Note and the format bar. Files dropped
+  onto the window open the quick note dialog and wait in it above the
+  text (#267): a picture as a photo, a
   sound file as a voice recording, any other file as an Attachment, each
   named on its own line; Ctrl+V in the empty field holds a pasted
   picture the same way. **A file dropped onto the Note dialog goes onto
@@ -2683,14 +2753,15 @@ There are three kinds, and an action takes the first that fits.
   hint.
 - **The Amend box shows only when asked** (obf-1072, C15): the Note
   dialog and a Note's own window show no format bar, "What's new?" nor
-  "Add to Note" on their own. A Note just made and opened there, a
+  "Add" on their own. A Note just made and opened there, a
   Checklist or Shopping List by "+" or a Note by the quick note's "Open
   in the editor", has no "Add a part" while that dialog stays open;
   opened again later, it has it. Where this Device may amend the Note,
   **"Add a part"** stands last under Add (obf-1073); a click opens the
   box in its place, above the groups Add, Share and Tidy, its field
-  taking the keyboard, and opening it is no step of Undo.
-  The box stays while it holds text and goes once "Add to Note" added
+  taking the keyboard, and opening it is no step of Undo; Add a part in
+  a card's Add ▸ opens the Note dialog with the box so (obf-1014).
+  The box stays while it holds text and goes once "Add" added
   the Section or the Note is left, which adds what was typed, as ever.
 - **A table's ⋮ sits beside its top right corner** (obf-1050) wherever
   a table is drawn on the desktop: on a card, in a Section, in the Note
@@ -2717,13 +2788,18 @@ There are three kinds, and an action takes the first that fits.
   The click is the header row's alone, never the card's or the table's,
   which the rows under it keep. In the Note dialog's text as it reads, a
   click on the header row edits the cell, as on any row. Full screen
-  where the table is edited, the column's letter offers Show sorted
-  ascending, Show sorted descending and Show as written, and putting in,
-  moving or deleting a row or column shows the rows as written again. On
-  the Note dialog's grid the column's letter offers Sort rows by this
-  column and Sort rows by this column, descending, which rewrite the
-  rows in the text, each a step of the bar's Undo, none when the rows
-  already stand so.
+  where the table is edited, the column's letter offers Show sorted ▸
+  with Show sorted ascending, Show sorted descending and Show as
+  written, and putting in, moving or deleting a row or column shows the
+  rows as written again. On the Note dialog's grid the column's letter
+  offers Sort rows ▸ with Sort rows by this column and Sort rows by this
+  column, descending, which rewrite the rows in the text, each a step
+  of the bar's Undo, none when the rows already stand so. **A column's
+  menu keeps to seven entries** (obf-1014): on the grid Insert ▸ (to the
+  left, to the right), Move ▸ (left, right), Align ▸ (left, Centre,
+  right), Sort rows ▸, Delete column and First column as headings; full
+  screen Insert ▸, Move ▸, Delete column, Show sorted ▸ and First column
+  as headings. A row's menu stays flat.
 - **A drag that starts on a cell selects cells** (obf-1054), as the
   phone's long press does: in a text only read in the Note dialog, in
   the reading view, in the Markdown viewer, on the Note dialog's grid
@@ -2746,7 +2822,7 @@ There are three kinds, and an action takes the first that fits.
   their own, as the table's Copy does: HTML beside Markdown, the first
   row selected its header row, the line marking the first column as
   headings only while that column is selected, each box as it shows,
-  one cell as a table of one cell. Where the menu has Search, it takes
+  one cell as a table of one cell. Where the menu has Find in Note, it takes
   the words of one cell, greyed for more. A click on the table and Esc
   end the selection, each doing nothing else; a press beside the cells,
   on the table's bar too, ends it as well, doing what it does. A
@@ -2764,10 +2840,12 @@ There are three kinds, and an action takes the first that fits.
   menu, so nothing it does on losing the cursor happens. Cut, Copy and
   Paste work as their keys do. No spelling entries.
   In the Note dialog and a Note's own window the menu also has
-  **Search** (obf-1055) after Paste, greyed without a selection: it opens
-  the Note's find bar with the words selected, as they read, its lines
-  one line. A text only read there (#255) has Copy, Search and Select
-  all, no Paste. No field outside the Note open offers Search, and a
+  **Find in Note** (obf-1055, obf-1014) after Paste, greyed without a
+  selection: it opens the Note's find bar with the words selected, as
+  they read, its lines one line. A text only read there (#255) has Copy,
+  Find in Note and Select all, no Paste; in the Markdown viewer the
+  entry reads Find, as its ⋮ does. No field outside the Note open
+  offers it, and a
   card's right-click stays its ⋮ menu. The find bar has **Search all
   Notes**, an icon button beside ✕, greyed while its field is empty: All
   Notes' search finds its words in the main window.

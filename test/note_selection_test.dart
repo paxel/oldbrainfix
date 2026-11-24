@@ -239,8 +239,8 @@ void main() {
     expect(notes.byId(a.id)?.isTrashed, isTrue);
     expect(notes.byId(b.id)?.isTrashed, isTrue);
     expect(notes.byId(c.id)?.isTrashed, isFalse);
-    expect(find.text('Moved to the Trash'), findsOneWidget);
-    await tap(tester, find.text('Moved to the Trash'));
+    expect(find.text('Moved to the trash'), findsOneWidget);
+    await tap(tester, find.text('Moved to the trash'));
     expect(notes.byId(a.id)?.isTrashed, isFalse);
     expect(notes.byId(b.id)?.isTrashed, isFalse);
     expect(find.text('apples'), findsOneWidget);

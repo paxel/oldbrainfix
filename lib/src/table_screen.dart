@@ -10,6 +10,7 @@ import 'box_ids.dart';
 import 'cell_selection.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'menu_groups.dart';
 import 'page_bar.dart';
 import 'photo_platform.dart';
 import 'system_bars.dart';
@@ -394,6 +395,10 @@ enum _Op {
   asWritten,
 }
 
+/// A group of a column's menu, opening its [_Op]s in a second menu at the
+/// finger (obf-1014).
+enum _Group { insert, move, sorted }
+
 class _TableScreenState extends State<TableScreen> {
   late String _text = widget.text;
   late int _at = widget.at;
@@ -648,17 +653,24 @@ class _TableScreenState extends State<TableScreen> {
   }
 
   /// The menu of the row [row] ([column] false) or of the column [row],
-  /// at [at] (global).
+  /// at [at] (global). A column's has Insert and Move, each opening its
+  /// entries in a second menu at the finger, Delete column, Show sorted,
+  /// opening the same way, and, on the first, First column as headings
+  /// (obf-1014).
   Future<void> _menu(int index, Offset at, {required bool column}) async {
     final table = _table;
     if (table == null) return;
     _finish();
     final t = context.t;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (overlay == null) return;
     final count = column ? table.columns : table.rows.length;
-    PopupMenuItem<_Op> item(_Op op, IconData icon, String label) =>
+    PopupMenuItem<Object> group(_Group which, IconData icon, String label) =>
+        groupMenuItem(
+          key: ValueKey('table-group-${which.name}'),
+          value: which,
+          icon: Icon(icon),
+          label: label,
+        );
+    PopupMenuItem<Object> item(_Op op, IconData icon, String label) =>
         PopupMenuItem(
           key: ValueKey('table-${op.name}'),
           value: op,
@@ -675,29 +687,15 @@ class _TableScreenState extends State<TableScreen> {
             ],
           ),
         );
-    final picked = await showMenu<_Op>(
-      context: context,
-      position: RelativeRect.fromRect(
-        overlay.globalToLocal(at) & Size.zero,
-        Offset.zero & overlay.size,
-      ),
-      items: column
+    var picked = await showMenuAt<Object>(
+      context,
+      at,
+      column
           ? [
-              item(_Op.before, Icons.west, t.tableColumnBefore),
-              item(_Op.after, Icons.east, t.tableColumnAfter),
-              item(_Op.back, Icons.arrow_back, t.tableColumnLeft),
-              item(_Op.forward, Icons.arrow_forward, t.tableColumnRight),
+              group(_Group.insert, Icons.add, t.tableInsertMenu),
+              group(_Group.move, Icons.swap_horiz, t.tableMoveMenu),
               item(_Op.delete, Icons.delete_outline, t.tableColumnDelete),
-              if (_sort != (column: index, descending: false))
-                item(_Op.sortUp, Icons.arrow_upward, t.tableShowSortedUp),
-              if (_sort != (column: index, descending: true))
-                item(_Op.sortDown, Icons.arrow_downward, t.tableShowSortedDown),
-              if (_sort != null)
-                item(
-                  _Op.asWritten,
-                  Icons.format_list_numbered,
-                  t.tableShowAsWritten,
-                ),
+              group(_Group.sorted, Icons.sort, t.tableShowSortedMenu),
               if (index == 0)
                 PopupMenuItem(
                   key: const ValueKey('table-headings'),
@@ -726,7 +724,33 @@ class _TableScreenState extends State<TableScreen> {
               item(_Op.delete, Icons.delete_outline, t.tableRowDelete),
             ],
     );
-    if (!mounted || picked == null) return;
+    if (!mounted) return;
+    if (picked is _Group) {
+      picked = await showMenuAt<Object>(context, at, switch (picked) {
+        _Group.insert => [
+          item(_Op.before, Icons.west, t.tableColumnBefore),
+          item(_Op.after, Icons.east, t.tableColumnAfter),
+        ],
+        _Group.move => [
+          item(_Op.back, Icons.arrow_back, t.tableColumnLeft),
+          item(_Op.forward, Icons.arrow_forward, t.tableColumnRight),
+        ],
+        _Group.sorted => [
+          if (_sort != (column: index, descending: false))
+            item(_Op.sortUp, Icons.arrow_upward, t.tableShowSortedUp),
+          if (_sort != (column: index, descending: true))
+            item(_Op.sortDown, Icons.arrow_downward, t.tableShowSortedDown),
+          if (_sort != null)
+            item(
+              _Op.asWritten,
+              Icons.format_list_numbered,
+              t.tableShowAsWritten,
+            ),
+        ],
+      });
+      if (!mounted) return;
+    }
+    if (picked is! _Op) return;
     final (text, where) = (_text, _at);
     switch ((picked, column)) {
       case (_Op.before, false):

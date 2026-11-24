@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'reveal.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -333,12 +334,14 @@ void main() {
         'the one it has marked', (tester) async {
       await startAtNotes(tester);
       await tap(tester, key('note-menu'));
+      await openCardGroup(tester, 'note-show-on-agenda-off');
       expect(find.text('Show on the Agenda'), findsOneWidget);
       expect(key('note-show-on-agenda'), findsNothing, reason: 'no switch');
       expect(menuChosen(tester), [false, true, false]);
       await tap(tester, key('note-show-on-agenda-lines'));
       expect(lists.onAgenda(hardware), ShoppingOnAgenda.lines);
       await tap(tester, key('note-menu'));
+      await openCardGroup(tester, 'note-show-on-agenda-off');
       expect(menuChosen(tester), [false, false, true]);
       await tap(tester, key('note-show-on-agenda-off'));
       expect(lists.onAgenda(hardware), ShoppingOnAgenda.off);
@@ -348,6 +351,7 @@ void main() {
       lists.check(lineId(hardware, 'Nails'), deviceWallClock);
       await startAtNotes(tester);
       await tap(tester, key('note-menu'));
+      await openCardGroup(tester, 'note-show-on-agenda-lines');
       await tap(tester, key('note-show-on-agenda-lines'));
       expect(lists.onAgenda(hardware), ShoppingOnAgenda.lines);
     });
@@ -390,6 +394,7 @@ void main() {
       final checklists = Checklists(store)..make(trip);
       await startAtNotes(tester);
       await tap(tester, key('note-menu'));
+      await openCardGroup(tester, 'note-show-on-agenda-off');
       expect(key('note-show-on-agenda'), findsNothing, reason: 'no switch');
       expect(menuChosen(tester), [false, false, true]);
       await tap(tester, key('note-show-on-agenda-count'));
@@ -470,6 +475,7 @@ void main() {
     testWidgets('a Member chooses for his own Agenda alone', (tester) async {
       await startAtNotes(tester, ben);
       await tap(tester, key('note-menu'));
+      await openCardGroup(tester, 'note-show-on-agenda-lines');
       await tap(tester, key('note-show-on-agenda-lines'));
       expect(ShoppingLists(ben).onAgenda(note), ShoppingOnAgenda.lines);
       sync();

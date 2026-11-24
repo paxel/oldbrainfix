@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/shopping_list_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'held_ticks.dart';
 import 'reveal.dart';
 
@@ -193,6 +194,7 @@ void main() {
       final note = notes.capture('Shop\nMilk\nEggs').id;
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-checklist');
       expect(key('note-make-checklist'), findsOneWidget);
       expect(key('note-to-plain'), findsNothing);
       await tap(tester, key('note-make-shopping'));
@@ -214,11 +216,15 @@ void main() {
       expect(lineOf(note, 'Milk').reappear, Reappear.unset);
 
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-shopping');
       expect(key('note-make-shopping'), findsNothing);
       expect(key('note-make-checklist'), findsNothing);
       expect(key('note-make-tally'), findsNothing);
-      expect(key('note-uncheck-all'), findsNothing);
       expect(key('note-to-plain'), findsOneWidget);
+      await closeMenu(tester);
+      await cardMenu(tester);
+      await openCardGroup(tester, 'note-uncheck-all');
+      expect(key('note-uncheck-all'), findsNothing);
     });
 
     testWidgets('a full card checks a Line: struck through, folded at the '
@@ -322,11 +328,13 @@ void main() {
       lists.make(note);
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-to-plain');
       await tap(tester, key('note-to-plain'));
       expect(lists.isShoppingList(note), isFalse);
       expect(notes.byId(note)!.text, 'Shop\nMilk\n✓ Eggs');
       expect(find.byType(Checkbox), findsNothing);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-shopping');
       expect(key('note-make-shopping'), findsOneWidget);
     });
   });
@@ -848,6 +856,7 @@ void main() {
       final milk = idOf(note, 'Milk', ben);
       await startAtNotes(tester, ben);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-to-plain');
       expect(key('note-to-plain'), findsNothing);
       expect(key('note-make-shopping'), findsNothing);
       await closeMenu(tester);

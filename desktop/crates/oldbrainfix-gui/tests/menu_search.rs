@@ -1,9 +1,9 @@
-//! Search in the right-click menu (obf-1055, C9c): in the fields and the
-//! texts only read of the Note open, in the Note dialog, a Note's own
-//! window and its reading view, the menu has Search beside Copy and
+//! Find in Note in the right-click menu (obf-1055, C9c; obf-1014, C3): in
+//! the fields and the texts only read of the Note open, in the Note
+//! dialog, a Note's own window and its reading view, the menu has it beside Copy and
 //! Paste, greyed without a selection; it opens the Note's find bar with
 //! the words selected. A text only read has no Paste, a field outside a
-//! Note no Search. The find bar's Search all Notes searches All Notes
+//! Note none. The find bar's Search all Notes searches All Notes
 //! for its words, from a Note's own window in the main window.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
@@ -26,7 +26,7 @@ use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SEARCH: &str = "Search";
+const SEARCH: &str = "Find in Note";
 const SEARCH_ALL: &str = "Search all Notes";
 
 /// A store with the Notes `texts` in `format` captured into Unsorted, and

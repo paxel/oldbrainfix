@@ -644,12 +644,6 @@ abstract class AppLocalizations {
   /// **'Close the find bar'**
   String get findClose;
 
-  /// In the small toolbar above selected words: opens the Note's find bar with them (obf-1055).
-  ///
-  /// In en, this message translates to:
-  /// **'Search'**
-  String get selectionSearch;
-
   /// No description provided for @noNotesHere.
   ///
   /// In en, this message translates to:
@@ -1034,7 +1028,7 @@ abstract class AppLocalizations {
   /// **'Remind me…'**
   String get remindMe;
 
-  /// Entry in a compact Note card's ⋮ menu, in Advanced, that opens the editor of a new Session run from the Note.
+  /// Entry in every menu that gives a Note a Routine, a Reminder, a Frog or a Session (a card's ⋮ and alarm clock, the Note editor's +), in Advanced, that opens the editor of a new Session run from the Note.
   ///
   /// In en, this message translates to:
   /// **'Session…'**
@@ -2149,12 +2143,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More about the capture'**
   String get moreCaptureContext;
-
-  /// No description provided for @recordVoice.
-  ///
-  /// In en, this message translates to:
-  /// **'Record voice'**
-  String get recordVoice;
 
   /// No description provided for @recording.
   ///
@@ -3923,7 +3911,7 @@ abstract class AppLocalizations {
   /// No description provided for @shareArea.
   ///
   /// In en, this message translates to:
-  /// **'Share…'**
+  /// **'Share with people…'**
   String get shareArea;
 
   /// No description provided for @areaShared.
@@ -4379,7 +4367,7 @@ abstract class AppLocalizations {
   /// No description provided for @sentItemAcceptCancel.
   ///
   /// In en, this message translates to:
-  /// **'Move to the trash'**
+  /// **'Move to trash'**
   String get sentItemAcceptCancel;
 
   /// No description provided for @sentItemTrashed.
@@ -5129,7 +5117,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteNoteQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Note?'**
+  /// **'Move this Note to the trash?'**
   String get deleteNoteQuestion;
 
   /// No description provided for @deleteNoteDetail.
@@ -5141,13 +5129,13 @@ abstract class AppLocalizations {
   /// No description provided for @deleteNoteLinkedQuestion.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Delete this Note and its 1 Routine?} other{Delete this Note and its {count} Routines and Reminders?}}'**
+  /// **'{count, plural, =1{Move this Note and its 1 Routine to the trash?} other{Move this Note and its {count} Routines and Reminders to the trash?}}'**
   String deleteNoteLinkedQuestion(int count);
 
   /// No description provided for @deleteNoteReminderQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Note and its 1 Reminder?'**
+  /// **'Move this Note and its 1 Reminder to the trash?'**
   String get deleteNoteReminderQuestion;
 
   /// No description provided for @removeRecordingKeepText.
@@ -5963,7 +5951,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteFrogQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Frog? It stays in the trash. Its Note stays.'**
+  /// **'Move this Frog to the trash? Its Note stays.'**
   String get deleteFrogQuestion;
 
   /// The Frog badge's value in the Note editor while the Frog is not eaten (#259).
@@ -7682,17 +7670,11 @@ abstract class AppLocalizations {
   /// **'Install a messenger or a mail app, then send it again.'**
   String get sendNoAppFix;
 
-  /// The entry in a Note's ⋮ menu and the editor's bar that hands the Note's text, photos and recordings to another app on the share sheet.
+  /// The entry in a Note's ⋮ menu and the editor's Share group that hands the Note's text, photos and recordings to another app on the share sheet, and in the ⋮ of the phone's full-screen photo that hands the photo to one.
   ///
   /// In en, this message translates to:
   /// **'Share to an app'**
   String get shareToApp;
-
-  /// Entry in a Note card's ⋮ menu that opens a small menu with Send to a person, Share to an app, Copy text and Export as Pack…
-  ///
-  /// In en, this message translates to:
-  /// **'Share…'**
-  String get shareNote;
 
   /// Announced when a Note could not be handed to another app; the tap shows why and what to do.
   ///
@@ -8546,6 +8528,42 @@ abstract class AppLocalizations {
   /// **'Sort rows by this column, descending'**
   String get tableSortRowsDown;
 
+  /// Entry of a table column's menu on the phone (obf-1014) that opens a second menu with Insert a column to the left and to the right.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert'**
+  String get tableInsertMenu;
+
+  /// Entry of a table column's menu on the phone (obf-1014) that opens a second menu with Move left and Move right.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get tableMoveMenu;
+
+  /// Entry of a table column's menu in the Note editor on the phone (obf-1014) that opens a second menu with Align left, Centre and Align right.
+  ///
+  /// In en, this message translates to:
+  /// **'Align'**
+  String get tableAlignMenu;
+
+  /// Entry of a table column's menu in the Note editor on the phone (obf-1014) that opens a second menu with the two ways of sorting the rows by that column in the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort rows'**
+  String get tableSortRowsMenu;
+
+  /// Entry of a table column's menu in the full-screen table on the phone (obf-1014) that opens a second menu with Show sorted ascending, Show sorted descending and Show as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sorted'**
+  String get tableShowSortedMenu;
+
+  /// The last entry of a menu on the phone that would show more than seven (obf-1014): opens a second menu with the rest.
+  ///
+  /// In en, this message translates to:
+  /// **'More…'**
+  String get menuMore;
+
   /// Under the pair code field, on the phone and the desktop, when the code typed or scanned is of a layout a later version of the app writes (ADR 0034): this version cannot join with it.
   ///
   /// In en, this message translates to:
@@ -8633,20 +8651,14 @@ abstract class AppLocalizations {
   /// In the ⋮ of the phone's full-screen photo: puts the picture on the clipboard (#149).
   ///
   /// In en, this message translates to:
-  /// **'Copy'**
+  /// **'Copy photo'**
   String get copyPhoto;
 
   /// In the ⋮ of the phone's full-screen photo: saves it into the phone's Pictures, in the album 'Old Brain Fix' (#149).
   ///
   /// In en, this message translates to:
-  /// **'Save'**
+  /// **'Save photo'**
   String get savePhoto;
-
-  /// In the ⋮ of the phone's full-screen photo: hands it to the app picked on the share sheet (#149).
-  ///
-  /// In en, this message translates to:
-  /// **'Share'**
-  String get sharePhoto;
 
   /// Announced at the top of the phone when Save in the full-screen photo's ⋮ failed; the tap opens the cause and the fix.
   ///
@@ -10034,10 +10046,10 @@ abstract class AppLocalizations {
   /// **'Undo'**
   String get undo;
 
-  /// Announced after a Note was moved to the Trash without asking; its tap brings it back with its Routines and Reminders.
+  /// Announced after a Note was moved to the trash without asking; its tap brings it back with its Routines and Reminders.
   ///
   /// In en, this message translates to:
-  /// **'Moved to the Trash'**
+  /// **'Moved to the trash'**
   String get undoNoteTrashed;
 
   /// Announced after a Line of a Checklist or Shopping List was deleted without asking; its tap restores it.
@@ -10055,19 +10067,19 @@ abstract class AppLocalizations {
   /// Announced after a Frog was moved to the Trash without asking; its tap restores it.
   ///
   /// In en, this message translates to:
-  /// **'Frog moved to the Trash'**
+  /// **'Frog moved to the trash'**
   String get undoFrogTrashed;
 
   /// Announced after a Routine was moved to the Trash without asking; its tap restores it.
   ///
   /// In en, this message translates to:
-  /// **'Routine moved to the Trash'**
+  /// **'Routine moved to the trash'**
   String get undoRoutineTrashed;
 
   /// Announced after a Reminder was moved to the Trash without asking; its tap restores it.
   ///
   /// In en, this message translates to:
-  /// **'Reminder moved to the Trash'**
+  /// **'Reminder moved to the trash'**
   String get undoReminderTrashed;
 
   /// Announced after a Note's “From …” label was removed without asking; its tap brings it back. No name: values never go into an announcement.
@@ -10352,10 +10364,10 @@ abstract class AppLocalizations {
   /// **'File'**
   String get file;
 
-  /// Action in the Note editor's bar: picks files with the system's file picker and attaches them to the Note.
+  /// Action in the Add group of the Note editor: picks files with the system's file picker and attaches them to the Note.
   ///
   /// In en, this message translates to:
-  /// **'Attach a file'**
+  /// **'Attach a file…'**
   String get attachFile;
 
   /// Label over the text read out of an attached file, shown dimmed so it does not read as typed text (like Photo Text).

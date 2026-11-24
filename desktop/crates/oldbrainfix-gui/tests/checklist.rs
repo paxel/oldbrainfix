@@ -142,6 +142,20 @@ fn texts(
         .collect())
 }
 
+/// Opens the submenus `path` of the menu open (obf-1014).
+fn sub(harness: &mut Harness<'_, App>, path: &[&str]) -> TestResult {
+    for part in path {
+        let label = format!("{part} ⏵");
+        harness
+            .query_all_by_label(&label)
+            .last()
+            .ok_or(format!("{label:?}"))?
+            .click();
+        harness.run();
+    }
+    Ok(())
+}
+
 /// Picks the radio button `label` of the open small editor (#188).
 fn pick(harness: &mut Harness<'_, App>, label: &str) {
     harness
@@ -622,6 +636,8 @@ fn the_cards_menu_makes_a_checklist_unchecks_all_and_goes_back() -> TestResult {
     let mut harness = window(&store, None);
     click(&mut harness, "More: Packing")?;
     assert!(shows(&harness, "Edit"));
+    // Under This Note ▸ Kind ▸, Uncheck all under Tidy ▸ (obf-1014).
+    sub(&mut harness, &["This Note", "Kind"])?;
     click(&mut harness, "Make it a Checklist")?;
     // Every line a Line (#309): the list has no name, and its card shows
     // its kind instead.
@@ -632,15 +648,18 @@ fn the_cards_menu_makes_a_checklist_unchecks_all_and_goes_back() -> TestResult {
     assert!(shows(&harness, "Checklist"));
     // Nothing checked: nothing to uncheck.
     click(&mut harness, "More: Checklist")?;
+    sub(&mut harness, &["This Note", "Kind"])?;
     assert!(!shows(&harness, "Uncheck all"));
     assert!(!shows(&harness, "Make it a Checklist"));
     harness.key_press(egui::Key::Escape);
     harness.run();
     tick(&mut harness, "Ticket")?;
     click(&mut harness, "More: Checklist")?;
+    sub(&mut harness, &["Tidy"])?;
     click(&mut harness, "Uncheck all")?;
     assert_eq!(list(&harness, &note)?.checked_count(), 0);
     click(&mut harness, "More: Checklist")?;
+    sub(&mut harness, &["This Note", "Kind"])?;
     click(&mut harness, "Back to a plain Note")?;
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
@@ -763,6 +782,8 @@ fn a_member_checks_and_adds_lines_but_changes_only_their_own() -> TestResult {
     harness.state_mut().select(Selection::All);
     harness.run();
     click(&mut harness, "More: Packing")?;
+    assert!(!shows(&harness, "Kind ⏵"));
+    sub(&mut harness, &["Tidy"])?;
     assert!(shows(&harness, "Uncheck all"));
     assert!(!shows(&harness, "Back to a plain Note"));
     Ok(())

@@ -153,7 +153,7 @@ fn shift_click<S>(harness: &mut Harness<'_, S>, at: Pos2) {
     harness.run();
 }
 
-fn right_click(harness: &mut Harness<'_, App>, at: Pos2) {
+fn right_click<S>(harness: &mut Harness<'_, S>, at: Pos2) {
     harness.event(Event::PointerMoved(at));
     press(harness, at, PointerButton::Secondary, true);
     press(harness, at, PointerButton::Secondary, false);
@@ -290,8 +290,8 @@ fn the_right_click_menu_copies_the_cells_picked_and_searches_one() -> TestResult
             .map(|n| !n.accesskit_node().is_disabled())
     };
     assert_eq!(entry(&harness, "Copy"), Some(true));
-    // Search takes the words of a single cell only.
-    assert_eq!(entry(&harness, "Search"), Some(false));
+    // Find in Note takes the words of a single cell only.
+    assert_eq!(entry(&harness, "Find in Note"), Some(false));
     harness
         .query_all_by_role_and_label(Role::Button, "Copy")
         .last()
@@ -302,14 +302,14 @@ fn the_right_click_menu_copies_the_cells_picked_and_searches_one() -> TestResult
         copied.borrow().as_slice(),
         [cells("| milk | two |\n| --- | --: |")]
     );
-    // One cell: Search is offered.
+    // One cell: Find in Note is offered.
     let pos = at(&harness, "Bread too");
     click(&mut harness, pos);
     let pos = at(&harness, "oat");
     shift_click(&mut harness, pos);
     let pos = at(&harness, "oat");
     right_click(&mut harness, pos);
-    assert_eq!(entry(&harness, "Search"), Some(true));
+    assert_eq!(entry(&harness, "Find in Note"), Some(true));
     Ok(())
 }
 
@@ -498,6 +498,18 @@ fn the_markdown_viewer_picks_cells_and_asks_the_window_to_copy_them() -> TestRes
         })
         .collect();
     assert_eq!(copies, ["| Item |\n| --- |\n| milk |"]);
+    // Its right-click finds in the file, so it reads Find, not Find in
+    // Note (obf-1014, C3).
+    let milk = at(&harness, "milk");
+    right_click(&mut harness, milk);
+    let entry = |harness: &Harness<'_, (Viewer, Vec<Asked>)>, label: &str| {
+        harness
+            .query_all_by_role_and_label(Role::Button, label)
+            .next()
+            .is_some()
+    };
+    assert!(entry(&harness, "Find"));
+    assert!(!entry(&harness, "Find in Note"));
     Ok(())
 }
 

@@ -128,6 +128,20 @@ fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     Ok(())
 }
 
+/// Opens the submenus `path` of the menu open (obf-1014).
+fn sub(harness: &mut Harness<'_, App>, path: &[&str]) -> TestResult {
+    for part in path {
+        let label = format!("{part} ⏵");
+        harness
+            .query_all_by_label(&label)
+            .last()
+            .ok_or(format!("{label:?}"))?
+            .click();
+        harness.run();
+    }
+    Ok(())
+}
+
 /// The checkboxes of the Line `text`.
 fn boxes<'a>(harness: &'a Harness<'_, App>, text: &'a str) -> Vec<egui_kittest::Node<'a>> {
     harness
@@ -940,6 +954,8 @@ fn the_cards_menu_makes_a_shopping_list_and_turns_it_back() -> TestResult {
     let (store, note, _) = with_note()?;
     let mut harness = window(&store, None);
     click(&mut harness, "More: Weekly")?;
+    // Under This Note ▸ Kind ▸ (obf-1014).
+    sub(&mut harness, &["This Note", "Kind"])?;
     assert!(shows(&harness, "Make it a Checklist"));
     click(&mut harness, "Make it a Shopping List")?;
     // Every line a Line (#309): the list has no name, and its card shows
@@ -949,6 +965,7 @@ fn the_cards_menu_makes_a_shopping_list_and_turns_it_back() -> TestResult {
         ["Weekly", "Milk", "Bread", "Apples"]
     );
     click(&mut harness, "More: Shopping List")?;
+    sub(&mut harness, &["This Note", "Kind"])?;
     assert!(!shows(&harness, "Make it a Shopping List"));
     assert!(!shows(&harness, "Make it a Checklist"));
     assert!(!shows(&harness, "Uncheck all"));
@@ -1531,25 +1548,18 @@ fn the_cards_menu_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
     lists.make(&note)?;
     let mut harness = window(&store, None);
     click(&mut harness, "More: Weekly")?;
-    assert!(shows(&harness, "Show on the Agenda"));
+    // Under This Note ▸ Show on the Agenda ▸ (obf-1014).
+    sub(&mut harness, &["This Note", "Show on the Agenda"])?;
     assert_eq!(radio(&harness, OFF), Some(false));
     assert_eq!(radio(&harness, COUNT), Some(true));
     assert_eq!(radio(&harness, LINES), Some(false));
-    // No switch as a Checklist's, and before "Back to a plain Note".
+    // No switch as a Checklist's.
     assert!(
         harness
             .query_all_by_role_and_label(Role::CheckBox, "Show on the Agenda")
             .next()
             .is_none()
     );
-    let plain = top(&harness, "Back to a plain Note")?;
-    let off = harness
-        .query_all_by_role_and_label(Role::RadioButton, OFF)
-        .last()
-        .ok_or("Off")?
-        .rect()
-        .top();
-    assert!(off < plain);
     pick(&mut harness, LINES)?;
     assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Lines);
     assert_eq!(radio(&harness, LINES), None, "the menu closed");
@@ -1559,6 +1569,7 @@ fn the_cards_menu_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
     harness.state_mut().select(Selection::All);
     harness.run();
     click(&mut harness, "More: Weekly")?;
+    sub(&mut harness, &["This Note", "Show on the Agenda"])?;
     assert_eq!(radio(&harness, LINES), Some(true));
     pick(&mut harness, OFF)?;
     assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Off);

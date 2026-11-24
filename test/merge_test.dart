@@ -47,11 +47,11 @@ void main() {
     await tap(tester, find.byTooltip('All Notes'));
   }
 
-  /// The "merge into…" button on the card showing [text], named "Add to
-  /// Note…" on an Unsorted Note's card (#308).
+  /// The "merge into…" button on the card showing [text], so named on an
+  /// Unsorted Note's card too (obf-1014).
   Finder mergeOn(String text, {bool unsorted = false}) => find.descendant(
     of: find.ancestor(of: find.text(text), matching: find.byType(NoteCard)),
-    matching: find.byTooltip(unsorted ? 'Add to Note…' : 'Merge into…'),
+    matching: find.byTooltip('Merge into…'),
   );
 
   List<String> cards() => [

@@ -71,7 +71,7 @@ Widget selectionToolbar(
     ?of(ContextMenuButtonType.paste),
     if (onSearch != null && words.isNotEmpty)
       ContextMenuButtonItem(
-        label: context.t.selectionSearch,
+        label: context.t.findInNote,
         onPressed: () {
           hide();
           onSearch(words);

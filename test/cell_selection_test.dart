@@ -212,13 +212,13 @@ void main() {
       final photos = await pumpRead(tester, searched: searched);
       clipboard(tester);
       await span(tester, words('oat'));
-      expect(toolbar(tester), ['Copy', 'Search']);
+      expect(toolbar(tester), ['Copy', 'Find in Note']);
       await tester.tap(find.text('Copy'));
       await tester.pumpAndSettle();
       expect(photos.copiedHtml.single.text, '| oat |\n| --- |');
 
       await span(tester, words('Item'));
-      await tester.tap(find.text('Search'));
+      await tester.tap(find.text('Find in Note'));
       await tester.pumpAndSettle();
       expect(searched, ['Item']);
 
@@ -305,7 +305,7 @@ void main() {
       await pumpRead(tester, text: wide);
       clipboard(tester);
       await span(tester, words('first'));
-      expect(toolbar(tester), ['Copy', 'Search']);
+      expect(toolbar(tester), ['Copy', 'Find in Note']);
       final before = tester.getTopLeft(words('first'));
       await tester.drag(words('first'), const Offset(-200, 0));
       await tester.pumpAndSettle();
@@ -414,7 +414,7 @@ void main() {
       expect(plain, ['| ✅ milk | 2 |\n| --- | --: |\n| oat | 1 |']);
 
       await span(tester, key('grid-cell-1-0'));
-      await tester.tap(find.text('Search'));
+      await tester.tap(find.text('Find in Note'));
       await tester.pumpAndSettle();
       expect(searched, hasLength(1));
       expect(searched.single, contains('milk'));

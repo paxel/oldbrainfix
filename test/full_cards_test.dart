@@ -267,7 +267,7 @@ void main() {
       await openAllNotes(tester);
 
       await tap(tester, find.byKey(const ValueKey('note-menu')));
-      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-group-share')));
       await tap(tester, find.byKey(const ValueKey('note-copy')));
       expect(copied, ['Pack ✅ the tent\n\nMerged in\n\nAmended later']);
       expect(find.byType(NoteEditorScreen), findsNothing);
@@ -302,7 +302,7 @@ void main() {
 
     Future<void> copyFromTheCard(WidgetTester tester) async {
       await tap(tester, find.byKey(const ValueKey('note-menu')));
-      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-group-share')));
       await tap(tester, find.byKey(const ValueKey('note-copy')));
     }
 

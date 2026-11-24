@@ -717,6 +717,7 @@ impl Reads {
             | Action::CopyTable(_) => Reads::Nothing,
             Action::SwitchView(_) | Action::Compact(_) => Reads::Look,
             Action::SelectNote(_)
+            | Action::AddPartTo(_)
             | Action::OpenFinding(..)
             | Action::CloseNote
             | Action::Find
@@ -1088,15 +1089,13 @@ enum Dialog {
         area: Option<String>,
         name: String,
     },
-    /// Renaming the Area or Topic `id`, shown as `shown`.
+    /// Renaming the Area or Topic `id`, shown as `shown`; an Area's with
+    /// its colour and icon as picked, `look`, one dialog (obf-1014).
     Rename {
         id: String,
         name: String,
         shown: String,
-    },
-    /// The colour and icon of an Area.
-    Look {
-        area: String,
+        look: Option<AreaLook>,
     },
     Delete(Deleting),
     /// Picking the Note to merge `notes` into, by id and text: the
@@ -1182,10 +1181,6 @@ enum Dialog {
     HeldSentItem {
         held: HeldSentItem,
         blocking: Option<Vec<String>>,
-    },
-    /// The people of the Shared Area `area`.
-    People {
-        area: String,
     },
     /// Whether `person` goes from the Shared Area `area`.
     RemovePerson {
@@ -1690,6 +1685,12 @@ enum Action {
     /// "Attach a file…" (#267): asks the system's dialog for files and
     /// does with them what a drop does.
     AttachFiles,
+    /// "Attach a file…" in a card's Add ▸ (obf-1014): asks for files and
+    /// attaches them to that Note, as a drop on its dialog does.
+    AttachFilesTo(String),
+    /// "Add a part" in a card's Add ▸ (obf-1014): opens the Note in the
+    /// Note dialog with its Amend box open.
+    AddPartTo(String),
     /// Holds these files, by name and content, on the capture field for
     /// one Note with what is typed: the pictures as photos, the sound
     /// files as voice recordings, any other file as an Attachment
@@ -1793,7 +1794,6 @@ enum Action {
     NewArea,
     NewTopic(String),
     Rename(String),
-    Look(String),
     Delete(String),
     StartMerge,
     /// The merge dialog's search changed.
@@ -1803,8 +1803,6 @@ enum Action {
     AddCustomHeadsUp,
     AddPlace,
     SaveName,
-    Colour(String, Option<String>),
-    Icon(String, Option<String>),
     DeletePlace(NotesGo),
     Back,
     Forward,
@@ -1828,9 +1826,6 @@ enum Action {
     /// Saves one calendar file of every Routine and Reminder, in the
     /// order their page lists them (#115).
     ExportRoutines,
-    /// Saves the Routine with this id as a calendar file, its whole
-    /// series with its end, or the Reminder (#115).
-    ShareRoutine(String),
     /// A new Routine, or Reminder, from the Note, or with its Note made
     /// behind the scenes.
     NewRoutine {
@@ -1985,8 +1980,6 @@ enum Action {
     ImportKeep(bool),
     /// Shares the Area of the Share dialog and hosts its invite.
     StartInvite,
-    /// Shows who shares the Area.
-    People(String),
     SetRole {
         area: String,
         person: String,
@@ -2213,6 +2206,9 @@ pub struct App {
     /// The Note "To full editor" opens, until its text takes the
     /// keyboard in the Note dialog (#142).
     edit_wanted: Option<String>,
+    /// The Note whose Amend box opens once it shows in the Note dialog:
+    /// Add a part from its card (obf-1014).
+    amend_wanted: Option<String>,
     /// The selected Note's text as it is being edited, and that Note;
     /// of a Note of a kind its description, its name in `name` (#188),
     /// whether it is one in `text_kinded`.
@@ -2970,6 +2966,7 @@ impl App {
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
             edit_wanted: None,
+            amend_wanted: None,
             text: String::new(),
             text_of: None,
             name: String::new(),
@@ -7340,6 +7337,16 @@ impl App {
             self.text_editing = true;
             self.text_focus = true;
         }
+        // Add a part from its card: the Amend box opens, its field taking
+        // the keyboard (obf-1014).
+        if self.amend_wanted.is_some() && self.text_of == self.amend_wanted {
+            self.amend_wanted = None;
+            self.amend_open = true;
+            self.amend_focus = true;
+        } else if self.selected_note != self.amend_wanted {
+            // Another Note shows, or none: it is asked no more.
+            self.amend_wanted = None;
+        }
         // The Agenda as it is now, on its thread where it has one (#207).
         if main {
             self.read_agenda_aside();
@@ -8594,6 +8601,20 @@ impl App {
                 let read = self.read_files(&paths);
                 return self.act(Action::Files(read));
             }
+            Action::AttachFilesTo(note) => {
+                let paths = (self.files_picker)(self.t.attach_file_title());
+                let read = self.read_files(&paths);
+                // Asked again: a sync while the dialog was open may have
+                // taken it.
+                if !read.is_empty() && self.store.may_change(&note)? {
+                    self.save_text()?;
+                    self.attach_to(&note, read)?;
+                }
+            }
+            Action::AddPartTo(note) => {
+                self.act(Action::SelectNote(note.clone()))?;
+                self.amend_wanted = Some(note);
+            }
             Action::Files(files) => {
                 // Onto the Note open they are its own (#267); else they
                 // wait in the quick note, with what is typed (#146).
@@ -8998,13 +9019,17 @@ impl App {
             }
             Action::Rename(id) => {
                 let shown = self.shown_name(&id);
+                let look = self.view.area(&id).map(|area| AreaLook {
+                    colour: area.colour.clone(),
+                    icon: area.icon.clone(),
+                });
                 self.dialog = Some(Dialog::Rename {
                     id,
                     name: shown.clone(),
                     shown,
+                    look,
                 });
             }
-            Action::Look(area) => self.dialog = Some(Dialog::Look { area }),
             // Not asked again for an Area being deleted (obf-1093).
             Action::Delete(id) if self.deletions.of(&id).is_some() => {}
             Action::Delete(id) => self.dialog = Some(Dialog::Delete(self.deleting(&id)?)),
@@ -9054,16 +9079,30 @@ impl App {
                 }
             }
             Action::SaveName => {
-                if let Some(Dialog::Rename { id, name, shown }) = &self.dialog {
+                if let Some(Dialog::Rename {
+                    id,
+                    name,
+                    shown,
+                    look,
+                }) = &self.dialog
+                {
                     // An unchanged starter name stays translatable.
                     if name.trim() != shown {
                         places.rename(id, name)?;
                     }
+                    // Only what was changed: a sync meanwhile keeps the
+                    // rest.
+                    if let (Some(look), Some(area)) = (look, self.view.area(id)) {
+                        if look.colour != area.colour {
+                            places.set_colour(id, look.colour.as_deref())?;
+                        }
+                        if look.icon != area.icon {
+                            places.set_icon(id, look.icon.as_deref())?;
+                        }
+                    }
                     self.dialog = None;
                 }
             }
-            Action::Colour(area, colour) => places.set_colour(&area, colour.as_deref())?,
-            Action::Icon(area, icon) => places.set_icon(&area, icon.as_deref())?,
             Action::DeletePlace(go) => {
                 if let Some(Dialog::Delete(deleting)) = &self.dialog {
                     if deleting.area.is_none() && self.import_open.is_some() {
@@ -9135,11 +9174,6 @@ impl App {
                     .map(|(routine, ..)| routine.clone())
                     .collect();
                 self.save_calendar_file(&all)?;
-            }
-            Action::ShareRoutine(id) => {
-                if let Some(routine) = Routines::new(&self.store).by_id(&id)? {
-                    self.save_calendar_file(&[routine])?;
-                }
             }
             Action::OpenRoutine(id) => {
                 self.save_text()?;
@@ -9670,14 +9704,29 @@ impl App {
                 }
             }
             Action::Share(area) => {
+                // Share with people… also lists the people of a Shared
+                // Area (obf-1014), for anyone in it; only who manages it
+                // shares it.
+                let manages = matches!(
+                    self.view.access.get(&area),
+                    None | Some(AreaAccess::Owner | AreaAccess::Manager)
+                );
+                let shared = self.view.people.contains_key(&area);
                 // Asked before whom (#267): an Area hidden or holding a
-                // Note hidden from AI is not shared.
-                let marks = self.store.hidden_from_ai_in(&area)?;
-                if !marks.is_empty() {
-                    self.ask_hidden(marks, Some(&area), Action::Share(area.clone()));
-                    return Ok(());
+                // Note hidden from AI is not shared. One shared already
+                // keeps its people at hand; the invite asks the core.
+                if manages && !shared {
+                    let marks = self.store.hidden_from_ai_in(&area)?;
+                    if !marks.is_empty() {
+                        self.ask_hidden(marks, Some(&area), Action::Share(area.clone()));
+                        return Ok(());
+                    }
                 }
-                let afar = self.afar_people()?;
+                let afar = if manages {
+                    self.afar_people()?
+                } else {
+                    Vec::new()
+                };
                 self.dialog = Some(Dialog::Share {
                     area,
                     role: AreaRole::Member,
@@ -9748,7 +9797,6 @@ impl App {
             Action::Sync(SyncAction::Join) => {
                 self.sync.join(self.store.clone(), &self.sync_name, &self.t)
             }
-            Action::People(area) => self.dialog = Some(Dialog::People { area }),
             Action::SetRole { area, person, role } => self.store.set_role(&area, &person, role)?,
             Action::AskRemovePerson { area, person } => {
                 let name = self
@@ -9768,7 +9816,8 @@ impl App {
             Action::RemovePerson => {
                 if let Some(Dialog::RemovePerson { area, person, .. }) = self.dialog.take() {
                     self.store.remove_person(&area, &person)?;
-                    self.dialog = Some(Dialog::People { area });
+                    // Back on Share with people… (obf-1014).
+                    return self.act(Action::Share(area));
                 }
             }
             Action::AskRemoveMedia { note, hash, made } => {
@@ -10262,11 +10311,13 @@ impl App {
             && note.text_format != text_format::CODE;
         let marked = self.store.is_marked_hidden_from_ai(&note.id)?;
         let hides = !note.is_trashed() && (marked || self.store.may_hide_from_ai(&note.id)?);
+        let amends = !note.is_trashed() && self.store.may_write_in(&note.id)?;
         Ok(CardSpawns {
             note: note.id.clone(),
             schedules,
             frog: advanced && !frog_open,
             session: plain,
+            amends,
             hidden: hides.then_some(marked),
         })
     }
@@ -14077,6 +14128,8 @@ impl App {
                             );
                         });
                     }
+                    // The band's ⋮ has the same entries (obf-1014), at most
+                    // seven.
                     resp.context_menu(|ui| {
                         let mut items = Vec::new();
                         // Topics are made only in Advanced (#197).
@@ -14084,40 +14137,54 @@ impl App {
                             items.push((t.new_topic(), Action::NewTopic(area.id.clone())));
                         }
                         if manages {
-                            items.extend([
-                                (t.rename(), Action::Rename(area.id.clone())),
-                                (t.area_look(), Action::Look(area.id.clone())),
-                                (t.share_area(), Action::Share(area.id.clone())),
-                            ]);
+                            let look = t.desk_area_look();
+                            items.push((look, Action::Rename(area.id.clone())));
+                        }
+                        // Its people too, for anyone in a Shared Area.
+                        if manages || people.is_some() {
+                            items.push((t.share_area(), Action::Share(area.id.clone())));
+                        }
+                        let mut picked = None;
+                        for (label, action) in items {
+                            if ui.button(RichText::new(label).color(text)).clicked() {
+                                picked = Some(action);
+                            }
                         }
                         // The order is the person's own, so every Area
                         // moves, a Shared one too; not past an end
                         // (#280).
-                        for (label, up) in [(t.area_move_up(), true), (t.area_move_down(), false)] {
-                            if let Some(index) = self.view.area_step(&area.id, up) {
-                                items.push((label, Action::MoveArea(area.id.clone(), index)));
-                            }
+                        let moves: Vec<_> = [(t.area_move_up(), true), (t.area_move_down(), false)]
+                            .into_iter()
+                            .filter_map(|(label, up)| {
+                                let index = self.view.area_step(&area.id, up)?;
+                                Some((label, Action::MoveArea(area.id.clone(), index)))
+                            })
+                            .collect();
+                        if !moves.is_empty() {
+                            let label = RichText::new(t.desk_area_move()).color(text);
+                            ui.menu_button(label, |ui| {
+                                for (label, action) in moves {
+                                    if ui.button(RichText::new(label).color(text)).clicked() {
+                                        picked = Some(action);
+                                    }
+                                }
+                            });
                         }
                         // Copies of what anyone may read (#165).
-                        items.push((t.export_as_pack(), Action::ExportPack(area.id.clone())));
-                        if people.is_some() {
-                            items.push((t.people_title(), Action::People(area.id.clone())));
+                        let pack = RichText::new(t.export_as_pack()).color(text);
+                        if ui.button(pack).clicked() {
+                            picked = Some(Action::ExportPack(area.id.clone()));
                         }
-                        for (label, action) in items {
-                            if ui.button(RichText::new(label).color(text)).clicked() {
-                                actions.push(action);
-                                // Also a pick by keyboard or screen reader.
-                                ui.close();
-                            }
-                        }
-                        // In no Shared Area, or to take the mark off (#267),
-                        // before Delete as in the band's ⋮ (obf-1065).
+                        // In no Shared Area, or to take the mark off (#267).
                         if let Some(asked) = hidden_entry(ui, &t, &self.view, &area.id) {
-                            actions.push(asked);
-                            ui.close();
+                            picked = Some(asked);
                         }
                         if manages && ui.button(RichText::new(t.delete()).color(text)).clicked() {
-                            actions.push(Action::Delete(area.id.clone()));
+                            picked = Some(Action::Delete(area.id.clone()));
+                        }
+                        if let Some(action) = picked {
+                            actions.push(action);
+                            // Also a pick by keyboard or screen reader.
                             ui.close();
                         }
                     });
@@ -14422,7 +14489,6 @@ impl App {
         Some(NoteMenu {
             id: note.id.clone(),
             changes: may.changes,
-            amends: may.amends,
         })
     }
 
@@ -15045,45 +15111,48 @@ impl App {
             Some(ctx.format_shortcut(&shortcut).replace("Comma", ","))
         };
         let keys = |key: Key| keys_with(Modifiers::COMMAND, key);
-        let note = self.note_menu();
-        let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
-        let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
         let cards = self.cards_key().is_some();
         egui::MenuBar::new().ui(ui, |ui| {
+            // At most seven entries (obf-1014): what opens a file under
+            // Open ▸; Attach a file… and Save as Markdown… are the Note
+            // dialog's.
             ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
                 let items = [
                     (t.menu_new_note(), keys(Key::N), true, Action::NewNote),
-                    // Onto the Note open, else a new one (#267).
-                    (t.attach_file_menu(), None, true, Action::AttachFiles),
                     (t.settings_quick_note(), None, true, Action::QuickNote),
                     (t.menu_import(), None, true, Action::AskImport),
-                    (t.desk_markdown_open(), None, true, Action::OpenMarkdown),
-                    (t.menu_open_pack(), None, true, Action::OpenPack),
-                    (
-                        t.backup_open(),
-                        None,
-                        true,
-                        Action::Backup(BackupAction::OpenNotes),
-                    ),
-                    (
-                        t.save_as_markdown(),
-                        None,
-                        may(|n| n.amends),
-                        Action::SaveAsMarkdown(id.clone()),
-                    ),
-                    // Greyed while one is written, and while the AI port is
-                    // open or its Task waits, whose drafts are no Notes yet
-                    // (#267).
-                    (
-                        t.menu_export_vault(),
-                        None,
-                        self.may_export_vault(),
-                        Action::ExportVault,
-                    ),
                 ];
                 menu_entries(ui, items, actions);
+                ui.menu_button(RichText::new(t.desk_menu_open()).color(text), |ui| {
+                    let items = [
+                        (
+                            t.desk_open_markdown_file(),
+                            None,
+                            true,
+                            Action::OpenMarkdown,
+                        ),
+                        (t.desk_open_pack(), None, true, Action::OpenPack),
+                        (
+                            t.desk_open_backup(),
+                            None,
+                            true,
+                            Action::Backup(BackupAction::OpenNotes),
+                        ),
+                    ];
+                    menu_entries(ui, items, actions);
+                });
+                // Greyed while one is written, and while the AI port is
+                // open or its Task waits, whose drafts are no Notes yet
+                // (#267).
+                let vault = [(
+                    t.menu_export_vault(),
+                    None,
+                    self.may_export_vault(),
+                    Action::ExportVault,
+                )];
+                menu_entries(ui, vault, actions);
                 ui.separator();
                 menu_entries(ui, [(t.tray_quit(), None, true, Action::Quit)], actions);
             });
@@ -15097,11 +15166,18 @@ impl App {
                     actions,
                 );
                 ui.separator();
+                let find = if self.selected_note.is_some() {
+                    t.find_in_note()
+                } else {
+                    t.menu_search()
+                };
                 let items = [
                     (t.menu_cut(), None, field, Action::Clip(Clip::Cut)),
                     (t.menu_copy(), None, field, Action::Clip(Clip::Copy)),
                     (t.paste(), None, field, Action::Clip(Clip::Paste)),
-                    (t.menu_find(), keys(Key::F), true, Action::Find),
+                    // Find in Note where it opens the Note's find bar,
+                    // else Search, as the list's field (obf-1014, C3).
+                    (find, keys(Key::F), true, Action::Find),
                 ];
                 menu_entries(ui, items, actions);
                 ui.separator();
@@ -15113,22 +15189,25 @@ impl App {
                 );
             });
             ui.menu_button(RichText::new(t.menu_view()).color(text), |ui| {
-                let places = [
-                    (t.agenda_title(), Selection::Agenda),
-                    (t.unsorted(), Selection::Unsorted),
-                    (t.all_notes_title(), Selection::All),
-                    (t.frogs_title(), Selection::Frogs),
-                    (t.all_routines_title(), Selection::AllRoutines),
-                ];
-                for (label, place) in places {
-                    let on = self.selection == place;
-                    let button = egui::Button::selectable(on, RichText::new(label).color(text));
-                    if ui.add(button).clicked() {
-                        actions.push(Action::Select(place));
-                        ui.close();
+                // The places under Go to ▸, at most seven entries
+                // (obf-1014).
+                ui.menu_button(RichText::new(t.desk_menu_go_to()).color(text), |ui| {
+                    let places = [
+                        (t.agenda_title(), Selection::Agenda),
+                        (t.unsorted(), Selection::Unsorted),
+                        (t.all_notes_title(), Selection::All),
+                        (t.frogs_title(), Selection::Frogs),
+                        (t.all_routines_title(), Selection::AllRoutines),
+                    ];
+                    for (label, place) in places {
+                        let on = self.selection == place;
+                        let button = egui::Button::selectable(on, RichText::new(label).color(text));
+                        if ui.add(button).clicked() {
+                            actions.push(Action::Select(place));
+                            ui.close();
+                        }
                     }
-                }
-                ui.separator();
+                });
                 // What runs in the background, never greyed (obf-1078).
                 let running = Action::OpenPage(Page::Running);
                 menu_entries(ui, [(t.menu_running(), None, true, running)], actions);
@@ -16858,11 +16937,12 @@ impl App {
     }
 
     /// The ⋮ of the Area or Topic `place` the list shows (#279,
-    /// obf-1065): Rename (F2), Colour and icon, Share…, People, Export as
-    /// Pack…, Hidden from AI, Move up (Alt+Up), Move down (Alt+Down) and
-    /// Delete, as the sidebar's right-click offers them, each greyed where
-    /// that leaves it out, and all of them while a dialog lies over the
-    /// list, so that none acts on a place behind it.
+    /// obf-1065), as the sidebar's right-click offers them (obf-1014):
+    /// for an Area New Topic, Name, colour and icon… (F2), Share with
+    /// people…, Move ▸ (Alt+Up, Alt+Down), Export as Pack…, Hidden from
+    /// AI and Delete, each greyed where that leaves it out; for a Topic
+    /// Rename (F2), Export as Pack… and Delete. All of them greyed while a
+    /// dialog lies over the list, so that none acts on a place behind it.
     fn place_more(
         &self,
         ui: &mut Ui,
@@ -16893,65 +16973,82 @@ impl App {
         egui::Popup::menu(&more).show(|ui| {
             let id = &place.id;
             let manages = acts && place.manages;
-            let of_area = acts && place.area && place.manages;
-            let shared = acts && place.area && place.shared;
-            let items = [
-                (
+            let delete = [(t.delete(), None, manages, Action::Delete(id.clone()))];
+            let pack = [(
+                t.export_as_pack(),
+                None,
+                acts,
+                Action::ExportPack(id.clone()),
+            )];
+            if !place.area {
+                let rename = [(
                     t.rename(),
                     keys(Modifiers::NONE, Key::F2),
                     manages,
                     Action::Rename(id.clone()),
-                ),
-                (t.area_look(), None, of_area, Action::Look(id.clone())),
-                (t.share_area(), None, of_area, Action::Share(id.clone())),
-                (t.people_title(), None, shared, Action::People(id.clone())),
+                )];
+                menu_entries(ui, rename, actions);
                 // Copies of what anyone may read (#165).
+                menu_entries(ui, pack, actions);
+                ui.separator();
+                menu_entries(ui, delete, actions);
+                return;
+            }
+            // Topics are made only in Advanced (#197).
+            let topics = manages && self.view.advanced;
+            let items = [
+                (t.new_topic(), None, topics, Action::NewTopic(id.clone())),
                 (
-                    t.export_as_pack(),
+                    t.desk_area_look(),
+                    keys(Modifiers::NONE, Key::F2),
+                    manages,
+                    Action::Rename(id.clone()),
+                ),
+                // Its people too, for anyone in a Shared Area.
+                (
+                    t.share_area(),
                     None,
-                    acts,
-                    Action::ExportPack(id.clone()),
+                    manages || (acts && place.shared),
+                    Action::Share(id.clone()),
                 ),
             ];
             menu_entries(ui, items, actions);
+            // Any Area moves, a Shared one too; not past an end (#280).
+            let step = |up| acts.then(|| self.view.area_step(id, up)).flatten();
+            let (up, down) = (step(true), step(false));
+            let moves = up.is_some() || down.is_some();
+            ui.add_enabled_ui(moves, |ui| {
+                ui.menu_button(RichText::new(t.desk_area_move()).color(text), |ui| {
+                    let items = [
+                        (
+                            t.area_move_up(),
+                            keys(Modifiers::ALT, Key::ArrowUp),
+                            up.is_some(),
+                            Action::MoveArea(id.clone(), up.unwrap_or_default()),
+                        ),
+                        (
+                            t.area_move_down(),
+                            keys(Modifiers::ALT, Key::ArrowDown),
+                            down.is_some(),
+                            Action::MoveArea(id.clone(), down.unwrap_or_default()),
+                        ),
+                    ];
+                    menu_entries(ui, items, actions);
+                });
+            });
+            // Copies of what anyone may read (#165).
+            menu_entries(ui, pack, actions);
             // An Area's own mark (#267), greyed where the right-click
-            // leaves it out: a Topic, and an Area shared unmarked.
-            let on = place.area && self.view.hidden_areas.contains(id);
-            let offered = acts && (on || (place.area && self.view.hideable_areas.contains(id)));
+            // leaves it out: an Area shared unmarked.
+            let on = self.view.hidden_areas.contains(id);
+            let offered = acts && (on || self.view.hideable_areas.contains(id));
             let switched = ui.add_enabled_ui(offered, |ui| hidden_switch(ui, &t, id, on));
             if let Some(asked) = switched.inner {
                 actions.push(asked);
                 ui.close();
             }
             ui.separator();
-            // Any Area moves, a Shared one too; not past an end (#280).
-            let step = |up| {
-                (acts && place.area)
-                    .then(|| self.view.area_step(id, up))
-                    .flatten()
-            };
-            let (up, down) = (step(true), step(false));
-            let items = [
-                (
-                    t.area_move_up(),
-                    keys(Modifiers::ALT, Key::ArrowUp),
-                    up.is_some(),
-                    Action::MoveArea(id.clone(), up.unwrap_or_default()),
-                ),
-                (
-                    t.area_move_down(),
-                    keys(Modifiers::ALT, Key::ArrowDown),
-                    down.is_some(),
-                    Action::MoveArea(id.clone(), down.unwrap_or_default()),
-                ),
-            ];
-            menu_entries(ui, items, actions);
-            ui.separator();
-            menu_entries(
-                ui,
-                [(t.delete(), None, manages, Action::Delete(id.clone()))],
-                actions,
-            );
+            menu_entries(ui, delete, actions);
         });
     }
 
@@ -17730,7 +17827,10 @@ impl App {
                                 }
                             });
                         }
-                        if std::mem::take(amend_focus) {
+                        // Not in the dialog's first, sizing pass, which
+                        // drops a focus: opened with the dialog from a
+                        // card's Add a part (obf-1014).
+                        if !ui.is_sizing_pass() && std::mem::take(amend_focus) {
                             match amend_select.take() {
                                 Some(range) => format_bar::select(ui, id, amend, range),
                                 None => ui.memory_mut(|m| m.request_focus(id)),
@@ -17834,7 +17934,7 @@ impl App {
                         ui.horizontal_wrapped(|ui| {
                             let add = ui.add_enabled(
                                 ready,
-                                egui::Button::new(RichText::new(t.amend()).color(text)),
+                                egui::Button::new(RichText::new(t.add()).color(text)),
                             );
                             if add.clicked() {
                                 actions.push(Action::Amend);
@@ -17880,14 +17980,14 @@ impl App {
                             {
                                 actions.push(Action::PasteOntoNote);
                             }
-                            let attach = t.attach_file_menu();
+                            let attach = t.attach_file();
                             if group_button(ui, Some(icons::ATTACH_FILE), attach).clicked() {
                                 actions.push(Action::AttachFiles);
                             }
                         }
                         // Opens the Amend box, the field taking the
                         // keyboard.
-                        if parts && group_button(ui, None, t.desk_add_part()).clicked() {
+                        if parts && group_button(ui, None, t.add_a_part()).clicked() {
                             *amend_open = true;
                             *amend_focus = true;
                             ui.ctx().request_repaint();
@@ -17897,14 +17997,11 @@ impl App {
                 }
                 if may.amends {
                     let draw = move |ui: &mut Ui, actions: &mut Vec<Action>| {
-                        if group_button(ui, None, t.send_button())
-                            .on_hover_text(t.send_to_person())
-                            .clicked()
-                        {
+                        if group_button(ui, None, t.send_to_person()).clicked() {
                             actions.push(Action::StartSend(note_id.clone()));
                         }
                         // To another app (#129).
-                        if group_button(ui, None, t.copy_as_text()).clicked() {
+                        if group_button(ui, None, t.copy_text()).clicked() {
                             actions.push(Action::CopyAsText(note_id.clone()));
                         }
                         if group_button(ui, None, t.save_as_markdown()).clicked() {
@@ -18094,10 +18191,17 @@ impl App {
                         let form = (title, t.create(), Action::AddPlace);
                         name_form(ui, &t, form, (name, focus), actions);
                     }
-                    Dialog::Rename { name, .. } => {
+                    Dialog::Rename {
+                        name, look: None, ..
+                    } => {
                         let form = (t.rename(), t.save(), Action::SaveName);
                         name_form(ui, &t, form, (name, focus), actions);
                     }
+                    Dialog::Rename {
+                        name,
+                        look: Some(look),
+                        ..
+                    } => area_look_form(ui, &t, (name, focus), look, actions),
                     Dialog::NewKind { kind, name } => {
                         let title = match kind {
                             NewKind::Checklist => t.new_checklist(),
@@ -18107,7 +18211,6 @@ impl App {
                         let form = (title, t.create(), Action::CreateNamed);
                         name_form(ui, &t, form, (name, focus), actions);
                     }
-                    Dialog::Look { area } => look_form(ui, &t, view.area(area), actions),
                     Dialog::Delete(deleting) => delete_form(ui, &t, deleting, actions),
                     Dialog::Merge { query, others, .. } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
@@ -18117,13 +18220,39 @@ impl App {
                             .area(area)
                             .map(|a| area_name(&t, a))
                             .unwrap_or_default();
-                        share_form(
-                            ui,
-                            &t,
-                            &shown,
-                            (role, !afar.is_empty(), view.advanced),
-                            actions,
-                        );
+                        let access = view.access.get(area);
+                        let manages =
+                            matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager));
+                        if manages {
+                            title(ui, &t.share_title(&shown));
+                        } else {
+                            title(ui, t.people_title());
+                        }
+                        // Its people first (obf-1014), where it is shared.
+                        if let Some(people) = view.people.get(area) {
+                            let mine = view.mine.get(area).map(String::as_str);
+                            let names = &view.names;
+                            let shown = (&view.shown, &mut *pictures);
+                            let roles = access == Some(&AreaAccess::Manager);
+                            people_form(
+                                ui,
+                                &t,
+                                area,
+                                (people, names, mine),
+                                shown,
+                                (roles, view.advanced),
+                                actions,
+                            );
+                            ui.separator();
+                        }
+                        if manages {
+                            share_form(ui, &t, (role, !afar.is_empty(), view.advanced), actions);
+                        } else {
+                            let text = ui.visuals().text_color();
+                            if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                                actions.push(Action::CloseDialog);
+                            }
+                        }
                     }
                     Dialog::ShareAfar {
                         area,
@@ -18241,22 +18370,6 @@ impl App {
                         held,
                         blocking: None,
                     } => held_sent_item_form(ui, &t, held, actions),
-                    Dialog::People { area } => {
-                        let manages = view.access.get(area) == Some(&AreaAccess::Manager);
-                        let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
-                        let mine = view.mine.get(area).map(String::as_str);
-                        let names = &view.names;
-                        let shown = (&view.shown, &mut *pictures);
-                        people_form(
-                            ui,
-                            &t,
-                            area,
-                            (people, names, mine),
-                            shown,
-                            (manages, view.advanced),
-                            actions,
-                        );
-                    }
                     Dialog::RemovePerson { question, .. } => {
                         title(ui, question);
                         let text = ui.visuals().text_color();
@@ -18503,8 +18616,14 @@ impl App {
                             actions.push(Action::FileIntoPicked(picked));
                         }
                     }
-                    Dialog::AddToNote { picker, .. } => {
-                        title(ui, t.add_to_note());
+                    Dialog::AddToNote { picker, adding } => {
+                        // Notes merged go by Merge into… (obf-1014, C2);
+                        // an answer of Ask is added to a Note.
+                        let heading = match adding {
+                            Filing::Notes(_) => t.merge_into(),
+                            Filing::Answer(_) => t.add_to_note(),
+                        };
+                        title(ui, heading);
                         if let Some(asked) = picker.show(ui, (&t, tones)) {
                             actions.push(Action::AddToNotePicked(asked));
                         }
@@ -20344,11 +20463,18 @@ struct PlaceMenu {
     shared: bool,
 }
 
+/// An Area's colour and icon as picked in its dialog (obf-1014), kept
+/// with its name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AreaLook {
+    colour: Option<String>,
+    icon: Option<String>,
+}
+
 /// What may be done to the Note shown (#145), by its id.
 struct NoteMenu {
     id: String,
     changes: bool,
-    amends: bool,
 }
 
 /// Important, Normal and Unimportant, as a menu's entries (#273), with
@@ -21232,13 +21358,11 @@ fn custom_heads_up_form(
 fn share_form(
     ui: &mut Ui,
     t: &L10n,
-    area: &str,
     (role, afar, advanced): (&mut AreaRole, bool, bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    title(ui, &t.share_title(area));
     ui.label(RichText::new(t.share_host_intro()).color(weak));
     // Roles are chosen only in Advanced (#197); in Simple the person
     // joins as a Member.
@@ -21966,8 +22090,9 @@ fn held_sent_item_form(ui: &mut Ui, t: &L10n, held: &HeldSentItem, actions: &mut
     }
 }
 
-/// The people of a Shared Area with their roles; a Manager changes them
-/// and takes them out here.
+/// The people of a Shared Area with their roles, on its Share with
+/// people… page (obf-1014); a Manager changes them and takes them out
+/// here.
 fn people_form(
     ui: &mut Ui,
     t: &L10n,
@@ -21986,7 +22111,7 @@ fn people_form(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    title(ui, t.people_title());
+    ui.label(RichText::new(t.people_title()).strong().color(text));
     ui.label(RichText::new(t.people_intro()).small().color(weak));
     for person in people {
         let own = Some(person.id.as_str()) == mine;
@@ -22040,62 +22165,83 @@ fn people_form(
             }
         });
     }
-    ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.close()).color(text)).clicked() {
-            actions.push(Action::CloseDialog);
-        }
-    });
 }
 
-/// An Area's colour and icon, each kept as it is picked.
-fn look_form(ui: &mut Ui, t: &L10n, area: Option<&Area>, actions: &mut Vec<Action>) {
-    let Some(area) = area else {
-        return;
-    };
+/// An Area's name, colour and icon in one dialog (obf-1014): its name
+/// over the colours and icons, each marked as it is picked and kept with
+/// Save, or Enter in the name; Cancel keeps none of them.
+fn area_look_form(
+    ui: &mut Ui,
+    t: &L10n,
+    (name, focus): (&mut String, bool),
+    look: &mut AreaLook,
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
-    title(ui, t.area_look());
+    title(ui, t.desk_area_look_title());
+    let field = focused_field(ui, t, (&mut *name, focus), "name", t.name_hint());
+    let ready = !name.trim().is_empty();
+    if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        actions.push(Action::SaveName);
+    }
+    ui.add_space(8.0);
     ui.label(RichText::new(t.colour_heading()).strong().color(text));
     ui.horizontal_wrapped(|ui| {
+        let none = look.colour.is_none();
         if ui
-            .button(RichText::new(t.no_colour()).color(text))
+            .add(egui::Button::selectable(
+                none,
+                RichText::new(t.no_colour()).color(text),
+            ))
             .clicked()
         {
-            actions.push(Action::Colour(area.id.clone(), None));
+            look.colour = None;
         }
         for hex in AREA_PALETTE {
-            let on = area.colour.as_deref() == Some(hex);
+            let on = look.colour.as_deref() == Some(hex);
             let colour = area_colour(Some(hex)).unwrap_or(text);
             if swatch(ui, hex, on, |painter, rect| {
                 painter.circle_filled(rect.center(), rect.width() / 2.0 - 3.0, colour);
             })
             .clicked()
             {
-                actions.push(Action::Colour(area.id.clone(), Some(hex.to_string())));
+                look.colour = Some(hex.to_string());
             }
         }
     });
     ui.label(RichText::new(t.icon_heading()).strong().color(text));
     ui.horizontal_wrapped(|ui| {
-        if ui.button(RichText::new(t.no_icon()).color(text)).clicked() {
-            actions.push(Action::Icon(area.id.clone(), None));
+        let none = look.icon.is_none();
+        if ui
+            .add(egui::Button::selectable(
+                none,
+                RichText::new(t.no_icon()).color(text),
+            ))
+            .clicked()
+        {
+            look.icon = None;
         }
         for key in AREA_ICONS {
             let Some(glyph) = icons::area_icon(Some(key)) else {
                 continue;
             };
-            let on = area.icon.as_deref() == Some(key);
+            let on = look.icon.as_deref() == Some(key);
             if swatch(ui, key, on, |painter, rect| {
                 icons::paint(painter, rect.shrink(5.0), glyph, text);
             })
             .clicked()
             {
-                actions.push(Action::Icon(area.id.clone(), Some(key.to_string())));
+                look.icon = Some(key.to_string());
             }
         }
     });
-    if ui.button(RichText::new(t.close()).color(text)).clicked() {
-        actions.push(Action::CloseDialog);
-    }
+    ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        if theme::main_action(ui, ready, t.save()) {
+            actions.push(Action::SaveName);
+        }
+    });
 }
 
 /// A round choice called `label`, ringed while it is `on`.
@@ -23154,9 +23300,6 @@ fn agenda_row(
                 Some(OccurrencePick::History) => {
                     actions.push(Action::Select(Selection::History(routine.id.clone())));
                 }
-                Some(OccurrencePick::Share) => {
-                    actions.push(Action::ShareRoutine(routine.id.clone()));
-                }
                 Some(OccurrencePick::Answer(answer)) => {
                     actions.push(Action::Answer(routine.id.clone(), occurrence, answer));
                 }
@@ -23374,16 +23517,14 @@ fn answered_under(t: &L10n, row: &AgendaRow) -> Option<&'static str> {
 enum OccurrencePick {
     Schedule,
     History,
-    Share,
     Answer(Answer),
 }
 
 /// An Occurrence's menu, from a right-click on it or its ⋮, as the
 /// phone's: Snooze and Not today as far as `answers` allows (#269), each
 /// under its heading, then Edit schedule, which opens its Routine or
-/// Reminder editor (#270), History for a Routine (`history`), and Share,
-/// which saves its Routine as the whole series with its end, or its
-/// Reminder, as a calendar file. What was picked.
+/// Reminder editor (#270), and History for a Routine (`history`); no
+/// calendar file (obf-1014). What was picked.
 fn occurrence_menu(
     ui: &mut Ui,
     t: &L10n,
@@ -23407,9 +23548,6 @@ fn occurrence_menu(
             .clicked()
     {
         picked = Some(OccurrencePick::History);
-    }
-    if ui.button(RichText::new(t.share()).color(text)).clicked() {
-        picked = Some(OccurrencePick::Share);
     }
     // A pick closes the menu, also one by keyboard or screen reader,
     // which no pointer click closes.
@@ -24331,7 +24469,7 @@ fn add_badge(
         {
             entries.push((
                 icons::SESSION,
-                t.session(),
+                t.spawn_session(),
                 Action::NewSession(Some(id.clone())),
             ));
         }
@@ -24376,7 +24514,7 @@ fn frog_badge(
             actions.push(Action::Frog(FrogAction::Toggle(frog.id.clone())));
             ui.close();
         }
-        if shown.manages && menu_entry(ui, (icons::TRASH, text), t.frog_remove()).clicked() {
+        if shown.manages && menu_entry(ui, (icons::TRASH, text), t.move_to_trash()).clicked() {
             actions.push(Action::Frog(FrogAction::Delete(frog.id.clone())));
             ui.close();
         }
@@ -24580,13 +24718,16 @@ struct CardLook<'a> {
 
 /// What a card's menu offers of the Note's Routines (#281): Remind me…
 /// (#344) with `schedules`, Frog with `frog` and Session… with
-/// `session`.
+/// `session`; and Add a part (obf-1014).
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CardSpawns {
     note: String,
     schedules: bool,
     frog: bool,
     session: bool,
+    /// Whether Add a part opens the Note dialog with its Amend box
+    /// (obf-1014): where this Device may add a Section.
+    amends: bool,
     /// The switch Hidden from AI, ticked while the Note is marked itself;
     /// none while it may not be marked (#267).
     hidden: Option<bool>,
@@ -24891,7 +25032,7 @@ fn add_button(
                 NewKind::Tally => (icons::TALLY, t.tally_heading()),
                 NewKind::Session => (icons::SESSION, t.session()),
                 NewKind::Frog => (icons::FROG, t.frog()),
-                NewKind::Topic => (icons::NO_AREA_ICON, t.topic_choice()),
+                NewKind::Topic => (icons::NO_AREA_ICON, t.new_topic()),
             };
             if menu_entry(ui, (icon, text), label).clicked() {
                 picked = Some(*kind);
@@ -26851,144 +26992,177 @@ fn note_card(
     let has_boxes = !note.boxes.is_empty() || look.sections.iter().any(|s| !s.boxes.is_empty());
     let mut entries = |ui: &mut Ui| {
         let text = ui.visuals().text_color();
-        if ui.button(RichText::new(t.edit()).color(text)).clicked() {
+        let entry =
+            |ui: &mut Ui, label: &str| ui.button(RichText::new(label).color(text)).clicked();
+        // Edit, then the Note dialog's groups (obf-1014): This Note ▸,
+        // Add ▸, Share ▸ and Tidy ▸, each only with something in it.
+        if entry(ui, t.edit()) {
             picked = Some(Action::SelectNote(note.id.clone()));
         }
         // Beside the list (#287), for this card alone.
-        if !note.is_trashed()
-            && ui
-                .button(RichText::new(t.note_window_open()).color(text))
-                .clicked()
-        {
+        if !note.is_trashed() && entry(ui, t.note_window_open()) {
             picked = Some(Action::OpenWindow(note.id.clone()));
         }
-        // With the cards selected along, as the list makes it (#148).
-        if look.changes
-            && ui
-                .button(RichText::new(t.file_into()).color(text))
-                .clicked()
-        {
-            picked = Some(Action::AskFileInto(vec![note.id.clone()]));
+        // These with the cards selected along (#148, #273).
+        let one = || vec![note.id.clone()];
+        let pack_from = placed.pack_from.as_ref().filter(|_| look.changes);
+        let hidden = spawns.and_then(|s| s.hidden);
+        let kinds = menu.is_some_and(|m| m.make || m.make_shopping || m.to_plain);
+        let on_agenda =
+            menu.is_some_and(|m| m.on_agenda.is_some() || m.shopping_on_agenda.is_some());
+        let this_note = look.changes
+            || look.may
+            || kinds
+            || on_agenda
+            || pack_from.is_some()
+            || has_boxes
+            || hidden.is_some();
+        if this_note {
+            ui.menu_button(
+                RichText::new(t.editor_group_this_note()).color(text),
+                |ui| {
+                    if look.changes && entry(ui, t.file_into()) {
+                        picked = Some(Action::AskFileInto(one()));
+                    }
+                    if look.may {
+                        ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
+                            if let Some(importance) = importance_entries(ui, t, false) {
+                                picked = Some(Action::ImportanceOf(one(), importance));
+                            }
+                        });
+                    }
+                    // Its kind as the Kind badge changes it, then how a list
+                    // shows on the Agenda (#186, #219).
+                    if let Some(menu) = menu.filter(|_| kinds) {
+                        ui.menu_button(RichText::new(t.badge_kind()).color(text), |ui| {
+                            if let Some(asked) = checklist_view::card_make(ui, t, menu) {
+                                picked = Some(Action::Checklist(asked));
+                            }
+                            if let Some(asked) = shopping_view::card_menu_entry(ui, t, menu) {
+                                picked = Some(Action::Shopping(asked));
+                            }
+                            if let Some(asked) = checklist_view::card_to_plain(ui, t, menu) {
+                                picked = Some(Action::Checklist(asked));
+                            }
+                        });
+                    }
+                    if let Some(asked) = menu.and_then(|m| shopping_view::card_on_agenda(ui, t, m))
+                    {
+                        picked = Some(Action::Shopping(asked));
+                    }
+                    if let Some(asked) = menu.and_then(|m| checklist_view::card_on_agenda(ui, t, m))
+                    {
+                        picked = Some(Action::Checklist(asked));
+                    }
+                    // Who they came from (#165).
+                    if let Some(from) = pack_from {
+                        let name = profile_view::display_name(t, &from.name);
+                        let label = t.remove_pack_from(name);
+                        if ui.button(RichText::new(label).color(text)).clicked() {
+                            picked = Some(Action::RemovePackFrom(note.id.clone()));
+                        }
+                    }
+                    // Who ticked each box last and when (ADR 0035), where it
+                    // has any.
+                    if has_boxes {
+                        let mut on = look.boxes.show;
+                        let label = RichText::new(t.box_show_ticks()).color(text);
+                        if theme::checkbox(ui, &mut on, label).clicked() {
+                            picked = Some(Action::ShowTicks {
+                                note: note.id.clone(),
+                                on,
+                            });
+                        }
+                    }
+                    // Read as the menu opens, in no Shared Area or to take it
+                    // off (#267).
+                    if let Some(on) = hidden
+                        && let Some(asked) = hidden_switch(ui, t, &note.id, on)
+                    {
+                        picked = Some(asked);
+                    }
+                },
+            );
         }
-        // Its Routines after File into…, as the phone's compact ⋮ has
-        // them (#281); for this card alone.
-        if let Some(spawns) = spawns {
-            let id = || Some(note.id.clone());
-            let mut entries = Vec::new();
-            if spawns.schedules {
-                // One way in for a Routine or Reminder, starting as a
-                // Reminder (#344).
-                entries.push((
-                    t.remind_me(),
-                    Action::NewRoutine {
+        // Its Routines as the "+" badge sets them up (#281), for this card
+        // alone; files of any kind and a part as the dialog adds them
+        // (obf-1014).
+        let spawned = spawns.map(|s| (s.schedules, s.frog, s.session, s.amends));
+        let (schedules, frog, session, amends) = spawned.unwrap_or_default();
+        if schedules || look.may || amends {
+            ui.menu_button(RichText::new(t.add()).color(text), |ui| {
+                let id = || Some(note.id.clone());
+                if schedules {
+                    // One way in for a Routine or Reminder, starting as a
+                    // Reminder (#344).
+                    let reminder = Action::NewRoutine {
                         note: id(),
                         reminder: true,
-                    },
-                ));
-            }
-            if spawns.frog {
-                entries.push((t.frog(), Action::SpawnFrog(note.id.clone())));
-            }
-            if spawns.session {
-                entries.push((t.spawn_session(), Action::NewSession(id())));
-            }
-            for (label, action) in entries {
-                if ui.button(RichText::new(label).color(text)).clicked() {
-                    picked = Some(action);
+                    };
+                    if entry(ui, t.remind_me()) {
+                        picked = Some(reminder);
+                    }
                 }
-            }
-        }
-        // These too with the cards selected along (#273).
-        let one = || vec![note.id.clone()];
-        if look.may {
-            // On an Unsorted Note's card Merge into… is Add to Note…
-            // (#308): the same Merge, picked as a capture picks its Note.
-            let (label, merge) = if note.is_unsorted() {
-                (t.add_to_note(), Action::AskAddToNote(one()))
-            } else {
-                (t.merge_into(), Action::AskMergeNotes(one()))
-            };
-            if ui.button(RichText::new(label).color(text)).clicked() {
-                picked = Some(merge);
-            }
-            ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
-                if let Some(importance) = importance_entries(ui, t, false) {
-                    picked = Some(Action::ImportanceOf(one(), importance));
+                if frog && entry(ui, t.frog()) {
+                    picked = Some(Action::SpawnFrog(note.id.clone()));
+                }
+                if session && entry(ui, t.spawn_session()) {
+                    picked = Some(Action::NewSession(id()));
+                }
+                if look.may && entry(ui, t.attach_file()) {
+                    picked = Some(Action::AttachFilesTo(note.id.clone()));
+                }
+                // Opens the Note dialog with the Amend box open.
+                if amends && entry(ui, t.add_a_part()) {
+                    picked = Some(Action::AddPartTo(note.id.clone()));
                 }
             });
         }
-        // A Shopping List's ways onto the Agenda before "Back to a plain
-        // Note", as on the phone (#186).
-        if let Some(asked) = menu.and_then(|m| shopping_view::card_on_agenda(ui, t, m)) {
-            picked = Some(Action::Shopping(asked));
-        }
-        if let Some(asked) = menu.and_then(|m| checklist_view::card_menu_entries(ui, t, m)) {
-            picked = Some(Action::Checklist(asked));
-        }
-        if let Some(asked) = menu.and_then(|m| shopping_view::card_menu_entry(ui, t, m)) {
-            picked = Some(Action::Shopping(asked));
-        }
-        // To a person as a Sent Item, or to another app (#129).
-        if ui
-            .button(RichText::new(t.send_to_person()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::StartSend(note.id.clone()));
-        }
-        if ui
-            .button(RichText::new(t.copy_as_text()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::CopyAsText(note.id.clone()));
-        }
-        if ui
-            .button(RichText::new(t.save_as_markdown()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::SaveAsMarkdown(note.id.clone()));
-        }
-        // Copies for another person (#165), and who they came from.
-        if ui
-            .button(RichText::new(t.export_as_pack()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::ExportPack(note.id.clone()));
-        }
-        if let Some(from) = placed.pack_from.as_ref().filter(|_| look.changes) {
-            let name = profile_view::display_name(t, &from.name);
-            if ui
-                .button(RichText::new(t.remove_pack_from(name)).color(text))
-                .clicked()
-            {
-                picked = Some(Action::RemovePackFrom(note.id.clone()));
+        // To a person as a Sent Item, or to another app (#129), and copies
+        // for another person (#165).
+        ui.menu_button(RichText::new(t.share()).color(text), |ui| {
+            if entry(ui, t.send_to_person()) {
+                picked = Some(Action::StartSend(note.id.clone()));
             }
-        }
-        // Who ticked each box last and when (ADR 0035), where it has any.
-        if has_boxes {
-            let mut on = look.boxes.show;
-            let label = RichText::new(t.box_show_ticks()).color(text);
-            if theme::checkbox(ui, &mut on, label).clicked() {
-                picked = Some(Action::ShowTicks {
-                    note: note.id.clone(),
-                    on,
-                });
+            if entry(ui, t.copy_text()) {
+                picked = Some(Action::CopyAsText(note.id.clone()));
             }
-        }
-        // Read as the menu opens, in no Shared Area or to take it off
-        // (#267).
-        if let Some(on) = spawns.and_then(|s| s.hidden)
-            && let Some(asked) = hidden_switch(ui, t, &note.id, on)
-        {
-            picked = Some(asked);
-        }
-        if look.may {
-            ui.separator();
-            if ui
-                .button(RichText::new(t.move_to_trash()).color(text))
-                .clicked()
-            {
-                picked = Some(Action::TrashNotes(one()));
+            let markdown = Action::SaveAsMarkdown(note.id.clone());
+            if entry(ui, t.save_as_markdown()) {
+                picked = Some(markdown);
             }
+            if entry(ui, t.export_as_pack()) {
+                picked = Some(Action::ExportPack(note.id.clone()));
+            }
+        });
+        let unchecks = menu.is_some_and(|m| m.uncheck_all);
+        if look.may || unchecks {
+            ui.menu_button(RichText::new(t.editor_group_tidy()).color(text), |ui| {
+                // On an Unsorted Note's card the Merge is picked as a
+                // capture picks its Note (#308).
+                if look.may {
+                    let merge = if note.is_unsorted() {
+                        Action::AskAddToNote(one())
+                    } else {
+                        Action::AskMergeNotes(one())
+                    };
+                    if entry(ui, t.merge_into()) {
+                        picked = Some(merge);
+                    }
+                }
+                if let Some(asked) = menu.and_then(|m| checklist_view::card_uncheck_all(ui, t, m)) {
+                    picked = Some(Action::Checklist(asked));
+                }
+                if look.may {
+                    let error = ui.visuals().error_fg_color;
+                    if ui
+                        .button(RichText::new(t.move_to_trash()).color(error))
+                        .clicked()
+                    {
+                        picked = Some(Action::TrashNotes(one()));
+                    }
+                }
+            });
         }
         // A pick closes the menu, also one made with the keyboard or a
         // screen reader, which no pointer click closes.

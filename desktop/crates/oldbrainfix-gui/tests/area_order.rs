@@ -180,11 +180,27 @@ fn open_area_menu(harness: &mut Harness<'_, App>) {
 /// menu is closed again.
 fn moves(harness: &mut Harness<'_, App>) -> [bool; 2] {
     open_area_menu(harness);
-    let on = ["Move up Alt+Up", "Move down Alt+Down"]
-        .map(|entry| !last(harness, entry).accesskit_node().is_disabled());
+    // Under Move ▸ (obf-1014), greyed with neither, a Topic's has none.
+    let opens = harness
+        .query_all_by_label("Move ⏵")
+        .last()
+        .is_some_and(|n| !n.accesskit_node().is_disabled());
+    let on = if opens {
+        open_move(harness);
+        ["Move up Alt+Up", "Move down Alt+Down"]
+            .map(|entry| !last(harness, entry).accesskit_node().is_disabled())
+    } else {
+        [false, false]
+    };
     harness.key_press(Key::Escape);
     harness.run();
     on
+}
+
+/// Opens Move ▸ of the Area's menu open.
+fn open_move(harness: &mut Harness<'_, App>) {
+    last(harness, "Move ⏵").click();
+    harness.run();
 }
 
 #[test]
@@ -317,6 +333,7 @@ fn the_bands_menu_moves_the_area_shown_greyed_at_an_end_and_for_a_topic() -> Tes
     harness.run();
     assert_eq!(moves(&mut harness), [false, true]);
     open_area_menu(&mut harness);
+    open_move(&mut harness);
     last(&harness, "Move down Alt+Down").click_accesskit();
     harness.run();
     assert_eq!(kept(&harness)?, ["Household", "Garden", "Work"]);
@@ -342,12 +359,14 @@ fn the_right_click_moves_the_area_and_leaves_out_the_way_past_an_end() -> TestRe
     let mut harness = window(store()?, "en", Selection::All);
     row(&harness, "Garden").click_secondary();
     harness.run();
+    open_move(&mut harness);
     assert!(harness.query_by_label("Move up").is_none());
     last(&harness, "Move down").click();
     harness.run();
     assert_eq!(kept(&harness)?, ["Household", "Garden", "Work"]);
     row(&harness, "Work").click_secondary();
     harness.run();
+    open_move(&mut harness);
     assert!(harness.query_by_label("Move down").is_none());
     last(&harness, "Move up").click();
     harness.run();

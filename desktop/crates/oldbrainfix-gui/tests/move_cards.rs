@@ -309,6 +309,9 @@ fn file_into_from_the_right_click_files_the_cards_selected() -> TestResult {
     pause(&mut harness);
     card(&harness, PLUMBER).click_secondary();
     harness.run();
+    // Under This Note ▸ (obf-1014).
+    harness.get_by_label("This Note ⏵").click();
+    harness.run();
     harness.get_by_label("File into…").click();
     harness.run_steps(8);
     // The dialog names how many go.

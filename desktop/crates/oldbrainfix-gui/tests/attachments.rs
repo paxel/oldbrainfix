@@ -234,9 +234,10 @@ fn a_file_dropped_onto_the_note_dialog_goes_onto_its_note() -> TestResult {
 }
 
 #[test]
-fn attach_a_file_picks_files_for_the_note_open_or_a_new_one() -> TestResult {
+fn attach_a_file_picks_files_for_the_note_open_or_a_cards_note() -> TestResult {
     let store = store()?;
     let note = Notes::new(&store).capture("Flat", None, None)?;
+    let lease = Notes::new(&store).capture("Lease", None, None)?;
     let dir = tempfile::tempdir()?;
     let deed = dir.path().join("deed.txt");
     std::fs::write(&deed, b"The deed")?;
@@ -249,15 +250,26 @@ fn attach_a_file_picks_files_for_the_note_open_or_a_new_one() -> TestResult {
     harness.run();
     let flat = Notes::new(&store).by_id(&note.id)?.ok_or("Flat")?;
     assert_eq!(flat.attachments.len(), 1);
-    // From the File menu with no Note open, into the quick note.
+    // From a card's Add ▸, onto the card's Note (obf-1014); File has
+    // no Attach a file… any more.
     harness.state_mut().close_note();
     harness.run();
     harness.get_by_label("File").click();
     harness.run();
+    assert!(harness.query_by_label("Attach a file…").is_none());
+    harness.key_press(Key::Escape);
+    harness.run();
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::Button, "Lease")
+        .click_secondary();
+    harness.run();
+    harness.get_by_label("Add ⏵").click();
+    harness.run();
     harness.get_by_label("Attach a file…").click_accesskit();
     harness.run();
-    assert!(harness.state().quick_note_open());
-    assert!(shows(&harness, "deed.txt"));
+    assert!(!harness.state().quick_note_open());
+    let lease = Notes::new(&store).by_id(&lease.id)?.ok_or("Lease")?;
+    assert_eq!(lease.attachments.len(), 1);
     Ok(())
 }
 

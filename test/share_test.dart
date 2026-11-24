@@ -142,7 +142,7 @@ void main() {
     await rowMenu(tester, 'Household');
     expect(find.text('People'), findsOneWidget);
     expect(find.text('Rename'), findsNothing);
-    expect(find.text('Share…'), findsNothing);
+    expect(find.text('Share with people…'), findsNothing);
     expect(find.text('Delete'), findsNothing);
     await tester.tap(find.text('People'));
     await tester.pumpAndSettle();
@@ -251,7 +251,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Share…'), findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
+    // Removals sit under Tidy (obf-1014), where it is offered at all.
+    final tidy = find.byKey(const ValueKey('note-group-tidy'));
+    if (tidy.evaluate().isNotEmpty) {
+      await tester.tap(tidy);
+      await tester.pumpAndSettle();
+    }
     expect(find.byKey(ValueKey('note-remove-$hash')), findsNothing);
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();
@@ -277,7 +283,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
     await rowMenu(tester, 'Household');
-    for (final item in ['Rename', 'Share…', 'People', 'Delete']) {
+    for (final item in ['Rename', 'Share with people…', 'People', 'Delete']) {
       expect(find.text(item), findsOneWidget);
     }
   });

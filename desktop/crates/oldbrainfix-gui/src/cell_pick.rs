@@ -277,7 +277,12 @@ pub fn menu(response: &Response, t: &L10n, words: Option<&str>) -> Option<Pick> 
         };
         entry(ui, t.menu_copy(), true, Pick::Copy);
         if searches {
-            entry(ui, t.menu_search(), !words.is_empty(), Pick::Search);
+            entry(
+                ui,
+                crate::text_menu::search_label(&ctx, t),
+                !words.is_empty(),
+                Pick::Search,
+            );
         }
     });
     if picked == Some(Pick::Search) {

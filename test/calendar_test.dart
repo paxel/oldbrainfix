@@ -383,56 +383,26 @@ void main() {
     });
   });
 
-  group('Share one', () {
-    testWidgets('a Routine is shared as its whole series with its end', (
-      tester,
-    ) async {
-      final pills = routines.create(
-        'pills',
-        Schedule(
-          start: Day(2026, 10, 24),
-          times: [at(8), at(20)],
-          rule: Recurrence.parse('FREQ=DAILY;COUNT=5'),
-        ),
-      );
-      final other = routines.create('water plants', daily([at(9)]));
+  group('An Occurrence\'s menu', () {
+    // A calendar file is the Routine editor's and the Note's to share,
+    // not the row's (obf-1014).
+    testWidgets('offers no calendar file of a Routine', (tester) async {
+      final pills = routines.create('pills', daily([at(8), at(20)]));
       await start(tester);
 
       await tap(tester, rowMenu(pills).first);
       expect(find.text('History'), findsOneWidget);
-      await tap(tester, find.text('Share'));
-      final (name, ics) = calendar.shared.single;
-      expect(name, 'oldbrainfix.ics');
-      expect(ics, routinesIcs([pills], (_) => 'pills', stamp: now));
-      expect(ics, contains('RRULE:FREQ=DAILY;UNTIL=20261026T080000'));
-      expect(ics, isNot(contains(other.id)));
-    });
-
-    testWidgets('a Reminder is shared as its one event', (tester) async {
-      final dentist = routines.create(
-        'dentist',
-        Schedule(start: Day(2026, 10, 25), times: [at(14, 30)]),
-      );
-      routines.create('pills', daily([at(8)]));
-      await start(tester);
-
-      await tap(tester, rowMenu(dentist));
-      expect(find.text('History'), findsNothing);
-      await tap(tester, find.text('Share'));
-      final (_, ics) = calendar.shared.single;
-      expect(ics, routinesIcs([dentist], (_) => 'dentist', stamp: now));
-      expect(ics, isNot(contains('RRULE')));
-      expect('BEGIN:VEVENT'.allMatches(ics), hasLength(1));
+      expect(find.text('Share'), findsNothing);
+      expect(find.text('Share as calendar file'), findsNothing);
     });
 
     testWidgets('a long press opens the same menu', (tester) async {
-      final pills = routines.create('pills', daily([at(8)]));
+      routines.create('pills', daily([at(8)]));
       await start(tester);
       await tester.longPress(find.text('pills').first);
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Share'));
-      final (_, ics) = calendar.shared.single;
-      expect(ics, contains(pills.id));
+      expect(find.text('History'), findsOneWidget);
+      expect(find.text('Share'), findsNothing);
     });
   });
 }

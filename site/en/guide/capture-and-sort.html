@@ -78,7 +78,7 @@
   <li><strong>Open in the editor</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note dialog in place of the quick note, its text ready for typing. The list stays where it was. The badges are there under This Note, Voice, Paste and Attach a file… under Add, and Merge into… and Add to a Shopping List under Tidy.</li>
   <li>With an Area or Topic shown in the list, the Note is filed there and needs no Nudge: one <strong>Save</strong> takes the place of the three Nudge buttons, and Open in the editor files it there too.</li>
   <li>Ctrl+V in the empty field puts the clipboard's text into the field. A pasted picture waits above the field as a "Photo" line and is saved with what is typed as the Note's photo.</li>
-  <li>Files dropped onto the window, and <strong>File ▸ Attach a file…</strong> with no Note open, open the quick note. They wait above the field, a picture as a "Photo" line, a sound file as a "Voice recording" line and any other file as a line with its name, and are saved with what is typed as one Note, the other files as its Attachments (see <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>).</li>
+  <li>Files dropped onto the window open the quick note. They wait above the field, a picture as a "Photo" line, a sound file as a "Voice recording" line and any other file as a line with its name, and are saved with what is typed as one Note, the other files as its Attachments (see <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>).</li>
 </ul>
 <p>
   Text still typed, and pictures and files still waiting, when the window closes are kept as a
@@ -196,7 +196,7 @@
   pressed next, and the field "Hotkey" takes them typed out; it needs Ctrl, Alt or Super. On X11, Windows and macOS the app takes the key itself. On Wayland the desktop manages it:
   it asks once and lets you change the key in its own keyboard settings. Where the key is taken or no
   hotkey is possible, the line under the field says so. The tray's menu also has
-  <strong>Capture a Note</strong>.
+  <strong>Quick note</strong>.
 </p>
 <p>The command line:</p>
 <ul>
@@ -228,10 +228,10 @@
 <li>Tap the folder, <strong>File into…</strong>, in the bar.</li>
 <li>Pick the Area or Topic.</li>
 </box-tab>
-<box-tab device="desktop" alt="Unsorted in the desktop app, both of its cards selected, with File into… in a card's right-click menu">
+<box-tab device="desktop" alt="Unsorted in the desktop app, both of its cards selected, with This Note and File into… in a card's right-click menu">
 <li>Click the Nudge, or <strong>Unsorted</strong> in the sidebar.</li>
 <li>Ctrl-click the cards of the Notes.</li>
-<li>Right-click one of them ▸ <strong>File into…</strong>.</li>
+<li>Right-click one of them ▸ <strong>This Note ▸ File into…</strong>.</li>
 <li>Pick the Area or Topic.</li>
 </box-tab>
 <box-more>
@@ -255,19 +255,19 @@
   Unsorted" as well, which opens Unsorted.
 </p>
 <p>
-  On the desktop, File into… is also in a card's right-click menu and its ⋮, Ctrl+M opens it, and
+  On the desktop, File into… is also under This Note in a card's right-click menu and its ⋮, Ctrl+M opens it, and
   the badge "Area and Topic" in the Note dialog opens it. A card can be
   dragged onto an Area or Topic in the sidebar. Ctrl-click and Shift-click select several cards;
-  File into… then files all of them. A selected card's right-click also offers <strong>Merge
-  into…</strong>, <strong>Importance</strong> and <strong>Move to trash</strong> for all of them, and
+  File into… then files all of them. A selected card's right-click also offers
+  <strong>Importance</strong> under This Note, <strong>Merge into…</strong> and <strong>Move to
+  trash</strong> under Tidy for all of them, and
   in the Trash <strong>Restore</strong>; Ctrl+Z takes back the trash or the Merge of all of them at
   once.
 </p>
 <p>
-  On the card of an Unsorted Note, on the phone and on the desktop, Merge into… is called
-  <strong>Add to Note…</strong>: it merges the Note into the one picked, which it then shows as a
-  Section, the Notes added to last at the top.
-  On a filed Note's card and in the Note editor it stays Merge into….
+  On the card of an Unsorted Note, on the phone and on the desktop, <strong>Merge into…</strong>
+  merges the Note into the one picked, which it then shows as a Section, the Notes added to last at
+  the top; it has the same name as on a filed Note's card and in the Note editor.
 </p>
 <p>
   A Note opened from Unsorted, or on the phone from "Waiting to be sorted", moves on once it is
@@ -291,7 +291,7 @@
   bar then says how many are ticked and offers <strong>File into…</strong>, <strong>Merge
   into…</strong>, which merges all of them into the Note picked, a ticked one included,
   <strong>Importance</strong> and <strong>Move to trash</strong>, which asks nothing: the
-  announcement "Moved to the Trash" at the top brings all of them back with one tap. In the Trash it
+  announcement "Moved to the trash" at the top brings all of them back with one tap. In the Trash it
   offers <strong>Restore</strong>. The card's own File into… still files that Note alone. Back or
   <strong>Stop selecting</strong> ends the selection without changing anything.
 </p>
@@ -355,7 +355,7 @@
   <li><strong>Area and Topic</strong>: where the Note is filed, or Unsorted, or "Not filed" for a Note with a Routine or the like and no Area. A tap opens File into….</li>
   <li><strong>Captured</strong>: when the Note was captured; its editor also shows the place, the calendar event, the Bluetooth device and the app it was shared from, as far as they were recorded. Each of these but the time has <strong>Remove</strong> beside it, which asks once and then takes the detail off the Note on every Device; the time it was captured stays. Under its text, each Section shows its own in one small grey line, such as "12:40 · Home · Dentist", its time alone when it was captured the same day as the part before it; a tap on the line opens the same details, with the same Remove. In a Shared Area, the Note's author and the Area's Managers may remove them.</li>
   <li>Each <strong>Routine</strong> and <strong>Reminder</strong> of the Note with its schedule, such as "Every day · 08:00". A tap opens its editor.</li>
-  <li><strong>Frog</strong>, while the Note has an open Frog or one eaten today or yesterday: Open, Eaten today or Eaten yesterday. A tap offers <strong>Eat now</strong> while it is open and <strong>Remove the Frog</strong> (see <a href="lists-tallies-sessions-frogs.html#eat-a-frog">Eat a frog</a>).</li>
+  <li><strong>Frog</strong>, while the Note has an open Frog or one eaten today or yesterday: Open, Eaten today or Eaten yesterday. A tap offers <strong>Eat now</strong> while it is open and <strong>Move to trash</strong> (see <a href="lists-tallies-sessions-frogs.html#eat-a-frog">Eat a frog</a>).</li>
   <li><strong>Text format</strong>, for a Plain Note: <strong>Plain text</strong>, <strong>Formatted text</strong> or <strong>Code</strong>, as choice chips; a formatted text does not become plain again (see <a href="formatted-text-transcripts-photo-texts.html">Formatted text</a>).</li>
   <li><strong>Show on the Agenda</strong> of a Checklist without a Routine or Reminder, and of a Shopping List: Off, One row with the number of open Lines, or Each open Line on its own row, with radio buttons in its editor.</li>
   <li><strong>Show ticks</strong>, while the Note has a box: On or Off, with a switch in its editor.</li>
@@ -367,7 +367,7 @@
   not apply has no badge, and where you may not change a setting, as on another person's Note in a
   Shared Area, its badge only shows it. <strong>+</strong>, first under <strong>Add</strong>, is
   there where you may set things up; it offers <strong>Remind me…</strong>, <strong>Frog</strong>
-  and <strong>Session</strong>, as the alarm clock on the card does, in Simple only Remind me…,
+  and <strong>Session…</strong>, as the alarm clock on the card does, in Simple only Remind me…,
   no Frog while the Note has an open one, and no Session on a Session or a Code text. A screen reader reads each badge as its
   setting and value, such as "Importance: Important".
 </p>
@@ -375,10 +375,10 @@
   On the phone, the Note's actions follow at the end of the page in three more groups, as in the
   Note dialog on the desktop: <strong>Add</strong> with "+", <strong>Voice</strong>,
   <strong>Photo</strong>, <strong>Gallery</strong>, <strong>Paste</strong>, <strong>Attach a
-  file</strong> and <strong>Add a part</strong>; <strong>Share</strong> with <strong>Send to a
+  file…</strong> and <strong>Add a part</strong>; <strong>Share</strong> with <strong>Send to a
   person</strong>, <strong>Share to an app</strong> and <strong>Export as Pack…</strong>;
   <strong>Tidy</strong> with <strong>Merge into…</strong>, <strong>Add to a Shopping List</strong>
-  and <strong>Move to trash</strong>. Voice, Photo, Gallery, Paste and Attach a file show where the
+  and <strong>Move to trash</strong>. Voice, Photo, Gallery, Paste and Attach a file… show where the
   phone has them, and a group shows only what you may do with the Note. The top bar keeps
   <strong>Undo</strong>, <strong>Redo</strong>, <strong>Find in Note</strong>, the calendar,
   <strong>History</strong> and <strong>Revert all changes</strong>.
@@ -387,8 +387,8 @@
   In the Note dialog on the desktop, and in a Note's own window, the same three groups follow the
   Note's files, Sections and Linked from, side by side where the dialog is wide enough:
   <strong>Add</strong> with "+", <strong>Voice</strong>, <strong>Paste</strong>, <strong>Attach a
-  file…</strong> and <strong>Add a part</strong>; <strong>Share</strong> with <strong>Send…</strong>,
-  <strong>Copy as text</strong>, <strong>Save as Markdown…</strong> and <strong>Export as
+  file…</strong> and <strong>Add a part</strong>; <strong>Share</strong> with <strong>Send to a
+  person</strong>, <strong>Copy text</strong>, <strong>Save as Markdown…</strong> and <strong>Export as
   Pack…</strong>; <strong>Tidy</strong> with <strong>Merge into…</strong>, <strong>Add to a Shopping
   List</strong> and <strong>Move to trash</strong>. The desktop takes no photos; a picture comes in
   by Paste, Attach a file… or a drop.
@@ -403,16 +403,16 @@
 </p>
 <p>
   On the phone, <strong>Add a part</strong> under <strong>Add</strong> at the end of the page adds a
-  Section: it opens <strong>Add to Note</strong> with "What's new?", and <strong>Add</strong> puts
+  Section: it opens <strong>Add a part</strong> with "What's new?", and <strong>Add</strong> puts
   what was typed under the Note with its own time and place. The editor shows no field for it until
   then. A Note just made, in the editor opened by <strong>Open in the editor</strong> or by a list's
   "+", has no Add a part; it is there once the Note is opened again.
 </p>
 <p>
-  <strong>Copy text</strong>, under <strong>Share…</strong> in the ⋮ of a Note's card, puts the text of the Note and of each of its
+  <strong>Copy text</strong>, under <strong>Share</strong> in the ⋮ of a Note's card, puts the text of the Note and of each of its
   Sections on the clipboard, as they show, oldest first, with a blank line between them; a
   Checklist's or Shopping List's Lines come after its text as Markdown tasks. In the editor, a text that is only read, such as another person's Section, is selected with a long press;
-  the toolbar just above it offers <strong>Copy</strong> and <strong>Search</strong>.
+  the toolbar just above it offers <strong>Copy</strong> and <strong>Find in Note</strong>.
 </p>
 <p>
   On the phone, <strong>Undo</strong> and <strong>Redo</strong> come first in the editor's top bar.
@@ -433,8 +433,8 @@
 <p>
   On the desktop, a double-click on a card, its pencil or Edit in its ⋮ opens the Note dialog; a
   single click only selects the card. The dialog shows the same badges and the same Done at the
-  top. Esc, its cross or a click beside it close it and keep the text. <strong>Copy as text</strong>,
-  in the dialog and the card's ⋮, copies the Note's text, a list's Lines as Markdown tasks; text that is only read can
+  top. Esc, its cross or a click beside it close it and keep the text. <strong>Copy text</strong>,
+  in the dialog and under Share in the card's ⋮, copies the Note's text, a list's Lines as Markdown tasks; text that is only read can
   be selected and copied.
 </p>
 </box-more>

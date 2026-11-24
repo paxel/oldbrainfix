@@ -84,17 +84,16 @@ void main() {
 
   String photoOf(Note note) => note.photos.single;
 
-  testWidgets('the ⋮ offers Save, Copy and Share, each with its icon', (
-    tester,
-  ) async {
+  testWidgets('the ⋮ offers Save photo, Copy photo and Share to an app, '
+      'each with its icon', (tester) async {
     final hash = photoOf(notes.capture('receipt', photos: [onePixelPng]));
     await view(tester, hash);
     await tester.tap(find.byKey(const ValueKey('photo-menu')));
     await tester.pumpAndSettle();
     for (final (key, icon, label) in [
-      ('photo-save', Icons.download_outlined, 'Save'),
-      ('photo-copy', Icons.copy_outlined, 'Copy'),
-      ('photo-share', Icons.share_outlined, 'Share'),
+      ('photo-save', Icons.download_outlined, 'Save photo'),
+      ('photo-copy', Icons.copy_outlined, 'Copy photo'),
+      ('photo-share', Icons.share_outlined, 'Share to an app'),
     ]) {
       final item = find.byKey(ValueKey(key));
       expect(

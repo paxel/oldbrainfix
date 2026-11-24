@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'held_ticks.dart';
 import 'open_capture.dart';
 
@@ -263,6 +264,7 @@ void main() {
 
       // A Note without boxes has no Show ticks.
       await tap(tester, menuOf('No boxes'));
+      await openCardGroup(tester, 'note-show-ticks');
       expect(key('note-show-ticks'), findsNothing);
       await closeMenu(tester);
 
@@ -272,6 +274,7 @@ void main() {
       expect(find.textContaining('You, ', findRichText: true), findsNothing);
 
       await tap(tester, menuOf('Milk'));
+      await openCardGroup(tester, 'note-show-ticks');
       expect(find.text('Show ticks'), findsOneWidget);
       expect(
         tester
@@ -294,6 +297,7 @@ void main() {
       expect(store.localSetting(showTicksKey(other)), isNull);
 
       await tap(tester, menuOf('Milk'));
+      await openCardGroup(tester, 'note-show-ticks');
       expect(
         tester
             .widget<Switch>(

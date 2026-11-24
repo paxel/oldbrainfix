@@ -350,7 +350,11 @@ pub fn menu(ctx: &Context, t: &L10n) {
                 };
                 copy = entry(ui, t.menu_copy(), copies);
                 if open.region.searches {
-                    search = entry(ui, t.menu_search(), !words.is_empty());
+                    search = entry(
+                        ui,
+                        crate::text_menu::search_label(ctx, t),
+                        !words.is_empty(),
+                    );
                 }
                 all = entry(ui, t.menu_select_all(), true);
             });

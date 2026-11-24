@@ -1,5 +1,5 @@
 //! The viewer of a Markdown file (obf-1056): a file opened from the
-//! command line, with "Open with" or File ▸ Open Markdown file… shows in
+//! command line, with "Open with" or File ▸ Open ▸ Markdown file… shows in
 //! a window of its own as a Note's reading view shows its Note (#322,
 //! obf-1015): drawn as it reads, in a column in the middle, at the
 //! Device's text size. Nothing of it goes into the store or syncs; it is
@@ -400,6 +400,7 @@ impl Viewer {
                 let marks = self.find_row(ui, t, &mut asked);
                 let before = find_marks::set(&ctx, marks);
                 let searched = text_menu::searches(&ctx, true);
+                text_menu::finds_in_file(&ctx);
                 self.content(ui, t);
                 text_menu::searches(&ctx, searched);
                 find_marks::set(&ctx, before);
@@ -518,7 +519,7 @@ impl Viewer {
                     if entry(ui, t.menu_find(), readable) {
                         self.open_find(None);
                     }
-                    if entry(ui, t.desk_markdown_open_elsewhere(), true) {
+                    if entry(ui, t.open_in_other_app(), true) {
                         asked.push(Asked::OpenElsewhere(self.file.clone()));
                     }
                     if entry(ui, t.desk_markdown_import(), readable && !importing) {

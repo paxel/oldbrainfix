@@ -297,7 +297,7 @@ fn a_saved_reminder_and_a_new_session_offer_none() -> TestResult {
     harness.run();
     harness.get_by_label(CLOCK).click();
     harness.run();
-    click(&mut harness, "Session")?;
+    click(&mut harness, "Session…")?;
     assert!(harness.query_all_by_label("New Session").next().is_some());
     pick(&mut harness, "Once");
     assert!(chips(&harness).is_empty());

@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/tally_field_screen.dart';
 import 'package:oldbrainfix/src/tally_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'reveal.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -71,8 +72,14 @@ void main() {
     ) async {
       final note = notes.capture('Push-ups');
       await startAtNotes(tester);
+      // No Add entry on a Note that is no Tally.
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-add-entry');
       expect(key('note-add-entry'), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-tally');
       await tap(tester, key('note-make-tally'));
       expect(find.byType(TallyFieldScreen), findsOneWidget);
       expect(find.byType(BottomSheet), findsNothing);
@@ -102,7 +109,12 @@ void main() {
       expect(notes.unsorted(), isEmpty);
 
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-tally');
       expect(key('note-make-tally'), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      await cardMenu(tester);
+      await openCardGroup(tester, 'note-add-entry');
       expect(key('note-add-entry'), findsOneWidget);
     });
 
@@ -111,6 +123,7 @@ void main() {
       final note = notes.capture('Reading');
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-tally');
       await tap(tester, key('note-make-tally'));
       await enter(tester, key('tally-field-target'), 'lots');
       await tap(tester, key('tally-field-save'));
@@ -134,6 +147,7 @@ void main() {
       final note = notes.capture('Lifting');
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-tally');
       await tap(tester, key('note-make-tally'));
 
       // The unit is one field; the known units it may mean show under it
@@ -180,6 +194,7 @@ void main() {
       final note = notes.capture('Video');
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-tally');
       await tap(tester, key('note-make-tally'));
       await enter(tester, key('tally-field-name'), 'Watched');
 
@@ -209,6 +224,7 @@ void main() {
       final note = notes.capture('Running');
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-tally');
       await tap(tester, key('note-make-tally'));
       await enter(tester, key('tally-field-name'), 'Distance');
       await enter(tester, key('tally-unit-text'), 'mi');
@@ -476,6 +492,7 @@ void main() {
       final note = notes.capture('Kitchen');
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-tally');
       await tap(tester, key('note-make-tally'));
       await enter(tester, key('tally-field-name'), 'Wiped');
       await tap(tester, key('tally-field-kind-check'));
@@ -598,6 +615,7 @@ void main() {
       final weight = tallies.addField(note.id, name: 'Weight', unit: 'kg');
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-add-entry');
       await tap(tester, key('note-add-entry'));
       expect(find.byType(TallyEntryScreen), findsOneWidget);
       expect(
@@ -630,6 +648,7 @@ void main() {
       now = now.add(const Duration(minutes: 1));
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-add-entry');
       await tap(tester, key('note-add-entry'));
       TextEditingController field(String id) =>
           tester.widget<TextField>(key('tally-value-$id')).controller!;
@@ -657,6 +676,7 @@ void main() {
       final id = tallies.addField(note.id, name: 'Pages');
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-add-entry');
       await tap(tester, key('note-add-entry'));
       await tap(tester, key('tally-entry-save'));
       expect(find.text('Enter a value or a line of text.'), findsOneWidget);

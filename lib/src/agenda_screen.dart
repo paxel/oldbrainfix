@@ -18,7 +18,6 @@ import 'areas_screen.dart';
 import 'ask_screen.dart';
 import 'browser.dart';
 import 'all_routines_screen.dart';
-import 'calendar_platform.dart';
 import 'calendar_screen.dart';
 import 'card_glance.dart';
 import 'capture_fan.dart';
@@ -55,7 +54,7 @@ import 'tick_saves.dart';
 import 'unit_system.dart';
 
 /// What the menu of an Occurrence's row does.
-enum _RowChoice { schedule, history, share }
+enum _RowChoice { schedule, history }
 
 /// The home screen (CONTEXT.md): today's Occurrences, all-day first and
 /// then by time, a visible gap, and tomorrow's in dimmer colours, then
@@ -69,8 +68,8 @@ enum _RowChoice { schedule, history, share }
 /// of all Routines and Reminders and the Calendar page, makes a Routine
 /// without a Note, and has the Profile picture in its corner, the only
 /// way to Settings. Each
-/// row's ⋮, or a long press on it, shares its Routine or Reminder as a
-/// calendar file, and a Routine's leads to its history. A red
+/// row's ⋮, or a long press on it, answers it, opens its schedule, and a
+/// Routine's leads to its history. A red
 /// banner on top shows while alarms lack a permission, and leads to the
 /// setup. Below it the Missed Summary shows until "seen", and under it
 /// the "x Unsorted" banner while Notes are Unsorted, opening them, and
@@ -888,22 +887,20 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
 
   /// The ⋮ of an Occurrence's row, or a long press on it, opens a menu
   /// where the finger is: Snooze and Not today while it can be answered
-  /// (#269), Edit schedule, which opens its Routine (#270), a Routine's
-  /// history, and Share, which hands the Routine as its whole series, or
-  /// the Reminder, to another app as a calendar file. Edit schedule,
-  /// History and Share open a locked Area first, as a Masked row tells
+  /// (#269), Edit schedule, which opens its Routine (#270), and a
+  /// Routine's history; a calendar file is shared from the Routine's
+  /// editor (obf-1014). Edit schedule and History open a locked Area
+  /// first, as a Masked row tells
   /// nothing until then; Snooze and Not today answer it as its box does.
   void Function(Offset at) _rowMenu(AgendaRow row) {
     final history = !row.routine.isReminder;
-    final share = CalendarScope.of(context).available;
-    return (at) => _showRowMenu(row, at, history: history, share: share);
+    return (at) => _showRowMenu(row, at, history: history);
   }
 
   Future<void> _showRowMenu(
     AgendaRow row,
     Offset at, {
     required bool history,
-    required bool share,
   }) async {
     final t = context.t;
     final overlay =
@@ -941,7 +938,6 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
       if (answers.isNotEmpty) const PopupMenuDivider(),
       item(_RowChoice.schedule, Icons.edit_calendar_outlined, t.editSchedule),
       if (history) item(_RowChoice.history, Icons.history, t.historyTitle),
-      if (share) item(_RowChoice.share, Icons.share_outlined, t.share),
     ];
     if (items.isEmpty) return;
     final choice = await showMenu<Object>(
@@ -975,8 +971,6 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
         return;
       case _RowChoice.history:
         await openHistory(context, widget.notes, row.routine);
-      case _RowChoice.share:
-        await shareRoutinesFile(context, _routines, [row.routine]);
     }
     if (!mounted) return;
     _closeAreas();

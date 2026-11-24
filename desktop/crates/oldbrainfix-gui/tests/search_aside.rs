@@ -212,6 +212,9 @@ fn from_card_menu(harness: &mut Harness<'_, App>, label: &str, item: &str) -> Te
         .get_by_role_and_label(Role::Button, label)
         .click_secondary();
     harness.run();
+    // Under Tidy ▸ (obf-1014).
+    harness.get_by_label("Tidy ⏵").click();
+    harness.run();
     harness
         .query_all_by_label(item)
         .next_back()
@@ -252,7 +255,7 @@ fn add_to_note_searches_once_typing_stops() -> TestResult {
     let dir = tempfile::tempdir()?;
     let (shown_store, own) = stores(dir.path())?;
     let mut harness = all_notes(shown_store, move || own.clone());
-    from_card_menu(&mut harness, MILK, "Add to Note…")?;
+    from_card_menu(&mut harness, MILK, "Merge into…")?;
     searches_in_the_dialog(&mut harness, BIKE)
 }
 
@@ -301,7 +304,7 @@ fn ctrl_enter_in_add_to_note_adds_to_what_is_typed_before_its_search_is_in() -> 
     let (shown_store, own) = stores(dir.path())?;
     let (gate, open) = Gate::opener(own);
     let mut harness = all_notes(shown_store.clone(), open);
-    from_card_menu(&mut harness, MILK, "Add to Note…")?;
+    from_card_menu(&mut harness, MILK, "Merge into…")?;
     // "Fix the bike", the newer, offered first.
     picks_what_is_typed_at_once(&mut harness, &gate, "tea");
     assert_eq!(sections_of(&shown_store, MINT)?, [MILK]);

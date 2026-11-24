@@ -46,6 +46,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, removing a recording or photo but keeping its words puts them into the Note's text, to edit or delete. ([obf-1084](https://github.com/paxel/oldbrainfix/issues/397))
 - On the phone and the desktop, the most used tags sit as chips under the search, ending in All tags… for the whole tree. ([obf-1074](https://github.com/paxel/oldbrainfix/issues/387))
 - On the phone and the desktop, buttons, chips and header bands follow one design: outlined buttons are tonal, deleting is red, chips are pills. ([obf-1081](https://github.com/paxel/oldbrainfix/issues/394))
+- Actions have one name in both apps; the menus of a card, an Area, a table column, File and View are grouped into short submenus. ([obf-1014](https://github.com/paxel/oldbrainfix/issues/321))
 
 ### Fixed
 

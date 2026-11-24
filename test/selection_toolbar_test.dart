@@ -15,9 +15,9 @@ import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// The toolbar above a selection on the phone (obf-1055): Copy, Paste and
-/// Search in place of the system's menu, in reading and in editing; only
+/// Find in Note in place of the system's menu, in reading and in editing; only
 /// Paste on an empty spot of a field, never Paste where nothing can be
-/// pasted; Search opens the Note's find bar with the words selected, and
+/// pasted; Find in Note opens the Note's find bar with the words selected, and
 /// the find bar's "Search all Notes" the search over every Note.
 void main() {
   /// The clipboard holds [held]; what is copied goes into [copied].
@@ -98,26 +98,29 @@ void main() {
     }
 
     for (final twoRows in [true, false]) {
-      testWidgets('a word selected offers Copy, Paste, Search and Delete, '
-          'no Cut or Select all (two rows: $twoRows)', (tester) async {
-        clipboard(tester, held: 'pasted');
-        final searched = <String>[];
-        await pumpField(
-          tester,
-          text: 'buy oat milk',
-          twoRows: twoRows,
-          searched: searched,
-        );
+      testWidgets(
+        'a word selected offers Copy, Paste, Find in Note and Delete, '
+        'no Cut or Select all (two rows: $twoRows)',
+        (tester) async {
+          clipboard(tester, held: 'pasted');
+          final searched = <String>[];
+          await pumpField(
+            tester,
+            text: 'buy oat milk',
+            twoRows: twoRows,
+            searched: searched,
+          );
 
-        await tester.longPressAt(caretAt(tester, 5));
-        await tester.pumpAndSettle();
-        expect(toolbar(tester), ['Copy', 'Paste', 'Search', 'Delete']);
+          await tester.longPressAt(caretAt(tester, 5));
+          await tester.pumpAndSettle();
+          expect(toolbar(tester), ['Copy', 'Paste', 'Find in Note', 'Delete']);
 
-        await tester.tap(find.text('Search'));
-        await tester.pumpAndSettle();
-        expect(searched, ['oat']);
-        expect(find.text('Copy'), findsNothing, reason: 'the toolbar closed');
-      });
+          await tester.tap(find.text('Find in Note'));
+          await tester.pumpAndSettle();
+          expect(searched, ['oat']);
+          expect(find.text('Copy'), findsNothing, reason: 'the toolbar closed');
+        },
+      );
     }
 
     testWidgets('a long press on an empty spot offers only Paste', (
@@ -175,7 +178,7 @@ void main() {
       expect(toolbar(tester), isEmpty);
     });
 
-    testWidgets('a text only read offers Copy and Search, never Paste', (
+    testWidgets('a text only read offers Copy and Find in Note, never Paste', (
       tester,
     ) async {
       final copied = <String?>[];
@@ -184,13 +187,13 @@ void main() {
 
       await tester.longPressAt(caretAt(tester, 9));
       await tester.pumpAndSettle();
-      expect(toolbar(tester), ['Copy', 'Search']);
+      expect(toolbar(tester), ['Copy', 'Find in Note']);
       await tester.tap(find.text('Copy'));
       await tester.pumpAndSettle();
       expect(copied, ['milk']);
     });
 
-    testWidgets('Search finds the words as they read, without marks or a '
+    testWidgets('Find in Note finds the words as they read, without marks or a '
         "box's id", (tester) async {
       clipboard(tester);
       final searched = <String>[];
@@ -207,7 +210,7 @@ void main() {
       );
       tester.state<EditableTextState>(find.byType(EditableText)).showToolbar();
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Search'));
+      await tester.tap(find.text('Find in Note'));
       await tester.pumpAndSettle();
       expect(searched, ['hello there']);
     });
@@ -268,7 +271,7 @@ void main() {
         tester.widget<Text>(find.byKey(const ValueKey('find-count'))).data ??
         '';
 
-    testWidgets('Search opens the find bar with the word selected, whose '
+    testWidgets('Find in Note opens the find bar with the word selected, whose '
         '"Search all Notes" opens the search over every Note', (tester) async {
       clipboard(tester);
       final note = notes.capture('Boiler service\ncheck the boiler');
@@ -278,8 +281,27 @@ void main() {
 
       await tester.longPressAt(caretAt(tester, 2));
       await tester.pumpAndSettle();
-      expect(toolbar(tester), ['Copy', 'Search', 'Delete']);
-      await tester.tap(find.text('Search'));
+      expect(toolbar(tester).take(2), ['Copy', 'Find in Note']);
+      // Delete, past the toolbar's width, waits under its own ⋮.
+      final overflow = find.descendant(
+        of: find.byType(TextSelectionToolbar),
+        matching: find.byType(IconButton),
+      );
+      final delete = find.descendant(
+        of: find.byType(TextSelectionToolbar),
+        matching: find.text('Delete'),
+      );
+      if (!toolbar(tester).contains('Delete')) {
+        await tester.tap(overflow);
+        await tester.pumpAndSettle();
+        expect(delete, findsOneWidget);
+        // Its back arrow shows the first ones again.
+        await tester.tap(overflow);
+        await tester.pumpAndSettle();
+      } else {
+        expect(delete, findsOneWidget);
+      }
+      await tester.tap(find.text('Find in Note'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('find-bar')), findsOneWidget);
       expect(

@@ -122,7 +122,14 @@ void main() {
     await addAPart(tester);
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text("What's new?"), findsOneWidget);
-    expect(find.text('Add to Note'), findsOneWidget);
+    // Titled as the action that opened it (obf-1014).
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Add a part'),
+      ),
+      findsOneWidget,
+    );
     // Cancel adds nothing.
     await tap(tester, find.text('Cancel'));
     expect(notes.sections(id), isEmpty);

@@ -258,7 +258,10 @@ fn file_menu_opens_a_markdown_file_picked() -> TestResult {
         .set_markdown_picker(Box::new(move |_| Some(picked.clone())));
     harness.get_by_label("File").click();
     harness.run();
-    harness.get_by_label("Open Markdown file…").click();
+    // Under Open ▸ (obf-1014).
+    harness.get_by_label("Open ⏵").click();
+    harness.run();
+    harness.get_by_label("Markdown file…").click();
     settle(&mut harness, loaded);
     assert!(shows(&harness, "Mind the frost"));
     Ok(())

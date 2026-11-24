@@ -309,16 +309,16 @@ pub enum Viewed {
 /// How a photo is handed out of a Note (#149).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Out {
-    /// "Save image as…": its file where the user says.
+    /// "Save photo…": its file where the user says.
     SaveAs,
-    /// "Copy image": the picture on the clipboard.
+    /// "Copy photo": the picture on the clipboard.
     Copy,
-    /// "Open in another program": the system's program for pictures.
+    /// "Open in another app": the system's program for pictures.
     Open,
 }
 
-/// The right-click menu of the photo `resp`: "Save image as…", "Copy
-/// image" and "Open in another program" (#149). The one picked comes
+/// The right-click menu of the photo `resp`: "Save photo…", "Copy
+/// photo" and "Open in another app" (#149, obf-1014). The one picked comes
 /// back; the menu closes on it, also when picked with the keyboard.
 fn out_menu(resp: &egui::Response, t: &L10n) -> Option<Out> {
     let mut asked = None;
@@ -326,8 +326,8 @@ fn out_menu(resp: &egui::Response, t: &L10n) -> Option<Out> {
         let text = ui.visuals().text_color();
         for (out, label) in [
             (Out::SaveAs, t.save_image_as()),
-            (Out::Copy, t.copy_image()),
-            (Out::Open, t.open_in_another_program()),
+            (Out::Copy, t.copy_photo()),
+            (Out::Open, t.open_in_other_app()),
         ] {
             if ui.button(RichText::new(label).color(text)).clicked() {
                 asked = Some(out);

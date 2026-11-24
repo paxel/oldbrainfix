@@ -185,7 +185,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.add));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Topic'));
+      await tester.tap(find.text('New Topic'));
       await tester.pumpAndSettle();
       await typeName(tester, 'Model trains', 'Create');
       expect(find.text('Model trains'), findsOneWidget);

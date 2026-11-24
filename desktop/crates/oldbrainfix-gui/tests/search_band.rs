@@ -193,6 +193,8 @@ fn merge_intos_notes_scroll_under_its_searchs_line() -> TestResult {
         .get_by_role_and_label(Role::Button, SAUCE)
         .click_secondary();
     harness.run();
+    harness.get_by_label("Tidy ⏵").click();
+    harness.run();
     press(&mut harness, "Merge into…")?;
     let t = *harness.state().t();
     on_the_band(&harness, t.search_all_hint(), PASTA);
@@ -210,7 +212,10 @@ fn add_to_notes_notes_scroll_under_its_searchs_line() -> TestResult {
         .get_by_role_and_label(Role::Button, MILK)
         .click_secondary();
     harness.run();
-    press(&mut harness, "Add to Note…")?;
+    // An Unsorted Note's Merge into… picks as Add to Note does (#308).
+    harness.get_by_label("Tidy ⏵").click();
+    harness.run();
+    press(&mut harness, "Merge into…")?;
     harness.run_steps(20);
     let t = *harness.state().t();
     on_the_band(&harness, t.search_all_hint(), SAUCE);

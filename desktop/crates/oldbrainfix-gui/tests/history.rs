@@ -163,7 +163,7 @@ fn a_reminder_has_no_history_in_its_menu() -> TestResult {
     let mut harness = window(App::new(store, "en"));
     harness.get_by_label("More for Dentist").click();
     harness.run();
-    assert!(harness.query_by_label("Share").is_some());
+    assert!(harness.query_by_label("Edit schedule").is_some());
     assert!(harness.query_by_label("History").is_none());
     Ok(())
 }

@@ -212,7 +212,7 @@ void main() {
       for (final spawn in ['remind', 'frog', 'session']) {
         expect(key('spawn-$spawn'), findsOneWidget, reason: spawn);
       }
-      for (final words in ['Remind me…', 'Frog', 'Session']) {
+      for (final words in ['Remind me…', 'Frog', 'Session…']) {
         expect(find.text(words), findsOneWidget, reason: words);
       }
       await tap(tester, key('spawn-remind'));
@@ -608,7 +608,7 @@ void main() {
     expect(find.bySemanticsLabel('Art: Checkliste'), findsOneWidget);
     semantics.dispose();
     await tap(tester, key('badge-add'));
-    for (final words in ['Erinnere mich …', 'Frosch', 'Einheit']) {
+    for (final words in ['Erinnere mich …', 'Frosch', 'Einheit …']) {
       expect(find.text(words), findsOneWidget, reason: words);
     }
     expect(tester.takeException(), isNull);

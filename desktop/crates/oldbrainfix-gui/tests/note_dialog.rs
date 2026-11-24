@@ -436,7 +436,8 @@ fn plus_badge_offers_remind_me_frog_and_session() -> TestResult {
         .get_by_label("Routine, Reminder, Frog or Session")
         .click();
     harness.run();
-    for label in ["Remind me…", "Frog", "Session"] {
+    // Session… as in every spawn menu (obf-1014, C11).
+    for label in ["Remind me…", "Frog", "Session…"] {
         assert!(shows(&harness, label), "{label}");
     }
     click(&mut harness, "Frog");
@@ -478,7 +479,8 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
     let mut harness = window(&store, Selection::Place(household.clone()));
     harness.get_by_label("Add here").click();
     harness.run();
-    for label in kinds.iter().chain(&["Topic"]) {
+    // New Topic, as everywhere (obf-1014, C12).
+    for label in kinds.iter().chain(&["New Topic"]) {
         assert!(shows(&harness, label), "{label}");
     }
     let mut harness = window(&store, Selection::All);
@@ -487,7 +489,7 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
     for label in kinds {
         assert!(shows(&harness, label), "{label}");
     }
-    assert!(!shows(&harness, "Topic"));
+    assert!(!shows(&harness, "New Topic"));
     // Note opens the quick note, filed where the list is.
     let mut harness = window(&store, Selection::Place(household.clone()));
     harness.get_by_label("Add here").click();
@@ -522,7 +524,7 @@ fn in_simple_plus_offers_note_checklist_and_shopping_list_and_a_tally_stays() ->
     for label in ["Note", "Checklist", "Shopping List"] {
         assert!(shows(&harness, label), "{label}");
     }
-    for label in ["Tally", "Session", "Frog", "Topic"] {
+    for label in ["Tally", "Session", "Frog", "New Topic"] {
         assert!(!shows(&harness, label), "{label}");
     }
     Ok(())
@@ -826,7 +828,8 @@ fn the_amend_box_shows_only_once_add_a_part_opens_it() -> TestResult {
     let focused = harness.get_by(|n| n.is_focused());
     assert_eq!(focused.accesskit_node().placeholder(), Some("What's new?"));
     typed(&mut harness, "Washer bought");
-    click(&mut harness, "Add to Note");
+    // The box confirms with Add (obf-1014, C1).
+    click(&mut harness, "Add");
     let sections = Notes::new(&store).sections(&tap)?;
     assert_eq!(sections.len(), 1);
     assert_eq!(sections[0].text, "Washer bought");
@@ -1208,8 +1211,8 @@ fn assert_grouped(harness: &Harness<'_, App>) {
         ("Routine, Reminder, Frog or Session", "Add"),
         ("Attach a file…", "Add"),
         ("Add a part", "Add"),
-        ("Send…", "Share"),
-        ("Copy as text", "Share"),
+        ("Send to a person", "Share"),
+        ("Copy text", "Share"),
         ("Save as Markdown…", "Share"),
         ("Export as Pack…", "Share"),
         ("Merge into…", "Tidy"),
@@ -1298,7 +1301,7 @@ fn a_group_with_nothing_this_device_may_do_shows_nothing() -> TestResult {
     harness.run();
     assert_eq!(heading_names(&harness), ["This Note"]);
     assert!(shows(&harness, "Restore"));
-    assert!(!shows(&harness, "Copy as text"));
+    assert!(!shows(&harness, "Copy text"));
     Ok(())
 }
 

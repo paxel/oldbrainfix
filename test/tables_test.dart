@@ -15,6 +15,7 @@ import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
+import 'table_menu.dart';
 
 /// Tables in formatted text (#128, ADR 0033): drawn at the text's size
 /// in the text, long cells wrapping, moving sideways when wider than
@@ -625,6 +626,32 @@ void main() {
       expect(table.rows[0].visible, 'Item Qty Shop');
     });
 
+    testWidgets('a column\'s menu groups its entries: Insert, Move, Delete '
+        'column, Show sorted and First column as headings (obf-1014)', (
+      tester,
+    ) async {
+      await open(tester, shop, edits: true);
+      await tester.longPress(key('column-0'));
+      await tester.pumpAndSettle();
+      for (final entry in [
+        'table-group-insert',
+        'table-group-move',
+        'table-delete',
+        'table-group-sorted',
+        'table-headings',
+      ]) {
+        expect(key(entry), findsOneWidget, reason: entry);
+      }
+      expect(key('table-before'), findsNothing);
+      expect(key('table-sortUp'), findsNothing);
+      await tester.tap(key('table-group-sorted'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show sorted ascending'), findsOneWidget);
+      expect(find.text('Show sorted descending'), findsOneWidget);
+      // Nothing is sorted yet.
+      expect(find.text('Show as written'), findsNothing);
+    });
+
     testWidgets('a row\'s and a column\'s heading open their menu', (
       tester,
     ) async {
@@ -634,6 +661,7 @@ void main() {
 
       await tester.longPress(key('row-2'));
       await tester.pumpAndSettle();
+      await openTableGroup(tester, 'table-before');
       await tester.tap(key('table-before'));
       await tester.pumpAndSettle();
       expect(
@@ -643,6 +671,7 @@ void main() {
 
       await tester.longPress(key('row-3'));
       await tester.pumpAndSettle();
+      await openTableGroup(tester, 'table-back');
       await tester.tap(key('table-back'));
       await tester.pumpAndSettle();
       expect(last().rows[2].visible, 'oat 1');
@@ -656,6 +685,7 @@ void main() {
 
       await tester.longPress(key('column-1'));
       await tester.pumpAndSettle();
+      await openTableGroup(tester, 'table-back');
       await tester.tap(key('table-back'));
       await tester.pumpAndSettle();
       expect(last().rows[0].visible, 'Qty Item');
@@ -672,6 +702,7 @@ void main() {
       await tester.longPress(key('column-1'));
       await tester.pumpAndSettle();
       expect(key('table-headings'), findsNothing);
+      await openTableGroup(tester, 'table-after');
       await tester.tap(key('table-after'));
       await tester.pumpAndSettle();
       expect(last().columns, 3);
@@ -809,6 +840,7 @@ void main() {
       List<int> rows() => order(tester, [1, 2, 3], (r) => 'table-row-$r');
       await tester.tap(key('column-1'));
       await tester.pumpAndSettle();
+      await openTableGroup(tester, 'table-sortDown');
       expect(key('table-asWritten'), findsNothing);
       await tester.tap(key('table-sortDown'));
       await tester.pumpAndSettle();
@@ -827,6 +859,7 @@ void main() {
 
       await tester.tap(key('column-1'));
       await tester.pumpAndSettle();
+      await openTableGroup(tester, 'table-asWritten');
       expect(key('table-sortDown'), findsNothing);
       await tester.tap(key('table-asWritten'));
       await tester.pumpAndSettle();
@@ -840,11 +873,13 @@ void main() {
       List<int> rows() => order(tester, [1, 2, 3], (r) => 'table-row-$r');
       await tester.tap(key('column-1'));
       await tester.pumpAndSettle();
+      await openTableGroup(tester, 'table-sortUp');
       await tester.tap(key('table-sortUp'));
       await tester.pumpAndSettle();
       expect(rows(), [3, 1, 2]);
       await tester.tap(key('column-1'));
       await tester.pumpAndSettle();
+      await openTableGroup(tester, 'table-back');
       await tester.tap(key('table-back'));
       await tester.pumpAndSettle();
       expect(written, hasLength(1));

@@ -44,12 +44,12 @@
   formats and a formatted text shows formatted.
 </p>
 <p>
-  On the phone, the format bar sits on the keyboard while the Note editor or Add to Note has it
+  On the phone, the format bar sits on the keyboard while the Note editor or Add a part has it
   open; the quick note has none, and its <strong>Open in the editor</strong> opens the Note editor. Its buttons,
   in this order:
 </p>
 <ul>
-  <li>☐: <strong>Put in ☐</strong> at the cursor (in the Note editor and in a table's cell; not in Add to Note; see "Tick a box in the text").</li>
+  <li>☐: <strong>Put in ☐</strong> at the cursor (in the Note editor and in a table's cell; not in Add a part; see "Tick a box in the text").</li>
   <li><strong>Bold</strong>, <strong>Italic</strong>, <strong>Strike through</strong> and <strong>Code</strong>.</li>
   <li><strong>H1</strong> and <strong>H2</strong>: <strong>Large heading</strong> and <strong>Small heading</strong>.</li>
   <li><strong>Bulleted list</strong>, <strong>Numbered list</strong> and <strong>Quote</strong>.</li>
@@ -229,11 +229,11 @@
   <li>A tap or click on a cell edits it in place. Tab and Shift+Tab go to the next and the previous cell row by row, ↵ to the cell below, and the arrow keys at a cell's edge to the cell beside it. Past the first or the last cell the cursor goes into the text before or after the table, and the arrow keys (on the phone also ◀ and ▶) go from the text into it.</li>
   <li>While a cell is edited, the format bar holds ☐, bold, italic, strike-through, link and code for its words. A cell holds one line.</li>
   <li><strong>+</strong> under the last row and beside the last column adds a row or a column.</li>
-  <li>A tap or click on a row's number opens <strong>Insert a row above</strong>, <strong>Insert a row below</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete row</strong>; a column's letter opens <strong>Insert a column to the left</strong>, <strong>Insert a column to the right</strong>, <strong>Move left</strong>, <strong>Move right</strong>, <strong>Delete column</strong>, <strong>Align left</strong>, <strong>Centre</strong> and <strong>Align right</strong>, and for column A the switch <strong>First column as headings</strong>.</li>
+  <li>A tap or click on a row's number opens <strong>Insert a row above</strong>, <strong>Insert a row below</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete row</strong>; a column's letter opens <strong>Insert</strong> ▸ (<strong>Insert a column to the left</strong>, <strong>Insert a column to the right</strong>), <strong>Move</strong> ▸ (<strong>Move left</strong>, <strong>Move right</strong>), <strong>Align</strong> ▸ (<strong>Align left</strong>, <strong>Centre</strong>, <strong>Align right</strong>), <strong>Sort rows</strong> ▸, <strong>Delete column</strong>, and for column A the switch <strong>First column as headings</strong>.</li>
   <li>Deleting a row or column that holds words asks once, "Delete this row?" or "Delete this column?": "The words in its cells are deleted from the Note." Deleting the last row or column deletes the table, and asks "Delete the table?".</li>
   <li><strong>Show as lines</strong> shows the table's Markdown lines to edit them as text; <strong>Show as table</strong>, the cursor leaving the lines or leaving the field shows the table again.</li>
   <li>On the phone, ⋮ at the table's top right corner holds <strong>Copy</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete table</strong>. Moving takes the whole table past the block of text above or below it: a paragraph, a list, a quote, a heading, a code block or another table. Deleting a table that holds words asks "Delete the table?" first. <strong>Undo</strong> takes each of them back.</li>
-  <li>A column's letter also offers <strong>Sort rows by this column</strong> and <strong>Sort rows by this column, descending</strong>, which put the rows under the header in that order in the Note's text. A column of numbers, also with a unit or a currency sign such as "12,50 €", sorts by number, one of dates by date, any other alphabetically, case and umlauts not counted; empty cells go last. <strong>Undo</strong> takes it back; rows already in that order change nothing.</li>
+  <li><strong>Sort rows</strong> ▸ under a column's letter offers <strong>Sort rows by this column</strong> and <strong>Sort rows by this column, descending</strong>, which put the rows under the header in that order in the Note's text. A column of numbers, also with a unit or a currency sign such as "12,50 €", sorts by number, one of dates by date, any other alphabetically, case and umlauts not counted; empty cells go last. <strong>Undo</strong> takes it back; rows already in that order change nothing.</li>
   <li>On the desktop, ⋮ at the table's top right corner in the Note dialog and a Note's own window holds the same <strong>Copy</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete table</strong>, also while the text is only shown there. <strong>Undo</strong> in the dialog's bar takes each of them back.</li>
 </ul>
 <p>
@@ -272,7 +272,7 @@
   as written again, an arrow in that cell showing which. It opens neither the table nor the
   Note, the Note's text stays as written, and the order is forgotten on leaving; a card then shows
   the first 10 rows in that order. Full screen where the table is edited, a tap or click on a cell of the header
-  row edits it, and the column's letter offers <strong>Show sorted ascending</strong>,
+  row edits it, and the column's letter offers under <strong>Show sorted</strong> ▸ <strong>Show sorted ascending</strong>,
   <strong>Show sorted descending</strong> and <strong>Show as written</strong> instead; putting in, moving or deleting a row or column there
   shows the rows as written again. On the desktop
   ⋮ beside a table's top right corner offers <strong>Copy</strong> on a card, in a Section, in the
@@ -284,7 +284,7 @@
   editor's table and full screen, but not on a card. Dragging on without lifting the finger selects
   every cell from there to the one under the finger. <strong>Copy</strong> above the cells puts
   them on the clipboard as a table of their own, the first row as its header row, also a single
-  cell; for one cell <strong>Search</strong> finds its words in the Note. A tap ends the selection.
+  cell; for one cell <strong>Find in Note</strong> finds its words in the Note. A tap ends the selection.
   A selection that starts in the text before a table runs through its cells and copies as text.
 </p>
 <p>
@@ -293,7 +293,7 @@
   table and full screen, but not on a card; Shift+click selects from the cell selected first to the
   one clicked. Ctrl+C (Cmd+C on macOS) or <strong>Copy</strong> in the right-click menu puts the
   cells on the clipboard as a table of their own, in the same way; for one cell
-  <strong>Search</strong> there finds its words in the Note. A click on the table or Esc ends the
+  <strong>Find in Note</strong> there finds its words in the Note. A click on the table or Esc ends the
   selection and does nothing else; a click beside it ends it too. A drag that starts in the text
   before a table selects its words as text.
 </p>
@@ -332,10 +332,10 @@
   <li>☐ in the format bar puts ☐ in at the cursor, also in the middle of a word.</li>
   <li>In a formatted text, a list item written as a Markdown task, such as <code>- [ ] milk</code> or <code>1. [x] bread</code>, becomes a box: <code>[ ]</code> becomes ☐ and <code>[x]</code> or <code>[X]</code> becomes ✅. This happens as the space after <code>]</code> is typed, when such a list is pasted, and when a Markdown file is imported. In code, a code block, a Code text or a plain text it stays as written.</li>
   <li>Each box carries an id that is never seen. The cursor steps over a box as one character; deleting the box's character deletes the box.</li>
-  <li><strong>Show ticks</strong>, in the ⋮ of the Note's card and as a badge in the Note editor while the Note or a Section holds a box, shows after each ticked box, small and grey, who ticked it last and when, such as "Ann, Tue 14:02", or "You" for your own ticks; an older tick shows its date. It is kept for that Note on that Device.</li>
+  <li><strong>Show ticks</strong>, under This Note in the ⋮ of the Note's card and as a badge in the Note editor while the Note or a Section holds a box, shows after each ticked box, small and grey, who ticked it last and when, such as "Ann, Tue 14:02", or "You" for your own ticks; an older tick shows its date. It is kept for that Note on that Device.</li>
   <li>Once a box has been ticked, its menu also has <strong>History</strong>: every change, the oldest first, with its state, who made it and when.</li>
   <li>In a Shared Area everyone with a role there ticks every box of every Note and Section. Adding, moving and deleting boxes is an edit of the text, which stays with the Note's author and the Managers. A Note in the Trash is not ticked; where you may not tick, the menu of a box ticked before holds only History.</li>
-  <li>Copies, shares, Markdown files and Sent Items show each box in its state now. Copy as text, Share and Save as Markdown write a list item of a formatted text that starts with a box as a Markdown task, so other Markdown apps show a checkbox: ☐ as <code>- [ ]</code>, ✅ as <code>- [x]</code>, and ❌ as <code>- [x]</code> with the rest of the item struck through. The formatted copy beside it shows the boxes as they are.</li>
+  <li>Copies, shares, Markdown files and Sent Items show each box in its state now. Copy text, Share and Save as Markdown write a list item of a formatted text that starts with a box as a Markdown task, so other Markdown apps show a checkbox: ☐ as <code>- [ ]</code>, ✅ as <code>- [x]</code>, and ❌ as <code>- [x]</code> with the rest of the item struck through. The formatted copy beside it shows the boxes as they are.</li>
 </ul>
 <p>
   On the desktop a click on a box opens its menu under it, also in the field being edited: ☐
@@ -497,7 +497,7 @@
 </box-tab>
 <box-tab device="desktop" alt="The Note dialog of a bakery's receipt with its photo and the Photo Text under it, line by line">
 <li>Press Ctrl+N, or click <strong>File ▸ New Note</strong>.</li>
-<li>Press Ctrl+V, or click <strong>File ▸ Attach a file…</strong>, for the photo.</li>
+<li>Press Ctrl+V, or drag the photo onto the window.</li>
 <li>Click <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 <li>Double-click the Note's card.</li>
 <li>Read the Photo Text under the photo.</li>
@@ -545,7 +545,7 @@
   Any file can be attached: a PDF, a Word document, a spreadsheet, a <code>.zip</code>. It is kept
   as it is, with its name, type and size, on all your Devices and with everyone you share the Note's
   Area with. Besides <strong>File</strong> in Capture and in the fan of <strong>+</strong>, a file
-  comes in by sharing it from another app to Old Brain Fix, and by <strong>Attach a file</strong>
+  comes in by sharing it from another app to Old Brain Fix, and by <strong>Attach a file…</strong>
   under Add at the end of the Note editor. A file larger than 256 MB is not attached, and the app says so at the
   top. A Note made from one file alone shows the file as its card and goes by its name, also in
   alarms. A tap on a PDF shows it in the app; a tap on any other file opens it with the app of the
@@ -577,12 +577,12 @@
   text</strong> take its text in, <strong>Remove generated text</strong> removes the text (the
   announcement at the top brings it back), <strong>Read the text again</strong> reads it anew, and
   <strong>Remove Attachment, keep text</strong> asks once and removes the file from all your Devices
-  while its text stays. The card's ⋮ offers the last too.
+  while its text stays. The card's ⋮ offers the last too, under Tidy.
 </p>
 <p>
   On the desktop, a file dropped onto the window waits in the quick note and is saved with what is
-  typed as one Note; dropped onto the Note dialog, it goes onto that Note. <strong>File</strong> ▸
-  <strong>Attach a file…</strong>, and <strong>Attach a file…</strong> under Add in the Note dialog pick files in the system's dialog. A click on a file
+  typed as one Note; dropped onto the Note dialog, it goes onto that Note. <strong>Attach a
+  file…</strong> under Add in the Note dialog and in a card's ⋮ ▸ Add picks files in the system's dialog. A click on a file
   opens a copy of it with the program the computer has for its kind; one that has not synced to the
   computer yet, or that no program opens, is said at the top. A file that could run a program, such
   as an <code>.exe</code>, a script or a shortcut, asks "Open it anyway?" first, naming who added it
@@ -668,7 +668,7 @@
 </ul>
 <p>
   <strong>Remove recording, keep text</strong> and <strong>Remove photo, keep text</strong>, in the
-  editor and in the card's ⋮, do the opposite for a recording or photo that has a text: they ask
+  editor and under Tidy in the card's ⋮, do the opposite for a recording or photo that has a text: they ask
   once ("Remove this recording and keep its words in the text?" or "Remove this photo and keep its
   words in the text?"), then the file goes from all your Devices and from everyone you share the Note's Area
   with. Its text goes into the Note's text as a paragraph of its own, after a blank line, or
@@ -724,7 +724,7 @@
 <p>
   Words selected in a Note with a long press show a small toolbar just above them:
   <strong>Copy</strong>, <strong>Paste</strong> where the text may be changed and something was
-  copied, and <strong>Search</strong>, which opens the find bar with those words. A long press on
+  copied, and <strong>Find in Note</strong>, which opens the find bar with those words. A long press on
   an empty spot of the text shows only Paste. <strong>Search all Notes</strong> in the find bar,
   between ↓ and ✕, searches every Note for its words; back returns to the Note.
 </p>
@@ -732,7 +732,7 @@
   On the desktop the search field sits above the list of Notes: "Search all Notes" on All Notes,
   "Search Unsorted" on Unsorted, "Search this Area" on an Area, "Search this Topic" on a Topic and
   "Search the Trash" in the Trash, which also finds its Routines, Reminders and Frogs by their
-  Note; the Agenda has none. Ctrl+F, or <strong>Edit ▸ Find</strong>, puts the cursor into it, into
+  Note; the Agenda has none. Ctrl+F, or <strong>Edit ▸ Search</strong>, puts the cursor into it, into
   All Notes' where the list shown has none. Down in the field goes to the first card found.
 </p>
 <p>
@@ -745,8 +745,8 @@
   words editable there, <strong>Search all Notes</strong>, which searches All Notes for the words
   in the main window, closing the Note dialog, and ✕ to close it; Esc closes it before the Note, and leaving the Note
   closes it too. With a Note open in the Note dialog or in a window of its own, its reading view
-  included, Ctrl+F or <strong>Edit ▸ Find</strong> opens the find bar without a search, or puts the
-  cursor back into it; a right-click on words selected in the Note, then <strong>Search</strong>,
+  included, Ctrl+F or <strong>Edit ▸ Find in Note</strong> opens the find bar without a search, or puts the
+  cursor back into it; a right-click on words selected in the Note, then <strong>Find in Note</strong>,
   opens it with those words.
 </p>
 </box-more>

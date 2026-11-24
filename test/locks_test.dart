@@ -605,23 +605,27 @@ void main() {
       expect(find.text('Pills'), findsOneWidget);
     });
 
-    testWidgets('asks for the PIN before a Masked row shares its file', (
-      tester,
-    ) async {
+    testWidgets("asks for the PIN before a Masked row's History opens; "
+        'the row shares no calendar file (obf-1014)', (tester) async {
       final (:routine, doctor: _, note: _) = lockedDoctor();
       await start(tester);
 
       await tap(tester, find.byKey(ValueKey('row-menu-${routine.id}')).first);
-      await tap(tester, find.text(en.share));
+      expect(find.text(en.share), findsNothing);
+      await tap(tester, find.byKey(const ValueKey('row-history')));
       expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
       await tap(tester, find.widgetWithText(TextButton, en.cancel));
-      expect(calendar.shared, isEmpty, reason: 'the title stays hidden');
+      expect(
+        find.text('Pills'),
+        findsNothing,
+        reason: 'the title stays hidden',
+      );
 
       await tap(tester, find.byKey(ValueKey('row-menu-${routine.id}')).first);
-      await tap(tester, find.text(en.share));
+      await tap(tester, find.byKey(const ValueKey('row-history')));
       await enterPin(tester, pin);
-      final (_, ics) = calendar.shared.single;
-      expect(ics, contains('SUMMARY:Pills'));
+      expect(find.byKey(const ValueKey('pinField')), findsNothing);
+      expect(find.text(en.historyTitle), findsWidgets);
     });
 
     testWidgets('shows a Reminder Masked as "Private Reminder"', (

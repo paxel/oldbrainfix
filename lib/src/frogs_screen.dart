@@ -59,7 +59,7 @@ Future<void> openFrogs(BuildContext context, Notes notes, Places places) =>
     );
 
 /// A long press on a Frog's row opens a menu where the finger is, with
-/// Delete for who may manage it (ADR 0013), which moves the Frog to the
+/// Move to trash for who may manage it (ADR 0013), which moves the Frog to the
 /// trash without asking, the announcement at the top undoing it (#268);
 /// its Note stays. Nothing opens for others.
 Future<void> frogMenu(
@@ -79,7 +79,7 @@ Future<void> frogMenu(
       overlay.globalToLocal(at) & Size.zero,
       Offset.zero & overlay.size,
     ),
-    items: [PopupMenuItem(value: true, child: Text(t.delete))],
+    items: [PopupMenuItem(value: true, child: Text(t.moveToTrash))],
   );
   if (choice != true || !context.mounted) return;
   trashFrog(context, frogs, frog);

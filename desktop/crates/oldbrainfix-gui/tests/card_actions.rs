@@ -14,7 +14,7 @@ use chrono::{DateTime, Duration, Utc};
 use egui::Modifiers;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
     AreaRole, Checklists, ClockTime, Day, Frogs, Importance, Invite, Notes, OwnProfile,
@@ -105,13 +105,32 @@ fn select(harness: &mut Harness<'_, App>, texts: &[&str]) {
     }
 }
 
-/// Right-clicks the card of `text` and picks `entry` in its menu.
+/// Opens the submenus of `path`, such as "Tidy ▸ Move to trash", in a
+/// menu open, and gives its last entry's label (obf-1014).
+fn open_path(harness: &mut Harness<'_, App>, path: &str) -> Result<String, String> {
+    let mut parts: Vec<&str> = path.split(" ▸ ").collect();
+    let entry = parts.pop().unwrap_or_default().to_string();
+    for part in parts {
+        let label = format!("{part} ⏵");
+        harness
+            .query_all_by_label(&label)
+            .next_back()
+            .ok_or_else(|| format!("no {label:?} in the card's menu"))?
+            .click();
+        harness.run();
+    }
+    Ok(entry)
+}
+
+/// Right-clicks the card of `text` and picks `entry` in its menu, its
+/// submenus as "Tidy ▸ Move to trash".
 fn right_pick(harness: &mut Harness<'_, App>, text: &str, entry: &str) -> TestResult {
     pause(harness);
     card(harness, text).click_secondary();
     harness.run();
+    let entry = open_path(harness, entry)?;
     harness
-        .query_all_by_label(entry)
+        .query_all_by_label(&entry)
         .next_back()
         .ok_or_else(|| format!("no {entry:?} in the card's menu"))?
         .click();
@@ -183,7 +202,7 @@ fn the_cards_selected_go_to_the_trash_together_and_one_undo_brings_all_back() ->
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, PLUMBER]);
-    right_pick(&mut harness, PLUMBER, "Move to trash")?;
+    right_pick(&mut harness, PLUMBER, "Tidy ▸ Move to trash")?;
     assert!(trashed(&harness, &ids, MILK)?);
     assert!(trashed(&harness, &ids, PLUMBER)?);
     // Its Reminder goes with it (#262).
@@ -205,7 +224,7 @@ fn a_card_outside_the_selection_goes_alone() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, PLUMBER]);
-    right_pick(&mut harness, ROSES, "Move to trash")?;
+    right_pick(&mut harness, ROSES, "Tidy ▸ Move to trash")?;
     assert!(trashed(&harness, &ids, ROSES)?);
     assert!(!trashed(&harness, &ids, MILK)?);
     assert!(!trashed(&harness, &ids, PLUMBER)?);
@@ -234,15 +253,16 @@ fn the_cards_menu_names_move_to_trash_as_the_phone_does() -> TestResult {
     // #329: the card's right-click says the phone's words, in German
     // too, and not Delete.
     for (language, entry, delete) in [
-        ("en", "Move to trash", "Delete"),
-        ("de", "In den Papierkorb", "Löschen"),
+        ("en", "Tidy ▸ Move to trash", "Delete"),
+        ("de", "Aufräumen ▸ In den Papierkorb", "Löschen"),
     ] {
         let mut harness = harness_in(store()?, Selection::All, language);
         let ids = known(&harness)?;
         pause(&mut harness);
         card(&harness, ROSES).click_secondary();
         harness.run();
-        assert!(harness.query_by_label(entry).is_some(), "{language}");
+        let trash = open_path(&mut harness, entry)?;
+        assert!(harness.query_by_label(&trash).is_some(), "{language}");
         assert!(harness.query_by_label(delete).is_none(), "{language}");
         harness.key_press(egui::Key::Escape);
         harness.run();
@@ -295,8 +315,7 @@ fn importance_sets_it_on_the_cards_selected_and_closes_the_menu() -> TestResult 
     pause(&mut harness);
     card(&harness, ROSES).click_secondary();
     harness.run();
-    harness.get_by_label("Importance ⏵").click();
-    harness.run();
+    open_path(&mut harness, "This Note ▸ Importance ▸ Important")?;
     // As a keyboard or screen reader picks it, which no pointer click
     // closes.
     harness.get_by_label("Important").click_accesskit();
@@ -325,7 +344,7 @@ fn the_cards_selected_merge_into_another_and_one_undo_parts_them() -> TestResult
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
     // On an Unsorted Note's card it is Add to Note… (#308).
-    right_pick(&mut harness, ROSES, "Add to Note…")?;
+    right_pick(&mut harness, ROSES, "Tidy ▸ Merge into…")?;
     // Picked in the dialog, drawn after the cards.
     harness
         .query_all_by_label(PLUMBER)
@@ -357,7 +376,7 @@ fn a_card_selected_picked_in_merge_into_takes_the_others_in() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, MILK, "Add to Note…")?;
+    right_pick(&mut harness, MILK, "Tidy ▸ Merge into…")?;
     harness
         .query_all_by_label(ROSES)
         .next_back()
@@ -425,7 +444,7 @@ fn a_note_this_device_may_not_change_stays() -> TestResult {
     harness.run();
 
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, ROSES, "Move to trash")?;
+    right_pick(&mut harness, ROSES, "Tidy ▸ Move to trash")?;
     assert!(trashed(&harness, &ids, ROSES)?);
     assert!(!trashed(&harness, &ids, MILK)?);
     Ok(())
@@ -437,7 +456,7 @@ fn a_merge_leaves_out_a_note_this_device_may_not_change() -> TestResult {
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
     // Ben's Unsorted Note's card names it Add to Note… (#308).
-    right_pick(&mut harness, ROSES, "Add to Note…")?;
+    right_pick(&mut harness, ROSES, "Tidy ▸ Merge into…")?;
     pick_note(&mut harness, PLUMBER)?;
     // Ben's own Note merged; Ann's, in her Shared Area, did not stop it
     // and stayed.
@@ -495,12 +514,16 @@ fn the_keys_weigh_and_merge_the_cards_selected() -> TestResult {
     Ok(())
 }
 
-/// The entries of the card menu of `text`, by their labels, that show
-/// after a right-click, the menu left open.
+/// The entries of the card menu of `text` under Add ▸, by their labels,
+/// that show after a right-click, the menu left open.
 fn menu_of(harness: &mut Harness<'_, App>, text: &str, labels: &[&str]) -> Vec<String> {
     pause(harness);
     card(harness, text).click_secondary();
     harness.run();
+    if harness.query_all_by_label("Add ⏵").next().is_some() {
+        harness.get_by_label("Add ⏵").click();
+        harness.run();
+    }
     labels
         .iter()
         .filter(|label| harness.query_all_by_label(label).next().is_some())
@@ -511,18 +534,27 @@ fn menu_of(harness: &mut Harness<'_, App>, text: &str, labels: &[&str]) -> Vec<S
 const SPAWNS: [&str; 3] = ["Remind me…", "Frog", "Session…"];
 
 #[test]
-fn a_cards_menu_offers_its_routines_after_file_into_and_before_merge_into() -> TestResult {
+fn a_cards_menu_has_edit_then_the_note_dialogs_groups() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
+    // Edit, then This Note, Add, Share and Tidy, as the Note dialog
+    // groups them (obf-1014); its Routines under Add.
     let order = [
-        "File into…",
-        "Remind me…",
-        "Frog",
-        "Session…",
-        // On an Unsorted Note's card (#308).
-        "Add to Note…",
-        "Importance ⏵",
+        "Edit",
+        "Open in its own window",
+        "This Note ⏵",
+        "Add ⏵",
+        "Share ⏵",
+        "Tidy ⏵",
     ];
-    assert_eq!(menu_of(&mut harness, MILK, &order), order);
+    pause(&mut harness);
+    card(&harness, MILK).click_secondary();
+    harness.run();
+    let shown: Vec<&str> = order
+        .iter()
+        .copied()
+        .filter(|label| harness.query_all_by_label(label).next().is_some())
+        .collect();
+    assert_eq!(shown, order);
     let tops: Vec<f32> = order
         .iter()
         .map(|label| {
@@ -570,7 +602,7 @@ fn a_checklist_has_no_session_and_a_frog_open_no_second() -> TestResult {
 
     // Frog spawns one at once, nothing asked; then it is not offered
     // again while that one is open.
-    right_pick(&mut harness, MILK, "Frog")?;
+    right_pick(&mut harness, MILK, "Add ▸ Frog")?;
     let milk = id(MILK)?;
     let frogs = Frogs::new(harness.state().store()).of_note(&milk)?;
     assert_eq!(frogs.len(), 1);
@@ -596,7 +628,7 @@ fn remind_me_sets_up_a_reminder_for_the_card_alone() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    right_pick(&mut harness, ROSES, "Remind me…")?;
+    right_pick(&mut harness, ROSES, "Add ▸ Remind me…")?;
     harness.run();
     let roses = note(&harness, &ids, ROSES)?.id;
     let editor = harness.state().routine_editor().ok_or("the editor")?;
@@ -622,10 +654,26 @@ fn remind_me_sets_up_a_reminder_for_the_card_alone() -> TestResult {
 }
 
 #[test]
+fn add_a_part_from_a_card_opens_the_note_dialog_with_its_amend_box() -> TestResult {
+    // C1 of obf-1014: the card's Add ▸ has the dialog's Add a part.
+    let mut harness = harness(store()?, Selection::All);
+    let ids = known(&harness)?;
+    right_pick(&mut harness, ROSES, "Add ▸ Add a part")?;
+    harness.run();
+    let roses = note(&harness, &ids, ROSES)?.id;
+    assert_eq!(harness.state().selected_note(), Some(roses.as_str()));
+    let field = harness.query_by(|n| n.placeholder() == Some("What's new?"));
+    assert!(field.is_some(), "the Amend box");
+    let focused = harness.get_by(|n| n.is_focused());
+    assert_eq!(focused.accesskit_node().placeholder(), Some("What's new?"));
+    Ok(())
+}
+
+#[test]
 fn session_opens_the_editor_of_a_session_of_the_note() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
-    right_pick(&mut harness, MILK, "Session…")?;
+    right_pick(&mut harness, MILK, "Add ▸ Session…")?;
     harness.run();
     let milk = note(&harness, &ids, MILK)?.id;
     let editor = harness.state().routine_editor().ok_or("the editor")?;

@@ -2,7 +2,7 @@
 //! of an Area and a Topic, on a card's ⋮ and right-click, in the Note
 //! menu and on the Note dialog opens the tree as a dialog, its default
 //! ticks and its size as on the phone, and saves the file where the user
-//! says; File ▸ Open Pack… and a Pack dropped onto the window open the
+//! says; File ▸ Open ▸ Pack… and a Pack dropped onto the window open the
 //! same tree, all ticked, who it is from with "Add … to People" and
 //! "Claim as mine", and "Add" puts the copies into new Areas. A Pack the
 //! Dart core made opens, unclaimed Notes say "From Ada" on their card and
@@ -95,6 +95,12 @@ fn last<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> Node<'a> {
 
 fn click(harness: &mut Harness<'_, App>, label: &str) {
     last(harness, label).click_accesskit();
+    harness.run();
+}
+
+/// Opens the submenu `label` of the menu open (obf-1014).
+fn sub(harness: &mut Harness<'_, App>, label: &str) {
+    last(harness, &format!("{label} ⏵")).click();
     harness.run();
 }
 
@@ -258,6 +264,7 @@ fn a_topic_a_card_the_note_menu_and_the_note_dialog_export_what_they_hold() -> T
 
     // From a card's ⋮ and its right-click: that Note.
     click(&mut harness, "More: Water");
+    sub(&mut harness, "Share");
     click(&mut harness, "Export as Pack…");
     assert!(ticked(&harness, "Water"));
     assert!(
@@ -270,6 +277,7 @@ fn a_topic_a_card_the_note_menu_and_the_note_dialog_export_what_they_hold() -> T
         .get_by_role_and_label(Role::Button, "Laps")
         .click_secondary();
     harness.run();
+    sub(&mut harness, "Share");
     click(&mut harness, "Export as Pack…");
     assert!(ticked(&harness, "Laps"));
     click(&mut harness, "Cancel");
@@ -306,7 +314,8 @@ fn a_pack_the_dart_core_made_opens_from_the_file_menu_and_adds_its_notes() -> Te
         .ok_or("File")?
         .click();
     harness.run();
-    click(&mut harness, "Open Pack…");
+    sub(&mut harness, "Open");
+    click(&mut harness, "Pack…");
 
     // Who it is from, everything ticked, Claim as mine ticked.
     assert!(shows(&harness, "From Ada"));
@@ -375,6 +384,7 @@ fn unclaimed_notes_say_from_ada_on_the_card_and_in_the_dialog_until_removed() ->
 
     // The card's ⋮ removes it at once.
     click(&mut harness, "More: Buy shoes");
+    sub(&mut harness, "This Note");
     click(&mut harness, "Remove “From Ada”");
     assert_eq!(harness.state().error(), None);
     assert_eq!(harness.state().store().pack_from(&shoes)?, None);

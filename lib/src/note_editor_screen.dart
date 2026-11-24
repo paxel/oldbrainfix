@@ -2447,7 +2447,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           if (advanced &&
               _kind != NoteKind.session &&
               _placed?.note.textFormat != TextFormats.code)
-            (Spawn.session, const Icon(Icons.event_repeat), t.session),
+            (Spawn.session, const Icon(Icons.event_repeat), t.spawnSession),
         ])
           PopupMenuItem(
             key: ValueKey('spawn-${spawn.name}'),
@@ -2916,7 +2916,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// The Frog badge's menu at the finger [at]: Eat now while it is open
-  /// and this Device may check it off, Remove the Frog for who may
+  /// and this Device may check it off, Move to trash for who may
   /// manage it (ADR 0013), which the announcement at the top undoes, as
   /// in the Frog view (#268).
   Future<void> _frogMenu(
@@ -2956,7 +2956,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               children: [
                 const Icon(Icons.delete_outline),
                 const SizedBox(width: 12),
-                Flexible(child: Text(t.frogRemove)),
+                Flexible(child: Text(t.moveToTrash)),
               ],
             ),
           ),
@@ -4613,7 +4613,7 @@ class _AmendDialogState extends State<_AmendDialog> {
         viewInsets: media.viewInsets.copyWith(bottom: below),
       ),
       child: AlertDialog(
-        title: Text(t.amend),
+        title: Text(t.addAPart),
         content: TwoRowTextField(
           controller: _text,
           twoRows: widget.twoRows,

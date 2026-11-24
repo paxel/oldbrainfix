@@ -135,7 +135,7 @@ fn the_quick_notes_open_in_the_editor_leads_to_merge_into_another_note() -> Test
 }
 
 #[test]
-fn an_unsorted_cards_right_click_offers_add_to_note_in_place_of_merge_into() -> TestResult {
+fn an_unsorted_cards_merge_into_picks_its_note_as_add_to_note_does() -> TestResult {
     let store = store()?;
     let mut app = App::new(store, "en");
     app.select(Selection::All);
@@ -145,12 +145,14 @@ fn an_unsorted_cards_right_click_offers_add_to_note_in_place_of_merge_into() -> 
         .get_by_role_and_label(Role::Button, PASTA)
         .click_secondary();
     harness.run();
-    assert!(shows(&harness, "Add to Note…"));
-    assert!(!shows(&harness, "Merge into…"));
+    // Named Merge into… as everywhere (obf-1014, C2), under Tidy ▸.
+    harness.get_by_label("Tidy ⏵").click();
+    harness.run();
+    assert!(!shows(&harness, "Add to Note…"));
     harness
-        .query_all_by_label("Add to Note…")
+        .query_all_by_label("Merge into…")
         .next_back()
-        .ok_or("Add to Note… in the menu")?
+        .ok_or("Merge into… in the menu")?
         .click();
     harness.run_steps(8);
     pick(&mut harness, SAUCE)?;
@@ -171,6 +173,8 @@ fn an_unsorted_cards_right_click_offers_add_to_note_in_place_of_merge_into() -> 
     harness
         .get_by_role_and_label(Role::Button, SAUCE)
         .click_secondary();
+    harness.run();
+    harness.get_by_label("Tidy ⏵").click();
     harness.run();
     assert!(shows(&harness, "Merge into…"));
     assert!(!shows(&harness, "Add to Note…"));

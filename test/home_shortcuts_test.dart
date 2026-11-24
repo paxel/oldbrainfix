@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/notes_screen.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'fake_home_shortcuts.dart';
 import 'fake_lock.dart';
 import 'reveal.dart';
@@ -90,7 +91,11 @@ void main() {
 
   Finder key(String value) => find.byKey(ValueKey(value));
 
-  Future<void> cardMenu(WidgetTester tester) => tap(tester, key('note-menu'));
+  /// The card's ⋮ open at This Note, which holds it (obf-1014).
+  Future<void> cardMenu(WidgetTester tester) async {
+    await tap(tester, key('note-menu'));
+    await openCardGroup(tester, 'note-add-to-home');
+  }
 
   final entryPage = find.byType(TallyEntryScreen);
 
@@ -176,8 +181,11 @@ void main() {
       weight();
       await startAtNotes(tester);
       await cardMenu(tester);
-      expect(key('note-add-entry'), findsOneWidget);
       expect(key('note-add-to-home'), findsNothing);
+      await closeMenu(tester);
+      // The Tally's own Add entry stays, under Add.
+      await openCardMenu(tester, 'note-add-entry');
+      expect(key('note-add-entry'), findsOneWidget);
     });
   });
 

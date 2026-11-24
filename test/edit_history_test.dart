@@ -11,6 +11,7 @@ import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'editor_actions.dart';
+import 'table_menu.dart';
 
 /// Undo, Redo and "Revert all changes" of the Note editor (obf-1051):
 /// step by step back to the Note as it was opened, for its text, its
@@ -289,11 +290,13 @@ void main() {
       notes.setFormat(sorted, TextFormats.markdown);
       await edit(tester, sorted);
       await tap(tester, key('grid-column-1'));
+      await openTableGroup(tester, 'table-sortUp');
       await tap(tester, key('table-sortUp'));
       expect(typed(tester), 'Shop\n\n$table');
       expect(enabled(tester, 'editor-undo'), isFalse);
 
       await tap(tester, key('grid-column-1'));
+      await openTableGroup(tester, 'table-sortDown');
       await tap(tester, key('table-sortDown'));
       expect(
         typed(tester),

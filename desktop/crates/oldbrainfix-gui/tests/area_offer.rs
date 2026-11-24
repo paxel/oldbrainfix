@@ -151,7 +151,7 @@ fn open_share(harness: &mut Harness<'_, App>, label: &str) {
         .get_by_role_and_label(Role::Button, label)
         .click_secondary();
     harness.run();
-    click(harness, "Share…");
+    click(harness, "Share with people…");
 }
 
 #[test]

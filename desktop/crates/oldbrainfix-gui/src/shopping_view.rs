@@ -499,36 +499,30 @@ pub fn section(
     });
 }
 
-/// "Show on the Agenda" of a Shopping List in a card's menu as `menu`
-/// offers it (#186): its three ways as radio buttons under their heading,
-/// before "Back to a plain Note" as on the phone; the way clicked. A
-/// click on the way it has already changes nothing.
+/// "Show on the Agenda ▸" of a Shopping List in a card's This Note ▸ as
+/// `menu` offers it (#186, obf-1014): its three ways as radio buttons;
+/// the way clicked. A click on the way it has already changes nothing.
 pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ShoppingAction> {
     let current = menu.shopping_on_agenda?;
-    agenda_radios(ui, t, current).map(|shows| ShoppingAction::OnAgenda(menu.note.clone(), shows))
+    agenda_menu(ui, t, current).map(|shows| ShoppingAction::OnAgenda(menu.note.clone(), shows))
 }
 
-/// "Show on the Agenda" of a Shopping List or a Checklist (#219) in a
-/// card's menu: its three ways as radio buttons under their heading,
-/// `current` marked; the other way clicked.
-pub fn agenda_radios(ui: &mut Ui, t: &L10n, current: ShoppingOnAgenda) -> Option<ShoppingOnAgenda> {
+/// "Show on the Agenda ▸" of a Shopping List or a Checklist (#219) in a
+/// card's menu: its three ways as radio buttons, `current` marked; the
+/// other way clicked.
+pub fn agenda_menu(ui: &mut Ui, t: &L10n, current: ShoppingOnAgenda) -> Option<ShoppingOnAgenda> {
     let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
     let mut picked = None;
-    ui.separator();
-    ui.label(
-        RichText::new(t.checklist_show_on_agenda())
-            .small()
-            .color(weak),
-    );
-    for shows in ShoppingOnAgenda::ALL {
-        let on = shows == current;
-        let label = RichText::new(on_agenda_label(t, shows)).color(text);
-        if ui.radio(on, label).clicked() && !on {
-            picked = Some(shows);
+    let label = RichText::new(t.checklist_show_on_agenda()).color(text);
+    ui.menu_button(label, |ui| {
+        for shows in ShoppingOnAgenda::ALL {
+            let on = shows == current;
+            let label = RichText::new(on_agenda_label(t, shows)).color(text);
+            if ui.radio(on, label).clicked() && !on {
+                picked = Some(shows);
+            }
         }
-    }
-    ui.separator();
+    });
     picked
 }
 

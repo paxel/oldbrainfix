@@ -15,8 +15,8 @@
 //! field otherwise turns into the cursor at the pointer.
 //!
 //! In the fields of the Note open, in the Note dialog and a Note's own
-//! window, the menu also has Search (obf-1055, C9c): the words selected
-//! go into the Note's find bar, as they read. The App says where it is offered with
+//! window, the menu also has Find in Note (obf-1055, C9c; obf-1014, C3):
+//! the words selected go into the Note's find bar, as they read. The App says where it is offered with
 //! [`searches`] and takes the words asked with [`take_searched`]; the
 //! menu of a text only shown asks the same ([`crate::read_text`]).
 
@@ -122,7 +122,12 @@ fn entries(
         entry(ui, t.menu_copy(), copies && selected, Pick::Copy);
         entry(ui, t.paste(), true, Pick::Paste);
         if offers_search {
-            entry(ui, t.menu_search(), !words.is_empty(), Pick::Search);
+            entry(
+                ui,
+                search_label(ui.ctx(), t),
+                !words.is_empty(),
+                Pick::Search,
+            );
         }
         entry(ui, t.menu_select_all(), !text.is_empty(), Pick::SelectAll);
         let offered: Vec<Format> = FORMATS
@@ -182,6 +187,32 @@ pub fn searches(ctx: &Context, on: bool) -> bool {
 pub(crate) fn offers_search(ctx: &Context) -> bool {
     ctx.data(|d| d.get_temp::<bool>(searches_id(ctx)))
         .unwrap_or(false)
+}
+
+/// Where the Search drawn now finds in a file, not a Note.
+fn files_id(ctx: &Context) -> Id {
+    Id::new(("text menu finds in a file", ctx.viewport_id()))
+}
+
+/// Marks the window drawn now as a Markdown file's viewer, whose Search
+/// finds in the file (obf-1056).
+pub fn finds_in_file(ctx: &Context) {
+    let id = files_id(ctx);
+    ctx.data_mut(|d| d.insert_temp(id, true));
+}
+
+/// What Search is called in the window drawn now (obf-1014, C3): Find in
+/// Note, as everywhere the Note's find bar opens, and Find in a Markdown
+/// file's viewer, as its ⋮ calls it.
+pub(crate) fn search_label<'a>(ctx: &Context, t: &'a L10n) -> &'a str {
+    if ctx
+        .data(|d| d.get_temp::<bool>(files_id(ctx)))
+        .unwrap_or(false)
+    {
+        t.menu_find()
+    } else {
+        t.find_in_note()
+    }
 }
 
 /// The words of `selected` as the find bar's one line takes them: its

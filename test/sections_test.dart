@@ -443,7 +443,7 @@ void main() {
         tester.getTopLeft(find.text('Two litres')) + const Offset(8, 8),
       );
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Search'));
+      await tap(tester, find.text('Find in Note'));
       expect(
         tester
             .widget<TextField>(find.byKey(const ValueKey('find-field')))

@@ -72,6 +72,12 @@ fn card_menu(harness: &mut Harness<'_, App>) {
     harness.run();
 }
 
+/// Opens the submenu `label` of the menu open (obf-1014).
+fn sub(harness: &mut Harness<'_, App>, label: &str) {
+    harness.get_by_label(&format!("{label} ⏵")).click();
+    harness.run();
+}
+
 /// Opens the right-click menu of the sidebar's row `name`.
 fn row_menu(harness: &mut Harness<'_, App>, name: &str) {
     harness
@@ -118,12 +124,14 @@ fn a_cards_menu_marks_the_note_and_a_shield_shows_it() -> TestResult {
     let mut harness = harness(store);
     assert_eq!(shields(&harness), 0);
     card_menu(&mut harness);
+    sub(&mut harness, "This Note");
     switch(&harness).ok_or("the switch")?.click_accesskit();
     harness.run();
     assert!(harness.state().store().is_marked_hidden_from_ai(&milk)?);
     assert_eq!(shields(&harness), 1);
     // Ticked as the menu opens again; its click takes the mark off.
     card_menu(&mut harness);
+    sub(&mut harness, "This Note");
     let on = switch(&harness).ok_or("the switch")?;
     assert_eq!(
         on.accesskit_node().toggled(),
@@ -228,6 +236,7 @@ fn sending_sharing_and_packing_ask_before_anything_else() -> TestResult {
     let mut harness = harness(store);
     // Send asks before whom.
     card_menu(&mut harness);
+    sub(&mut harness, "Share");
     harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     assert!(shows(&harness, BODY));
@@ -235,6 +244,7 @@ fn sending_sharing_and_packing_ask_before_anything_else() -> TestResult {
     harness.run();
     // Export as Pack… asks before the tree.
     card_menu(&mut harness);
+    sub(&mut harness, "Share");
     harness.get_by_label("Export as Pack…").click_accesskit();
     harness.run();
     assert!(shows(&harness, BODY));
@@ -249,7 +259,7 @@ fn sending_sharing_and_packing_ask_before_anything_else() -> TestResult {
     harness.state_mut().select(Selection::Place(house.clone()));
     harness.run();
     row_menu(&mut harness, "Household");
-    harness.get_by_label("Share…").click_accesskit();
+    harness.get_by_label("Share with people…").click_accesskit();
     harness.run();
     assert!(shows(&harness, BODY));
     Ok(())

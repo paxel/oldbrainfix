@@ -313,7 +313,10 @@ fn the_file_menu_opens_a_backup_with_the_recovery_key() -> TestResult {
         .ok_or("File")?
         .click();
     harness.run();
-    click(&mut harness, "Open a Backup…");
+    // File ▸ Open ▸ A Backup… (obf-1014).
+    last(&harness, "Open ⏵").click();
+    harness.run();
+    click(&mut harness, "A Backup…");
     // Alone, with no way back to a dialog it was not opened from.
     assert_eq!(harness.state().page(), Some(Page::BackupNotes));
     assert!(!shows(&harness, "Back to Backups"));

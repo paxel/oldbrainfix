@@ -10,6 +10,8 @@ import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
+
 /// Every kind has a compact and a detailed view (#189): the list's switch
 /// sets the view of all cards, a tap switches one card, remembered on this
 /// Device until the switch changes again; a compact card has no buttons at
@@ -347,33 +349,36 @@ void main() {
         of: cardOf('Call the plumber'),
         matching: key('note-menu'),
       );
-      await tap(tester, menu);
+      // File into… under This Note, Merge into… under Tidy, as in the
+      // Note editor (obf-1014).
+      await openCardMenu(tester, 'note-file', menu: menu);
       expect(find.text('File into…'), findsOneWidget);
-      // So named on an Unsorted Note's card (#308).
-      expect(find.text('Add to Note…'), findsOneWidget);
       await tap(tester, key('note-file'));
       expect(find.byType(FileIntoScreen), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
 
-      await tap(tester, menu);
+      await openCardMenu(tester, 'note-merge', menu: menu);
+      // One name, also on an Unsorted Note's card (obf-1014).
+      expect(find.text('Merge into…'), findsOneWidget);
+      expect(find.text('Add to Note…'), findsNothing);
       await tap(tester, key('note-merge'));
       expect(find.byType(MergeIntoScreen), findsOneWidget);
     });
 
-    testWidgets('offers Remind me…, Frog and Session… between '
-        'File into… and Merge into…, and Remind me… opens the editor as a '
-        'Reminder (#281, #344)', (tester) async {
+    testWidgets('offers Remind me…, Frog and Session… first under Add, and '
+        'Remind me… opens the editor as a Reminder (#281, #344)', (
+      tester,
+    ) async {
       notes.capture('Call the plumber');
       await openCompact(tester);
 
-      await tap(tester, key('note-menu'));
+      await openCardMenu(tester, 'note-spawn-remind');
       final order = [
-        key('note-file'),
         key('note-spawn-remind'),
         key('note-spawn-frog'),
         key('note-spawn-session'),
-        key('note-merge'),
+        key('note-amend'),
       ];
       for (var i = 1; i < order.length; i++) {
         expect(
@@ -396,7 +401,7 @@ void main() {
       Checklists(store).make(id);
       await openCompact(tester);
 
-      await tap(tester, key('note-menu'));
+      await openCardMenu(tester, 'note-spawn-remind');
       expect(key('note-spawn-remind'), findsOneWidget);
       expect(key('note-spawn-frog'), findsOneWidget);
       // Only a plain Note becomes a Session (ADR 0039).
@@ -410,7 +415,7 @@ void main() {
       store.advanced = false;
       await openCompact(tester);
 
-      await tap(tester, key('note-menu'));
+      await openCardMenu(tester, 'note-spawn-remind');
       expect(key('note-spawn-remind'), findsOneWidget);
       expect(key('note-spawn-frog'), findsNothing);
       expect(key('note-spawn-session'), findsNothing);
@@ -423,19 +428,70 @@ void main() {
       await start(tester);
       await openAllNotes(tester);
 
-      await tap(tester, key('note-menu'));
+      await openCardMenu(tester, 'note-file');
       expect(key('note-file'), findsNothing);
-      expect(key('note-merge'), findsNothing);
+      await closeMenu(tester);
+      await openCardMenu(tester, 'note-spawn-remind');
       for (final spawn in Spawn.values) {
         expect(key('note-spawn-${spawn.name}'), findsNothing);
       }
+      await closeMenu(tester);
+      await openCardMenu(tester, 'note-merge');
+      expect(key('note-merge'), findsNothing);
+      await closeMenu(tester);
       expect(find.byTooltip('File into…'), findsOneWidget);
-      expect(find.byTooltip('Add to Note…'), findsOneWidget);
+      expect(find.byTooltip('Merge into…'), findsOneWidget);
     });
   });
 
-  group('Share… in a card\'s ⋮ (#281)', () {
-    testWidgets('opens a small menu of Send, Share, Copy and Export as Pack, '
+  group('the groups of a card\'s ⋮ (obf-1014)', () {
+    testWidgets('are Edit, This Note, Add, Share and Tidy, as the editor\'s', (
+      tester,
+    ) async {
+      notes.capture('Call the plumber');
+      await start(tester);
+      await openAllNotes(tester);
+
+      await tap(tester, key('note-menu'));
+      final order = [
+        key('note-edit'),
+        key('note-group-this-note'),
+        key('note-group-add'),
+        key('note-group-share'),
+        key('note-group-tidy'),
+      ];
+      for (var i = 1; i < order.length; i++) {
+        expect(
+          tester.getTopLeft(order[i]).dy,
+          greaterThan(tester.getTopLeft(order[i - 1]).dy),
+          reason: 'step $i',
+        );
+      }
+      for (final words in ['This Note', 'Add', 'Share', 'Tidy']) {
+        expect(find.text(words), findsOneWidget, reason: words);
+      }
+    });
+
+    testWidgets('show at most seven entries each, on a compact card of a '
+        'plain Note in Advanced with boxes', (tester) async {
+      notes.capture('Call the plumber ☐');
+      await openCompact(tester);
+
+      for (final group in [
+        'note-group-this-note',
+        'note-group-add',
+        'note-group-share',
+        'note-group-tidy',
+      ]) {
+        await tap(tester, key('note-menu'));
+        expect(menuEntries(tester), lessThanOrEqualTo(7), reason: 'the ⋮');
+        await tap(tester, key(group));
+        expect(menuEntries(tester), lessThanOrEqualTo(7), reason: group);
+        await closeMenu(tester);
+      }
+    });
+
+    testWidgets('Share opens a menu of Send, Share, Copy and Export as Pack, '
         'which the ⋮ no longer lists itself', (tester) async {
       notes.capture('Call the plumber');
       await start(tester);
@@ -446,8 +502,8 @@ void main() {
       for (final share in shares) {
         expect(key(share), findsNothing, reason: share);
       }
-      await tap(tester, key('note-share-menu'));
-      expect(key('note-share-menu'), findsNothing);
+      await tap(tester, key('note-group-share'));
+      expect(key('note-group-share'), findsNothing);
       for (final share in shares) {
         expect(key(share), findsOneWidget, reason: share);
       }
@@ -465,8 +521,7 @@ void main() {
       notes.capture('Call the plumber');
       await openCompact(tester);
 
-      await tap(tester, key('note-menu'));
-      await tap(tester, key('note-share-menu'));
+      await openCardMenu(tester, 'note-copy');
       expect(key('note-copy'), findsOneWidget);
     });
   });

@@ -106,11 +106,11 @@ void main() {
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(notes.byId(pills.id)?.isTrashed, isTrue);
       expect(routines.all(), isEmpty);
-      expect(find.text('Moved to the Trash'), findsOneWidget);
+      expect(find.text('Moved to the trash'), findsOneWidget);
       expect(find.text('Undo'), findsOneWidget);
 
-      await tap(tester, find.text('Moved to the Trash'));
-      expect(find.text('Moved to the Trash'), findsNothing);
+      await tap(tester, find.text('Moved to the trash'));
+      expect(find.text('Moved to the trash'), findsNothing);
       expect(notes.byId(pills.id)?.isTrashed, isFalse);
       expect(routines.all(), hasLength(2));
       // The list it was left for shows it again.
@@ -125,10 +125,10 @@ void main() {
       await openNote(tester, 'pills');
       await tapEditorAction(tester, editorTrash);
       await tester.pump(const Duration(seconds: 9));
-      expect(find.text('Moved to the Trash'), findsOneWidget);
+      expect(find.text('Moved to the trash'), findsOneWidget);
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
-      expect(find.text('Moved to the Trash'), findsNothing);
+      expect(find.text('Moved to the trash'), findsNothing);
       expect(notes.byId(pills.id)?.isTrashed, isTrue);
       expect(routines.all(), isEmpty);
     });
@@ -255,7 +255,7 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(notes.byId(milk.id)?.isTrashed, isTrue);
-      expect(find.text('Moved to the Trash'), findsOneWidget);
+      expect(find.text('Moved to the trash'), findsOneWidget);
     });
   });
 
@@ -270,7 +270,7 @@ void main() {
       expect(find.byType(RoutineEditorScreen), findsNothing);
       expect(routines.byId(routine.id)?.isTrashed, isTrue);
       expect(find.byType(Checkbox), findsNothing);
-      await tap(tester, find.text('Routine moved to the Trash'));
+      await tap(tester, find.text('Routine moved to the trash'));
       expect(routines.byId(routine.id)?.isTrashed, isFalse);
       expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
 
@@ -305,7 +305,7 @@ void main() {
       await tap(tester, find.byTooltip('Delete'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
       expect(badge, findsNothing);
-      await tap(tester, find.text('Routine moved to the Trash'));
+      await tap(tester, find.text('Routine moved to the trash'));
       expect(routines.byId(routine.id)?.isTrashed, isFalse);
       expect(badge, findsOneWidget);
     });
@@ -321,7 +321,7 @@ void main() {
       await tap(tester, find.byTooltip('Delete'));
       expect(find.byType(AllRoutinesScreen), findsOneWidget);
       expect(card, findsNothing);
-      await tap(tester, find.text('Routine moved to the Trash'));
+      await tap(tester, find.text('Routine moved to the trash'));
       expect(card, findsOneWidget);
 
       // Its Note deleted from there and brought back: no longer "in the
@@ -338,7 +338,7 @@ void main() {
       await tapEditorAction(tester, editorTrash);
       expect(find.byType(RoutineEditorScreen), findsNothing);
       expect(card, findsNothing);
-      await tap(tester, find.text('Moved to the Trash'));
+      await tap(tester, find.text('Moved to the trash'));
       expect(card, findsOneWidget);
       expect(find.text('The Note is in the trash'), findsNothing);
     });

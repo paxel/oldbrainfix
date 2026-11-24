@@ -439,7 +439,7 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
     let mut harness = window(&device.store, Some(&device.legs));
     let t = L10n::new("en");
     add_menu(&mut harness, &t);
-    click_button(&mut harness, t.session());
+    click_button(&mut harness, t.spawn_session());
     assert!(shows(&harness, t.new_session()));
     // Every day, All day, by default.
     assert!(shows(&harness, t.all_day()));
@@ -1009,7 +1009,7 @@ fn plus_on_a_session_note_offers_no_session_and_its_routine_runs_it() -> TestRes
     }
     assert!(
         harness
-            .query_all_by_role_and_label(Role::Button, t.session())
+            .query_all_by_role_and_label(Role::Button, t.spawn_session())
             .next()
             .is_none()
     );
@@ -1124,7 +1124,7 @@ fn with_no_tally_a_session_is_offered_shows_the_hint_and_save_makes_nothing() ->
     let t = L10n::new("en");
     let mut harness = window(&store, Some(&legs));
     add_menu(&mut harness, &t);
-    for offered in [t.remind_me(), t.frog(), t.session()] {
+    for offered in [t.remind_me(), t.frog(), t.spawn_session()] {
         assert!(
             harness
                 .query_all_by_role_and_label(Role::Button, offered)
@@ -1133,7 +1133,7 @@ fn with_no_tally_a_session_is_offered_shows_the_hint_and_save_makes_nothing() ->
             "{offered}"
         );
     }
-    click_button(&mut harness, t.session());
+    click_button(&mut harness, t.spawn_session());
     assert!(shows(&harness, t.new_session()));
     assert!(shows(&harness, t.session_pool_none_desk()));
     click_button(&mut harness, t.save());

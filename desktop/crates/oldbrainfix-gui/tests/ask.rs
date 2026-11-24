@@ -650,7 +650,7 @@ fn a_question_not_answered_stays_under_it_with_its_cause_and_fix_until_asked_aga
         assert!(harness.state().ask_panel().exchanges.is_empty());
         // Nothing to copy, keep, add or save under a failure (#316).
         for action in [
-            t.copy_as_text(),
+            t.copy_text(),
             t.ask_keep(),
             t.add_to_note(),
             t.save_as_markdown(),
@@ -1277,7 +1277,7 @@ fn copy_as_text_puts_the_answer_with_its_links_on_the_clipboard_and_html_beside(
         .state_mut()
         .set_clipboard(Box::new(FakeClipboard(copied.clone())));
     ask(&mut harness, "Where is my passport?");
-    press(&mut harness, t.copy_as_text());
+    press(&mut harness, t.copy_text());
     let copied = copied.borrow();
     let [(text, html)] = copied.as_slice() else {
         panic!("copied once: {copied:?}");

@@ -302,41 +302,15 @@ fn a_calendar_file_that_could_not_be_saved_says_so_and_the_click_says_why() -> T
 }
 
 #[test]
-fn share_in_an_occurrences_menu_saves_its_routine_as_a_series_or_its_reminder() -> TestResult {
-    let store = store()?;
-    let course = routine(&store, "Course")?;
-    let dentist = routine(&store, "Dentist")?;
-    let series = expected_ics(&store, std::slice::from_ref(&course))?;
-    let reminder = expected_ics(&store, std::slice::from_ref(&dentist))?;
-    let dir = tempfile::tempdir()?;
-    let saved = dir.path().join("shared.ics");
-    let mut harness = window(saving_to(App::new(store, "en"), &saved));
-
-    // The row's ⋮.
+fn an_occurrences_menu_has_no_calendar_file() -> TestResult {
+    // obf-1014: Share as calendar file left the Occurrence's menu; Export
+    // writes them all.
+    let mut harness = window(App::new(store()?, "en"));
     harness.get_by_label("More for Course").click();
     harness.run();
-    harness.get_by_label("Share").click_accesskit();
-    harness.run();
-    assert!(harness.query_by_label("Share").is_none());
-    assert!(shows(&harness, "The calendar file is saved."));
-    let written = std::fs::read_to_string(&saved)?;
-    assert_eq!(written, series);
-    assert_eq!(written.matches("BEGIN:VEVENT").count(), 1);
-    assert!(written.contains("UNTIL=20261216"), "{written}");
-    assert!(!written.contains("Dentist"));
-
-    // A right-click on the row opens the same menu, which a pick by a
-    // screen reader or the keyboard closes too.
-    harness.get_by_label("Dentist").click_secondary();
-    harness.run();
-    harness.get_by_label("Share").click_accesskit();
-    harness.run();
-    assert!(harness.query_by_label("Share").is_none());
-    let written = std::fs::read_to_string(&saved)?;
-    assert_eq!(written, reminder);
-    assert_eq!(written.matches("BEGIN:VEVENT").count(), 1);
-    assert!(!written.contains("RRULE"));
-    assert!(written.contains("Dentist"));
+    assert!(shows(&harness, "Edit schedule"));
+    assert!(!shows(&harness, "Share"));
+    assert!(!shows(&harness, "Share as calendar file"));
     Ok(())
 }
 
@@ -344,10 +318,9 @@ fn share_in_an_occurrences_menu_saves_its_routine_as_a_series_or_its_reminder() 
 fn backing_out_of_the_save_dialog_writes_nothing() -> TestResult {
     let mut app = App::new(store()?, "en");
     app.set_calendar_saver(Box::new(|_, _| None));
+    app.select(Selection::AllRoutines);
     let mut harness = window(app);
-    harness.get_by_label("More for Course").click();
-    harness.run();
-    harness.get_by_label("Share").click();
+    harness.get_by_label("Export").click();
     harness.run();
     assert!(!shows(&harness, "The calendar file is saved."));
     Ok(())

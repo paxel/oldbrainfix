@@ -82,18 +82,32 @@ fn open(harness: &mut Harness<'_, App>, menu: &str) {
     harness.run();
 }
 
+/// Opens the submenus of `path` in the menu open, such as "Open ▸
+/// Pack…" (obf-1014), and gives its last entry's label.
+fn open_path(harness: &mut Harness<'_, App>, path: &str) -> String {
+    let mut parts: Vec<&str> = path.split(" ▸ ").collect();
+    let entry = parts.pop().unwrap_or_default().to_string();
+    for part in parts {
+        last(harness, &format!("{part} ⏵")).click();
+        harness.run();
+    }
+    entry
+}
+
 /// Picks `entry` of the menu bar's `menu`, one step: what it asked is
 /// done in that frame.
 fn pick(harness: &mut Harness<'_, App>, menu: &str, entry: &str) {
     open(harness, menu);
-    last(harness, entry).click();
+    let entry = open_path(harness, entry);
+    last(harness, &entry).click();
     harness.step();
 }
 
 /// Whether `entry` of `menu` can be picked; the menu is closed again.
 fn enabled(harness: &mut Harness<'_, App>, menu: &str, entry: &str) -> bool {
     open(harness, menu);
-    let on = !last(harness, entry).accesskit_node().is_disabled();
+    let entry = open_path(harness, entry);
+    let on = !last(harness, &entry).accesskit_node().is_disabled();
     bar(harness, menu).click();
     harness.run();
     on
@@ -153,9 +167,41 @@ fn the_file_menu_reaches_new_note_quick_note_import_and_quit() -> TestResult {
     harness.run();
     assert!(!shows(&harness, "A folder…"));
 
-    // Open Pack… wants no Note (#165); Save as Markdown… wants one.
-    assert!(enabled(&mut harness, "File", "Open Pack…"));
-    assert!(!enabled(&mut harness, "File", "Save as Markdown…"));
+    // Open ▸ Pack… wants no Note (#165).
+    assert!(enabled(&mut harness, "File", "Open ▸ Pack…"));
+    // At most seven entries (obf-1014): Attach a file… and Save as
+    // Markdown… are the Note dialog's.
+    open(&mut harness, "File");
+    let entries: Vec<String> = harness
+        .query_all_by(|n| n.role() == egui::accesskit::Role::Button)
+        .filter_map(|n| n.accesskit_node().label())
+        .filter(|l| {
+            [
+                "New Note Ctrl+N",
+                "Quick note",
+                "Import…",
+                "Open ⏵",
+                "Export as vault…",
+                "Quit",
+                "Attach a file…",
+                "Save as Markdown…",
+            ]
+            .contains(&l.as_str())
+        })
+        .collect();
+    assert_eq!(
+        entries,
+        [
+            "New Note Ctrl+N",
+            "Quick note",
+            "Import…",
+            "Open ⏵",
+            "Export as vault…",
+            "Quit"
+        ]
+    );
+    bar(&harness, "File").click();
+    harness.run();
     assert!(!harness.state_mut().take_quit());
     pick(&mut harness, "File", "Quit");
     assert!(harness.state_mut().take_quit());
@@ -196,13 +242,14 @@ fn the_edit_menu_finds_opens_the_settings_and_hands_the_clipboard_to_the_field()
 
     // Find: over the Note its find bar (obf-1047), the Note staying;
     // without one All Notes' search on the Agenda, which has none.
-    pick(&mut harness, "Edit", "Find Ctrl+F");
+    // Named Find in Note there, else Search (obf-1014, C3).
+    pick(&mut harness, "Edit", "Find in Note Ctrl+F");
     harness.run();
     assert!(harness.state().note_open());
     assert_eq!(focused(&harness).as_deref(), Some("Find in this Note"));
     harness.state_mut().close_note();
     harness.run();
-    pick(&mut harness, "Edit", "Find Ctrl+F");
+    pick(&mut harness, "Edit", "Search Ctrl+F");
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::All);
     assert_eq!(focused(&harness).as_deref(), Some("Search all Notes"));
@@ -227,13 +274,14 @@ fn the_view_menu_shows_the_places_and_switches_the_cards() -> TestResult {
         ("All Routines and Reminders", Selection::AllRoutines),
         ("Agenda", Selection::Agenda),
     ] {
-        pick(&mut harness, "View", entry);
+        // Under Go to ▸ (obf-1014).
+        pick(&mut harness, "View", &format!("Go to ▸ {entry}"));
         harness.run();
         assert_eq!(harness.state().selection(), &place, "{entry}");
     }
     // The Agenda has no cards to switch.
     assert!(!enabled(&mut harness, "View", "Compact views"));
-    pick(&mut harness, "View", "All Notes");
+    pick(&mut harness, "View", "Go to ▸ All Notes");
     harness.run();
     assert!(!harness.state().compact());
     pick(&mut harness, "View", "Compact views");
@@ -273,7 +321,8 @@ fn the_menu_bar_has_no_area_or_note_menu_and_the_note_dialog_holds_its_entries()
     harness.state_mut().select(Selection::Place(repairs));
     harness.state_mut().select_note(&tap);
     harness.run();
-    assert!(enabled(&mut harness, "File", "Save as Markdown…"));
+    // Save as Markdown… under Share in the dialog (obf-1014).
+    assert!(shows(&harness, "Save as Markdown…"));
 
     // Ctrl+M asks where, and files it there.
     press_file_into(&mut harness);
@@ -295,7 +344,7 @@ fn the_menu_bar_has_no_area_or_note_menu_and_the_note_dialog_holds_its_entries()
     harness.run();
     assert!(harness.state().note_open());
 
-    last(&harness, "Send…").click();
+    last(&harness, "Send to a person").click();
     harness.run();
     assert!(shows(&harness, "Send this Note"));
     harness.key_press(Key::Escape);
@@ -305,7 +354,7 @@ fn the_menu_bar_has_no_area_or_note_menu_and_the_note_dialog_holds_its_entries()
     last(&harness, "Move to trash").click();
     harness.step();
     harness.run();
-    assert!(!shows(&harness, "Delete this Note?"));
+    assert!(!shows(&harness, "Move this Note to the trash?"));
     let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
         Ok(Notes::new(h.state().store())
             .by_id(&tap)?

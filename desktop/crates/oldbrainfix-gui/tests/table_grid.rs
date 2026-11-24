@@ -98,9 +98,27 @@ fn click_cell(harness: &mut Harness<'_, App>, cell: &str) -> TestResult {
     Ok(())
 }
 
-/// Clicks a heading's menu entry `label`, after the heading `heading`.
+/// Opens the submenu `label` of the menu open (obf-1014).
+fn sub(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    let label = format!("{label} ⏵");
+    harness
+        .query_all_by_label(&label)
+        .last()
+        .ok_or(format!("{label:?}"))?
+        .click();
+    harness.run();
+    Ok(())
+}
+
+/// Clicks a heading's menu entry `label`, after the heading `heading`,
+/// its submenus as "Move ▸ Move left".
 fn menu(harness: &mut Harness<'_, App>, heading: &str, label: &str) -> TestResult {
     press(harness, heading)?;
+    let mut parts: Vec<&str> = label.split(" ▸ ").collect();
+    let label = parts.pop().unwrap_or_default();
+    for part in parts {
+        sub(harness, part)?;
+    }
     harness
         .query_all_by_label(label)
         .last()
@@ -341,7 +359,7 @@ fn the_plus_and_the_menus_add_delete_move_and_line_up() -> TestResult {
     );
     // Moved: the row up, the column left.
     menu(&mut harness, "Row 3", "Move up")?;
-    menu(&mut harness, "Column C", "Move left")?;
+    menu(&mut harness, "Column C", "Move ▸ Move left")?;
     assert!(
         field(&harness)?.starts_with(
             "| Item | Shop | Qty |\n| --- | --- | --- |\n| eggs |  |  |\n| milk |  | 2 |"
@@ -350,9 +368,10 @@ fn the_plus_and_the_menus_add_delete_move_and_line_up() -> TestResult {
         field(&harness)?
     );
     // A column lines up as picked, the pick checked.
-    menu(&mut harness, "Column C", "Align right")?;
+    menu(&mut harness, "Column C", "Align ▸ Align right")?;
     assert!(field(&harness)?.contains("| --- | --- | --: |"));
     press(&mut harness, "Column C")?;
+    sub(&mut harness, "Align")?;
     let right = harness
         .query_all_by_label("Align right")
         .last()

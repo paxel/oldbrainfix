@@ -15,6 +15,7 @@ import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'fake_alarms.dart';
 import 'open_settings.dart';
 import 'open_capture.dart';
@@ -446,6 +447,7 @@ void main() {
       await tester.pumpAndSettle();
       await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
       await tap(tester, find.byKey(const ValueKey('note-menu')).first);
+      await openCardGroup(tester, 'note-delete');
       await tap(tester, find.byKey(const ValueKey('note-delete')));
       expect(notes.byId(junk.id)?.isTrashed, isTrue);
       expect(find.byType(UnsortedScreen), findsOneWidget);

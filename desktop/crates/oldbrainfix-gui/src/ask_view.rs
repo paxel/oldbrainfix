@@ -10,7 +10,7 @@
 //! ask again, and Up in the empty field fetches the last one. Each
 //! answer shows with links to the Notes it came from, then to the other
 //! Notes the model read for it under "Also read" (#314), which open them,
-//! and "Copy as text", "Keep as Note", "Add to Note…" and "Save as
+//! and "Copy text", "Keep as Note", "Add to Note…" and "Save as
 //! Markdown…" (#316). What the model changed waits as an AI Task for its
 //! review. The thread is gone once the list shows another place.
 //!
@@ -424,7 +424,7 @@ fn thread(
 /// An answer as Markdown, its links opening the Notes they name, whether
 /// it was cut off, whether a link to a Note not read was removed from it
 /// (#294), the Notes it came from, then those the model also read
-/// (#314), and in one row "Copy as text", "Keep as Note" or that it was
+/// (#314), and in one row "Copy text", "Keep as Note" or that it was
 /// kept, "Add to Note…" and "Save as Markdown…" (#316), Copy and Save only
 /// for an answer with words, then the Note it was added to last.
 fn answer_rows(
@@ -472,7 +472,7 @@ fn answer_rows(
     ui.horizontal_wrapped(|ui| {
         if words
             && ui
-                .button(RichText::new(t.copy_as_text()).color(text))
+                .button(RichText::new(t.copy_text()).color(text))
                 .clicked()
         {
             asked.push(AskAsked::Copy(at));

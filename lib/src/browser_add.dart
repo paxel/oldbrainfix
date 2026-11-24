@@ -64,7 +64,7 @@ FanEntry _describe(BuildContext context, NewKind kind) {
     NewKind.tally => (const Icon(Icons.bar_chart), t.tallyHeading),
     NewKind.session => (const Icon(Icons.event_repeat), t.session),
     NewKind.frog => (const FrogIcon(), t.frog),
-    NewKind.topic => (const Icon(Icons.folder_outlined), t.topicChoice),
+    NewKind.topic => (const Icon(Icons.folder_outlined), t.newTopic),
   };
   return (key: ValueKey('addFan-${kind.name}'), icon: icon, label: label);
 }

@@ -258,7 +258,8 @@ fn an_areas_people_open_their_profile() -> TestResult {
         .get_by_role_and_label(Role::Button, "Household")
         .click_secondary();
     harness.run();
-    harness.get_by_label("People").click();
+    // The people are on Share with people… (obf-1014).
+    harness.get_by_label("Share with people…").click();
     harness.run();
     assert!(shows(&harness, "Ann (you)"));
     assert!(shows(&harness, "Mum"));

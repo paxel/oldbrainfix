@@ -1,5 +1,5 @@
 //! A Note handed to another app from the window (#129): the card's ⋮
-//! and the editor offer "Send to a person", "Copy as text" and "Save as
+//! and the editor offer "Send to a person", "Copy text" and "Save as
 //! Markdown…". Copying puts the Note's text and its Sections on the
 //! clipboard, a Checklist's or Shopping List's Lines after its text as a
 //! task list (#323) that pastes back as boxes, with HTML beside formatted text, or plain text through the
@@ -87,9 +87,21 @@ fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     Ok(())
 }
 
-/// Opens the ⋮ of the card `line` and picks `entry`.
+/// Opens Share ▸ of the card's menu open (obf-1014).
+fn share_menu(harness: &mut Harness<'_, App>) -> TestResult {
+    harness
+        .query_all_by_label("Share ⏵")
+        .last()
+        .ok_or("Share ⏵")?
+        .click();
+    harness.run();
+    Ok(())
+}
+
+/// Opens the ⋮ of the card `line` and picks `entry` under Share ▸.
 fn pick(harness: &mut Harness<'_, App>, line: &str, entry: &str) -> TestResult {
     click(harness, &format!("More: {line}"))?;
+    share_menu(harness)?;
     click(harness, entry)
 }
 
@@ -109,7 +121,7 @@ fn the_editor_copies_formatted_text_with_html_beside_it_and_says_nothing() -> Te
     app.select(Selection::All);
     app.select_note(&note.id);
     let mut harness = window(app);
-    click(&mut harness, "Copy as text")?;
+    click(&mut harness, "Copy text")?;
     let copied = copied.borrow();
     let [(text, html)] = copied.as_slice() else {
         return Err(format!("{copied:?}").into());
@@ -137,7 +149,7 @@ fn the_editor_copies_boxes_as_task_list_items() -> TestResult {
     app.select(Selection::All);
     app.select_note(&note.id);
     let mut harness = window(app);
-    click(&mut harness, "Copy as text")?;
+    click(&mut harness, "Copy text")?;
     let copied = copied.borrow();
     let [(text, html)] = copied.as_slice() else {
         return Err(format!("{copied:?}").into());
@@ -158,10 +170,11 @@ fn without_the_systems_clipboard_the_card_copies_plain_text_through_the_window()
     app.select(Selection::All);
     let mut harness = window(app);
     click(&mut harness, "More: Milk")?;
+    share_menu(&mut harness)?;
     harness
-        .query_all_by_label("Copy as text")
+        .query_all_by_label("Copy text")
         .last()
-        .ok_or("Copy as text")?
+        .ok_or("Copy text")?
         .click_accesskit();
     let mut copied = None;
     for _ in 0..4 {
@@ -193,7 +206,8 @@ fn a_note_without_words_is_not_copied_and_says_why() -> TestResult {
         .ok_or("no ⋮")?
         .click_accesskit();
     harness.run();
-    click(&mut harness, "Copy as text")?;
+    share_menu(&mut harness)?;
+    click(&mut harness, "Copy text")?;
     assert!(copied.borrow().is_empty());
     assert_eq!(harness.state().notice(), Some("The Note was not shared."));
     Ok(())
@@ -291,7 +305,7 @@ fn the_card_still_sends_to_a_person() -> TestResult {
     Ok(())
 }
 
-/// Opens the ⋮ of the only card and picks "Copy as text".
+/// Opens the ⋮ of the only card and picks "Copy text".
 fn copy_from_the_card(harness: &mut Harness<'_, App>) -> TestResult {
     harness
         .query_all_by_label_contains("More: ")
@@ -299,7 +313,8 @@ fn copy_from_the_card(harness: &mut Harness<'_, App>) -> TestResult {
         .ok_or("no ⋮")?
         .click_accesskit();
     harness.run();
-    click(harness, "Copy as text")
+    share_menu(harness)?;
+    click(harness, "Copy text")
 }
 
 #[test]
@@ -342,7 +357,7 @@ fn the_editor_copies_a_shopping_list_its_struck_lines_checked_at_the_end() -> Te
     app.select(Selection::All);
     app.select_note(&note.id);
     let mut harness = window(app);
-    click(&mut harness, "Copy as text")?;
+    click(&mut harness, "Copy text")?;
     let copied = copied.borrow();
     let [(text, _)] = copied.as_slice() else {
         return Err(format!("{copied:?}").into());

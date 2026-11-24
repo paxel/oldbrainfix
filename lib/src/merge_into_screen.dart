@@ -14,8 +14,8 @@ import 'text_marks_view.dart';
 /// Opens "merge into…" for [note] and merges it into the Note picked
 /// there; true when it was merged. Hidden from AI and a Shared Area do
 /// not meet in a Merge (#267): asked as when filing. With [adding], by
-/// default for an Unsorted Note, whose card names it so (#308), the page
-/// is "Add to Note…".
+/// default for an Unsorted Note (#308), the page offers the Notes added
+/// to last first.
 Future<bool> mergeNote(
   BuildContext context,
   Notes notes,
@@ -46,12 +46,13 @@ Future<bool> mergeNote(
 /// picked Note's id. Without [noteId], for several Notes (#273), every
 /// Note is offered.
 ///
-/// With [adding] it is "Add to Note…" (#308), for a capture or an
-/// Unsorted Note: "Added to recently" with the Notes this Device added to
+/// With [adding], for a capture, an answer of Ask or an Unsorted Note
+/// (#308), "Added to recently" with the Notes this Device added to
 /// last at the top while nothing is typed, as File into… has its places
 /// (#272), and only the Notes this Device may add to; the pick is kept
 /// as added to last. A capture [hidden] from AI is offered no Note of a
-/// Shared Area (#267).
+/// Shared Area (#267). Its title is "Merge into…" for a Note picked to
+/// merge and "Add to Note…" for an answer of Ask (obf-1014).
 class MergeIntoScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -144,7 +145,11 @@ class _MergeIntoScreenState extends State<MergeIntoScreen>
     return Scaffold(
       appBar: pageBar(
         context,
-        title: widget.adding ? t.addToNote : t.mergeInto,
+        // A Note picked to merge is Merge into… also from an Unsorted
+        // Note's card (obf-1014); an answer of Ask is added.
+        title: widget.adding && widget.noteId == null
+            ? t.addToNote
+            : t.mergeInto,
         background: searchHeaderColour(context),
       ),
       body: Column(

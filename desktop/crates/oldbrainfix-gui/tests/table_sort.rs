@@ -99,6 +99,20 @@ fn press(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     Ok(())
 }
 
+/// Opens the submenu `label` of the menu open with the pointer
+/// (obf-1014), two frames.
+fn sub(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    let label = format!("{label} ⏵");
+    harness
+        .query_all_by_label(&label)
+        .last()
+        .ok_or(format!("{label:?}"))?
+        .click();
+    harness.step();
+    harness.step();
+    Ok(())
+}
+
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
@@ -321,6 +335,7 @@ fn the_table_full_screen_edited_shows_it_sorted_by_the_columns_letter() -> TestR
     let heads = harness.query_all_by_role_and_label(Role::Button, PRICE);
     assert_eq!(heads.count(), 1);
     press(&mut harness, "Column B")?;
+    sub(&mut harness, "Show sorted")?;
     assert!(shows(&harness, "Show sorted ascending"));
     assert!(shows(&harness, "Show sorted descending"));
     assert!(!shows(&harness, "Show as written"));
@@ -341,6 +356,7 @@ fn the_table_full_screen_edited_shows_it_sorted_by_the_columns_letter() -> TestR
     assert_eq!(cells(&harness), ["figs", "pears", "apples"]);
     assert_eq!(text_of(&store, &id)?, TABLE);
     press(&mut harness, "Column B")?;
+    sub(&mut harness, "Show sorted")?;
     assert!(shows(&harness, "Show sorted ascending"));
     assert!(!shows(&harness, "Show sorted descending"));
     assert!(shows(&harness, "Show as written"));
@@ -348,6 +364,7 @@ fn the_table_full_screen_edited_shows_it_sorted_by_the_columns_letter() -> TestR
     assert_eq!(cells(&harness), ["pears", "apples", "figs"]);
     // Sorted again, a row put in shows them as written.
     press(&mut harness, "Column B")?;
+    sub(&mut harness, "Show sorted")?;
     press(&mut harness, "Show sorted ascending")?;
     assert_eq!(cells(&harness), ["apples", "pears", "figs"]);
     press(&mut harness, "Row 2")?;
@@ -370,6 +387,7 @@ fn the_grids_column_sorts_the_rows_in_the_text_a_step_of_undo() -> TestResult {
         .ok_or("Column B")?
         .click();
     harness.step();
+    sub(&mut harness, "Sort rows")?;
     harness
         .query_all_by_label("Sort rows by this column, descending")
         .last()
@@ -387,6 +405,7 @@ fn the_grids_column_sorts_the_rows_in_the_text_a_step_of_undo() -> TestResult {
         .ok_or("Column B")?
         .click();
     harness.step();
+    sub(&mut harness, "Sort rows")?;
     harness
         .query_all_by_label("Sort rows by this column, descending")
         .last()
@@ -416,6 +435,7 @@ fn rows_already_sorted_are_no_step_of_undo() -> TestResult {
         .ok_or("Column B")?
         .click();
     harness.step();
+    sub(&mut harness, "Sort rows")?;
     harness
         .query_all_by_label("Sort rows by this column")
         .last()

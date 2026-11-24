@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'held_ticks.dart';
 import 'reveal.dart';
 
@@ -167,6 +168,7 @@ void main() {
       final note = notes.capture('Trip\nBath\n  Soap\nTent').id;
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-to-plain');
       expect(key('note-to-plain'), findsNothing);
       await tap(tester, key('note-make-checklist'));
 
@@ -208,6 +210,7 @@ void main() {
 
       // A Checklist is no Tally, and is made only once.
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-checklist');
       expect(key('note-make-checklist'), findsNothing);
       expect(key('note-make-tally'), findsNothing);
       expect(key('note-to-plain'), findsOneWidget);
@@ -309,10 +312,12 @@ void main() {
       expect(find.byType(Checkbox), findsNothing);
 
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-uncheck-all');
       await tap(tester, key('note-uncheck-all'));
       expect(shown(note), ['Milk', 'Eggs', 'Tea']);
       expect(find.text('3 of 3 open'), findsOneWidget);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-uncheck-all');
       // Nothing left to uncheck.
       expect(key('note-uncheck-all'), findsNothing);
     });
@@ -341,11 +346,13 @@ void main() {
       lists.make(note);
       await startAtNotes(tester);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-to-plain');
       await tap(tester, key('note-to-plain'));
       expect(lists.isChecklist(note), isFalse);
       expect(notes.byId(note)!.text, 'Trip\nBath\n  Soap\n✓ Tent');
       expect(find.byType(Checkbox), findsNothing);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-make-checklist');
       expect(key('note-make-checklist'), findsOneWidget);
     });
   });
@@ -832,6 +839,7 @@ void main() {
       final milk = idOf(note, 'Milk', ben);
       await startAtNotes(tester, ben);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-to-plain');
       expect(key('note-to-plain'), findsNothing);
       expect(key('note-make-checklist'), findsNothing);
       await tester.tapAt(Offset.zero);
@@ -839,6 +847,7 @@ void main() {
       await tap(tester, key('checklist-check-$milk'));
       expect(shown(note, ben), ['[x] Milk', 'Eggs']);
       await cardMenu(tester);
+      await openCardGroup(tester, 'note-uncheck-all');
       expect(key('note-uncheck-all'), findsOneWidget);
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();

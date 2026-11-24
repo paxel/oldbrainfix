@@ -103,15 +103,19 @@ fn pick(harness: &mut Harness<'_, App>, menu: &str, entry: &str) {
     harness.run();
 }
 
-/// The six entries of the band's ⋮, Rename with its key.
+/// The entries of an Area's band ⋮ (obf-1014), Name, colour and icon…
+/// with its key, Hidden from AI being a switch.
 const ENTRIES: [&str; 6] = [
-    "Rename F2",
-    "Colour and icon",
-    "Share…",
-    "People",
+    "New Topic",
+    "Name, colour and icon… F2",
+    "Share with people…",
+    "Move ⏵",
     "Export as Pack…",
     "Delete",
 ];
+
+/// The entries of a Topic's band ⋮, Rename with its key.
+const TOPIC_ENTRIES: [&str; 3] = ["Rename F2", "Export as Pack…", "Delete"];
 
 #[test]
 fn no_area_menu_shows_where_no_area_or_topic_shows() -> TestResult {
@@ -148,22 +152,32 @@ fn the_bands_menu_acts_on_the_area_shown_and_closes() -> TestResult {
     let mut app = App::new(store, "en");
     app.select(Selection::Place(household));
     let mut harness = window(app);
-    // Not shared: People is greyed, the rest may be done.
+    // The one Area: Move is greyed, the rest may be done.
     assert_eq!(
         enabled(&mut harness, AREA, ENTRIES),
         [true, true, true, false, true, true]
     );
     assert!(!shows(&harness, TOPIC));
-    pick(&mut harness, AREA, "Rename F2");
-    assert!(shows(&harness, "Rename"), "the Rename dialog");
-    assert!(!shows(&harness, "Rename F2"), "the menu closed");
+    pick(&mut harness, AREA, "Name, colour and icon… F2");
+    assert!(
+        shows(&harness, "Name, colour and icon"),
+        "the one dialog of the three"
+    );
+    assert!(shows(&harness, "No colour"));
+    assert!(
+        !shows(&harness, "Name, colour and icon… F2"),
+        "the menu closed"
+    );
     harness.key_press(Key::Escape);
     harness.run();
-    assert!(!shows(&harness, "Rename"));
+    assert!(!shows(&harness, "Name, colour and icon"));
 
     pick(&mut harness, AREA, "Delete");
     assert!(shows(&harness, "Delete the Area “Household”?"));
-    assert!(!shows(&harness, "Rename F2"), "the menu closed");
+    assert!(
+        !shows(&harness, "Name, colour and icon… F2"),
+        "the menu closed"
+    );
     Ok(())
 }
 
@@ -181,15 +195,22 @@ fn the_bands_menu_stands_last_in_its_second_row() -> TestResult {
 }
 
 #[test]
-fn for_a_topic_colour_share_and_people_are_greyed() -> TestResult {
+fn a_topics_menu_renames_exports_and_deletes() -> TestResult {
     let (store, _, repairs) = store()?;
     let mut app = App::new(store, "en");
     app.select(Selection::Place(repairs));
     let mut harness = window(app);
+    // As its right-click in the sidebar (obf-1014), none of the Area's.
     assert_eq!(
-        enabled(&mut harness, TOPIC, ENTRIES),
-        [true, false, false, false, true, true]
+        enabled(&mut harness, TOPIC, TOPIC_ENTRIES),
+        [true, true, true]
     );
+    open(&mut harness, TOPIC);
+    for gone in ["Name, colour and icon… F2", "Share with people…", "Move ⏵"] {
+        assert!(!shows(&harness, gone), "{gone}");
+    }
+    bar(&harness, TOPIC).click();
+    harness.run();
     assert!(!shows(&harness, AREA));
     pick(&mut harness, TOPIC, "Export as Pack…");
     assert!(shows(&harness, "Export as Pack"), "the Pack dialog");
@@ -252,7 +273,7 @@ fn the_bands_menu_rests_over_the_note_dialog() -> TestResult {
     assert!(harness.state().selected_note().is_some());
     harness.key_press(Key::F2);
     harness.run();
-    assert!(!shows(&harness, "Rename"));
+    assert!(!shows(&harness, "Name, colour and icon"));
     Ok(())
 }
 

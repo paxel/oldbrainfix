@@ -45,6 +45,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop kommen die Worte einer entfernten Aufnahme oder eines Fotos in den Text der Notiz, zum Bearbeiten oder Löschen. ([obf-1084](https://github.com/paxel/oldbrainfix/issues/397))
 - Auf dem Handy und dem Desktop stehen die meistgenutzten #Wörter unter der Suche, am Ende „Alle #Wörter …“ für den ganzen Baum. ([obf-1074](https://github.com/paxel/oldbrainfix/issues/387))
 - Auf dem Handy und dem Desktop folgen Knöpfe, Chips und Kopfstreifen einem Entwurf: umrandete Knöpfe sind getönt, Löschen ist rot, Chips sind Pillen. ([obf-1081](https://github.com/paxel/oldbrainfix/issues/394))
+- Aktionen heißen in beiden Apps gleich, und die Menüs einer Karte, eines Bereichs, einer Tabellenspalte, Datei und Ansicht stehen in kurzen Untermenüs. ([obf-1014](https://github.com/paxel/oldbrainfix/issues/321))
 
 ### Behoben
 

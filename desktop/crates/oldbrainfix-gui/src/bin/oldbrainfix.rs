@@ -1042,7 +1042,7 @@ fn run() -> Result<i32, String> {
     let labels = tray::Labels {
         title: t.app_title().into(),
         open: t.tray_open().into(),
-        capture: t.capture_tooltip().into(),
+        capture: t.settings_quick_note().into(),
         quit: t.tray_quit().into(),
     };
     // On Linux on ksni's own thread, now; on Windows and macOS in the

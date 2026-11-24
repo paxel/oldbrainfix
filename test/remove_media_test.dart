@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/photo_views.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'fake_photos.dart';
 import 'reveal.dart';
 
@@ -95,6 +96,7 @@ void main() {
       await start(tester);
       await tap(tester, find.text('1 Unsorted'));
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await openCardGroup(tester, 'note-remove-');
 
       final [read, blank] = note.photos;
       final [spoken, silent] = note.recordings;
@@ -124,6 +126,7 @@ void main() {
       // The detailed view shows the Photo Text under its photo.
       expect(inCard(find.text('Room 12')), findsOneWidget);
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await openCardGroup(tester, 'note-remove-');
       await tap(tester, find.byKey(ValueKey('note-remove-$read')));
 
       expect(
@@ -190,6 +193,7 @@ void main() {
       await start(tester);
       await tap(tester, find.text('1 Unsorted'));
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await openCardGroup(tester, 'note-remove-');
       await tap(tester, find.byKey(ValueKey('note-remove-$spoken')));
       expect(
         find.text('Remove this recording and keep its words in the text?'),
@@ -200,6 +204,7 @@ void main() {
       expect(notes.byId(note.id)!.recordings, note.recordings);
       expect(inCard(find.byType(RecordingButton)), findsNWidgets(2));
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await openCardGroup(tester, 'note-remove-');
       expect(find.byKey(ValueKey('note-remove-$spoken')), findsOneWidget);
     });
   });
@@ -353,6 +358,7 @@ void main() {
       await tester.pumpAndSettle();
       await tap(tester, find.text('1 unsortiert'));
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await openCardGroup(tester, 'note-remove-');
       await reveal(tester, find.text('Aufnahme entfernen, Text behalten'));
       expect(find.text('Foto entfernen, Text behalten'), findsOneWidget);
       expect(

@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'fake_photos.dart';
 import 'fake_speech.dart';
 import 'fake_voice.dart';
@@ -149,6 +150,7 @@ void main() {
       final hash = note.recordings.single;
 
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await openCardGroup(tester, 'note-remove-');
       await tap(tester, find.byKey(ValueKey('note-remove-$hash')));
       await tap(tester, find.text('Remove'));
 

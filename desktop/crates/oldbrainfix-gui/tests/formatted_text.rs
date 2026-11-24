@@ -527,7 +527,7 @@ fn add_to_note_has_the_format_bar_without_the_mark() -> TestResult {
     click(&mut harness, "Set link")?;
     let added = amend_field(&harness).ok_or("the Amend field")?;
     assert!(added.contains("milk](https://example.org)"), "{added}");
-    click(&mut harness, "Add to Note")?;
+    click(&mut harness, "Add")?;
     let sections = Notes::new(&store).sections(&note)?;
     assert_eq!(sections.len(), 1);
     assert_eq!(sections[0].text, added);

@@ -134,15 +134,16 @@ fn a_member_sees_who_shares_and_only_adds_to_someone_elses_note() -> TestResult 
     harness.state_mut().close_note();
     harness.run();
     open_menu(&mut harness, "Household");
-    assert!(shows(&harness, "People"));
-    for hidden in ["Rename", "Share…", "Delete", "New Topic"] {
+    // Its people on Share with people… (obf-1014).
+    assert!(shows(&harness, "Share with people…"));
+    for hidden in ["Name, colour and icon…", "Rename", "Delete", "New Topic"] {
         assert!(!shows(&harness, hidden), "{hidden}");
     }
     Ok(())
 }
 
 #[test]
-fn for_a_member_the_area_menu_offers_people_and_export_only() -> TestResult {
+fn for_a_member_the_area_menu_offers_its_people_and_export_only() -> TestResult {
     let (_ann, ben, area) = shared(AreaRole::Member)?;
     let mut harness = harness(ben, Selection::Place(area));
     // The ⋮ of the Area's band (#279, obf-1065).
@@ -163,30 +164,31 @@ fn for_a_member_the_area_menu_offers_people_and_export_only() -> TestResult {
             .is_some_and(|n| n.accesskit_node().is_disabled())
     };
     for (entry, may) in [
-        ("Rename F2", false),
-        ("Colour and icon", false),
-        ("Share…", false),
-        ("People", true),
+        ("New Topic", false),
+        ("Name, colour and icon… F2", false),
+        ("Share with people…", true),
         ("Export as Pack…", true),
         ("Delete", false),
     ] {
         assert_eq!(!greyed(entry), may, "{entry}");
     }
     harness
-        .get_all_by_label("People")
+        .get_all_by_label("Share with people…")
         .last()
-        .ok_or("People")?
+        .ok_or("Share with people…")?
         .click();
     harness.run();
-    // The People dialog's title, the menu closed.
-    assert_eq!(harness.query_all_by_label("People").count(), 1);
+    // Its people, the menu closed; a Member shares nothing on.
+    assert!(shows(&harness, "Ben (you)"));
+    assert!(!shows(&harness, "Show the code"));
+    assert!(!shows(&harness, "Share with people…"), "the menu closed");
     // F2 renames nothing a Member may not rename.
     harness.key_press(egui::Key::Escape);
     harness.run();
-    assert!(!shows(&harness, "People"), "the People dialog closed");
+    assert!(!shows(&harness, "Ben (you)"), "the dialog closed");
     harness.key_press(egui::Key::F2);
     harness.run();
-    assert!(!shows(&harness, "Rename"));
+    assert!(!shows(&harness, "Name, colour and icon"));
     Ok(())
 }
 
@@ -274,7 +276,7 @@ fn start_inviting(
     harness: &mut Harness<'_, App>,
 ) -> Result<(u16, String), Box<dyn std::error::Error>> {
     open_menu(harness, "Household");
-    harness.get_by_label("Share…").click();
+    harness.get_by_label("Share with people…").click();
     harness.run();
     harness.get_by_label("Manager").click();
     harness.run();
@@ -291,7 +293,7 @@ fn sharing_an_area_hosts_its_invite() -> TestResult {
     let house = Places::new(&ann).add_area("Household")?;
     let mut harness = harness(ann, Selection::All);
     open_menu(&mut harness, "Household");
-    harness.get_by_label("Share…").click();
+    harness.get_by_label("Share with people…").click();
     harness.run();
     // Nobody types a name: the other person's Profile shows later.
     assert!(!shows(&harness, "Your name"));
@@ -409,7 +411,7 @@ fn in_simple_roles_show_but_are_neither_chosen_nor_changed() -> TestResult {
     Places::new(&ann).add_area("Garden")?;
     let mut harness = harness(ann, Selection::All);
     open_menu(&mut harness, "Household");
-    harness.get_by_label("People").click();
+    harness.get_by_label("Share with people…").click();
     harness.run();
     assert!(shows(&harness, "Member"));
     assert!(!shows(&harness, "Make Manager"));
@@ -417,7 +419,7 @@ fn in_simple_roles_show_but_are_neither_chosen_nor_changed() -> TestResult {
     harness.key_press(egui::Key::Escape);
     harness.run();
     open_menu(&mut harness, "Garden");
-    harness.get_by_label("Share…").click();
+    harness.get_by_label("Share with people…").click();
     harness.run();
     assert!(shows(&harness, "Show the code"));
     assert!(!shows(&harness, "Manager"));
@@ -430,7 +432,7 @@ fn a_manager_changes_roles_and_removes_people() -> TestResult {
     let (ann, _ben, area) = shared(AreaRole::Member)?;
     let mut harness = harness(ann, Selection::All);
     open_menu(&mut harness, "Household");
-    harness.get_by_label("People").click();
+    harness.get_by_label("Share with people…").click();
     harness.run();
     assert!(shows(&harness, "Ann (you)"));
     harness.get_by_label("Make Manager").click();

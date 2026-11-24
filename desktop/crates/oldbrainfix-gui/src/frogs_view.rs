@@ -187,7 +187,10 @@ pub fn frog_row(
             }
             if shown.manages {
                 open.context_menu(|ui| {
-                    if ui.button(RichText::new(t.delete()).color(text)).clicked() {
+                    if ui
+                        .button(RichText::new(t.move_to_trash()).color(text))
+                        .clicked()
+                    {
                         actions.push(FrogAction::Delete(frog.id.clone()));
                         // Also a pick by keyboard or screen reader.
                         ui.close();

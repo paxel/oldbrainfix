@@ -116,8 +116,6 @@ struct Texts {
     /// The repeat chip of a Reminder.
     once: &'static str,
     escalate: &'static str,
-    /// The start of an Agenda row's ⋮, "More for {title}".
-    more_for: &'static str,
     /// The Household's lists (#174): a packing Checklist, its first line
     /// its name, a group under one of its Lines; the weekly Shopping
     /// List; a Tally of the pages read in the evenings, with its field
@@ -192,7 +190,6 @@ const EN: Texts = Texts {
     weekdays: "Weekdays",
     once: "Once",
     escalate: "Escalate to an urgent alarm with sound",
-    more_for: "More for",
     packing: "Packing for the weekend at the lake\n✓ Toothbrush\nPhone charger\nHiking gear\n  ✓ Boots\n  Rain jacket",
     groceries: "Weekly shopping\nMilk\nBread\nCoffee\nApples\nWashing-up liquid",
     reading: "Reading before bed",
@@ -258,7 +255,6 @@ const DE: Texts = Texts {
     weekdays: "Wochentage",
     once: "Einmal",
     escalate: "Zum dringenden Alarm mit Ton eskalieren",
-    more_for: "Mehr zu",
     packing: "Packen fürs Wochenende am See\n✓ Zahnbürste\nLadekabel fürs Handy\nWandersachen\n  ✓ Wanderschuhe\n  Regenjacke",
     groceries: "Wocheneinkauf\nMilch\nBrot\nKaffee\nÄpfel\nSpülmittel",
     reading: "Lesen vor dem Schlafen",
@@ -1024,6 +1020,14 @@ fn all_guide_frames() -> TestResult {
                 .get_by_role_and_label(Role::Button, book)
                 .click_secondary();
             harness.run();
+            // File into… under This Note ▸ (obf-1014).
+            let this_note = format!("{} ⏵", harness.state().t().editor_group_this_note());
+            harness
+                .query_all_by_label(&this_note)
+                .last()
+                .ok_or("This Note ⏵")?
+                .click();
+            harness.run();
             problems.extend(match_frame(
                 &mut harness,
                 &box_frame("capture-and-sort", "sort-later"),
@@ -1219,12 +1223,10 @@ fn all_guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame("routines-and-agenda", "all-routines"),
             )?);
+            // A calendar file of them all from Export (obf-1014: the
+            // Occurrence's menu has no Share).
             let mut harness = window(texts, language, theme)?;
-            harness
-                .get_all_by_label(&format!("{} {}", texts.more_for, texts.snack))
-                .nth(1)
-                .ok_or("the snack's ⋮")?
-                .click();
+            harness.state_mut().select(Selection::AllRoutines);
             harness.run();
             problems.extend(match_frame(
                 &mut harness,
@@ -1919,17 +1921,18 @@ fn sharing_frames(
             click_first(harness, &afar)
         }),
         ("roles", shared, |harness, _, texts| {
-            let people = harness.state().t().people_title().to_string();
+            // Its people are on Share with people… (obf-1014).
+            let people = harness.state().t().share_area().to_string();
             area_menu(harness, texts.work, &people)
         }),
         ("share-to-app", plain, |harness, people, _| {
             harness.state_mut().select_note(&people.note);
             harness.run();
-            let copy = harness.state().t().copy_as_text().to_string();
+            let copy = harness.state().t().copy_text().to_string();
             harness
                 .query_all_by_label(&copy)
                 .last()
-                .ok_or("Copy as text")?
+                .ok_or("Copy text")?
                 .scroll_to_me();
             harness.run();
             Ok(())
@@ -1937,7 +1940,7 @@ fn sharing_frames(
         ("send-note", plain, |harness, people, _| {
             harness.state_mut().select_note(&people.note);
             harness.run();
-            let send = harness.state().t().send_button().to_string();
+            let send = harness.state().t().send_to_person().to_string();
             click_first(harness, &send)
         }),
         ("receive-note", plain, |harness, people, _| {

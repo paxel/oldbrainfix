@@ -316,9 +316,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get findClose => 'Close the find bar';
 
   @override
-  String get selectionSearch => 'Search';
-
-  @override
   String get noNotesHere => 'No Notes here yet. Tap + to add one.';
 
   @override
@@ -1367,9 +1364,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moreCaptureContext => 'More about the capture';
-
-  @override
-  String get recordVoice => 'Record voice';
 
   @override
   String get recording => 'Recording…';
@@ -2477,7 +2471,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bundleNoApp => 'No app here can take the bundle.';
 
   @override
-  String get shareArea => 'Share…';
+  String get shareArea => 'Share with people…';
 
   @override
   String get areaShared => 'Shared';
@@ -2764,7 +2758,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Accepting moves it and its Routines and Reminders to the trash, alarms off. You can restore it from there.';
 
   @override
-  String get sentItemAcceptCancel => 'Move to the trash';
+  String get sentItemAcceptCancel => 'Move to trash';
 
   @override
   String get sentItemTrashed =>
@@ -3203,7 +3197,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToCalendar => 'Add to calendar';
 
   @override
-  String get deleteNoteQuestion => 'Delete this Note?';
+  String get deleteNoteQuestion => 'Move this Note to the trash?';
 
   @override
   String get deleteNoteDetail => 'It stays in the trash for 30 days.';
@@ -3213,15 +3207,16 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Delete this Note and its $count Routines and Reminders?',
-      one: 'Delete this Note and its 1 Routine?',
+      other:
+          'Move this Note and its $count Routines and Reminders to the trash?',
+      one: 'Move this Note and its 1 Routine to the trash?',
     );
     return '$_temp0';
   }
 
   @override
   String get deleteNoteReminderQuestion =>
-      'Delete this Note and its 1 Reminder?';
+      'Move this Note and its 1 Reminder to the trash?';
 
   @override
   String get removeRecordingKeepText => 'Remove recording, keep text';
@@ -3750,7 +3745,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteFrogQuestion =>
-      'Delete this Frog? It stays in the trash. Its Note stays.';
+      'Move this Frog to the trash? Its Note stays.';
 
   @override
   String get frogOpen => 'Open';
@@ -4844,9 +4839,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareToApp => 'Share to an app';
 
   @override
-  String get shareNote => 'Share…';
-
-  @override
   String get noteNotShared => 'The Note was not shared.';
 
   @override
@@ -5312,6 +5304,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tableSortRowsDown => 'Sort rows by this column, descending';
 
   @override
+  String get tableInsertMenu => 'Insert';
+
+  @override
+  String get tableMoveMenu => 'Move';
+
+  @override
+  String get tableAlignMenu => 'Align';
+
+  @override
+  String get tableSortRowsMenu => 'Sort rows';
+
+  @override
+  String get tableShowSortedMenu => 'Show sorted';
+
+  @override
+  String get menuMore => 'More…';
+
+  @override
   String get pairCodeNeedsUpdate =>
       'This code comes from a newer Old Brain Fix. Update Old Brain Fix on this Device, then try again.';
 
@@ -5362,13 +5372,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickNoteSchedule => 'Frog, Session or Tally';
 
   @override
-  String get copyPhoto => 'Copy';
+  String get copyPhoto => 'Copy photo';
 
   @override
-  String get savePhoto => 'Save';
-
-  @override
-  String get sharePhoto => 'Share';
+  String get savePhoto => 'Save photo';
 
   @override
   String get photoSaveFailed => 'The photo was not saved.';
@@ -6228,7 +6235,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undo => 'Undo';
 
   @override
-  String get undoNoteTrashed => 'Moved to the Trash';
+  String get undoNoteTrashed => 'Moved to the trash';
 
   @override
   String get undoLineDeleted => 'Line deleted';
@@ -6237,13 +6244,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undoEntryDeleted => 'Entry deleted';
 
   @override
-  String get undoFrogTrashed => 'Frog moved to the Trash';
+  String get undoFrogTrashed => 'Frog moved to the trash';
 
   @override
-  String get undoRoutineTrashed => 'Routine moved to the Trash';
+  String get undoRoutineTrashed => 'Routine moved to the trash';
 
   @override
-  String get undoReminderTrashed => 'Reminder moved to the Trash';
+  String get undoReminderTrashed => 'Reminder moved to the trash';
 
   @override
   String get undoPackFromRemoved => '“From” label removed';
@@ -6415,7 +6422,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get file => 'File';
 
   @override
-  String get attachFile => 'Attach a file';
+  String get attachFile => 'Attach a file…';
 
   @override
   String get attachmentTextLabel => 'Attachment Text';
