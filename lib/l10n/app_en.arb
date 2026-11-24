@@ -3095,7 +3095,7 @@
   "@useThisVersion": {"description": "A Note's History: writes this old text as the Note's or the Amend's text again, as a new change; nothing is deleted (#193)."},
   "useThisVersionDone": "The old text is back. The History keeps every version.",
   "@useThisVersionDone": {"description": "Short message after Use this version (#193)."},
-  "features": "What Old Brain Fix offers",
+  "features": "Complexity",
   "@features": {"description": "The heading of the Simple / Advanced choice on the first start's Starter Set page and in Settings (#197); a setting of the person, the same on all of their own Devices."},
   "featuresDetail": "What you already made stays, either way. The same on all your own Devices; Settings changes it any time.",
   "@featuresDetail": {"description": "Under the heading features (#197)."},

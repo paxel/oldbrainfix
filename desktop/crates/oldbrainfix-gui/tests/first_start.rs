@@ -201,7 +201,7 @@ fn new_to_old_brain_fix_plants_what_is_left_ticked_of_the_starter_set() -> TestR
 fn the_starter_set_asks_simple_or_advanced_with_simple_picked() -> TestResult {
     let mut harness = first_start()?;
     click(&mut harness, "New to Old Brain Fix");
-    assert!(shows(&harness, "What Old Brain Fix offers"));
+    assert!(shows(&harness, "Complexity"));
     assert_eq!(
         harness.get_by_label("Simple").accesskit_node().toggled(),
         Some(egui::accesskit::Toggled::True)

@@ -16,6 +16,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy steht Code weit vorn in der Formatleiste und macht aus mehreren Zeilen oder einer leeren Zeile auch einen Codeblock. ([obf-1097](https://github.com/paxel/oldbrainfix/issues/410))
 - Auf dem Handy zeigt die Liste der Bereiche Griffe zum Verschieben erst nach „Neu anordnen“ in ihrem ⋮; Scrollen und Wischen erwischen sie nicht mehr. ([obf-1089](https://github.com/paxel/oldbrainfix/issues/402))
 - Auf dem Handy stehen die Knöpfe der Schnellnotiz direkt unter dem Text und springen nicht mehr, wenn sich die Tastatur öffnet. ([obf-1083](https://github.com/paxel/oldbrainfix/issues/396))
+- Auf dem Handy und dem Desktop heißt der Abschnitt der Einstellungen für Einfach und Erweitert jetzt Komplexität. ([obf-1086](https://github.com/paxel/oldbrainfix/issues/399))
 
 ## [0.7.2] - 2026-11-23
 

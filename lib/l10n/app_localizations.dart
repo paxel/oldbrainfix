@@ -9095,7 +9095,7 @@ abstract class AppLocalizations {
   /// The heading of the Simple / Advanced choice on the first start's Starter Set page and in Settings (#197); a setting of the person, the same on all of their own Devices.
   ///
   /// In en, this message translates to:
-  /// **'What Old Brain Fix offers'**
+  /// **'Complexity'**
   String get features;
 
   /// Under the heading features (#197).

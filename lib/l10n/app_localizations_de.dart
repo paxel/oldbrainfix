@@ -5724,7 +5724,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der alte Text ist zurück. Der Verlauf behält jede Version.';
 
   @override
-  String get features => 'Was Old Brain Fix anbietet';
+  String get features => 'Komplexität';
 
   @override
   String get featuresDetail =>

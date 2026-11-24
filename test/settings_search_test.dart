@@ -135,6 +135,19 @@ void main() {
     expect(shown(en.settingsAlarms), findsNothing);
   });
 
+  testWidgets('Simple and Advanced sit under Complexity, found by it', (
+    tester,
+  ) async {
+    await start(tester);
+    // obf-1086: the section was "What Old Brain Fix offers".
+    await search(tester, 'complexity');
+
+    expect(shown('Complexity'), findsOneWidget);
+    expect(keyed('features'), findsOneWidget);
+    expect(shown(en.settingsNudges), findsNothing);
+    expect(AppLocalizationsDe().features, 'Komplexität');
+  });
+
   testWidgets('a row this Device does not show finds nothing, and says so', (
     tester,
   ) async {
