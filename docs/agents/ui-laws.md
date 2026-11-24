@@ -2170,6 +2170,26 @@ There are three kinds, and an action takes the first that fits.
   then Larger text (Ctrl+Plus, Ctrl+= too) and Smaller text
   (Ctrl+Minus), each greyed at its end; the keys work as the menu bar's
   others do, and egui's own zoom keys are off (Both apps ▸ Look).
+- **View ▸ Running and a click on the line under the menu bar open the
+  page Running** (obf-1078, C21): never greyed, a Page dialog as the
+  Settings, listing each job beside the window (a sync with a Device, an
+  Import, the Transcripts, Photo Texts and Attachment Texts being read,
+  the speech model's download, an Area being deleted, a Pack being
+  opened, the Agenda's first read) with what it does, how far it is when
+  known ("120 of 340 Notes"), "Since 14:32", and Abort, which stops it at
+  its next safe point and reads "Stopping…" until then; with none, "Nothing
+  runs in the background." An Import stops before its next Note and keeps
+  the Notes it made; the page says "Stopped: 120 of 340 imported" and the
+  top "Import stopped.", what it made behind the click. Deleting an Area
+  stops before its next Note, the Area staying with the Notes not moved.
+  A sync round or answer, a Transcript or a Photo Text under way is not
+  cut and ends first; then the automatic syncs pause (a paired Device
+  asking is told to come back later) until Sync now, or the other
+  recordings, photos and files wait, until Go on on the page or the next
+  start. The Agenda's first read has no Abort. What Abort stopped stays
+  listed under "Stopped" while the app runs, the newest first, at most
+  ten. The line takes the click a little above and below itself, never on
+  the menus.
 - **File ▸ Attach a file…** (#267) picks files of any kind and does
   with them what a drop does (see Capture): onto the Note in the Note
   dialog, else into the quick note for a new Note.

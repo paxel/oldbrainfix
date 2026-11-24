@@ -4,11 +4,13 @@
 //! edge. It takes no room of its own, so nothing else in the window
 //! moves. The desktop reads no "remove animations" setting yet, so it
 //! always moves, as the question marks do. A screen reader finds it as
-//! "Syncing…".
+//! "Syncing…". A click on it opens the page Running (obf-1078); it takes
+//! the click a little above and below itself, a 3 point line being hard
+//! to hit, but not on the menus above it.
 
 use std::time::Duration;
 
-use egui::{Color32, Id, Rect, Sense, Ui, WidgetInfo, WidgetType, pos2};
+use egui::{Color32, CursorIcon, Id, Rect, Response, Sense, Ui, WidgetInfo, WidgetType, pos2};
 
 /// How thick the line is, in points.
 pub const HEIGHT: f32 = 3.0;
@@ -25,6 +27,11 @@ pub const FRAME: Duration = Duration::from_millis(33);
 /// it keeps running, the line goes (#292).
 pub const LIMIT: Duration = Duration::from_secs(120);
 
+/// How far above and below the line a click still takes it, in points:
+/// above only within the bar's own margin under its menus.
+pub const REACH_ABOVE: f32 = 1.0;
+pub const REACH_BELOW: f32 = 5.0;
+
 /// The stretch's share of the bar's width.
 const SHARE: f32 = 0.25;
 
@@ -39,16 +46,27 @@ pub fn place(time: f64) -> f32 {
 
 /// Draws the line along the bottom of `bar`, named `label` for screen
 /// readers, and keeps the window drawing at [`FRAME`]'s pace while it
-/// shows.
-pub fn show(ui: &Ui, bar: Rect, accent: Color32, label: &str) {
+/// shows; its response says when it was clicked.
+pub fn show(ui: &Ui, bar: Rect, accent: Color32, label: &str) -> Response {
     let line = Rect::from_min_max(pos2(bar.left(), bar.bottom() - HEIGHT), bar.right_bottom());
     let width = line.width() * SHARE;
     let left = line.left() + (line.width() - width) * place(ui.input(|i| i.time));
     let stretch = Rect::from_min_max(pos2(left, line.top()), pos2(left + width, line.bottom()));
     ui.painter().rect_filled(stretch, 0.0, accent);
-    let named = ui.interact(line, Id::new("sync line"), Sense::hover());
+    // The pointer's reach first, so the line itself, named, lies over it.
+    let reach = Rect::from_min_max(
+        pos2(line.left(), line.top() - REACH_ABOVE),
+        pos2(line.right(), line.bottom() + REACH_BELOW),
+    );
+    // Clicked, not a stop for Tab, which View ▸ Running stands in for: the
+    // line comes and goes with the jobs.
+    let around = ui.interact(reach, Id::new("sync line reach"), Sense::CLICK);
+    let named = ui.interact(line, Id::new("sync line"), Sense::CLICK);
     named.widget_info(|| WidgetInfo::labeled(WidgetType::ProgressIndicator, true, label));
     ui.ctx().request_repaint_after(FRAME);
+    named
+        .union(around)
+        .on_hover_cursor(CursorIcon::PointingHand)
 }
 
 #[cfg(test)]

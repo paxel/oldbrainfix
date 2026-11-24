@@ -9,11 +9,14 @@
 //! It runs beside the window on a connection of its own (obf-1061), each
 //! Note written in a transaction of its own and a rest after it, so the
 //! window reads and writes on meanwhile; how many of its Notes are in
-//! shows as it goes.
+//! shows as it goes. Aborted on the page Running (obf-1078), it stops
+//! before its next Note, and the Notes it wrote stay.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
+use std::time::Instant;
 
 use parking_lot::Mutex;
 
@@ -62,11 +65,22 @@ pub(crate) fn low_priority(tell: impl Fn(usize, usize)) -> impl Fn(usize, usize)
     }
 }
 
+/// The Import running off the window's thread, until it answers.
+struct Running {
+    kind: Importing,
+    answer: Receiver<Imported>,
+    progress: Progress,
+    /// When it started, for the page Running (obf-1078).
+    since: Instant,
+    /// Raised by Abort there: it stops before its next Note.
+    stop: Arc<AtomicBool>,
+}
+
 /// The Import running off the window's thread, until it answers, with
 /// how far it is.
 #[derive(Default)]
 pub struct FolderImport {
-    running: Option<(Importing, Receiver<Imported>, Progress)>,
+    running: Option<Running>,
 }
 
 impl FolderImport {
@@ -74,12 +88,13 @@ impl FolderImport {
     /// hands it there, its Notes into a new Area named `area_name`;
     /// `name` is the folder's name for people. Nothing while one runs.
     pub fn start(&mut self, open: ImportStore, folder: PathBuf, name: String, area_name: String) {
-        self.run(Importing::Folder(name), open, move |store, tell| {
+        self.run(Importing::Folder(name), open, move |store, tell, stop| {
             read_folder(&folder)
                 .map_err(|e| format!("{}: {e}", folder.display()))
                 .and_then(|files| {
                     Imports::new(store)
                         .reporting(tell)
+                        .stopping(stop)
                         .folder(&area_name, &files)
                         .map_err(|e| e.to_string())
                 })
@@ -99,10 +114,11 @@ impl FolderImport {
         name: String,
         area_name: String,
     ) {
-        self.run(Importing::Markdown(name), open, move |store, tell| {
+        self.run(Importing::Markdown(name), open, move |store, tell, stop| {
             read_linked(&root, &file, &linked).and_then(|(files, pictures)| {
                 Imports::new(store)
                     .reporting(tell)
+                    .stopping(stop)
                     .linked(&area_name, &files, &pictures)
                     .map_err(|e| e.to_string())
             })
@@ -114,10 +130,11 @@ impl FolderImport {
     /// new Area named `area_name` (ADR 0036, Google Keep). Nothing while
     /// an Import runs.
     pub fn start_keep(&mut self, open: ImportStore, source: KeepSource, area_name: String) {
-        self.run(Importing::Keep, open, move |store, tell| {
+        self.run(Importing::Keep, open, move |store, tell, stop| {
             keep_import::read(&source).and_then(|(files, refused)| {
                 let mut summary = Imports::new(store)
                     .reporting(tell)
+                    .stopping(stop)
                     .keep(&area_name, &files)
                     .map_err(|e| e.to_string())?;
                 summary.not_text += refused;
@@ -127,35 +144,62 @@ impl FolderImport {
     }
 
     /// Runs `job` on a thread of its own as the Import `kind`, on the
-    /// store `open` hands it there, telling it how far it is, unless one
-    /// runs.
+    /// store `open` hands it there, telling it how far it is and whether
+    /// it is to stop, unless one runs.
     fn run(
         &mut self,
         kind: Importing,
         open: ImportStore,
-        job: impl FnOnce(&Store, &dyn Fn(usize, usize)) -> Imported + Send + 'static,
+        job: impl FnOnce(&Store, &dyn Fn(usize, usize), &dyn Fn() -> bool) -> Imported + Send + 'static,
     ) {
         if self.running.is_some() {
             return;
         }
         let progress = Progress::default();
         let shared = progress.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let asked = stop.clone();
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let store = open();
             let tell = low_priority(|written, of| *shared.lock() = Some((written, of)));
+            let stopped = || asked.load(Ordering::SeqCst);
             // A window gone meanwhile is nobody's problem.
-            drop(tx.send(job(&store, &tell)));
+            drop(tx.send(job(&store, &tell, &stopped)));
         });
-        self.running = Some((kind, rx, progress));
+        self.running = Some(Running {
+            kind,
+            answer: rx,
+            progress,
+            since: Instant::now(),
+            stop,
+        });
     }
 
     /// How many of how many Notes the Import running has written; `None`
     /// while it reads, or while none runs.
     pub fn progress(&self) -> Option<(usize, usize)> {
+        self.running.as_ref().and_then(|r| *r.progress.lock())
+    }
+
+    /// When the Import running started, `None` while none runs.
+    pub fn since(&self) -> Option<Instant> {
+        self.running.as_ref().map(|r| r.since)
+    }
+
+    /// Stops the Import running before its next Note (obf-1078): the
+    /// Notes it wrote stay, and its answer says how many it was to write.
+    pub fn abort(&self) {
+        if let Some(running) = &self.running {
+            running.stop.store(true, Ordering::SeqCst);
+        }
+    }
+
+    /// Whether the Import running was aborted and has not answered yet.
+    pub fn aborting(&self) -> bool {
         self.running
             .as_ref()
-            .and_then(|(_, _, progress)| *progress.lock())
+            .is_some_and(|r| r.stop.load(Ordering::SeqCst))
     }
 
     /// Whether an Import is reading its folder or zip.
@@ -165,21 +209,20 @@ impl FolderImport {
 
     /// Which Import runs, `None` while none does.
     pub fn kind(&self) -> Option<&Importing> {
-        self.running.as_ref().map(|(kind, ..)| kind)
+        self.running.as_ref().map(|r| &r.kind)
     }
 
     /// Takes in the Import's answer once there, with which Import it
     /// was: `None` while it runs.
     pub fn finished(&mut self) -> Option<(Importing, Imported)> {
-        let (_, rx, _) = self.running.as_ref()?;
-        let answer = match rx.try_recv() {
+        let answer = match self.running.as_ref()?.answer.try_recv() {
             Ok(answer) => answer,
             Err(TryRecvError::Empty) => return None,
             // The thread broke off without an answer.
             Err(TryRecvError::Disconnected) => Err("the import broke off".to_string()),
         };
-        let (kind, ..) = self.running.take()?;
-        Some((kind, answer))
+        let running = self.running.take()?;
+        Some((running.kind, answer))
     }
 }
 

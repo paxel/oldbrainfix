@@ -1007,3 +1007,35 @@ mod linked {
         Ok(())
     }
 }
+
+#[test]
+fn an_import_stopped_keeps_the_notes_it_wrote_and_says_how_many_it_was_to_write() -> Result<()> {
+    let store = store();
+    let files: Vec<ImportFile> = (0..4)
+        .map(|i| file(&format!("Note {i}.txt"), "text", Some(march())))
+        .collect();
+    let written = std::cell::Cell::new(0);
+    let tell = |n: usize, _: usize| written.set(n);
+    let stop = || written.get() >= 2;
+    let summary = Imports::new(&store)
+        .reporting(&tell)
+        .stopping(&stop)
+        .folder("From Notes", &files)?;
+    assert_eq!(summary.notes, 2);
+    assert_eq!(summary.stopped, Some(4));
+    assert_eq!(inside(&store, &summary)?.len(), 2, "the Notes written stay");
+
+    // Not stopped: none said.
+    let summary = Imports::new(&store).folder("Again", &files)?;
+    assert_eq!((summary.notes, summary.stopped), (4, None));
+
+    // Stopped before the first: no Area is made.
+    let summary = Imports::new(&store)
+        .stopping(&|| true)
+        .folder("Never", &files)?;
+    assert_eq!(
+        (summary.area_id, summary.notes, summary.stopped),
+        (None, 0, Some(4))
+    );
+    Ok(())
+}

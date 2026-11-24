@@ -16,6 +16,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop kann eine Vorwarnung eine eigene Länge haben: Minuten, Stunden, Tage oder Wochen. ([obf-1087](https://github.com/paxel/oldbrainfix/issues/400))
 - Auf dem Handy und dem Desktop schalten „Tipps zeigen“ in den Einstellungen und „Keine Tipps mehr“ auf jedem Tipp die Tipps ab. ([obf-1060](https://github.com/paxel/oldbrainfix/issues/373))
 - Auf dem Handy und dem Desktop kann eine Sprachaufnahme nach einer Pause von 2, 3, 5 oder 10 Sekunden von selbst enden. ([obf-1053](https://github.com/paxel/oldbrainfix/issues/364))
+- Auf dem Desktop listet eine Seite „Im Hintergrund“ die laufenden Arbeiten, wie weit jede ist, und Abbrechen; ein abgebrochener Import behält seine Notizen. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
 
 ### Geändert
 

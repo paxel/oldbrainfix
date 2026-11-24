@@ -17,7 +17,7 @@ use crate::error::{Error, Result};
 use crate::import_formats::{self, ImportFormat};
 use crate::notes::keys;
 use crate::obsidian;
-use crate::places::Places;
+use crate::places::{Places, Stopping};
 use crate::search::lower_case;
 use crate::shopping_lists::ListOnAgenda;
 use crate::store::Store;
@@ -97,6 +97,10 @@ pub struct ImportSummary {
     pub missing: usize,
     /// Files a note names that are no photo, such as a voice recording.
     pub not_photo: usize,
+    /// How many Notes it was to write, when it was stopped before all of
+    /// them were in (obf-1078): the `notes` written stay, the others are
+    /// not made. `None` when it was not stopped.
+    pub stopped: Option<usize>,
 }
 
 impl ImportSummary {
@@ -114,6 +118,7 @@ pub type ImportProgress<'a> = &'a dyn Fn(usize, usize);
 pub struct Imports<'a> {
     store: &'a Store,
     progress: Option<ImportProgress<'a>>,
+    stop: Option<Stopping<'a>>,
 }
 
 impl<'a> Imports<'a> {
@@ -121,6 +126,7 @@ impl<'a> Imports<'a> {
         Imports {
             store,
             progress: None,
+            stop: None,
         }
     }
 
@@ -131,6 +137,21 @@ impl<'a> Imports<'a> {
             progress: Some(progress),
             ..self
         }
+    }
+
+    /// These Imports, asking `stop` before each Note they write
+    /// (obf-1078): once it says so, the Notes written stay and the
+    /// summary says how many were to be ([`ImportSummary::stopped`]).
+    pub fn stopping(self, stop: Stopping<'a>) -> Imports<'a> {
+        Imports {
+            stop: Some(stop),
+            ..self
+        }
+    }
+
+    /// Whether the hook, when there is one, says to stop.
+    fn stop_asked(&self) -> bool {
+        self.stop.is_some_and(|stop| stop())
     }
 
     /// Tells the hook, when there is one, that `written` of `of` are in.
@@ -352,6 +373,13 @@ impl<'a> Imports<'a> {
         if kept.is_empty() {
             return Ok(summary);
         }
+        // Stopped before anything was written: no Area either.
+        if self.stop_asked() {
+            return Ok(ImportSummary {
+                stopped: Some(kept.len()),
+                ..summary
+            });
+        }
         let kept: Vec<(&ImportedNote, DateTime<Utc>, Option<&String>)> = kept
             .into_iter()
             .filter_map(|(i, at)| Some((notes.get(i)?, at, ids.get(i))))
@@ -371,7 +399,12 @@ impl<'a> Imports<'a> {
         }
         let area_id = s.batch(|| Ok(Places::new(s).add_area(&self.unused(name)?)?.id))?;
         self.tell(0, kept.len());
+        let mut written = kept.len();
         for (i, ((note, at, given), held)) in kept.iter().zip(&hashes).enumerate() {
+            if self.stop_asked() {
+                written = i;
+                break;
+            }
             s.batch(|| {
                 let id = match given {
                     Some(id) => (*id).clone(),
@@ -394,11 +427,13 @@ impl<'a> Imports<'a> {
             })?;
             self.tell(i + 1, kept.len());
         }
+        let made = kept.get(..written).unwrap_or_default();
         Ok(ImportSummary {
             area_id: Some(area_id),
-            notes: kept.len(),
-            checklists: kept.iter().filter(|(n, _, _)| n.lines.is_some()).count(),
-            photos: hashes.iter().map(Vec::len).sum(),
+            notes: written,
+            checklists: made.iter().filter(|(n, _, _)| n.lines.is_some()).count(),
+            photos: hashes.iter().take(written).map(Vec::len).sum(),
+            stopped: (written < kept.len()).then_some(kept.len()),
             ..summary
         })
     }

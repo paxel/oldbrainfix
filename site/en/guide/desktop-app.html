@@ -107,7 +107,22 @@
 <p>
   While a sync of this computer runs, a thin line in the accent moves back and forth under the menu
   bar, taking no room; the app stays usable meanwhile. A screen reader finds it as a progress
-  indicator named "Syncing…".
+  indicator named "Syncing…". A click on the line opens <strong>Running</strong>, as
+  <strong>View ▸ Running</strong> does.
+</p>
+<p>
+  <strong>Running</strong> lists what runs in the background: a sync with a Device, an Import,
+  Transcripts, Photo Texts and attached files being read, the speech model being downloaded, an Area
+  being deleted, a Pack being opened. Each says what it is doing, how far it is where that is known,
+  such as "120 of 340 Notes", and since when, with <strong>Abort</strong>, which stops it at its next
+  safe point. An Import stops before its next Note, and the Notes it made stay: the page says
+  "Stopped: 120 of 340 imported", and the top of the window "Import stopped.", with what it made
+  behind the click. Deleting an Area stops before its next Note: the Notes moved so far stay where
+  they went, and the Area stays with the others. A sync, a Transcript or a Photo Text under way cannot
+  be cut in the middle and ends first; then the computer syncs only by <strong>Sync ▸ Sync
+  now</strong>, or the other recordings, photos and files wait, until <strong>Go on</strong> on the
+  page or the next start. The Agenda's first read has no Abort, as the window waits for it. With
+  nothing running the page says "Nothing runs in the background."
 </p>
 <p>
   The window shows at once when it opens. Until the Agenda is read, its rows are empty and the same
@@ -325,7 +340,7 @@
 <ul>
   <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Attach a file…</strong> picks files of any kind: with the Note dialog open they go onto its Note, else they wait in the quick note for a new Note, as files dropped onto the window do. <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown, text, AsciiDoc, Org, reStructuredText or HTML files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Open Markdown file…</strong> shows a Markdown file in a viewer of its own, to read or import (see <a href="#capture-from-the-command-line">Capture from the command line</a>). <strong>Open Pack…</strong> opens a Pack someone sent you (see <a href="sharing-and-sync.html">Sharing and sync</a>). <strong>Open a Backup…</strong> opens a Backup to take Notes back from it, as on the Backups dialog (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Export as vault…</strong> writes every Note as Markdown files for another app (see <a href="#take-your-notes-to-another-app">Take your Notes to another app</a>). <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
   <li><strong>Edit</strong>: <strong>Undo</strong> (Ctrl+Z) takes back the last delete, check-off, filing or Merge, of all the cards selected at once where they went together; with a Note open, the Note's last change instead, unless the delete or check-off came later. It is greyed while there is nothing to undo. <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Find</strong> (Ctrl+F) puts the cursor into the search field of the list shown, All Notes' where the list has none, such as the Agenda, and over the Settings into theirs; with a Note open in the Note dialog it opens the Note's find bar instead. <strong>Settings…</strong> (Ctrl+,) opens the Settings, whose search field at the top shows only the settings that hold the words typed. In the Settings, <strong>AI…</strong> opens the AI settings; the search finds it by the words of every AI setting, such as "API key".</li>
-  <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Theme</strong> and <strong>Text size</strong>, with <strong>Larger text</strong> (Ctrl+Plus) and <strong>Smaller text</strong> (Ctrl+Minus) (see <a href="#change-the-theme-and-the-size">Change the theme and the size</a>).</li>
+  <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Running</strong>, what runs in the background, with Abort (see <a href="#find-your-way-in-the-window">Find your way in the window</a>); <strong>Theme</strong> and <strong>Text size</strong>, with <strong>Larger text</strong> (Ctrl+Plus) and <strong>Smaller text</strong> (Ctrl+Minus) (see <a href="#change-the-theme-and-the-size">Change the theme and the size</a>).</li>
   <li><strong>AI</strong>: <strong>AI (experimental)</strong> at the top switches the AI on or off, off at first; <strong>Ask…</strong> (Ctrl+K), there only while it is on, shows the Ask panel in the list (see <a href="#ask-about-your-notes">Ask about your Notes</a>), <strong>AI settings…</strong> opens the page with every AI setting, the switch, the Ask panel's provider and the AI port, and <strong>Review the AI Task</strong> shows the review of the AI Task, or "No changes yet" while there is none (see <a href="#open-the-ai-port">Open the AI port</a>).</li>
   <li><strong>Sync</strong>: <strong>Sync now</strong>, <strong>Pair a Device</strong>, <strong>People</strong>, <strong>Profile</strong> and <strong>Backups…</strong>, each a dialog (see <a href="#close-a-dialog-or-go-back-in-it">Close a dialog or go back in it</a>).</li>
   <li><strong>Help</strong>: <strong>User guide</strong> opens this page in the browser; <strong>About Old Brain Fix</strong> shows the version, the documentation and privacy policy, the source code and every third-party component with its licence.</li>

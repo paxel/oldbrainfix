@@ -129,7 +129,7 @@ use crate::cell_pick;
 use crate::checklist_view::{
     self, CardMenu, ChecklistAction, ChecklistShown, LineStep, RemovedAsk, ShownLine,
 };
-use crate::enrich::Enricher;
+use crate::enrich::{self, Enricher};
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::find_bar::{self, FindBar};
@@ -169,6 +169,7 @@ use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
 use crate::read_text;
 use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
+use crate::running::{self, Abort, Ended, Job, JobId};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::search_aside::{Searching, Work};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
@@ -305,6 +306,9 @@ pub enum Page {
     /// this Device's code and the field for the other's; Sync ▸ Pair a
     /// Device. It hosts while it shows, as Sync does.
     Pair,
+    /// Every job running beside the window, with Abort (obf-1078); View ▸
+    /// Running, and a click on the line under the menu bar.
+    Running,
 }
 
 /// How a click on a card selects (#148): a plain click this card alone,
@@ -500,6 +504,16 @@ struct AgendaReads {
 
 /// What the Agenda's thread read, at its mark, and whether it wrote.
 type AgendaRead = (oldbrainfix_core::Result<(AgendaView, i64)>, bool);
+
+/// A Pack's work running off the window's thread (#165): its answer to
+/// come, what it does, since when, and whether Abort on the page Running
+/// dropped it (obf-1078), its answer then taken in but not shown.
+struct PackRunning {
+    arrives: std::sync::mpsc::Receiver<PackDone>,
+    kind: PackWork,
+    since: std::time::Instant,
+    dropped: bool,
+}
 
 /// What a Pack's work off the window's thread did (#165), and whether
 /// it wrote to the log there.
@@ -1453,6 +1467,8 @@ enum Action {
     /// Back to the dialog this one was opened from, or none.
     PageBack,
     ClosePage,
+    /// Abort or Go on on the page Running (obf-1078).
+    Running(running::Act),
     /// File ▸ New Note (Ctrl+N) and "+": the quick note's dialog
     /// (#146), the cursor in its field.
     NewNote,
@@ -2401,7 +2417,7 @@ pub struct App {
     agenda_reads: Option<AgendaReads>,
     /// The Pack work running on threads of their own, on connections
     /// the Agenda's opener hands them, with what each does.
-    pack_work: Vec<(std::sync::mpsc::Receiver<PackDone>, PackWork)>,
+    pack_work: Vec<PackRunning>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
@@ -2427,6 +2443,9 @@ pub struct App {
     import_open: Option<StoreOpener>,
     /// The Areas being deleted beside the window (obf-1093).
     deletions: AreaDeletions,
+    /// The jobs Abort stopped on the page Running (obf-1078), while the
+    /// app runs.
+    stopped_jobs: running::Stopped,
     /// Asks the system's dialog for the folder a vault goes into, or is
     /// rebuilt from (#267).
     vault_picker: FolderPicker,
@@ -3031,6 +3050,7 @@ impl App {
             import: FolderImport::default(),
             import_open: None,
             deletions: AreaDeletions::default(),
+            stopped_jobs: running::Stopped::default(),
             vault_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             vault: VaultJob::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
@@ -4475,21 +4495,317 @@ impl App {
             let wrote = before.is_some_and(|before| store.current_seq().ok() != Some(before));
             drop(sent.send(PackDone { done, wrote }));
         });
-        self.pack_work.push((arrives, kind));
+        self.pack_work.push(PackRunning {
+            arrives,
+            kind,
+            since: std::time::Instant::now(),
+            dropped: false,
+        });
     }
 
     /// Whether a Pack is being opened off the window's thread.
     fn pack_opening(&self) -> bool {
         self.pack_work
             .iter()
-            .any(|(_, kind)| *kind == PackWork::Opening)
+            .any(|w| w.kind == PackWork::Opening && !w.dropped)
     }
 
     /// Whether a Pack is being saved off the window's thread.
     fn pack_saving(&self) -> bool {
-        self.pack_work
+        self.pack_work.iter().any(|w| w.kind == PackWork::Saving)
+    }
+
+    /// Every job running beside the window, as the page Running lists
+    /// them (obf-1078), read from where each runs.
+    fn jobs(&self) -> Vec<Job> {
+        let t = self.t;
+        let mut jobs = Vec::new();
+        if let Some(syncing) = self.syncing.as_ref().filter(|s| s.running()) {
+            jobs.push(Job {
+                id: JobId::Sync,
+                what: t.running_sync().to_string(),
+                far: None,
+                since: syncing.since(),
+                abort: if syncing.paused() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_sync_abort().to_string()),
+            });
+        }
+        if let Some(kind) = self.import.kind() {
+            jobs.push(Job {
+                id: JobId::Import,
+                what: self.import_what(kind),
+                far: self
+                    .import
+                    .progress()
+                    .map(|(done, of)| t.import_written(done as i64, of as i64)),
+                since: self.import.since(),
+                abort: if self.import.aborting() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_import_abort().to_string()),
+            });
+        }
+        for (enricher, kind) in self.enrichers() {
+            let Some((since, done, of)) = enricher.busy() else {
+                continue;
+            };
+            jobs.push(Job {
+                id: JobId::Reading(kind),
+                what: reading_what(&t, kind).to_string(),
+                far: Some(t.running_read(done as i64, of as i64)),
+                since: Some(since),
+                abort: if enricher.stopped() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_read_abort().to_string()),
+            });
+        }
+        if let Some(model) = &self.speech
+            && let speech::Status::Fetching {
+                downloading,
+                received,
+                total,
+            } = model.status()
+        {
+            let mb = |bytes: u64| format!("{:.0}", bytes as f64 / 1_000_000.0);
+            let size = model
+                .chosen()
+                .unwrap_or(oldbrainfix_whisper::model::WhisperModel::Base)
+                .megabytes();
+            let total = total.map_or_else(|| size.to_string(), mb);
+            jobs.push(Job {
+                id: JobId::SpeechModel,
+                what: if downloading {
+                    t.running_model_download()
+                } else {
+                    t.running_model_copy()
+                }
+                .to_string(),
+                far: downloading.then(|| t.speech_model_downloading(&mb(received), &total)),
+                since: model.since(),
+                abort: if model.cancelling() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: None,
+            });
+        }
+        for deleting in self.deletions.list() {
+            jobs.push(Job {
+                what: t.running_area_deletion(&self.area_called(&deleting.area_id)),
+                far: deleting
+                    .moved
+                    .map(|(moved, of)| t.area_deleting(moved as i64, of as i64)),
+                since: Some(deleting.since),
+                abort: if deleting.aborting {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_area_abort().to_string()),
+                id: JobId::AreaDeletion(deleting.area_id),
+            });
+        }
+        for opening in self
+            .pack_work
             .iter()
-            .any(|(_, kind)| *kind == PackWork::Saving)
+            .filter(|w| w.kind == PackWork::Opening && !w.dropped)
+        {
+            jobs.push(Job {
+                id: JobId::PackOpening,
+                what: t.pack_opening().to_string(),
+                far: None,
+                since: Some(opening.since),
+                abort: Abort::Offered,
+                abort_does: Some(t.running_pack_abort().to_string()),
+            });
+        }
+        // The window waits for it: no Abort.
+        if self.agenda_waiting() {
+            jobs.push(Job {
+                id: JobId::AgendaRead,
+                what: t.agenda_reading().to_string(),
+                far: None,
+                since: None,
+                abort: Abort::No,
+                abort_does: None,
+            });
+        }
+        jobs
+    }
+
+    /// The jobs Abort paused once what was under way ended (obf-1078),
+    /// read from where they pause, each with Go on: the automatic syncs,
+    /// and the reading of Transcripts, Photo Texts and Attachment Texts.
+    fn paused_jobs(&self) -> Vec<Ended> {
+        let t = self.t;
+        let mut paused = Vec::new();
+        if self
+            .syncing
+            .as_ref()
+            .is_some_and(|s| s.paused() && !s.running())
+        {
+            paused.push(Ended {
+                id: JobId::Sync,
+                what: t.running_sync().to_string(),
+                said: t.running_sync_paused().to_string(),
+                goes_on: true,
+            });
+        }
+        for (enricher, kind) in self.enrichers() {
+            if enricher.stopped() && enricher.busy().is_none() {
+                paused.push(Ended {
+                    id: JobId::Reading(kind),
+                    what: reading_what(&t, kind).to_string(),
+                    said: t.running_read_stopped().to_string(),
+                    goes_on: true,
+                });
+            }
+        }
+        paused
+    }
+
+    /// The threads reading Transcripts, Photo Texts and Attachment Texts
+    /// there are, each with what it reads.
+    fn enrichers(&self) -> Vec<(&Enricher, enrich::Kind)> {
+        [
+            (&self.transcriber, enrich::Kind::Transcripts),
+            (&self.reader, enrich::Kind::PhotoTexts),
+            (&self.files_reader, enrich::Kind::AttachmentTexts),
+        ]
+        .into_iter()
+        .filter_map(|(enricher, kind)| enricher.as_ref().map(|e| (e, kind)))
+        .collect()
+    }
+
+    /// What the Import `kind` is, as the page Running names it.
+    fn import_what(&self, kind: &Importing) -> String {
+        match kind {
+            Importing::Folder(name) | Importing::Markdown(name) => self.t.running_import(name),
+            Importing::Keep => self.t.running_import_keep().to_string(),
+        }
+    }
+
+    /// The name the Area `area_id` shows under in the sidebar, empty
+    /// once it is gone.
+    fn area_called(&self, area_id: &str) -> String {
+        self.view
+            .areas
+            .iter()
+            .find(|(area, _)| area.id == area_id)
+            .map(|(area, _)| area_name(&self.t, area))
+            .unwrap_or_default()
+    }
+
+    /// "Since 14:32": when a job started at `at`, as this computer's
+    /// clock shows it.
+    fn since_text(&self, at: std::time::Instant) -> String {
+        let ago = chrono::Duration::from_std(at.elapsed()).unwrap_or_default();
+        let then = (self.wall)(self.store.now() - ago);
+        self.t.running_since(&then.format("%H:%M").to_string())
+    }
+
+    /// Does what was clicked on the page Running (obf-1078): Abort stops
+    /// a job at its next safe point, Go on starts a paused one again.
+    fn running_act(&mut self, act: running::Act) {
+        let t = self.t;
+        match act {
+            // Listed as paused once the round under way ended.
+            running::Act::Abort(JobId::Sync) => {
+                if let Some(syncing) = &self.syncing {
+                    syncing.pause();
+                }
+            }
+            // Said once it has stopped, with how far it came.
+            running::Act::Abort(JobId::Import) => self.import.abort(),
+            running::Act::Abort(JobId::AreaDeletion(id)) => self.deletions.abort(&id),
+            running::Act::Abort(JobId::Reading(kind)) => {
+                if let Some((enricher, _)) = self.enrichers().into_iter().find(|(_, k)| *k == kind)
+                {
+                    enricher.stop();
+                }
+            }
+            running::Act::Abort(JobId::SpeechModel) => {
+                if let Some(model) = &self.speech {
+                    let downloading = matches!(
+                        model.status(),
+                        speech::Status::Fetching {
+                            downloading: true,
+                            ..
+                        }
+                    );
+                    model.cancel();
+                    self.stopped_jobs.push(Ended {
+                        id: JobId::SpeechModel,
+                        what: if downloading {
+                            t.running_model_download()
+                        } else {
+                            t.running_model_copy()
+                        }
+                        .to_string(),
+                        said: t.running_model_stopped().to_string(),
+                        goes_on: false,
+                    });
+                }
+            }
+            running::Act::Abort(JobId::PackOpening) => {
+                for opening in self
+                    .pack_work
+                    .iter_mut()
+                    .filter(|w| w.kind == PackWork::Opening)
+                {
+                    opening.dropped = true;
+                }
+                self.stopped_jobs.push(Ended {
+                    id: JobId::PackOpening,
+                    what: t.pack_opening().to_string(),
+                    said: t.running_pack_stopped().to_string(),
+                    goes_on: false,
+                });
+            }
+            running::Act::Abort(JobId::AgendaRead) => {}
+            running::Act::GoOn(JobId::Sync) => self.sync_goes_on(),
+            running::Act::GoOn(JobId::Reading(kind)) => {
+                if let Some((enricher, _)) = self.enrichers().into_iter().find(|(_, k)| *k == kind)
+                {
+                    enricher.go_on();
+                }
+            }
+            // Only those two pause.
+            running::Act::GoOn(_) => {}
+        }
+    }
+
+    /// Lists the Import `what` Abort stopped once it ended with `done` of
+    /// `of` Notes written (obf-1078), and says so at the top in place of
+    /// "Import finished.", what it made behind the click.
+    fn import_stopped(&mut self, what: String, (done, of): (usize, usize)) {
+        let t = self.t;
+        let said = t.running_import_stopped(done as i64, of as i64);
+        self.stopped_jobs.push(Ended {
+            id: JobId::Import,
+            what,
+            said: said.clone(),
+            goes_on: false,
+        });
+        match &mut self.notice_dialog {
+            Some((notice, Dialog::Imported { details, .. })) => {
+                *notice = t.import_stopped().to_string();
+                *details = format!("{said}\n\n{details}");
+                self.notice = Some(t.import_stopped().to_string());
+            }
+            // Stopped before its first Note: no Area to open.
+            _ => self.announce_done(t.import_stopped(), said),
+        }
     }
 
     /// Takes in what the Pack threads did once it is in; the window
@@ -4500,9 +4816,9 @@ impl App {
         }
         let mut arrived = Vec::new();
         self.pack_work
-            .retain(|(running, _)| match running.try_recv() {
+            .retain(|running| match running.arrives.try_recv() {
                 Ok(done) => {
-                    arrived.push(done);
+                    arrived.push((done, running.dropped));
                     false
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => true,
@@ -4511,11 +4827,13 @@ impl App {
         if !self.pack_work.is_empty() {
             ctx.request_repaint_after(std::time::Duration::from_millis(30));
         }
-        for PackDone { done, wrote } in arrived {
+        for (PackDone { done, wrote }, dropped) in arrived {
             if wrote {
                 self.store.changed_elsewhere();
             }
-            self.pack_done(done);
+            if !dropped {
+                self.pack_done(done);
+            }
         }
     }
 
@@ -5904,6 +6222,7 @@ impl App {
     /// Syncs through the shared folder now: on the folder thread, or here
     /// when there is none.
     fn folder_now(&mut self) -> oldbrainfix_core::Result<()> {
+        self.sync_goes_on();
         match &self.folder_wanted {
             Some(wanted) => wanted.store(true, Ordering::SeqCst),
             None => {
@@ -5911,6 +6230,14 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// Ends a pause of the automatic syncs Abort began on the page
+    /// Running (obf-1078): syncing now by hand syncs on from then.
+    fn sync_goes_on(&self) {
+        if let Some(syncing) = self.syncing.as_ref().filter(|s| s.paused()) {
+            syncing.go_on();
+        }
     }
 
     /// The AI port while it is open (#112).
@@ -7889,6 +8216,7 @@ impl App {
                 self.settings_query.clear();
                 self.backup_notes_left();
             }
+            Action::Running(act) => self.running_act(act),
             Action::NewNote => {
                 // One dialog at a time: the Note open is kept and closed.
                 self.leave_note()?;
@@ -8004,6 +8332,7 @@ impl App {
             Action::OpenGuide => self.open_url = Some(about_view::guide_url(self.t.locale())),
             Action::SyncNow => {
                 self.save_text()?;
+                self.sync_goes_on();
                 self.pages = vec![Page::Sync];
                 if self.store.sync_folder()?.is_some() {
                     self.folder_now()?;
@@ -12347,6 +12676,12 @@ impl App {
             match self.import.finished() {
                 Some((kind, imported)) => {
                     let made = imported.as_ref().is_ok_and(|s| s.area_id.is_some());
+                    // Aborted on the page Running (obf-1078): how far it came.
+                    let stopped = imported
+                        .as_ref()
+                        .ok()
+                        .and_then(|s| s.stopped.map(|of| (s.notes, of)));
+                    let what = self.import_what(&kind);
                     // Written on a connection of its own, a Note after
                     // another, also when it failed on the way: this one
                     // reads the log anew, the new Area too.
@@ -12363,6 +12698,9 @@ impl App {
                                 egui::ViewportCommand::Focus,
                             );
                         }
+                    }
+                    if let Some(stopped) = stopped {
+                        self.import_stopped(what, stopped);
                     }
                     // What it made is announced at the top; the Import
                     // dialog, when it shows, says the same in its place,
@@ -12394,14 +12732,26 @@ impl App {
                 // the log anew.
                 self.store.changed_elsewhere();
                 let t = self.t;
-                for (_, deleted) in finished {
-                    if let Err(details) = deleted {
-                        self.announce_failure(
+                for (area_id, deleted, moved) in finished {
+                    match deleted {
+                        Ok(true) => {}
+                        // Aborted on the page Running (obf-1078): the Area
+                        // stays, listed there with how far it came.
+                        Ok(false) => {
+                            let (moved, of) = moved.unwrap_or_default();
+                            self.stopped_jobs.push(Ended {
+                                what: t.running_area_deletion(&self.area_called(&area_id)),
+                                said: t.running_area_stopped(moved as i64, of as i64),
+                                id: JobId::AreaDeletion(area_id),
+                                goes_on: false,
+                            });
+                        }
+                        Err(details) => self.announce_failure(
                             t.area_delete_failed(),
                             t.area_delete_failed_title(),
                             (t.area_delete_failed_cause(), t.area_delete_failed_fix()),
                             details,
-                        );
+                        ),
                     }
                 }
                 self.refresh();
@@ -12671,31 +13021,36 @@ impl App {
             // Under it, while a sync of this Device runs (#225).
             // Not while hidden: nobody sees it, and it would keep asking for frames.
             let drawn = self.drawn(ui.ctx());
-            if drawn
-                && self
-                    .syncing
-                    .as_ref()
-                    .is_some_and(|s| s.shows_line(sync_line::LIMIT))
+            let named = if !drawn {
+                None
+            } else if self
+                .syncing
+                .as_ref()
+                .is_some_and(|s| s.shows_line(sync_line::LIMIT))
             {
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
-            } else if drawn && self.pack_opening() {
+                Some(self.t.sync_syncing())
+            } else if self.pack_opening() {
                 // And while a Pack opens off the window's thread.
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.pack_opening());
-            } else if drawn && self.import.running() {
+                Some(self.t.pack_opening())
+            } else if self.import.running() {
                 // And while an Import runs beside the window (obf-1061).
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.import_running());
-            } else if drawn && self.deletions.running() {
+                Some(self.t.import_running())
+            } else if self.deletions.running() {
                 // And while an Area is being deleted beside it (obf-1093).
-                sync_line::show(
-                    ui,
-                    bar.response.rect,
-                    tones.accent,
-                    self.t.area_deleting_line(),
-                );
-            } else if drawn && self.agenda_waiting() {
+                Some(self.t.area_deleting_line())
+            } else if self.agenda_waiting() {
                 // And while the Agenda is read for the first time
                 // (obf-1090).
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.agenda_reading());
+                Some(self.t.agenda_reading())
+            } else {
+                None
+            };
+            if let Some(named) = named {
+                let line = sync_line::show(ui, bar.response.rect, tones.accent, named);
+                // A click on it shows what runs (obf-1078).
+                if line.on_hover_text(self.t.running_line_hint()).clicked() {
+                    actions.push(Action::OpenPage(Page::Running));
+                }
             }
         }
         // What the Note dialog lies over: all but the menu bar, which
@@ -14666,6 +15021,10 @@ impl App {
                     }
                 }
                 ui.separator();
+                // What runs in the background, never greyed (obf-1078).
+                let running = Action::OpenPage(Page::Running);
+                menu_entries(ui, [(t.menu_running(), None, true, running)], actions);
+                ui.separator();
                 let compact = self.view.compact;
                 for (label, wanted) in [
                     (t.menu_detailed_views(), false),
@@ -14943,6 +15302,14 @@ impl App {
                             backup_view::notes_page(ui, &t, &self.wall, state, &mut asked);
                             actions.extend(asked.map(Action::BackupNotes));
                         }
+                    }
+                    Page::Running => {
+                        let jobs = self.jobs();
+                        let mut ended = self.paused_jobs();
+                        ended.extend_from_slice(self.stopped_jobs.list());
+                        let since = |at| self.since_text(at);
+                        let asked = running::page(ui, &t, tones, (&jobs, &ended), &since);
+                        actions.extend(asked.map(Action::Running));
                     }
                     Page::Sync | Page::Pair => {
                         let wall = self.wall.clone();
@@ -19960,6 +20327,16 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
         Page::BackupNotes => t.backup_open_page_title(),
         Page::Sync => t.sync_title(),
         Page::Pair => t.menu_pair(),
+        Page::Running => t.running_title(),
+    }
+}
+
+/// What reading `kind` is, as the page Running names it (obf-1078).
+fn reading_what(t: &L10n, kind: enrich::Kind) -> &'static str {
+    match kind {
+        enrich::Kind::Transcripts => t.running_transcripts(),
+        enrich::Kind::PhotoTexts => t.running_photo_texts(),
+        enrich::Kind::AttachmentTexts => t.running_attachment_texts(),
     }
 }
 

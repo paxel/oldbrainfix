@@ -41,7 +41,8 @@ pub fn run(
     // Told once, not every half minute while it lasts.
     let mut told: Option<String> = None;
     while !stop.load(Ordering::Relaxed) {
-        let due = last.is_none_or(|at| at.elapsed() >= EVERY);
+        // Paused on the page Running (obf-1078), only Sync now syncs.
+        let due = last.is_none_or(|at| at.elapsed() >= EVERY) && !syncing.paused();
         if due || wanted.swap(false, Ordering::SeqCst) {
             last = Some(Instant::now());
             match syncing.during(|| round(store)) {

@@ -55,6 +55,8 @@ struct State {
     /// How the model in use came, once a fetch put it in place; `None`
     /// for the one found at start.
     source: Option<SpeechModelSource>,
+    /// When the fetch running started, for the page Running (obf-1078).
+    since: Option<std::time::Instant>,
 }
 
 /// The speech model of this computer.
@@ -90,6 +92,7 @@ impl SpeechModel {
                 current: None,
                 target: None,
                 source: None,
+                since: None,
             })),
             stop: Arc::new(AtomicBool::new(false)),
             download,
@@ -187,6 +190,19 @@ impl SpeechModel {
         self.stop.store(true, Ordering::Relaxed);
     }
 
+    /// When the download or copy running started; `None` while none runs.
+    pub fn since(&self) -> Option<std::time::Instant> {
+        let state = self.state.lock();
+        matches!(state.status, Status::Fetching { .. })
+            .then_some(state.since)
+            .flatten()
+    }
+
+    /// Whether the download or copy running was told to stop.
+    pub fn cancelling(&self) -> bool {
+        self.since().is_some() && self.stop.load(Ordering::Relaxed)
+    }
+
     /// Fetches a model with `fetch`, a download of `target` or, for none,
     /// a file; whatever the outcome, the model in use before stays until
     /// a new one took its place.
@@ -202,6 +218,7 @@ impl SpeechModel {
             }
             state.outcome = None;
             state.target = target;
+            state.since = Some(std::time::Instant::now());
             state.status = Status::Fetching {
                 downloading: target.is_some(),
                 received: 0,

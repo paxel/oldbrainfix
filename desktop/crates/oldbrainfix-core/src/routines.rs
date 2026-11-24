@@ -670,6 +670,20 @@ impl<'a> Routines<'a> {
     /// are in, before the first and after each, as the Dart core's
     /// `trashNotes`.
     pub fn trash_notes(&self, notes: &[Note], progress: &dyn Fn(usize, usize)) -> Result<()> {
+        self.trash_notes_stopping(notes, progress, &|| false)
+            .map(drop)
+    }
+
+    /// As [`Routines::trash_notes`], asking `stop` before each Note
+    /// (obf-1078): once it says so, the Notes in the trash stay there, the
+    /// others where they are, and it answers `false`; `true` once all are
+    /// in.
+    pub fn trash_notes_stopping(
+        &self,
+        notes: &[Note],
+        progress: &dyn Fn(usize, usize),
+        stop: &dyn Fn() -> bool,
+    ) -> Result<bool> {
         let mut by_note: HashMap<String, Vec<Routine>> = HashMap::new();
         for routine in self.all()? {
             if let Some(note) = self.note(&routine)? {
@@ -678,6 +692,9 @@ impl<'a> Routines<'a> {
         }
         progress(0, notes.len());
         for (i, note) in notes.iter().enumerate() {
+            if stop() {
+                return Ok(false);
+            }
             self.store.batch(|| {
                 let at = dart_iso(self.store.now());
                 self.store
@@ -692,7 +709,7 @@ impl<'a> Routines<'a> {
             })?;
             progress(i + 1, notes.len());
         }
-        Ok(())
+        Ok(true)
     }
 
     /// Brings the Note `note_id` back from the trash, with the Routines
