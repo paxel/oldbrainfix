@@ -502,6 +502,10 @@ fn the_text_comes_off_with_an_undo_and_the_file_goes_asked_once() -> TestResult 
         &harness,
         "Remove this Attachment and keep its Attachment Text?"
     ));
+    assert!(shows(
+        &harness,
+        "The file goes from all your Devices and from everyone you share the Note's Area with. The text stays on the Note."
+    ));
     assert_eq!(shown()?.attachments.len(), 1);
     harness
         .query_all_by_label("Remove")

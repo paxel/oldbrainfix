@@ -309,3 +309,31 @@ fn ctrl_plus_grows_the_text_shown_at_once_and_rests_over_the_settings() -> TestR
     assert_eq!(harness.ctx.zoom_factor(), 1.0);
     Ok(())
 }
+
+#[test]
+fn quiet_today_goes_under_the_agendas_bar_where_the_bar_has_no_room_for_it() -> TestResult {
+    let store = store()?;
+    DeviceSettings::new(&store).set_fat_fingers(true)?;
+    let pills = "Take the evening pills with water";
+    Routines::new(&store).create(pills, &daily()?)?;
+    DeviceSettings::new(&store).set_text_size(TextSize::Largest)?;
+    let harness = window(&store, Selection::Agenda, MIN_WINDOW);
+    let scale = harness.ctx.pixels_per_point();
+    let edge = harness.ctx.content_rect().right() * scale;
+    let quiet = harness.get_by_label("Quiet today").rect();
+    let all = harness.get_by_label("All Routines and Reminders").rect();
+    let more = harness
+        .query_all_by_label(&format!("More for {pills}"))
+        .map(|n| n.rect().right())
+        .reduce(f32::max)
+        .ok_or("a row's menu")?;
+    assert!(
+        quiet.right() <= edge,
+        "Quiet today ends at {}",
+        quiet.right()
+    );
+    assert!(more <= edge, "a row's menu ends at {more}");
+    // On the line under the bar, at its right.
+    assert!(quiet.top() >= all.bottom());
+    Ok(())
+}

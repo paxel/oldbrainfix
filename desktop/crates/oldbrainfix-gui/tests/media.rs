@@ -200,6 +200,14 @@ fn shows<S>(harness: &Harness<'_, S>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
+/// The text a field of the editor holds, which has `words` in it.
+fn field_with<S>(harness: &Harness<'_, S>, words: &str) -> Option<String> {
+    let typed = |role| matches!(role, Role::TextInput | Role::MultilineTextInput);
+    harness
+        .query_all_by(|n| typed(n.role()) && n.value().is_some_and(|v| v.contains(words)))
+        .find_map(|n| n.value())
+}
+
 /// Where `label` shows last: in the Note dialog, over the card in the
 /// list that shows it too (#114, #146).
 fn rightmost<S>(harness: &Harness<'_, S>, label: &str) -> egui::Rect {
@@ -394,7 +402,8 @@ fn the_editor_shows_photos_recordings_and_their_transcripts() -> TestResult {
     let store = media_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store, &devices);
-    // Shed: two Photos, an empty Transcript; Groceries: a Transcript.
+    // Shed: two Photos, an empty Transcript; Groceries: its removed
+    // recording's words in its text (obf-1084).
     harness
         .state_mut()
         .select_note("note:00000000000000000000000000000003");
@@ -404,7 +413,10 @@ fn the_editor_shows_photos_recordings_and_their_transcripts() -> TestResult {
         .state_mut()
         .select_note("note:00000000000000000000000000000002");
     harness.run();
-    assert!(harness.query_all_by_label("Milk, eggs and bread").count() >= 2);
+    assert_eq!(
+        field_with(&harness, "Milk, eggs and bread").as_deref(),
+        Some("Groceries\n\nMilk, eggs and bread")
+    );
     // Dentist: a photo from another Device whose bytes are not here, and
     // the merged Notes' photo and recording in its Sections.
     harness
@@ -791,29 +803,37 @@ fn only_a_photo_or_recording_with_a_text_offers_its_removal() -> TestResult {
     );
     assert!(!shows(&harness, "Remove recording, keep text"));
     // Groceries: a photo without a Photo Text, its recording removed and
-    // the Transcript on the card and in the editor.
+    // its words in the text (obf-1084).
     harness
         .state_mut()
         .select_note("note:00000000000000000000000000000002");
     harness.run();
     assert!(!shows(&harness, "Remove photo, keep text"));
-    assert!(harness.query_all_by_label("Milk, eggs and bread").count() >= 2);
-    // A Note whose only photo was removed shows its Photo Text alone.
+    assert!(!shows(&harness, "Remove recording, keep text"));
+    assert!(field_with(&harness, "Milk, eggs and bread").is_some());
+    // A Note whose only photo was removed has its words as its text.
     harness
         .state_mut()
         .select_note("note:00000000000000000000000000000001");
     harness.run();
-    assert!(harness.query_all_by_label("RECEIPT\nTotal 12,50").count() >= 2);
-    // Dentist: the removed photo of a merged Note, in its Section.
+    assert_eq!(
+        field_with(&harness, "RECEIPT").as_deref(),
+        Some("RECEIPT\nTotal 12,50")
+    );
+    // Dentist: the removed photo of a merged Note, its words in its
+    // Section's text.
     harness.state_mut().select_note(DENTIST);
     harness.run();
-    assert!(shows(&harness, "Dr. Müller, Tuesday 9:00"));
+    assert_eq!(
+        field_with(&harness, "Dr. Müller").as_deref(),
+        Some("Dr. Müller, Tuesday 9:00")
+    );
     assert!(!shows(&harness, "Remove recording, keep text"));
     Ok(())
 }
 
 #[test]
-fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
+fn removing_a_photo_asks_once_and_puts_its_words_into_the_text() -> TestResult {
     let store = media_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
@@ -831,44 +851,56 @@ fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
     harness.run();
     assert!(shows(
         &harness,
-        "Remove this photo and keep its Photo Text?"
+        "Remove this photo and keep its words in the text?"
     ));
     harness.get_by_label("Cancel").click();
     harness.run();
     assert!(!shows(
         &harness,
-        "Remove this photo and keep its Photo Text?"
+        "Remove this photo and keep its words in the text?"
     ));
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert_eq!(shed.photos.len(), 3);
     assert!(shed.removed_photos.is_empty());
-    // Remove takes it; the Photo Text stays where it was.
+    // Remove takes it; its words go into the text, which the editor's
+    // field shows at once (obf-1084).
     harness.get_by_label("Remove photo, keep text").click();
     harness.run();
+    assert!(shows(
+        &harness,
+        "The file goes from all your Devices and from everyone you share the Note's Area with. Its words go into the text, to be edited or deleted like typed text."
+    ));
     harness.get_by_label("Remove").click();
     harness.run();
     assert!(!shows(
         &harness,
-        "Remove this photo and keep its Photo Text?"
+        "Remove this photo and keep its words in the text?"
     ));
     assert_eq!(harness.state().error(), None);
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert_eq!(shed.photos.len(), 2);
-    assert_eq!(shed.removed_photos, vec![photo.to_string()]);
+    assert!(!shed.photos.contains(&photo.to_string()));
     assert!(store.photo(photo).is_none(), "its bytes go");
-    // On the card and in the editor.
-    assert_eq!(harness.query_all_by_label(spare).count(), 2);
+    assert!(
+        !shed.photo_texts.contains_key(photo),
+        "no Photo Text is left"
+    );
+    let words = "Shed\n\nSpare key under the pot";
+    assert_eq!(shed.text, words);
+    assert_eq!(field_with(&harness, spare).as_deref(), Some(words));
     assert!(!shows(&harness, "Remove photo, keep text"));
-    // Search still finds it, under the Note dialog.
+    // Leaving writes no old text back; search still finds it.
     harness.state_mut().close_note();
     harness.run();
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert_eq!(shed.text, words);
     type_into(&mut harness, "Search all Notes", "spare key");
     assert_eq!(harness.state().shown_notes(), vec![SHED]);
     Ok(())
 }
 
 #[test]
-fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
+fn removing_a_recording_of_a_merged_note_puts_its_words_into_its_section() -> TestResult {
     let store = media_store()?;
     let merged = "note:00000000000000000000000000000006";
     let recording = "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d";
@@ -886,7 +918,7 @@ fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
     harness.run();
     assert!(shows(
         &harness,
-        "Remove this recording and keep its Transcript?"
+        "Remove this recording and keep its words in the text?"
     ));
     harness.get_by_label("Cancel").click();
     harness.run();
@@ -898,9 +930,63 @@ fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
     harness.run();
     let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
     assert!(note.recordings.is_empty());
-    assert_eq!(note.removed_recordings, vec![recording.to_string()]);
-    assert!(shows(&harness, "Bring the X-ray"));
+    assert!(note.transcripts.is_empty(), "no Transcript is left");
+    assert_eq!(note.text, "Bring the X-ray");
+    // The Section's field shows it, and leaving writes no old text back.
+    assert_eq!(
+        field_with(&harness, "X-ray").as_deref(),
+        Some("Bring the X-ray")
+    );
     assert!(!shows(&harness, "Remove recording, keep text"));
+    // Its text was empty: as on the phone, Ctrl+Z empties no text, and
+    // the field keeps showing what is stored.
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
+    assert_eq!(note.text, "Bring the X-ray");
+    assert_eq!(
+        field_with(&harness, "X-ray").as_deref(),
+        Some("Bring the X-ray")
+    );
+    assert_eq!(harness.state().error(), None);
+    harness.state_mut().close_note();
+    harness.run();
+    let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
+    assert_eq!(note.text, "Bring the X-ray");
+    Ok(())
+}
+
+#[test]
+fn ctrl_z_takes_a_removed_recordings_words_out_of_the_text_again() -> TestResult {
+    let store = empty_store()?;
+    let notes = Notes::new(&store);
+    let note = notes.capture("Bike", None, None)?;
+    let hash = notes.add_recording(&note.id, &heard())?;
+    notes.set_transcript(&note.id, &hash, "Lock code 1234")?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    harness.get_by_label("Remove recording, keep text").click();
+    harness.run();
+    harness.get_by_label("Remove").click();
+    harness.run();
+    let text = |store: &Store| -> Result<String, Box<dyn std::error::Error>> {
+        Ok(Notes::new(store).by_id(&note.id)?.ok_or("Bike")?.text)
+    };
+    assert_eq!(text(&store)?, "Bike\n\nLock code 1234");
+    assert_eq!(
+        field_with(&harness, "Bike").as_deref(),
+        Some("Bike\n\nLock code 1234")
+    );
+    // One step: the text as it was; the recording stays gone.
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert_eq!(text(&store)?, "Bike");
+    assert_eq!(field_with(&harness, "Bike").as_deref(), Some("Bike"));
+    let bike = Notes::new(&store).by_id(&note.id)?.ok_or("Bike")?;
+    assert!(bike.recordings.is_empty());
+    assert!(bike.transcripts.is_empty());
     Ok(())
 }
 

@@ -2142,7 +2142,9 @@ There are three kinds, and an action takes the first that fits.
   reads **End quiet day** in the same place, its right edge and the
   buttons before it where they were, and ends it as End on the line
   "Quiet day until midnight" does; the line stays on top. The bar's row
-  is as tall as the button, all of it centred in it.
+  is as tall as the button, all of it centred in it. Too narrow for it
+  beside the other buttons, as with Bigger text and icons in the
+  smallest window, it goes to the line under the bar, at the right.
 
 ### Menu bar and keys
 
@@ -2583,7 +2585,9 @@ There are three kinds, and an action takes the first that fits.
   "Open in its own window" and the cross, and so has a Note's own window
   before "Reading view", which shows none. They go step by step through
   everything changed since the Note opened: its text, its tables' cells,
-  its Sections' texts, its Lines (their checks too, as on the phone), its
+  its Sections' texts, the words a removed recording or photo put into
+  them (obf-1084; the file stays gone, an empty text stays as it is now),
+  its Lines (their checks too, as on the phone), its
   Area and Topic and its badges, each greyed while it has
   nothing to do. Typing is one step until it rests for a second, a new
   word begins, its field is left or saved, or anything else is done; a

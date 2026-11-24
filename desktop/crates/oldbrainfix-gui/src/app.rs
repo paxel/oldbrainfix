@@ -9680,9 +9680,11 @@ impl App {
                 if let Some(Dialog::RemoveMedia { note, hash, made }) = self.dialog.take() {
                     // A sync while the dialog was open may have taken it
                     // already.
+                    let mut into_text = false;
                     if made == Made::Photo {
                         if notes.may_remove_photo(&note, &hash)? {
                             notes.remove_photo(&note, &hash)?;
+                            into_text = true;
                         }
                     } else if made == Made::File {
                         if notes.may_remove_attachment(&note, &hash)? {
@@ -9696,6 +9698,12 @@ impl App {
                             self.playing = None;
                         }
                         notes.remove_recording(&note, &hash)?;
+                        into_text = true;
+                    }
+                    // Its words went into the text (obf-1084): the field
+                    // shows them, a step Ctrl+Z takes back.
+                    if into_text && let Some(removed) = notes.by_id(&note)? {
+                        self.show_written(&note, removed.text);
                     }
                 }
             }
@@ -9733,13 +9741,7 @@ impl App {
                 // As the phone joins them, escaped into a formatted text
                 // (ADR 0033).
                 let written = notes.take_over(&note, generated, append)?;
-                if self.text_of.as_deref() == Some(note.as_str()) {
-                    self.put_typed(written);
-                } else if let Some(field) = self.section_texts.get_mut(&note) {
-                    // A Section's field shows the text it has now, or the
-                    // next save would put the old one back (#183).
-                    field.text = written;
-                }
+                self.show_written(&note, written);
             }
             Action::RemoveText { note, hash, made } => {
                 self.save_text()?;
@@ -12165,6 +12167,16 @@ impl App {
             note_kinds::join(&self.name, &self.text)
         } else {
             self.text.clone()
+        }
+    }
+
+    /// Puts `written`, the text the Note or Section `note` has now, into
+    /// its field, or the next save would put the old one back (#183).
+    fn show_written(&mut self, note: &str, written: String) {
+        if self.text_of.as_deref() == Some(note) {
+            self.put_typed(written);
+        } else if let Some(field) = self.section_texts.get_mut(note) {
+            field.text = written;
         }
     }
 
@@ -18177,7 +18189,11 @@ impl App {
                             },
                         );
                         let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.remove_media_detail()).color(text));
+                        let detail = match made {
+                            Made::File => t.remove_attachment_detail(),
+                            Made::Photo | Made::Recording => t.remove_media_detail(),
+                        };
+                        ui.label(RichText::new(detail).color(text));
                         ui.horizontal(|ui| {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.remove()) {
@@ -18480,6 +18496,43 @@ impl App {
         let sizes = BandSizes::of(ui);
         let row = egui::vec2(ui.available_width(), sizes.row);
         let centred = egui::Layout::left_to_right(egui::Align::Center);
+        let quiet = self.view.agenda.as_ref().map(|a| a.quiet);
+        let quiet_width = quiet.map_or(0.0, |_| {
+            let words = [t.quiet_today(), t.end_quiet_day()];
+            let widest = words
+                .iter()
+                .map(|w| band_button_width(ui, w, sizes))
+                .fold(0.0, f32::max);
+            widest + ui.spacing().item_spacing.x
+        });
+        // Quiet today, the phone's bar action, in the band's framed look;
+        // End quiet day in its place while today is quiet.
+        let quiet_button = |ui: &mut Ui, quiet: bool, actions: &mut Vec<Action>| {
+            let word = if quiet {
+                t.end_quiet_day()
+            } else {
+                t.quiet_today()
+            };
+            let width = quiet_width - ui.spacing().item_spacing.x;
+            let resp = ui
+                .allocate_ui_with_layout(
+                    egui::vec2(width, sizes.row),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| band_button(ui, (icons::NOTIFICATIONS_OFF, word, word), sizes, None),
+                )
+                .inner;
+            if !quiet {
+                spotlight::anchor(ui, "quiet-today", resp.rect);
+            }
+            if resp.clicked() {
+                actions.push(if quiet {
+                    Action::EndQuietDay
+                } else {
+                    Action::QuietToday
+                });
+            }
+        };
+        let mut below = None;
         ui.allocate_ui_with_layout(row, centred, |ui| {
             ui.heading(RichText::new(t.agenda_title()).color(text));
             // As the phone's bar, without its Calendar (UI laws, "The
@@ -18492,19 +18545,14 @@ impl App {
             // New Session only in Advanced (#197, #246); then Quiet today,
             // once the Agenda is read (obf-1044, obf-1066), room for the
             // wider of its two words so that its right edge keeps its
-            // place.
+            // place. Too narrow for it, as with Bigger text and icons in
+            // the smallest window, it goes to the line under the bar, at
+            // the right, and the bar stays in the window.
             let advanced = self.view.advanced;
-            let quiet = self.view.agenda.as_ref().map(|a| a.quiet);
-            let quiet_width = quiet.map_or(0.0, |_| {
-                let words = [t.quiet_today(), t.end_quiet_day()];
-                let widest = words
-                    .iter()
-                    .map(|w| band_button_width(ui, w, sizes))
-                    .fold(0.0, f32::max);
-                widest + ui.spacing().item_spacing.x
-            });
             let buttons = 2 + usize::from(advanced);
-            let room = buttons as f32 * 32.0 - 4.0 + quiet_width;
+            let icons_room = buttons as f32 * 32.0 - 4.0;
+            let beside = ui.available_width() >= icons_room + quiet_width;
+            let room = icons_room + if beside { quiet_width } else { 0.0 };
             ui.add_space((ui.available_width() - room).max(0.0));
             let all = icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text);
             spotlight::anchor(ui, "all-routines", all.rect);
@@ -18523,34 +18571,15 @@ impl App {
             if advanced && icon_button(ui, icons::SESSION, t.new_session(), text).clicked() {
                 actions.push(Action::NewSession(None));
             }
-            // Quiet today, the phone's bar action, in the band's framed
-            // look; End quiet day in its place while today is quiet.
-            if let Some(quiet) = quiet {
-                let word = if quiet {
-                    t.end_quiet_day()
-                } else {
-                    t.quiet_today()
-                };
-                let width = quiet_width - ui.spacing().item_spacing.x;
-                let resp = ui
-                    .allocate_ui_with_layout(
-                        egui::vec2(width, sizes.row),
-                        egui::Layout::right_to_left(egui::Align::Center),
-                        |ui| band_button(ui, (icons::NOTIFICATIONS_OFF, word, word), sizes, None),
-                    )
-                    .inner;
-                if !quiet {
-                    spotlight::anchor(ui, "quiet-today", resp.rect);
-                }
-                if resp.clicked() {
-                    actions.push(if quiet {
-                        Action::EndQuietDay
-                    } else {
-                        Action::QuietToday
-                    });
-                }
+            match quiet {
+                Some(quiet) if beside => quiet_button(ui, quiet, actions),
+                _ => below = quiet,
             }
         });
+        if let Some(quiet) = below {
+            let right = egui::Layout::right_to_left(egui::Align::Center);
+            ui.allocate_ui_with_layout(row, right, |ui| quiet_button(ui, quiet, actions));
+        }
         ui.add_space(8.0);
         ui.spacing_mut().item_spacing.y = 16.0;
         let Some(agenda) = self.view.agenda.clone() else {
