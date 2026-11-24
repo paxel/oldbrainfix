@@ -145,14 +145,18 @@ class _MergeIntoScreenState extends State<MergeIntoScreen>
       appBar: pageBar(
         context,
         title: widget.adding ? t.addToNote : t.mergeInto,
+        background: searchHeaderColour(context),
       ),
       body: Column(
         children: [
-          BrowserSearchField(
-            controller: _query,
-            hint: t.searchAllHint,
-            onChanged: _typed,
-            onSet: _set,
+          // The Notes scroll under its line (obf-1088).
+          SearchBand(
+            child: BrowserSearchField(
+              controller: _query,
+              hint: t.searchAllHint,
+              onChanged: _typed,
+              onSet: _set,
+            ),
           ),
           Expanded(
             child: ListView(

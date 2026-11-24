@@ -160,13 +160,20 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
       ),
     );
     return Scaffold(
-      appBar: pageBar(context, title: t.fileInto),
+      appBar: pageBar(
+        context,
+        title: t.fileInto,
+        background: searchHeaderColour(context),
+      ),
       body: Column(
         children: [
-          BrowserSearchField(
-            controller: _query,
-            hint: t.fileIntoFilterHint,
-            onChanged: _filter,
+          // The places scroll under its line (obf-1088).
+          SearchBand(
+            child: BrowserSearchField(
+              controller: _query,
+              hint: t.fileIntoFilterHint,
+              onChanged: _filter,
+            ),
           ),
           Expanded(
             child: ListView(

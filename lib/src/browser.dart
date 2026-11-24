@@ -813,16 +813,41 @@ mixin SearchesAfterPause<T extends StatefulWidget> on State<T> {
 Color searchHeaderColour(BuildContext context) =>
     Theme.of(context).colorScheme.surfaceContainer;
 
+/// The band a search bar sits on (#351, obf-1041): filled with
+/// [searchHeaderColour], which its page's bar takes too, with a line along
+/// its bottom, so bar and band read as one header set off from the page
+/// and what scrolls under it goes under a line, not an edge in the page's
+/// own colour. The list pages have it in their [SearchHeaderSliver]; the
+/// Settings, File into…, Merge into…, Add to Note… and Link to… keep it
+/// standing over what they list (obf-1088).
+class SearchBand extends StatelessWidget {
+  /// The search field, with what goes under it.
+  final Widget child;
+
+  const SearchBand({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: searchHeaderColour(context),
+      border: Border(
+        bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+    ),
+    // Room under the bar, so its line runs along the band's bottom and
+    // not along the field's edge (#351, obf-1041).
+    child: Padding(padding: const EdgeInsets.only(bottom: 8), child: child),
+  );
+}
+
 /// The header of a list page with a search field, the Areas list, an
 /// Area and a Topic (#336, Q749): the first sliver of the list, it scrolls
 /// away with it and comes back over it, the list staying where it is, as
 /// soon as the list is scrolled up a little; one half shown at the end of
 /// a scroll snaps shown or gone. While [child]'s field has the focus or
 /// [controller] holds a search it stays, so a search being typed or shown
-/// never goes away. It sits on a band of [searchHeaderColour], which its
-/// page's bar takes too, with a line along its bottom (#351, obf-1041):
-/// bar and band read as one header set off from the page, and the cards
-/// go under it, shown over the list or with the list pulled down.
+/// never goes away. It sits on a [SearchBand] (#351, obf-1041), and the
+/// cards go under it, shown over the list or with the list pulled down.
 class SearchHeaderSliver extends StatefulWidget {
   /// The field's text: a search in it keeps the header.
   final TextEditingController controller;
@@ -876,26 +901,14 @@ class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final header = KeyedSubtree(
       key: _kept,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: searchHeaderColour(context),
-          border: Border(
-            bottom: BorderSide(color: theme.colorScheme.outlineVariant),
-          ),
-        ),
-        // Room under the bar, so its line runs along the band's bottom and
-        // not along the field's edge (#351, obf-1041).
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Focus(
-            canRequestFocus: false,
-            skipTraversal: true,
-            onFocusChange: (focused) => setState(() => _focused = focused),
-            child: widget.child,
-          ),
+      child: SearchBand(
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: (focused) => setState(() => _focused = focused),
+          child: widget.child,
         ),
       ),
     );

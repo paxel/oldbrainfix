@@ -618,18 +618,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final typed = _search.text.trim();
     final imports = ImportJobsScope.of(context);
     return Scaffold(
-      appBar: pageBar(context, title: t.settingsTitle),
+      appBar: pageBar(
+        context,
+        title: t.settingsTitle,
+        background: searchHeaderColour(context),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // At the top, above the page it filters (#282).
-          Spotlight(
-            id: 'settings-search',
-            child: BrowserSearchField(
-              key: const ValueKey('settingsSearch'),
-              controller: _search,
-              hint: t.settingsSearchHint,
-              onChanged: _searched,
+          // At the top, above the page it filters (#282), on its band, so
+          // the page scrolls under a line, not an edge (obf-1088).
+          SearchBand(
+            child: Spotlight(
+              id: 'settings-search',
+              child: BrowserSearchField(
+                key: const ValueKey('settingsSearch'),
+                controller: _search,
+                hint: t.settingsSearchHint,
+                onChanged: _searched,
+              ),
             ),
           ),
           Expanded(
