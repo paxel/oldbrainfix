@@ -5828,9 +5828,18 @@ impl App {
                 self.review_ai()?;
             }
             AiAction::Review => {
-                if self.ai_port.is_none() {
-                    self.review_ai()?;
+                // Always the review page (obf-1077): one that changed
+                // nothing, with the port closed, is declined as at
+                // "Done, review", and the page says "No changes yet".
+                if self.ai_port.is_none()
+                    && let Some(task) = self.store.ai_task()?
+                    && self.store.ai_review(&task)?.is_empty()
+                {
+                    self.store.decline_pending(&task)?;
                 }
+                // In the list, the dialogs over it closed.
+                self.pages.clear();
+                self.go(Selection::AiReview);
             }
             AiAction::Accept => {
                 if self.ai_port.is_some() {
@@ -5858,18 +5867,15 @@ impl App {
         Ok(())
     }
 
-    /// The AI Task's review (#112), or that none waits.
+    /// The AI Task's review (#112), "No changes yet" without one, and
+    /// while the port is open the changes so far (obf-1077).
     fn ai_review_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
-        let Some(shown) = &self.view.ai_review else {
-            let text = ui.visuals().text_color();
-            ui.heading(RichText::new(t.ai_review_title()).color(text));
-            let weak = ui.visuals().weak_text_color();
-            ui.label(RichText::new(t.ai_review_none()).color(weak));
-            return;
-        };
+        let none = ReviewShown::default();
+        let shown = self.view.ai_review.as_ref().unwrap_or(&none);
+        let open = self.ai_port.is_some();
         let mut asked = None;
-        if let Some(note) = ai_view::review_page(ui, &t, tones, shown, &mut asked) {
+        if let Some(note) = ai_view::review_page(ui, &t, tones, shown, open, &mut asked) {
             actions.push(Action::SelectNote(note));
         }
         if let Some(asked) = asked {
@@ -7429,7 +7435,7 @@ impl App {
             profile_newer: OwnProfile::new(&self.store).is_newer()?,
             profile_question: OwnProfile::new(&self.store).question()?,
             ai_review: match &ai_task {
-                Some(task) if self.selection == Selection::AiReview && self.ai_port.is_none() => {
+                Some(task) if self.selection == Selection::AiReview => {
                     Some(ai_view::read_review(&self.store, &self.t, task)?)
                 }
                 _ => None,
@@ -14275,7 +14281,6 @@ impl App {
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
         let cards = self.cards_key().is_some();
-        let reviews = self.ai_port.is_none() && self.view.ai_task.is_some();
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
                 let items = [
@@ -14422,8 +14427,8 @@ impl App {
             });
             // The main switch first (#334), then the Ask panel (#267)
             // only while it is on, every AI setting on one page (#335) and
-            // the review of the AI Task that waits (#279), greyed while
-            // none does.
+            // the review of the AI Task (#279), never greyed: with no change
+            // yet it says so (obf-1077).
             ui.menu_button(RichText::new(t.menu_ai()).color(text), |ui| {
                 let mut on = self.view.ai_on;
                 if theme::checkbox(ui, &mut on, RichText::new(t.ai_switch()).color(text)).changed()
@@ -14446,7 +14451,7 @@ impl App {
                     (
                         t.ai_review_title(),
                         None,
-                        reviews,
+                        true,
                         Action::Ai(AiAction::Review),
                     ),
                 ];

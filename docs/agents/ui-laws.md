@@ -1996,8 +1996,10 @@ replace a law of Both apps where they say so. A desktop law marked
   Ask… (Ctrl+K, #267), the Ask panel and its provider's card, and does
   the desktop answer the phone's questions. The AI port works either
   way. Ask… shows the Ask panel, AI settings… opens the page with every
-  AI setting, and Review the AI Task shows the review of the AI Task
-  that waits, greyed while none waits or the port is open.
+  AI setting, and Review the AI Task shows the review of the AI Task,
+  never greyed (obf-1077): with no change yet it says "No changes yet",
+  and while the port is open "Close the port" stands in for Accept all
+  and Reject all, under the changes so far.
 - **The AI settings are one page** (#335, Q748): a Page dialog like
   the Settings, with "AI (experimental)" on top, under it the
   provider's card only while it is on, then the AI port's card with its

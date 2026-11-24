@@ -730,25 +730,39 @@ pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> O
 /// per kind of change, each item a card naming what it is about with its
 /// changes, before and after, the user's own later edits marked as
 /// staying. A click on an item with a Note opens that Note in the Note dialog,
-/// as the task leaves it. Whether a Note was asked for, by its id.
+/// as the task leaves it. With no change yet it says so (obf-1077).
+/// While the port is `open`, "Close the port" stands in for Accept all
+/// and Reject all, which wait until it is closed. Whether a Note was
+/// asked for, by its id.
 pub fn review_page(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
     shown: &ReviewShown,
+    open: bool,
     asked: &mut Option<AiAction>,
 ) -> Option<String> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.heading(RichText::new(t.ai_review_title()).color(text));
-    ui.label(RichText::new(t.ai_review_intro()).color(weak));
+    if shown.groups.is_empty() {
+        ui.label(RichText::new(t.ai_review_no_changes()).color(weak));
+    } else {
+        ui.label(RichText::new(t.ai_review_intro()).color(weak));
+    }
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        if theme::primary(ui, true, t.ai_accept_all()).clicked() {
-            *asked = Some(AiAction::Accept);
-        }
-        if theme::destructive(ui, true, t.ai_reject_all()).clicked() {
-            *asked = Some(AiAction::AskReject);
+        if open {
+            if theme::primary(ui, true, t.ai_port_close()).clicked() {
+                *asked = Some(AiAction::Done);
+            }
+        } else if !shown.groups.is_empty() {
+            if theme::primary(ui, true, t.ai_accept_all()).clicked() {
+                *asked = Some(AiAction::Accept);
+            }
+            if theme::destructive(ui, true, t.ai_reject_all()).clicked() {
+                *asked = Some(AiAction::AskReject);
+            }
         }
     });
     ui.add_space(8.0);

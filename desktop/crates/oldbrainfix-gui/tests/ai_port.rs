@@ -6,7 +6,10 @@
 //! review: a section per kind of change, before and after, the user's
 //! own later edit marked as staying; Accept all keeps the changes, Reject
 //! all asks once and keeps nothing; a task that changed nothing is
-//! declined without a review. A task left waiting shows its review on
+//! declined without a review. AI ▸ Review the AI Task is never greyed:
+//! with no change yet it says so, and while the port is open it has
+//! "Close the port" in place of Accept all (obf-1077). A task left
+//! waiting shows its review on
 //! start; a bundle comes in meanwhile, as sync goes on, and the review
 //! marks the drafts it touched, which edit Accept keeps.
 //! Who may connect (#167) is chosen on the card while the port is
@@ -555,7 +558,7 @@ fn review_with(mine_wins: bool, synced: bool) -> Harness<'static, ()> {
         .build_ui(move |ui| {
             oldbrainfix_gui::theme::install(ui.ctx());
             let tones = oldbrainfix_gui::theme::tones(ui.visuals());
-            review_page(ui, &L10n::new("en"), tones, &shown, &mut None);
+            review_page(ui, &L10n::new("en"), tones, &shown, false, &mut None);
         });
     harness.run();
     harness
@@ -778,13 +781,19 @@ fn the_open_ports_announcement_opens_the_ai_settings_at_its_card() -> TestResult
 }
 
 #[test]
-fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestResult {
+fn the_ai_menu_reviews_the_task_and_is_never_greyed() -> TestResult {
     let store = device()?;
     let t = L10n::new("en");
     let milk = Notes::new(&store).capture("Milk", None, None)?;
     let mut harness = window(App::new(store.clone(), "en"));
-    assert!(!ai_entry_enabled(&mut harness, t.ai_review_title()));
-    bar(&harness, "AI").click();
+    // No AI Task: the page says so, with nothing to click.
+    assert!(ai_entry_enabled(&mut harness, t.ai_review_title()));
+    click(&mut harness, t.ai_review_title());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(shows(&harness, t.ai_review_no_changes()));
+    assert!(!shows(&harness, t.ai_port_close()));
+    assert!(!shows(&harness, t.ai_accept_all()));
+    harness.state_mut().select(Selection::Agenda);
     harness.run_steps(4);
 
     // The menu bar is under the AI settings: they close for it.
@@ -793,16 +802,30 @@ fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestRe
     click(&mut harness, t.ai_port_open());
     harness.state_mut().close_page();
     harness.run_steps(4);
-    // Open, the task does not wait yet.
-    assert!(!ai_entry_enabled(&mut harness, t.ai_review_title()));
-    bar(&harness, "AI").click();
-    harness.run_steps(4);
+    // Open, nothing drafted yet: "Close the port" in place of Accept all.
+    assert!(ai_entry_enabled(&mut harness, t.ai_review_title()));
+    click(&mut harness, t.ai_review_title());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(harness.state().ai_port().is_some());
+    assert!(shows(&harness, t.ai_review_no_changes()));
+    assert!(shows(&harness, t.ai_port_close()));
+    assert!(!shows(&harness, t.ai_accept_all()));
+    // What the AI drafts meanwhile shows, the port still open.
     let task = task(&harness)?;
     store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
-    harness.state_mut().open(Page::AiSettings);
+    harness.state_mut().select(Selection::Agenda);
     harness.run_steps(4);
-    click(&mut harness, t.ai_port_done());
+    assert!(ai_entry_enabled(&mut harness, t.ai_review_title()));
+    click(&mut harness, t.ai_review_title());
+    assert!(shows(&harness, &t.ai_after("Milk and eggs")));
+    assert!(!shows(&harness, t.ai_review_no_changes()));
+    assert!(!shows(&harness, t.ai_accept_all()));
+    // Closed from the page, the review to accept or reject.
+    click(&mut harness, t.ai_port_close());
+    assert!(harness.state().ai_port().is_none());
     assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(shows(&harness, t.ai_accept_all()));
+    assert!(shows(&harness, &t.ai_after("Milk and eggs")));
 
     harness.state_mut().select(Selection::Agenda);
     harness.run_steps(4);
@@ -812,5 +835,24 @@ fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestRe
     assert!(shows(&harness, &t.ai_after("Milk and eggs")));
     // The menu closed with the pick.
     assert!(!shows(&harness, t.menu_ai_settings()));
+    Ok(())
+}
+
+#[test]
+fn closing_the_port_from_a_review_with_no_changes_keeps_nothing() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let mut harness = settings(&store);
+    click(&mut harness, t.ai_port_open());
+    harness.state_mut().close_page();
+    harness.run_steps(4);
+    assert!(ai_entry_enabled(&mut harness, t.ai_review_title()));
+    click(&mut harness, t.ai_review_title());
+    assert!(shows(&harness, t.ai_review_no_changes()));
+    click(&mut harness, t.ai_port_close());
+    assert!(harness.state().ai_port().is_none());
+    assert!(store.ai_task()?.is_none());
+    assert!(!shows(&harness, t.ai_port_open_banner()));
+    assert!(!shows(&harness, t.ai_review_banner()));
     Ok(())
 }

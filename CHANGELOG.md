@@ -40,6 +40,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 - On the phone and the desktop, no search bar cuts off what scrolls under it; each sits on a band with a line under it. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
 - On the desktop, New Note stays when a filter is on; on both apps a Note the filter hides is announced with Show. ([obf-1070](https://github.com/paxel/oldbrainfix/issues/383))
+- On the desktop, Review the AI Task is never greyed out; with nothing to review it says "No changes yet". ([obf-1077](https://github.com/paxel/oldbrainfix/issues/390))
 
 ---
 
