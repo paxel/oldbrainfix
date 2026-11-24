@@ -53,12 +53,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Color? buttonColour(WidgetTester tester, String label) {
-    final button = tester.widget<TextButton>(
-      find.ancestor(of: find.text(label), matching: find.byType(TextButton)),
-    );
-    return button.style?.foregroundColor?.resolve({});
-  }
+  /// The fill of the button labelled [label]: a step that deletes is
+  /// filled on the error colour (obf-1081).
+  Color? buttonFill(WidgetTester tester, String label) => tester
+      .widget<Material>(
+        find
+            .ancestor(of: find.text(label), matching: find.byType(Material))
+            .first,
+      )
+      .color;
 
   Color errorColour(WidgetTester tester) =>
       Theme.of(tester.element(find.byType(AlertDialog))).colorScheme.error;
@@ -202,7 +205,7 @@ void main() {
 
       await rowMenu(tester, 'Kitchen', 'Delete');
       expect(find.text('Delete the Topic “Kitchen”?'), findsOneWidget);
-      expect(buttonColour(tester, 'Delete'), errorColour(tester));
+      expect(buttonFill(tester, 'Delete'), errorColour(tester));
       await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
 
@@ -223,7 +226,7 @@ void main() {
       await rowMenu(tester, 'Household', 'Delete');
       expect(find.text('Delete the Area “Household”?'), findsOneWidget);
       expect(find.text('Its Topics are deleted with it.'), findsOneWidget);
-      expect(buttonColour(tester, 'Delete'), errorColour(tester));
+      expect(buttonFill(tester, 'Delete'), errorColour(tester));
       await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
 
@@ -248,7 +251,7 @@ void main() {
       await rowMenu(tester, 'Kitchen', 'Delete');
       expect(find.textContaining('1 Note inside.'), findsOneWidget);
       expect(find.text('Move to Unsorted'), findsOneWidget);
-      expect(buttonColour(tester, 'Move to “Household”'), errorColour(tester));
+      expect(buttonFill(tester, 'Move to “Household”'), errorColour(tester));
       await tester.tap(find.text('Move to “Household”'));
       await tester.pumpAndSettle();
 
@@ -277,10 +280,10 @@ void main() {
       // Cancel, Unsorted, trash: an Area has no Area to move them into.
       final actions = find.descendant(
         of: find.byType(AlertDialog),
-        matching: find.byType(TextButton),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
       );
       expect(actions, findsNWidgets(3));
-      expect(buttonColour(tester, 'Move to trash'), errorColour(tester));
+      expect(buttonFill(tester, 'Move to trash'), errorColour(tester));
       await tester.tap(find.text('Move to Unsorted'));
       await tester.pumpAndSettle();
 
@@ -326,7 +329,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await rowMenu(tester, 'Kitchen', 'Delete');
-      expect(buttonColour(tester, 'Move to trash'), errorColour(tester));
+      expect(buttonFill(tester, 'Move to trash'), errorColour(tester));
       await tester.tap(find.text('Move to trash'));
       await tester.pumpAndSettle();
 

@@ -40,8 +40,9 @@ use oldbrainfix_core::{
 };
 
 use crate::all_routines_view::routine_name;
-use crate::app::{chip_row, embossed, icon_button, pill};
+use crate::app::{chip_row, embossed, icon_button};
 use crate::capture_choices::{ScheduleChoice, SessionChoice};
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
@@ -1069,7 +1070,7 @@ impl RoutineEditor {
                 if self.advanced {
                     changed |= self.advanced_editor(ui, t);
                 } else {
-                    changed |= self.simple_editor(ui, t, tones);
+                    changed |= self.simple_editor(ui, t);
                 }
                 changed |= self.start_editor(ui, t, once);
                 if !self.advanced && self.kind != RepeatKind::Once {
@@ -1078,7 +1079,7 @@ impl RoutineEditor {
             });
             spotlight::anchor(ui, "routine-schedule", schedule.rect);
             embossed(ui, tones, false, None, |ui| {
-                changed |= self.times_editor(ui, t, tones, once, shown_now);
+                changed |= self.times_editor(ui, t, once, shown_now);
             });
         });
         let next = embossed(ui, tones, false, None, |ui| {
@@ -1335,7 +1336,7 @@ impl RoutineEditor {
         self.advanced = advanced;
     }
 
-    fn simple_editor(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> bool {
+    fn simple_editor(&mut self, ui: &mut Ui, t: &L10n) -> bool {
         let text = ui.visuals().text_color();
         let mut kind = self.kind;
         let kinds = [
@@ -1393,7 +1394,7 @@ impl RoutineEditor {
             ui.horizontal_wrapped(|ui| {
                 for day in 1..=7 {
                     let on = self.weekdays.contains(&day);
-                    if pill(ui, tones, on, weekday_text(t, day)).clicked() {
+                    if design::chip(ui, on, weekday_text(t, day)).clicked() {
                         if on {
                             self.weekdays.remove(&day);
                         } else {
@@ -1534,7 +1535,6 @@ impl RoutineEditor {
         &mut self,
         ui: &mut Ui,
         t: &L10n,
-        tones: Tones,
         once: bool,
         shown_now: NaiveDateTime,
     ) -> bool {
@@ -1543,7 +1543,7 @@ impl RoutineEditor {
         ui.label(RichText::new(t.times_heading()).strong().color(text));
         ui.horizontal_wrapped(|ui| {
             if self.times.is_empty() {
-                pill(ui, tones, false, t.all_day());
+                design::chip(ui, false, t.all_day());
             }
             let mut removed = None;
             for time in &self.times {

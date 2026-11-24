@@ -348,7 +348,7 @@ class _SyncScreenState extends State<SyncScreen> {
       if (folder == null)
         Align(
           alignment: Alignment.centerLeft,
-          child: FilledButton.tonalIcon(
+          child: OutlinedButton.icon(
             key: const ValueKey('pick-folder'),
             onPressed: _pickFolder,
             icon: const Icon(Icons.folder_open),
@@ -481,13 +481,13 @@ class _SyncScreenState extends State<SyncScreen> {
         spacing: 8,
         runSpacing: 8,
         children: [
-          FilledButton.tonalIcon(
+          OutlinedButton.icon(
             key: const ValueKey('send-bundle'),
             onPressed: _bundleBusy ? null : _sendBundle,
             icon: const Icon(Icons.send_outlined),
             label: Text(t.bundleSend),
           ),
-          FilledButton.tonalIcon(
+          OutlinedButton.icon(
             key: const ValueKey('import-bundle'),
             onPressed: _bundleBusy ? null : _importBundle,
             icon: const Icon(Icons.file_open_outlined),
@@ -557,7 +557,7 @@ class _SyncScreenState extends State<SyncScreen> {
                       Text(t.syncSyncing),
                     ],
                   )
-                : FilledButton.tonal(
+                : OutlinedButton(
                     key: const ValueKey('join'),
                     onPressed: _sync,
                     child: Text(t.syncJoin),
@@ -568,7 +568,7 @@ class _SyncScreenState extends State<SyncScreen> {
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
+            child: OutlinedButton.icon(
               key: const ValueKey('show-code'),
               onPressed: _busy ? null : _showCode,
               icon: const Icon(Icons.qr_code_2),

@@ -349,13 +349,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               Text(context.t.importKeepAsk),
               const SizedBox(height: 16),
-              FilledButton.tonal(
+              OutlinedButton(
                 key: const ValueKey('importKeepZip'),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: Text(context.t.importKeepZip),
               ),
               const SizedBox(height: 8),
-              FilledButton.tonal(
+              OutlinedButton(
                 key: const ValueKey('importKeepFolder'),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: Text(context.t.importKeepFolder),

@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use egui::{RichText, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::tag_tree::TagNode;
 
+use crate::design::Chip;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::theme::{self, Tones};
@@ -108,8 +109,7 @@ fn rows(
                 asked.push(TagAsked::Fold(key(node), !open));
             }
         }
-        let tag =
-            egui::Button::new(RichText::new(name).size(15.0).color(tones.accent)).frame(false);
+        let tag = egui::Button::new(RichText::new(name).color(tones.accent)).frame(false);
         if ui
             .add(tag)
             .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -119,7 +119,7 @@ fn rows(
         }
         let weak = ui.visuals().weak_text_color();
         let count = i64::try_from(node.notes).unwrap_or(i64::MAX);
-        ui.label(RichText::new(t.tag_notes(count)).size(13.0).color(weak));
+        ui.label(RichText::new(t.tag_notes(count)).small().color(weak));
     });
     if open {
         for child in &node.children {
@@ -128,17 +128,16 @@ fn rows(
     }
 }
 
-/// The tags `found` for what is typed into a search, as buttons under its
-/// field; the one clicked, to fill in.
-pub fn suggestions(ui: &mut Ui, t: &L10n, found: &[String]) -> Option<String> {
+/// The tags `found` for what is typed into a search, as chips `height`
+/// high under its field (obf-1081); the one clicked, to fill in.
+pub fn suggestions(ui: &mut Ui, t: &L10n, found: &[String], height: f32) -> Option<String> {
     if found.is_empty() {
         return None;
     }
-    let text = ui.visuals().text_color();
     let mut picked = None;
     let row = ui.horizontal_wrapped(|ui| {
         for tag in found {
-            if ui.button(RichText::new(tag).color(text)).clicked() {
+            if Chip::new(tag).height(height).show(ui).clicked() {
                 picked = Some(tag.clone());
             }
         }
@@ -178,25 +177,19 @@ pub enum RowAsked {
     All,
 }
 
-/// The most used tags `tags` as one row of buttons under All Notes'
-/// search field (obf-1074), ending in "All tags…", shown also without a
-/// tag. A row wider than the band leaves out the tags at its end, the
-/// least used, so "All tags…" always shows. Each tag reads as "Search
-/// for" it to a screen reader, as a tag in a text does.
-pub fn most_used_row(ui: &mut Ui, t: &L10n, tags: &[String]) -> Option<RowAsked> {
-    let text = ui.visuals().text_color();
-    let font = egui::TextStyle::Button.resolve(ui.style());
-    let pad = ui.spacing().button_padding.x * 2.0;
+/// The most used tags `tags` as one row of chips `height` high under
+/// All Notes' search field (obf-1074, obf-1081), ending in "All tags…",
+/// shown also without a tag. A row wider than the band leaves out the
+/// tags at its end, the least used, so "All tags…" always shows. Each
+/// tag reads as "Search for" it to a screen reader, as a tag in a text
+/// does.
+pub fn most_used_row(ui: &mut Ui, t: &L10n, tags: &[String], height: f32) -> Option<RowAsked> {
     let gap = ui.spacing().item_spacing.x;
-    let width = |words: &str| {
-        let galley = ui.fonts_mut(|f| f.layout_no_wrap(words.to_string(), font.clone(), text));
-        galley.size().x + pad
-    };
     let all = t.all_tags();
-    let mut room = ui.available_width() - width(all);
+    let mut room = ui.available_width() - Chip::new(all).width(ui);
     let mut fit = 0;
     for tag in tags {
-        let wide = width(tag) + gap;
+        let wide = Chip::new(tag).width(ui) + gap;
         if wide > room {
             break;
         }
@@ -207,13 +200,12 @@ pub fn most_used_row(ui: &mut Ui, t: &L10n, tags: &[String]) -> Option<RowAsked>
     let row = ui.horizontal(|ui| {
         for tag in tags.iter().take(fit) {
             let said = t.search_for_tag(tag);
-            let chip = ui.button(RichText::new(tag).color(text));
-            chip.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &said));
+            let chip = Chip::new(tag).said(&said).height(height).show(ui);
             if chip.on_hover_text(&said).clicked() {
                 asked = Some(RowAsked::Search(tag.clone()));
             }
         }
-        if ui.button(RichText::new(all).color(text)).clicked() {
+        if Chip::new(all).height(height).show(ui).clicked() {
             asked = Some(RowAsked::All);
         }
     });

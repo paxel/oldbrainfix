@@ -348,6 +348,34 @@ pub fn install(ctx: &Context) {
     for theme in [Theme::Light, Theme::Dark] {
         ctx.style_mut_of(theme, |s| s.spacing.button_padding = BUTTON_PADDING);
     }
+    text_styles(ctx);
+}
+
+/// The size of a label's and a button's words (UI laws, "Spacing and
+/// type", obf-1081), before the text size: egui's body and button text.
+pub const LABEL: f32 = 14.0;
+
+/// The size of a caption, a meta line or a hint (obf-1081), before the
+/// text size: egui's small text, `.small()`.
+pub const CAPTION: f32 = 12.0;
+
+/// Sets egui's text styles to the design's sizes (obf-1081): body and
+/// buttons [`LABEL`], small text [`CAPTION`], grown by this Device's
+/// text size as a card's text is; headings and code keep egui's.
+fn text_styles(ctx: &Context) {
+    let factor = text_factor(ctx);
+    for theme in [Theme::Light, Theme::Dark] {
+        ctx.style_mut_of(theme, |s| {
+            for (style, size) in [
+                (egui::TextStyle::Body, LABEL),
+                (egui::TextStyle::Button, LABEL),
+                (egui::TextStyle::Small, CAPTION),
+            ] {
+                s.text_styles
+                    .insert(style, egui::FontId::proportional(size * factor));
+            }
+        });
+    }
 }
 
 /// Where the context keeps the factor of this Device's text size.
@@ -356,10 +384,12 @@ fn text_size_id() -> egui::Id {
 }
 
 /// Shows the text of Notes, Lines, Sections, the Agenda's rows and Ask's
-/// answers at `size`'s factor (#326, obf-1019), on top of the zoom of
-/// "Bigger text and icons"; the context keeps it, for every window.
+/// answers at `size`'s factor (#326, obf-1019), and the labels, buttons
+/// and captions around them (obf-1081), on top of the zoom of "Bigger
+/// text and icons"; the context keeps it, for every window.
 pub fn set_text_size(ctx: &Context, size: TextSize) {
     ctx.data_mut(|d| d.insert_temp(text_size_id(), size.factor()));
+    text_styles(ctx);
 }
 
 /// The factor of the text size shown around `ctx`; 1 until one is set.
@@ -368,8 +398,9 @@ pub fn text_factor(ctx: &Context) -> f32 {
 }
 
 /// `size`, a content text's usual size in points, at the text size of
-/// this Device (#326, obf-1019). Buttons, icons and labels around the
-/// text keep theirs.
+/// this Device (#326, obf-1019). Labels, buttons and captions grow with
+/// it through egui's text styles ([`LABEL`], [`CAPTION`]); icons keep
+/// their size.
 pub fn content(ui: &Ui, size: f32) -> f32 {
     size * text_factor(ui.ctx())
 }

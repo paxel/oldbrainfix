@@ -426,6 +426,97 @@ void main() {
       expect(find.text('pushed'), findsOneWidget);
     });
   });
+
+  group('design system (obf-1081)', () {
+    Future<ColorScheme> show(
+      WidgetTester tester,
+      Brightness brightness,
+      Widget child,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: lookTheme(brightness),
+          home: Scaffold(body: Center(child: child)),
+        ),
+      );
+      return Theme.of(tester.element(find.byType(Scaffold))).colorScheme;
+    }
+
+    Material materialIn(WidgetTester tester, Type type) => tester.widget(
+      find.descendant(of: find.byType(type), matching: find.byType(Material)),
+    );
+
+    for (final brightness in Brightness.values) {
+      testWidgets('an outlined button has a tonal fill and a 1 px outline in '
+          'the $brightness look', (tester) async {
+        final scheme = await show(
+          tester,
+          brightness,
+          OutlinedButton(onPressed: () {}, child: const Text('Open')),
+        );
+        final material = materialIn(tester, OutlinedButton);
+        expect(material.color, scheme.secondaryContainer);
+        final side = (material.shape as OutlinedBorder).side;
+        expect(side.width, 1);
+        expect(side.color, scheme.outline);
+        expect(material.textStyle?.color, scheme.onSecondaryContainer);
+      });
+
+      testWidgets('a button that deletes is filled on the error colour in '
+          'the $brightness look', (tester) async {
+        final scheme = await show(
+          tester,
+          brightness,
+          DestructiveButton(onPressed: () {}, child: const Text('Delete')),
+        );
+        final material = materialIn(tester, DestructiveButton);
+        expect(material.color, scheme.error);
+        expect(material.textStyle?.color, scheme.onError);
+      });
+
+      testWidgets('a chip is a full pill, 32 high inside its outline, in '
+          'the $brightness look', (tester) async {
+        await show(
+          tester,
+          brightness,
+          FilterChip(label: const Text('#home'), onSelected: (_) {}),
+        );
+        final pill = find
+            .descendant(
+              of: find.byType(FilterChip),
+              matching: find.byType(Material),
+            )
+            .first;
+        expect(tester.widget<Material>(pill).shape, isA<StadiumBorder>());
+        // 32 inside the outline, 1 px of it above and below.
+        expect(tester.getSize(pill).height, 32 + 2);
+      });
+
+      testWidgets('a text button with an icon has both in the accent in the '
+          '$brightness look', (tester) async {
+        await show(
+          tester,
+          brightness,
+          TextButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.copy),
+            label: const Text('Copy text'),
+          ),
+        );
+        final accent = LookTones.of(brightness).accent;
+        expect(
+          IconTheme.of(tester.element(find.byIcon(Icons.copy))).color,
+          accent,
+        );
+        expect(
+          DefaultTextStyle.of(tester.element(find.text('Copy text')))
+              .style
+              .color,
+          accent,
+        );
+      });
+    }
+  });
 }
 
 /// A [RenderGrown] at twice the size, without a child.

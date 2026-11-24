@@ -69,7 +69,7 @@
   "@biggerSwitch": {"description": "Switches this computer's window to 1.3 times its size: text, icons and buttons (#224). The phone calls it Fat fingers."},
   "biggerDetail": "Text, icons and buttons show 1.3 times their size on this computer.",
   "@biggerDetail": {"description": "Under the switch biggerSwitch."},
-  "textSizeDetailDesktop": "How large the text of Notes, Lines, the Agenda and Ask's answers shows on this computer, on top of “Bigger text and icons”. Ctrl+Plus and Ctrl+Minus change it.",
+  "textSizeDetailDesktop": "How large the text of Notes, Lines, the Agenda and Ask's answers shows on this computer, with the words of labels and buttons, on top of “Bigger text and icons”. Ctrl+Plus and Ctrl+Minus change it.",
   "@textSizeDetailDesktop": {"description": "Under the choice textSize in Settings > This computer (#326, obf-1019)."},
   "menuTextLarger": "Larger text",
   "@menuTextLarger": {"description": "View > Text size entry, Ctrl+Plus: the text one step larger (#326, obf-1019)."},

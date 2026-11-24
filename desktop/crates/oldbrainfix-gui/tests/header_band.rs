@@ -250,6 +250,33 @@ fn a_person_the_filter_keeps_is_a_chip_in_row_two() -> TestResult {
 }
 
 #[test]
+fn all_notes_tag_row_is_chips_as_tall_as_the_row_and_round_at_the_ends() -> TestResult {
+    let (store, _) = store(TextSize::Normal)?;
+    let harness = window(&store, Selection::All, egui::vec2(1280.0, 800.0));
+    let t = t();
+    let (band, _) = band(&harness);
+    let all = button(&harness, t.all_tags());
+    let view = button(&harness, t.show_notes_compact());
+    assert!(band.contains_rect(all), "{all:?} outside the band {band:?}");
+    assert!(
+        (all.height() - view.height()).abs() <= 1.0,
+        "the chip {all:?} as tall as the row's {view:?}"
+    );
+    // A full pill (obf-1081): round at half its height.
+    let round = drawn(&harness).into_iter().find_map(|shape| match shape {
+        Shape::Rect(r)
+            if (r.rect.min - all.min).length() < 1.0 && (r.rect.max - all.max).length() < 1.0 =>
+        {
+            Some(r.corner_radius)
+        }
+        _ => None,
+    });
+    let half = (all.height() / 2.0).round() as u8;
+    assert_eq!(round, Some(egui::epaint::CornerRadius::same(half)));
+    Ok(())
+}
+
+#[test]
 fn the_band_grows_with_the_text_size() -> TestResult {
     let measure = |size: TextSize| -> Result<(f32, f32, f32), Box<dyn std::error::Error>> {
         let (store, kitchen) = store(size)?;

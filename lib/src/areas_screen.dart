@@ -2015,13 +2015,7 @@ Widget _cancel(BuildContext context, AppLocalizations t) => TextButton(
   child: Text(t.cancel),
 );
 
-/// A confirm button for a destructive step: its verb in the error colour
-/// (UI laws).
+/// A confirm button for a step that deletes: filled on the error colour
+/// (UI laws, "Design system").
 Widget _destructive(BuildContext context, String label, VoidCallback onTap) =>
-    TextButton(
-      style: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.error,
-      ),
-      onPressed: onTap,
-      child: Text(label),
-    );
+    DestructiveButton(onPressed: onTap, child: Text(label));

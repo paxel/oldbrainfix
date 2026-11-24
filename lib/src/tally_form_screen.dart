@@ -427,7 +427,7 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
                 _fieldRow(t, index, field),
               Align(
                 alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
+                child: OutlinedButton.icon(
                   key: const ValueKey('tally-form-add-field'),
                   onPressed: _addField,
                   icon: const Icon(Icons.add),

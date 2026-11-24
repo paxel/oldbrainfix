@@ -12,7 +12,7 @@ use crate::app::{agenda_card, area_colour, check, list_scroll, row_title};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::day_text;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// The frog that marks Frogs: there is none among the Material icons,
 /// and egui's emoji font has it.
@@ -163,7 +163,9 @@ pub fn frog_row(
             let width = (ui.available_width() - 32.0).max(40.0);
             let body = ui.vertical(|ui| {
                 ui.set_max_width(width);
-                let mut line = RichText::new(&title).size(15.0).color(text);
+                let mut line = RichText::new(&title)
+                    .size(theme::content(ui, 16.0))
+                    .color(text);
                 if done {
                     line = line.strikethrough();
                 }

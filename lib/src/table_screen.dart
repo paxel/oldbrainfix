@@ -87,11 +87,8 @@ Future<bool> confirmTableDelete(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(t.cancel),
           ),
-          TextButton(
+          DestructiveButton(
             key: const ValueKey('table-delete-confirm'),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(t.delete),
           ),

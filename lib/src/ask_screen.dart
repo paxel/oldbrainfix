@@ -752,7 +752,7 @@ class _AskScreenState extends State<AskScreen> {
 
   Widget _tryAgain(AppLocalizations t) => Align(
     alignment: Alignment.centerLeft,
-    child: FilledButton.tonal(
+    child: OutlinedButton(
       key: const ValueKey('ask-try-again'),
       onPressed: _look,
       child: Text(t.phoneAskTryAgain),

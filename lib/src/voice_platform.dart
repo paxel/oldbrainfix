@@ -277,7 +277,7 @@ class RecordingButton extends StatelessWidget {
                 icon: icon,
               )
             else
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 onPressed: onPressed,
                 icon: icon,
                 label: Text(on ? t.stopPlaying : t.voiceRecording),

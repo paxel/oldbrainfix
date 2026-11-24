@@ -9,6 +9,7 @@ import 'folder_platform.dart';
 import 'hidden_from_ai_view.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'page_bar.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
@@ -415,7 +416,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
                       Text(t.syncSyncing),
                     ],
                   )
-                : FilledButton.tonal(
+                : OutlinedButton(
                     key: const ValueKey('invite'),
                     onPressed: _invite,
                     child: Text(t.shareInvite),
@@ -426,7 +427,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
+            child: OutlinedButton.icon(
               key: const ValueKey('share-show'),
               onPressed: _busy ? null : _showCode,
               icon: const Icon(Icons.qr_code_2),
@@ -445,7 +446,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
+                child: OutlinedButton.icon(
                   key: const ValueKey('share-afar'),
                   onPressed: _busy ? null : _shareAfar,
                   icon: const Icon(Icons.person_search_outlined),
@@ -726,10 +727,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(t.cancel),
           ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
+          DestructiveButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(t.removePerson),
           ),

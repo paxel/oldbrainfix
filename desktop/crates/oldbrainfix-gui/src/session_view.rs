@@ -256,7 +256,7 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &SessionCardShown, actions: &mut Vec<S
             ui.add(egui::Label::new(RichText::new(name).color(text)).wrap());
         });
     }
-    ui.label(RichText::new(&shown.setup).size(13.0).color(weak));
+    ui.label(RichText::new(&shown.setup).small().color(weak));
     if !shown.today.is_empty() {
         ui.add_space(4.0);
         ui.label(RichText::new(t.agenda_today()).strong().color(text));

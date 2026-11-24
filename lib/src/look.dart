@@ -327,9 +327,16 @@ ThemeData lookTheme(
     filledButtonTheme: fatFingers
         ? FilledButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
         : null,
-    outlinedButtonTheme: fatFingers
-        ? OutlinedButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
+    // The outlined button, a standing action that is not the main one
+    // (UI laws, "Design system", obf-1081): a tonal fill with its 1 px
+    // outline, so it reads as a button on the question marks too.
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        backgroundColor: scheme.secondaryContainer,
+        foregroundColor: scheme.onSecondaryContainer,
+        disabledBackgroundColor: scheme.onSurface.withValues(alpha: 0.12),
+      ).copyWith(iconSize: fatFingers ? buttonIcon : null),
+    ),
     elevatedButtonTheme: fatFingers
         ? ElevatedButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
         : null,
@@ -353,6 +360,13 @@ ThemeData lookTheme(
       backgroundColor: scheme.primary,
       foregroundColor: scheme.onPrimary,
       iconSize: fatFingers ? icon : null,
+    ),
+    // Chips are full pills, round ends at half their height, 32 high
+    // inside their outline (UI laws, "Design system", obf-1081):
+    // Material's 8 above and below its 20 high words made them 36.
+    chipTheme: const ChipThemeData(
+      shape: StadiumBorder(),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
     ),
     // Text fields sit on the question marks too and must stand out.
     inputDecorationTheme: InputDecorationThemeData(
@@ -400,6 +414,33 @@ class Embossed extends StatelessWidget {
           ),
         ],
       ),
+      child: child,
+    );
+  }
+}
+
+/// The button of an action that deletes or removes, in a dialog's action
+/// row (Delete, Remove, Move to trash): filled on the error colour, with
+/// its words in the colour on it (UI laws, "Design system", obf-1081).
+class DestructiveButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  const DestructiveButton({
+    super.key,
+    required this.onPressed,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: scheme.error,
+        foregroundColor: scheme.onError,
+      ),
+      onPressed: onPressed,
       child: child,
     );
   }

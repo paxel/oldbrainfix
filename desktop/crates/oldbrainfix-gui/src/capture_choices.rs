@@ -26,7 +26,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::{Atom, Button, Color32, Id, Key, Modifiers, Response, RichText, Ui, Vec2};
+use egui::{Atom, Button, Id, Key, Modifiers, Response, RichText, Ui, Vec2};
 use oldbrainfix_core::{
     Checklists, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes, Routines, Schedule,
     SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, WallClock, markdown,
@@ -522,15 +522,14 @@ pub fn nudge_key(ui: &Ui, nudges: bool) -> Option<Duration> {
 }
 
 /// The quick note's Open in the editor (obf-1080), under the Nudge
-/// buttons or their Save: a full-width outlined button with the editor's
-/// pencil before its words, greyed unless `enabled`. Its caller saves
+/// buttons or their Save: a full-width outlined button, the tonal fill
+/// with the outline (obf-1081), with the editor's pencil before its
+/// words, greyed unless `enabled`. Its caller saves
 /// the Note and opens it in the Note dialog.
 pub fn open_in_editor(ui: &mut Ui, t: &L10n, enabled: bool) -> Response {
     let text = ui.visuals().text_color();
     let pencil = Id::new("open in the editor pencil");
     ui.add_enabled_ui(enabled, |ui| {
-        // Outlined: no fill until the pointer is on it.
-        ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
         // The pencil and the words in the middle of the width.
         let atoms = (
             Atom::grow(),

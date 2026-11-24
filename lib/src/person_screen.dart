@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'announcements.dart';
 import 'bundle_platform.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'notes_screen.dart';
 import 'page_bar.dart';
 import 'photo_platform.dart';
@@ -136,11 +137,8 @@ Future<bool> _askBlock(
           onPressed: () => Navigator.of(context).pop(false),
           child: Text(t.cancel),
         ),
-        TextButton(
+        DestructiveButton(
           key: const ValueKey('block-confirm'),
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(areas.isEmpty ? t.personBlock : t.personBlockLeave),
         ),

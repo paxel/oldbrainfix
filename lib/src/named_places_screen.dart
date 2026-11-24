@@ -113,7 +113,7 @@ class _NamedPlacesScreenState extends State<NamedPlacesScreen> {
                 onPressed: () => Navigator.of(context).pop(false),
                 child: Text(t.cancel),
               ),
-              TextButton(
+              DestructiveButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 child: Text(t.delete),
               ),

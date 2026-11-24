@@ -120,6 +120,8 @@ void main() {
         expect(colour, isNotNull);
         expect(colour, barColour(tester));
         expect(colour, isNot(ground));
+        // The tone of the question marks, not Material's (obf-1081).
+        expect(colour, LookTones.of(brightness).mark);
         expect(colour?.a, 1.0);
         final border = decoration.border;
         expect(border, isA<Border>());

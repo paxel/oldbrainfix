@@ -19,7 +19,7 @@ use crate::app::{area_colour, banded_clickable_card, icon_button, list_scroll};
 use crate::icons;
 use crate::l10n::{self, L10n};
 use crate::schedule_text::schedule_text;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// What the page asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -201,7 +201,14 @@ fn card(
             let width = (ui.available_width() - 32.0).max(40.0);
             ui.vertical(|ui| {
                 ui.set_max_width(width);
-                ui.add(egui::Label::new(RichText::new(first).size(15.0).color(text)).truncate());
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(first)
+                            .size(theme::content(ui, 16.0))
+                            .color(text),
+                    )
+                    .truncate(),
+                );
                 ui.label(RichText::new(when).small().color(weak));
                 if let Some(mark) = mark {
                     let error = ui.visuals().error_fg_color;

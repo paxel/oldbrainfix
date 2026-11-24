@@ -350,7 +350,7 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
             ),
             for (final field in tally.fields) _fieldRow(tally, field, decimal),
             if (widget.notes.store.mayChange(widget.noteId))
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 key: const ValueKey('tally-add-field'),
                 onPressed: () => _openField(null),
                 icon: const Icon(Icons.playlist_add),
@@ -669,7 +669,7 @@ class _CardTallyState extends State<CardTally> {
               padding: const EdgeInsets.only(top: 8),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
+                child: OutlinedButton.icon(
                   key: const ValueKey('tally-add-entry'),
                   onPressed: _addEntry,
                   icon: const Icon(Icons.add),

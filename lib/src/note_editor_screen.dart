@@ -4564,11 +4564,8 @@ class _RemoveDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(t.cancel),
         ),
-        TextButton(
+        DestructiveButton(
           key: const ValueKey('remove-media-confirm'),
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(t.remove),
         ),

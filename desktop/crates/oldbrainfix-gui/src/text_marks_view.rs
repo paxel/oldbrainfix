@@ -580,9 +580,7 @@ pub fn marked_label(
     if !marked && !tagged && !linked && !finding {
         // At the Device's text size, as [`Look::of`] has it (#326,
         // obf-1019).
-        let size = look
-            .0
-            .unwrap_or_else(|| TextStyle::Body.resolve(ui.style()).size);
+        let size = look.0.unwrap_or(crate::theme::LABEL);
         let rich = RichText::new(part)
             .color(look.1)
             .size(crate::theme::content(ui, size));
@@ -958,11 +956,9 @@ impl Look {
     /// the Device's text size (#326, obf-1019), the rest as `ui`'s
     /// visuals have it.
     pub(crate) fn of(ui: &Ui, (size, colour): (Option<f32>, Color32)) -> Look {
+        // The body's own size before the text size grows it (obf-1081).
         let mut font = TextStyle::Body.resolve(ui.style());
-        if let Some(size) = size {
-            font.size = size;
-        }
-        font.size = crate::theme::content(ui, font.size);
+        font.size = crate::theme::content(ui, size.unwrap_or(crate::theme::LABEL));
         let visuals = ui.visuals();
         Look {
             font,

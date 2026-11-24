@@ -129,6 +129,7 @@ use crate::cell_pick;
 use crate::checklist_view::{
     self, CardMenu, ChecklistAction, ChecklistShown, LineStep, RemovedAsk, ShownLine,
 };
+use crate::design;
 use crate::enrich::{self, Enricher};
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::file_into::{self, FileIntoPicker, Picked};
@@ -16678,7 +16679,9 @@ impl App {
             spotlight::anchor(ui, "nav", row.response.rect);
             self.band_tools(ui, tones, sizes, hint, actions);
             // The tags starting with the "#…" typed (#267, Q639).
-            if let Some(tag) = tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions) {
+            if let Some(tag) =
+                tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions, sizes.row)
+            {
                 // The cursor after it, to type on.
                 let end = tag.chars().count();
                 self.query = tag;
@@ -16696,7 +16699,8 @@ impl App {
             // All Notes' most used tags while nothing is typed (obf-1074),
             // gone at the first letter.
             if self.selection == Selection::All && self.query.trim().is_empty() {
-                match tag_tree_view::most_used_row(ui, &self.t, &self.tag_row.tags) {
+                let tags = &self.tag_row.tags;
+                match tag_tree_view::most_used_row(ui, &self.t, tags, sizes.row) {
                     Some(RowAsked::Search(tag)) => actions.push(Action::SearchFor(tag)),
                     Some(RowAsked::All) => actions.push(Action::Select(Selection::Tags)),
                     None => {}
@@ -16741,7 +16745,8 @@ impl App {
             self.filter_kept()
         };
         for (_, name) in &kept {
-            beside += chip_width(ui, name, sizes) + gap;
+            let chip = design::Chip::new(name).closing().height(sizes.row);
+            beside += chip.width(ui) + gap;
         }
         if kinds.is_some() {
             beside += band_button_width(ui, t.menu_new_note(), sizes) + gap;
@@ -16833,7 +16838,7 @@ impl App {
             }
             if !trash {
                 self.person_filter_menu(ui, sizes, actions);
-                self.person_filter_chips(ui, (tones, sizes), kept, actions);
+                self.person_filter_chips(ui, sizes, kept, actions);
             }
             // "+" makes what the list holds (#161), an Area's level its
             // Topics too (UI laws, "Navigation"), whatever the filter
@@ -17065,13 +17070,16 @@ impl App {
     fn person_filter_chips(
         &self,
         ui: &mut Ui,
-        (tones, sizes): (Tones, BandSizes),
+        sizes: BandSizes,
         kept: Vec<(Option<String>, String)>,
         actions: &mut Vec<Action>,
     ) {
         let filter = &self.people;
         for (id, name) in kept {
-            if filter_chip(ui, tones, &name, sizes)
+            let chip = design::Chip::new(&name).on(true).closing();
+            if chip
+                .height(sizes.row)
+                .show(ui)
                 .on_hover_text(self.t.person_filter_remove(&name))
                 .clicked()
             {
@@ -17689,13 +17697,13 @@ impl App {
                         let focused = ui.memory(|m| m.has_focus(id));
                         // Its tables as grids, as in the Note's text (#257).
                         let unticked = BoxLook::default();
-                        let body = egui::TextStyle::Body.resolve(ui.style());
-                        // Typed at the Device's text size (#326, obf-1019).
-                        let mut typed_font = body.clone();
-                        typed_font.size = theme::content(ui, body.size);
+                        // Typed at the Device's text size (#326, obf-1019),
+                        // from the label's size before it (obf-1081).
+                        let mut typed_font = egui::TextStyle::Body.resolve(ui.style());
+                        typed_font.size = theme::content(ui, theme::LABEL);
                         let grids = markdown::uses(amend).then(|| {
                             let look = GridLook {
-                                size: body.size,
+                                size: theme::LABEL,
                                 colour: text,
                                 boxes: &unticked,
                             };
@@ -22522,16 +22530,15 @@ pub(crate) fn radio_column<T: PartialEq + Copy>(
     changed
 }
 
-/// A short single choice (#226): a wrapping row of pills, the `current`
-/// one selected, as the Routine editor's weekday pills look. A screen
-/// reader hears a radio group of radio buttons; Tab and the arrows move
+/// A short single choice (#226): a wrapping row of choice chips
+/// ([`design::Chip`], obf-1081), the `current` one picked, as the
+/// Routine editor's weekday chips look. A screen reader hears a radio group of radio buttons; Tab and the arrows move
 /// between them, Space or Enter picks one. True when a click picked one.
 pub(crate) fn chip_row<T: PartialEq + Copy>(
     ui: &mut Ui,
     current: &mut T,
     options: impl IntoIterator<Item = (T, String)>,
 ) -> bool {
-    let tones = theme::tones(ui.visuals());
     ui.horizontal_wrapped(|ui| {
         ui.ctx().accesskit_node_builder(ui.unique_id(), |node| {
             node.set_role(egui::accesskit::Role::RadioGroup);
@@ -22539,7 +22546,7 @@ pub(crate) fn chip_row<T: PartialEq + Copy>(
         let mut changed = false;
         for (value, label) in options {
             let on = *current == value;
-            if pill_as(ui, tones, on, &label, WidgetType::RadioButton).clicked() {
+            if design::Chip::new(&label).on(on).radio().show(ui).clicked() {
                 *current = value;
                 changed = true;
             }
@@ -22547,55 +22554,6 @@ pub(crate) fn chip_row<T: PartialEq + Copy>(
         changed
     })
     .inner
-}
-
-/// A pill to pick one or several of a few choices: self-painted so its
-/// text reads in every state, with the accent while `on`.
-pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Response {
-    pill_as(ui, tones, on, label, WidgetType::Button)
-}
-
-/// A [`pill`] a screen reader hears as `typ`, with the focus ring while
-/// it has the keyboard.
-fn pill_as(ui: &mut Ui, tones: Tones, on: bool, label: &str, typ: WidgetType) -> egui::Response {
-    let font = FontId::proportional(14.0);
-    let fg = ui.visuals().text_color();
-    let galley = ui.painter().layout_no_wrap(label.to_string(), font, fg);
-    let pad = egui::vec2(10.0, 5.0);
-    let (rect, resp) = ui.allocate_exact_size(galley.size() + pad * 2.0, Sense::click());
-    resp.widget_info(|| WidgetInfo::selected(typ, true, on, label));
-    if ui.is_rect_visible(rect) {
-        let fill = if on {
-            tones.accent.gamma_multiply(0.3)
-        } else if resp.hovered() {
-            tones.card.gamma_multiply(0.7)
-        } else {
-            Color32::TRANSPARENT
-        };
-        if fill.a() > 0 {
-            ui.painter().rect_filled(rect, 12.0, fill);
-        }
-        ui.painter().rect_stroke(
-            rect,
-            12.0,
-            egui::Stroke::new(
-                1.0,
-                if on {
-                    tones.accent
-                } else {
-                    ui.visuals().weak_text_color()
-                },
-            ),
-            egui::StrokeKind::Inside,
-        );
-        if resp.has_focus() {
-            let ring = ui.visuals().widgets.active.bg_stroke;
-            ui.painter()
-                .rect_stroke(rect.expand(2.0), 14.0, ring, egui::StrokeKind::Outside);
-        }
-        ui.painter().galley(rect.min + pad, galley, fg);
-    }
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 /// The box that checks an Occurrence off, called `label`.
@@ -23038,7 +22996,7 @@ fn agenda_entry(
         ui.add_space(4.0);
         // The row's words at the Device's text size (#326, obf-1019).
         let mut shown = RichText::new(words)
-            .size(theme::content(ui, 15.0))
+            .size(theme::content(ui, 16.0))
             .color(text);
         if struck {
             shown = shown.strikethrough().color(weak);
@@ -23142,7 +23100,7 @@ fn agenda_row(
                 ui.spacing_mut().item_spacing.y = 2.0;
                 ui.label(RichText::new(&time).strong().color(text));
                 let mut line = RichText::new(&title)
-                    .size(theme::content(ui, 15.0))
+                    .size(theme::content(ui, 16.0))
                     .color(text);
                 if done || skipped {
                     line = line.strikethrough();
@@ -23306,7 +23264,7 @@ fn list_heading(
         let body = ui.vertical(|ui| {
             ui.set_max_width(width);
             let words = RichText::new(words)
-                .size(theme::content(ui, 15.0))
+                .size(theme::content(ui, 16.0))
                 .color(text);
             ui.add(egui::Label::new(words).truncate());
         });
@@ -23603,7 +23561,7 @@ fn context_line(ui: &mut Ui, icon: char, line: &str) {
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         icons::show(ui, icon, 16.0, weak);
-        ui.add(egui::Label::new(RichText::new(line).size(13.0).color(text)).wrap());
+        ui.add(egui::Label::new(RichText::new(line).color(text)).wrap());
     });
 }
 
@@ -23742,7 +23700,7 @@ fn row(
     label: &str,
     droppable: bool,
 ) -> egui::Response {
-    let font = egui::FontId::proportional(15.0);
+    let font = egui::TextStyle::Body.resolve(ui.style());
     let height = 30.0;
     let width = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, height), Sense::click());
@@ -23803,7 +23761,7 @@ pub(crate) fn merge_row(ui: &mut Ui, tones: Tones, label: &str) -> egui::Respons
         }
         let x = rect.left() + 8.0;
         let colours = (ui.visuals().text_color(), ui.visuals().hyperlink_color);
-        let font = FontId::proportional(15.0);
+        let font = egui::TextStyle::Body.resolve(ui.style());
         let mut job = text_marks_view::tag_job(label, (0, label.len()), font, colours);
         job.wrap.max_width = (rect.right() - x - 8.0).max(0.0);
         let text = ui.painter().layout_job(job);
@@ -24893,53 +24851,6 @@ impl BandSizes {
     }
 }
 
-/// The room left and right in a [`filter_chip`].
-const CHIP_PAD: f32 = 12.0;
-
-/// How wide [`filter_chip`] draws `name`'s chip.
-fn chip_width(ui: &Ui, name: &str, sizes: BandSizes) -> f32 {
-    let font = FontId::proportional(sizes.words);
-    let colour = ui.visuals().text_color();
-    let words = ui.painter().layout_no_wrap(name.to_string(), font, colour);
-    CHIP_PAD + words.size().x + 6.0 + sizes.words + CHIP_PAD
-}
-
-/// A person the filter keeps, as a chip of the band's row (obf-1064):
-/// the name and ✕, a click taking them out; a screen reader hears the
-/// name.
-fn filter_chip(ui: &mut Ui, tones: Tones, name: &str, sizes: BandSizes) -> egui::Response {
-    let text = ui.visuals().text_color();
-    let galley =
-        ui.painter()
-            .layout_no_wrap(name.to_string(), FontId::proportional(sizes.words), text);
-    let (pad, cross) = (CHIP_PAD, sizes.words);
-    let width = chip_width(ui, name, sizes);
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, sizes.row), Sense::click());
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, true, name));
-    if ui.is_rect_visible(rect) {
-        let radius = rect.height() / 2.0;
-        let tint = if resp.hovered() { 0.45 } else { 0.3 };
-        ui.painter()
-            .rect_filled(rect, radius, tones.accent.gamma_multiply(tint));
-        let line = egui::Stroke::new(1.0, tones.accent);
-        ui.painter()
-            .rect_stroke(rect, radius, line, egui::StrokeKind::Inside);
-        let at = egui::pos2(rect.left() + pad, rect.center().y - galley.size().y / 2.0);
-        ui.painter().galley(at, galley, text);
-        let x = egui::Rect::from_center_size(
-            egui::pos2(rect.right() - pad - cross / 2.0, rect.center().y),
-            egui::vec2(cross, cross),
-        );
-        icons::paint(ui.painter(), x, icons::CLOSE, text);
-        if resp.has_focus() {
-            let ring = ui.visuals().widgets.active.bg_stroke;
-            ui.painter()
-                .rect_stroke(rect, radius, ring, egui::StrokeKind::Outside);
-        }
-    }
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
-}
-
 /// "+" at the top of a list (#146, #161): with one kind it makes that at
 /// once, with more its menu offers them, Note first, each with its icon
 /// and words; the kind picked. In a list's band, of `band`'s sizes, it
@@ -25233,7 +25144,7 @@ fn edited_text(
         let weak = ui.visuals().weak_text_color();
         let code = ui.visuals().code_bg_color;
         let dark = ui.visuals().dark_mode;
-        let small = FontId::proportional(13.0);
+        let small = egui::TextStyle::Small.resolve(ui.style());
         let grammars = text_marks_view::grammars(ui.ctx());
         let grammar = grammars.by_scope(edit.language);
         let typed_format = match (as_code, formatted) {
@@ -26272,9 +26183,7 @@ fn card_findings(ui: &mut Ui, t: &L10n, id: &str, found: &[Finding]) -> Option<A
             if let Some(next) = found.get(CARD_FINDINGS) {
                 let more = (found.len() - CARD_FINDINGS) as i64;
                 let accent = theme::tones(ui.visuals()).accent;
-                let label = RichText::new(t.desk_find_more(more))
-                    .size(theme::content(ui, 13.0))
-                    .color(accent);
+                let label = RichText::new(t.desk_find_more(more)).color(accent);
                 let button = ui.add(egui::Button::new(label).frame(false));
                 if button
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -26526,7 +26435,7 @@ fn note_card(
                                 {
                                     icons::show(ui, icon, 16.0, colour.unwrap_or(weak));
                                 }
-                                ui.label(RichText::new(place).size(13.0).color(text));
+                                ui.label(RichText::new(place).color(text));
                             }
                         });
                     }
@@ -26536,7 +26445,7 @@ fn note_card(
                         ui.horizontal(|ui| {
                             icons::show(ui, pack_view::PACK_ICON, 16.0, weak);
                             let said = t.pack_from(profile_view::display_name(t, &from.name));
-                            ui.label(RichText::new(said).size(13.0).color(weak));
+                            ui.label(RichText::new(said).small().color(weak));
                         });
                     }
                     // Under where it is filed, over its text (#215).
@@ -26576,7 +26485,7 @@ fn note_card(
                                     if !struck.is_empty() {
                                         let said = t.shopping_struck_count(struck.len() as i64);
                                         let row = folded_row(ui, struck_open, |ui| {
-                                            ui.label(RichText::new(&said).size(13.0).color(weak));
+                                            ui.label(RichText::new(&said).small().color(weak));
                                         });
                                         struck_rect = Some((row.response.rect, said));
                                         if struck_open {

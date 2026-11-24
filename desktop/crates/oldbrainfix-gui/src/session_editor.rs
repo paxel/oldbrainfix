@@ -1,6 +1,6 @@
 //! The Session's part of the Routine editor (#104, ADR 0029), as the
 //! phone's `session_editor.dart` draws it, on top of the schedule: the
-//! pool as a checkbox per Tally, filtered by the pills of its Tallies'
+//! pool as a checkbox per Tally, filtered by the chips of its Tallies'
 //! tags (#220), ordered with up and down buttons for Rolling while it is
 //! not filtered; the count's − / + stepper; the weekdays in a fold, each with
 //! a checkbox for its own count and then its stepper, open as last left
@@ -18,8 +18,9 @@ use egui::{RichText, Ui};
 use oldbrainfix_core::sessions::keys::MAX_COUNT;
 use oldbrainfix_core::{Notes, Schedule, SessionRule, SessionSetup, Sessions, Store, text_tags};
 
-use crate::app::{embossed, icon_button, pill, row_title};
+use crate::app::{embossed, icon_button, row_title};
 use crate::capture_choices::SessionChoice;
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::routine_editor::stepper;
@@ -339,7 +340,7 @@ impl SessionDraft {
             if self.order.is_empty() && !self.new_tally {
                 ui.label(RichText::new(t.session_pool_none_desk()).color(weak));
             } else if !self.order.is_empty() {
-                self.tag_chips(ui, tones);
+                self.tag_chips(ui);
                 self.pool_rows(ui, t, page);
             }
             // Making one stays inside the list, on this page (#161).
@@ -422,11 +423,11 @@ impl SessionDraft {
         }
     }
 
-    /// The tags of the pool's Tallies as pills (#220), those most of them
+    /// The tags of the pool's Tallies as chips (#220), those most of them
     /// carry first; a click picks one to show only the Tallies carrying
     /// any of those picked, and again takes it back. Nothing without a
     /// tag.
-    fn tag_chips(&mut self, ui: &mut Ui, tones: Tones) {
+    fn tag_chips(&mut self, ui: &mut Ui) {
         let tags = self.tag_list();
         if tags.is_empty() {
             return;
@@ -434,7 +435,7 @@ impl SessionDraft {
         ui.horizontal_wrapped(|ui| {
             for tag in tags {
                 let on = self.picked.contains(&tag);
-                if pill(ui, tones, on, &tag).clicked() {
+                if design::chip(ui, on, &tag).clicked() {
                     if on {
                         self.picked.remove(&tag);
                     } else {

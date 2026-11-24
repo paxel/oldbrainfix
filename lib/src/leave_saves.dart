@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'look.dart';
 
 /// Leaving an edit page by Back, the swipe back or its bar's arrow
 /// (#275, UI laws, "Navigation"): a page left as it opened, not
@@ -70,11 +71,8 @@ Future<bool> askDiscard(BuildContext context) async {
           onPressed: () => Navigator.of(context).pop(false),
           child: Text(t.leaveKeepEditing),
         ),
-        TextButton(
+        DestructiveButton(
           key: const ValueKey('leave-discard'),
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(t.leaveDiscard),
         ),

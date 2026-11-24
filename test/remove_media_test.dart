@@ -130,14 +130,15 @@ void main() {
         find.text('Remove this photo and keep its words in the text?'),
         findsOneWidget,
       );
-      final confirm = tester.widget<TextButton>(
-        find.byKey(const ValueKey('remove-media-confirm')),
+      // Filled on the error colour, as every step that removes (obf-1081).
+      final confirm = tester.widget<Material>(
+        find.descendant(
+          of: find.byKey(const ValueKey('remove-media-confirm')),
+          matching: find.byType(Material),
+        ),
       );
       final context = tester.element(find.byType(AlertDialog));
-      expect(
-        confirm.style?.foregroundColor?.resolve({}),
-        Theme.of(context).colorScheme.error,
-      );
+      expect(confirm.color, Theme.of(context).colorScheme.error);
       await tap(tester, find.text('Remove'));
 
       final after = notes.byId(note.id)!;

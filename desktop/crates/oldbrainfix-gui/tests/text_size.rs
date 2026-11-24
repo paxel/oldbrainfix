@@ -1,8 +1,8 @@
 //! The text's own size driven headless (#326, obf-1019): normal, larger
 //! and largest, in View ▸ Text size, in Settings ▸ This computer and by
 //! Ctrl+Plus and Ctrl+Minus, kept at the ends and across a restart; the
-//! text of Notes and the Agenda's rows grow, buttons and boxes keep their
-//! size, egui's zoom stays that of "Bigger text and icons", and the
+//! text of Notes and the Agenda's rows grow, the words of labels and
+//! buttons with them (obf-1081), boxes keep their size, egui's zoom stays that of "Bigger text and icons", and the
 //! smallest window holds it all at largest with Bigger text and icons on.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
@@ -195,7 +195,8 @@ fn the_settings_pick_a_step_beside_bigger_text_and_icons() -> TestResult {
 }
 
 #[test]
-fn a_notes_text_and_the_agendas_rows_grow_while_buttons_and_boxes_keep_their_size() -> TestResult {
+fn a_notes_text_the_agendas_rows_and_the_buttons_words_grow_while_boxes_keep_their_size()
+-> TestResult {
     let store = store()?;
     Notes::new(&store).capture("Buy milk", None, None)?;
     Routines::new(&store).create("Take pills", &daily()?)?;
@@ -211,7 +212,7 @@ fn a_notes_text_and_the_agendas_rows_grow_while_buttons_and_boxes_keep_their_siz
             .next()
             .map(|n| n.rect())
             .ok_or("a box")?;
-        Ok((note.width(), menu.height(), row.width(), tick.size()))
+        Ok((note.width(), menu.width(), row.width(), tick.size()))
     };
     let (note, menu, row, tick) = measure(TextSize::Normal)?;
     for size in [TextSize::Larger, TextSize::Largest] {
@@ -225,7 +226,10 @@ fn a_notes_text_and_the_agendas_rows_grow_while_buttons_and_boxes_keep_their_siz
             (grown_row / row - factor).abs() < 0.08,
             "{size:?}: a row's words {row} → {grown_row}"
         );
-        assert_eq!(grown_menu, menu, "{size:?}: the menu bar keeps its size");
+        assert!(
+            grown_menu > menu + 1.0,
+            "{size:?}: the menu bar's words grow with it (obf-1081), {menu} → {grown_menu}"
+        );
         assert_eq!(grown_tick, tick, "{size:?}: a box keeps its size");
     }
     Ok(())

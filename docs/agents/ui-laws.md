@@ -15,8 +15,8 @@ The building blocks every screen is made of, defined once for both apps
 (obf-1081, C24). This section stands before the three parts and binds
 the phone and the desktop alike. A screen uses these blocks and invents
 no others; a block missing here is added here first. The page that
-shows each one live waits for the user's approval before a shared
-widget set is built from it.
+shows each one live was approved on 2026-11-24 (obf-1081), and each
+app builds its screens from one shared widget set.
 
 - **Everything tappable is recognisable as tappable** (obf-1081): a
   fill, an outline, or the accent's colour on its words and icon says
@@ -32,7 +32,8 @@ There are three kinds, and an action takes the first that fits.
   Create, Done, Use, Restore, Continue), on the accent with its words
   in `on_accent`. An action that deletes or removes (Delete, Remove,
   Move to Trash) is filled on the error colour instead. Phone:
-  `FilledButton` / `FilledButton.icon`. Desktop: `theme::primary`,
+  `FilledButton` / `FilledButton.icon`, and `DestructiveButton` in
+  `look.dart`. Desktop: `theme::primary`,
   `theme::main_action` (which Ctrl+Enter also runs) and
   `theme::destructive` in `theme.rs`. Do not use it for a second action
   beside the main one, nor as a page's only way to leave.
@@ -40,18 +41,20 @@ There are three kinds, and an action takes the first that fits.
   1 px outline and its words, an icon before them where one says more,
   for example the quick note's full-width "Open in the editor"
   (obf-1080) or the list band's "+ New Note", "View" and "Show Notes
-  by…" (obf-1067). Phone: `OutlinedButton` / `OutlinedButton.icon`.
-  Desktop: every button egui draws (`ui.button`, `Button::new`) wears
+  by…" (obf-1067). Phone: `OutlinedButton` / `OutlinedButton.icon`,
+  which `lookTheme`'s `outlinedButtonTheme` in `look.dart` gives the
+  tonal fill with the outline. Desktop: every button egui draws (`ui.button`, `Button::new`) wears
   the secondary look of "Buttons look like buttons" (Desktop ▸ Buttons
   and look, #218), a tonal fill with the outline; `band_button` in
   `app.rs` draws that frame at the band's height, and
-  `capture_choices::open_in_editor` leaves the fill out until the
-  pointer is on it. Do not use it for the main action or in a menu.
+  `capture_choices::open_in_editor` wears it across the width
+  (obf-1081). Do not use it for the main action or in a menu.
 - **Text with icon: a lesser action inside a card or a row** ("Copy
   text", the Frogs' "Another one"). It has no frame: the icon and the
   words are both in the accent, which is what makes it a button, and it
   gets a tinted ground under the finger or pointer. Phone:
-  `TextButton.icon`. Desktop: no helper yet (obf-1081). Do not draw it
+  `TextButton.icon`. Desktop: `design::text_button` in `design.rs`
+  (obf-1081), its words and icon in the accent's text colour. Do not draw it
   in the text's or the weak colour, and do not leave out its icon. A
   dialog's action row is the one place a text button goes without an
   icon (Cancel, Close, Not now beside the filled main action), because
@@ -73,7 +76,8 @@ There are three kinds, and an action takes the first that fits.
   with its chips, and "+ New Note", all one height (36), wrapping under
   the field below 200 wide.
 - Phone: `SearchBand`, and `SearchHeaderSliver` for a list that scrolls
-  it away, in `browser.dart`; its fill is `searchHeaderColour`. Desktop:
+  it away, in `browser.dart`; its fill is `searchHeaderColour`, the
+  marks' tone (`LookTones.mark` in `look.dart`). Desktop:
   `theme::search_band` with `theme::band_fill`, and `list_band` /
   `band_tools` with `BandSizes` in `app.rs`.
 - Use it on every page or dialog that searches what it lists. Do not
@@ -100,19 +104,24 @@ There are three kinds, and an action takes the first that fits.
 
 - **A chip is a short, tappable word with rounded ends**, a 1 px
   outline, and its fill tinted with the accent while picked (the phone
-  uses Material's chip with radius 8, the desktop a pill). There are
+  gives Material's chip the pill and 32 inside the outline once, in
+  `lookTheme`'s `chipTheme` in `look.dart`; the desktop
+  `design::Chip` and `design::chip` in `design.rs`, a full pill 32
+  high, in a list's band the band's 36, obf-1081). There are
   three uses:
   - **Filter chips** pick what a list shows and can be taken back
     (the Session pool's tags, #220; a Routine's weekdays; the person
     filter's kept people, whose ✕ takes them out, obf-1064). Phone:
-    `FilterChip` / `InputChip`. Desktop: `pill` and `filter_chip` in
-    `app.rs`.
+    `FilterChip` / `InputChip`. Desktop: `design::chip`, a kept
+    person's with `Chip::closing`.
   - **Tag chips** start a search for a tag, and the row ends in
-    "All tags…" (obf-1074). Phone: `TagChipRow` (`ActionChip`) in
-    `tag_tree_screen.dart`.
+    "All tags…" (obf-1074), as do the tags a typed "#…" suggests.
+    Phone: `TagChipRow` (`ActionChip`) in `tag_tree_screen.dart`.
+    Desktop: `tag_tree_view::most_used_row` and
+    `tag_tree_view::suggestions`, of `design::Chip`.
   - **Choice chips** pick exactly one of a few short options (Theme,
-    Text size). Phone: `ChoiceChips` in `look.dart`. Desktop: none
-    yet; it picks one with `radio_column`.
+    Text size). Phone: `ChoiceChips` in `look.dart`. Desktop:
+    `chip_row` in `app.rs` (`Chip::radio`).
 - Use a chip for a short word in a row of equals. Do not use one for
   an action with a consequence (use a button), nor for a choice with
   details (that is a `RadioColumn` or `radio_column`).
@@ -134,12 +143,13 @@ There are three kinds, and an action takes the first that fits.
   Material's dialog title on the phone and 18 strong on the desktop
   (`.size(18.0).strong()`). A card's or section's heading is 16
   medium (phone `titleMedium`), on the desktop strong. Labels and
-  buttons are 14 (phone `labelLarge` / `bodyMedium`, desktop
-  `BandSizes::words` and `pill`). A caption, meta line or hint is 12 in
-  the weak colour (phone `bodySmall`). The desktop still draws most
-  labels in egui's own sizes (body and buttons 13, `.small()` 9),
-  which these steps replace. Fat fingers grows all of them (#224);
-  Text size grows only content.
+  buttons are 14 (phone `labelLarge` / `bodyMedium`, desktop egui's
+  body and button text styles, `theme::LABEL`). A caption, meta line
+  or hint is 12 in the weak colour (phone `bodySmall`, desktop
+  `.small()`, `theme::CAPTION`). The desktop sets these once in egui's
+  text styles (`theme::install`), grown by Text size as content is
+  (obf-1081). Fat fingers grows all of them (#224); on the phone Text
+  size grows only content.
 
 ## Both apps
 
@@ -1109,7 +1119,9 @@ There are three kinds, and an action takes the first that fits.
   cells, the Agenda's rows and Ask's answers, as they read and in the
   fields they are typed in; buttons, icons, boxes, menus, bars, headings
   of pages and the labels around the text keep their size, which stays
-  Fat fingers' alone. The step multiplies the system's font size and
+  Fat fingers' alone. On the desktop the words of labels, buttons and
+  captions grow with it too, through egui's text styles (Design system
+  ▸ Spacing and type, obf-1081); its icons keep their size. The step multiplies the system's font size and
   Fat fingers (the desktop's zoom), never replaces them, and applies
   once where content nests. A formatted text's room, a list item's
   indent and a code block's padding grow with the size it shows at, so
@@ -1925,7 +1937,7 @@ There are three kinds, and an action takes the first that fits.
   is scrolled up a little; half shown, it snaps. While the field has the
   focus or a search it stays; otherwise no edge under the bar cuts the
   list. The bar sits on a band (#351, obf-1041), and the page's top bar
-  takes the band's fill, the theme's surface container, set off from the
+  takes the band's fill, the pattern's (marks') tone (obf-1081), set off from the
   page's ground in the light and the dark look, so top bar and band read
   as one header with one line under the band only; shown over the list,
   and with the list pulled down, the cards go under it. The pages whose
@@ -2418,7 +2430,7 @@ There are three kinds, and an action takes the first that fits.
   with its words beside the box, its detail in a small weak line under
   it, in place of the phone's switch on its own line. A short single
   choice is a wrapping row of choice chips (`app::chip_row`, the weekday
-  pills' look), a radio group of radio buttons to a screen reader, Tab
+  chips' look, `design::Chip`), a radio group of radio buttons to a screen reader, Tab
   and the arrows moving between them, Space or Enter picking one; a
   long one is a column of radio buttons (`app::radio_column`), as in
   Both apps (#226); the Sync dialog's "Bundle for",
@@ -2593,7 +2605,7 @@ There are three kinds, and an action takes the first that fits.
   (obf-1053): desktop Settings ▸ Capture, a card of its own with "End a
   recording after a pause", kept on this computer only under the
   phone's key, offers Off, the default, which ignores pauses, and 2, 3,
-  5 or 10 s as pills. Set as Voice starts, the recording ends
+  5 or 10 s as chips. Set as Voice starts, the recording ends
   once the microphone stayed under 2 % of full scale at its peak that
   long after it heard something louder, and is kept on the Note as Stop
   keeps it, the Note dialog staying open; one nothing was said into yet

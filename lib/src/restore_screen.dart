@@ -396,7 +396,7 @@ class _BackupUnlockFormState extends State<BackupUnlockForm> {
           child: Center(child: Text(t.restoreOr)),
         ),
         if (PhotoScope.of(context).available) ...[
-          FilledButton.tonalIcon(
+          OutlinedButton.icon(
             key: const ValueKey('restore-scan'),
             onPressed: busy ? null : _scan,
             icon: const Icon(Icons.qr_code_scanner),

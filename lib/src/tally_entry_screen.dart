@@ -526,7 +526,7 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: FilledButton.tonalIcon(
+                    child: OutlinedButton.icon(
                       key: const ValueKey('tally-add-set'),
                       onPressed: _sets.length < TallyKeys.maxSets
                           ? _addSet

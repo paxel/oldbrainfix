@@ -808,10 +808,11 @@ mixin SearchesAfterPause<T extends StatefulWidget> on State<T> {
 }
 
 /// The fill of the header of a page with a [SearchHeaderSliver], its bar
-/// and the band under it (#351, obf-1041): set off from the page's ground
-/// in the light and the dark look.
+/// and the band under it (#351, obf-1041): the tone of the question
+/// marks, set off from the page's ground in the light and the dark look
+/// (UI laws, "Design system", obf-1081).
 Color searchHeaderColour(BuildContext context) =>
-    Theme.of(context).colorScheme.surfaceContainer;
+    LookTones.of(Theme.of(context).brightness).mark;
 
 /// The band a search bar sits on (#351, obf-1041): filled with
 /// [searchHeaderColour], which its page's bar takes too, with a line along
@@ -831,7 +832,8 @@ class SearchBand extends StatelessWidget {
     decoration: BoxDecoration(
       color: searchHeaderColour(context),
       border: Border(
-        bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        // Material's outline: its variant fades into the marks' tone.
+        bottom: BorderSide(color: Theme.of(context).colorScheme.outline),
       ),
     ),
     // Room under the bar, so its line runs along the band's bottom and
