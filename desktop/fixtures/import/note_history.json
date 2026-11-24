@@ -224,6 +224,226 @@
           "mayUse": false
         }
       ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000f",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:34.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.123Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "filed",
+          "before": null,
+          "after": "area:0000000000000000000000000000000e",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.123Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "captured",
+          "before": null,
+          "after": "Müller\nHerr Müller € 12,50",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000010",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:32.000Z",
+          "entity": "note:00000000000000000000000000000010",
+          "kind": "filed",
+          "before": "area:0000000000000000000000000000000e",
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.123Z",
+          "entity": "note:00000000000000000000000000000010",
+          "kind": "filed",
+          "before": null,
+          "after": "area:0000000000000000000000000000000e",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.123Z",
+          "entity": "note:00000000000000000000000000000010",
+          "kind": "captured",
+          "before": null,
+          "after": "dentist\nTuesday 9:00\nbring the X-ray",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000011",
+      "history": [
+        {
+          "at": "2025-03-01T08:00:00.000Z",
+          "entity": "note:00000000000000000000000000000011",
+          "kind": "filed",
+          "before": null,
+          "after": "area:0000000000000000000000000000000e",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2025-03-01T08:00:00.000Z",
+          "entity": "note:00000000000000000000000000000011",
+          "kind": "captured",
+          "before": null,
+          "after": "# Shopping\n- **milk** and ~~bread~~\n- ☐ eggs",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000013",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:04.000Z",
+          "entity": "note:00000000000000000000000000000013",
+          "kind": "filed",
+          "before": null,
+          "after": "area:0000000000000000000000000000000e",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:04.000Z",
+          "entity": "note:00000000000000000000000000000013",
+          "kind": "captured",
+          "before": null,
+          "after": "# Ideas 2\\*3\n> *quoted*\n`code` [link](https://x.org)",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000014",
+      "history": [
+        {
+          "at": "2025-01-01T00:00:00.000Z",
+          "entity": "note:00000000000000000000000000000014",
+          "kind": "filed",
+          "before": null,
+          "after": "area:0000000000000000000000000000000e",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2025-01-01T00:00:00.000Z",
+          "entity": "note:00000000000000000000000000000014",
+          "kind": "captured",
+          "before": null,
+          "after": "～\ntilde",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000015",
+      "history": [
+        {
+          "at": "2025-01-01T00:00:00.000Z",
+          "entity": "note:00000000000000000000000000000015",
+          "kind": "filed",
+          "before": null,
+          "after": "area:0000000000000000000000000000000e",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2025-01-01T00:00:00.000Z",
+          "entity": "note:00000000000000000000000000000015",
+          "kind": "captured",
+          "before": null,
+          "after": "😀\nemoji",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000016",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:35.000Z",
+          "entity": "note:00000000000000000000000000000016",
+          "kind": "filed",
+          "before": null,
+          "after": "area:0000000000000000000000000000000e",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:35.000Z",
+          "entity": "note:00000000000000000000000000000016",
+          "kind": "captured",
+          "before": null,
+          "after": "later\nWritten later",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000018",
+      "history": [
+        {
+          "at": "2025-01-01T00:00:00.000Z",
+          "entity": "note:00000000000000000000000000000018",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000017",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2025-01-01T00:00:00.000Z",
+          "entity": "note:00000000000000000000000000000018",
+          "kind": "captured",
+          "before": null,
+          "after": "😀\nemoji",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
     }
   ]
 }

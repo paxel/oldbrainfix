@@ -1,15 +1,57 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
+
 import 'checklists.dart';
+import 'entry.dart';
 import 'import_formats.dart';
 import 'notes.dart';
 import 'places.dart';
+import 'profiles.dart';
+import 'shared_areas.dart';
 import 'shopping_lists.dart';
 import 'store.dart';
 import 'text_boxes.dart';
 import 'text_format.dart';
 import 'text_tags.dart';
+
+/// The fields an Import keeps of where its Notes came from (obf-1078,
+/// ADR 0036), so the same source imported again adds only what is
+/// missing.
+abstract final class ImportKeys {
+  /// On a Note an Import made: the path of its file inside what was
+  /// imported, its folders apart by `/`.
+  static const source = 'source';
+
+  /// On a Note an Import made: the Area that Import made, which names
+  /// the Import.
+  static const importArea = 'importArea';
+
+  /// On the Area an Import made: what was imported ([Imports.sourceId]).
+  static const importSource = 'importSource';
+}
+
+/// What an Import reads: a folder, or a Google Keep export. Part of the
+/// identity of its source ([Imports.sourceId]).
+enum ImportSourceKind { folder, keep }
+
+/// An earlier Import of a source, which a new one may fill in: the Area
+/// it made, by [areaId] and [areaName], when it was made, and how many of
+/// the paths asked about its Notes hold already.
+class EarlierImport {
+  final String areaId;
+  final String areaName;
+  final DateTime at;
+  final int held;
+
+  const EarlierImport({
+    required this.areaId,
+    required this.areaName,
+    required this.at,
+    required this.held,
+  });
+}
 
 /// One file handed to an Import: its name, when it was last changed
 /// (null when the app cannot tell) and its bytes. The apps pick the
@@ -36,7 +78,8 @@ class ImportedLine {
 /// One Note an Import makes: its [text] in its [format], when it was
 /// [captured], and the [name] of what it came from, which orders Notes
 /// of the same date. With [lines] it is a Checklist of them, an empty
-/// one too; it holds the [photos], as their bytes.
+/// one too; it holds the [photos], as their bytes. Its [path] inside
+/// what was imported, when it has one, is kept on it ([ImportKeys]).
 class ImportedNote {
   final String name;
   final String text;
@@ -44,6 +87,7 @@ class ImportedNote {
   final DateTime captured;
   final List<ImportedLine>? lines;
   final List<Uint8List> photos;
+  final String? path;
 
   const ImportedNote({
     required this.name,
@@ -52,6 +96,7 @@ class ImportedNote {
     required this.captured,
     this.lines,
     this.photos = const [],
+    this.path,
   });
 }
 
@@ -97,6 +142,11 @@ class ImportSummary {
   /// not made. Null when it was not stopped.
   final int? stopped;
 
+  /// Files and notes left out of an Import that filled in an earlier one
+  /// (obf-1078), as that one made a Note of their path already; not
+  /// counted among the [skipped].
+  final int already;
+
   const ImportSummary({
     required this.areaId,
     required this.notes,
@@ -108,6 +158,7 @@ class ImportSummary {
     this.missing = 0,
     this.notPhoto = 0,
     this.stopped,
+    this.already = 0,
   });
 
   /// How many files and notes were skipped.
@@ -143,11 +194,17 @@ class Imports {
   /// its Markdown as written; a text file's is plain; the others' are
   /// formatted, read into the Markdown subset ([ImportFormats]). A Note
   /// is dated by its file's modification time, and by now when that is
-  /// unknown or later. [progress] hears how far the writing is; [stop]
-  /// is asked before each Note, as [notes] asks it.
+  /// unknown or later. Each Note keeps its file's path ([ImportKeys]);
+  /// the Area keeps the folder the app picked, [from], when it says it.
+  /// With [fillIn], the Area of an earlier Import of the same folder
+  /// ([earlier]), only the files no Note of that Import came from are
+  /// made, into that Area (obf-1078). [progress] hears how far the
+  /// writing is; [stop] is asked before each Note, as [notes] asks it.
   ImportSummary folder(
     String areaName,
     List<ImportFile> files, {
+    String? from,
+    String? fillIn,
     ImportProgress? progress,
     Stopping? stop,
   }) {
@@ -190,18 +247,130 @@ class Imports {
       var at = file.modified?.toUtc();
       if (at == null || !at.isAfter(_epoch) || at.isAfter(now)) at = now;
       made.add(
-        ImportedNote(name: base, text: text, format: format, captured: at),
+        ImportedNote(
+          name: base,
+          text: text,
+          format: format,
+          captured: at,
+          path: _slashed(file.name),
+        ),
       );
     }
-    return notes(
+    return _write(
       name,
       made,
-      notText: notText,
-      tooLarge: tooLarge,
-      progress: progress,
-      stop: stop,
+      ImportSummary(
+        areaId: null,
+        notes: 0,
+        notText: notText,
+        tooLarge: tooLarge,
+      ),
+      progress,
+      stop,
+      source: from == null ? null : sourceId(ImportSourceKind.folder, from),
+      fillIn: fillIn,
     );
   }
+
+  /// The identity of what an Import of [kind] reads, as the Area it made
+  /// keeps it ([ImportKeys.importSource]): the SHA-256 in lower case hex
+  /// of the kind's name, a line break and [from], where the app picked
+  /// it (the folder's or the zip's path, or the system's lasting address
+  /// of it), so no path lies in the log as written.
+  static String sourceId(ImportSourceKind kind, String from) =>
+      sha256.convert(utf8.encode('${kind.name}\n$from')).toString();
+
+  /// The earlier Import of [kind] from [from] that a new one may fill in
+  /// (obf-1078): of the Areas an Import of it made that are still there
+  /// and may be written in, as one of the user's own Devices wrote it,
+  /// the newest whose Notes came from any of [paths], the paths inside
+  /// the source the app lists, before any file is read; null when there
+  /// is none. A name alone matches nothing: neither the Area's nor a
+  /// file's.
+  EarlierImport? earlier(
+    ImportSourceKind kind,
+    String from,
+    Iterable<String> paths,
+  ) {
+    final source = sourceId(kind, from);
+    final wanted = {for (final p in paths) _slashed(p)};
+    final own = <String, bool>{};
+    EarlierImport? found;
+    for (final areaId in store.everWith(ImportKeys.importSource, source)) {
+      final made = _importOf(areaId, source, own);
+      if (made == null) continue;
+      final held = _held(areaId, own).where(wanted.contains).length;
+      if (held == 0) continue;
+      final newer = switch (found) {
+        null => true,
+        final f =>
+          made.at.isAfter(f.at) ||
+              (made.at == f.at && areaId.compareTo(f.areaId) > 0),
+      };
+      if (!newer) continue;
+      found = EarlierImport(
+        areaId: areaId,
+        areaName: made.name,
+        at: made.at,
+        held: held,
+      );
+    }
+    return found;
+  }
+
+  /// Where the Note [noteId] came from, as one of the user's own Devices
+  /// wrote it: the path of its file inside what was imported and the
+  /// Area that Import made; null for a Note no Import made (obf-1078).
+  ({String path, String areaId})? sourceOf(String noteId) {
+    final logged = store.loggedHistory(noteId);
+    final own = <String, bool>{};
+    final path = store.latestByOwn(logged, ImportKeys.source, own);
+    final area = store.latestByOwn(logged, ImportKeys.importArea, own);
+    if (path == null || area == null) return null;
+    return (path: path, areaId: area);
+  }
+
+  /// The name of the Area [areaId] and when an Import of [source] made
+  /// it, as one of the user's own Devices wrote it, when it is there
+  /// and this Device may write in it; else null. [own] remembers which
+  /// Devices are the user's own.
+  ({String name, DateTime at})? _importOf(
+    String areaId,
+    String source,
+    Map<String, bool> own,
+  ) {
+    final area = Places(store).areaById(areaId);
+    if (area == null || !store.mayWriteIn(areaId)) return null;
+    Entry? held;
+    for (final e in store.loggedHistory(areaId)) {
+      if (e.field != ImportKeys.importSource) continue;
+      if (!own.putIfAbsent(e.device, () => store.writtenByOwn(e.device))) {
+        continue;
+      }
+      if (held == null || Store.latestWins(e, held) > 0) held = e;
+    }
+    if (held == null || held.value != source) return null;
+    return (name: area.name, at: held.date);
+  }
+
+  /// The paths the Notes of the Import that made the Area [areaId] came
+  /// from, as the user's own Devices wrote them: of every such Note,
+  /// moved, in the trash or purged since as well. Read at once, not
+  /// Note by Note.
+  Set<String> _held(String areaId, Map<String, bool> own) {
+    final logged = store.loggedFieldsOf(
+      store.everWith(ImportKeys.importArea, areaId),
+      {ImportKeys.importArea, ImportKeys.source},
+    );
+    return {
+      for (final entries in logged.values)
+        if (store.latestByOwn(entries, ImportKeys.importArea, own) == areaId)
+          ?store.latestByOwn(entries, ImportKeys.source, own),
+    };
+  }
+
+  /// [path] with its folders apart by `/`.
+  static String _slashed(String path) => path.replaceAll(r'\', '/');
 
   /// Writes [notes] into a new Area named [areaName], oldest first,
   /// filed there so none of them is Unsorted or Nudged, each captured
@@ -232,24 +401,46 @@ class Imports {
     stop,
   );
 
-  /// [notes] with the files and notes [skipped] before them counted.
+  /// [notes] with the files and notes [skipped] before them counted. The
+  /// new Area keeps the [source] the Notes came from ([sourceId]). With
+  /// [fillIn], the Area an earlier Import of that [source] made, as
+  /// [earlier] takes it (there, writable, and written so by one of the
+  /// user's own Devices), they go into that Area instead, but for those
+  /// whose path a Note of that Import came from already, which are
+  /// counted as [ImportSummary.already]; with any other, as with none, a
+  /// new Area is made for every Note.
   ImportSummary _write(
     String areaName,
     List<ImportedNote> notes,
     ImportSummary skipped,
     ImportProgress? progress,
-    Stopping? stop,
-  ) {
+    Stopping? stop, {
+    String? source,
+    String? fillIn,
+  }) {
     final name = _areaName(areaName);
     for (final note in notes) {
       if (!TextFormats.known.contains(note.format)) {
         throw ArgumentError.value(note.format, 'format', 'not known here');
       }
     }
-    final order = [
-      for (final (i, note) in notes.indexed)
-        (i: i, note: note, at: note.captured.toUtc()),
-    ];
+    final own = <String, bool>{};
+    final into =
+        fillIn != null &&
+            source != null &&
+            _importOf(fillIn, source, own) != null
+        ? fillIn
+        : null;
+    final held = into == null ? const <String>{} : _held(into, own);
+    var already = 0;
+    final order = <({int i, ImportedNote note, DateTime at})>[];
+    for (final (i, note) in notes.indexed) {
+      if (held.contains(note.path)) {
+        already++;
+      } else {
+        order.add((i: i, note: note, at: note.captured.toUtc()));
+      }
+    }
     order.sort((a, b) {
       final byDate = a.at.compareTo(b.at);
       if (byDate != 0) return byDate;
@@ -288,6 +479,7 @@ class Imports {
       missing: skipped.missing,
       notPhoto: skipped.notPhoto,
       stopped: stopped,
+      already: already,
     );
     if (kept.isEmpty) return summary();
     // Stopped before anything was written: no Area either.
@@ -298,7 +490,15 @@ class Imports {
       for (final (:note, at: _) in writing)
         {for (final bytes in note.photos) store.putPhoto(bytes)}.toList(),
     ];
-    final areaId = Places(store).addArea(_unused(name)).id;
+    final areaId =
+        into ??
+        store.batch(() {
+          final id = Places(store).addArea(_unused(name)).id;
+          if (source != null) {
+            store.append(id, ImportKeys.importSource, source);
+          }
+          return id;
+        });
     progress?.call(0, writing.length);
     var written = writing.length;
     for (final (i, (:note, :at)) in writing.indexed) {
@@ -322,6 +522,10 @@ class Imports {
           date: at,
         );
         store.append(id, NoteKeys.place, areaId, date: at);
+        if (note.path case final path?) {
+          store.append(id, ImportKeys.importArea, areaId, date: at);
+          store.append(id, ImportKeys.source, path, date: at);
+        }
         for (final hash in hashes[i]) {
           store.append(id, NoteKeys.photo(hash), NoteKeys.photoAdded, date: at);
         }
@@ -398,12 +602,18 @@ class Imports {
   /// is made as any other. Its title is its first line, its labels are
   /// tags in a last line, a list is a Checklist with its Lines checked as
   /// in Keep, its photos are its photos. It is captured when Keep says it
-  /// was made, and its checks are dated when it was last changed.
-  /// [progress] hears how far the writing is; [stop] is asked before each
-  /// Note, as [notes] asks it.
+  /// was made, and its checks are dated when it was last changed. Each
+  /// Note keeps the path of its `.json` ([ImportKeys]); the Area keeps
+  /// the zip or folder the app picked, [from], when it says it. With
+  /// [fillIn], the Area of an earlier Import of the same export
+  /// ([earlier]), only the notes no Note of that Import came from are
+  /// made, into that Area (obf-1078). [progress] hears how far the
+  /// writing is; [stop] is asked before each Note, as [notes] asks it.
   ImportSummary keep(
     String areaName,
     List<ImportFile> entries, {
+    String? from,
+    String? fillIn,
     ImportProgress? progress,
     Stopping? stop,
   }) {
@@ -494,6 +704,7 @@ class Imports {
           captured: at,
           lines: lines,
           photos: photos,
+          path: _slashed(entry.name),
         ),
       );
     }
@@ -511,6 +722,8 @@ class Imports {
       ),
       progress,
       stop,
+      source: from == null ? null : sourceId(ImportSourceKind.keep, from),
+      fillIn: fillIn,
     );
   }
 

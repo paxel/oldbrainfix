@@ -193,9 +193,13 @@ final _scenarios = <Scenario>[
         'date, dated now; an empty one; a hidden file, a photo, one with a '
         'zero byte and one too large, skipped; a folder of nothing usable, '
         'which makes no Area; a file of the folder again, into a third '
-        'Area.',
+        'Area; four files of a folder picked, each keeping its path, the '
+        'Area what was picked (obf-1078), and the earlier Import found by '
+        'that and its paths only; of them one moved and one trashed, then '
+        'filled in with them, one changed, one by a backslash path, and '
+        'three new; and a fill-in of another folder, into a new Area.',
     build: (store) {
-      Places(store).addArea('From Notes');
+      final own = Places(store).addArea('From Notes').id;
       final imports = Imports(store);
       final folder = _importFolder();
       _imported = [
@@ -203,6 +207,64 @@ final _scenarios = <Scenario>[
         imports.folder('From Notes', [folder[8], folder[9]]),
         imports.folder('From Notes', [folder[1]]),
       ];
+      final picked = imports.folder('From Notes', [
+        folder[0],
+        folder[1],
+        folder[2],
+        folder[5],
+      ], from: _importFrom);
+      _imported.add(picked);
+      final area = picked.areaId ?? '';
+      final paths = [for (final f in folder) f.name];
+      _earlier = [
+        imports.earlier(ImportSourceKind.folder, _importFrom, paths),
+        imports.earlier(ImportSourceKind.folder, _importOther, paths),
+        imports.earlier(ImportSourceKind.keep, _importFrom, paths),
+      ];
+      final notes = Notes(store);
+      String withPath(String path) => notes
+          .inside(area)
+          .firstWhere((n) => store.current(n.id, ImportKeys.source) == path)
+          .id;
+      notes.file(withPath('dentist.txt'), own);
+      notes.trash(withPath('Müller.txt'));
+      final shopping = folder[0];
+      final ideas = folder[5];
+      _imported.add(
+        imports.folder(
+          'From Notes',
+          [
+            ImportFile(
+              shopping.name,
+              shopping.modified,
+              Uint8List.fromList(utf8.encode('# Shopping\nchanged')),
+            ),
+            folder[1],
+            folder[2],
+            folder[3],
+            folder[4],
+            ImportFile(
+              ideas.name.replaceAll('/', r'\'),
+              ideas.modified,
+              ideas.bytes,
+            ),
+            folder[6],
+          ],
+          from: _importFrom,
+          fillIn: area,
+        ),
+      );
+      _earlier.add(
+        imports.earlier(ImportSourceKind.folder, _importFrom, paths),
+      );
+      _imported.add(
+        imports.folder(
+          'From Notes',
+          [folder[3]],
+          from: _importOther,
+          fillIn: area,
+        ),
+      );
     },
   ),
   (
@@ -234,9 +296,16 @@ final _scenarios = <Scenario>[
         'the Agenda; an archived '
         'note without a time of making; a note in the trash, one that is '
         'no JSON, its .html twin, Labels.txt and a note of another product '
-        'outside the Keep folder.',
+        'outside the Keep folder; each Note keeps its path, the Area the zip '
+        'picked (obf-1078).',
     build: (store) {
-      _imported = [Imports(store).keep('From Google Keep', _keepTakeout())];
+      _imported = [
+        Imports(store).keep(
+          'From Google Keep',
+          _keepTakeout(),
+          from: 'content://downloads/takeout.zip',
+        ),
+      ];
     },
   ),
   (
@@ -5622,6 +5691,14 @@ Map<String, Object?> _ics() {
 /// What the Imports of the `import` scenario came to.
 var _imported = <ImportSummary>[];
 
+/// What the `import` scenario found of earlier Imports (obf-1078).
+var _earlier = <EarlierImport?>[];
+
+/// Where the app picked the folder the `import` scenario fills in, and
+/// another one.
+const _importFrom = 'content://tree/primary%3ANotes';
+const _importOther = 'content://tree/primary%3AOther';
+
 /// What the `features` scenario read after each of its steps.
 final _featureReads = <Map<String, Object>>[];
 
@@ -5660,7 +5737,17 @@ const _helpBundle = {
   '0.4.1': {'en': 'Fixed\n• A thing.', 'de': 'Behoben\n• Eine Sache.'},
 };
 
+Map<String, Object?>? _earlierJson(EarlierImport? e) => e == null
+    ? null
+    : {
+        'areaId': e.areaId,
+        'areaName': e.areaName,
+        'at': e.at.toUtc().toIso8601String(),
+        'held': e.held,
+      };
+
 Map<String, Object?> _summary(ImportSummary s) => {
+  'already': s.already,
   'areaId': s.areaId,
   'checklists': s.checklists,
   'missing': s.missing,
@@ -12616,7 +12703,10 @@ Future<void> main(List<String> args) async {
     'values before and after, the format of its text, the name of who '
     'made it and whether this Device may use its text again.\n'
     '- `import/import.json`: what each Import of the `import` log came to '
-    '(ADR 0036): the Area made, the Notes made and the files skipped.\n'
+    '(ADR 0036): the Area made, the Notes made, the files skipped and '
+    'those an earlier Import made already (obf-1078); `earlier.json` the '
+    'earlier Import found for a folder picked and its paths, by its Area, '
+    'date and the paths it holds, or none.\n'
     '- `import-formats/`: the documents the Import of its log took, as '
     'they lie in a folder (`inputs/`), and for each, in the order handed '
     'over, its name, when it was last changed and, for AsciiDoc, Org, '
@@ -13154,6 +13244,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/${scenario.name}.json'),
           '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',
+        );
+      }
+      if (scenario.name == 'import') {
+        _write(
+          File('${out.path}/earlier.json'),
+          '${_json.convert({'earlier': _earlier.map(_earlierJson).toList()})}\n',
         );
       }
       if (scenario.name == 'features') {

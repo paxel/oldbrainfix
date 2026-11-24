@@ -119,7 +119,7 @@ fn nothing_imported_is_unsorted_or_nudged() -> Result<()> {
     assert_eq!(notes.len(), 2);
     for note in notes {
         assert_eq!(note.place, summary.area_id);
-        assert_eq!(store.current(&note.id, keys::NUDGE)?, None);
+        assert_eq!(store.current(&note.id, note_keys::NUDGE)?, None);
     }
     Ok(())
 }
@@ -174,7 +174,7 @@ fn notes_of_one_date_go_by_name_as_code_points() -> Result<()> {
     let notes = Notes::new(&store);
     let mut lasts = Vec::new();
     for e in store.all_entries()? {
-        if e.field == keys::TYPE && e.entity.starts_with("note:") {
+        if e.field == note_keys::TYPE && e.entity.starts_with("note:") {
             let text = notes.by_id(&e.entity)?.map(|n| n.text).unwrap_or_default();
             lasts.push(text.rsplit('\n').next().unwrap_or_default().to_string());
         }
@@ -432,7 +432,7 @@ mod keep {
             assert_eq!(entry.date_at, made());
         }
         assert!(Notes::new(&store).unsorted()?.is_empty());
-        assert_eq!(store.current(&dentist.id, keys::NUDGE)?, None);
+        assert_eq!(store.current(&dentist.id, note_keys::NUDGE)?, None);
         Ok(())
     }
 
@@ -734,6 +734,7 @@ fn only_formats_known_here_are_taken() {
         captured: now(),
         lines: None,
         photos: Vec::new(),
+        path: None,
     };
     assert!(
         Imports::new(&store)

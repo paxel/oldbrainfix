@@ -117,7 +117,10 @@ pub use help_notes::{HelpNotes, HelpTexts, WhatsNew, compare_versions, parse_wha
 pub use history::{
     Adherence, DayTally, DoneTiming, HistoryEntry, OccurrenceStatus, RoutineHistory, ScheduleSpan,
 };
-pub use imports::{ImportFile, ImportSummary, ImportedLine, ImportedNote, Imports};
+pub use imports::{
+    EarlierImport, ImportFile, ImportSourceKind, ImportSummary, ImportedFrom, ImportedLine,
+    ImportedNote, Imports,
+};
 pub use named_places::{Coordinates, NamedPlace, NamedPlaces};
 pub use note_history::{NoteChange, NoteChangeKind, NoteHistory};
 pub use notes::{

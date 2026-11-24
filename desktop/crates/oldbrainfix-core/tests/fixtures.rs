@@ -25,7 +25,9 @@ use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
 use oldbrainfix_core::alarms::{WallMoment, instant_of};
 use oldbrainfix_core::history::{Adherence, DoneTiming, RoutineHistory, schedule_spans};
 use oldbrainfix_core::ics::routines_ics;
-use oldbrainfix_core::imports::MAX_FILE_BYTES;
+use oldbrainfix_core::imports::{
+    EarlierImport, ImportSourceKind, MAX_FILE_BYTES, keys as import_keys,
+};
 use oldbrainfix_core::named_places::keys as named_place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::nudges::QuietHours;
@@ -2375,17 +2377,111 @@ fn import_folder() -> Result<Vec<ImportFile>, Box<dyn std::error::Error>> {
     ])
 }
 
+/// Where the generator's `import` scenario picked the folder it fills
+/// in, and another one.
+const IMPORT_FROM: &str = "content://tree/primary%3ANotes";
+const IMPORT_OTHER: &str = "content://tree/primary%3AOther";
+
+/// What the Imports of the generator's `import` scenario came to, and
+/// what it found of earlier Imports (obf-1078).
+type ImportSteps = (Vec<ImportSummary>, Vec<Option<EarlierImport>>);
+
 /// The Imports of the generator's `import` scenario, with what each came
 /// to.
 fn import_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
-    Places::new(store).add_area("From Notes")?;
+    Ok(import_steps(store)?.0)
+}
+
+/// The steps of the generator's `import` scenario.
+fn import_steps(store: &Store) -> Result<ImportSteps, Box<dyn std::error::Error>> {
+    let own = Places::new(store).add_area("From Notes")?.id;
     let imports = Imports::new(store);
     let folder = import_folder()?;
-    Ok(vec![
+    let mut made = vec![
         imports.folder("From Notes", &folder)?,
         imports.folder("From Notes", &folder[8..10])?,
         imports.folder("From Notes", &folder[1..2])?,
-    ])
+    ];
+    let at = |i: usize| folder.get(i).cloned().ok_or("a file");
+    let picked = Imports::new(store)
+        .from_source(IMPORT_FROM)
+        .folder("From Notes", &[at(0)?, at(1)?, at(2)?, at(5)?])?;
+    let area = picked.area_id.clone().unwrap_or_default();
+    made.push(picked);
+    let paths: Vec<&str> = folder.iter().map(|f| f.name.as_str()).collect();
+    let mut earlier = vec![
+        imports.earlier(ImportSourceKind::Folder, IMPORT_FROM, &paths)?,
+        imports.earlier(ImportSourceKind::Folder, IMPORT_OTHER, &paths)?,
+        imports.earlier(ImportSourceKind::Keep, IMPORT_FROM, &paths)?,
+    ];
+    let notes = Notes::new(store);
+    let with_path = |path: &str| -> Result<String, Box<dyn std::error::Error>> {
+        for note in notes.inside(&area)? {
+            if store.current(&note.id, import_keys::SOURCE)?.as_deref() == Some(path) {
+                return Ok(note.id);
+            }
+        }
+        Err(format!("no Note of {path}").into())
+    };
+    notes.file(&with_path("dentist.txt")?, &own)?;
+    notes.trash(&with_path("Müller.txt")?)?;
+    let shopping = at(0)?;
+    let ideas = at(5)?;
+    made.push(
+        Imports::new(store)
+            .from_source(IMPORT_FROM)
+            .filling_in(&area)
+            .folder(
+                "From Notes",
+                &[
+                    ImportFile {
+                        bytes: b"# Shopping\nchanged".to_vec(),
+                        ..shopping
+                    },
+                    at(1)?,
+                    at(2)?,
+                    at(3)?,
+                    at(4)?,
+                    ImportFile {
+                        name: ideas.name.replace('/', "\\"),
+                        ..ideas
+                    },
+                    at(6)?,
+                ],
+            )?,
+    );
+    earlier.push(imports.earlier(ImportSourceKind::Folder, IMPORT_FROM, &paths)?);
+    made.push(
+        Imports::new(store)
+            .from_source(IMPORT_OTHER)
+            .filling_in(&area)
+            .folder("From Notes", &[at(3)?])?,
+    );
+    Ok((made, earlier))
+}
+
+/// What an earlier Import found came to, as the generator's
+/// `_earlierJson` writes it.
+fn earlier_json(e: &Option<EarlierImport>) -> Value {
+    match e {
+        None => Value::Null,
+        Some(e) => json!({
+            "areaId": e.area_id,
+            "areaName": e.area_name,
+            "at": dart_iso(e.at),
+            "held": e.held,
+        }),
+    }
+}
+
+#[test]
+fn earlier_imports_are_found_as_the_dart_core_finds_them() -> TestResult {
+    let store = writer_store()?;
+    let (_, earlier) = import_steps(&store)?;
+    let found: Vec<Value> = earlier.iter().map(earlier_json).collect();
+    let expected = read_json(&fixtures().join("import").join("earlier.json"))?;
+    assert_eq!(json!({ "earlier": found }), expected);
+    Ok(())
 }
 
 /// The generator's `import` scenario.
@@ -2556,7 +2652,9 @@ const KEEP_PNG: [u8; 67] = [
 /// The Import of the generator's `keep` scenario.
 fn keep_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
     Ok(vec![
-        Imports::new(store).keep("From Google Keep", &keep_takeout())?,
+        Imports::new(store)
+            .from_source("content://downloads/takeout.zip")
+            .keep("From Google Keep", &keep_takeout())?,
     ])
 }
 
@@ -2569,6 +2667,7 @@ fn write_keep(store: &Store) -> Built {
 /// What an Import came to, as the generator's `_summary` writes it.
 fn summary_json(s: &ImportSummary) -> Value {
     json!({
+        "already": s.already,
         "areaId": s.area_id,
         "checklists": s.checklists,
         "missing": s.missing,
