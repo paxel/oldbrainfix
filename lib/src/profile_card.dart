@@ -311,7 +311,8 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
             Text(t.personAddIntro),
             const SizedBox(height: 16),
             if (photos.available) ...[
-              FilledButton.icon(
+              // Add stays the one filled button of the page (obf-1100).
+              OutlinedButton.icon(
                 key: const ValueKey('add-person-scan'),
                 onPressed: _busy ? null : _scan,
                 icon: const Icon(Icons.qr_code_scanner),
