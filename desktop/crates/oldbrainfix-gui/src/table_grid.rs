@@ -124,6 +124,9 @@ pub struct Outcome {
     pub link: Option<(usize, usize, Option<String>)>,
     /// The format picked went to the cell edited.
     pub took: bool,
+    /// A menu of the grids changed the text whole: what it was before,
+    /// for the step of the Note's Undo (obf-1051).
+    pub whole: Option<String>,
 }
 
 /// One table of a field's text this frame: as lines, or laid out as a
@@ -159,6 +162,8 @@ pub struct Grids {
     size: f32,
     colour: Color32,
     room: f32,
+    /// What the text was before a menu changed it whole this frame.
+    whole: Option<String>,
 }
 
 impl Grids {
@@ -218,6 +223,7 @@ impl Grids {
             size: look.size,
             colour: look.colour,
             room: ui.available_width(),
+            whole: None,
         };
         grids.lay(ui, text, look.boxes);
         grids
@@ -450,6 +456,7 @@ impl Grids {
         self.state.was = field_cursor(ui, self.id).map(|(a, _)| a);
         self.state.seen = text.clone();
         ui.data_mut(|d| d.insert_temp(self.key, self.state));
+        outcome.whole = self.whole;
         outcome
     }
 
@@ -1171,10 +1178,13 @@ impl Grids {
         }
     }
 
-    /// Takes `change` as the text, one step back for Ctrl+Z in the field.
+    /// Takes `change` as the text, one step back for Ctrl+Z in the field
+    /// and one of the Note's Undo (obf-1051): every change of a menu of
+    /// the grids goes through here.
     fn take(&mut self, ui: &Ui, text: &mut String, change: Change) {
         if change.text != *text {
             undoable(ui, self.id, text);
+            self.whole.get_or_insert_with(|| text.clone());
             put(ui, self.id, text, change.text);
         }
     }

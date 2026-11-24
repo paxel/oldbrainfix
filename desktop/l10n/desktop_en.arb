@@ -962,5 +962,17 @@
   "deskMarkdownImportNothingFix": "Split it into smaller files and import those. Nothing was changed.",
   "@deskMarkdownImportNothingFix": {"description": "Fix in the details when Import as Note (obf-1056) took nothing."},
   "deskMarkdownImportSkipped": "File: {file}\nOther files: {notText}\nToo large: {tooLarge}",
-  "@deskMarkdownImportSkipped": {"description": "The details of what Import as Note in the desktop's Markdown viewer (obf-1056) skipped: the file opened, how many files were no Markdown and how many files or pictures were too large.", "placeholders": {"file": {"type": "String"}, "notText": {"type": "int"}, "tooLarge": {"type": "int"}}}
+  "@deskMarkdownImportSkipped": {"description": "The details of what Import as Note in the desktop's Markdown viewer (obf-1056) skipped: the file opened, how many files were no Markdown and how many files or pictures were too large.", "placeholders": {"file": {"type": "String"}, "notText": {"type": "int"}, "tooLarge": {"type": "int"}}},
+  "deskRedo": "Redo",
+  "@deskRedo": {"description": "Redo in the bar of the desktop's Note dialog and a Note's own window (obf-1051): the change taken back last is made again."},
+  "deskNoteMore": "More for this Note",
+  "@deskNoteMore": {"description": "The ⋮ button in the bar of the desktop's Note dialog and a Note's own window (obf-1051), for screen readers."},
+  "deskNoteRevertAll": "Revert all changes",
+  "@deskNoteRevertAll": {"description": "Entry of the ⋮ in the bar of the desktop's Note dialog (obf-1051): the Note goes back to what it was when it was opened, after one question."},
+  "deskNoteRevertQuestion": "Revert all changes?",
+  "@deskNoteRevertQuestion": {"description": "Title of the question before Revert all changes in the desktop's Note dialog (obf-1051)."},
+  "deskNoteRevertDetail": "The Note goes back to how it was when it was opened. Redo brings the changes back one by one.",
+  "@deskNoteRevertDetail": {"description": "Body of the question before Revert all changes in the desktop's Note dialog (obf-1051)."},
+  "deskNoteRevert": "Revert",
+  "@deskNoteRevert": {"description": "Confirm button of the question Revert all changes? in the desktop's Note dialog (obf-1051)."}
 }

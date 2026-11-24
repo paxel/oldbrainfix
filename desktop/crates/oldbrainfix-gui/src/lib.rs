@@ -63,6 +63,7 @@ pub mod media_view;
 pub mod names;
 pub mod navigation;
 pub mod note_history_view;
+pub mod note_steps;
 pub mod note_window;
 pub mod notify;
 pub mod occurrence_answers;

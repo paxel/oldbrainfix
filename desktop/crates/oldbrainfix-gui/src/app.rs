@@ -158,6 +158,7 @@ use crate::media_view::{
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
 use crate::note_history_view;
+use crate::note_steps::{self, LinesKept, See, State, Steps};
 use crate::note_window::{self, Alone, Shown};
 use crate::occurrence_answers::{self, Answer, Answers};
 use crate::pack_view::{self, PackAsk};
@@ -675,6 +676,8 @@ impl Reads {
             // A letter in a dialog's search changes only the dialog
             // (obf-1068).
             Action::MergeQuery | Action::AddToNotePicked(NoteAsk::Find) => Reads::Nothing,
+            // Only the Note's steps, or a question about them (obf-1051).
+            Action::WholeStep { .. } | Action::AskRevert => Reads::Nothing,
             _ => Reads::All,
         }
     }
@@ -1004,6 +1007,8 @@ enum Dialog {
         /// are selected (#261).
         label: Option<String>,
     },
+    /// "Revert all changes?" of the Note open (obf-1051).
+    Revert,
     /// The one question before a file link opens (#261): the file, its
     /// path inside the synced folder, and the app that opens it, "" when
     /// the system does not tell.
@@ -1474,8 +1479,28 @@ enum Action {
     /// Edit ▸ Cut, Copy or Paste, on the field the cursor was in.
     Clip(Clip),
     /// Edit ▸ Undo, and Ctrl+Z outside a text field (#268): takes back
-    /// the last delete, check-off, filing or Merge.
+    /// the last delete, check-off, filing or Merge, or, over the Note
+    /// open, its last step where that came later (obf-1051).
     Undo,
+    /// Undo in the bar of the Note open (obf-1051): its last step back.
+    NoteUndo,
+    /// Redo there, and Ctrl+Shift+Z or Ctrl+Y outside a text field: the
+    /// step taken back last again.
+    NoteRedo,
+    /// "Revert all changes" in its ⋮: asks once.
+    AskRevert,
+    /// The question's Revert: the Note back to what it was as it opened,
+    /// every step taken back at once, for Redo to make again one by one.
+    Revert,
+    /// The text of the Note open, or of its Section `section`, changed
+    /// whole by a menu, `before` what its field held just before (a
+    /// table's row deleted, moved or its rows sorted): what was typed up
+    /// to it is a step of its own and the change one more, so Undo takes
+    /// back the change alone (obf-1051).
+    WholeStep {
+        section: Option<String>,
+        before: String,
+    },
     /// Help ▸ User guide: the guide's desktop page in the browser.
     OpenGuide,
     /// Sync ▸ Sync now: the Sync dialog, and the shared folder synced at
@@ -2164,6 +2189,23 @@ pub struct App {
     /// What Ctrl+Z and Edit ▸ Undo take back: the last delete, check-off,
     /// filing or Merge (#268).
     undo: Option<Undo>,
+    /// The steps of the Note open (obf-1051): what its Undo, Redo and
+    /// "Revert all changes" go through; none while no Note is open.
+    steps: Option<Steps>,
+    /// Whether the window's undo above was set since the Note's last
+    /// step: Ctrl+Z and Edit ▸ Undo take back the later of the two.
+    undo_later: bool,
+    /// The Note's step, by its depth, made by what also set the window's
+    /// undo, as a Line deleted or a Note filed: taking it back takes the
+    /// window's undo with it.
+    slot_step: Option<usize>,
+    /// Whether the Note's fields forget their own typing history at the
+    /// next frame, once its Undo, Redo or Revert put other text into
+    /// them (obf-1051).
+    fields_forget: bool,
+    /// The time of the frame drawn last, in seconds, for how long typing
+    /// rested (obf-1051).
+    steps_time: f64,
     /// The Notes sorted in Unsorted before it moved on (#313), for Ctrl+Z
     /// to show them where they were sorted once it brings them back.
     moved_on: Option<MovedOn>,
@@ -2848,6 +2890,11 @@ impl App {
             badge: None,
             reappear_line: None,
             undo: None,
+            steps: None,
+            undo_later: false,
+            slot_step: None,
+            fields_forget: false,
+            steps_time: 0.0,
             moved_on: None,
             code_offer: None,
             code_guess: None,
@@ -6666,6 +6713,9 @@ impl App {
             self.text_of = shown.map(|n| n.id.clone());
             self.text_kinded = kinded;
             self.put_typed(stored);
+            // Its steps start as it opens (obf-1051).
+            self.steps = None;
+            self.slot_step = None;
             self.text_editing = false;
             self.text_focus = false;
             self.text_select = None;
@@ -7525,6 +7575,20 @@ impl App {
             Reads::All => self.sorting_now(),
             _ => None,
         };
+        // The steps of the Note open (obf-1051): what was written
+        // elsewhere since starts them again, and what was typed is a step
+        // before what is asked now, unless it goes with the typing.
+        let seen = match &action {
+            Action::WholeStep { .. } => None,
+            Action::FormatText(_) | Action::OfferCode(..) | Action::AskLink { .. } => {
+                Some(See::Drawn(self.steps_time))
+            }
+            _ => Some(See::Before),
+        };
+        if let Some(how) = seen {
+            self.see_steps(how);
+        }
+        let slot = self.undo.clone();
         let done = self.act(action);
         // A recording into a Note that is no longer open, whatever closed
         // it, goes onto it (#352).
@@ -7578,6 +7642,19 @@ impl App {
             (Ok(()), Some(sorting)) => self.move_on(sorting),
             (done, _) => done,
         };
+        // What it changed of the Note open is a step; Ctrl+Z takes back
+        // the later of that and the window's undo.
+        let slot_set = self.undo.is_some() && self.undo != slot;
+        if self.see_steps(See::After) {
+            self.undo_later = false;
+            self.slot_step = match slot_set {
+                true => self.steps.as_ref().map(Steps::depth),
+                false => None,
+            };
+        } else if slot_set {
+            self.undo_later = true;
+            self.slot_step = None;
+        }
         match done {
             Ok(()) => {}
             // Waiting, not failed: said with what to do.
@@ -7733,6 +7810,9 @@ impl App {
                 self.search_focus = true;
             }
             Action::Clip(clip) => self.clip = Some(clip),
+            // Over the Note open, its last step where it came after the
+            // window's undo (obf-1051).
+            Action::Undo if self.steps_undo_first() => self.note_step(Way::Undo)?,
             Action::Undo => {
                 if let Some(undo) = self.undo.take() {
                     self.save_text()?;
@@ -7740,6 +7820,18 @@ impl App {
                     self.back_to_sorted()?;
                 }
             }
+            Action::NoteUndo => self.note_step(Way::Undo)?,
+            Action::NoteRedo => self.note_step(Way::Redo)?,
+            Action::AskRevert => {
+                if self.steps.as_ref().is_some_and(Steps::changed) {
+                    self.dialog = Some(Dialog::Revert);
+                }
+            }
+            Action::Revert => {
+                self.dialog = None;
+                self.note_step(Way::Revert)?;
+            }
+            Action::WholeStep { section, before } => self.whole_step(section.as_deref(), before),
             Action::OpenGuide => self.open_url = Some(about_view::guide_url(self.t.locale())),
             Action::SyncNow => {
                 self.save_text()?;
@@ -10912,6 +11004,481 @@ impl App {
         self.save_sections()
     }
 
+    /// The Note open as its steps hold it (obf-1051): what is typed into
+    /// its fields and what is written of it; `None` while none is open.
+    fn steps_state(&self) -> Option<State> {
+        let view = &self.view;
+        let (placed, _) = view.detail.as_ref()?;
+        let note = &placed.note;
+        if self.text_of.as_deref() != Some(note.id.as_str()) {
+            return None;
+        }
+        let typed = note_steps::Typed {
+            text: self.typed_text(),
+            sections: self
+                .section_texts
+                .iter()
+                .map(|(id, field)| (id.clone(), field.text.clone()))
+                .collect(),
+        };
+        let lines = match (&view.checklist, &view.shopping) {
+            (Some(shown), _) => Some(LinesKept::of_checklist(&shown.list)),
+            (None, Some(shown)) => Some(LinesKept::of_shopping(&shown.list)),
+            (None, None) => None,
+        };
+        let on_agenda = match (&view.checklist, &view.shopping) {
+            (Some(shown), _) => shown.on_agenda,
+            (None, Some(shown)) => shown.on_agenda,
+            (None, None) => None,
+        };
+        let kept = note_steps::Kept {
+            kind: view.kind.unwrap_or(NoteKind::Plain),
+            format: note.text_format.clone(),
+            language: note.code_language.clone(),
+            importance: note.importance,
+            place: note.place.clone(),
+            lines,
+            on_agenda,
+            hidden: view.note_hidden.is_some_and(|(own, _)| own),
+            ticks: view.show_ticks.contains(&note.id),
+            tally: view
+                .tally
+                .as_ref()
+                .map(|shown| (shown.tally.bar, shown.tally.counts_in_sets)),
+            session: view.session_setup.clone(),
+        };
+        Some(State { typed, kept })
+    }
+
+    /// Looks at the Note open for a step, as `how` says (obf-1051): the
+    /// steps of a Note opened anew start with it as it is. Whether it
+    /// made a step.
+    fn see_steps(&mut self, how: See) -> bool {
+        let Some(now) = self.steps_state() else {
+            self.steps = None;
+            return false;
+        };
+        let Some(note) = self.text_of.clone() else {
+            return false;
+        };
+        let Some(steps) = self.steps.as_mut().filter(|s| s.note() == note) else {
+            self.steps = Some(Steps::new(&note, now));
+            return false;
+        };
+        if !steps.see(now, how) {
+            return false;
+        }
+        // A Tally or a Session made or unmade has no way back as it was:
+        // the steps start again from it.
+        let lists = |kind: NoteKind| {
+            matches!(
+                kind,
+                NoteKind::Plain | NoteKind::Checklist | NoteKind::ShoppingList
+            )
+        };
+        let kinds = (steps.undo_to().map(|s| s.kept.kind), steps.at().kept.kind);
+        if let (Some(was), is) = kinds
+            && was != is
+            && !(lists(was) && lists(is))
+        {
+            let now = steps.at().clone();
+            steps.restart(now);
+        }
+        true
+    }
+
+    /// Whether Ctrl+Z and Edit ▸ Undo take back the last step of the Note
+    /// open rather than the window's undo: it has one, and the window's
+    /// came before it or waits for nothing (obf-1051).
+    fn steps_undo_first(&self) -> bool {
+        self.steps.as_ref().is_some_and(|s| s.undo_to().is_some())
+            && (!self.undo_later || self.undo.is_none())
+    }
+
+    /// Undo, Redo or "Revert all changes" of the Note open (obf-1051):
+    /// what is typed is kept first, as a step of its own, then the Note
+    /// is written as the step it goes to was, as an edit does. Its fields
+    /// forget their own typing then.
+    fn note_step(&mut self, way: Way) -> oldbrainfix_core::Result<()> {
+        self.save_text()?;
+        self.refresh();
+        self.see_steps(See::After);
+        let Some(steps) = &self.steps else {
+            return Ok(());
+        };
+        let to = match way {
+            Way::Undo => steps.undo_to().cloned(),
+            Way::Redo => steps.redo_to().cloned(),
+            Way::Revert => steps.changed().then(|| steps.opened().clone()),
+        };
+        let Some(to) = to else {
+            return Ok(());
+        };
+        // The window's undo of the same change goes with it.
+        if way == Way::Undo && self.slot_step.is_some() && self.slot_step == Some(steps.depth()) {
+            self.undo = None;
+            self.slot_step = None;
+        }
+        let written = self.write_state(&to);
+        self.refresh();
+        self.fields_forget = true;
+        if let (Some(now), Some(steps)) = (self.steps_state(), self.steps.as_mut()) {
+            match way {
+                Way::Undo => steps.undone(now),
+                Way::Redo => steps.redone(now),
+                Way::Revert => steps.reverted(now),
+            }
+        }
+        written
+    }
+
+    /// The step of a text changed whole by a menu (obf-1051), as
+    /// [`Action::WholeStep`] says: the field as it was before it, then
+    /// as it is.
+    fn whole_step(&mut self, section: Option<&str>, before: String) {
+        let Some(after) = self.steps_state() else {
+            return;
+        };
+        let mut was = after.clone();
+        match section {
+            None if self.text_kinded => was.typed.text = note_kinds::join(&self.name, &before),
+            None => was.typed.text = before,
+            Some(id) => {
+                if let Some(text) = was.typed.sections.get_mut(id) {
+                    *text = before;
+                }
+            }
+        }
+        if let Some(steps) = self.steps.as_mut() {
+            steps.see(was, See::Before);
+            steps.see(after, See::Before);
+        }
+    }
+
+    /// Writes the Note open as `to` holds it (obf-1051), where it is
+    /// otherwise, by the same steps its editor writes it with: its kind
+    /// between a plain Note and the lists, the format and language of its
+    /// text, its text and its Sections' as a save keeps them, its
+    /// Importance, its Lines, its badges. A formatted text stays formatted
+    /// (ADR 0033).
+    fn write_state(&mut self, to: &State) -> oldbrainfix_core::Result<()> {
+        let Some(id) = self.text_of.clone() else {
+            return Ok(());
+        };
+        let Some(now) = self.steps_state() else {
+            return Ok(());
+        };
+        let lists = |kind: NoteKind| {
+            matches!(
+                kind,
+                NoteKind::Plain | NoteKind::Checklist | NoteKind::ShoppingList
+            )
+        };
+        let (from, kind) = (now.kept.kind, to.kept.kind);
+        if from != kind
+            && lists(from)
+            && lists(kind)
+            && KindShown::of(&self.view).choices.contains(&kind)
+        {
+            self.save_text()?;
+            self.act(kind_action(&id, from, kind))?;
+            self.refresh();
+        }
+        let Some(now) = self.steps_state() else {
+            return Ok(());
+        };
+        if now.kept.format != to.kept.format {
+            let known = [text_format::PLAIN, text_format::MARKDOWN, text_format::CODE];
+            if let Some(format) = known.into_iter().find(|f| *f == to.kept.format) {
+                self.set_text_format(format)?;
+            }
+        }
+        if now.kept.language != to.kept.language {
+            self.set_code_language(to.kept.language.as_deref())?;
+        }
+        // The texts as a save keeps them.
+        if !note_steps::same_text(&self.typed_text(), &to.typed.text) {
+            self.put_typed(to.typed.text.clone());
+        }
+        for (section, text) in &to.typed.sections {
+            if let Some(field) = self.section_texts.get_mut(section)
+                && !note_steps::same_text(&field.text, text)
+            {
+                field.text = text.clone();
+            }
+        }
+        self.save_note_text()?;
+        self.save_sections()?;
+        let (now, to) = (&now.kept, &to.kept);
+        if now.importance != to.importance {
+            Notes::new(&self.store).set_importance(&id, to.importance)?;
+        }
+        // Filed back as Ctrl+Z files it back, Unsorted included.
+        if now.place != to.place {
+            Undo::Filed(vec![(id.clone(), to.place.clone())]).apply(&self.store)?;
+        }
+        if let (Some(_), Some(lines)) = (&now.lines, &to.lines) {
+            self.restore_lines(&id, lines)?;
+        }
+        if now.on_agenda != to.on_agenda
+            && let (Some(shows), Some(lines)) = (to.on_agenda, &to.lines)
+        {
+            self.act(match lines.shopping {
+                true => Action::Shopping(ShoppingAction::OnAgenda(id.clone(), shows)),
+                false => Action::Checklist(ChecklistAction::OnAgenda(id.clone(), shows)),
+            })?;
+        }
+        if now.hidden != to.hidden {
+            self.act(Action::HideFromAi(id.clone(), to.hidden))?;
+        }
+        if now.ticks != to.ticks {
+            self.act(Action::ShowTicks {
+                note: id.clone(),
+                on: to.ticks,
+            })?;
+        }
+        if let (Some((bar, sets)), Some((was_bar, was_sets))) = (to.tally, now.tally) {
+            if bar != was_bar {
+                self.act(Action::Tally(TallyAction::Bar(bar)))?;
+            }
+            if sets != was_sets {
+                self.act(Action::Tally(TallyAction::Sets(sets)))?;
+            }
+        }
+        if let (Some(setup), Some(was)) = (&to.session, &now.session)
+            && setup != was
+        {
+            SessionDraft::of(&self.store, &self.t, &id, Some(setup))?.write(&self.store, was)?;
+        }
+        Ok(())
+    }
+
+    /// Brings the Lines of the Note `note` back to `to` (obf-1051): the
+    /// Lines added since deleted, those deleted since restored, their
+    /// texts and reappear times, then their order and groups by moves as
+    /// a drag makes them, a Shopping List's among its open Lines. Only
+    /// the Lines this Device may change.
+    fn restore_lines(&self, note: &str, to: &LinesKept) -> oldbrainfix_core::Result<()> {
+        let store = &*self.store;
+        let wall = &*self.wall;
+        let checklists = Checklists::new(store);
+        let shopping = ShoppingLists::new(store);
+        let read = || -> oldbrainfix_core::Result<Option<(LinesKept, HashSet<String>)>> {
+            Ok(match to.shopping {
+                true => shopping.by_note(note, wall)?.map(|list| {
+                    let open = list.open().into_iter().map(|l| l.id.clone()).collect();
+                    (LinesKept::of_shopping(&list), open)
+                }),
+                false => checklists.shown_now(note, wall)?.map(|list| {
+                    let all = list.lines.iter().map(|l| l.id.clone()).collect();
+                    (LinesKept::of_checklist(&list), all)
+                }),
+            })
+        };
+        let Some((now, _)) = read()? else {
+            return Ok(());
+        };
+        // Made anew, as its kind went back and forth: by their places.
+        if now.making != to.making {
+            return self.rebuild_lines(note, &now, to);
+        }
+        let deleted: HashSet<String> = match to.shopping {
+            true => shopping.deleted_lines(note)?,
+            false => checklists.deleted_lines(note)?,
+        }
+        .into_iter()
+        .map(|line| line.id)
+        .collect();
+        store.batch(|| {
+            for line in &to.lines {
+                if now.line(&line.id).is_none()
+                    && deleted.contains(&line.id)
+                    && checklists.may_edit(&line.id)?
+                {
+                    match to.shopping {
+                        true => shopping.restore(&line.id)?,
+                        false => checklists.restore(&line.id)?,
+                    }
+                }
+            }
+            for line in &now.lines {
+                if to.line(&line.id).is_none() && checklists.may_edit(&line.id)? {
+                    match to.shopping {
+                        true => shopping.delete(&line.id)?,
+                        false => checklists.delete(&line.id)?,
+                    }
+                }
+            }
+            Ok(())
+        })?;
+        let Some((now, _)) = read()? else {
+            return Ok(());
+        };
+        store.batch(|| {
+            for line in &to.lines {
+                let Some(was) = now.line(&line.id) else {
+                    continue;
+                };
+                if !checklists.may_edit(&line.id)? {
+                    continue;
+                }
+                if was.text != line.text && !line.text.trim().is_empty() {
+                    match to.shopping {
+                        true => shopping.rename(&line.id, &line.text)?,
+                        false => checklists.rename(&line.id, &line.text)?,
+                    }
+                }
+                if let Some(reappear) = line.reappear
+                    && was.reappear != Some(reappear)
+                {
+                    shopping.set_reappear(&line.id, reappear)?;
+                }
+            }
+            Ok(())
+        })?;
+        // Their order, a move at a time, from the first Line out of place;
+        // a move that changes nothing ends it.
+        let mut last = None;
+        for _ in 0..=2 * to.lines.len() {
+            let Some((now, movable)) = read()? else {
+                break;
+            };
+            if last.as_ref() == Some(&now) {
+                break;
+            }
+            // The Lines both hold that may move.
+            let shown: Vec<&note_steps::LineKept> = now
+                .lines
+                .iter()
+                .filter(|l| movable.contains(&l.id) && to.line(&l.id).is_some())
+                .collect();
+            let wanted: Vec<&note_steps::LineKept> = to
+                .lines
+                .iter()
+                .filter(|l| movable.contains(&l.id) && now.line(&l.id).is_some())
+                .collect();
+            let out = shown
+                .iter()
+                .zip(&wanted)
+                .position(|(is, wants)| is.id != wants.id || is.in_group != wants.in_group);
+            let Some(at) = out else {
+                break;
+            };
+            let (Some(is), Some(wants)) = (shown.get(at), wanted.get(at)) else {
+                break;
+            };
+            if !checklists.may_edit(&wants.id)? {
+                break;
+            }
+            match (to.shopping, is.id == wants.id) {
+                (true, _) => shopping.move_line(&wants.id, wall, Some(&is.id))?,
+                // In place, only in the wrong group.
+                (false, true) if at == 0 && wants.in_group => break,
+                (false, true) => checklists.indent(&wants.id, wants.in_group)?,
+                (false, false) => checklists.move_line(&wants.id, Some(&is.id))?,
+            }
+            last = Some(now);
+        }
+        // Their checks, a Line at a time, as a group checks with its
+        // Lines: for the Occurrence the list shows checked for.
+        let checks = match to.shopping {
+            true => shopping.may_check(note)?,
+            false => checklists.may_check(note)?,
+        };
+        if !checks {
+            return Ok(());
+        }
+        let on = match to.shopping {
+            true => None,
+            false => checklists.shown_now(note, wall)?.and_then(|l| l.on),
+        };
+        let mut last = None;
+        for _ in 0..=to.lines.len() {
+            let Some((now, _)) = read()? else {
+                break;
+            };
+            if last.as_ref() == Some(&now) {
+                break;
+            }
+            let Some(wants) = to.lines.iter().find(|wants| {
+                now.line(&wants.id)
+                    .is_some_and(|is| is.checked != wants.checked)
+            }) else {
+                break;
+            };
+            let id = wants.id.as_str();
+            match (to.shopping, wants.checked, &on) {
+                (true, true, _) => shopping.check(id, wall)?,
+                (true, false, _) => shopping.uncheck(id, wall)?,
+                (false, true, Some(on)) => checklists.check_for(id, on)?,
+                (false, false, Some(on)) => checklists.uncheck_for(id, on)?,
+                (false, true, None) => checklists.check(id)?,
+                (false, false, None) => checklists.uncheck(id)?,
+            }
+            last = Some(now);
+        }
+        Ok(())
+    }
+
+    /// Brings the Lines of the Note `note`, made anew since and read as
+    /// `now`, back to `to` by their places (obf-1051): each Line's text,
+    /// group and reappear time as the Line at its place had them, Lines
+    /// added where `to` has more and deleted where it has fewer.
+    fn rebuild_lines(
+        &self,
+        note: &str,
+        now: &LinesKept,
+        to: &LinesKept,
+    ) -> oldbrainfix_core::Result<()> {
+        let store = &*self.store;
+        let wall = &*self.wall;
+        let checklists = Checklists::new(store);
+        let shopping = ShoppingLists::new(store);
+        store.batch(|| {
+            for (at, wants) in to.lines.iter().enumerate() {
+                let id = match now.lines.get(at) {
+                    Some(is) if !checklists.may_edit(&is.id)? => continue,
+                    Some(is) => {
+                        if is.text != wants.text {
+                            match to.shopping {
+                                true => shopping.rename(&is.id, &wants.text)?,
+                                false => checklists.rename(&is.id, &wants.text)?,
+                            }
+                        }
+                        if !to.shopping && at > 0 && is.in_group != wants.in_group {
+                            checklists.indent(&is.id, wants.in_group)?;
+                        }
+                        is.id.clone()
+                    }
+                    None => match to.shopping {
+                        true => shopping.add(note, &wants.text, wall)?,
+                        false => checklists.add(note, &wants.text, None, wants.in_group)?,
+                    },
+                };
+                if let Some(reappear) = wants.reappear {
+                    shopping.set_reappear(&id, reappear)?;
+                }
+            }
+            for gone in now.lines.iter().skip(to.lines.len()) {
+                if checklists.may_edit(&gone.id)? {
+                    match to.shopping {
+                        true => shopping.delete(&gone.id)?,
+                        false => checklists.delete(&gone.id)?,
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Whether the Note open has a step for Undo, one for Redo, and
+    /// something "Revert all changes" goes back from (obf-1051).
+    pub fn note_steps(&self) -> (bool, bool, bool) {
+        self.steps.as_ref().map_or((false, false, false), |s| {
+            (s.undo_to().is_some(), s.redo_to().is_some(), s.changed())
+        })
+    }
+
     /// Keeps the edited text of each Section of the shown Note whose
     /// field changed (#183), fixed in place as the Note's is, where this
     /// Device may edit it as it is stored now; an emptied text goes back
@@ -11723,6 +12290,7 @@ impl App {
                 && !ui.ctx().text_edit_focused()
                 && !egui::Popup::is_any_open(ui.ctx());
             let ai_on = self.view.ai_on;
+            let note_open = self.note_open();
             ui.input_mut(|i| {
                 if clears && i.consume_key(Modifiers::NONE, Key::Escape) {
                     actions.push(Action::ClearCards);
@@ -11735,9 +12303,13 @@ impl App {
                 }
                 // In a text field Ctrl+Z is the field's, undoing what was
                 // typed (#268); Ctrl+Shift+Z, a redo elsewhere, undoes
-                // nothing.
+                // nothing. Over the Note open it and Ctrl+Y are its Redo
+                // (obf-1051).
                 if !typing && !i.modifiers.shift && i.consume_key(Modifiers::COMMAND, Key::Z) {
                     actions.push(Action::Undo);
+                }
+                if !typing && note_open && redo_keys(i) {
+                    actions.push(Action::NoteRedo);
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
@@ -12171,6 +12743,7 @@ impl App {
         }
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
+        self.steps_frame(ui.ctx());
         // Files dropped onto it go onto its Note while nothing lies over
         // it (#267); the app's own open in the main window. Embedded, the
         // drops are the main window's.
@@ -12248,6 +12821,9 @@ impl App {
             {
                 // Ctrl+Z outside a text field, as in the main window (#268).
                 actions.push(Action::Undo);
+            } else if !typing && ui.input_mut(redo_keys) {
+                // And Redo, as over the Note dialog (obf-1051).
+                actions.push(Action::NoteRedo);
             }
         } else if self.viewer.is_some() {
             let back = ui.input_mut(|i| {
@@ -12296,6 +12872,11 @@ impl App {
                         .on_hover_text("F9");
                     if button.clicked() {
                         actions.push(Action::ReadingView(!reading));
+                    }
+                    // Undo, Redo and ⋮ as in the Note dialog (obf-1051),
+                    // not in the reading view.
+                    if !reading {
+                        self.step_buttons(ui, &mut actions);
                     }
                 });
             });
@@ -13667,8 +14248,9 @@ impl App {
                 menu_entries(ui, [(t.tray_quit(), None, true, Action::Quit)], actions);
             });
             ui.menu_button(RichText::new(t.menu_edit()).color(text), |ui| {
-                // The last delete, check-off, filing or Merge (#268).
-                let undoes = self.undo.is_some();
+                // The last delete, check-off, filing or Merge (#268), or
+                // the last step of the Note open (obf-1051).
+                let undoes = self.undo.is_some() || self.steps_undo_first();
                 menu_entries(
                     ui,
                     [(t.undo(), keys(Key::Z), undoes, Action::Undo)],
@@ -14230,6 +14812,7 @@ impl App {
                 actions.push(Action::CloseNote);
             }
         }
+        self.steps_frame(ctx);
         // As large as it was left on this computer (#278), in the room
         // the window has.
         let size = window_sizes::note_dialog(self.note_kept, under.size());
@@ -14297,6 +14880,8 @@ impl App {
                                                 actions.push(Action::OpenWindow(id.clone()));
                                             }
                                         }
+                                        // Undo, Redo and ⋮ (obf-1051).
+                                        self.step_buttons(ui, actions);
                                     },
                                 );
                             });
@@ -14315,6 +14900,73 @@ impl App {
             }
         }
         self.badge_dialog(ctx, tones, actions);
+    }
+
+    /// The steps of the Note open as it is drawn (obf-1051): typing that
+    /// rested is a step, looked at again once it may have; its fields
+    /// forget their own typing once Undo, Redo or Revert wrote them.
+    fn steps_frame(&mut self, ctx: &egui::Context) {
+        self.steps_time = ctx.input(|i| i.time);
+        self.see_steps(See::Drawn(self.steps_time));
+        if self.steps.as_ref().is_some_and(Steps::typing) {
+            ctx.request_repaint_after(std::time::Duration::from_secs_f64(note_steps::PAUSE));
+        }
+        if !std::mem::take(&mut self.fields_forget) {
+            return;
+        }
+        let Some(note) = &self.text_of else {
+            return;
+        };
+        let fields = [Id::new(("note text", note)), Id::new(("note name", note))]
+            .into_iter()
+            .chain(
+                self.section_texts
+                    .keys()
+                    .map(|id| Id::new(("section text", id))),
+            );
+        for id in fields {
+            if let Some(mut state) = egui::widgets::text_edit::TextEditState::load(ctx, id) {
+                state.clear_undoer();
+                state.store(ctx, id);
+            }
+        }
+    }
+
+    /// Undo, Redo and ⋮ with "Revert all changes" in the bar of the Note
+    /// open (obf-1051), drawn right to left: each greyed while it has
+    /// nothing to do.
+    fn step_buttons(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let (undoes, redoes, changed) = self.note_steps();
+        let more = icon_button(ui, icons::MORE_VERT, t.desk_note_more(), text);
+        egui::Popup::menu(&more).show(|ui| {
+            let revert = egui::Button::new(RichText::new(t.desk_note_revert_all()).color(text));
+            // Closed by keyboard and screen reader too (UI laws, "Menu bar
+            // and keys").
+            if ui.add_enabled(changed, revert).clicked() {
+                actions.push(Action::AskRevert);
+                ui.close();
+            }
+        });
+        // Their keys in the tooltip, as the system writes them.
+        let ctx = ui.ctx().clone();
+        let keys = |modifiers: Modifiers| {
+            let shortcut = egui::KeyboardShortcut::new(modifiers, Key::Z);
+            ctx.format_shortcut(&shortcut)
+        };
+        let redo = format!(
+            "{} ({})",
+            t.desk_redo(),
+            keys(Modifiers::COMMAND | Modifiers::SHIFT)
+        );
+        if step_button(ui, (icons::REDO, t.desk_redo(), &redo), redoes, text).clicked() {
+            actions.push(Action::NoteRedo);
+        }
+        let undo = format!("{} ({})", t.undo(), keys(Modifiers::COMMAND));
+        if step_button(ui, (icons::UNDO, t.undo(), &undo), undoes, text).clicked() {
+            actions.push(Action::NoteUndo);
+        }
     }
 
     /// The small editor of the Note's badge clicked (#160), while it is
@@ -16904,6 +17556,18 @@ impl App {
                         Some(false) => actions.push(Action::KeepEditing(*from)),
                         None => {}
                     },
+                    // Asked once; Redo brings the changes back (obf-1051).
+                    Dialog::Revert => {
+                        title(ui, t.desk_note_revert_question());
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.desk_note_revert_detail()).color(text));
+                        ui.horizontal_wrapped(|ui| {
+                            cancel(ui, &t, actions);
+                            if theme::primary(ui, true, t.desk_note_revert()).clicked() {
+                                actions.push(Action::Revert);
+                            }
+                        });
+                    }
                     Dialog::RejectAi => {
                         title(ui, t.ai_reject_question());
                         let text = ui.visuals().text_color();
@@ -18748,6 +19412,28 @@ pub(crate) fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32)
     theme::icon_button_back(ui, &resp, rect);
     icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
     resp.on_hover_text(label)
+}
+
+/// An icon button of the Note's bar (obf-1051): `label` to a screen
+/// reader, `said` in its tooltip, greyed and not clickable while not
+/// `on`.
+fn step_button(
+    ui: &mut Ui,
+    (icon, label, said): (char, &str, &str),
+    on: bool,
+    colour: Color32,
+) -> egui::Response {
+    let sense = if on { Sense::click() } else { Sense::hover() };
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), sense);
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, on, label));
+    let colour = if on {
+        theme::icon_button_back(ui, &resp, rect);
+        colour
+    } else {
+        ui.visuals().weak_text_color()
+    };
+    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+    resp.on_hover_text(said)
 }
 
 /// Gives the text field `field` the name a screen reader says for it,
@@ -22042,6 +22728,14 @@ struct BadgesShown<'a> {
     advanced: bool,
 }
 
+/// Where a step of the Note open goes (obf-1051).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Way {
+    Undo,
+    Redo,
+    Revert,
+}
+
 /// The kind of the Note open (#188), and the kinds this Device may make
 /// it from its kind badge, in the order offered: a plain Note a
 /// Checklist, a Shopping List, a Tally or a Session (#191), as it may make
@@ -22098,6 +22792,13 @@ impl KindShown {
         }
         KindShown { kind, choices }
     }
+}
+
+/// Whether Redo's keys were pressed, Ctrl+Shift+Z or Ctrl+Y (Cmd on
+/// macOS), and takes them (obf-1051).
+fn redo_keys(i: &mut egui::InputState) -> bool {
+    (i.modifiers.shift && i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z))
+        || i.consume_key(Modifiers::COMMAND, Key::Y)
 }
 
 /// What making the Note `id` of the kind `from` one of the kind `to`
@@ -23280,6 +23981,14 @@ fn edited_text(
         }
         if let Some(asked) = grid.boxes.take() {
             actions.push(box_action(of.to_string(), asked));
+        }
+        // A menu of a grid changed the text whole: a step of its own
+        // (obf-1051).
+        if let Some(before) = grid.whole.take() {
+            actions.push(Action::WholeStep {
+                section: edit.section.then(|| of.to_string()),
+                before,
+            });
         }
         // A click on the bar keeps the field being edited,
         // and so does the keyboard going into a cell of its

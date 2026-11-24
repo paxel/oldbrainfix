@@ -82,6 +82,9 @@ pub const MORE: char = '\u{e402}';
 /// `file_upload_outlined`, as that page's Export.
 pub const ALL_ROUTINES: char = '\u{e2b8}';
 pub const MORE_VERT: char = '\u{e404}';
+/// Undo and Redo in the bar of the Note open (obf-1051).
+pub const UNDO: char = '\u{e68c}';
+pub const REDO: char = '\u{e512}';
 /// `drag_handle`, as the phone's Areas list drags its rows by.
 pub const DRAG_HANDLE: char = '\u{e206}';
 /// `check_circle`, `cancel` and `timelapse`, as the phone's Routine
