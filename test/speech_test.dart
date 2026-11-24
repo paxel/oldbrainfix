@@ -11,6 +11,7 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
+import 'package:oldbrainfix/src/sync_line.dart';
 import 'package:oldbrainfix/src/speech_model_screen.dart';
 import 'package:oldbrainfix/src/speech_offer_screen.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
@@ -640,7 +641,8 @@ void main() {
         ..transcribeGate = Completer<void>();
       await start(tester);
       await openCaptureBy(tester, 'voice');
-      await tap(tester, find.byKey(const ValueKey('stopRecording')));
+      // The quick note's line moves while it transcribes (obf-1082).
+      await press(tester, find.byKey(const ValueKey('stopRecording')));
       await saveCapture(tester);
 
       // Saved and back on the Agenda while Whisper still works.
@@ -659,6 +661,170 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Transcribing…'), findsNothing);
+    });
+
+    group('on the quick note (obf-1082)', () {
+      final stop = find.byKey(const ValueKey('stopRecording'));
+      final transcribing = find.byWidgetPredicate(
+        (w) => '${w.key}'.contains('capture-transcribing-'),
+      );
+      final fold = find.byWidgetPredicate(
+        (w) => '${w.key}'.contains('capture-transcript-'),
+      );
+      String typed(WidgetTester tester) =>
+          tester.widget<TextField>(find.byType(TextField)).controller!.text;
+
+      testWidgets('says it transcribes, then fills the empty text with the '
+          'Transcript, which stays folded under the recording', (tester) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+
+        expect(
+          find.descendant(
+            of: transcribing,
+            matching: find.text('Transcribing…'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: transcribing, matching: find.byType(SweepLine)),
+          findsOneWidget,
+        );
+        expect(typed(tester), '');
+
+        speech.transcribeGate?.complete();
+        await tester.pumpAndSettle();
+        expect(transcribing, findsNothing);
+        expect(typed(tester), 'call the garage');
+        expect(
+          find.descendant(of: fold, matching: find.text('Transcript')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: fold, matching: find.text('call the garage')),
+          findsNothing,
+        );
+        await tap(tester, find.text('Transcript'));
+        expect(
+          find.descendant(of: fold, matching: find.text('call the garage')),
+          findsOneWidget,
+        );
+
+        await saveCapture(tester);
+        final note = notes.all().single;
+        expect(note.text, 'call the garage');
+        expect(note.transcripts, {store.putAudio(first): 'call the garage'});
+      });
+
+      testWidgets('waits for a pause in typing, then adds the Transcript as '
+          'a new paragraph; Open in the editor saves both', (tester) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+        await tester.enterText(find.byType(TextField), 'plumber');
+        speech.transcribeGate?.complete();
+        await tester.pump();
+        await tester.pump();
+
+        // Still typing: it waits.
+        expect(transcribing, findsNothing);
+        expect(typed(tester), 'plumber');
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(typed(tester), 'plumber');
+        await tester.enterText(find.byType(TextField), 'plumber Monday');
+        await tester.pump(const Duration(milliseconds: 900));
+        expect(typed(tester), 'plumber Monday');
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(typed(tester), 'plumber Monday\n\ncall the garage');
+        // The cursor stays where the typing ended.
+        expect(
+          tester
+              .widget<TextField>(find.byType(TextField))
+              .controller!
+              .selection,
+          const TextSelection.collapsed(offset: 14),
+        );
+
+        await tap(tester, find.byKey(const ValueKey('captureToEditor')));
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        final note = notes.all().single;
+        expect(note.text, 'plumber Monday\n\ncall the garage');
+        expect(note.transcripts, {store.putAudio(first): 'call the garage'});
+      });
+
+      testWidgets('a Transcript waiting for a pause in typing is saved with '
+          'the text by a Nudge button', (tester) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+        // Ending in a space, as a phone keyboard leaves it.
+        await tester.enterText(find.byType(TextField), 'plumber ');
+        speech.transcribeGate?.complete();
+        await tester.pump();
+        expect(typed(tester), 'plumber ');
+        await tap(tester, find.byKey(const ValueKey('nudge10')));
+
+        expect(find.byType(CaptureScreen), findsNothing);
+        expect(notes.all().single.text, 'plumber \n\ncall the garage');
+      });
+
+      testWidgets('left before it is transcribed, the saved Note keeps the '
+          'text typed and gets the Transcript as the recording\'s', (
+        tester,
+      ) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+        await tester.enterText(find.byType(TextField), 'plumber');
+        await saveCapture(tester);
+        expect(find.byType(CaptureScreen), findsNothing);
+        expect(notes.all().single.text, 'plumber');
+
+        speech.transcribeGate?.complete();
+        await tester.pumpAndSettle();
+        final note = notes.all().single;
+        expect(note.text, 'plumber');
+        expect(note.transcripts, {store.putAudio(first): 'call the garage'});
+      });
+
+      testWidgets('a recording that cannot be transcribed stops saying so and '
+          'adds nothing', (tester) async {
+        speech.installed = WhisperModel.base.sha256;
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await tap(tester, stop);
+        expect(transcribing, findsNothing);
+        expect(fold, findsNothing);
+        expect(find.byType(SweepLine), findsNothing);
+        expect(typed(tester), '');
+      });
+
+      testWidgets('without a speech model nothing says it transcribes', (
+        tester,
+      ) async {
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await tap(tester, stop);
+        expect(transcribing, findsNothing);
+        expect(find.byType(SweepLine), findsNothing);
+      });
     });
 
     testWidgets('a recording that cannot be transcribed is not tried again '

@@ -1309,6 +1309,19 @@ replace a law of Both apps where they say so. A desktop law marked
   place of the capture screen; leaving the editor
   returns to where Capture was opened from. It waits while there is
   nothing to save and is not offered behind the App Lock.
+- **The quick note takes its recording's Transcript** (obf-1082): with
+  a speech model, "Transcribing…" shows under the recording made there,
+  over the sync line's moving stretch (3 px, still across the width
+  with "remove animations"), until Whisper is done or could not make
+  it. The Transcript then goes into the text field, filling an empty
+  one or after the text as a new paragraph, the cursor left where it
+  was; while the user types it waits until typing rests for 1 s. Under
+  the recording it stays, folded under "Transcript" until a tap opens
+  it, and it stays the recording's Transcript. A Transcript still
+  waiting for the pause is saved with the text by a Nudge button, Back
+  or Open in the editor. Left before Whisper is done, the Note is saved
+  with the text as it was and the recording gets its Transcript later,
+  not the text. A recording shared in is not taken into the text.
 - **The Note editor holds what the quick note no longer shows** (#352):
   in its bar Photo, Voice, Gallery, Paste and Add to a Shopping List
   beside Attach file (on a phone-wide bar mostly in ⋮); its badges the

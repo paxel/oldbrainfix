@@ -52,6 +52,22 @@ class SyncLine extends StatelessWidget {
   }
 }
 
+/// The sync line's moving stretch on its own, 3 px across the room it is
+/// given, for work shown where it happens rather than under the bar: a
+/// voice recording being transcribed on the quick note (obf-1082).
+class SweepLine extends StatelessWidget {
+  const SweepLine({super.key});
+
+  @override
+  Widget build(BuildContext context) => const ExcludeSemantics(
+    child: SizedBox(
+      height: syncLineHeight,
+      width: double.infinity,
+      child: _Sweep(),
+    ),
+  );
+}
+
 class _Sweep extends StatefulWidget {
   const _Sweep();
 

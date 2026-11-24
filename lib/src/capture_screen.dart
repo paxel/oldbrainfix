@@ -9,6 +9,7 @@ import 'announcements.dart';
 import 'attachment_views.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'edit_history.dart';
 import 'failure_dialog.dart';
 import 'file_platform.dart';
 import 'l10n.dart';
@@ -17,6 +18,7 @@ import 'note_editor_screen.dart';
 import 'photo_platform.dart';
 import 'photo_views.dart';
 import 'routine_editor_screen.dart';
+import 'speech_platform.dart';
 import 'spotlight.dart';
 import 'sync_line.dart';
 import 'voice_recorder.dart';
@@ -228,7 +230,10 @@ void announceUntranscribable(
 /// recording goes on with the app in the background and the phone locked,
 /// until Stop here, Back or a Nudge button ends and keeps it; on Android
 /// leaving the app or locking the phone ends and keeps it too (#368)
-/// ([VoiceRecorder]). Text typed before goes into the same Note.
+/// ([VoiceRecorder]). Text typed before goes into the same Note. With a
+/// speech model, the recording says it is being transcribed, and its
+/// Transcript then goes into the text field as well, kept folded under
+/// the recording too (obf-1082).
 class CaptureScreen extends StatefulWidget {
   final Notes notes;
   final LocationSource location;
@@ -331,6 +336,24 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// Whether the last Paste found nothing to paste, said above the field.
   var _pasteEmpty = false;
 
+  /// The recordings made here whose Transcript is still to come, by hash
+  /// (obf-1082).
+  final _transcribing = <String>{};
+
+  /// The Transcripts of the recordings made here, by hash, as they came.
+  final _transcripts = <String, String>{};
+
+  /// The Transcripts come while the user typed, waiting for a pause
+  /// before they go into the text field.
+  final _held = <String>[];
+
+  /// Runs from each letter typed for [EditHistory.typingPause]; a
+  /// Transcript waits for it.
+  Timer? _typing;
+
+  /// The recordings whose Transcript is unfolded under them.
+  final _unfolded = <String>{};
+
   /// Set once leaving began, so a second tap does not leave twice.
   var _leaving = false;
 
@@ -425,6 +448,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     // Closed from elsewhere while recording: the recording ends, so the
     // screen times out again, and is kept.
     _recorder.dispose();
+    _typing?.cancel();
     _text.removeListener(_textChanged);
     _text.dispose();
     super.dispose();
@@ -434,12 +458,73 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// no Nudge then.
   bool get _sorted => _place != null;
 
-  /// What is typed or pasted answers "nothing to paste".
+  /// What is typed or pasted answers "nothing to paste", and holds a
+  /// Transcript back until typing pauses.
   void _textChanged() {
     final text = _text.text;
     if (text == _typed) return;
     _typed = text;
+    _typing?.cancel();
+    _typing = Timer(EditHistory.typingPause, _typingPaused);
     if (_pasteEmpty) setState(() => _pasteEmpty = false);
+  }
+
+  /// Typing paused: what Transcripts came meanwhile go into the text.
+  void _typingPaused() {
+    _typing = null;
+    if (!mounted || _leaving || _held.isEmpty) return;
+    setState(_takeTranscripts);
+  }
+
+  /// Waits for the Transcript of the recording [hash] made here, saying
+  /// meanwhile that it is being transcribed; nothing without a speech
+  /// model.
+  Future<void> _awaitTranscript(String noteId, String hash) async {
+    final speech = SpeechScope.of(context);
+    if (speech == null || speech.model.current == null) return;
+    final transcriber = speech.transcriber;
+    _transcribing.add(hash);
+    final kept = await transcriber.transcribed(noteId, hash);
+    final transcript = transcriber.transcriptOf(noteId, hash);
+    _transcribing.remove(hash);
+    // Left meanwhile: it is the saved Note's Transcript, as it is
+    // anyway.
+    if (!mounted || _leaving) return;
+    setState(() {
+      if (!kept || transcript == null) return;
+      _transcripts[hash] = transcript;
+      _held.add(hash);
+      if (!(_typing?.isActive ?? false)) _takeTranscripts();
+    });
+  }
+
+  /// Puts the Transcripts held into the text field: into an empty one,
+  /// else after the text as a new paragraph, the cursor left where it
+  /// was. A recording with no words heard adds nothing.
+  void _takeTranscripts() {
+    for (final hash in _held) {
+      final transcript = _transcripts[hash]?.trim() ?? '';
+      if (transcript.isEmpty) continue;
+      final value = _text.value;
+      final typed = value.text;
+      // What was typed stays as it is, so does the cursor in it.
+      final joined = typed.trim().isEmpty
+          ? transcript
+          : typed.endsWith('\n\n')
+          ? '$typed$transcript'
+          : typed.endsWith('\n')
+          ? '$typed\n$transcript'
+          : '$typed\n\n$transcript';
+      // Not typing: the Transcript does not hold the next Transcript back.
+      _typed = joined;
+      _text.value = TextEditingValue(
+        text: joined,
+        selection: typed.trim().isEmpty
+            ? TextSelection.collapsed(offset: joined.length)
+            : value.selection,
+      );
+    }
+    _held.clear();
   }
 
   /// Writes the text as a Note, or into the one already written; nothing
@@ -637,13 +722,21 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// Writes the recording [bytes] into the Note, capturing it with the
   /// text so far when there is none yet.
   void _addRecording(Uint8List bytes) {
+    final had = _recordings;
     final captured = _captured;
     if (captured == null) {
       _create(_text.text.trim(), recordings: [bytes]);
-      return;
+    } else {
+      widget.notes.addRecording(captured.noteId, bytes);
+      _recordings =
+          widget.notes.byId(captured.noteId)?.recordings ?? _recordings;
     }
-    widget.notes.addRecording(captured.noteId, bytes);
-    _recordings = widget.notes.byId(captured.noteId)?.recordings ?? _recordings;
+    // Kept by leaving, it is transcribed for the saved Note alone.
+    final noteId = _captured?.noteId;
+    if (noteId == null || !mounted || _leaving) return;
+    for (final hash in _recordings) {
+      if (!had.contains(hash)) unawaited(_awaitTranscript(noteId, hash));
+    }
   }
 
   /// Switches to voice and starts recording, asking for the microphone
@@ -683,6 +776,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
     await _stopRecording();
     await _picking;
     if (!mounted) return;
+    // A Transcript waiting for a pause in typing is saved with the text.
+    _takeTranscripts();
     try {
       _write(nudgeIn);
     } catch (_) {
@@ -706,6 +801,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     await _stopRecording();
     await _picking;
     if (!mounted) return;
+    _takeTranscripts();
     try {
       _write(null);
     } catch (_) {
@@ -904,23 +1000,69 @@ class _CaptureScreenState extends State<CaptureScreen> {
       ),
       const SizedBox(height: 8),
     ],
-    if (_recordings.isNotEmpty && !_voiceMode) ...[
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(
-          spacing: 8,
-          children: [
-            for (final hash in _recordings)
-              RecordingButton(key: ValueKey(hash), hash: hash),
-          ],
+    if (!_voiceMode)
+      for (final hash in _recordings) ...[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: RecordingButton(key: ValueKey(hash), hash: hash),
         ),
-      ),
-      const SizedBox(height: 8),
-    ],
+        ?_transcriptOf(context, hash),
+        const SizedBox(height: 8),
+      ],
     for (final file in _files)
       AttachmentRow(key: ValueKey('capture-file-${file.hash}'), file: file),
     if (_files.isNotEmpty) const SizedBox(height: 8),
   ];
+
+  /// Under the recording [hash] made here: "Transcribing…" over the
+  /// sync line's sweep while it is transcribed, then its Transcript
+  /// folded under the word "Transcript"; nothing for any other.
+  Widget? _transcriptOf(BuildContext context, String hash) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final weak = theme.colorScheme.onSurfaceVariant;
+    if (_transcribing.contains(hash)) {
+      return Padding(
+        key: ValueKey('capture-transcribing-$hash'),
+        padding: const EdgeInsets.only(top: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t.transcribing,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: weak,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const SweepLine(),
+          ],
+        ),
+      );
+    }
+    final transcript = _transcripts[hash];
+    if (transcript == null) return null;
+    return ExpansionTile(
+      key: ValueKey('capture-transcript-$hash'),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: EdgeInsets.zero,
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      dense: true,
+      title: Text(t.transcriptLabel),
+      initiallyExpanded: _unfolded.contains(hash),
+      onExpansionChanged: (open) =>
+          open ? _unfolded.add(hash) : _unfolded.remove(hash),
+      children: [
+        Text(
+          transcript.trim().isEmpty ? t.noWordsHeard : transcript,
+          style: TextStyle(color: weak),
+        ),
+      ],
+    );
+  }
 }
 
 /// Puts [text] into [field] in place of its selection, the cursor after
