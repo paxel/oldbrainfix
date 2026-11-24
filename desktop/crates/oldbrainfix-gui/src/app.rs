@@ -915,9 +915,7 @@ struct View {
     profile_newer: bool,
     /// The other Profile "Which one is you?" asks about, if it does.
     profile_question: Option<ProfileChoice>,
-    /// Whether sync waits for an AI Task (ADR 0026), and the AI Task
-    /// open or waiting for its review, by id.
-    sync_paused: bool,
+    /// The AI Task open or waiting for its review, by id (ADR 0026).
     ai_task: Option<String>,
     /// The AI Task's review, while it shows.
     ai_review: Option<ReviewShown>,
@@ -1361,8 +1359,6 @@ pub enum NewKind {
 enum ChangesSent {
     Saved,
     NothingNew,
-    /// Refused while an AI Task waits.
-    Paused,
     /// Not saved: whose, and the full text of why.
     Failed(String),
 }
@@ -4133,19 +4129,17 @@ impl App {
     /// cause, the fix and the full text (UI laws, "Announcements").
     fn announce_join_failed(&mut self, failure: JoinFailure) {
         let t = self.t;
-        match failure {
-            JoinFailure::Paused => self.notice = Some(t.sync_paused_error().to_string()),
-            JoinFailure::Failed {
-                cause,
-                fix,
-                details,
-            } => self.announce_failure(
-                t.sync_not_done(),
-                t.sync_not_done_title(),
-                (cause, fix),
-                details,
-            ),
-        }
+        let JoinFailure {
+            cause,
+            fix,
+            details,
+        } = failure;
+        self.announce_failure(
+            t.sync_not_done(),
+            t.sync_not_done_title(),
+            (cause, fix),
+            details,
+        );
     }
 
     /// Announces that a Sent Item was not taken, refused as `error`
@@ -4195,11 +4189,6 @@ impl App {
     /// Saves a bundle for the paired Device `device`, or of everything,
     /// where the user says; nothing asked when there is nothing new.
     fn save_bundle(&mut self, device: Option<String>) -> oldbrainfix_core::Result<()> {
-        // Not even asked where to while sync waits for an AI Task.
-        if self.store.sync_paused()? {
-            self.notice = Some(self.t.sync_paused_error().to_string());
-            return Ok(());
-        }
         let since = match &device {
             Some(id) => self.store.held_by(id)?,
             None => Default::default(),
@@ -4221,9 +4210,6 @@ impl App {
         match bundle::write_bundle_now(&self.store, &path, device.as_deref()) {
             Ok(Some(_)) => self.notice = Some(t.bundle_saved().to_string()),
             Ok(None) => self.notice = Some(t.bundle_nothing_to_send().to_string()),
-            Err(oldbrainfix_core::Error::SyncPaused) => {
-                self.notice = Some(t.sync_paused_error().to_string());
-            }
             Err(e) => self.announce_failure(
                 t.bundle_not_saved(),
                 t.bundle_not_saved_title(),
@@ -4993,10 +4979,6 @@ impl App {
         else {
             return Ok(());
         };
-        if self.store.sync_paused()? {
-            self.notice = Some(self.t.sync_paused_error().to_string());
-            return Ok(());
-        }
         let day = (self.wall)(self.store.now()).date().format("%Y-%m-%d");
         let Some(mut path) =
             (self.item_saver)(self.t.send_save_title(), &sent::file_name(&day.to_string()))
@@ -5070,10 +5052,6 @@ impl App {
             return Ok(());
         };
         let t = self.t;
-        if self.store.sync_paused()? {
-            self.notice = Some(t.sync_paused_error().to_string());
-            return Ok(());
-        }
         let transport = self.store.transport_with(&person)?.unwrap_or(transport);
         let mut folder = None;
         if transport == Transport::Folder && self.store.sync_folder()?.is_none() {
@@ -5125,14 +5103,9 @@ impl App {
     }
 
     /// Announces that sharing from afar failed as `error` says; the click
-    /// opens the cause, the fix and the full text. A refusal while an AI
-    /// Task waits says so instead, as it does everywhere.
+    /// opens the cause, the fix and the full text.
     fn announce_afar_failed(&mut self, error: &oldbrainfix_core::Error) {
         let t = self.t;
-        if let oldbrainfix_core::Error::SyncPaused = error {
-            self.notice = Some(t.sync_paused_error().to_string());
-            return;
-        }
         self.announce_failure(
             t.share_afar_failed(),
             t.share_afar_failed_title(),
@@ -5242,8 +5215,6 @@ impl App {
                 (t.changes_not_saved_cause(), t.changes_not_saved_fix()),
                 failed.join("\n"),
             );
-        } else if sent.contains(&ChangesSent::Paused) {
-            self.notice = Some(t.sync_paused_error().to_string());
         } else if sent.contains(&ChangesSent::Saved) {
             self.notice = Some(t.sent_saved().to_string());
         } else if !sent.is_empty() {
@@ -5260,9 +5231,6 @@ impl App {
         id: &str,
         title: &str,
     ) -> oldbrainfix_core::Result<Option<ChangesSent>> {
-        if self.store.sync_paused()? {
-            return Ok(Some(ChangesSent::Paused));
-        }
         if self.store.entries_for_person(id)?.is_empty() {
             return Ok(Some(ChangesSent::NothingNew));
         }
@@ -5283,7 +5251,6 @@ impl App {
                     ChangesSent::Saved
                 }
                 Ok(None) => ChangesSent::NothingNew,
-                Err(oldbrainfix_core::Error::SyncPaused) => ChangesSent::Paused,
                 Err(e) => {
                     let name =
                         profile_view::display_name(&self.t, &self.store.person_shown(id)?.name)
@@ -5309,9 +5276,6 @@ impl App {
                 None => self.announce_imported(&result),
             },
             Err(oldbrainfix_core::Error::Offer(e)) => self.announce_offer_not_taken(e),
-            Err(oldbrainfix_core::Error::SyncPaused) => {
-                self.notice = Some(self.t.sync_paused_error().to_string());
-            }
             Err(e) => {
                 let t = self.t;
                 self.announce_failure(
@@ -7464,7 +7428,6 @@ impl App {
             profile_code: OwnProfile::new(&self.store).code()?,
             profile_newer: OwnProfile::new(&self.store).is_newer()?,
             profile_question: OwnProfile::new(&self.store).question()?,
-            sync_paused: self.store.sync_paused()?,
             ai_review: match &ai_task {
                 Some(task) if self.selection == Selection::AiReview && self.ai_port.is_none() => {
                     Some(ai_view::read_review(&self.store, &self.t, task)?)
@@ -7692,10 +7655,6 @@ impl App {
         }
         match done {
             Ok(()) => {}
-            // Waiting, not failed: said with what to do.
-            Err(oldbrainfix_core::Error::SyncPaused) => {
-                self.notice = Some(self.t.sync_paused_error().to_string());
-            }
             Err(e) => self.error = Some(e.to_string()),
         }
         // Nor does anyone else need to look again.
@@ -13626,10 +13585,11 @@ impl App {
                         actions.push(Action::OpenPage(Page::Sync));
                     }
                 });
-        } else if self.view.sync_paused {
-            // Sync waits for the AI Task, open or waiting for its review,
-            // for as long as it does, below every announcement that goes
-            // by a click; the click leads to where the wait ends.
+        } else if self.ai_port.is_some() || self.view.ai_task.is_some() {
+            // The AI port open, or its AI Task waiting for its review,
+            // below every announcement that goes by a click; sync goes
+            // on meanwhile (obf-1076). The click leads to the port or the
+            // review.
             let (text, asked) = if self.ai_port.is_some() {
                 (
                     self.t.ai_port_open_banner(),

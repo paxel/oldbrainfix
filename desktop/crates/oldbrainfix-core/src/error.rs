@@ -32,11 +32,6 @@ pub enum Error {
     /// A LAN sync this Device joined that did not happen, and why.
     #[error("sync: {0:?}")]
     Sync(crate::join::SyncFailure),
-    /// Sync once waited while an AI Task did. It no longer does
-    /// (obf-1076) and the core returns this nowhere; kept only while the
-    /// desktop still matches it, to go with its last use.
-    #[error("sync is paused until the pending changes are decided")]
-    SyncPaused,
     /// The AI port was to let Docker containers connect, and this
     /// computer has no Docker bridge (`docker0`, #167): it stays closed.
     #[error("no Docker bridge (docker0) found")]

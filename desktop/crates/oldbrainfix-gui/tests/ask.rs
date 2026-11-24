@@ -519,7 +519,7 @@ fn a_note_hidden_from_ai_is_in_no_request() -> TestResult {
 }
 
 #[test]
-fn a_change_the_model_makes_waits_for_its_review_with_sync() -> TestResult {
+fn a_change_the_model_makes_waits_for_its_review() -> TestResult {
     let (store, passport) = store()?;
     let area = Places::new(&store).add_area("Papers")?;
     let fake = Fake::new(vec![
@@ -533,14 +533,12 @@ fn a_change_the_model_makes_waits_for_its_review_with_sync() -> TestResult {
     let t = L10n::new("en");
     let mut harness = harness(store, &fake);
     ask(&mut harness, "Where is my passport?");
-    // Asking reads only: no AI Task, sync goes on.
+    // Asking reads only: no AI Task.
     assert_eq!(harness.state().store().ai_task()?, None);
-    assert!(!harness.state().store().sync_paused()?);
     assert!(!shows(&harness, t.ask_task_waits()));
 
     ask(&mut harness, "Sort what's new");
     assert!(harness.state().store().ai_task()?.is_some());
-    assert!(harness.state().store().sync_paused()?);
     assert!(shows(&harness, t.ask_task_waits()));
     harness
         .get_by_role_and_label(Role::Button, t.ai_review_open())

@@ -708,7 +708,7 @@
 <li>Führe die KI-Aufgabe in der Desktop-App aus.</li>
 <li>Gleiche das Handy ab, sobald die Prüfung fertig ist.</li>
 </box-tab>
-<box-tab device="desktop" alt="KI-Aufgabe prüfen: ein Tippfehler behoben, mit Vorher und Nachher, Alle annehmen und Alle ablehnen, und die Zeile, dass die KI-Aufgabe auf die Prüfung wartet und der Abgleich pausiert">
+<box-tab device="desktop" alt="KI-Aufgabe prüfen: ein Tippfehler behoben, mit Vorher und Nachher, Alle annehmen und Alle ablehnen, und die Zeile, dass die KI-Aufgabe auf die Prüfung wartet">
 <li>Klicke <strong>KI ▸ KI-Einstellungen …</strong>, dann <strong>KI-Port öffnen</strong>.</li>
 <li>Klicke <strong>Client-Konfiguration kopieren</strong> und füge sie im KI-Client ein.</li>
 <li>Gib der KI ihre Aufgabe.</li>
@@ -718,12 +718,13 @@
 <box-more>
 <p>
   Nur der Desktop hat den KI-Port. Seine Karte ist in <strong>KI ▸ KI-Einstellungen …</strong>,
-  auch über <strong>KI …</strong> in den Einstellungen erreichbar; ein Klick auf „KI-Port offen,
-  Synchronisierung pausiert“ oben öffnet diese Seite bei der Karte. <strong>KI ▸ KI-Aufgabe
+  auch über <strong>KI …</strong> in den Einstellungen erreichbar; ein Klick auf „KI-Port offen“
+  oben öffnet diese Seite bei der Karte. <strong>KI ▸ KI-Aufgabe
   prüfen</strong> zeigt die Prüfung einer KI-Aufgabe, die noch wartet. <strong>KI-Port öffnen</strong> lässt ein
   KI-Modell deiner Wahl für eine Aufgabe an deinen Notizen arbeiten, erreichbar nur mit seinem Token,
   von diesem Computer oder, wie unter <strong>Wer sich verbinden darf</strong> gewählt, von
-  Docker-Containern darauf. Der Abgleich wartet, solange der Port offen ist und bis zur Prüfung.
+  Docker-Containern darauf. Der Abgleich geht währenddessen weiter; die Änderungen der KI bleiben
+  auf diesem Computer und werden nirgendwohin gesendet, bis du sie annimmst.
   <strong>Fertig, prüfen</strong> schließt den Port und listet jede Änderung mit Vorher und
   Nachher auf, um sie als Ganzes anzunehmen oder abzulehnen (siehe
   <a href="sharing-and-sync.html#die-ki-aufgabe">Eine KI an deinen Notizen arbeiten lassen</a>).
@@ -800,7 +801,7 @@
   hat, nie aus allgemeinem Wissen, und sagt „Das steht nicht in deinen Notizen“, wenn sie nichts dazu
   enthalten. Ein Link zu einer Notiz, die es nicht gelesen hat, wird entfernt, seine Wörter bleiben,
   und die Antwort sagt dann <strong>Eine Quelle konnte nicht geprüft werden</strong>. Nur was das Modell findet und liest, geht an den Anbieter: die Namen deiner Bereiche, Themen und #Wörter, deine Routinen und Erinnerungen mit ihren Erledigt-Haken, wenn es sie auflistet, die Titel und kurzen Auszüge der Notizen, die seine Suchen finden, und die Notizen, die es ganz liest, mit ihren Abschnitten, Transkripten, Fototexten, Anhangtexten und ihrem Erfassungskontext (wann und wo eine Notiz erfasst wurde, der Kalendertermin und das Bluetooth-Gerät). Notizen und Bereiche, die vor KI verborgen sind, werden nie gesendet, nicht einmal als
-  Anzahl. Das Fragen hält den Abgleich nicht an.
+  Anzahl.
 </p>
 <p>
   Die Fragen stehen untereinander, die älteste zuerst, mit dem Fragefeld darunter, und eine Frage nach
@@ -821,7 +822,8 @@
   Frage; eine Antwort ohne Worte bietet beides nicht, eine Frage ohne Antwort nichts davon. Bittest du das Modell, etwas zu ändern, etwa „sortier das Neue“ in Bereiche und
   Themen, warten seine Änderungen als KI-Aufgabe: Die Ansicht sagt es, und <strong>Prüfen</strong>
   zeigt sie, um sie als Ganzes anzunehmen oder abzulehnen (siehe
-  <a href="#den-ki-port-oeffnen">Den KI-Port öffnen</a>). Der Abgleich wartet, bis du entscheidest.
+  <a href="#den-ki-port-oeffnen">Den KI-Port öffnen</a>). Bis du entscheidest, bleiben sie auf diesem
+  Computer, und der Abgleich geht weiter.
 </p>
 <p>
   Auch auf dem Handy ist das Fragen experimentell und anfangs aus. <strong>Fragen (experimentell)</strong>

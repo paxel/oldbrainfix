@@ -34,6 +34,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, the quick note shows "Transcribing…" after a recording and puts the Transcript into its text when done. ([obf-1082](https://github.com/paxel/oldbrainfix/issues/395))
 - On the phone and the desktop, the Amend box shows only after "Add a part", and a Note being made has none. ([obf-1072](https://github.com/paxel/oldbrainfix/issues/385))
 - On the phone and the desktop, a Checklist, Shopping List or Tally is one card with Add a Line; a description waits for its button. ([obf-1071](https://github.com/paxel/oldbrainfix/issues/384))
+- On the desktop, sync goes on while the AI port is open; the AI's changes stay on this computer until you accept them. ([obf-1076](https://github.com/paxel/oldbrainfix/issues/389))
 
 ### Fixed
 

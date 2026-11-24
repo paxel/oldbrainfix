@@ -664,7 +664,7 @@
 <li>Run the AI Task in the desktop app.</li>
 <li>Sync the phone once the review is done.</li>
 </box-tab>
-<box-tab device="desktop" alt="Review the AI Task: a typo fixed, with before and after, Accept all and Reject all, and the line AI Task waits for review, sync paused">
+<box-tab device="desktop" alt="Review the AI Task: a typo fixed, with before and after, Accept all and Reject all, and the line AI Task waits for review">
 <li>Click <strong>AI ▸ AI settings…</strong>, then <strong>Open the AI port</strong>.</li>
 <li>Click <strong>Copy client config</strong> and paste it into the AI client.</li>
 <li>Give the AI its task.</li>
@@ -674,13 +674,14 @@
 <box-more>
 <p>
   Only the desktop has the AI port. Its card is in <strong>AI ▸ AI settings…</strong>, also
-  reached by <strong>AI…</strong> in the Settings; a click on "AI port open, sync paused" at the top
+  reached by <strong>AI…</strong> in the Settings; a click on "AI port open" at the top
   opens that page at the card. <strong>AI ▸ Review the AI Task</strong> shows the review of an AI
   Task left waiting. <strong>AI ▸ Review the AI Task</strong> shows the review of an AI Task left waiting.
   <strong>Open the AI port</strong> lets an AI model of
   your choice work on your Notes for one task, reachable only with its token, from this computer or,
-  as chosen under <strong>Who may connect</strong>, from Docker containers on it. Sync waits while
-  the port is open and until the review. <strong>Done, review</strong> closes the port and lists
+  as chosen under <strong>Who may connect</strong>, from Docker containers on it. Sync goes on
+  meanwhile; the AI's changes stay on this computer, sent nowhere, until you accept them.
+  <strong>Done, review</strong> closes the port and lists
   every change with its before and after, to accept or reject as a whole (see
   <a href="sharing-and-sync.html#the-ai-task">Let an AI work on your Notes</a>).
 </p>
@@ -751,7 +752,7 @@
   Notes" when they hold nothing about it. A link to a Note it did not read is removed, its words stay,
   and the answer then says <strong>A source could not be checked</strong>. Only what the model
   finds and reads is sent to the provider: the names of your Areas, Topics and tags, your Routines and Reminders with their check-offs when it lists them, the titles and short excerpts of the Notes its searches find, and the Notes it reads in full, with their Sections, Transcripts, Photo Texts, Attachment Texts and Capture Context (when and where a Note was captured, the calendar event and the Bluetooth device). Notes and Areas Hidden from AI are never
-  sent, not even as a count. Asking does not pause sync.
+  sent, not even as a count.
 </p>
 <p>
   The questions stand one below the other, the oldest first, with the question field under them, and a
@@ -771,7 +772,8 @@
   words offers neither, and a question not answered offers none of them. When you ask the model to change something, such
   as "sort what's new" into Areas and Topics, its changes wait as an AI Task: the panel says so, and
   <strong>Review</strong> shows them to accept or reject as a whole (see
-  <a href="#open-the-ai-port">Open the AI port</a>). Sync waits until you decide.
+  <a href="#open-the-ai-port">Open the AI port</a>). Until you decide they stay on this computer,
+  and sync goes on.
 </p>
 <p>
   On the phone, asking is experimental and off at first as well. <strong>Ask (experimental)</strong>

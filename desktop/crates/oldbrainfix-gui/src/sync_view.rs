@@ -389,10 +389,7 @@ impl SyncHost {
             }
             Err(e) => {
                 let failure = join_failure(t, &e);
-                self.code_error = Some(match &failure {
-                    JoinFailure::Paused => t.sync_paused_error().to_string(),
-                    JoinFailure::Failed { cause, fix, .. } => format!("{cause} {fix}"),
-                });
+                self.code_error = Some(format!("{} {}", failure.cause, failure.fix));
                 self.join_failure = Some(failure);
                 Some(false)
             }
@@ -779,29 +776,24 @@ impl SyncHost {
     }
 }
 
-/// Why joining a typed code failed.
+/// Why joining a typed code failed: why and what to do, one sentence
+/// each, and the full text.
 #[derive(Debug, Clone, PartialEq)]
-pub enum JoinFailure {
-    /// Refused while an AI Task waits: said as everywhere.
-    Paused,
-    /// Failed: why and what to do, one sentence each, and the full text.
-    Failed {
-        cause: &'static str,
-        fix: &'static str,
-        details: String,
-    },
+pub struct JoinFailure {
+    pub cause: &'static str,
+    pub fix: &'static str,
+    pub details: String,
 }
 
 /// Why joining a typed code failed as `error` says: each
 /// [`SyncFailure`] as the phone says it, anything else as broken off.
 pub fn join_failure(t: &L10n, error: &Error) -> JoinFailure {
     let (failure, details) = match error {
-        Error::SyncPaused => return JoinFailure::Paused,
         Error::Sync(failure) => (*failure, format!("sync: {failure:?}")),
         e => (SyncFailure::Failed, format!("sync: {e}")),
     };
     let (cause, fix) = sync_failure_why(t, failure);
-    JoinFailure::Failed {
+    JoinFailure {
         cause,
         fix,
         details,
@@ -986,7 +978,6 @@ pub fn bundle_error_text(t: &L10n, error: Error) -> String {
             let (cause, fix) = offer_refusal(t, e);
             format!("{cause} {fix}")
         }
-        Error::SyncPaused => t.sync_paused_error().to_string(),
         e => format!("{} ({e})", t.bundle_failed()),
     }
 }

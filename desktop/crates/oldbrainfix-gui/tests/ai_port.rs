@@ -2,12 +2,13 @@
 //! from the AI settings (#335) with the client config to copy, its token
 //! kept from one opening to the next; while it is open,
 //! a tool call is answered as the window idles, and the top says "AI
-//! port open, sync paused". "Done, review" closes it and shows the
+//! port open". "Done, review" closes it and shows the
 //! review: a section per kind of change, before and after, the user's
 //! own later edit marked as staying; Accept all keeps the changes, Reject
 //! all asks once and keeps nothing; a task that changed nothing is
 //! declined without a review. A task left waiting shows its review on
-//! start, and a bundle is refused meanwhile with words that say why.
+//! start; a bundle comes in meanwhile, as sync goes on, and the review
+//! marks the drafts it touched, which edit Accept keeps.
 //! Who may connect (#167) is chosen on the card while the port is
 //! closed, this computer only until then, and kept for the next start;
 //! the Docker choice without a Docker bridge says so and does not open.
@@ -24,7 +25,6 @@
     clippy::indexing_slicing
 )]
 
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration as StdDuration, Instant};
@@ -109,7 +109,7 @@ fn the_port_is_off_by_default_and_opens_from_the_settings() -> TestResult {
     let t = L10n::new("en");
     let mut harness = settings(&store);
     assert!(harness.state().ai_port().is_none());
-    assert!(!store.sync_paused()?);
+    assert!(store.ai_task()?.is_none());
     // It works without "AI (experimental)", which is off (#334).
     assert!(!store.ai_on()?);
     assert!(!shows(&harness, t.ai_port_open_banner()));
@@ -118,7 +118,7 @@ fn the_port_is_off_by_default_and_opens_from_the_settings() -> TestResult {
     let url = harness.state().ai_port().ok_or("the port is open")?.url();
     assert!(url.starts_with("http://127.0.0.1:"));
     assert!(shows(&harness, &url));
-    assert!(store.sync_paused()?);
+    assert!(store.ai_task()?.is_some());
     assert!(shows(&harness, t.ai_port_open_banner()));
     assert!(!shows(&harness, t.ai_port_open()));
 
@@ -222,7 +222,6 @@ fn a_tool_call_is_answered_while_the_window_idles_and_kept_on_accept() -> TestRe
     click(&mut harness, t.ai_accept_all());
     assert!(store.log_only(|| garden(&store))?);
     assert!(store.ai_task()?.is_none());
-    assert!(!store.sync_paused()?);
     assert_eq!(harness.state().notice(), Some(t.ai_accepted()));
     Ok(())
 }
@@ -435,35 +434,157 @@ fn a_task_that_changed_nothing_is_declined_without_a_review() -> TestResult {
     click(&mut harness, t.ai_port_open());
     click(&mut harness, t.ai_port_done());
     assert!(store.ai_task()?.is_none());
-    assert!(!store.sync_paused()?);
     assert_eq!(harness.state().page(), Some(Page::AiSettings));
     assert!(!shows(&harness, t.ai_review_title()));
     Ok(())
 }
 
+/// A desk with the user's phone, met once as at a Pairing, on one clock,
+/// so what was written later is later on both.
+fn desk_and_phone() -> Result<(Arc<Store>, Store), Box<dyn std::error::Error>> {
+    use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
+    let start = DateTime::parse_from_rfc3339("2026-03-01T09:00:00Z")?.with_timezone(&Utc);
+    let ticks = Arc::new(AtomicI64::new(0));
+    let clock = |ticks: &Arc<AtomicI64>| -> oldbrainfix_core::Clock {
+        let ticks = ticks.clone();
+        Box::new(move || start + Duration::seconds(ticks.fetch_add(1, Ordering::SeqCst)))
+    };
+    let desk = Store::in_memory(clock(&ticks), || Ok(SigningKey::from_seed([7; 32])))?;
+    OwnProfile::new(&desk).apply_defaults("Device", None)?;
+    let phone = Store::in_memory(clock(&ticks), || Ok(SigningKey::from_seed([8; 32])))?;
+    let request = sync_request(&phone, &desk.version_vector()?, "Pixel", "", "")?;
+    let (answer, _) = answer_sync(&desk, &request, "Desk")?.ok_or("an answer")?;
+    apply_answer(&phone, &answer)?;
+    Ok((Arc::new(desk), phone))
+}
+
 #[test]
-fn a_bundle_is_refused_while_a_task_waits_and_says_why() -> TestResult {
-    let store = device()?;
+fn bundles_come_in_and_go_out_while_a_task_waits_and_the_review_marks_what_came_in() -> TestResult {
+    use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
+    let (store, phone) = desk_and_phone()?;
     let t = L10n::new("en");
     let milk = Notes::new(&store).capture("Milk", None, None)?;
+    let bread = Notes::new(&store).capture("Bread", None, None)?;
+    let request = sync_request(&phone, &store.version_vector()?, "Pixel", "", "")?;
+    let (answer, _) = answer_sync(&store, &request, "Desk")?.ok_or("an answer")?;
+    apply_answer(&phone, &answer)?;
     let task = store.open_ai_task()?;
-    store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
+    store.drafting(&task, || {
+        Notes::new(&store).edit(&milk.id, "Milk and eggs")?;
+        Notes::new(&store).edit(&bread.id, "Rye bread")
+    })?;
+    // The user fixes the Note on the phone meanwhile; its bundle comes.
+    Notes::new(&phone).edit(&milk.id, "Milk, 2 l")?;
+    let dir = tempfile::tempdir()?;
+    let bundle = dir.path().join("changes.obfsync");
+    oldbrainfix_core::bundle::write_bundle_now(&phone, &bundle, None)?.ok_or("a bundle")?;
     let mut harness = window(App::new(store.clone(), "en"));
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
     assert!(shows(&harness, t.ai_review_banner()));
+    assert!(!shows(&harness, t.ai_synced_mine_stays()));
 
     harness.input_mut().dropped_files = vec![egui::DroppedFile {
-        path: Some(Path::new("changes.obfsync").to_path_buf()),
+        path: Some(bundle),
         ..Default::default()
     }];
-    // An open port repaints every 100 ms, so steps, not run().
     harness.run_steps(4);
-    assert_eq!(harness.state().notice(), Some(t.sync_paused_error()));
-    // Said at the top, the standing banner back once it is clicked away.
-    assert!(shows(&harness, t.sync_paused_error()));
-    assert!(!shows(&harness, t.ai_review_banner()));
-    click(&mut harness, t.sync_paused_error());
+    // Taken in, not refused; the task waits on.
+    let in_log = store.log_only(|| Notes::new(&store).by_id(&milk.id))?;
+    assert_eq!(in_log.ok_or("the Note")?.text, "Milk, 2 l");
+    assert!(store.ai_task()?.is_some());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    // The phone's newer value is marked as staying, once, on Milk only.
+    assert_eq!(
+        harness.query_all_by_label(t.ai_synced_mine_stays()).count(),
+        1
+    );
+    assert!(!shows(&harness, t.ai_your_edit_stays()));
+    assert!(!shows(&harness, t.ai_synced_overwritten()));
+
+    // Once its announcement is gone, the standing line is back, with no
+    // word of a pause.
+    if let Some(said) = harness.state().notice().map(str::to_string) {
+        click(&mut harness, &said);
+    }
     assert!(shows(&harness, t.ai_review_banner()));
+    assert!(!shows(&harness, "paused"));
+
+    // A bundle is saved meanwhile too, as the log has it: no draft in it.
+    let saved = dir.path().join("for-the-phone.obfsync");
+    {
+        let save = saved.clone();
+        harness
+            .state_mut()
+            .set_bundle_dialogs(Box::new(move |_, _| Some(save.clone())), Box::new(|_| None));
+    }
+    harness.state_mut().open(Page::Sync);
+    harness.run_steps(4);
+    click(&mut harness, t.bundle_save());
+    assert_eq!(harness.state().notice(), Some(t.bundle_saved()));
+    oldbrainfix_core::bundle::import_bundle(&phone, &saved)?;
+    let on_phone = Notes::new(&phone).by_id(&bread.id)?.ok_or("the Note")?;
+    assert_eq!(on_phone.text, "Bread");
     Ok(())
+}
+
+/// The review page alone, showing one change of a Note marked as
+/// `mine_wins` and `synced` say.
+fn review_with(mine_wins: bool, synced: bool) -> Harness<'static, ()> {
+    use oldbrainfix_core::ai_task::AiChangeKind;
+    use oldbrainfix_gui::ai_view::{ReviewChange, ReviewItem, ReviewShown, review_page};
+    let shown = ReviewShown {
+        task: "task".into(),
+        groups: vec![(
+            AiChangeKind::NoteText,
+            vec![ReviewItem {
+                entity: "note".into(),
+                title: "Milk".into(),
+                note: None,
+                changes: vec![ReviewChange {
+                    label: "Text".into(),
+                    before: Some("Milk".into()),
+                    after: Some("Milk and eggs".into()),
+                    mine_wins,
+                    synced,
+                }],
+            }],
+        )],
+    };
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(800.0, 600.0))
+        .build_ui(move |ui| {
+            oldbrainfix_gui::theme::install(ui.ctx());
+            let tones = oldbrainfix_gui::theme::tones(ui.visuals());
+            review_page(ui, &L10n::new("en"), tones, &shown, &mut None);
+        });
+    harness.run();
+    harness
+}
+
+#[test]
+fn the_review_says_which_later_edit_accept_keeps_and_which_it_writes_over() {
+    let t = L10n::new("en");
+    let marks = [
+        t.ai_your_edit_stays(),
+        t.ai_synced_mine_stays(),
+        t.ai_synced_overwritten(),
+    ];
+    let cases = [
+        ((false, false), None),
+        ((true, false), Some(marks[0])),
+        ((true, true), Some(marks[1])),
+        ((false, true), Some(marks[2])),
+    ];
+    for ((mine_wins, synced), said) in cases {
+        let harness = review_with(mine_wins, synced);
+        for mark in marks {
+            assert_eq!(
+                harness.query_all_by_label(mark).next().is_some(),
+                said == Some(mark),
+                "{mark} with mine_wins {mine_wins}, synced {synced}"
+            );
+        }
+    }
 }
 
 #[test]

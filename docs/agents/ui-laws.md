@@ -2005,7 +2005,12 @@ replace a law of Both apps where they say so. A desktop law marked
   its place, which opens the page with the arrow back to the Settings;
   the Settings' search finds the row by the words of every setting on
   the page. The announcement of the open AI port opens the page at the
-  port's card.
+  port's card. The standing line at the top says "AI port open" or "AI
+  Task waits for review", no word of a pause: sync goes on (obf-1076),
+  the drafts sent nowhere until Accept. The review marks each change a
+  later edit synced in touches: one of the user's other Devices' as
+  staying, another person's, in the warning colour, as written over by
+  Accept.
 - **The Ask panel is a place in the list** (#267, ADR 0051), reached
   by Ask… and Ctrl+K, which also work while typing and over the Note
   dialog and put the cursor into its question field. Under its heading
@@ -2038,7 +2043,8 @@ replace a law of Both apps where they say so. A desktop law marked
   opens in the Note dialog over the panel, which stays. A follow-up is
   asked after the earlier answers; Start over drops them, and so does
   showing another place. While an AI Task waits, a line says that its
-  changes wait for review with sync, beside Review. The provider's
+  changes wait for review and stay on this computer until decided,
+  beside Review. The provider's
   card in the AI settings sits before the AI port's: the protocol as
   radio buttons, the base URL only for an OpenAI-compatible provider
   with its error under it, the model, the API key hidden as typed, and

@@ -516,13 +516,6 @@ impl Store {
         Ok(())
     }
 
-    /// Whether a shown pending set waits, such as an AI Task, open or
-    /// waiting for its review. Sync no longer waits for it (obf-1076);
-    /// kept only while the desktop still asks, to go with its last use.
-    pub fn sync_paused(&self) -> Result<bool> {
-        Ok(self.pending_sets()?.iter().any(|s| s.shown))
-    }
-
     /// Whether another Device's edit of `field` on `entity` (its whole
     /// schedule, for a Routine's) came into the log after `mark`, as one
     /// that counts: by sync, while the AI Task waited (obf-1076).
