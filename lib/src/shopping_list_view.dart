@@ -157,7 +157,6 @@ class _CardShoppingListState extends State<CardShoppingList>
       for (final line in lines)
         if (line.checked) line,
     ];
-    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Column(
@@ -171,31 +170,20 @@ class _CardShoppingListState extends State<CardShoppingList>
             ],
             onCheck: _checks ? _check : null,
           ),
-          // The struck ones folded under the open ones (#189).
+          // The struck ones folded under the open ones (#189), the fold a
+          // text button in the accent with its chevron (obf-1110).
           if (struck.isNotEmpty) ...[
-            Semantics(
-              button: true,
-              expanded: _struckShown,
-              child: InkWell(
-                key: const ValueKey('shopping-struck'),
-                borderRadius: BorderRadius.circular(8),
-                onTap: _toggleStruck,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _struckShown ? Icons.expand_less : Icons.expand_more,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        context.t.shoppingStruckCount(struck.length),
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Semantics(
+                expanded: _struckShown,
+                child: TextButton.icon(
+                  key: const ValueKey('shopping-struck'),
+                  onPressed: _toggleStruck,
+                  icon: Icon(
+                    _struckShown ? Icons.expand_less : Icons.expand_more,
                   ),
+                  label: Text(context.t.shoppingStruckCount(struck.length)),
                 ),
               ),
             ),

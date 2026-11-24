@@ -243,6 +243,34 @@ void main() {
       expect(shown(note), ['Eggs', 'Tea', '[x] Milk']);
       expect(key('checklist-check-$milk'), findsNothing);
       expect(find.text('1 struck through'), findsOneWidget);
+      // A text button in the accent, the chevron its icon (obf-1110).
+      final fold = tester.widget<ButtonStyleButton>(key('shopping-struck'));
+      expect(fold, isA<TextButton>());
+      final accent = Theme.of(tester.element(key('shopping-struck')))
+          .colorScheme
+          .primary;
+      expect(
+        tester
+            .widget<RichText>(
+              find
+                  .descendant(
+                    of: key('shopping-struck'),
+                    matching: find.byType(RichText),
+                  )
+                  .last,
+            )
+            .text
+            .style
+            ?.color,
+        accent,
+      );
+      expect(
+        find.descendant(
+          of: key('shopping-struck'),
+          matching: find.byIcon(Icons.expand_more),
+        ),
+        findsOneWidget,
+      );
       await tap(tester, key('shopping-struck'));
       expect(struck(tester, milk), isTrue);
       expect(top(tester, milk), greaterThan(top(tester, tea)));
