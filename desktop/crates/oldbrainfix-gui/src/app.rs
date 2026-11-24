@@ -216,6 +216,18 @@ struct Left {
     scroll: f32,
 }
 
+/// How long "Made, hidden by the filter" stays at the top left alone
+/// (obf-1070), as the phone's offers do.
+const MADE_HIDDEN_LASTS: f64 = 10.0;
+
+/// A Note made in a list whose person filter hides it (obf-1070): the
+/// list it was made in, and since when the top says so, once it does.
+#[derive(Debug, Clone)]
+struct MadeHidden {
+    list: Selection,
+    shown_since: Option<f64>,
+}
+
 /// What the middle pane shows.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Selection {
@@ -2418,6 +2430,9 @@ pub struct App {
     /// click on that notice opens it; a later notice says something else
     /// and leaves it closed.
     notice_dialog: Option<(String, Dialog)>,
+    /// A Note just made that the person filter of the list hides
+    /// (obf-1070): said at the top once back in the list, with "Show".
+    made_hidden: Option<MadeHidden>,
     /// The section of the Settings an app link opened them at (#261),
     /// scrolled to for the frames it is kept, while the dialog finds its
     /// size.
@@ -3008,6 +3023,7 @@ impl App {
             handed: None,
             notice: None,
             notice_dialog: None,
+            made_hidden: None,
             settings_section: None,
             settings_query: String::new(),
             settings_find: false,
@@ -7915,7 +7931,9 @@ impl App {
                 // A running recording is ended and kept first; held
                 // until it is, so a failed save loses nothing.
                 self.end_recording()?;
-                self.capture_note(nudge_in, &[], &[])?;
+                if let Some(id) = self.capture_note(nudge_in, &[], &[])? {
+                    self.say_if_filter_hides(&id)?;
+                }
                 // Saved, the quick note's dialog goes (#146).
                 self.quick_open = false;
                 self.capture_focus = false;
@@ -7925,6 +7943,7 @@ impl App {
                 // The quick note goes and the Note dialog opens on the Note
                 // saved, its text taking the keyboard (#142, #146).
                 if let Some(id) = self.capture_note(Notes::default_nudge(), &[], &[])? {
+                    self.say_if_filter_hides(&id)?;
                     self.quick_open = false;
                     self.capture_focus = false;
                     self.selected_note = Some(id.clone());
@@ -8081,7 +8100,11 @@ impl App {
                 self.searching.set_searched(&query);
                 self.query = query;
             }
-            Action::FilterPeople(people) => self.people = people,
+            Action::FilterPeople(people) => {
+                self.people = people;
+                // "Show" or another filter: nothing more to say (obf-1070).
+                self.made_hidden = None;
+            }
             Action::ViewPhoto(hash) => self.viewer = Some(Viewer::new(hash)),
             Action::ClosePhoto => self.viewer = None,
             Action::PhotoOut(hash, out) => self.photo_out(&hash, out),
@@ -8650,8 +8673,17 @@ impl App {
                         }
                     }
                     Some(editor) => {
-                        if editor.save(&self.store)?.is_some() {
+                        // A new Session's page makes its Note (#161).
+                        let makes_note = editor.routine.is_none()
+                            && editor.note.is_none()
+                            && editor.session().is_some();
+                        if let Some(id) = editor.save(&self.store)? {
                             self.editor = None;
+                            if makes_note
+                                && let Some(routine) = Routines::new(&self.store).by_id(&id)?
+                            {
+                                self.say_if_filter_hides(&routine.note_id)?;
+                            }
                         }
                     }
                     None => {}
@@ -10679,6 +10711,31 @@ impl App {
         Ok(())
     }
 
+    /// Remembers that the Note `id`, just made, is one the list's person
+    /// filter hides where it would show but for it (obf-1070): back in the
+    /// list the top says so, with "Show".
+    fn say_if_filter_hides(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        if self.people.is_everyone() {
+            return Ok(());
+        }
+        let Some(note) = Notes::new(&self.store).by_id(id)? else {
+            return Ok(());
+        };
+        let here = match &self.selection {
+            Selection::All => true,
+            Selection::Unsorted => note.place.is_none(),
+            Selection::Place(place) => note.place.as_deref() == Some(place.as_str()),
+            _ => false,
+        };
+        if here && !self.store.wrote_by(id, &self.people)? {
+            self.made_hidden = Some(MadeHidden {
+                list: self.selection.clone(),
+                shown_since: None,
+            });
+        }
+        Ok(())
+    }
+
     /// Makes the Checklist, Shopping List or Frog the name dialog asked
     /// for, filed where the list is: a list then opens in the Note dialog
     /// with the cursor in its first Line.
@@ -10704,6 +10761,7 @@ impl App {
             }
             Ok(note.id)
         })?;
+        self.say_if_filter_hides(&made)?;
         if matches!(kind, NewKind::Checklist | NewKind::Shopping) {
             self.act(Action::SelectNote(made))?;
             self.start_lines = true;
@@ -10736,6 +10794,8 @@ impl App {
                         }
                         (None, None) => {}
                     }
+                } else {
+                    self.say_if_filter_hides(&id)?;
                 }
                 self.tally_page = None;
             }
@@ -11762,6 +11822,8 @@ impl App {
             self.searching.set_searched(&left.query);
             self.query = left.query;
             self.people = left.people;
+            // Its "Show" would clear another list's filter (obf-1070).
+            self.made_hidden = None;
             // The cards selected were those of the list left (#148).
             self.cards.clear();
             self.list_offset = left.scroll;
@@ -13427,7 +13489,24 @@ impl App {
     /// most pressing first: of the window, or of the dialog shown over it
     /// (#145).
     fn announcements(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
-        if self.error.is_some() {
+        if self.made_hidden_shows(ui) {
+            // A Note made that the filter hides, back in its list
+            // (obf-1070), before what waits; the click shows it.
+            let t = self.t;
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    ui.horizontal(|ui| {
+                        let text = RichText::new(t.made_hidden_by_filter()).color(colour);
+                        let said = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+                        let show = ui.button(RichText::new(t.show_hidden()).strong().color(colour));
+                        if said.clicked() || show.clicked() {
+                            actions.push(Action::FilterPeople(PersonFilter::default()));
+                        }
+                    });
+                });
+        } else if self.error.is_some() {
             // Announcements go to the top (UI laws), without the error's
             // text: the click shows it, with the cause and the fix.
             egui::Panel::top("announcement")
@@ -13551,6 +13630,28 @@ impl App {
                     }
                 });
         }
+    }
+
+    /// Whether "Made, hidden by the filter" shows at the top (obf-1070):
+    /// once the main window's list it was made in is back in front, for
+    /// [`MADE_HIDDEN_LASTS`] from then, after which it goes by itself.
+    fn made_hidden_shows(&mut self, ui: &Ui) -> bool {
+        let back = self.announces_in() == Announcer::Window;
+        let Some(made) = &mut self.made_hidden else {
+            return false;
+        };
+        if !back || made.list != self.selection {
+            return false;
+        }
+        let now = ui.input(|i| i.time);
+        let since = *made.shown_since.get_or_insert(now);
+        let left = MADE_HIDDEN_LASTS - (now - since);
+        if left <= 0.0 {
+            self.made_hidden = None;
+            return false;
+        }
+        ui.ctx().request_repaint_after_secs(left as f32);
+        true
     }
 
     /// What the Note menu may do to the Note in the Note dialog (#145,
@@ -16195,8 +16296,9 @@ impl App {
                 self.person_filter_chips(ui, (tones, sizes), kept, actions);
             }
             // "+" makes what the list holds (#161), an Area's level its
-            // Topics too (UI laws, "Navigation"); last, so the buttons
-            // before it keep their place while it goes.
+            // Topics too (UI laws, "Navigation"), whatever the filter
+            // (obf-1070); last, so the buttons before it keep their place
+            // where it is not.
             if let Some(kinds) = kinds
                 && let Some(kind) = add_button(ui, &t, &kinds, Some(sizes))
             {
@@ -16209,12 +16311,9 @@ impl App {
     /// menu shows them: in All Notes, an Area and a Topic the six kinds,
     /// Session and Frog only for who may set them up there, in an Area
     /// a Topic too for who may add one; in Unsorted a Note. Tally,
-    /// Session, Frog and Topic only in Advanced (#197). Nothing among
-    /// another person's Notes, nor in the trash.
+    /// Session, Frog and Topic only in Advanced (#197). Whatever the
+    /// person filter keeps (obf-1070); nothing in the trash.
     fn new_kinds(&self) -> Option<Vec<NewKind>> {
-        if !self.people.is_everyone() {
-            return None;
-        }
         match &self.selection {
             Selection::Unsorted => Some(vec![NewKind::Note]),
             Selection::All | Selection::Place(_) => {
@@ -18354,6 +18453,7 @@ impl App {
         self.dialog = None;
         self.act(Action::Select(Selection::All))?;
         self.people = PersonFilter::person(&id);
+        self.made_hidden = None;
         Ok(())
     }
 

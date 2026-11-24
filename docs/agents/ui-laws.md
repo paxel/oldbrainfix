@@ -83,8 +83,10 @@ replace a law of Both apps where they say so. A desktop law marked
 - An announcement goes by itself or by a tap; it is never swiped away.
   A horizontal swipe stays navigation only.
 - An announcement says only that a job finished, failed or waits; the
-  tap opens the details, or, on an offer to undo, undoes. Values never
-  go into an announcement.
+  tap opens the details, or, on an offer, does what its last word
+  names: "Undo" undoes, and "Show", after a Note made that the person
+  filter hides (obf-1070), clears the filter. Values never go into an
+  announcement.
 - A quick local success the screen already shows (copied, saved) gets
   no announcement. The one exception is the phone's offer to undo what
   was just deleted, skipped or moved to tomorrow (#268, #269; see Phone,
@@ -1222,8 +1224,7 @@ replace a law of Both apps where they say so. A desktop law marked
   Topic and All Notes, "Show Notes by…" never hides it. A Note the
   filter hides is made and opened as usual; back in the list the top
   says "Made, hidden by the filter", ending with "Show", whose tap
-  clears the filter; this replaces Both apps ▸ Announcements, where a
-  tap opens the details or undoes. It is an offer as the one to undo is: it shows
+  clears the filter, as Both apps ▸ Announcements names. It is an offer as the one to undo is: it shows
   before what waits, takes the place of the offer before, a screen
   reader hears "Show" as the tap's hint, and left alone it goes by
   itself after 10 seconds. With "Me" in the filter nothing is said.
@@ -1870,6 +1871,17 @@ replace a law of Both apps where they say so. A desktop law marked
   Both apps ▸ Look, "The text has a size of its own", where bars and
   headings keep their size. The other places keep their arrows and
   path over their own heading.
+- **"New Note" stays whatever filter is on** (obf-1070, C13): in All
+  Notes, Unsorted, an Area and a Topic, "Show Notes by…" never hides
+  it. A Note the filter hides is made and opened as usual: the quick
+  note saves it, a Checklist or Shopping List opens in the Note dialog.
+  Back in the main window's list, not over a dialog, the top says
+  "Made, hidden by the filter" with the button "Show"; a click on it or
+  on the words clears the list's person filter. It shows before every
+  other announcement and goes by itself 10 seconds after it first
+  showed, or once the list shows another place or its filter changes.
+  With "Me" in the filter nothing is said, nor for a Note the quick
+  note's choices filed elsewhere, which this list would not show.
 - **The Agenda's bar on the desktop holds All Routines and Reminders and
   New Routine or Reminder** (draft, #196): no Calendar and no Profile
   picture; the menu bar leads to the rest.

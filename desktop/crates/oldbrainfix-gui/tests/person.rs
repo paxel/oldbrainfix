@@ -621,3 +621,140 @@ fn ones_own_sent_item_offers_no_block() -> TestResult {
     assert!(harness.query_by_label("Decline and block").is_none());
     Ok(())
 }
+
+/// Ann's window on the Household showing only Ben's Notes.
+fn only_ben(area: &str, ann: Store) -> Harness<'static, App> {
+    let mut harness = window(app(ann, Selection::Place(area.to_string())));
+    press(&mut harness, Role::Button, "Show Notes by…");
+    press(&mut harness, Role::CheckBox, "Ben");
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    harness
+}
+
+/// Whether the top says a Note just made is hidden by the filter.
+fn says_hidden(harness: &Harness<'_, App>) -> bool {
+    harness
+        .query_all_by(|n| n.value().as_deref() == Some("Made, hidden by the filter"))
+        .next()
+        .is_some()
+}
+
+/// "+" ▸ `kind`, then `text` typed where the keyboard is.
+fn plus(harness: &mut Harness<'_, App>, kind: &str, text: &str) {
+    press(harness, Role::Button, "Add here");
+    click(harness, kind);
+    harness.get_by(|n| n.is_focused()).type_text(text);
+    harness.run();
+}
+
+fn note_named(store: &Store, text: &str) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(Notes::new(store)
+        .all()?
+        .into_iter()
+        .find(|n| n.text == text)
+        .ok_or("the Note")?
+        .id)
+}
+
+#[test]
+fn plus_stays_under_the_filter_and_show_clears_it_for_the_note_made() -> TestResult {
+    let shared = shared()?;
+    let (_, theirs) = two_notes(&shared)?;
+    let mut harness = only_ben(&shared.area, shared.ann);
+    assert_eq!(harness.state().shown_notes(), vec![theirs]);
+    plus(&mut harness, "Note", "Ann waters the plants");
+    click(&mut harness, "Save");
+    assert!(!harness.state().quick_note_open());
+    let made = note_named(harness.state().store(), "Ann waters the plants")?;
+    assert!(!harness.state().shown_notes().contains(&made));
+    assert!(says_hidden(&harness));
+    press(&mut harness, Role::Button, "Show");
+    assert!(harness.state().people_filter().is_everyone());
+    assert!(harness.state().shown_notes().contains(&made));
+    assert!(!says_hidden(&harness));
+    Ok(())
+}
+
+#[test]
+fn a_note_made_that_the_filter_keeps_says_nothing() -> TestResult {
+    let shared = shared()?;
+    two_notes(&shared)?;
+    let mut harness = window(app(shared.ann, Selection::Place(shared.area)));
+    press(&mut harness, Role::Button, "Show Notes by…");
+    press(&mut harness, Role::CheckBox, "Me");
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    plus(&mut harness, "Note", "Ann waters the plants");
+    click(&mut harness, "Save");
+    let made = note_named(harness.state().store(), "Ann waters the plants")?;
+    assert!(harness.state().shown_notes().contains(&made));
+    assert!(!says_hidden(&harness));
+    Ok(())
+}
+
+#[test]
+fn a_hidden_checklist_opens_as_usual_and_the_top_says_so_after_for_ten_seconds() -> TestResult {
+    let shared = shared()?;
+    two_notes(&shared)?;
+    let mut harness = only_ben(&shared.area, shared.ann);
+    plus(&mut harness, "Checklist", "Packing");
+    click(&mut harness, "Create");
+    let made = note_named(harness.state().store(), "Packing")?;
+    assert!(harness.state().note_open());
+    assert_eq!(harness.state().selected_note(), Some(made.as_str()));
+    // Not over the Note dialog: back in the list.
+    assert!(!says_hidden(&harness));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(!harness.state().note_open());
+    assert!(says_hidden(&harness));
+    // Left alone it goes by itself, after 10 s (a step is 0.25 s).
+    for _ in 0..36 {
+        harness.step();
+    }
+    assert!(says_hidden(&harness));
+    for _ in 0..8 {
+        harness.step();
+    }
+    harness.run();
+    assert!(!says_hidden(&harness));
+    assert!(!harness.state().people_filter().is_everyone());
+    Ok(())
+}
+
+#[test]
+fn another_list_shown_drops_the_word_of_the_note_hidden() -> TestResult {
+    let shared = shared()?;
+    two_notes(&shared)?;
+    let area = shared.area.clone();
+    let mut harness = only_ben(&area, shared.ann);
+    plus(&mut harness, "Note", "Ann waters the plants");
+    click(&mut harness, "Save");
+    assert!(says_hidden(&harness));
+    harness.state_mut().select(Selection::Unsorted);
+    harness.run();
+    assert!(!says_hidden(&harness));
+    harness.state_mut().select(Selection::Place(area));
+    harness.run();
+    assert!(!says_hidden(&harness));
+    Ok(())
+}
+
+#[test]
+fn a_hidden_note_opened_in_the_editor_opens_and_says_so_once_closed() -> TestResult {
+    let shared = shared()?;
+    two_notes(&shared)?;
+    let mut harness = only_ben(&shared.area, shared.ann);
+    plus(&mut harness, "Note", "Ann waters the plants");
+    click(&mut harness, "Open in the editor");
+    let made = note_named(harness.state().store(), "Ann waters the plants")?;
+    assert!(harness.state().note_open());
+    assert_eq!(harness.state().selected_note(), Some(made.as_str()));
+    assert!(!says_hidden(&harness));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(!harness.state().note_open());
+    assert!(says_hidden(&harness));
+    Ok(())
+}
