@@ -20,7 +20,7 @@
 //! all-day and then timed Occurrences, a gap, and tomorrow's dimmed,
 //! then the five days after it under their weekdays and dates, all of them checkable. Its alarm button leads
 //! to a new Routine. A Note spawns Routines and Reminders from its
-//! editor and from the Note menu; deleting a Note that spawned some asks
+//! editor and from its card's menu; deleting a Note that spawned some asks
 //! whether they go too.
 //!
 //! Every change goes through `oldbrainfix_core`, which writes the entries
@@ -1204,7 +1204,7 @@ enum Dialog {
     /// File ▸ Export as vault… (#267): what it writes and how far it is;
     /// closing it leaves the vault being written, announced when done.
     Vault,
-    /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Notes
+    /// File into… or Ctrl+M (#145): the Area or Topic the Notes
     /// go into, the selected ones together (#148), or the Note being
     /// captured, picked with a filter (#272).
     FileInto {
@@ -1520,8 +1520,8 @@ enum Action {
     /// Sync ▸ Sync now: the Sync dialog, and the shared folder synced at
     /// once if one is chosen.
     SyncNow,
-    /// Asks where the Notes with these ids are filed (Note ▸ File into…,
-    /// Ctrl+M, a card's right-click), together (#148).
+    /// Asks where the Notes with these ids are filed (Ctrl+M, a card's
+    /// right-click, the Note dialog's badge), together (#148).
     AskFileInto(Vec<String>),
     /// The Settings' Record keys: starts recording the hotkey, or with
     /// `false` stops it (#283).
@@ -9623,7 +9623,7 @@ impl App {
     }
 
     /// What a card's menu offers of the Note `note`'s Routines (#281), as
-    /// the Note menu and the "+" badge do: Remind me… (#344) for who
+    /// the "+" badge does: Remind me… (#344) for who
     /// may set them up (ADR 0013), in Advanced also Frog while it has none
     /// open and Session… on a plain Note without Code text (#197, #213).
     fn card_spawns(&self, note: &Note) -> oldbrainfix_core::Result<CardSpawns> {
@@ -12332,7 +12332,7 @@ impl App {
         }
         // The menu bar's keys, over the window only; they are no text
         // keys, so they work while typing too.
-        // Over the Note dialog they work, its Note the Note menu's.
+        // Over the Note dialog they work, on its Note.
         let over = self.viewer.is_some()
             || self.table.is_some()
             || self.dialog.is_some()
@@ -12954,7 +12954,7 @@ impl App {
                     // Undo, Redo and ⋮ as in the Note dialog (obf-1051),
                     // not in the reading view.
                     if !reading {
-                        self.step_buttons(ui, &mut actions);
+                        self.step_buttons(ui, None, &mut actions);
                     }
                 });
             });
@@ -13424,7 +13424,7 @@ impl App {
                             }
                         }
                         // In no Shared Area, or to take the mark off (#267),
-                        // before Delete as in the Area menu.
+                        // before Delete as in the band's ⋮ (obf-1065).
                         if let Some(asked) = hidden_entry(ui, &t, &self.view, &area.id) {
                             actions.push(asked);
                             ui.close();
@@ -13654,9 +13654,9 @@ impl App {
         true
     }
 
-    /// What the Note menu may do to the Note in the Note dialog (#145,
-    /// #146), as the dialog's buttons may; none while no Note is open, or
-    /// one in the trash.
+    /// What may be done to the Note in the Note dialog (#145, #146), as
+    /// the dialog's buttons may: File ▸ Save as Markdown, its History and
+    /// Ctrl+M; none while no Note is open, or one in the trash.
     fn note_menu(&self) -> Option<NoteMenu> {
         let (placed, _) = self.view.detail.as_ref()?;
         let note = &placed.note;
@@ -13664,36 +13664,18 @@ impl App {
             return None;
         }
         let may = self.view.may;
-        let frog_open = self
-            .view
-            .note_frog
-            .as_ref()
-            .is_some_and(|f| !f.frog.is_done());
-        // A Code text becomes no Tally or Session (#213).
-        let code = note.text_format == text_format::CODE;
-        let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged() && !code;
         Some(NoteMenu {
             id: note.id.clone(),
             changes: may.changes,
-            schedules: may.schedules,
-            frog: may.schedules && !frog_open,
-            // A Routine of a Session Note runs it already (#191).
-            session: may.schedules && self.view.kind == Some(NoteKind::Plain) && !code,
             amends: may.amends,
-            checklist: may.amends && self.view.makes_checklist,
-            shopping: may.amends && self.view.makes_shopping,
-            tally: may.amends && may.changes && plain,
         })
     }
 
-    /// What the Area menu may do to the Area or Topic the list shows
-    /// (#279), as the sidebar's right-click offers it: none while another
-    /// place shows or a dialog lies over the list, the Note dialog and a
-    /// photo or table full screen too.
+    /// What the band's ⋮ (obf-1065) and its keys may do to the Area or
+    /// Topic the list shows (#279), as the sidebar's right-click offers
+    /// it: none while another place shows or a dialog lies over the list,
+    /// the Note dialog and a photo or table full screen too.
     fn place_menu(&self) -> Option<PlaceMenu> {
-        let Selection::Place(id) = &self.selection else {
-            return None;
-        };
         if self.top_dialog().is_some()
             || self.dialog.is_some()
             || self.badge.is_some()
@@ -13702,6 +13684,15 @@ impl App {
         {
             return None;
         }
+        self.place_shown()
+    }
+
+    /// The Area or Topic the list shows, whatever lies over it: what its
+    /// ⋮ would offer.
+    fn place_shown(&self) -> Option<PlaceMenu> {
+        let Selection::Place(id) = &self.selection else {
+            return None;
+        };
         let (area, of_area) = match self.view.area(id) {
             Some(area) => (area.id.clone(), true),
             None => (self.view.topic(id)?.area_id.clone(), false),
@@ -13720,7 +13711,7 @@ impl App {
         self.note_menu().filter(|n| n.changes).map(|n| n.id)
     }
 
-    /// The Notes Note ▸ File into… and Ctrl+M file (#148): the one in the
+    /// The Notes Ctrl+M files (#148): the one in the
     /// Note dialog, where it may be filed, else the cards selected in the
     /// list, in its order; none in the trash, whose Notes are restored.
     fn file_into_notes(&self) -> Option<Vec<String>> {
@@ -13733,9 +13724,9 @@ impl App {
         Some(self.cards.in_order(&self.shown_cards()))
     }
 
-    /// The cards selected that the Note menu's Merge into…, Importance,
-    /// Delete and Restore act on while no Note is open (#273): those this
-    /// Device may change, in the list's order.
+    /// The cards selected that Ctrl+Shift+M, Delete and 1 to 3 act on
+    /// while no Note is open (#273, #274): those this Device may change,
+    /// in the list's order.
     fn menu_cards(&self) -> Vec<String> {
         if self.note_open() {
             return Vec::new();
@@ -14284,12 +14275,10 @@ impl App {
         l10n::names_text(&self.t, &names)
     }
 
-    /// The menu bar (#145): File, Edit, View, Area (#279), Note, AI
-    /// (#279), Sync and Help, each entry with its keys where it has some,
-    /// the Note menu's greyed while no Note is open, but File into… for
-    /// the cards selected (#148), the Area menu's while no Area or Topic
-    /// shows. A pick closes its menu, also one by keyboard or screen
-    /// reader.
+    /// The menu bar (#145): File, Edit, View, AI (#279), Sync and Help,
+    /// each entry with its keys where it has some; an Area's and a Note's
+    /// actions are theirs (obf-1065). A pick closes its menu, also one by
+    /// keyboard or screen reader.
     fn menu_bar(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -14303,33 +14292,10 @@ impl App {
         let keys = |key: Key| keys_with(Modifiers::COMMAND, key);
         let note = self.note_menu();
         let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
-        // File into… also files the cards selected in the list (#148),
-        // and Merge into…, Importance and Move to trash, or Restore in the
-        // trash, act on them (#273).
-        let filing = self.file_into_notes();
-        let chosen = self.menu_cards();
-        let in_trash = self.selection == Selection::Trash;
-        let listed = !chosen.is_empty() && !in_trash;
-        let open = note.as_ref().is_some_and(|n| n.changes);
-        let restores = self.view.may.changes
-            && self
-                .view
-                .detail
-                .as_ref()
-                .is_some_and(|(p, _)| p.note.is_trashed());
-        let merge = if open {
-            Action::StartMerge
-        } else {
-            Action::AskMergeNotes(chosen.clone())
-        };
-        // Delete and 1 to 3 stand beside the entries where they act on the
-        // cards selected (#274), as over the list; not on the Note open.
-        let list_keys = listed && !open;
         let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
         let cards = self.cards_key().is_some();
-        let place = self.place_menu();
         let reviews = self.ai_port.is_none() && self.view.ai_task.is_some();
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
@@ -14474,222 +14440,6 @@ impl App {
                         actions,
                     );
                 });
-            });
-            // The Area or Topic the list shows, as the sidebar's
-            // right-click offers it (#279); F2 renames.
-            ui.menu_button(RichText::new(t.menu_area()).color(text), |ui| {
-                let id = place.as_ref().map(|p| p.id.clone()).unwrap_or_default();
-                let manages = place.as_ref().is_some_and(|p| p.manages);
-                let of_area = place.as_ref().is_some_and(|p| p.area && p.manages);
-                let shared = place.as_ref().is_some_and(|p| p.area && p.shared);
-                let items = [
-                    (
-                        t.rename(),
-                        keys_with(Modifiers::NONE, Key::F2),
-                        manages,
-                        Action::Rename(id.clone()),
-                    ),
-                    (t.area_look(), None, of_area, Action::Look(id.clone())),
-                    (t.share_area(), None, of_area, Action::Share(id.clone())),
-                    (t.people_title(), None, shared, Action::People(id.clone())),
-                    // Copies of what anyone may read (#165).
-                    (
-                        t.export_as_pack(),
-                        None,
-                        place.is_some(),
-                        Action::ExportPack(id.clone()),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                // An Area's own mark (#267), greyed where the right-click
-                // leaves it out: a Topic, and an Area shared unmarked.
-                let area = place.as_ref().filter(|p| p.area);
-                let on = area.is_some_and(|p| self.view.hidden_areas.contains(&p.id));
-                let offered = on || area.is_some_and(|p| self.view.hideable_areas.contains(&p.id));
-                let switched = ui.add_enabled_ui(offered, |ui| hidden_switch(ui, &t, &id, on));
-                if let Some(asked) = switched.inner {
-                    actions.push(asked);
-                    ui.close();
-                }
-                ui.separator();
-                // Any Area moves, a Shared one too; not past an end
-                // (#280).
-                let step = |up| {
-                    place
-                        .as_ref()
-                        .filter(|p| p.area)
-                        .and_then(|p| self.view.area_step(&p.id, up))
-                };
-                let (up, down) = (step(true), step(false));
-                let items = [
-                    (
-                        t.area_move_up(),
-                        keys_with(Modifiers::ALT, Key::ArrowUp),
-                        up.is_some(),
-                        Action::MoveArea(id.clone(), up.unwrap_or_default()),
-                    ),
-                    (
-                        t.area_move_down(),
-                        keys_with(Modifiers::ALT, Key::ArrowDown),
-                        down.is_some(),
-                        Action::MoveArea(id.clone(), down.unwrap_or_default()),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                ui.separator();
-                menu_entries(
-                    ui,
-                    [(t.delete(), None, manages, Action::Delete(id.clone()))],
-                    actions,
-                );
-            });
-            ui.menu_button(RichText::new(t.menu_note()).color(text), |ui| {
-                let items = [
-                    (
-                        t.file_into(),
-                        keys(Key::M),
-                        filing.is_some(),
-                        Action::AskFileInto(filing.clone().unwrap_or_default()),
-                    ),
-                    (
-                        t.merge_into(),
-                        keys_with(Modifiers::COMMAND | Modifiers::SHIFT, Key::M),
-                        open || listed,
-                        merge,
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                let weighs = open || listed;
-                ui.add_enabled_ui(weighs, |ui| {
-                    ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
-                        // One that has it already writes nothing.
-                        if let Some(importance) = importance_entries(ui, &t, list_keys) {
-                            let weighed = if open {
-                                vec![id.clone()]
-                            } else {
-                                chosen.clone()
-                            };
-                            actions.push(Action::ImportanceOf(weighed, importance));
-                        }
-                    });
-                });
-                // One way in for a Routine or Reminder, starting as a
-                // Reminder (#344).
-                let items = [(
-                    t.remind_me(),
-                    None,
-                    may(|n| n.schedules),
-                    Action::NewRoutine {
-                        note: Some(id.clone()),
-                        reminder: true,
-                    },
-                )];
-                menu_entries(ui, items, actions);
-                // Frogs, Sessions and Tallies are made only in Advanced
-                // (#197).
-                let advanced = self.view.advanced;
-                if advanced {
-                    let items = [
-                        (
-                            t.frog(),
-                            None,
-                            may(|n| n.frog),
-                            Action::SpawnFrog(id.clone()),
-                        ),
-                        (
-                            t.session(),
-                            None,
-                            may(|n| n.session),
-                            Action::NewSession(Some(id.clone())),
-                        ),
-                    ];
-                    menu_entries(ui, items, actions);
-                }
-                ui.separator();
-                let items = [
-                    (
-                        t.make_checklist(),
-                        None,
-                        may(|n| n.checklist),
-                        Action::Checklist(ChecklistAction::Make(id.clone())),
-                    ),
-                    (
-                        t.make_shopping_list(),
-                        None,
-                        may(|n| n.shopping),
-                        Action::Shopping(ShoppingAction::Make(id.clone())),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                if advanced {
-                    let items = [(
-                        t.make_tally(),
-                        None,
-                        may(|n| n.tally),
-                        Action::Tally(TallyAction::Make(id.clone())),
-                    )];
-                    menu_entries(ui, items, actions);
-                }
-                ui.separator();
-                let items = [
-                    (
-                        t.send_to_person(),
-                        None,
-                        may(|n| n.amends),
-                        Action::StartSend(id.clone()),
-                    ),
-                    (
-                        t.copy_as_text(),
-                        None,
-                        may(|n| n.amends),
-                        Action::CopyAsText(id.clone()),
-                    ),
-                    // Copies of what anyone may read (#165).
-                    (
-                        t.export_as_pack(),
-                        None,
-                        note.is_some(),
-                        Action::ExportPack(id.clone()),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                ui.separator();
-                menu_entries(
-                    ui,
-                    [(
-                        t.history_title(),
-                        None,
-                        note.is_some(),
-                        Action::NoteHistory(id.clone()),
-                    )],
-                    actions,
-                );
-                ui.separator();
-                // In the trash its Notes are restored instead, as the
-                // Note dialog restores the one open there.
-                let last = if restores {
-                    (t.restore(), None, true, Action::Restore)
-                } else if in_trash && !open {
-                    (
-                        t.restore(),
-                        None,
-                        !chosen.is_empty(),
-                        Action::RestoreNotes(chosen.clone()),
-                    )
-                } else if open {
-                    (t.move_to_trash(), None, true, Action::Trash)
-                } else {
-                    // Named as on the phone and in the card's menu (#329);
-                    // the Delete key does the same.
-                    let delete = keys_with(Modifiers::NONE, Key::Delete);
-                    (
-                        t.move_to_trash(),
-                        delete,
-                        listed,
-                        Action::TrashNotes(chosen.clone()),
-                    )
-                };
-                menu_entries(ui, [last], actions);
             });
             // The main switch first (#334), then the Ask panel (#267)
             // only while it is on, every AI setting on one page (#335) and
@@ -14920,8 +14670,8 @@ impl App {
 
     /// The Note open (#146), as a dialog over the window, one at a time:
     /// its editor, the badges of its settings (#160) and their small
-    /// editors. The menu bar stays at hand over it, its Note menu acting
-    /// on this Note. Closing it saves: the cross, Esc, Alt+Left, the
+    /// editors. The menu bar stays at hand over it, Ctrl+M and
+    /// Ctrl+Shift+M acting on this Note. Closing it saves: the cross, Esc, Alt+Left, the
     /// mouse's back button and a click beside it.
     fn note_dialog(
         &mut self,
@@ -15031,7 +14781,8 @@ impl App {
                                             }
                                         }
                                         // Undo, Redo and ⋮ (obf-1051).
-                                        self.step_buttons(ui, actions);
+                                        let note = self.note_menu().map(|n| n.id);
+                                        self.step_buttons(ui, note.as_deref(), actions);
                                     },
                                 );
                             });
@@ -15084,8 +14835,9 @@ impl App {
 
     /// Undo, Redo and ⋮ with "Revert all changes" in the bar of the Note
     /// open (obf-1051), drawn right to left: each greyed while it has
-    /// nothing to do.
-    fn step_buttons(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
+    /// nothing to do. In the Note dialog the ⋮ also holds the Note's
+    /// `history` (#193), which the menu bar's Note menu had (obf-1065).
+    fn step_buttons(&self, ui: &mut Ui, history: Option<&str>, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
         let (undoes, redoes, changed) = self.note_steps();
@@ -15096,6 +14848,14 @@ impl App {
             // and keys").
             if ui.add_enabled(changed, revert).clicked() {
                 actions.push(Action::AskRevert);
+                ui.close();
+            }
+            if let Some(note) = history
+                && ui
+                    .button(RichText::new(t.history_title()).color(text))
+                    .clicked()
+            {
+                actions.push(Action::NoteHistory(note.to_string()));
                 ui.close();
             }
         });
@@ -16210,6 +15970,10 @@ impl App {
         if kinds.is_some() {
             beside += band_button_width(ui, t.menu_new_note(), sizes) + gap;
         }
+        let place = self.place_shown();
+        if place.is_some() {
+            beside += sizes.row + gap;
+        }
         // The typed text at a card's text size (obf-1063); the margin
         // makes the field as tall as the row (egui's single line takes no
         // height of its own), the magnifier and ✕ inside it.
@@ -16304,6 +16068,109 @@ impl App {
             {
                 actions.push(Action::Add(kind));
             }
+            // An Area's or a Topic's own actions at the row's end, where
+            // the menu bar's Area menu had them (obf-1065).
+            if let Some(place) = &place {
+                self.place_more(ui, place, sizes, actions);
+            }
+        });
+    }
+
+    /// The ⋮ of the Area or Topic `place` the list shows (#279,
+    /// obf-1065): Rename (F2), Colour and icon, Share…, People, Export as
+    /// Pack…, Hidden from AI, Move up (Alt+Up), Move down (Alt+Down) and
+    /// Delete, as the sidebar's right-click offers them, each greyed where
+    /// that leaves it out, and all of them while a dialog lies over the
+    /// list, so that none acts on a place behind it.
+    fn place_more(
+        &self,
+        ui: &mut Ui,
+        place: &PlaceMenu,
+        sizes: BandSizes,
+        actions: &mut Vec<Action>,
+    ) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let label = if place.area {
+            t.desk_area_more()
+        } else {
+            t.desk_topic_more()
+        };
+        let more = sized_icon_button(
+            ui,
+            (icons::MORE_VERT, label, text),
+            (sizes.row, sizes.glyph),
+        );
+        spotlight::anchor(ui, "place-more", more.rect);
+        let acts = self.place_menu().is_some();
+        let ctx = ui.ctx().clone();
+        // As the system writes them, as in the menu bar.
+        let keys = |modifiers: Modifiers, key: Key| {
+            let shortcut = egui::KeyboardShortcut::new(modifiers, key);
+            Some(ctx.format_shortcut(&shortcut))
+        };
+        egui::Popup::menu(&more).show(|ui| {
+            let id = &place.id;
+            let manages = acts && place.manages;
+            let of_area = acts && place.area && place.manages;
+            let shared = acts && place.area && place.shared;
+            let items = [
+                (
+                    t.rename(),
+                    keys(Modifiers::NONE, Key::F2),
+                    manages,
+                    Action::Rename(id.clone()),
+                ),
+                (t.area_look(), None, of_area, Action::Look(id.clone())),
+                (t.share_area(), None, of_area, Action::Share(id.clone())),
+                (t.people_title(), None, shared, Action::People(id.clone())),
+                // Copies of what anyone may read (#165).
+                (
+                    t.export_as_pack(),
+                    None,
+                    acts,
+                    Action::ExportPack(id.clone()),
+                ),
+            ];
+            menu_entries(ui, items, actions);
+            // An Area's own mark (#267), greyed where the right-click
+            // leaves it out: a Topic, and an Area shared unmarked.
+            let on = place.area && self.view.hidden_areas.contains(id);
+            let offered = acts && (on || (place.area && self.view.hideable_areas.contains(id)));
+            let switched = ui.add_enabled_ui(offered, |ui| hidden_switch(ui, &t, id, on));
+            if let Some(asked) = switched.inner {
+                actions.push(asked);
+                ui.close();
+            }
+            ui.separator();
+            // Any Area moves, a Shared one too; not past an end (#280).
+            let step = |up| {
+                (acts && place.area)
+                    .then(|| self.view.area_step(id, up))
+                    .flatten()
+            };
+            let (up, down) = (step(true), step(false));
+            let items = [
+                (
+                    t.area_move_up(),
+                    keys(Modifiers::ALT, Key::ArrowUp),
+                    up.is_some(),
+                    Action::MoveArea(id.clone(), up.unwrap_or_default()),
+                ),
+                (
+                    t.area_move_down(),
+                    keys(Modifiers::ALT, Key::ArrowDown),
+                    down.is_some(),
+                    Action::MoveArea(id.clone(), down.unwrap_or_default()),
+                ),
+            ];
+            menu_entries(ui, items, actions);
+            ui.separator();
+            menu_entries(
+                ui,
+                [(t.delete(), None, manages, Action::Delete(id.clone()))],
+                actions,
+            );
         });
     }
 
@@ -19532,7 +19399,7 @@ fn area_drop(ui: &mut Ui, tones: Tones, blocks: &[AreaRows], actions: &mut Vec<A
     }
 }
 
-/// What the Area menu may do to the Area or Topic shown (#279), by its
+/// What the band's ⋮ may do to the Area or Topic shown (#279), by its
 /// id: whether it is an Area, whether this Device manages its Area and
 /// whether that is shared.
 struct PlaceMenu {
@@ -19542,17 +19409,11 @@ struct PlaceMenu {
     shared: bool,
 }
 
-/// What the Note menu may do to the Note shown (#145), by its id.
+/// What may be done to the Note shown (#145), by its id.
 struct NoteMenu {
     id: String,
     changes: bool,
-    schedules: bool,
-    frog: bool,
-    session: bool,
     amends: bool,
-    checklist: bool,
-    shopping: bool,
-    tally: bool,
 }
 
 /// Important, Normal and Unimportant, as a menu's entries (#273), with
@@ -19580,7 +19441,7 @@ fn importance_entries(ui: &mut Ui, t: &L10n, keys: bool) -> Option<Importance> {
     picked
 }
 
-/// The entries of a menu of the menu bar: each label with its keys, if
+/// The entries of a menu of the menu bar or the band's ⋮: each label with its keys, if
 /// any, at its end, greyed unless enabled; a pick asks its action and
 /// closes the menu, also one by keyboard or screen reader.
 fn menu_entries<const N: usize>(
@@ -23069,7 +22930,7 @@ impl KindShown {
                 // A Code text becomes no other kind (#213).
                 NoteKind::Plain if note.text_format == text_format::CODE => {}
                 NoteKind::Plain => {
-                    // As the Note menu offers them (#145).
+                    // As the card's menu offers them (#145).
                     let tally = may.amends && may.changes && !note.is_merged();
                     choices.extend(view.makes_checklist.then_some(NoteKind::Checklist));
                     choices.extend(view.makes_shopping.then_some(NoteKind::ShoppingList));

@@ -277,7 +277,6 @@
   "menuFile": "Datei",
   "menuEdit": "Bearbeiten",
   "menuView": "Ansicht",
-  "menuNote": "Notiz",
   "menuSync": "Synchronisieren",
   "menuHelp": "Hilfe",
   "menuNewNote": "Neue Notiz",
@@ -336,7 +335,6 @@
   "searchTrashHint": "Im Papierkorb suchen",
   "captureNudgeKeysHint": "Strg+Enter speichert sie, mit einem Stupser in 1 Std. Strg+1, Strg+2 und Strg+3 speichern sie mit einem in 10 Min., 30 Min. oder 1 Std.",
   "popupNudgeKeysHint": "Enter speichert sie, mit einem Stupser in 1 Std. Strg+1, Strg+2 und Strg+3 speichern sie mit einem in 10 Min., 30 Min. oder 1 Std. Umschalt+Enter beginnt eine neue Zeile. Esc behält Getipptes genauso; leer schließt es nur.",
-  "menuArea": "Bereich",
   "menuAi": "KI",
   "menuAiSettings": "KI-Einstellungen …",
   "aiSettingsTitle": "KI-Einstellungen",
@@ -511,5 +509,8 @@
   "deskNoteRevertQuestion": "Alle Änderungen zurücknehmen?",
   "deskNoteRevertDetail": "Die Notiz wird wieder so, wie sie beim Öffnen war. „Wiederholen“ holt die Änderungen einzeln zurück.",
   "deskNoteRevert": "Zurücknehmen",
-  "deskTableMore": "Mehr zu dieser Tabelle"
+  "deskTableMore": "Mehr zu dieser Tabelle",
+  "deskAreaMore": "Mehr zu diesem Bereich",
+  "deskTopicMore": "Mehr zu diesem Thema",
+  "spotDeskListPlaceMore": "Benennt diesen Ort um, teilt, exportiert oder löscht ihn."
 }

@@ -2,7 +2,7 @@
 //! sidebar lists them by the name it shows until one is moved; an Area's
 //! row dragged up or down puts it there, a drop beside where it stands
 //! writing nothing; Alt+Up and Alt+Down and Move up and Move down, in the
-//! Area menu and the right-click, move the Area shown one place, also a
+//! band's ⋮ (obf-1065) and the right-click, move the Area shown one place, also a
 //! Shared one a Member is in; a card dropped on an Area's row still files
 //! it; and File into… and Link to… list the Areas in that order.
 
@@ -159,16 +159,24 @@ fn last<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> Node<'a> {
     }
 }
 
-/// The menu bar's Area menu, opened.
+/// The ⋮ of the band of the Area or Topic shown (obf-1065), opened.
 fn open_area_menu(harness: &mut Harness<'_, App>) {
-    match harness.get_all_by_label("Area").next() {
+    match harness
+        .query_all_by(|n| {
+            matches!(
+                n.label().as_deref(),
+                Some("More for this Area" | "More for this Topic")
+            )
+        })
+        .next()
+    {
         Some(node) => node.click(),
-        None => panic!("no menu Area"),
+        None => panic!("no ⋮ of the Area or Topic"),
     }
     harness.run();
 }
 
-/// Whether Move up and Move down of the Area menu can be picked; the
+/// Whether Move up and Move down of the band's ⋮ can be picked; the
 /// menu is closed again.
 fn moves(harness: &mut Harness<'_, App>) -> [bool; 2] {
     open_area_menu(harness);
@@ -300,10 +308,10 @@ fn alt_up_moves_nothing_in_a_text_field() -> TestResult {
 }
 
 #[test]
-fn the_area_menu_moves_the_area_shown_greyed_at_an_end_and_for_a_topic() -> TestResult {
+fn the_bands_menu_moves_the_area_shown_greyed_at_an_end_and_for_a_topic() -> TestResult {
     let mut harness = window(store()?, "en", Selection::All);
-    // No Area shows.
-    assert_eq!(moves(&mut harness), [false, false]);
+    // No Area shows: no ⋮ of one.
+    assert!(harness.query_by_label("More for this Area").is_none());
     let garden = area(&harness, "Garden")?;
     harness.state_mut().select(Selection::Place(garden));
     harness.run();

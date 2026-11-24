@@ -148,7 +148,8 @@ fn an_updated_device_counts_what_it_had_as_shown_and_keeps_the_new_tips() -> Tes
         due(&store, spotlight::SETTINGS)?,
         ["settings-show-tips", "settings-grammar"]
     );
-    assert!(due(&store, spotlight::LIST)?.is_empty());
+    // obf-1065's ⋮ of an Area or a Topic came after.
+    assert_eq!(due(&store, spotlight::LIST)?, ["list-place-more"]);
     assert!(due(&store, spotlight::UNSORTED)?.is_empty());
     // Once only.
     spotlight::show_again(&store)?;

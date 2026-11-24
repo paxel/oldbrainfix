@@ -198,6 +198,12 @@ pub const MANIFEST: &[Screen] = &[
                 anchor: "first-card",
                 text: L10n::spot_desk_card_drag,
             },
+            // obf-1065: on the band's ⋮ of an Area or a Topic.
+            Tip {
+                id: "list-place-more",
+                anchor: "place-more",
+                text: L10n::spot_desk_list_place_more,
+            },
         ],
     },
     Screen {

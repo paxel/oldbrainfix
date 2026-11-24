@@ -186,17 +186,20 @@ fn the_menu_bar_stays_at_hand_over_the_note_dialog() -> TestResult {
     let mut harness = window(&store, Selection::All);
     harness.state_mut().select_note(&tap);
     harness.run();
-    bar(&harness, "Note").click();
+    bar(&harness, "File").click();
     harness.run();
-    let entry = last(&harness, "File into… Ctrl+M");
+    let entry = last(&harness, "Save as Markdown…");
     assert!(!entry.accesskit_node().is_disabled());
-    entry.click();
+    bar(&harness, "File").click();
+    harness.run();
+    // Ctrl+M files the Note open, with no Note menu (obf-1065).
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
     harness.run();
     last(&harness, "Household").click();
     harness.run();
     let filed = Notes::new(&store).by_id(&tap)?.ok_or("the Note")?;
     assert_eq!(filed.place.as_deref(), Some(household.as_str()));
-    // Ctrl+M too, over the dialog.
+    // Ctrl+M again, over the dialog.
     assert!(harness.state().note_open());
     harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
     harness.run();

@@ -364,7 +364,7 @@ replace a law of Both apps where they say so. A desktop law marked
   card Merge into… is named "Add to Note…"** (#308), in the action row,
   the ⋮ and on the desktop the right-click: the same Merge, picked in
   Add to Note… (see Dialogs and pages); the Note editor, the Note
-  dialog, the Note menu and a selection keep Merge into…. In the detailed view a Shopping List shows its open Lines,
+  dialog and a selection keep Merge into…. In the detailed view a Shopping List shows its open Lines,
   tickable, the struck ones folded under them ("2 struck through") until
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
@@ -1022,7 +1022,7 @@ replace a law of Both apps where they say so. A desktop law marked
   click or drag until the Area is gone; a failure is announced at the
   top, success is not. On the desktop it runs on a thread with its own
   connection, one Note per transaction, its Topics hidden under the
-  row; the line is named "Deleting an Area…", and the Area menu's Delete
+  row; the line is named "Deleting an Area…", and the Delete in the band's ⋮
   asks nothing for it meanwhile.
 - On the desktop the same line moves while the Agenda is read for the
   first time after the window opened (obf-1090), named "Reading the
@@ -1869,8 +1869,9 @@ replace a law of Both apps where they say so. A desktop law marked
   (`theme::search_band`), the cards scrolling under the line. Its first
   row holds back, forward and the path, the place shown last and large
   as the list's title; its second the search field, then the view
-  switch, "Show Notes by…" and "+", all at one height, the Trash's the
-  field alone. The view switch and "+" are icon and word in the frame
+  switch, "Show Notes by…" and "+", in an Area or a Topic ⋮ last
+  (obf-1065, C8, see Menu bar and keys), all at one height, the Trash's
+  the field alone. The view switch and "+" are icon and word in the frame
   "Show Notes by…" has, "View" and "New Note" (obf-1067); to a screen
   reader and in its tooltip the switch says what a click does, and
   "+" with a menu says "Add here". The search field is as tall as those buttons, its text
@@ -1901,17 +1902,19 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Menu bar and keys
 
+- **The menu bar holds what belongs to the window** (obf-1065, C8):
+  File, Edit, View, AI, Sync and Help. It has no Area and no Note menu;
+  an Area's or a Topic's actions are in the ⋮ of its list's band, a
+  Note's in its card's ⋮ and right-click and in the Note dialog (its
+  badges, its buttons and its bar's ⋮, which holds History).
 - **Every menu entry acts on what it names and closes its menu**, also
-  when picked by keyboard or screen reader; the Note menu acts on the
-  Note in the Note dialog and is greyed while none is open, each entry
-  as far as the dialog offers it, but File into…, Merge into…,
-  Importance and Move to trash, in the Trash Restore in its place, act on
-  the cards selected in the list while no Note is open (#148, #273). Its keys (Ctrl+N,
-  Ctrl+F, Ctrl+M, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on macOS)
-  stand beside the entries and work while typing, over the Note dialog
-  too, not while another dialog is open; Delete and 1 to 3 stand beside
-  Move to trash and Importance's entries while those act on the cards selected
-  (#274). Ctrl+F searches the list shown where it has a search field
+  when picked by keyboard or screen reader. The keys (Ctrl+N, Ctrl+F,
+  Ctrl+M for File into…, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on
+  macOS) stand beside the menu bar's entries where it has them and work
+  without any entry, while typing, over the Note dialog too, not while
+  another dialog is open; Ctrl+M and Ctrl+Shift+M act on the Note in the
+  Note dialog, else on the cards selected in the list (#148, #273), and
+  Delete and 1 to 3 on the cards selected (#274). Ctrl+F searches the list shown where it has a search field
   (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
   finds its Routines, Reminders and Frogs by their Note), else All
   Notes'; over the Note dialog and in a Note's own window it opens the
@@ -1926,15 +1929,16 @@ replace a law of Both apps where they say so. A desktop law marked
 - **File ▸ Attach a file…** (#267) picks files of any kind and does
   with them what a drop does (see Capture): onto the Note in the Note
   dialog, else into the quick note for a new Note.
-- **The Area menu acts on the Area or Topic the list shows** (#279):
-  Rename (F2), Colour and icon, Share…, People, Export as Pack…, the
-  switch Hidden from AI (#267) and
-  Delete, the sidebar right-click's entries, each greyed where that
+- **The band's ⋮ acts on the Area or Topic the list shows** (#279,
+  obf-1065), last in the band's second row, "More for this Area" or
+  "More for this Topic" to a screen reader: Rename (F2), Colour and
+  icon, Share…, People, Export as Pack…, the switch Hidden from AI (#267)
+  and Delete, the sidebar right-click's entries, each greyed where that
   menu would leave it out (a Topic has no Colour and icon, Share…,
   People or Hidden from AI, nor has an Area in a Shared Area that is not
-  marked), and all of them while no Area or Topic shows or a dialog
-  lies over the list, the Note dialog included, so that none acts on a
-  place behind it. F2 rests in a text field and while a menu is open.
+  marked), and all of them while a dialog lies over the list, the Note
+  dialog included, so that none acts on a place behind it; no other
+  place shows it, and its keys rest there too. F2 rests in a text field and while a menu is open.
   The sidebar's right-click stays, and keeps New Topic. Move up
   (Alt+Up) and Move down (Alt+Down) move the Area shown one place in
   the person's own order (#280), for whoever is in it, greyed for a
@@ -2145,8 +2149,8 @@ replace a law of Both apps where they say so. A desktop law marked
   alone, selected or not; the ⋮ and the right-click are one menu in
   both views. On a selected card each acts on all
   the cards selected, on another on that card alone, as File into…
-  does, and the Note menu offers the same while no Note is open (see
-  Menu bar and keys). Merge into… opens the Note picker with every Note,
+  does, and Ctrl+M, Ctrl+Shift+M, Delete and 1 to 3 do the same while
+  no Note is open (see Menu bar and keys). Merge into… opens the Note picker with every Note,
   the selected ones included, and a selected Note picked takes the
   others in, all in one go, the list staying shown; Move to trash asks
   nothing. A Note this Device may not change stays as it is, without an
@@ -2161,13 +2165,13 @@ replace a law of Both apps where they say so. A desktop law marked
   while nothing is selected, and Select all, which selects that whole
   text; the right-click and the menu keep the selection. The cards in
   the list stay click-to-select. A Section this Device may edit has its
-  own field and format bar there. "Copy as text" in a card's right-click menu, the
-  Note menu and the dialog is the desktop's "Copy text": the Note and
+  own field and format bar there. "Copy as text" in a card's right-click menu and
+  the dialog is the desktop's "Copy text": the Note and
   its Sections as they show, a list's Lines as a Markdown task list
   (#323), with HTML beside it, the boxes as glyphs.
 - **Cards move into an Area or Topic together** (#148): dragged onto it
   in the sidebar, which outlines the row under the pointer, or with
-  File into… from the card's right-click, the Note menu or Ctrl+M,
+  File into… from the card's right-click or Ctrl+M,
   whose dialog names how many go. A selected card takes the selection
   along; one outside it goes alone. A card this Device may not move
   stays where it is; the announcement says so without numbers, its
@@ -2198,8 +2202,8 @@ replace a law of Both apps where they say so. A desktop law marked
   picks more. The card's menu has none of these, as it has none for a
   photo.
 - **Hidden from AI on the desktop** (#267, ADR 0049): a card's ⋮ and
-  right-click, an Area's right-click in the sidebar and the Area menu
-  have the checkbox "Hidden from AI", the Note dialog its badge, offered
+  right-click, an Area's right-click in the sidebar and the ⋮ of its
+  band have the checkbox "Hidden from AI", the Note dialog its badge, offered
   as on the phone (Phone ▸ Cards) and read as the menu opens; the badge
   says "Off, hidden by its Area" while only another mark hides it.
 - **A photo gets out of the Note** (#149): on the desktop a right-click
@@ -2274,7 +2278,9 @@ replace a law of Both apps where they say so. A desktop law marked
   table's menu (insert, move, delete, align, and what ⋮ of a table adds)
   is a step of its own after the cell typed before it. A step is written
   back as an edit writes it, nothing deleted. In ⋮, **Revert all
-  changes**, greyed while nothing changed, asks once ("Revert all
+  changes**, greyed while nothing changed, and, in the Note dialog only,
+  **History** (#193, obf-1065), which the menu bar's Note menu had.
+  Revert all changes asks once ("Revert all
   changes?", Cancel and Revert) and brings the Note back to how it
   opened; Redo then makes the changes again one by one. In a text field
   Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y stay the field's own, for its typing;

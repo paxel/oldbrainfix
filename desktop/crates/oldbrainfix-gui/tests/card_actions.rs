@@ -1,5 +1,5 @@
 //! What the cards selected offer on the desktop (#273): from a card's
-//! right-click and the Note menu, Merge into…, Importance and Move to
+//! right-click and the list's keys, Merge into…, Importance and Move to
 //! trash act on the selection together, or on the card alone outside
 //! it, and Restore in the trash; one Ctrl+Z takes back the trash or the
 //! Merge of all of them, and a Note this Device may not change stays.
@@ -213,21 +213,12 @@ fn a_card_outside_the_selection_goes_alone() -> TestResult {
 }
 
 #[test]
-fn note_move_to_trash_with_no_note_open_trashes_the_cards_selected() -> TestResult {
+fn delete_with_no_note_open_trashes_the_cards_selected() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
     select(&mut harness, &[MILK, ROSES]);
-    harness
-        .query_all_by_label("Note")
-        .next()
-        .ok_or("the Note menu")?
-        .click();
-    harness.run();
-    harness
-        .query_all_by_label("Move to trash Delete")
-        .next_back()
-        .ok_or("Move to trash in the Note menu")?
-        .click();
+    // With no Note menu (obf-1065) the key still does it.
+    harness.key_press(egui::Key::Delete);
     harness.run();
     assert!(trashed(&harness, &ids, MILK)?);
     assert!(trashed(&harness, &ids, ROSES)?);
@@ -239,12 +230,12 @@ fn note_move_to_trash_with_no_note_open_trashes_the_cards_selected() -> TestResu
 }
 
 #[test]
-fn both_menus_name_move_to_trash_as_the_phone_does() -> TestResult {
-    // #329: the card's right-click and the Note menu say the phone's
-    // words, in German too, and neither says Delete.
-    for (language, menu, entry, delete) in [
-        ("en", "Note", "Move to trash", "Delete"),
-        ("de", "Notiz", "In den Papierkorb", "Löschen"),
+fn the_cards_menu_names_move_to_trash_as_the_phone_does() -> TestResult {
+    // #329: the card's right-click says the phone's words, in German
+    // too, and not Delete.
+    for (language, entry, delete) in [
+        ("en", "Move to trash", "Delete"),
+        ("de", "In den Papierkorb", "Löschen"),
     ] {
         let mut harness = harness_in(store()?, Selection::All, language);
         let ids = known(&harness)?;
@@ -257,19 +248,7 @@ fn both_menus_name_move_to_trash_as_the_phone_does() -> TestResult {
         harness.run();
 
         select(&mut harness, &[MILK]);
-        harness
-            .query_all_by_label(menu)
-            .next()
-            .ok_or("the Note menu")?
-            .click();
-        harness.run();
-        assert!(harness.query_by_label(delete).is_none(), "{language}");
-        harness
-            .query_all_by_label(&format!("{entry} Delete"))
-            .next_back()
-            .ok_or_else(|| format!("no {entry:?} in the Note menu"))?
-            .click();
-        harness.run();
+        right_pick(&mut harness, MILK, entry)?;
         assert!(trashed(&harness, &ids, MILK)?, "{language}");
         assert!(!trashed(&harness, &ids, ROSES)?, "{language}");
     }
@@ -301,20 +280,9 @@ fn the_cards_selected_in_the_trash_are_restored_together() -> TestResult {
     assert!(!reminder_trashed(&harness, &ids)?);
     assert!(trashed(&harness, &ids, ROSES)?);
 
-    // Note ▸ Restore restores the one selected, no Note open.
+    // Its right-click restores the one selected, no Note open.
     click(&mut harness, ROSES, Modifiers::NONE);
-    harness
-        .query_all_by_label("Note")
-        .next()
-        .ok_or("the Note menu")?
-        .click();
-    harness.run();
-    harness
-        .query_all_by_label("Restore")
-        .next_back()
-        .ok_or("Restore in the Note menu")?
-        .click();
-    harness.run();
+    right_pick(&mut harness, ROSES, "Restore")?;
     assert!(!trashed(&harness, &ids, ROSES)?);
     Ok(())
 }
@@ -491,26 +459,13 @@ fn pick_note(harness: &mut Harness<'_, App>, text: &str) -> TestResult {
     Ok(())
 }
 
-/// Opens the menu bar's Note menu, ahead of the window's own "Note".
-fn note_menu(harness: &mut Harness<'_, App>) -> TestResult {
-    harness
-        .query_all_by_label("Note")
-        .next()
-        .ok_or("the Note menu")?
-        .click();
-    harness.run();
-    Ok(())
-}
-
 #[test]
-fn the_note_menu_merges_and_weighs_the_cards_selected() -> TestResult {
+fn the_keys_weigh_and_merge_the_cards_selected() -> TestResult {
     let mut harness = harness(store()?, Selection::All);
     let ids = known(&harness)?;
+    // With no Note menu (obf-1065) the keys still do it.
     select(&mut harness, &[MILK, ROSES]);
-    note_menu(&mut harness)?;
-    harness.get_by_label("Importance ⏵").click();
-    harness.run();
-    harness.get_by_label("Unimportant 3").click_accesskit();
+    harness.key_press(egui::Key::Num3);
     harness.run();
     assert_eq!(
         note(&harness, &ids, MILK)?.importance,
@@ -524,16 +479,9 @@ fn the_note_menu_merges_and_weighs_the_cards_selected() -> TestResult {
         note(&harness, &ids, PLUMBER)?.importance,
         Importance::Normal
     );
-    // The menu closed with a pick by keyboard or screen reader too.
-    assert!(harness.query_by_label("Importance ⏵").is_none());
 
     select(&mut harness, &[MILK, ROSES]);
-    note_menu(&mut harness)?;
-    harness
-        .query_all_by_label("Merge into… Ctrl+Shift+M")
-        .next_back()
-        .ok_or("Merge into… in the Note menu")?
-        .click();
+    harness.key_press_modifiers(Modifiers::COMMAND | Modifiers::SHIFT, egui::Key::M);
     harness.run_steps(8);
     pick_note(&mut harness, PLUMBER)?;
     let plumber = note(&harness, &ids, PLUMBER)?.id;
@@ -544,45 +492,6 @@ fn the_note_menu_merges_and_weighs_the_cards_selected() -> TestResult {
     undo(&mut harness);
     assert!(!note(&harness, &ids, MILK)?.is_merged());
     assert!(!note(&harness, &ids, ROSES)?.is_merged());
-    Ok(())
-}
-
-#[test]
-fn the_note_menu_weighs_and_restores_the_note_open() -> TestResult {
-    let store = store()?;
-    let mut harness = harness(store, Selection::All);
-    let ids = known(&harness)?;
-    let milk = note(&harness, &ids, MILK)?.id;
-    harness.state_mut().select_note(&milk);
-    harness.run();
-    note_menu(&mut harness)?;
-    harness.get_by_label("Importance ⏵").click();
-    harness.run();
-    harness.get_by_label("Important").click_accesskit();
-    harness.run();
-    assert_eq!(
-        note(&harness, &ids, MILK)?.importance,
-        Importance::Important
-    );
-    assert_eq!(note(&harness, &ids, ROSES)?.importance, Importance::Normal);
-
-    // Open in the trash, it is restored from the Note menu as from the
-    // Note dialog.
-    Routines::new(harness.state().store()).trash_note(&milk)?;
-    harness.state_mut().select(Selection::Trash);
-    harness.run();
-    harness.state_mut().select_note(&milk);
-    harness.run();
-    note_menu(&mut harness)?;
-    // The menu's entry, ahead of the dialog's button it lies over since
-    // its keys widened it (#274).
-    harness
-        .query_all_by_label("Restore")
-        .next()
-        .ok_or("Restore in the Note menu")?
-        .click();
-    harness.run();
-    assert!(!trashed(&harness, &ids, MILK)?);
     Ok(())
 }
 

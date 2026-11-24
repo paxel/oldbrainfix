@@ -92,12 +92,13 @@ fn step_until(
     Err("the window never got there".into())
 }
 
-/// Picks Area ▸ Delete, by keyboard or screen reader, for the Area shown.
+/// Picks Delete in the band's ⋮ (obf-1065), by keyboard or screen
+/// reader, for the Area shown.
 fn area_delete(harness: &mut Harness<'_, App>) {
     harness
-        .get_all_by_label("Area")
+        .get_all_by_label("More for this Area")
         .next()
-        .expect("the Area menu")
+        .expect("the Area's ⋮")
         .click();
     harness.step();
     harness.step();

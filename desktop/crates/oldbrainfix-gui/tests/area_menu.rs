@@ -1,6 +1,6 @@
-//! The sidebar's Areas in the window (#279): the menu bar's Area menu
-//! for the Area or Topic shown, its entries greyed where they may not be
-//! done or none shows, F2 renaming but not in a text field; Unsorted
+//! The sidebar's Areas in the window (#279): the ⋮ of the band of the
+//! Area or Topic shown (obf-1065), its entries greyed where they may not
+//! be done, none elsewhere, F2 renaming but not in a text field; Unsorted
 //! saying how many Notes it holds; and an Area folding its Topics with
 //! its chevron, kept on this Device.
 
@@ -67,12 +67,14 @@ fn last<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> Node<'a> {
     }
 }
 
-/// The menu bar's `menu`, ahead of the window's widgets of the same name.
+/// The ⋮ of the band of an Area.
+const AREA: &str = "More for this Area";
+/// The ⋮ of the band of a Topic.
+const TOPIC: &str = "More for this Topic";
+
+/// The band's ⋮ labelled `menu`.
 fn bar<'a>(harness: &'a Harness<'_, App>, menu: &'a str) -> Node<'a> {
-    match harness.get_all_by_label(menu).next() {
-        Some(node) => node,
-        None => panic!("no menu {menu}"),
-    }
+    harness.get_by_label(menu)
 }
 
 fn open(harness: &mut Harness<'_, App>, menu: &str) {
@@ -93,15 +95,15 @@ fn enabled<const N: usize>(
     on
 }
 
-/// Picks `entry` of the Area menu by keyboard or screen reader, which
-/// leaves egui's menus open unless the entry closes it.
-fn pick(harness: &mut Harness<'_, App>, entry: &str) {
-    open(harness, "Area");
+/// Picks `entry` of the band's ⋮ `menu` by keyboard or screen reader,
+/// which leaves egui's menus open unless the entry closes it.
+fn pick(harness: &mut Harness<'_, App>, menu: &str, entry: &str) {
+    open(harness, menu);
     last(harness, entry).click_accesskit();
     harness.run();
 }
 
-/// The six entries of the Area menu, Rename with its key.
+/// The six entries of the band's ⋮, Rename with its key.
 const ENTRIES: [&str; 6] = [
     "Rename F2",
     "Colour and icon",
@@ -112,38 +114,69 @@ const ENTRIES: [&str; 6] = [
 ];
 
 #[test]
-fn the_area_menu_is_greyed_where_no_area_or_topic_shows() -> TestResult {
+fn no_area_menu_shows_where_no_area_or_topic_shows() -> TestResult {
     let (store, _, _) = store()?;
     let mut harness = window(App::new(store, "en"));
-    assert_eq!(enabled(&mut harness, "Area", ENTRIES), [false; 6]);
-    // F2 renames nothing there.
-    harness.key_press(Key::F2);
-    harness.run();
-    assert!(!shows(&harness, "Rename"));
+    // The menu bar has no Area and no Note menu (obf-1065).
+    for menu in ["File", "Edit", "View", "Sync", "AI", "Help"] {
+        assert!(shows(&harness, menu), "{menu}");
+    }
+    let bar_bottom = harness.get_by_label("File").rect().bottom();
+    for gone in ["Area", "Note"] {
+        let in_bar = harness
+            .query_all_by_label(gone)
+            .any(|n| n.rect().top() < bar_bottom);
+        assert!(!in_bar, "{gone}");
+    }
+    for place in [Selection::Agenda, Selection::All, Selection::Unsorted] {
+        harness.state_mut().select(place);
+        harness.run();
+        for gone in [AREA, TOPIC] {
+            assert!(!shows(&harness, gone), "{gone}");
+        }
+        // F2 renames nothing there.
+        harness.key_press(Key::F2);
+        harness.run();
+        assert!(!shows(&harness, "Rename"));
+    }
     Ok(())
 }
 
 #[test]
-fn the_area_menu_acts_on_the_area_shown_and_closes() -> TestResult {
+fn the_bands_menu_acts_on_the_area_shown_and_closes() -> TestResult {
     let (store, household, _) = store()?;
     let mut app = App::new(store, "en");
     app.select(Selection::Place(household));
     let mut harness = window(app);
     // Not shared: People is greyed, the rest may be done.
     assert_eq!(
-        enabled(&mut harness, "Area", ENTRIES),
+        enabled(&mut harness, AREA, ENTRIES),
         [true, true, true, false, true, true]
     );
-    pick(&mut harness, "Rename F2");
+    assert!(!shows(&harness, TOPIC));
+    pick(&mut harness, AREA, "Rename F2");
     assert!(shows(&harness, "Rename"), "the Rename dialog");
     assert!(!shows(&harness, "Rename F2"), "the menu closed");
     harness.key_press(Key::Escape);
     harness.run();
     assert!(!shows(&harness, "Rename"));
 
-    pick(&mut harness, "Delete");
+    pick(&mut harness, AREA, "Delete");
     assert!(shows(&harness, "Delete the Area “Household”?"));
     assert!(!shows(&harness, "Rename F2"), "the menu closed");
+    Ok(())
+}
+
+#[test]
+fn the_bands_menu_stands_last_in_its_second_row() -> TestResult {
+    let (store, household, _) = store()?;
+    let mut app = App::new(store, "en");
+    app.select(Selection::Place(household));
+    let harness = window(app);
+    let more = bar(&harness, AREA).rect();
+    let add = harness.get_by_label("Add here").rect();
+    assert!(more.left() >= add.right(), "{more:?} after {add:?}");
+    assert!((more.center().y - add.center().y).abs() < 1.0);
     Ok(())
 }
 
@@ -154,10 +187,11 @@ fn for_a_topic_colour_share_and_people_are_greyed() -> TestResult {
     app.select(Selection::Place(repairs));
     let mut harness = window(app);
     assert_eq!(
-        enabled(&mut harness, "Area", ENTRIES),
+        enabled(&mut harness, TOPIC, ENTRIES),
         [true, false, false, false, true, true]
     );
-    pick(&mut harness, "Export as Pack…");
+    assert!(!shows(&harness, AREA));
+    pick(&mut harness, TOPIC, "Export as Pack…");
     assert!(shows(&harness, "Export as Pack"), "the Pack dialog");
     Ok(())
 }
@@ -186,7 +220,7 @@ fn f2_renames_the_place_shown_but_not_in_a_text_field() -> TestResult {
 }
 
 #[test]
-fn the_area_menu_rests_over_the_note_dialog() -> TestResult {
+fn the_bands_menu_rests_over_the_note_dialog() -> TestResult {
     let (store, household, _) = store()?;
     let tap = Notes::new(&store)
         .all()?
@@ -199,17 +233,23 @@ fn the_area_menu_rests_over_the_note_dialog() -> TestResult {
     app.select_note(&tap);
     let mut harness = window(app);
     assert!(harness.state().selected_note().is_some());
-    // The Note dialog has an Export as Pack… of its own, for the Note:
-    // each entry has a greyed one, the Area menu's.
-    open(&mut harness, "Area");
+    // The band's ⋮ stays in its place under the dialog; opened by a
+    // screen reader, every entry of it is greyed. The Note dialog has an
+    // Export as Pack… of its own, for the Note.
+    bar(&harness, AREA).click_accesskit();
+    harness.run();
     for entry in ENTRIES {
         let greyed = harness
             .get_all_by_label(entry)
             .any(|n| n.accesskit_node().is_disabled());
-        assert!(greyed, "{entry}");
+        let picked = harness
+            .get_all_by_label(entry)
+            .all(|n| n.accesskit_node().is_disabled() || entry == "Export as Pack…");
+        assert!(greyed && picked, "{entry}");
     }
-    bar(&harness, "Area").click();
+    bar(&harness, AREA).click_accesskit();
     harness.run();
+    assert!(harness.state().selected_note().is_some());
     harness.key_press(Key::F2);
     harness.run();
     assert!(!shows(&harness, "Rename"));

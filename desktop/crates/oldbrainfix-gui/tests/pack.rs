@@ -274,17 +274,8 @@ fn a_topic_a_card_the_note_menu_and_the_note_dialog_export_what_they_hold() -> T
     assert!(ticked(&harness, "Laps"));
     click(&mut harness, "Cancel");
 
-    // From the Note dialog's bar and the Note menu.
+    // From the Note dialog's bar.
     harness.state_mut().select_note(&water);
-    harness.run();
-    click(&mut harness, "Export as Pack…");
-    assert!(ticked(&harness, "Water"));
-    click(&mut harness, "Cancel");
-    harness
-        .get_all_by_label("Note")
-        .next()
-        .ok_or("Note")?
-        .click();
     harness.run();
     click(&mut harness, "Export as Pack…");
     assert!(ticked(&harness, "Water"));

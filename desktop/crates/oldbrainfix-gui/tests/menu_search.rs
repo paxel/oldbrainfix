@@ -247,11 +247,8 @@ fn the_history_over_the_note_offers_no_search() -> TestResult {
     let (store, ids) = store(&[("Dentist on Tuesday", PLAIN)])?;
     Notes::new(&store).edit(&ids[0], "Dentist on Wednesday")?;
     let mut harness = window(&store, Selection::Unsorted, Some(&ids[0]));
-    harness
-        .get_all_by_label("Note")
-        .next()
-        .ok_or("the Note menu")?
-        .click();
+    // History in the Note dialog's ⋮ (obf-1065).
+    harness.get_by_label("More for this Note").click();
     harness.run();
     harness
         .get_all_by_label("History")

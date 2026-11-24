@@ -1,5 +1,5 @@
 //! Hidden from AI on the desktop (#267, ADR 0049): a card's menu, an
-//! Area's right-click and the Area menu mark a Note or Area, offered in
+//! Area's right-click and the ⋮ of its band mark a Note or Area, offered in
 //! no Shared Area; a shield on the card and the sidebar's row shows what
 //! is hidden, the Note dialog's badge "Off, hidden by its Area"; and
 //! filing, sending, sharing or packing something hidden asks to show it
@@ -154,13 +154,13 @@ fn an_areas_mark_hides_its_notes_and_is_not_offered_in_a_shared_area() -> TestRe
     harness.state_mut().select_note(&milk);
     harness.run();
     assert!(shows(&harness, "Hidden from AI: Off, hidden by its Area"));
-    // The Area menu offers the same switch for the Area shown.
+    // The ⋮ of the Area's band offers the same switch (obf-1065).
     harness.state_mut().close_note();
     harness.state_mut().select(Selection::Place(house.clone()));
     harness.run();
-    harness.get_by_label("Area").click();
+    harness.get_by_label("More for this Area").click();
     harness.run();
-    let on = switch(&harness).ok_or("the Area menu's switch")?;
+    let on = switch(&harness).ok_or("the ⋮'s switch")?;
     assert_eq!(
         on.accesskit_node().toggled(),
         Some(egui::accesskit::Toggled::True)

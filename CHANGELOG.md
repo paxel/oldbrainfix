@@ -29,6 +29,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, the list's search field is as tall as a button, its text a card's size, with the magnifier and ✕ inside. ([obf-1063](https://github.com/paxel/oldbrainfix/issues/376))
 - On the desktop, View and New Note are framed buttons with icon and word, like Show Notes by…. ([obf-1067](https://github.com/paxel/oldbrainfix/issues/380))
 - On the phone and the desktop, a Note without text is named by its Transcript or Photo Text on cards, Agenda, calendar and notifications. ([obf-1049](https://github.com/paxel/oldbrainfix/issues/360))
+- On the desktop, the Area and Note menus leave the menu bar; their actions sit in the ⋮ of the Area, Topic and Note. ([obf-1065](https://github.com/paxel/oldbrainfix/issues/378))
 
 ### Fixed
 

@@ -97,8 +97,8 @@ struct Texts {
     /// tyres' Note, `{id}` its id.
     ask_question: &'static str,
     ask_answer: &'static str,
-    /// The menu bar's Note menu.
-    note_menu: &'static str,
+    /// The ⋮ of the Note dialog (obf-1051), which holds its History.
+    note_more: &'static str,
     /// The first start's "New to Old Brain Fix".
     new_here: &'static str,
     /// The menu bar's File menu, its Import…, and Google Keep… in the
@@ -106,7 +106,7 @@ struct Texts {
     file_menu: &'static str,
     import: &'static str,
     keep: &'static str,
-    /// The Note menu's History.
+    /// The History in the Note dialog's ⋮ (obf-1065).
     history: &'static str,
     /// The Agenda's "New Routine or Reminder", the hint of its text, the
     /// schedule's Weekdays and the Escalation's switch.
@@ -181,7 +181,7 @@ const EN: Texts = Texts {
     fixed: "Pick up the parcel for Dana at the post office tomorrow",
     ask_question: "Where are the winter tyres?",
     ask_answer: "In the cellar, on the left shelf, with the wheel bolts ([Winter tyres](oldbrainfix://note/{id})).",
-    note_menu: "Note",
+    note_more: "More for this Note",
     new_here: "New to Old Brain Fix",
     file_menu: "File",
     import: "Import…",
@@ -247,7 +247,7 @@ const DE: Texts = Texts {
     fixed: "Paket für Dana morgen bei der Post abholen",
     ask_question: "Wo sind die Winterreifen?",
     ask_answer: "Im Keller, im linken Regal, mit den Radschrauben ([Winterreifen](oldbrainfix://note/{id})).",
-    note_menu: "Notiz",
+    note_more: "Mehr zu dieser Notiz",
     new_here: "Neu bei Old Brain Fix",
     file_menu: "Datei",
     import: "Importieren …",
@@ -1082,19 +1082,27 @@ fn all_guide_frames() -> TestResult {
                 &tap,
                 &box_frame(DESKTOP, "note-window"),
             )?);
-            // The menu bar's Note menu over it, for that Note.
-            harness
-                .get_all_by_label(texts.note_menu)
-                .next()
-                .ok_or("the Note menu")?
-                .click();
-            harness.run();
+            // The menu bar's File menu over it (obf-1065: no Note menu),
+            // ahead of the window's widgets of that name.
+            let file_menu = |harness: &mut Harness<'static, App>| -> TestResult {
+                harness
+                    .get_all_by_label(texts.file_menu)
+                    .next()
+                    .ok_or("the File menu")?
+                    .click();
+                harness.run();
+                Ok(())
+            };
+            file_menu(&mut harness)?;
             problems.extend(match_frame(&mut harness, &box_frame(DESKTOP, "menu-bar"))?);
-            // Note ▸ History of that Note.
+            file_menu(&mut harness)?;
+            // ⋮ ▸ History of that Note.
+            harness.get_by_label(texts.note_more).click();
+            harness.run();
             harness
                 .get_all_by_label(texts.history)
                 .last()
-                .ok_or("Note ▸ History")?
+                .ok_or("⋮ ▸ History")?
                 .click();
             harness.run();
             problems.extend(match_frame(

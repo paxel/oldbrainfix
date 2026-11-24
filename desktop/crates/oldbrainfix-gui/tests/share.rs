@@ -145,12 +145,12 @@ fn a_member_sees_who_shares_and_only_adds_to_someone_elses_note() -> TestResult 
 fn for_a_member_the_area_menu_offers_people_and_export_only() -> TestResult {
     let (_ann, ben, area) = shared(AreaRole::Member)?;
     let mut harness = harness(ben, Selection::Place(area));
-    // The menu bar's Area menu, ahead of the window's widgets (#279).
+    // The ⋮ of the Area's band (#279, obf-1065).
     let open = |harness: &mut Harness<'_, App>| {
         harness
-            .get_all_by_label("Area")
+            .get_all_by_label("More for this Area")
             .next()
-            .ok_or("Area")?
+            .ok_or("the Area's ⋮")?
             .click();
         harness.run();
         Ok::<(), &str>(())

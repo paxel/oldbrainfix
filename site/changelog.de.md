@@ -28,6 +28,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop ist das Suchfeld einer Liste so hoch wie ein Knopf, seine Schrift so groß wie auf Karten, Lupe und ✕ darin. ([obf-1063](https://github.com/paxel/oldbrainfix/issues/376))
 - Auf dem Desktop sind Ansicht und Neue Notiz gerahmte Knöpfe mit Symbol und Wort, wie „Notizen zeigen von …“. ([obf-1067](https://github.com/paxel/oldbrainfix/issues/380))
 - Auf dem Handy und dem Desktop heißt eine Notiz ohne Text nach ihrem Transkript oder Fototext, auf Karten, in Agenda, Kalender und Benachrichtigungen. ([obf-1049](https://github.com/paxel/oldbrainfix/issues/360))
+- Auf dem Desktop verlassen die Menüs Bereich und Notiz die Menüleiste; ihre Aktionen stehen im ⋮ des Bereichs, Themas und der Notiz. ([obf-1065](https://github.com/paxel/oldbrainfix/issues/378))
 
 ### Behoben
 

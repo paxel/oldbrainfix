@@ -1010,7 +1010,7 @@ abstract class AppLocalizations {
   /// **'Reminder'**
   String get reminder;
 
-  /// The one entry, in a Note card's menus, the Note editor's "+", the quick note's alarm clock and the desktop's Note menu, that opens the editor of a new Routine or Reminder for the Note, starting as a Reminder (once).
+  /// The one entry, in a Note card's menus, the Note editor's "+", the quick note's alarm clock and the desktop's Note dialog, that opens the editor of a new Routine or Reminder for the Note, starting as a Reminder (once).
   ///
   /// In en, this message translates to:
   /// **'Remind me…'**

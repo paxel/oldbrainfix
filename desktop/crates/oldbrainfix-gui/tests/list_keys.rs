@@ -589,32 +589,3 @@ fn the_card_reached_scrolls_into_view() -> TestResult {
     assert!(bottom <= 900.0, "the last card ends at {bottom}");
     Ok(())
 }
-
-#[test]
-fn the_note_menu_shows_the_keys_beside_its_entries() -> TestResult {
-    let mut harness = harness(store()?, Selection::Unsorted);
-    press(&mut harness, Key::ArrowDown);
-    harness
-        .query_all_by_label("Note")
-        .next()
-        .ok_or("the Note menu")?
-        .click();
-    harness.run();
-    for entry in [
-        "File into… Ctrl+M",
-        "Merge into… Ctrl+Shift+M",
-        "Move to trash Delete",
-    ] {
-        assert!(harness.query_by_label(entry).is_some(), "{entry}");
-    }
-    harness
-        .query_all_by_label_contains("Importance")
-        .next_back()
-        .ok_or("Importance")?
-        .click();
-    harness.run();
-    for entry in ["Important 1", "Normal 2", "Unimportant 3"] {
-        assert!(harness.query_by_label(entry).is_some(), "{entry}");
-    }
-    Ok(())
-}
