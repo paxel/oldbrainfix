@@ -67,6 +67,13 @@ There are three kinds, and an action takes the first that fits.
   (desktop `theme::icon_button_back`, phone `IconButton`), and they
   always have a tooltip and a screen-reader label. Menu entries stay
   flat, links stay links, and badges keep their own look (#192).
+- **The setting badge is a block of its own** (#160, obf-1117): a
+  Note's setting in the Note editor and the Note dialog is a split box
+  with radius 8, its icon in a tinted cell on the left and its value on
+  the right, a drop-down mark after the value where a tap opens a
+  choice. It is neither a button nor a chip; the buttons beside it in a
+  group keep their own kind and shape. Phone: `setting_badges.dart`.
+  Desktop: `setting_badges.rs`.
 
 ### The header band
 
