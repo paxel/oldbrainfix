@@ -8,7 +8,7 @@ An app link is a link of a formatted text (ADR 0033) whose destination has the s
 
 - `note/<id>` a Note, `area/<id>` an Area or a Topic, by the id it has on every Device;
 - `agenda`, `unsorted`, `routines` (All Routines and Reminders), `profile`, `frogs`, `session/new` (New Session);
-- `settings`, `settings/<section>` one of the Settings' sections (`look`, `units`, `agenda`, `alarms`, `nudges`, `capture`, `quick-note`, `calendar`, `privacy`, `typing`, `history`, `import`, `features`, `computer`), `settings/backups` and `settings/sync`;
+- `settings`, `settings/<section>` one of the Settings' sections (`look`, `units`, `agenda`, `alarms`, `nudges`, `capture`, `quick-note`, `calendar`, `privacy`, `typing`, `history`, `import`, `features`, `computer`), `settings/backups` and `settings/sync`; since obf-1096 the phone's Imports sit in the Areas list's ⋮, so `settings/import` is no longer offered by Link to… and an old link of it opens the Settings at the top, while the cores still read it;
 - `guide` the user guide's start page, `guide/<page>` one of its pages and `guide/<page>#<box>` one of its boxes, the names lower-case letters, digits and `-`;
 - `file/<path>` a file of the shared folder by its path inside it.
 
