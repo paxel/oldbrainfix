@@ -453,6 +453,7 @@ class _PersonScreenState extends State<PersonScreen> {
     final theirName = profileDisplayName(t, theirs.name);
     final shownName = profileDisplayName(t, shown.name);
     final text = Theme.of(context).textTheme;
+    final accent = Theme.of(context).colorScheme.primary;
     return PopScope(
       // The name typed last is kept when the page is left.
       onPopInvokedWithResult: (_, _) => _saveName(),
@@ -567,22 +568,48 @@ class _PersonScreenState extends State<PersonScreen> {
                     ),
                   ),
                 ),
+              // In the accent with a chevron: it opens their Notes
+              // (obf-1108).
               ListTile(
                 key: const ValueKey('theirNotes'),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                iconColor: accent,
                 leading: const Icon(Icons.notes),
-                title: Text(t.personTheirNotes),
+                title: Text(
+                  t.personTheirNotes,
+                  style: TextStyle(color: accent),
+                ),
+                trailing: const Icon(Icons.chevron_right),
                 onTap: _theirNotes,
               ),
+              // It sends: a text button with its icon, its hint below it
+              // (obf-1108).
               if (_sendsChanges)
-                ListTile(
-                  key: const ValueKey('sendChanges'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                  leading: const Icon(Icons.send_outlined),
-                  title: Text(t.personSendChanges(shownName)),
-                  subtitle: Text(t.personSendChangesDetail),
-                  enabled: !_sending,
-                  onTap: _sendChanges,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextButton.icon(
+                        key: const ValueKey('sendChanges'),
+                        onPressed: _sending ? null : _sendChanges,
+                        icon: const Icon(Icons.send_outlined),
+                        label: Text(t.personSendChanges(shownName)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsetsDirectional.fromSTEB(
+                          12,
+                          0,
+                          8,
+                          8,
+                        ),
+                        child: Text(
+                          t.personSendChangesDetail,
+                          style: text.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               SettingsHeading(t.personForMe),
               Padding(

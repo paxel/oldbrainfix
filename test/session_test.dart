@@ -14,6 +14,7 @@ import 'package:oldbrainfix/src/tally_form_screen.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'accent_row.dart';
 import 'open_capture.dart';
 import 'reveal.dart';
 
@@ -544,6 +545,8 @@ void main() {
       final made = session([tally('Push-ups')], count: 1);
       await start(tester);
       await edit(tester, made.noteId);
+      await tester.ensureVisible(key('session-new-tally'));
+      expectAccentRow(tester, key('session-new-tally'), 'New Tally');
       await tap(tester, key('session-new-tally'));
       expect(find.byType(TallyFormScreen), findsOneWidget);
       await tester.enterText(key('tally-form-name'), 'Plank');

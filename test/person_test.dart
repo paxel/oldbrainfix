@@ -18,6 +18,7 @@ import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'accent_row.dart';
 import 'fake_alarms.dart';
 import 'fake_profile.dart';
 import 'open_capture.dart';
@@ -447,6 +448,11 @@ void main() {
       Notes(ben).capture('Ben buys bread', place: area);
       sync();
       await page(tester, person());
+      expectAccentRow(
+        tester,
+        find.byKey(const ValueKey('theirNotes')),
+        'Their Notes',
+      );
       await tap(tester, find.byKey(const ValueKey('theirNotes')));
       expect(find.byType(AllNotesScreen), findsOneWidget);
       expect(find.text('Ben buys bread'), findsOneWidget);

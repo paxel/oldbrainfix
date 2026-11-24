@@ -585,11 +585,17 @@ class _SyncScreenState extends State<SyncScreen> {
   /// out.
   List<Widget> _rest(AppLocalizations t, DateFormat when) => [
     const SizedBox(height: 16),
+    // In the accent with a chevron: it opens the Conflicts (obf-1108).
     ListTile(
       key: const ValueKey('conflicts'),
       contentPadding: EdgeInsets.zero,
+      iconColor: Theme.of(context).colorScheme.primary,
       leading: const Icon(Icons.call_split),
-      title: Text(t.conflictsTitle),
+      title: Text(
+        t.conflictsTitle,
+        style: TextStyle(color: Theme.of(context).colorScheme.primary),
+      ),
+      trailing: const Icon(Icons.chevron_right),
       subtitle: Text(t.conflictsEntry(_conflicts)),
       onTap: () => _openConflicts(Navigator.of(context)),
     ),

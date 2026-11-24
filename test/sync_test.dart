@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'accent_row.dart';
 import 'announced.dart';
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
@@ -441,6 +442,11 @@ void main() {
     NamedPlaces(phone).setRadius(home.id, 250);
     NamedPlaces(desk).setRadius(home.id, 50);
     await syncNow(tester);
+    expectAccentRow(
+      tester,
+      find.byKey(const ValueKey('conflicts')),
+      'Conflicts',
+    );
     await tester.tap(find.byKey(const ValueKey('conflicts')));
     await tester.pumpAndSettle();
     expect(find.text('Routine schedule'), findsOneWidget);

@@ -105,14 +105,23 @@ class SessionNoteSetup extends StatelessWidget {
               ),
               if (changes && draft.ordersByHand) Text(t.sessionPoolOrder),
               if (changes)
-                // Making one stays inside the list, on this page.
+                // Making one stays inside the list, on this page. In the
+                // accent with a chevron: it opens the Tally's page
+                // (obf-1108).
                 Material(
                   type: MaterialType.transparency,
                   child: ListTile(
                     key: const ValueKey('session-new-tally'),
                     contentPadding: EdgeInsets.zero,
+                    iconColor: Theme.of(context).colorScheme.primary,
                     leading: const Icon(Icons.add),
-                    title: Text(t.newTally),
+                    title: Text(
+                      t.newTally,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
                     onTap: onNewTally,
                   ),
                 ),

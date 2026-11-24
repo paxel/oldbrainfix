@@ -11,6 +11,7 @@ import 'package:oldbrainfix/src/session_form_screen.dart';
 import 'package:oldbrainfix/src/tally_form_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'accent_row.dart';
 import 'open_capture.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -432,6 +433,8 @@ void main() {
       await tap(tester, key('session-form-save'));
       expect(key('session-pool-error'), findsOneWidget);
 
+      await tester.ensureVisible(key('session-new-tally'));
+      expectAccentRow(tester, key('session-new-tally'), 'New Tally');
       await tap(tester, key('session-new-tally'));
       expect(find.byType(TallyFormScreen), findsOneWidget);
       await fillTally(tester, 'Push-ups', [
