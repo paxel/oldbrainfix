@@ -754,31 +754,14 @@ fn speed_button(ui: &mut Ui, t: &L10n, speed: f64) -> Option<f64> {
     chosen.filter(|&chosen| chosen != speed)
 }
 
-/// What the microphone's button asked for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Voice {
-    Record,
-    /// The big stop button: end the recording and hold it on the
-    /// capture, with the rest, until the Note is saved.
-    Stop,
-}
-
-/// The microphone's button, or while `recording` runs, how long it has
-/// run and the one big stop button.
-pub fn voice_button(ui: &mut Ui, t: &L10n, recording: Option<Duration>) -> Option<Voice> {
+/// How long the recording has run, `elapsed`, and the one big stop
+/// button, which ends it and holds it on the Note; whether it was
+/// clicked. The Note dialog's Voice starts it (obf-1073).
+pub fn recording_stop(ui: &mut Ui, t: &L10n, elapsed: Duration) -> bool {
     let text = ui.visuals().text_color();
-    let Some(elapsed) = recording else {
-        let mic = ui.horizontal(|ui| {
-            icons::show(ui, icons::MIC, 20.0, text);
-            ui.button(RichText::new(t.record_voice()).color(text))
-                .clicked()
-        });
-        return mic.inner.then_some(Voice::Record);
-    };
     // The elapsed time moves on every second.
     ui.ctx().request_repaint_after(Duration::from_millis(500));
     let seconds = elapsed.as_secs();
-    let mut stop = false;
     ui.horizontal(|ui| {
         icons::show(ui, icons::MIC, 22.0, ui.visuals().error_fg_color);
         ui.label(
@@ -793,10 +776,7 @@ pub fn voice_button(ui: &mut Ui, t: &L10n, recording: Option<Duration>) -> Optio
     });
     let big = egui::Button::new(RichText::new(t.stop_recording()).size(18.0).color(text))
         .min_size(egui::vec2(ui.available_width(), 44.0));
-    if ui.add(big).clicked() {
-        stop = true;
-    }
-    stop.then_some(Voice::Stop)
+    ui.add(big).clicked()
 }
 
 /// What the speech model's card asked for.

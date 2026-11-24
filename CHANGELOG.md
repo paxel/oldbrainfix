@@ -40,6 +40,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, sync goes on while the AI port is open; the AI's changes stay on this computer until you accept them. ([obf-1076](https://github.com/paxel/oldbrainfix/issues/389))
 - On the desktop, the AI port's line offers Review with the number of changes, or Close the port while nothing has changed. ([obf-1075](https://github.com/paxel/oldbrainfix/issues/388))
 - On the phone and the desktop, a Backup brings back the Device's settings and offers the speech model chosen before. ([obf-1098](https://github.com/paxel/oldbrainfix/issues/411))
+- On the phone and the desktop, the Note's buttons stand in four named groups: This Note, Add, Share and Tidy. ([obf-1073](https://github.com/paxel/oldbrainfix/issues/386))
 
 ### Fixed
 

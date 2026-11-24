@@ -6,7 +6,7 @@
 //! as it closes, also with the main window, and its size kept for the
 //! next; a Note going to the trash closes its window, the one Ctrl+Z bringing it back; Keep on
 //! top puts it over the other windows, greyed with the reason on
-//! Wayland.
+//! Wayland. It shows the Note dialog's four groups (obf-1073).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -292,5 +292,37 @@ fn on_wayland_keep_on_top_is_greyed_with_the_reason() -> TestResult {
             .and_then(|v| v.window_level),
         Some(WindowLevel::Normal)
     );
+    Ok(())
+}
+
+#[test]
+fn a_note_window_shows_the_dialogs_four_groups() -> TestResult {
+    let (store, milk, stamps) = store()?;
+    let mut harness = window(&store, true);
+    right_pick(&mut harness, "Milk", OPEN);
+    assert_eq!(harness.state().note_windows(), [milk.as_str()]);
+    let headings: Vec<String> = harness
+        .query_all_by(|n| n.role() == Role::Heading)
+        .filter_map(|n| n.accesskit_node().value())
+        .collect();
+    for name in ["This Note", "Add", "Share", "Tidy"] {
+        assert!(headings.iter().any(|h| h == name), "{headings:?}");
+    }
+    // Voice only in the window's Note dialog, which has the microphone.
+    assert!(harness.query_all_by_label("Voice").next().is_none());
+    assert_eq!(harness.query_all_by_label("Move to trash").count(), 1);
+    // Beside the Note dialog, each lays its groups out on its own: the
+    // window's Amend box open, the dialog's not, both settle.
+    harness.state_mut().select_note(&stamps);
+    harness.run();
+    assert!(harness.state().note_open());
+    assert_eq!(harness.query_all_by_label("Add a part").count(), 2);
+    harness
+        .query_all_by_label("Add a part")
+        .next()
+        .ok_or("Add a part")?
+        .click_accesskit();
+    harness.run();
+    assert_eq!(harness.query_all_by_label("Add a part").count(), 1);
     Ok(())
 }

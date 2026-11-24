@@ -2245,6 +2245,22 @@ replace a law of Both apps where they say so. A desktop law marked
   separator's line along its bottom (`theme::search_band`), and the
   list starts right at the line, so what scrolls goes under the line
   and no edge in the page's or the dialog's colour cuts it.
+- **The Note dialog's buttons stand in four named groups** (obf-1073,
+  C16), as in the phone's Note editor, in a Note's own window too:
+  **This Note**, the badges under the Note's text (Kind, Importance,
+  Area and Topic, Captured, Show on the Agenda, Hidden from AI and the
+  others a Note has), with Make it a Tally in Advanced; at the dialog's
+  end, after the Note's files, Sections and Linked from, **Add** ("+"
+  with Remind me…, Voice, Paste, Attach a file…, Add a part), **Share**
+  (Send…, Copy as text, Save as Markdown…, Export as Pack…) and
+  **Tidy** (Merge into…, Add to a Shopping List, Move to trash in the
+  error colour). Each group is a small strong heading, read as a
+  heading, over its compact buttons side by side, wrapping; the groups
+  stand side by side where the dialog is wide enough, else one under
+  another. A group with nothing this Device may do shows nothing, and
+  a Note in the trash shows This Note and Restore only. While a
+  recording runs, its time and the big stop button stand over the
+  groups. The desktop takes no photo, so Add has no Photo.
 
 ### Cards and selection
 
@@ -2320,8 +2336,8 @@ replace a law of Both apps where they say so. A desktop law marked
   waits for them. In the Note dialog each file has Replace Note text,
   Append to Note text, Remove generated text (Ctrl+Z brings it back),
   Read the text again for a file of a kind with text, and "Remove
-  Attachment, keep text", asked once; "Attach a file…" under the files
-  picks more. The card's menu has none of these, as it has none for a
+  Attachment, keep text", asked once; "Attach a file…" under Add
+  (obf-1073) picks more. The card's menu has none of these, as it has none for a
   photo.
 - **Hidden from AI on the desktop** (#267, ADR 0049): a card's ⋮ and
   right-click, an Area's right-click in the sidebar and the ⋮ of its
@@ -2347,11 +2363,11 @@ replace a law of Both apps where they say so. A desktop law marked
   editor saves the Note and opens it in the
   window's Note dialog in place of the dialog; in the popup it closes
   the popup and opens the Note there in the window, brought back from
-  the tray. The Note dialog holds Record voice, Paste (in a row with
-  Attach a file…), Add to a Shopping List (at the bottom, between Merge
+  the tray. The Note dialog holds Voice, Paste and Attach a file… under
+  Add (obf-1073), Add to a Shopping List under Tidy (between Merge
   into… and Move to trash; its lists as radio buttons, the one used last
   at the top; with one list a single entry naming it, "Add to Weekly",
-  #276), the badges and the format bar. Files dropped onto the window,
+  #276), the badges under This Note and the format bar. Files dropped onto the window,
   and File ▸ Attach a file… with no Note open, open the quick note
   dialog and wait in it above the text (#267): a picture as a photo, a
   sound file as a voice recording, any other file as an Attachment, each
@@ -2368,7 +2384,7 @@ replace a law of Both apps where they say so. A desktop law marked
   (obf-1053): desktop Settings ▸ Capture, a card of its own with "End a
   recording after a pause", kept on this computer only under the
   phone's key, offers Off, the default, which ignores pauses, and 2, 3,
-  5 or 10 s as pills. Set as Record voice starts, the recording ends
+  5 or 10 s as pills. Set as Voice starts, the recording ends
   once the microphone stayed under 2 % of full scale at its peak that
   long after it heard something louder, and is kept on the Note as Stop
   keeps it, the Note dialog staying open; one nothing was said into yet
@@ -2448,9 +2464,9 @@ replace a law of Both apps where they say so. A desktop law marked
   Checklist or Shopping List by "+" or a Note by the quick note's "Open
   in the editor", has no "Add a part" while that dialog stays open;
   opened again later, it has it. Where this Device may amend the Note,
-  **"Add a part"** stands first in the row of Send…, Copy as text, Save as Markdown… and
-  Export as Pack…; a click opens the box in its place, above that row,
-  its field taking the keyboard, and opening it is no step of Undo.
+  **"Add a part"** stands last under Add (obf-1073); a click opens the
+  box in its place, above the groups Add, Share and Tidy, its field
+  taking the keyboard, and opening it is no step of Undo.
   The box stays while it holds text and goes once "Add to Note" added
   the Section or the Note is left, which adds what was typed, as ever.
 - **A table's ⋮ sits beside its top right corner** (obf-1050) wherever

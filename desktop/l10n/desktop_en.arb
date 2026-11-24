@@ -467,7 +467,7 @@
   "@showStreaksDevice": {"description": "Desktop wording of the phone's showStreaks: the switch in the Settings that hides the Streak on a Routine's History."},
   "snoozesHereDevice": "Snoozes show only as this computer recorded them, for about the last month.",
   "@snoozesHereDevice": {"description": "Desktop wording of the phone's snoozesHere, under the Log of a Routine's History."},
-  "settingsQuickNoteDetailDevice": "The quick note in the window and the capture popup show the text, the three Nudge buttons and Open in the editor, which opens the Note in the Note dialog. Record voice, Paste, Attach a file… and everything that sorts the Note are in the Note dialog.",
+  "settingsQuickNoteDetailDevice": "The quick note in the window and the capture popup show the text, the three Nudge buttons and Open in the editor, which opens the Note in the Note dialog. Voice, Paste, Attach a file… and everything that sorts the Note are in the Note dialog.",
   "@settingsQuickNoteDetailDevice": {"description": "Desktop wording of the phone's settingsQuickNoteDetail, under the Settings card 'Quick note'."},
   "saveImageAs": "Save image as…",
   "@saveImageAs": {"description": "In the right-click menu of a photo in the desktop's Note editor and of the photo shown full screen: saves its file where the user says (#149)."},

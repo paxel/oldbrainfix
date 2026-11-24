@@ -39,6 +39,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop läuft der Abgleich weiter, während der KI-Port offen ist; die Änderungen der KI bleiben bis zum Annehmen auf diesem Rechner. ([obf-1076](https://github.com/paxel/oldbrainfix/issues/389))
 - Auf dem Desktop bietet die Zeile des KI-Ports Prüfen mit der Zahl der Änderungen an, oder „KI-Port schließen“, solange nichts geändert ist. ([obf-1075](https://github.com/paxel/oldbrainfix/issues/388))
 - Auf dem Handy und dem Desktop bringt eine Sicherung die Einstellungen des Geräts zurück und bietet das vorher gewählte Sprachmodell an. ([obf-1098](https://github.com/paxel/oldbrainfix/issues/411))
+- Auf dem Handy und dem Desktop stehen die Knöpfe einer Notiz in vier benannten Gruppen: Diese Notiz, Hinzufügen, Teilen und Aufräumen. ([obf-1073](https://github.com/paxel/oldbrainfix/issues/386))
 
 ### Behoben
 

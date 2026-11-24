@@ -2272,7 +2272,7 @@ fn desktop_frames(
         problems.extend(match_frame(&mut harness, &box_frame(name))?);
     }
     // The Note dialog's Paste and Attach a file…, the desktop's ways to a
-    // photo without a camera (#352); Paste and Record voice show where a
+    // photo without a camera (#352); Paste and Voice show where a
     // clipboard and a microphone are.
     let mut harness = Box::new(window(texts, language, theme)?);
     let captured = Notes::new(harness.state().store()).capture(texts.capture, None, None)?;

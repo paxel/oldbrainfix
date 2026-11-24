@@ -235,7 +235,7 @@ fn the_quick_note_offers_no_record_voice_and_no_paste() -> TestResult {
     let mut harness = window(store, &devices);
     quick(&mut harness);
     // They are the Note dialog's (#352).
-    assert!(!shows(&harness, "Record voice"));
+    assert!(!shows(&harness, "Voice"));
     assert!(
         harness
             .query_by_role_and_label(Role::Button, "Paste")
@@ -251,7 +251,7 @@ fn recording_in_the_note_dialog_starts_at_once_and_the_big_stop_button_adds_it()
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     assert!(harness.state().recording());
     assert!(shows(&harness, "Recording… 1:15"));
@@ -286,7 +286,7 @@ fn leaving_the_note_dialog_while_recording_keeps_the_recording_on_its_note() -> 
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     harness.key_press(Key::Escape);
     harness.run();
@@ -312,7 +312,7 @@ fn closing_the_window_while_recording_keeps_the_recording() -> TestResult {
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     harness.state_mut().flush();
     let notes = Notes::new(&store).all()?;
@@ -328,7 +328,7 @@ fn without_a_microphone_the_top_says_so_and_nothing_is_kept() -> TestResult {
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     assert_eq!(devices.borrow().starts, 1);
     assert_eq!(
@@ -918,7 +918,7 @@ fn disk_store(dir: &std::path::Path) -> Result<Arc<Store>, Box<dyn std::error::E
 fn record_note(harness: &mut Harness<'_, App>, devices: &Shared) {
     devices.borrow_mut().mic = true;
     open_garage(harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     harness.get_by_label("Stop").click();
     harness.run();
@@ -1007,7 +1007,7 @@ fn the_playback_speed_is_written_the_german_way_in_german() -> TestResult {
     devices.borrow_mut().mic = true;
     // Recorded in the Note dialog, as the quick note has no recorder (#352).
     open_garage(&mut harness);
-    harness.get_by_label("Sprache aufnehmen").click();
+    harness.get_by_label("Sprache").click();
     harness.run();
     harness.get_by_label("Beenden").click();
     harness.run();
@@ -1324,7 +1324,7 @@ fn recording_garage(
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     // With a pause set, the window looks five times a second.
     harness.run_steps(1);
     assert!(harness.state().recording());
@@ -1356,7 +1356,7 @@ fn with_a_pause_set_a_recording_ends_once_it_was_quiet_that_long_and_is_kept() -
     // Kept as Stop keeps it: on the Note, which stays open.
     assert_eq!(recordings(&store, &garage)?, 1);
     assert_eq!(harness.state().selected_note(), Some(garage.as_str()));
-    assert!(shows(&harness, "Record voice"));
+    assert!(shows(&harness, "Voice"));
     assert_eq!(harness.state().notice(), None);
     Ok(())
 }
@@ -1426,7 +1426,7 @@ fn the_pause_is_read_as_each_recording_starts() -> TestResult {
     harness.get_by_label("Stop").click();
     harness.run();
     devices.borrow_mut().level = LOUD;
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run_steps(3);
     devices.borrow_mut().level = QUIET;
     harness.run_steps(12);

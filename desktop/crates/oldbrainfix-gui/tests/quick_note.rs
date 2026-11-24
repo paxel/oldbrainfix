@@ -31,7 +31,7 @@ const OPEN: &str = "Open in the editor";
 /// Note…, File into… and the format bar.
 const GONE: [&str; 9] = [
     "Routine, Reminder, Frog or Session",
-    "Record voice",
+    "Voice",
     "Paste",
     "From file…",
     "To full editor",

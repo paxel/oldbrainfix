@@ -13,7 +13,9 @@
 //! dialog its line under it opens (#170),
 //! goes with its Remove after one question while the time stays, and
 //! where this Device may change the Note only (#162). The Amend box
-//! shows only once "Add a part" opened it (obf-1072).
+//! shows only once "Add a part" opened it (obf-1072). The dialog's
+//! buttons stand in four named groups, side by side where they fit
+//! (obf-1073).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -39,6 +41,7 @@ use oldbrainfix_core::{
     PairedDevice, PersonSettings, Places, Recurrence, Routines, Schedule, Sessions, ShoppingLists,
     SigningKey, Store, Tallies, TallyRule,
 };
+use oldbrainfix_gui::window_sizes::NOTE_DIALOG_SIZE;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -1151,5 +1154,175 @@ fn a_member_has_no_remove_on_another_persons_note() -> TestResult {
             .next()
             .is_none()
     );
+    Ok(())
+}
+
+/// The group headings shown, each with its rect, top to bottom and left
+/// to right (obf-1073).
+fn headings(harness: &Harness<'_, App>) -> Vec<(String, egui::Rect)> {
+    let mut shown: Vec<(String, egui::Rect)> = harness
+        .query_all_by(|n| n.role() == Role::Heading)
+        .filter_map(|n| Some((n.accesskit_node().value()?, n.rect())))
+        .collect();
+    shown.sort_by(|a, b| {
+        (a.1.top(), a.1.left())
+            .partial_cmp(&(b.1.top(), b.1.left()))
+            .unwrap()
+    });
+    shown
+}
+
+fn heading_names(harness: &Harness<'_, App>) -> Vec<String> {
+    headings(harness)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect()
+}
+
+/// The heading `label`'s button stands under: the nearest one above it
+/// that begins left of its middle.
+fn group_of(harness: &Harness<'_, App>, label: &str) -> String {
+    let button = harness
+        .query_all_by(|n| n.label().is_some_and(|l| l.starts_with(label)))
+        .last()
+        .unwrap_or_else(|| panic!("no {label}"))
+        .rect();
+    headings(harness)
+        .into_iter()
+        .filter(|(_, at)| at.bottom() <= button.top() && at.left() <= button.center().x)
+        .max_by(|a, b| {
+            (a.1.top(), a.1.left())
+                .partial_cmp(&(b.1.top(), b.1.left()))
+                .unwrap()
+        })
+        .map(|(name, _)| name)
+        .unwrap_or_else(|| panic!("no heading over {label}"))
+}
+
+/// Each button and badge of the dialog's groups under its heading.
+fn assert_grouped(harness: &Harness<'_, App>) {
+    for (label, group) in [
+        ("Kind:", "This Note"),
+        ("Importance:", "This Note"),
+        ("Area and Topic:", "This Note"),
+        ("Routine, Reminder, Frog or Session", "Add"),
+        ("Attach a file…", "Add"),
+        ("Add a part", "Add"),
+        ("Send…", "Share"),
+        ("Copy as text", "Share"),
+        ("Save as Markdown…", "Share"),
+        ("Export as Pack…", "Share"),
+        ("Merge into…", "Tidy"),
+        ("Move to trash", "Tidy"),
+    ] {
+        assert_eq!(group_of(harness, label), group, "{label}");
+    }
+}
+
+#[test]
+fn the_dialogs_buttons_stand_in_four_named_groups() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let names = heading_names(&harness);
+    assert_eq!(names[0], "This Note");
+    for name in ["Add", "Share", "Tidy"] {
+        assert!(names.iter().any(|n| n == name), "{names:?}");
+    }
+    assert_grouped(&harness);
+    // The badges under their heading, the rest after the Note.
+    let at = |name: &str| {
+        headings(&harness)
+            .into_iter()
+            .find(|h| h.0 == name)
+            .unwrap()
+            .1
+    };
+    assert!(at("This Note").top() < at("Add").top());
+    assert!(at("Add").top() <= at("Share").top());
+    assert!(at("Share").top() <= at("Tidy").top());
+    Ok(())
+}
+
+#[test]
+fn the_groups_stand_side_by_side_where_they_fit_and_one_under_another_where_not() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    store.set_local_setting(NOTE_DIALOG_SIZE, "1200,1000")?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let top = |harness: &Harness<'_, App>, name: &str| {
+        headings(harness)
+            .into_iter()
+            .find(|h| h.0 == name)
+            .unwrap()
+            .1
+            .top()
+    };
+    assert_eq!(top(&harness, "Add"), top(&harness, "Share"));
+    assert!(top(&harness, "Add") > top(&harness, "This Note"));
+    assert_grouped(&harness);
+    harness.state_mut().close_note();
+    harness.run();
+    // As narrow as the dialog goes, one under another.
+    store.set_local_setting(NOTE_DIALOG_SIZE, "320,1000")?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert!(top(&harness, "Add") < top(&harness, "Share"));
+    assert!(top(&harness, "Share") < top(&harness, "Tidy"));
+    assert_grouped(&harness);
+    Ok(())
+}
+
+#[test]
+fn a_group_with_nothing_this_device_may_do_shows_nothing() -> TestResult {
+    // A Member on another person's Note: Add a part and Share, no Tidy.
+    let (ben, tap) = shared_captured()?;
+    let mut harness = window(&ben, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert_eq!(heading_names(&harness), ["This Note", "Add", "Share"]);
+    assert_eq!(group_of(&harness, "Add a part"), "Add");
+    assert!(!shows(&harness, "Attach a file…"));
+    assert!(!shows(&harness, "Move to trash"));
+    // A Note in the trash: its settings and Restore only.
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    Notes::new(&store).trash(&tap)?;
+    let mut harness = window(&store, Selection::Trash);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert_eq!(heading_names(&harness), ["This Note"]);
+    assert!(shows(&harness, "Restore"));
+    assert!(!shows(&harness, "Copy as text"));
+    Ok(())
+}
+
+#[test]
+fn the_group_headings_are_in_german_too() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Wasserhahn", None, None)?.id;
+    let mut app = App::new(store.clone(), "de");
+    app.select(Selection::All);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 1200.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let names = heading_names(&harness);
+    for name in ["Diese Notiz", "Hinzufügen", "Teilen", "Aufräumen"] {
+        assert!(names.iter().any(|n| n == name), "{names:?}");
+    }
     Ok(())
 }

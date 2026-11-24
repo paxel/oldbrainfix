@@ -36,7 +36,7 @@
 //!
 //! The quick note is the text and, once something is typed or held, the
 //! Nudge buttons and Open in the editor, nothing else (UI laws,
-//! "Capture", #352); voice is recorded with Record voice in the Note
+//! "Capture", #352); voice is recorded with Voice in the Note
 //! dialog, onto its Note. A picture pasted from the clipboard,
 //! and pictures and sound files chosen with "From file…" or dropped onto
 //! the window (where the system hands drops over: not on Wayland), wait
@@ -153,7 +153,7 @@ use crate::media::{
     photo_extension, photo_from_file,
 };
 use crate::media_view::{
-    self, Generated, Made, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer, Voice,
+    self, Generated, Made, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer,
 };
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
@@ -1634,7 +1634,7 @@ enum Action {
     /// and opens the Note in the Note dialog (#146), its text taking the
     /// keyboard.
     CaptureToEditor,
-    /// Record voice in the Note dialog (#352): starts recording voice
+    /// Voice in the Note dialog (#352): starts recording voice
     /// into the Note open there.
     Record,
     /// Ends the recording and adds it to the Note it was started on.
@@ -16743,8 +16743,8 @@ impl App {
         let today = Day::today(store.now(), &*self.wall);
         // Its one Reminder goes with it, where this Device moves it.
         let trashes = may.changes && linked.len() == 1;
-        // Record voice and Paste onto it (#352), while a microphone and
-        // a clipboard are there; Record voice only in the window's Note
+        // Voice and Paste onto it (#352), while a microphone and
+        // a clipboard are there; Voice only in the window's Note
         // dialog, as a Note's own window only borrows the microphone
         // while it draws (#287).
         let alone = self.alone.is_some();
@@ -17108,7 +17108,28 @@ impl App {
                     frog: note_frog,
                     advanced: self.view.advanced,
                 };
-                note_badges(ui, (&t, tones), &shown, actions);
+                // Under their heading (obf-1073), with "Make a Tally"
+                // after them: only a Note in the lists becomes a Tally (ADR
+                // 0028); one that is adds entries in its Tally part above.
+                // A Checklist, a Shopping List or a Session is no Tally
+                // (ADR 0030, ADR 0039).
+                let tallies = self.view.advanced
+                    && may.changes
+                    && !trashed
+                    && tally.is_none()
+                    && checklist.is_none()
+                    && shopping.is_none()
+                    && session_setup.is_none()
+                    && !note.is_merged()
+                    && note.text_format != text_format::CODE;
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = GROUP_SPACING.y;
+                    group_heading(ui, t.editor_group_this_note());
+                    note_badges(ui, (&t, tones), &shown, actions);
+                    if tallies && group_button(ui, None, t.make_tally()).clicked() {
+                        actions.push(Action::Tally(TallyAction::Make(note.id.clone())));
+                    }
+                });
                 // A Session's past runs (#264), under its settings.
                 if session_setup.is_some() {
                     embossed(ui, tones, false, None, |ui| {
@@ -17151,33 +17172,6 @@ impl App {
                         );
                     });
                 }
-                // A recording, the clipboard and files of any kind onto
-                // this Note (#352), as a drop on the dialog brings them
-                // (#267); a recording running ends by one big stop button.
-                if may.changes && !trashed {
-                    if has_recorder {
-                        match media_view::voice_button(ui, &t, recording) {
-                            Some(Voice::Record) => actions.push(Action::Record),
-                            Some(Voice::Stop) => actions.push(Action::StopRecording),
-                            None => {}
-                        }
-                    }
-                    ui.horizontal_wrapped(|ui| {
-                        if has_clipboard && recording.is_none() && paste::button(ui, &t) {
-                            actions.push(Action::PasteOntoNote);
-                        }
-                        let attach = ui.horizontal(|ui| {
-                            icons::show(ui, icons::ATTACH_FILE, 20.0, text);
-                            ui.button(RichText::new(t.attach_file_menu()).color(text))
-                        });
-                        if attach.inner.clicked() {
-                            actions.push(Action::AttachFiles);
-                        }
-                    });
-                    if paste_empty {
-                        paste::empty_line(ui, &t);
-                    }
-                }
                 // On the page, their text where the boxes' text begins and
                 // without the line an indent draws.
                 if kinded && !sections.is_empty() {
@@ -17198,12 +17192,9 @@ impl App {
                     }
                     return;
                 }
-                if !may.amends {
-                    return;
-                }
                 // Only when asked by "Add a part" (obf-1072); what is
                 // typed keeps it open.
-                let asked = *amend_open || !amend.trim().is_empty();
+                let asked = may.amends && (*amend_open || !amend.trim().is_empty());
                 if asked {
                     embossed(ui, tones, false, None, |ui| {
                         // The format bar goes with the field (UI laws), as on
@@ -17358,88 +17349,109 @@ impl App {
                         });
                     });
                 }
-                ui.horizontal_wrapped(|ui| {
-                    // Opens the Amend box, the field taking the keyboard.
-                    if !asked
-                        && !just_made
-                        && ui
-                            .button(RichText::new(t.desk_add_part()).color(text))
-                            .clicked()
-                    {
-                        *amend_open = true;
-                        *amend_focus = true;
-                        ui.ctx().request_repaint();
-                    }
-                    if ui
-                        .button(RichText::new(t.send_button()).color(text))
-                        .on_hover_text(t.send_to_person())
-                        .clicked()
-                    {
-                        actions.push(Action::StartSend(note.id.clone()));
-                    }
-                    // To another app (#129).
-                    if ui
-                        .button(RichText::new(t.copy_as_text()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::CopyAsText(note.id.clone()));
-                    }
-                    if ui
-                        .button(RichText::new(t.save_as_markdown()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::SaveAsMarkdown(note.id.clone()));
-                    }
-                    // Copies of it for another person (#165).
-                    if ui
-                        .button(RichText::new(t.export_as_pack()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::ExportPack(note.id.clone()));
-                    }
-                });
-                if !may.changes {
-                    return;
-                }
-                ui.horizontal(|ui| {
-                    if ui
-                        .button(RichText::new(t.merge_into()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::StartMerge);
-                    }
-                    // Its lines into a Shopping List there is (#352), the
-                    // one used last at the top (#276).
-                    if !lists.is_empty() {
-                        let label = RichText::new(t.add_to_shopping_list()).color(text);
-                        ui.menu_button(label, |ui| {
-                            if let Some(list) =
-                                capture_choices::shopping_picker(ui, &t, None, &lists)
-                            {
-                                actions.push(Action::PourIntoShopping(list));
-                            }
-                        });
-                    }
-                    if theme::destructive(ui, true, t.move_to_trash()).clicked() {
-                        actions.push(Action::Trash);
-                    }
-                });
-                // Only a Note in the lists becomes a Tally (ADR 0028); one
-                // that is adds entries in its Tally part above. A
-                // Checklist, a Shopping List or a Session is no Tally (ADR
-                // 0030, ADR 0039).
-                if self.view.advanced
-                    && tally.is_none()
-                    && checklist.is_none()
-                    && shopping.is_none()
-                    && session_setup.is_none()
-                    && !note.is_merged()
-                    && note.text_format != text_format::CODE
-                    && ui
-                        .button(RichText::new(t.make_tally()).color(text))
-                        .clicked()
+                // A recording running ends by one big stop button, over
+                // the groups (#352).
+                if has_recorder
+                    && let Some(elapsed) = recording
+                    && media_view::recording_stop(ui, &t, elapsed)
                 {
-                    actions.push(Action::Tally(TallyAction::Make(note.id.clone())));
+                    actions.push(Action::StopRecording);
+                }
+                // Add, Share and Tidy at the Note's end (obf-1073), each
+                // only with something this Device may do.
+                let note_id = &note.id;
+                let parts = may.amends && !asked && !just_made;
+                let mut groups = Vec::new();
+                if may.schedules || may.changes || parts {
+                    let shown = &shown;
+                    let draw = move |ui: &mut Ui, actions: &mut Vec<Action>| {
+                        // In a Shared Area only a Manager sets them up (ADR
+                        // 0013).
+                        if may.schedules {
+                            add_badge(ui, (&t, tones), shown, actions);
+                        }
+                        // A recording, the clipboard and files of any kind
+                        // onto this Note (#352), as a drop on the dialog
+                        // brings them (#267).
+                        if may.changes {
+                            let idle = recording.is_none();
+                            if has_recorder
+                                && idle
+                                && group_button(ui, Some(icons::MIC), t.voice()).clicked()
+                            {
+                                actions.push(Action::Record);
+                            }
+                            if has_clipboard
+                                && idle
+                                && group_button(ui, Some(icons::PASTE), t.paste()).clicked()
+                            {
+                                actions.push(Action::PasteOntoNote);
+                            }
+                            let attach = t.attach_file_menu();
+                            if group_button(ui, Some(icons::ATTACH_FILE), attach).clicked() {
+                                actions.push(Action::AttachFiles);
+                            }
+                        }
+                        // Opens the Amend box, the field taking the
+                        // keyboard.
+                        if parts && group_button(ui, None, t.desk_add_part()).clicked() {
+                            *amend_open = true;
+                            *amend_focus = true;
+                            ui.ctx().request_repaint();
+                        }
+                    };
+                    groups.push(ActionGroup::new("add", t.add(), draw));
+                }
+                if may.amends {
+                    let draw = move |ui: &mut Ui, actions: &mut Vec<Action>| {
+                        if group_button(ui, None, t.send_button())
+                            .on_hover_text(t.send_to_person())
+                            .clicked()
+                        {
+                            actions.push(Action::StartSend(note_id.clone()));
+                        }
+                        // To another app (#129).
+                        if group_button(ui, None, t.copy_as_text()).clicked() {
+                            actions.push(Action::CopyAsText(note_id.clone()));
+                        }
+                        if group_button(ui, None, t.save_as_markdown()).clicked() {
+                            actions.push(Action::SaveAsMarkdown(note_id.clone()));
+                        }
+                        // Copies of it for another person (#165).
+                        let pack = Some(pack_view::PACK_ICON);
+                        if group_button(ui, pack, t.export_as_pack()).clicked() {
+                            actions.push(Action::ExportPack(note_id.clone()));
+                        }
+                    };
+                    groups.push(ActionGroup::new("share", t.share(), draw));
+                }
+                if may.changes {
+                    let lists = &lists;
+                    let draw = move |ui: &mut Ui, actions: &mut Vec<Action>| {
+                        if group_button(ui, None, t.merge_into()).clicked() {
+                            actions.push(Action::StartMerge);
+                        }
+                        // Its lines into a Shopping List there is (#352), the
+                        // one used last at the top (#276).
+                        if !lists.is_empty() {
+                            let label = RichText::new(t.add_to_shopping_list()).color(text);
+                            ui.menu_button(label, |ui| {
+                                if let Some(list) =
+                                    capture_choices::shopping_picker(ui, &t, None, lists)
+                                {
+                                    actions.push(Action::PourIntoShopping(list));
+                                }
+                            });
+                        }
+                        if theme::destructive(ui, true, t.move_to_trash()).clicked() {
+                            actions.push(Action::Trash);
+                        }
+                    };
+                    groups.push(ActionGroup::new("tidy", t.editor_group_tidy(), draw));
+                }
+                action_groups(ui, note_id, groups, actions);
+                if paste_empty {
+                    paste::empty_line(ui, &t);
                 }
             });
     }
@@ -23503,6 +23515,113 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
     }
 }
 
+/// Room between a group's heading and its buttons and between their
+/// rows, and between two buttons side by side (obf-1073).
+const GROUP_SPACING: egui::Vec2 = egui::vec2(8.0, 8.0);
+
+/// Room between two groups side by side (obf-1073).
+const GROUP_GAP: f32 = 32.0;
+
+/// How tall a group's buttons are at least, as one with its icon is, so
+/// a row of them lines up (obf-1073).
+const GROUP_BUTTON_HEIGHT: f32 = 26.0;
+
+/// What draws a group's compact buttons (obf-1073), adding what they ask.
+type GroupDraw<'a> = Box<dyn FnOnce(&mut Ui, &mut Vec<Action>) + 'a>;
+
+/// One of the Note dialog's groups of actions (obf-1073): its heading
+/// and what draws its compact buttons, its width kept by `key`.
+struct ActionGroup<'a> {
+    key: &'static str,
+    heading: &'a str,
+    draw: GroupDraw<'a>,
+}
+
+impl<'a> ActionGroup<'a> {
+    fn new(
+        key: &'static str,
+        heading: &'a str,
+        draw: impl FnOnce(&mut Ui, &mut Vec<Action>) + 'a,
+    ) -> ActionGroup<'a> {
+        ActionGroup {
+            key,
+            heading,
+            draw: Box::new(draw),
+        }
+    }
+}
+
+/// The groups of the Note `of` (obf-1073), side by side where they fit:
+/// each as wide as it was drawn last for that Note, which shows in the
+/// dialog or in its own window, one not drawn yet on a line of its own;
+/// a group wider than the dialog takes its line alone, its buttons
+/// wrapping.
+fn action_groups(ui: &mut Ui, of: &str, groups: Vec<ActionGroup<'_>>, actions: &mut Vec<Action>) {
+    let room = ui.available_width();
+    let mut rows: Vec<Vec<(Id, ActionGroup<'_>)>> = Vec::new();
+    let mut used = 0.0;
+    for group in groups {
+        let id = Id::new(("note group", of, group.key));
+        let wide = ui.data(|d| d.get_temp::<f32>(id)).unwrap_or(room);
+        match rows.last_mut() {
+            Some(row) if used + GROUP_GAP + wide <= room => {
+                row.push((id, group));
+                used += GROUP_GAP + wide;
+            }
+            _ => {
+                rows.push(vec![(id, group)]);
+                used = wide;
+            }
+        }
+    }
+    for row in rows {
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = GROUP_GAP;
+            for (id, group) in row {
+                let drawn = ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing = GROUP_SPACING;
+                    ui.spacing_mut().interact_size.y = GROUP_BUTTON_HEIGHT;
+                    group_heading(ui, group.heading);
+                    ui.horizontal_wrapped(|ui| (group.draw)(ui, actions));
+                });
+                // Laid out anew once its width changed.
+                let wide = drawn.response.rect.width();
+                let was = ui.data(|d| d.get_temp::<f32>(id));
+                if was.is_none_or(|was| (was - wide).abs() > 0.5) {
+                    ui.data_mut(|d| d.insert_temp(id, wide));
+                    ui.ctx().request_repaint();
+                }
+            }
+        });
+    }
+}
+
+/// A group's heading (obf-1073), small and strong, read as a heading.
+fn group_heading(ui: &mut Ui, heading: &str) {
+    let text = ui.visuals().text_color();
+    let shown = ui.label(RichText::new(heading).strong().color(text));
+    ui.ctx().accesskit_node_builder(shown.id, |node| {
+        node.set_role(egui::accesskit::Role::Heading);
+    });
+}
+
+/// A compact button of a group (obf-1073): `icon`, where it has one,
+/// before its words.
+fn group_button(ui: &mut Ui, icon: Option<char>, label: &str) -> egui::Response {
+    let text = ui.visuals().text_color();
+    let words = RichText::new(label).color(text);
+    let Some(icon) = icon else {
+        return ui.button(words);
+    };
+    let at = Id::new(("group button icon", label));
+    let shown =
+        egui::Button::new((egui::Atom::custom(at, egui::Vec2::splat(18.0)), words)).atom_ui(ui);
+    if let Some(rect) = shown.rect(at) {
+        icons::paint(ui.painter(), rect, icon, text);
+    }
+    shown.response
+}
+
 /// The row of badges under the Note's text (#160), each the setting's
 /// icon and its value, an icon for a fixed set of values, short text
 /// otherwise (#192), in the phone's order: the kind, in words with ▾
@@ -23511,9 +23630,9 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 /// opening its editor, and those a newer version saved, only shown; its
 /// Frog, open or eaten today or yesterday, offering Eat now and Remove
 /// the Frog (#259); a Session's rule and weekdays' counts (#191); Show on the
-/// Agenda; Show ticks; and "+" with Remind me… (#344), Frog while none is
-/// open and, on a plain Note, Session, for who may set them up. A setting that does not
-/// apply has no badge; one this Device may not change only shows.
+/// Agenda; Show ticks; and Hidden from AI. "+" ([`add_badge`]) stands in
+/// the Add group (obf-1073). A setting that does not apply has no badge;
+/// one this Device may not change only shows.
 fn note_badges(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -23691,58 +23810,67 @@ fn note_badges(
                 actions.push(Action::Badge(Some(NoteBadge::HiddenFromAi)));
             }
         }
-        // In a Shared Area only a Manager sets them up (ADR 0013).
-        if !shown.may.schedules || trashed {
-            return;
+    });
+}
+
+/// The "+" badge (obf-1034), first in the Note dialog's Add group
+/// (obf-1073): its menu holds Remind me…, and in Advanced Frog and
+/// Session.
+fn add_badge(
+    ui: &mut Ui,
+    (t, tones): (&L10n, Tones),
+    shown: &BadgesShown,
+    actions: &mut Vec<Action>,
+) {
+    let note = &shown.placed.note;
+    let look = (t, tones);
+    let add = badge(
+        ui,
+        look,
+        (icons::ADD, None),
+        t.routine_or_reminder(),
+        None,
+        true,
+    );
+    // Its menu holds Remind me… (obf-1034).
+    spotlight::anchor(ui, "note-add-badge", add.rect);
+    let id = note.id.clone();
+    let text = ui.visuals().text_color();
+    egui::Popup::menu(&add).show(|ui| {
+        // One way in for a Routine or Reminder, starting as a
+        // Reminder (#344).
+        let mut entries = vec![(
+            icons::REMINDER,
+            t.remind_me(),
+            Action::NewRoutine {
+                note: Some(id.clone()),
+                reminder: true,
+            },
+        )];
+        // A Note has one open Frog at a time; Frogs and Sessions are
+        // made only in Advanced (#197).
+        let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
+        if shown.advanced && !frog_open {
+            entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
         }
-        let add = badge(
-            ui,
-            look,
-            (icons::ADD, None),
-            t.routine_or_reminder(),
-            None,
-            true,
-        );
-        // Its menu holds Remind me… (obf-1034).
-        spotlight::anchor(ui, "note-add-badge", add.rect);
-        let id = note.id.clone();
-        let text = ui.visuals().text_color();
-        egui::Popup::menu(&add).show(|ui| {
-            // One way in for a Routine or Reminder, starting as a
-            // Reminder (#344).
-            let mut entries = vec![(
-                icons::REMINDER,
-                t.remind_me(),
-                Action::NewRoutine {
-                    note: Some(id.clone()),
-                    reminder: true,
-                },
-            )];
-            // A Note has one open Frog at a time; Frogs and Sessions are
-            // made only in Advanced (#197).
-            let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
-            if shown.advanced && !frog_open {
-                entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
+        // Only a plain Note becomes a Session, and no Code text
+        // (#213); a Routine of a Session Note runs it already (#191).
+        if shown.advanced
+            && shown.kind.kind == NoteKind::Plain
+            && note.text_format != text_format::CODE
+        {
+            entries.push((
+                icons::SESSION,
+                t.session(),
+                Action::NewSession(Some(id.clone())),
+            ));
+        }
+        for (icon, label, action) in entries {
+            if menu_entry(ui, (icon, text), label).clicked() {
+                actions.push(action);
+                ui.close();
             }
-            // Only a plain Note becomes a Session, and no Code text
-            // (#213); a Routine of a Session Note runs it already (#191).
-            if shown.advanced
-                && shown.kind.kind == NoteKind::Plain
-                && note.text_format != text_format::CODE
-            {
-                entries.push((
-                    icons::SESSION,
-                    t.session(),
-                    Action::NewSession(Some(id.clone())),
-                ));
-            }
-            for (icon, label, action) in entries {
-                if menu_entry(ui, (icon, text), label).clicked() {
-                    actions.push(action);
-                    ui.close();
-                }
-            }
-        });
+        }
     });
 }
 
